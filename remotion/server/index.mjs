@@ -68,6 +68,19 @@ app.post('/render', async (req, res) => {
 				codec: 'h264',
 				outputLocation,
 				inputProps,
+				// Railway's plan caps this container at 1GB RAM. Parallel Chrome
+				// tabs (Remotion's default concurrency) blow past that and hang
+				// mid-frame. Serialize rendering and give each frame more time
+				// to land on a slow/shared vCPU instead of timing out.
+				concurrency: 1,
+				timeoutInMilliseconds: 120000,
+				chromiumOptions: {
+					// No GPU in this container; disabling it avoids Chrome trying
+					// (and failing) to init hardware acceleration, which otherwise
+					// burns memory/time before every render.
+					gl: 'swangle',
+					disableWebSecurity: false,
+				},
 				onProgress: ({progress}) => {
 					const job = jobs.get(jobId);
 					if (job) job.progress = progress;

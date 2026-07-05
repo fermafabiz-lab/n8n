@@ -5,6 +5,7 @@
   "scripts": {
     "start": "remotion studio src/index.ts",
     "render": "remotion render src/index.ts FinalVideo out/final-video.mp4",
+    "start:server": "node server/index.mjs",
     "lambda:deploy-function": "remotion lambda functions deploy",
     "lambda:deploy-site": "remotion lambda sites create src/index.ts --site-name=final-video"
   },
@@ -13,7 +14,11 @@
     "react-dom": "18.3.1",
     "remotion": "4.0.190",
     "@remotion/cli": "4.0.190",
-    "@remotion/lambda": "4.0.190"
+    "@remotion/lambda": "4.0.190",
+    "@remotion/renderer": "4.0.190",
+    "@remotion/bundler": "4.0.190",
+    "express": "^4.21.0",
+    "cors": "^2.8.5"
   },
   "devDependencies": {
     "typescript": "^5.4.0",

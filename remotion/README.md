@@ -15,49 +15,55 @@ npm start        # deschide Remotion Studio în browser
 Editează `trigger/example-props.json` cu date reale (un `finalVideoUrl` valid, scenele
 tale) și încarcă-le în Studio ca să vezi exact ce va ieși înainte de a plăti o randare.
 
-## 2. Deploy pe AWS (Remotion Lambda)
+## 2. Deploy pe Railway (fără AWS — calea aleasă acum)
 
-Necesită un cont AWS. **Recomandare:** creează un user IAM dedicat (nu chei root), cu
-permisiunile din [ghidul oficial Remotion](https://www.remotion.dev/docs/lambda/permissions) —
-nu acorda acces total la cont.
+Serverul din `server/index.mjs` randează pe cerere și servește fișierul rezultat prin
+HTTP simplu — n8n îl apelează exact ca pe fal/useapi (POST → poll status → download).
 
-```
-cd remotion
-npx remotion lambda functions deploy
-npx remotion lambda sites create src/index.ts --site-name=final-video
-```
+**Pași:**
 
-Prima comandă îți dă un `REMOTION_LAMBDA_FUNCTION_NAME`. A doua îți dă un
-`REMOTION_SERVE_URL`. Notează-le — sunt cheile de care ai nevoie mai departe.
+1. [railway.app](https://railway.app) → login cu GitHub (gratis, fără card la înscriere).
+2. **New Project → Deploy from GitHub repo** → alege `fermafabiz-lab/n8n`.
+3. **Settings → Root Directory** → setează `remotion` (repo-ul are și alte foldere,
+   Railway trebuie să construiască doar din acesta).
+4. Railway detectează `Dockerfile`-ul automat și îl folosește la build.
+5. **Variables** → adaugă `RENDER_API_KEY` = un secret la alegerea ta (orice șir lung,
+   random). Ăsta e header-ul cu care n8n se va autentifica.
+6. După primul deploy, Railway îți dă un URL public (ex.
+   `https://<proiect>.up.railway.app`). Notează-l — e `RENDER_SERVER_URL` de mai jos.
+7. Testează sănătatea: `curl https://<proiect>.up.railway.app/health` → `{"ok":true}`.
 
 ## 3. Testează o randare manual
 
 ```
-export REMOTION_AWS_REGION=us-east-1
-export REMOTION_LAMBDA_FUNCTION_NAME=<din pasul 2>
-export REMOTION_SERVE_URL=<din pasul 2>
-node trigger/render.mjs trigger/example-props.json
+curl -X POST https://<proiect>.up.railway.app/render \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: <RENDER_API_KEY>" \
+  -d @trigger/example-props.json
+# -> {"jobId": "..."}
+
+curl https://<proiect>.up.railway.app/render/<jobId>/status \
+  -H "x-api-key: <RENDER_API_KEY>"
+# -> {"status":"done","outputUrl":"https://.../output/<jobId>.mp4"}
 ```
 
-Dacă vezi `Done: https://...mp4` la final, deploy-ul funcționează.
+Primul render e mai lent (bundling + descărcarea Chrome-ului headless dacă nu a
+prins buildul din Dockerfile); cele următoare refolosesc bundle-ul deja făcut.
 
 ## 4. Cum îl apelează n8n
 
-Remotion Lambda **nu are un endpoint HTTP public simplu** — se invocă prin SDK-ul
-oficial (semnat AWS), nu printr-un POST generic. Ca n8n să-l poată apela, `trigger/render.mjs`
-trebuie găzduit undeva accesibil prin HTTP:
+Două noduri HTTP Request simple, adăugate în workflow 4 (Final Assembly) după
+`Get Render Result` (output-ul fal):
 
-- **Cel mai simplu:** o funcție Lambda mică proprie (sau un micro-serviciu Node oriunde —
-  Railway, Render, un VPS) care expune 2 rute HTTP și pe dinăuntru cheamă
-  `triggerRender()` / `checkProgress()` din acest fișier.
-- Rute necesare: `POST /render` (primește props, întoarce `{renderId, bucketName}`) și
-  `GET /render/:id/status?bucket=...` (întoarce `{done, outputFile}`).
-- n8n apelează aceste 2 rute cu noduri HTTP Request obișnuite (poll la fiecare ~10s,
-  la fel ca pattern-ul deja folosit pentru fal/Flow în restul pipeline-ului).
-
-Nu am provizionat eu acest micro-serviciu — necesită credențialele tale AWS. Spune-mi
-când ai un cont pregătit (sau dă-mi acces la niște credențiale IAM scoped) și fac
-deploy-ul + rutele împreună cu tine.
+1. **Submit Remotion Render** — `POST {RENDER_SERVER_URL}/render`, header
+   `x-api-key: {RENDER_API_KEY}`, body = `FinalVideoProps` (vezi secțiunea 5) →
+   întoarce `jobId`.
+2. **Wait** (~15-20s) → **Poll Remotion Status** — `GET {RENDER_SERVER_URL}/render/{jobId}/status`
+   → `If done` → ia `outputUrl`, altfel loop înapoi la Wait (identic cu pattern-ul de
+   poll deja folosit pentru fal compose și Flow video în rest).
+3. `outputUrl` devine noul `Link Video Final` (sau, mai robust, descarcă-l și
+   re-urcă-l pe Google Drive întâi — fișierele de pe Railway nu sunt garantat
+   permanente între redeploy-uri).
 
 ## 5. Datele pe care trebuie să le trimită n8n (`FinalVideoProps`)
 
@@ -80,3 +86,7 @@ nodul `Prepare Clips` / `Get Clip Duration`:
   posibil mai târziu: rulează Whisper pe voiceover pentru timestamp-uri reale, fără
   să schimbe forma props-urilor (`Captions.tsx` acceptă deja `startSeconds`/`durationSeconds`
   per cuvânt dacă vrem să extindem tipul).
+- **Railway ține contul „treaz" doar cât are trafic** — la volum mare de producție,
+  merită migrarea pe Remotion Lambda (`trigger/render.mjs`, deja scris, doar
+  nefolosit acum) pentru scalare automată pay-per-render. Schimbarea e izolată la
+  nivel de infrastructură — codul React din `src/` rămâne identic.

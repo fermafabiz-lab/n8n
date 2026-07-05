@@ -12,8 +12,12 @@ export const RemotionRoot: React.FC = () => {
 			component={FinalVideo}
 			durationInFrames={300}
 			fps={FPS}
-			width={1920}
-			height={1080}
+			// 720p, not 1080p: Railway's plan caps this container at 1GB RAM, and
+			// decoding+re-encoding 1080p crashed Chromium outright ("Page crashed!",
+			// an OOM kill) even at concurrency=1. Bump back to 1920x1080 once
+			// hosted somewhere with more memory.
+			width={1280}
+			height={720}
 			defaultProps={defaultFinalVideoProps}
 			calculateMetadata={async ({props}) => {
 				const p = props as FinalVideoProps;

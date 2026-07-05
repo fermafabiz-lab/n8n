@@ -1,0 +1,18 @@
+{
+	"finalVideoUrl": "https://v3.fal.media/files/example/final-video.mp4",
+	"projectTitle": "History of Germany in WW2",
+	"channelName": "Your Channel",
+	"subscribeText": "Subscribe for more",
+	"introDurationInSeconds": 2.5,
+	"outroDurationInSeconds": 3,
+	"palette": {
+		"primary": "#E8B84B",
+		"secondary": "#1C1C24",
+		"background": "#0B0B0F",
+		"text": "#F5F5F0"
+	},
+	"scenes": [
+		{"narratorText": "Berlin, 1939. A city on the edge of history.", "startSeconds": 0, "durationSeconds": 8},
+		{"narratorText": "Tensions rise as tanks gather at the border.", "startSeconds": 8, "durationSeconds": 8}
+	]
+}

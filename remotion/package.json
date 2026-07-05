@@ -1,0 +1,23 @@
+{
+  "name": "video-automation-remotion",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts FinalVideo out/final-video.mp4",
+    "lambda:deploy-function": "remotion lambda functions deploy",
+    "lambda:deploy-site": "remotion lambda sites create src/index.ts --site-name=final-video"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "remotion": "4.0.190",
+    "@remotion/cli": "4.0.190",
+    "@remotion/lambda": "4.0.190"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/react": "18.3.1",
+    "@types/node": "^20.0.0"
+  }
+}

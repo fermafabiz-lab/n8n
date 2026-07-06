@@ -1,0 +1,259 @@
+// Data layer — DataAdapter pattern from the platform proposal.
+// Today: AirtableAdapter reading the same base n8n already writes to.
+// Later: swap in a PostgresAdapter without touching any page or component.
+//
+// Required env vars (set on Vercel → Project → Settings → Environment Variables):
+//   AIRTABLE_API_KEY        personal access token with data.records:read
+//   AIRTABLE_BASE_ID        the app... id of the production base
+//   AIRTABLE_PROJECTS_TABLE table name or tbl... id for projects (default: "Proiecte")
+//   AIRTABLE_SCENES_TABLE   table name or tbl... id for scenes (default: "Scene")
+// Without them the app serves demo data so the UI is reviewable before wiring.
+
+export type StatusKind = "wait" | "run" | "done" | "err" | "idle";
+
+export interface Project {
+  id: string;
+  name: string;
+  lengthSeconds: number | null;
+  tone: string | null;
+  status: string;
+  statusKind: StatusKind;
+  progress: number; // 0..1
+  finalVideoUrl: string | null;
+  updatedAt: string | null;
+}
+
+export interface Scene {
+  id: string;
+  order: number;
+  label: string;
+  narration: string | null;
+  imageUrl: string | null;
+  videoUrl: string | null;
+  imageApproved: boolean;
+  status: string;
+  statusKind: StatusKind;
+}
+
+// Airtable status text → semantic kind + rough pipeline progress.
+// Keys are lowercased and diacritics-stripped before lookup, so both
+// "Așteaptă Aprobare Imagine" and "Asteapta Aprobare Imagine" match.
+const STATUS_MAP: Array<{ match: RegExp; kind: StatusKind; progress: number }> = [
+  { match: /finalizat|finished|done/, kind: "done", progress: 1 },
+  { match: /eroare|failed|error/, kind: "err", progress: 0.3 },
+  { match: /aprobare video/, kind: "wait", progress: 0.85 },
+  { match: /generare video/, kind: "run", progress: 0.7 },
+  { match: /aprobare imagine/, kind: "wait", progress: 0.55 },
+  { match: /generare imagine/, kind: "run", progress: 0.4 },
+  { match: /awaiting_approval|aprobare script/, kind: "wait", progress: 0.2 },
+  { match: /script/, kind: "run", progress: 0.15 },
+];
+
+function classifyStatus(raw: string): { kind: StatusKind; progress: number } {
+  const s = raw
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
+  for (const { match, kind, progress } of STATUS_MAP) {
+    if (match.test(s)) return { kind, progress };
+  }
+  return { kind: "idle", progress: 0 };
+}
+
+// Airtable field names as n8n writes them today. Several have grown
+// organically (including the "Lenght" typo) — this is the single place
+// that knows about them.
+const F = {
+  projectName: ["Nume Proiect", "Name", "Nume"],
+  projectStatus: ["Status"],
+  projectLength: ["Lenght", "Length", "Durata"],
+  projectTone: ["Tonalitate", "Tone"],
+  projectFinalVideo: ["Link Video Final", "Final Video URL"],
+  sceneOrder: ["Ordine Scenă", "Ordine Scena"],
+  sceneNarration: ["Narration", "Narațiune", "Text Scenă"],
+  sceneImage: ["Imagine Scenă", "Imagine Scena"],
+  sceneVideo: ["Scene Final URL", "Video Scenă URL"],
+  sceneImageApproved: ["Aprobare Imagine"],
+  sceneStatus: ["Status"],
+};
+
+function pick(fields: Record<string, unknown>, names: string[]): unknown {
+  for (const n of names) if (fields[n] !== undefined) return fields[n];
+  return undefined;
+}
+
+function firstAttachmentUrl(v: unknown): string | null {
+  if (Array.isArray(v) && v[0] && typeof v[0] === "object") {
+    const url = (v[0] as { url?: string }).url;
+    return url ?? null;
+  }
+  return typeof v === "string" && v.startsWith("http") ? v : null;
+}
+
+const API_KEY = process.env.AIRTABLE_API_KEY;
+const BASE_ID = process.env.AIRTABLE_BASE_ID;
+const PROJECTS_TABLE = process.env.AIRTABLE_PROJECTS_TABLE || "Proiecte";
+const SCENES_TABLE = process.env.AIRTABLE_SCENES_TABLE || "Scene";
+
+export const isConfigured = Boolean(API_KEY && BASE_ID);
+
+interface AirtableRecord {
+  id: string;
+  createdTime: string;
+  fields: Record<string, unknown>;
+}
+
+async function airtableList(table: string, params: string): Promise<AirtableRecord[]> {
+  const records: AirtableRecord[] = [];
+  let offset: string | undefined;
+  do {
+    const url =
+      `https://api.airtable.com/v0/${BASE_ID}/${encodeURIComponent(table)}?${params}` +
+      (offset ? `&offset=${offset}` : "");
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${API_KEY}` },
+      // Approvals flip in Airtable every few seconds while n8n runs;
+      // keep the dashboard near-live without hammering the API.
+      next: { revalidate: 10 },
+    });
+    if (!res.ok) throw new Error(`Airtable ${table}: HTTP ${res.status}`);
+    const data = (await res.json()) as { records: AirtableRecord[]; offset?: string };
+    records.push(...data.records);
+    offset = data.offset;
+  } while (offset);
+  return records;
+}
+
+function toProject(r: AirtableRecord): Project {
+  const status = String(pick(r.fields, F.projectStatus) ?? "—");
+  const { kind, progress } = classifyStatus(status);
+  return {
+    id: r.id,
+    name: String(pick(r.fields, F.projectName) ?? "Untitled project"),
+    lengthSeconds: Number(pick(r.fields, F.projectLength)) || null,
+    tone: (pick(r.fields, F.projectTone) as string) ?? null,
+    status,
+    statusKind: kind,
+    progress,
+    finalVideoUrl: (pick(r.fields, F.projectFinalVideo) as string) ?? null,
+    updatedAt: r.createdTime,
+  };
+}
+
+function toScene(r: AirtableRecord, index: number): Scene {
+  const status = String(pick(r.fields, F.sceneStatus) ?? "—");
+  const { kind } = classifyStatus(status);
+  const order = Number(pick(r.fields, F.sceneOrder)) || index + 1;
+  return {
+    id: r.id,
+    order,
+    label: `S${index + 1}`,
+    narration: (pick(r.fields, F.sceneNarration) as string) ?? null,
+    imageUrl: firstAttachmentUrl(pick(r.fields, F.sceneImage)),
+    videoUrl: (pick(r.fields, F.sceneVideo) as string) ?? null,
+    imageApproved: Boolean(pick(r.fields, F.sceneImageApproved)),
+    status,
+    statusKind: kind,
+  };
+}
+
+export async function getProjects(): Promise<Project[]> {
+  if (!isConfigured) return DEMO_PROJECTS;
+  const records = await airtableList(PROJECTS_TABLE, "pageSize=100");
+  return records
+    .map(toProject)
+    .sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""));
+}
+
+export async function getProject(id: string): Promise<Project | null> {
+  if (!isConfigured) return DEMO_PROJECTS.find((p) => p.id === id) ?? DEMO_PROJECTS[0];
+  const res = await fetch(
+    `https://api.airtable.com/v0/${BASE_ID}/${encodeURIComponent(PROJECTS_TABLE)}/${id}`,
+    { headers: { Authorization: `Bearer ${API_KEY}` }, next: { revalidate: 10 } },
+  );
+  if (!res.ok) return null;
+  return toProject((await res.json()) as AirtableRecord);
+}
+
+export async function getScenes(projectId: string): Promise<Scene[]> {
+  if (!isConfigured) return DEMO_SCENES;
+  // Scene records link to their project via a Project_ID text field.
+  const formula = encodeURIComponent(`{Project_ID} = "${projectId}"`);
+  const records = await airtableList(SCENES_TABLE, `pageSize=100&filterByFormula=${formula}`);
+  const scenes = records.map(toScene);
+  scenes.sort((a, b) => a.order - b.order);
+  return scenes.map((s, i) => ({ ...s, label: `S${i + 1}` }));
+}
+
+// ---------- demo data (shown until env vars are set) ----------
+const DEMO_PROJECTS: Project[] = [
+  {
+    id: "demo-1",
+    name: "History of Germany in WW2",
+    lengthSeconds: 64,
+    tone: "Dark",
+    status: "Așteaptă Aprobare Imagine",
+    statusKind: "wait",
+    progress: 0.62,
+    finalVideoUrl: null,
+    updatedAt: null,
+  },
+  {
+    id: "demo-2",
+    name: "Lost Cities of the Amazon",
+    lengthSeconds: 96,
+    tone: "Mystery",
+    status: "Generare Video · 7/12",
+    statusKind: "run",
+    progress: 0.58,
+    finalVideoUrl: null,
+    updatedAt: null,
+  },
+  {
+    id: "demo-3",
+    name: "Fall of Constantinople",
+    lengthSeconds: 64,
+    tone: "Epic",
+    status: "Eroare la scena 3",
+    statusKind: "err",
+    progress: 0.31,
+    finalVideoUrl: null,
+    updatedAt: null,
+  },
+  {
+    id: "demo-4",
+    name: "The Silk Road Merchants",
+    lengthSeconds: 64,
+    tone: "Epic",
+    status: "Finalizat",
+    statusKind: "done",
+    progress: 1,
+    finalVideoUrl: "#",
+    updatedAt: null,
+  },
+];
+
+const DEMO_SCENES: Scene[] = Array.from({ length: 8 }, (_, i) => {
+  const kinds: StatusKind[] = ["done", "done", "done", "run", "err", "idle", "idle", "idle"];
+  const names = [
+    "Hook — dune de cenușă",
+    "Berlin 1936",
+    "Blitzkrieg",
+    "Frontul de est",
+    "Stalingrad",
+    "Debarcarea",
+    "Căderea Berlinului",
+    "Epilog",
+  ];
+  return {
+    id: `demo-s${i + 1}`,
+    order: i + 1,
+    label: `S${i + 1}`,
+    narration: names[i],
+    imageUrl: null,
+    videoUrl: null,
+    imageApproved: i < 4,
+    status: kinds[i] === "run" ? "Generare Video" : kinds[i] === "err" ? "Eroare" : kinds[i] === "done" ? "Video gata" : "În așteptare",
+    statusKind: kinds[i],
+  };
+});

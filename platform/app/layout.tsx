@@ -22,6 +22,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               Projects
             </Link>
             <span className="sp" />
+            <Link href="/new" className="btn gold" style={{ padding: "8px 16px", fontSize: 13 }}>
+              + New video
+            </Link>
             <span className="av">F</span>
           </div>
         </nav>

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getProjects, isConfigured, type Project } from "@/lib/data";
+import AutoRefresh from "@/components/AutoRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,7 @@ export default async function Dashboard() {
 
   return (
     <main className="page">
+      <AutoRefresh seconds={15} />
       <div className="hero">
         <h1>
           Welcome back.

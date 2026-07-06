@@ -15,10 +15,13 @@ from the Airtable base that n8n already writes to. No auth yet.
 
    | Variable | Value |
    |---|---|
-   | `AIRTABLE_API_KEY` | Airtable personal access token (scope: `data.records:read`, access to the production base) |
+   | `AIRTABLE_API_KEY` | Airtable personal access token (scopes: `data.records:read` **and** `data.records:write`, access to the production base) |
    | `AIRTABLE_BASE_ID` | the `app...` id of the base (visible in the base URL) |
    | `AIRTABLE_PROJECTS_TABLE` | table name/id for projects (default `Proiecte`) |
    | `AIRTABLE_SCENES_TABLE` | table name/id for scenes (default `Scene`) |
+   | `SITE_PASSWORD` | optional — locks the whole site behind a shared password |
+   | `N8N_NEW_PROJECT_WEBHOOK_URL` | optional — n8n webhook that starts a new project; enables the “New video” form |
+   | `AIRTABLE_SCRIPT_APPROVED_STATUS` | optional — Status value the scripting workflow waits for (default `approved`) |
 
 4. Deploy. Without the env vars the app serves demo data, so the UI is
    reviewable before wiring anything.
@@ -33,7 +36,8 @@ npm run dev
 
 ## Roadmap
 
-- Phase B: Google login (Supabase), approve/regenerate buttons that write the
-  Airtable checkboxes n8n polls.
-- Phase C: new-project form (replaces the n8n form trigger), script editing.
-- Phase D: multi-user roles, workspaces, Postgres adapter.
+- ~~Phase B: approve/regenerate buttons that write the Airtable checkboxes
+  n8n polls~~ ✓
+- ~~Phase C: new-project form, script review, shared-password gate~~ ✓
+- Phase D: Google login (Supabase), multi-user roles, workspaces, Postgres
+  adapter.

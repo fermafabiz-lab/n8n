@@ -257,3 +257,75 @@ const DEMO_SCENES: Scene[] = Array.from({ length: 8 }, (_, i) => {
     statusKind: kinds[i],
   };
 });
+
+// ---------- writes (Phase B) ----------
+// The site never talks to n8n directly. Approvals and regenerations are
+// plain Airtable field writes — the exact checkboxes the n8n polling loops
+// already watch. Requires the token to also have data.records:write.
+
+async function airtablePatch(
+  table: string,
+  recordId: string,
+  fields: Record<string, unknown>,
+): Promise<void> {
+  if (!isConfigured) return; // demo mode: no-op
+  const res = await fetch(
+    `https://api.airtable.com/v0/${BASE_ID}/${encodeURIComponent(table)}/${recordId}`,
+    {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ fields }),
+    },
+  );
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Airtable PATCH ${table}/${recordId}: HTTP ${res.status} — ${body}`);
+  }
+}
+
+export async function writeSceneApproval(
+  sceneId: string,
+  kind: "image" | "video",
+  action: "approve" | "regenerate",
+): Promise<void> {
+  // Field names must match the Airtable Scene table exactly (diacritics
+  // included) — n8n polls these very checkboxes.
+  const fields =
+    kind === "image"
+      ? action === "approve"
+        ? { "Aprobare Imagine": true, "Regenerează Imagine": false }
+        : { "Regenerează Imagine": true, "Aprobare Imagine": false }
+      : action === "approve"
+        ? { "Aprobare Video": true, "Regenerează Video": false }
+        : { "Regenerează Video": true, "Aprobare Video": false };
+  await airtablePatch(SCENES_TABLE, sceneId, fields);
+}
+
+export async function writeProjectFields(
+  projectId: string,
+  fields: Record<string, unknown>,
+): Promise<void> {
+  await airtablePatch(PROJECTS_TABLE, projectId, fields);
+}
+
+export async function getProjectScript(projectId: string): Promise<string | null> {
+  if (!isConfigured) return DEMO_SCRIPT;
+  const res = await fetch(
+    `https://api.airtable.com/v0/${BASE_ID}/${encodeURIComponent(PROJECTS_TABLE)}/${projectId}`,
+    { headers: { Authorization: `Bearer ${API_KEY}` }, next: { revalidate: 10 } },
+  );
+  if (!res.ok) return null;
+  const rec = (await res.json()) as AirtableRecord;
+  const script = pick(rec.fields, ["Script", "Script Final", "Narrator Script"]);
+  return typeof script === "string" && script.trim() ? script : null;
+}
+
+const DEMO_SCRIPT = `[CHAPTER 0]
+What if the most documented war in history still hides its darkest turn?
+
+[CHAPTER 1]
+Berlin, 1936. The stadium roars, the cameras roll, and a nation rehearses
+the spectacle it will soon export as war...`;

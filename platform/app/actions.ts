@@ -70,11 +70,10 @@ export async function approveScript(projectId: string): Promise<ActionResult> {
     return { ok: true, message: "Demo mode — nothing was written." };
   }
   try {
-    // The Claude Scripting workflow polls the project Status field and
-    // proceeds when it reads this value. Override via env if the workflow
-    // ever changes its expected marker.
-    const approvedValue = process.env.AIRTABLE_SCRIPT_APPROVED_STATUS || "approved";
-    await writeProjectFields(projectId, { Status: approvedValue });
+    // The orchestrator's "Check Script Status" gate reads the boolean
+    // "Script Status" field on the project record — the same checkbox
+    // approved manually in Airtable until now.
+    await writeProjectFields(projectId, { "Script Status": true });
     revalidatePath(`/projects/${projectId}`);
     return { ok: true, message: "Script approved — production continues." };
   } catch (e) {

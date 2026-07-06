@@ -47,6 +47,8 @@ const STATUS_MAP: Array<{ match: RegExp; kind: StatusKind; progress: number }> =
   { match: /generare imagine/, kind: "run", progress: 0.4 },
   { match: /awaiting_approval|aprobare script/, kind: "wait", progress: 0.2 },
   { match: /script/, kind: "run", progress: 0.15 },
+  { match: /in lucru|desfasurare/, kind: "run", progress: 0.5 },
+  { match: /planificare|planificat/, kind: "wait", progress: 0.05 },
 ];
 
 function classifyStatus(raw: string): { kind: StatusKind; progress: number } {
@@ -65,7 +67,7 @@ function classifyStatus(raw: string): { kind: StatusKind; progress: number } {
 // that knows about them.
 const F = {
   projectName: ["Nume Proiect", "Name", "Nume"],
-  projectStatus: ["Status"],
+  projectStatus: ["Status General", "Status"],
   projectLength: ["Lenght", "Length", "Durata"],
   projectTone: ["Tonalitate", "Tone"],
   projectFinalVideo: ["Link Video Final", "Final Video URL"],
@@ -319,7 +321,11 @@ export async function getProjectScript(projectId: string): Promise<string | null
   );
   if (!res.ok) return null;
   const rec = (await res.json()) as AirtableRecord;
-  const script = pick(rec.fields, ["Script", "Script Final", "Narrator Script"]);
+  const script = pick(rec.fields, [
+    "Edited Narrator Script",
+    "Full Narrator Script",
+    "Script",
+  ]);
   return typeof script === "string" && script.trim() ? script : null;
 }
 

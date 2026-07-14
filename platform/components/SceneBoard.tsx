@@ -40,6 +40,7 @@ export default function SceneBoard({
   const running = scenes.find((s) => s.statusKind === "run");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [msg, setMsg] = useState<ActionResult | null>(null);
+  const [feedback, setFeedback] = useState("");
   const [pending, startTransition] = useTransition();
 
   const active =
@@ -140,7 +141,17 @@ export default function SceneBoard({
                   className="abtn"
                   disabled={pending}
                   onClick={() =>
-                    run(() => sceneAction(projectId, active.id, "image", "regenerate"))
+                    run(async () => {
+                      const r = await sceneAction(
+                        projectId,
+                        active.id,
+                        "image",
+                        "regenerate",
+                        feedback,
+                      );
+                      if (r.ok) setFeedback("");
+                      return r;
+                    })
                   }
                 >
                   Regenerate
@@ -178,12 +189,43 @@ export default function SceneBoard({
                   className="abtn"
                   disabled={pending}
                   onClick={() =>
-                    run(() => sceneAction(projectId, active.id, "video", "regenerate"))
+                    run(async () => {
+                      const r = await sceneAction(
+                        projectId,
+                        active.id,
+                        "video",
+                        "regenerate",
+                        feedback,
+                      );
+                      if (r.ok) setFeedback("");
+                      return r;
+                    })
                   }
                 >
                   Regenerate video
                 </button>
               </div>
+            )}
+            {(!active.imageApproved || (active.videoUrl && !active.videoApproved)) && (
+              <textarea
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+                placeholder="Opțional: ce să schimbe la regenerare? (ex. „mai multă lumină, camera mai aproape de personaj”)"
+                rows={2}
+                style={{
+                  width: "100%",
+                  marginTop: 12,
+                  background: "var(--bg2)",
+                  border: "1px solid var(--line2)",
+                  borderRadius: 10,
+                  color: "var(--ink)",
+                  font: "inherit",
+                  fontSize: 13,
+                  padding: "10px 12px",
+                  resize: "vertical",
+                  outline: "none",
+                }}
+              />
             )}
           </div>
         )}

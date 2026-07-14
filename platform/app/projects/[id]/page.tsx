@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getProject, getProjectScript, getScenes, type Scene } from "@/lib/data";
+import { getProject, getProjectScriptInfo, getScenes, type Scene } from "@/lib/data";
 import SceneBoard from "@/components/SceneBoard";
 import ScriptReview from "@/components/ScriptReview";
 import AutoRefresh from "@/components/AutoRefresh";
@@ -41,9 +41,13 @@ export default async function ProductionRoom({
   const scenes = await getScenes(id);
   const steps = pipeline(scenes, project.statusKind === "done");
 
-  // Script review phase: no scenes exist yet and the project is waiting.
-  const scriptPhase = scenes.length === 0 && project.statusKind !== "done";
-  const script = scriptPhase ? await getProjectScript(id) : null;
+  // Script review phase: the Scripturi record is still awaiting approval.
+  const scriptInfo =
+    project.statusKind !== "done" ? await getProjectScriptInfo(id) : null;
+  const script =
+    scriptInfo && scriptInfo.status === "awaiting_approval" && scriptInfo.content
+      ? scriptInfo
+      : null;
 
   return (
     <main className="page">
@@ -94,7 +98,9 @@ export default async function ProductionRoom({
           </div>
         )}
 
-        {script && <ScriptReview projectId={id} script={script} />}
+        {script && (
+          <ScriptReview projectId={id} scriptId={script.id} content={script.content} />
+        )}
 
         {scenes.length > 0 ? (
           <SceneBoard projectId={id} scenes={scenes} />

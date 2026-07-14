@@ -346,3 +346,55 @@ What if the most documented war in history still hides its darkest turn?
 [CHAPTER 1]
 Berlin, 1936. The stadium roars, the cameras roll, and a nation rehearses
 the spectacle it will soon export as war...`;
+
+// ---------- script review (Scripturi table) ----------
+// The scripting workflow saves the draft to the Scripturi table and polls
+// its Status field: "awaiting_approval" -> reviewer edits "Script Content"
+// (keeping the [CHAPTER n: title] markers) -> Status "approved" resumes
+// production with the EDITED text. The site edits exactly those fields.
+
+const SCRIPTS_TABLE = process.env.AIRTABLE_SCRIPTS_TABLE || "Scripturi";
+
+export interface ScriptInfo {
+  id: string;
+  content: string;
+  status: string;
+}
+
+export async function getProjectScriptInfo(projectId: string): Promise<ScriptInfo | null> {
+  if (!isConfigured) {
+    return { id: "demo-script", content: DEMO_SCRIPT, status: "awaiting_approval" };
+  }
+  const projRes = await fetch(
+    `https://api.airtable.com/v0/${BASE_ID}/${encodeURIComponent(PROJECTS_TABLE)}/${projectId}`,
+    { headers: { Authorization: `Bearer ${API_KEY}` }, next: { revalidate: 10 } },
+  );
+  if (!projRes.ok) return null;
+  const proj = (await projRes.json()) as AirtableRecord;
+  const links = proj.fields["scripts"];
+  const scriptId = Array.isArray(links) && links.length ? String(links[links.length - 1]) : null;
+  if (!scriptId) return null;
+  const res = await fetch(
+    `https://api.airtable.com/v0/${BASE_ID}/${encodeURIComponent(SCRIPTS_TABLE)}/${scriptId}`,
+    { headers: { Authorization: `Bearer ${API_KEY}` }, next: { revalidate: 10 } },
+  );
+  if (!res.ok) return null;
+  const rec = (await res.json()) as AirtableRecord;
+  return {
+    id: rec.id,
+    content: String(rec.fields["Script Content"] ?? ""),
+    status: String(rec.fields["Status"] ?? ""),
+  };
+}
+
+export async function writeScriptFields(
+  scriptId: string,
+  fields: Record<string, unknown>,
+): Promise<void> {
+  await airtablePatch(SCRIPTS_TABLE, scriptId, fields);
+}
+
+/** Reviewer feedback consumed (and cleared) by the n8n regen chains. */
+export async function writeSceneFeedback(sceneId: string, feedback: string): Promise<void> {
+  await airtablePatch(SCENES_TABLE, sceneId, { "Observații Scenă": feedback });
+}

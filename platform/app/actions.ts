@@ -3,7 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { isConfigured, writeProjectFields, writeSceneApproval } from "@/lib/data";
+import {
+  isConfigured,
+  writeProjectFields,
+  writeSceneApproval,
+  writeSceneFeedback,
+  writeScriptFields,
+} from "@/lib/data";
 import { stopExecution } from "@/lib/n8n";
 
 export interface ActionResult {
@@ -27,11 +33,16 @@ export async function sceneAction(
   sceneId: string,
   kind: "image" | "video",
   action: "approve" | "regenerate",
+  feedback?: string,
 ): Promise<ActionResult> {
   if (!isConfigured) {
     return { ok: true, message: "Demo mode — nothing was written. Connect Airtable to make this real." };
   }
   try {
+    if (action === "regenerate" && feedback?.trim()) {
+      // n8n appends this to the generation prompt, then clears it.
+      await writeSceneFeedback(sceneId, feedback.trim());
+    }
     await writeSceneApproval(sceneId, kind, action);
     revalidatePath(`/projects/${projectId}`);
     return {
@@ -66,15 +77,40 @@ export async function approveAllImages(
   }
 }
 
-export async function approveScript(projectId: string): Promise<ActionResult> {
+export async function saveScript(
+  projectId: string,
+  scriptId: string,
+  content: string,
+): Promise<ActionResult> {
   if (!isConfigured) {
     return { ok: true, message: "Demo mode — nothing was written." };
   }
   try {
-    // The orchestrator's "Check Script Status" gate reads the boolean
-    // "Script Status" field on the project record — the same checkbox
-    // approved manually in Airtable until now.
-    await writeProjectFields(projectId, { "Script Status": true });
+    await writeScriptFields(scriptId, { "Script Content": content });
+    revalidatePath(`/projects/${projectId}`);
+    return { ok: true, message: "Draft saved. Approve when you're happy with it." };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+export async function approveScript(
+  projectId: string,
+  scriptId: string,
+  content?: string,
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    // The scripting workflow polls the Scripturi record: it resumes when
+    // Status flips to "approved" and reads the (possibly edited) Script
+    // Content, so saving and approving in one write is safe.
+    const fields: Record<string, unknown> = { Status: "approved" };
+    if (typeof content === "string" && content.trim()) {
+      fields["Script Content"] = content;
+    }
+    await writeScriptFields(scriptId, fields);
     revalidatePath(`/projects/${projectId}`);
     return { ok: true, message: "Script approved — production continues." };
   } catch (e) {

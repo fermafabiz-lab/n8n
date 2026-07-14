@@ -26,6 +26,13 @@ app.use(express.json({limit: '5mb'}));
 const API_KEY = process.env.RENDER_API_KEY;
 app.use((req, res, next) => {
 	if (!API_KEY) return next();
+	// /output stays key-free: Remotion's OffthreadVideo re-fetches the
+	// assembled video from our own /output URL and cannot send headers, and
+	// Airtable/browsers need to fetch results too. Filenames are UUIDs and
+	// files are ephemeral, so unauthenticated reads are acceptable.
+	if (req.method === 'GET' && (req.path.startsWith('/output/') || req.path === '/health')) {
+		return next();
+	}
 	if (req.headers['x-api-key'] !== API_KEY) {
 		return res.status(401).json({error: 'unauthorized'});
 	}

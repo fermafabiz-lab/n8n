@@ -7,6 +7,12 @@ export type SceneCaption = {
 	durationSeconds: number;
 	/** Chapter number derived from "Ordine Scenă" (ord/100): 0 = hook, 1+ = chapters. */
 	chapter?: number;
+	/**
+	 * Real narration length in seconds (measured by the assemble step).
+	 * Captions pace words over this window, not over the silence-padded
+	 * scene duration.
+	 */
+	speechSeconds?: number;
 };
 
 export type Palette = {

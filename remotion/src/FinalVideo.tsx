@@ -9,7 +9,6 @@ import {
 import {HookTitle} from './components/HookTitle';
 import {ChapterMarker} from './components/ChapterMarker';
 import {OutroCard} from './components/OutroCard';
-import {ProgressBar} from './components/ProgressBar';
 import {Captions} from './components/Captions';
 import {FilmLayer, gradeForTone} from './components/FilmLayer';
 import {Transitions, kenBurnsTransform} from './components/Transitions';
@@ -80,8 +79,6 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 				<OutroCard channelName={channelName} subscribeText={subscribeText} palette={palette} />
 			</Sequence>
 
-			{/* Chapter-segmented progress bar, drawn last so it stays on top. */}
-			<ProgressBar palette={palette} scenes={scenes} />
 		</AbsoluteFill>
 	);
 };

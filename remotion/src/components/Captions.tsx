@@ -3,38 +3,64 @@ import {AbsoluteFill, useCurrentFrame, useVideoConfig} from 'remotion';
 import type {Palette, SceneCaption} from '../types';
 
 /**
- * Karaoke captions with keyword emphasis.
- *
- * We only have per-scene narration text and the scene's real clip duration
- * (no word-level ASR timestamps), so words are distributed evenly across the
- * scene's duration. Swap in forced-alignment timestamps later without
- * changing this component's props shape.
- *
- * Keywords (proper nouns mid-sentence, numbers, long words) render in the
- * accent color slightly larger, so the eye catches the load-bearing words.
+ * Short caption chunks (max 4-5 words on screen at once), paced over the
+ * scene's REAL narration length (`speechSeconds`, measured by the assemble
+ * step) rather than the silence-padded scene duration — that mismatch is
+ * what made captions lag the voice and keep playing into the silence.
+ * After the narration ends, no caption is shown.
  */
-const findActiveWord = (scenes: SceneCaption[], seconds: number) => {
+const CHUNK_SIZE = 4;
+
+const buildChunks = (text: string) => {
+	const words = text.trim().split(/\s+/).filter(Boolean);
+	const chunks: string[][] = [];
+	for (let i = 0; i < words.length; i += CHUNK_SIZE) {
+		chunks.push(words.slice(i, i + CHUNK_SIZE));
+	}
+	// Avoid a lonely 1-word last chunk: merge it into the previous one.
+	if (chunks.length > 1 && chunks[chunks.length - 1].length === 1) {
+		const last = chunks.pop()!;
+		chunks[chunks.length - 1].push(...last);
+	}
+	return {words, chunks};
+};
+
+const findActive = (scenes: SceneCaption[], seconds: number) => {
 	const scene = scenes.find(
 		(s) => seconds >= s.startSeconds && seconds < s.startSeconds + s.durationSeconds,
 	);
 	if (!scene) return null;
 
-	const words = scene.narratorText.trim().split(/\s+/).filter(Boolean);
+	const {words, chunks} = buildChunks(scene.narratorText);
 	if (words.length === 0) return null;
 
-	const elapsed = seconds - scene.startSeconds;
-	const perWord = scene.durationSeconds / words.length;
-	const activeIndex = Math.min(words.length - 1, Math.floor(elapsed / perWord));
+	// Words are spoken during speechSeconds; fall back to a ~2.6 words/sec
+	// estimate if the measurement is missing.
+	const speech = scene.speechSeconds && scene.speechSeconds > 0
+		? Math.min(scene.speechSeconds, scene.durationSeconds)
+		: Math.min(words.length / 2.6, scene.durationSeconds);
 
-	return {words, activeIndex};
+	const elapsed = seconds - scene.startSeconds;
+	if (elapsed > speech + 0.35) return null; // narration over → captions off
+
+	const perWord = speech / words.length;
+	const wordIndex = Math.min(words.length - 1, Math.floor(elapsed / perWord));
+
+	let count = 0;
+	for (const chunk of chunks) {
+		if (wordIndex < count + chunk.length) {
+			return {chunk, activeInChunk: wordIndex - count};
+		}
+		count += chunk.length;
+	}
+	return null;
 };
 
-const isKeyword = (word: string, index: number): boolean => {
+const isKeyword = (word: string): boolean => {
 	const clean = word.replace(/[^\p{L}\p{N}]/gu, '');
 	if (!clean) return false;
 	if (/\d/.test(clean)) return true; // numbers and years
-	if (index > 0 && /^\p{Lu}/u.test(clean)) return true; // proper noun mid-sentence
-	return clean.length >= 11; // long, usually meaningful words
+	return /^\p{Lu}/u.test(clean) || clean.length >= 11;
 };
 
 export const Captions: React.FC<{scenes: SceneCaption[]; palette: Palette}> = ({
@@ -45,33 +71,34 @@ export const Captions: React.FC<{scenes: SceneCaption[]; palette: Palette}> = ({
 	const {fps} = useVideoConfig();
 	const seconds = frame / fps;
 
-	const active = findActiveWord(scenes, seconds);
+	const active = findActive(scenes, seconds);
 	if (!active) return null;
 
 	return (
 		<AbsoluteFill style={{justifyContent: 'flex-end', alignItems: 'center'}}>
 			<div
 				style={{
-					marginBottom: 92,
-					maxWidth: '82%',
+					marginBottom: 84,
+					maxWidth: '86%',
 					textAlign: 'center',
 					fontFamily: 'Arial, sans-serif',
-					fontWeight: 700,
-					fontSize: 42,
-					lineHeight: 1.45,
-					textShadow: '0 2px 12px rgba(0,0,0,0.85)',
+					fontWeight: 800,
+					fontSize: 44,
+					lineHeight: 1.3,
+					textShadow: '0 3px 14px rgba(0,0,0,0.9)',
+					textTransform: 'uppercase',
 				}}
 			>
-				{active.words.map((word, i) => {
-					const activeNow = i === active.activeIndex;
-					const keyword = isKeyword(word, i);
+				{active.chunk.map((word, i) => {
+					const activeNow = i === active.activeInChunk;
+					const keyword = isKeyword(word);
 					return (
 						<span
 							key={i}
 							style={{
-								color: activeNow ? palette.primary : keyword ? `${palette.primary}D9` : '#FFFFFF',
-								fontSize: keyword || activeNow ? '1.09em' : '1em',
-								marginRight: 12,
+								color: activeNow || keyword ? palette.primary : '#FFFFFF',
+								opacity: activeNow ? 1 : 0.92,
+								marginRight: 14,
 							}}
 						>
 							{word}

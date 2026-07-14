@@ -119,11 +119,15 @@ export function registerAssemble(app, {jobs, outputDir}) {
 					await download(scenes[i].videoUrl, v);
 					const dur = await probeDuration(v, 'v:0');
 					let a = null;
+					let voiceDur = null;
 					if (scenes[i].audioUrl) {
 						a = path.join(work, `a${i}.mp3`);
 						await download(scenes[i].audioUrl, a);
+						// Real narration length — the graphics pass paces captions on
+						// this, not on the (silence-padded) scene length.
+						voiceDur = await probeDuration(a, 'a:0').catch(() => null);
 					}
-					items.push({v, a, dur});
+					items.push({v, a, dur, voiceDur});
 					const job = jobs.get(jobId);
 					if (job) job.progress = 0.35 * ((i + 1) / scenes.length);
 				}
@@ -234,7 +238,14 @@ export function registerAssemble(app, {jobs, outputDir}) {
 					progress: 1,
 					outputFile,
 					error: null,
-					verify: {videoSeconds, audioSeconds, sceneStartsSeconds},
+					verify: {
+						videoSeconds,
+						audioSeconds,
+						sceneStartsSeconds,
+						voiceDurationsSeconds: items.map((it) =>
+							it.voiceDur ? Number(Math.min(it.voiceDur, it.dur).toFixed(3)) : null,
+						),
+					},
 				});
 			} catch (err) {
 				jobs.set(jobId, {

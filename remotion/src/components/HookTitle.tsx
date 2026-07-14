@@ -3,9 +3,10 @@ import {AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig} from 'remoti
 import type {Palette} from '../types';
 
 /**
- * Cinematic title over the hook scene (replaces the old separate intro card —
- * the video now starts on frame 1, which is better for retention). Letters
- * track in from wide spacing while a gold rule draws itself underneath.
+ * Cinematic title over the hook scene. Animates SCALE + opacity only —
+ * animating letter-spacing (the previous approach) changed the layout every
+ * frame and made the text rewrap mid-animation. Font size adapts to the
+ * title length so long titles stay on 2-3 stable lines.
  */
 export const HookTitle: React.FC<{
 	title: string;
@@ -16,7 +17,6 @@ export const HookTitle: React.FC<{
 	const {fps} = useVideoConfig();
 	const t = frame / fps;
 
-	const inEnd = 0.9;
 	const outStart = durationInSeconds - 0.6;
 
 	const opacity =
@@ -26,11 +26,8 @@ export const HookTitle: React.FC<{
 			extrapolateRight: 'clamp',
 		});
 
-	const tracking = interpolate(t, [0, inEnd], [26, 4], {
-		extrapolateLeft: 'clamp',
-		extrapolateRight: 'clamp',
-	});
-	const rise = interpolate(t, [0.1, inEnd], [24, 0], {
+	// Scale-in: layout never changes, only the transform.
+	const scale = interpolate(t, [0, 0.9], [1.1, 1], {
 		extrapolateLeft: 'clamp',
 		extrapolateRight: 'clamp',
 	});
@@ -38,6 +35,10 @@ export const HookTitle: React.FC<{
 		extrapolateLeft: 'clamp',
 		extrapolateRight: 'clamp',
 	});
+
+	// Adaptive size: short titles get big type, long ones step down.
+	const len = title.length;
+	const fontSize = len <= 24 ? 76 : len <= 44 ? 60 : len <= 70 ? 48 : 40;
 
 	return (
 		<AbsoluteFill style={{justifyContent: 'center', alignItems: 'center', opacity}}>
@@ -48,16 +49,22 @@ export const HookTitle: React.FC<{
 						'radial-gradient(ellipse at center, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.15) 55%, rgba(0,0,0,0) 75%)',
 				}}
 			/>
-			<div style={{textAlign: 'center', padding: '0 100px', transform: `translateY(${rise}px)`}}>
+			<div
+				style={{
+					textAlign: 'center',
+					width: '78%',
+					transform: `scale(${scale})`,
+				}}
+			>
 				<h1
 					style={{
 						fontFamily: 'Georgia, "Times New Roman", serif',
 						fontWeight: 700,
-						fontSize: 74,
+						fontSize,
 						color: '#FFFFFF',
-						lineHeight: 1.12,
+						lineHeight: 1.18,
 						margin: 0,
-						letterSpacing: `${tracking}px`,
+						letterSpacing: 3,
 						textTransform: 'uppercase',
 						textShadow: '0 4px 24px rgba(0,0,0,0.85)',
 					}}

@@ -10,6 +10,7 @@ import {fileURLToPath} from 'url';
 import {randomUUID} from 'crypto';
 import {bundle} from '@remotion/bundler';
 import {renderMedia, selectComposition} from '@remotion/renderer';
+import {registerAssemble} from './assemble.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OUTPUT_DIR = path.join(__dirname, 'output');
@@ -99,7 +100,10 @@ app.post('/render', async (req, res) => {
 	})();
 });
 
-app.get('/render/:jobId/status', (req, res) => {
+registerAssemble(app, {jobs, outputDir: OUTPUT_DIR});
+
+// Shared status endpoint for render and assemble jobs.
+app.get(['/render/:jobId/status', '/assemble/:jobId/status'], (req, res) => {
 	const job = jobs.get(req.params.jobId);
 	if (!job) return res.status(404).json({error: 'job not found'});
 

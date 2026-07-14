@@ -134,6 +134,7 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     Tonalitate: String(formData.get("tone") ?? "Dark"),
     Pace: String(formData.get("pace") ?? "Normal"),
     Style: String(formData.get("style") ?? ""),
+    voice_id: String(formData.get("voice_id") ?? ""),
   };
   try {
     const res = await fetch(webhook, {

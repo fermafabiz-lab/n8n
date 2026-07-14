@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { createProject, type ActionResult } from "@/app/actions";
+import VoicePicker from "@/components/VoicePicker";
 
 async function submit(_prev: ActionResult | null, formData: FormData) {
   return createProject(formData);
@@ -93,6 +94,8 @@ export default function NewVideo() {
             placeholder="Visual style preferences — ex. photorealistic, golden hour, 35mm"
           />
         </div>
+
+        <VoicePicker />
 
         <div className="field">
           <label htmlFor="language">Language</label>

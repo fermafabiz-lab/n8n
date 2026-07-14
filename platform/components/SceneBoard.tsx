@@ -110,8 +110,10 @@ export default function SceneBoard({
             </div>
             <div className="kv">
               <span>Video</span>
-              {active.videoUrl ? (
-                <span className="chip ok">Ready</span>
+              {active.videoApproved ? (
+                <span className="chip ok">Approved</span>
+              ) : active.videoUrl ? (
+                <span className="chip wait">Awaiting review</span>
               ) : active.statusKind === "run" ? (
                 <span className="chip run">Rendering</span>
               ) : (
@@ -145,7 +147,23 @@ export default function SceneBoard({
                 </button>
               </div>
             )}
-            {active.imageApproved && active.videoUrl && (
+            {active.videoUrl && (
+              <div style={{ marginTop: 16 }}>
+                <video
+                  key={active.id}
+                  src={active.videoUrl}
+                  controls
+                  preload="metadata"
+                  style={{
+                    width: "100%",
+                    borderRadius: 12,
+                    background: "#000",
+                    aspectRatio: "16/9",
+                  }}
+                />
+              </div>
+            )}
+            {active.videoUrl && !active.videoApproved && (
               <div className="abtns">
                 <button
                   className="abtn ok"
@@ -165,19 +183,6 @@ export default function SceneBoard({
                 >
                   Regenerate video
                 </button>
-              </div>
-            )}
-            {active.videoUrl && (
-              <div style={{ marginTop: 14 }}>
-                <a
-                  className="abtn"
-                  style={{ display: "block" }}
-                  href={active.videoUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  ▶ Watch scene video
-                </a>
               </div>
             )}
           </div>

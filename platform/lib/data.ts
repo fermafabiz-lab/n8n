@@ -31,6 +31,7 @@ export interface Scene {
   imageUrl: string | null;
   videoUrl: string | null;
   imageApproved: boolean;
+  videoApproved: boolean;
   status: string;
   statusKind: StatusKind;
 }
@@ -72,11 +73,16 @@ const F = {
   projectTone: ["Tonalitate", "Tone"],
   projectFinalVideo: ["Link Video Final", "Final Video URL"],
   sceneOrder: ["Ordine Scenă", "Ordine Scena"],
-  sceneNarration: ["Narration", "Narațiune", "Text Scenă"],
+  sceneNarration: ["Script Scenă", "Narration", "Narațiune"],
   sceneImage: ["Imagine Scenă", "Imagine Scena"],
-  sceneVideo: ["Scene Final URL", "Video Scenă URL"],
+  // "Video Scenă URL" holds the motion PROMPT (legacy reuse) — never read
+  // it as a link. The muxed clip lives in Scene Final URL + the "Video
+  // Scenă" attachment.
+  sceneVideo: ["Scene Final URL"],
+  sceneVideoAttachment: ["Video Scenă"],
   sceneImageApproved: ["Aprobare Imagine"],
-  sceneStatus: ["Status"],
+  sceneVideoApproved: ["Aprobare Video"],
+  sceneStatus: ["Status Producție Scenă", "Status"],
 };
 
 function pick(fields: Record<string, unknown>, names: string[]): unknown {
@@ -146,14 +152,18 @@ function toScene(r: AirtableRecord, index: number): Scene {
   const status = String(pick(r.fields, F.sceneStatus) ?? "—");
   const { kind } = classifyStatus(status);
   const order = Number(pick(r.fields, F.sceneOrder)) || index + 1;
+  const videoUrl =
+    ((pick(r.fields, F.sceneVideo) as string) || null) ??
+    firstAttachmentUrl(pick(r.fields, F.sceneVideoAttachment));
   return {
     id: r.id,
     order,
     label: `S${index + 1}`,
     narration: (pick(r.fields, F.sceneNarration) as string) ?? null,
     imageUrl: firstAttachmentUrl(pick(r.fields, F.sceneImage)),
-    videoUrl: (pick(r.fields, F.sceneVideo) as string) ?? null,
+    videoUrl,
     imageApproved: Boolean(pick(r.fields, F.sceneImageApproved)),
+    videoApproved: Boolean(pick(r.fields, F.sceneVideoApproved)),
     status,
     statusKind: kind,
   };
@@ -255,6 +265,7 @@ const DEMO_SCENES: Scene[] = Array.from({ length: 8 }, (_, i) => {
     imageUrl: null,
     videoUrl: null,
     imageApproved: i < 4,
+    videoApproved: i < 2,
     status: kinds[i] === "run" ? "Generare Video" : kinds[i] === "err" ? "Eroare" : kinds[i] === "done" ? "Video gata" : "În așteptare",
     statusKind: kinds[i],
   };

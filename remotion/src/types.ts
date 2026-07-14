@@ -3,8 +3,10 @@ export type SceneCaption = {
 	narratorText: string;
 	/** Seconds from the start of the assembled video where this scene begins. */
 	startSeconds: number;
-	/** Real duration of this scene's clip, in seconds (from fal ffmpeg metadata). */
+	/** Real duration of this scene's clip, in seconds (from the assemble step's ffprobe). */
 	durationSeconds: number;
+	/** Chapter number derived from "Ordine Scenă" (ord/100): 0 = hook, 1+ = chapters. */
+	chapter?: number;
 };
 
 export type Palette = {
@@ -22,15 +24,23 @@ export const DEFAULT_PALETTE: Palette = {
 };
 
 export type FinalVideoProps = {
-	/** URL of the video already stitched by fal ffmpeg-api/compose (Phase 1 input). */
+	/** URL of the ffmpeg-assembled video (voices already aligned per scene). */
 	finalVideoUrl: string;
 	projectTitle: string;
 	scenes: SceneCaption[];
 	palette: Palette;
 	channelName: string;
 	subscribeText: string;
+	/** Project tone (Tonalitate) — drives color grade and transition style. */
+	tone: string;
+	/**
+	 * Kept for compatibility; the intro card was replaced by the hook title
+	 * overlay (the video now starts on frame 1), so this defaults to 0.
+	 */
 	introDurationInSeconds: number;
 	outroDurationInSeconds: number;
+	/** How long the cinematic title stays over the hook scene. */
+	hookTitleDurationInSeconds: number;
 };
 
 export const defaultFinalVideoProps: FinalVideoProps = {
@@ -38,8 +48,17 @@ export const defaultFinalVideoProps: FinalVideoProps = {
 	projectTitle: 'Untitled Project',
 	scenes: [],
 	palette: DEFAULT_PALETTE,
-	channelName: 'Your Channel',
+	channelName: 'Video Factory',
 	subscribeText: 'Subscribe for more',
-	introDurationInSeconds: 2.5,
-	outroDurationInSeconds: 3,
+	tone: 'Dark',
+	introDurationInSeconds: 0,
+	outroDurationInSeconds: 4,
+	hookTitleDurationInSeconds: 3.5,
 };
+
+/** Tone → visual language. Lowercased, diacritics-insensitive lookup. */
+export const toneKey = (tone: string): string =>
+	(tone || '')
+		.toLowerCase()
+		.normalize('NFD')
+		.replace(/[̀-ͯ]/g, '');

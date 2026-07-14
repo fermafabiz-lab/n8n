@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { isConfigured, writeProjectFields, writeSceneApproval } from "@/lib/data";
+import { stopExecution } from "@/lib/n8n";
 
 export interface ActionResult {
   ok: boolean;
@@ -95,6 +96,8 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     Language: String(formData.get("language") ?? "English"),
     Lenght: Number(formData.get("length") ?? 64),
     Tonalitate: String(formData.get("tone") ?? "Dark"),
+    Pace: String(formData.get("pace") ?? "Normal"),
+    Style: String(formData.get("style") ?? ""),
   };
   try {
     const res = await fetch(webhook, {
@@ -108,6 +111,12 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
   } catch (e) {
     return { ok: false, message: friendlyError(e) };
   }
+}
+
+export async function stopExecutionAction(formData: FormData): Promise<void> {
+  const id = String(formData.get("executionId") ?? "");
+  if (id) await stopExecution(id);
+  revalidatePath("/");
 }
 
 // ---------- auth (simple shared password until Supabase lands) ----------

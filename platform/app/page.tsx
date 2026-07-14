@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getProjects, isConfigured, type Project } from "@/lib/data";
 import AutoRefresh from "@/components/AutoRefresh";
+import OpsPanel from "@/components/OpsPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +77,8 @@ export default async function Dashboard() {
           <b>{projects.length}</b>
         </div>
       </div>
+
+      <OpsPanel />
 
       <div className="sechead">
         <h2>Projects</h2>

@@ -127,7 +127,11 @@ export function registerAssemble(app, {jobs, outputDir}) {
 						// this, not on the (silence-padded) scene length.
 						voiceDur = await probeDuration(a, 'a:0').catch(() => null);
 					}
-					items.push({v, a, dur, voiceDur});
+					// If the narration outlasts the clip (long scenes), extend the
+					// scene by freeze-framing the last frame instead of cutting the
+					// voice mid-sentence.
+					const eff = voiceDur && voiceDur > dur ? voiceDur + 0.25 : dur;
+					items.push({v, a, dur, voiceDur, eff});
 					const job = jobs.get(jobId);
 					if (job) job.progress = 0.35 * ((i + 1) / scenes.length);
 				}
@@ -142,7 +146,7 @@ export function registerAssemble(app, {jobs, outputDir}) {
 				const sceneStartsSeconds = [];
 				items.forEach((it) => {
 					sceneStartsSeconds.push(Number(t.toFixed(3)));
-					t += it.dur;
+					t += it.eff;
 				});
 				const totalDur = t;
 				const chapterBoundaries = [];
@@ -170,8 +174,12 @@ export function registerAssemble(app, {jobs, outputDir}) {
 				const parts = [];
 				const labels = [];
 				items.forEach((it, i) => {
-					const d = it.dur.toFixed(3);
-					parts.push(`[${i * 2}:v]scale=1280:720,fps=24,trim=duration=${d},setpts=PTS-STARTPTS[v${i}]`);
+					const d = it.eff.toFixed(3);
+					const freeze = Math.max(0, it.eff - it.dur);
+					const vchain =
+						`scale=1280:720,fps=24,trim=duration=${it.dur.toFixed(3)},setpts=PTS-STARTPTS` +
+						(freeze > 0.01 ? `,tpad=stop_mode=clone:stop_duration=${freeze.toFixed(3)}` : '');
+					parts.push(`[${i * 2}:v]${vchain}[v${i}]`);
 					parts.push(`[${i * 2 + 1}:a]${MONO},atrim=duration=${d},asetpts=PTS-STARTPTS,apad=whole_dur=${d}[a${i}]`);
 					labels.push(`[v${i}][a${i}]`);
 				});
@@ -243,7 +251,7 @@ export function registerAssemble(app, {jobs, outputDir}) {
 						audioSeconds,
 						sceneStartsSeconds,
 						voiceDurationsSeconds: items.map((it) =>
-							it.voiceDur ? Number(Math.min(it.voiceDur, it.dur).toFixed(3)) : null,
+							it.voiceDur ? Number(Math.min(it.voiceDur, it.eff).toFixed(3)) : null,
 						),
 					},
 				});

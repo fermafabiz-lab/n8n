@@ -63,7 +63,12 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 					</AbsoluteFill>
 					<FilmLayer tone={tone} />
 					<Transitions scenes={scenes} tone={tone} />
-					<Captions scenes={scenes} palette={palette} preset={preset} />
+					<Captions
+						scenes={scenes}
+						palette={palette}
+						preset={preset}
+						suppressUntilSeconds={hookSeconds - 0.4}
+					/>
 					{chapterStarts.map((s) => (
 						<Sequence
 							key={`ch-${s.chapter}`}

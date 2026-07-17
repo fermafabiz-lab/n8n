@@ -68,10 +68,17 @@ export const Captions: React.FC<{
 	scenes: SceneCaption[];
 	palette: Palette;
 	preset: StylePreset;
-}> = ({scenes, palette, preset}) => {
+	/** Hide captions before this time (while the hook title owns the frame). */
+	suppressUntilSeconds?: number;
+}> = ({scenes, palette, preset, suppressUntilSeconds = 0}) => {
 	const frame = useCurrentFrame();
 	const {fps} = useVideoConfig();
 	const seconds = frame / fps;
+
+	// One text element at a time: the hook title and captions fighting for
+	// the frame in the opening seconds read as clutter (seen on the contact
+	// sheet), so captions wait their turn.
+	if (seconds < suppressUntilSeconds) return null;
 
 	const active = findActive(scenes, seconds);
 	if (!active) return null;

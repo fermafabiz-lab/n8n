@@ -19,9 +19,17 @@ export const HookTitle: React.FC<{
 	const {fps} = useVideoConfig();
 	const t = frame / fps;
 
-	const chars = Array.from(title);
+	// Words are unbreakable inline-blocks so the line can only wrap BETWEEN
+	// words — per-character inline-blocks allowed mid-word line breaks.
+	const words = title.split(' ');
 	const perChar = 1 / preset.typeSpeed;
-	const typeDone = chars.length * perChar;
+	const typeDone = title.length * perChar;
+	let charOffset = 0;
+	const wordStarts = words.map((w) => {
+		const s = charOffset;
+		charOffset += w.length + 1;
+		return s;
+	});
 	// The parent sizes the hook window to fit the typing, so fading out in
 	// the last 0.6s never cuts the animation short.
 	const outStart = Math.max(0.5, durationInSeconds - 0.6);
@@ -69,28 +77,34 @@ export const HookTitle: React.FC<{
 						textShadow: '0 4px 24px rgba(0,0,0,0.85)',
 					}}
 				>
-					{chars.map((ch, i) => {
-						const start = i * perChar;
-						const p = interpolate(t, [start, start + 0.22], [0, 1], {
-							extrapolateLeft: 'clamp',
-							extrapolateRight: 'clamp',
-						});
-						// Ease-out on both channels: soft landing, no pop.
-						const e = 1 - (1 - p) * (1 - p);
-						return (
-							<span
-								key={i}
-								style={{
-									display: 'inline-block',
-									whiteSpace: 'pre',
-									opacity: e,
-									transform: `translateY(${(1 - e) * 14}px)`,
-								}}
-							>
-								{ch}
+					{words.map((word, wi) => (
+						<React.Fragment key={wi}>
+							<span style={{display: 'inline-block', whiteSpace: 'pre'}}>
+								{Array.from(word).map((ch, ci) => {
+									const start = (wordStarts[wi] + ci) * perChar;
+									const p = interpolate(t, [start, start + 0.22], [0, 1], {
+										extrapolateLeft: 'clamp',
+										extrapolateRight: 'clamp',
+									});
+									// Ease-out on both channels: soft landing, no pop.
+									const e = 1 - (1 - p) * (1 - p);
+									return (
+										<span
+											key={ci}
+											style={{
+												display: 'inline-block',
+												opacity: e,
+												transform: `translateY(${(1 - e) * 14}px)`,
+											}}
+										>
+											{ch}
+										</span>
+									);
+								})}
 							</span>
-						);
-					})}
+							{wi < words.length - 1 ? ' ' : null}
+						</React.Fragment>
+					))}
 				</h1>
 				<div
 					style={{

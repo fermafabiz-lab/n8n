@@ -41,8 +41,17 @@ export const ImpactCard: React.FC<{
 	const x = wipeIn + wipeOut;
 	if (t > hold + 0.4) return null;
 
-	const chars = Array.from(keyLine);
+	// Words are unbreakable inline-blocks; the spaces BETWEEN them are plain
+	// breakable text nodes. Per-character spans with white-space:pre killed
+	// every soft-wrap point and the line ran straight off the screen.
+	const words = keyLine.split(' ');
 	const perChar = 1 / Math.max(18, preset.typeSpeed * 1.4);
+	let charOffset = 0;
+	const wordStarts = words.map((w) => {
+		const s = charOffset;
+		charOffset += w.length + 1;
+		return s;
+	});
 
 	return (
 		<AbsoluteFill style={{transform: `translateX(${x}%)`}}>
@@ -76,18 +85,25 @@ export const ImpactCard: React.FC<{
 							color: preset.cardBg === '#F6EFE3' || preset.cardBg === '#F4F1EA' ? '#221D14' : '#F5F2EA',
 						}}
 					>
-						{chars.map((ch, i) => {
-							const start = 0.25 + i * perChar;
-							const o = interpolate(t, [start, start + 0.12], [0, 1], {
-								extrapolateLeft: 'clamp',
-								extrapolateRight: 'clamp',
-							});
-							return (
-								<span key={i} style={{whiteSpace: 'pre', opacity: o}}>
-									{ch}
+						{words.map((word, wi) => (
+							<React.Fragment key={wi}>
+								<span style={{display: 'inline-block', whiteSpace: 'pre'}}>
+									{Array.from(word).map((ch, ci) => {
+										const start = 0.25 + (wordStarts[wi] + ci) * perChar;
+										const o = interpolate(t, [start, start + 0.12], [0, 1], {
+											extrapolateLeft: 'clamp',
+											extrapolateRight: 'clamp',
+										});
+										return (
+											<span key={ci} style={{opacity: o}}>
+												{ch}
+											</span>
+										);
+									})}
 								</span>
-							);
-						})}
+								{wi < words.length - 1 ? ' ' : null}
+							</React.Fragment>
+						))}
 					</div>
 					<div
 						style={{

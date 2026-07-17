@@ -47,8 +47,13 @@ export default function NewVideo() {
             id="name"
             name="name"
             placeholder="History of Germany in WW2"
+            maxLength={140}
             required
           />
+          <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--dim)" }}>
+            Scurt — devine titlul afișat în video. Detaliile de stil merg la
+            câmpul Style, nu aici.
+          </p>
         </div>
 
         <div className="field">

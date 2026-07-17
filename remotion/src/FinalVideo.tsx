@@ -31,10 +31,23 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 	const seconds = frame / fps;
 	const preset = presetForTone(tone);
 
-	// Give long titles enough time to finish typing before the fade-out.
-	const hookSeconds = Math.max(
-		hookTitleDurationInSeconds,
-		projectTitle.length / preset.typeSpeed + 1.6,
+	// Titles come from a free-text form field, and people paste entire
+	// prompts into it (seen in production: a ~3000-char master prompt became
+	// the title, which stretched the hook past the whole video and
+	// suppressed every caption). Display a sane excerpt: first line, cut at
+	// a word boundary around 70 chars.
+	const displayTitle = (() => {
+		const firstLine = projectTitle.split(/\r?\n/)[0].trim();
+		if (firstLine.length <= 72) return firstLine;
+		const cut = firstLine.slice(0, 72);
+		return cut.slice(0, Math.max(30, cut.lastIndexOf(' '))) + '…';
+	})();
+
+	// Give long titles time to finish typing, but never let the hook eat
+	// the video: hard cap at 7s.
+	const hookSeconds = Math.min(
+		7,
+		Math.max(hookTitleDurationInSeconds, displayTitle.length / preset.typeSpeed + 1.6),
 	);
 
 	const videoDurationSeconds = scenes.length
@@ -84,7 +97,7 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 					))}
 					<Sequence from={0} durationInFrames={Math.round(hookSeconds * fps)}>
 						<HookTitle
-							title={projectTitle}
+							title={displayTitle}
 							palette={palette}
 							preset={preset}
 							durationInSeconds={hookSeconds}

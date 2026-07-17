@@ -1,0 +1,105 @@
+import React from 'react';
+import {AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig} from 'remotion';
+import type {StylePreset} from '../style';
+
+const ROMAN = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+
+/** First ~8 meaningful words of the chapter's opening narration. */
+export const keyLineFor = (narration: string): string => {
+	const words = narration.trim().split(/\s+/).filter(Boolean).slice(0, 8);
+	let line = words.join(' ');
+	line = line.replace(/[,;:]$/, '');
+	if (!/[.!?…]$/.test(line) && line) line += '…';
+	return line;
+};
+
+/**
+ * Director-style stop-frame at each chapter start: full-screen opaque card
+ * in the preset palette, chapter eyebrow + the chapter's key line typing on.
+ * Runs ~2s as an overlay (footage and narration continue underneath), then
+ * wipes away — a hard visual reset that re-hooks attention.
+ */
+export const ImpactCard: React.FC<{
+	chapter: number;
+	keyLine: string;
+	preset: StylePreset;
+}> = ({chapter, keyLine, preset}) => {
+	const frame = useCurrentFrame();
+	const {fps} = useVideoConfig();
+	const t = frame / fps;
+
+	const hold = 2.2;
+	// Card slides in as a wipe, holds, wipes out.
+	const wipeIn = interpolate(t, [0, 0.3], [100, 0], {
+		extrapolateLeft: 'clamp',
+		extrapolateRight: 'clamp',
+	});
+	const wipeOut = interpolate(t, [hold, hold + 0.35], [0, -100], {
+		extrapolateLeft: 'clamp',
+		extrapolateRight: 'clamp',
+	});
+	const x = wipeIn + wipeOut;
+	if (t > hold + 0.4) return null;
+
+	const chars = Array.from(keyLine);
+	const perChar = 1 / Math.max(18, preset.typeSpeed * 1.4);
+
+	return (
+		<AbsoluteFill style={{transform: `translateX(${x}%)`}}>
+			<AbsoluteFill
+				style={{
+					background: preset.cardBg,
+					justifyContent: 'center',
+					alignItems: 'center',
+				}}
+			>
+				<div style={{width: '74%', textAlign: 'left'}}>
+					<div
+						style={{
+							fontFamily: preset.captionFont,
+							fontWeight: 600,
+							fontSize: 17,
+							letterSpacing: 5,
+							textTransform: 'uppercase',
+							color: preset.cardInk,
+							marginBottom: 18,
+						}}
+					>
+						Chapter {ROMAN[chapter] ?? chapter}
+					</div>
+					<div
+						style={{
+							fontFamily: preset.displayFont,
+							fontWeight: preset.displayWeight,
+							fontSize: 52,
+							lineHeight: 1.25,
+							color: preset.cardBg === '#F6EFE3' || preset.cardBg === '#F4F1EA' ? '#221D14' : '#F5F2EA',
+						}}
+					>
+						{chars.map((ch, i) => {
+							const start = 0.25 + i * perChar;
+							const o = interpolate(t, [start, start + 0.12], [0, 1], {
+								extrapolateLeft: 'clamp',
+								extrapolateRight: 'clamp',
+							});
+							return (
+								<span key={i} style={{whiteSpace: 'pre', opacity: o}}>
+									{ch}
+								</span>
+							);
+						})}
+					</div>
+					<div
+						style={{
+							width: 74,
+							height: 4,
+							background: preset.cardInk,
+							marginTop: 24,
+							borderRadius: 2,
+						}}
+					/>
+				</div>
+			</AbsoluteFill>
+		</AbsoluteFill>
+	);
+};

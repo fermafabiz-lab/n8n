@@ -17,6 +17,7 @@
     "@remotion/lambda": "^4.0.0",
     "@remotion/renderer": "^4.0.0",
     "@remotion/bundler": "^4.0.0",
+    "@remotion/google-fonts": "^4.0.0",
     "express": "^4.21.0",
     "cors": "^2.8.5"
   },

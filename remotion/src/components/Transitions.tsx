@@ -46,6 +46,7 @@ export const Transitions: React.FC<{scenes: SceneCaption[]; tone: string}> = ({s
 export const kenBurnsTransform = (
 	scenes: SceneCaption[],
 	seconds: number,
+	energy: 0 | 1 | 2 = 1,
 ): string => {
 	const idx = scenes.findIndex(
 		(s) => seconds >= s.startSeconds && seconds < s.startSeconds + s.durationSeconds,
@@ -53,7 +54,23 @@ export const kenBurnsTransform = (
 	if (idx === -1) return 'scale(1)';
 	const s = scenes[idx];
 	const p = Math.min(1, (seconds - s.startSeconds) / Math.max(0.1, s.durationSeconds));
-	const scale = 1.015 + 0.035 * p;
+	let scale = 1.015 + 0.035 * p;
+
+	// Editor-style punch-ins: a quick extra push at 40% and 75% of the scene,
+	// where a human editor would cut. Scaled by the tone's energy; calm tones
+	// (energy 0) keep the pure slow push.
+	if (energy > 0) {
+		const punch = energy === 2 ? 0.02 : 0.011;
+		for (const at of [0.4, 0.75]) {
+			const d = p - at;
+			if (d >= 0 && d < 0.12) {
+				// Fast attack, slow release.
+				const k = d < 0.02 ? d / 0.02 : 1 - (d - 0.02) / 0.1;
+				scale += punch * Math.max(0, k);
+			}
+		}
+	}
+
 	const dir = idx % 2 === 0 ? 1 : -1;
 	const tx = dir * 8 * p; // px drift at 1280w — subtle
 	const ty = (idx % 3 === 0 ? -1 : 1) * 5 * p;

@@ -1,6 +1,7 @@
 import React from 'react';
 import {AbsoluteFill, useCurrentFrame, useVideoConfig} from 'remotion';
 import type {Palette, SceneCaption} from '../types';
+import type {StylePreset} from '../style';
 
 /**
  * Short caption chunks (max 4-5 words on screen at once), paced over the
@@ -63,10 +64,11 @@ const isKeyword = (word: string): boolean => {
 	return /^\p{Lu}/u.test(clean) || clean.length >= 11;
 };
 
-export const Captions: React.FC<{scenes: SceneCaption[]; palette: Palette}> = ({
-	scenes,
-	palette,
-}) => {
+export const Captions: React.FC<{
+	scenes: SceneCaption[];
+	palette: Palette;
+	preset: StylePreset;
+}> = ({scenes, palette, preset}) => {
 	const frame = useCurrentFrame();
 	const {fps} = useVideoConfig();
 	const seconds = frame / fps;
@@ -81,12 +83,11 @@ export const Captions: React.FC<{scenes: SceneCaption[]; palette: Palette}> = ({
 					marginBottom: 84,
 					maxWidth: '86%',
 					textAlign: 'center',
-					fontFamily: 'Arial, sans-serif',
-					fontWeight: 800,
-					fontSize: 44,
-					lineHeight: 1.3,
+					fontFamily: preset.captionFont,
+					fontWeight: 600,
+					fontSize: 40,
+					lineHeight: 1.35,
 					textShadow: '0 3px 14px rgba(0,0,0,0.9)',
-					textTransform: 'uppercase',
 				}}
 			>
 				{active.chunk.map((word, i) => {

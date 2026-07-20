@@ -96,6 +96,10 @@ export function registerAssemble(app, {jobs, outputDir}) {
 		const scenes = req.body && req.body.scenes;
 		const musicUrl = req.body && req.body.musicUrl;
 		const sceneChapters = (req.body && req.body.sceneChapters) || [];
+		// "16:9" (default) or "9:16" — decides the output canvas.
+		const portrait = (req.body && req.body.aspect) === '9:16';
+		const W = portrait ? 720 : 1280;
+		const H = portrait ? 1280 : 720;
 		if (!Array.isArray(scenes) || scenes.length === 0) {
 			return res.status(400).json({error: 'scenes: [{videoUrl, audioUrl}] is required'});
 		}
@@ -176,8 +180,10 @@ export function registerAssemble(app, {jobs, outputDir}) {
 				items.forEach((it, i) => {
 					const d = it.eff.toFixed(3);
 					const freeze = Math.max(0, it.eff - it.dur);
+					// Cover-fit to the target canvas: scale up to fill, center-crop
+					// the overflow. A 16:9 clip on a 9:16 canvas crops the sides.
 					const vchain =
-						`scale=1280:720,fps=24,trim=duration=${it.dur.toFixed(3)},setpts=PTS-STARTPTS` +
+						`scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},fps=24,trim=duration=${it.dur.toFixed(3)},setpts=PTS-STARTPTS` +
 						(freeze > 0.01 ? `,tpad=stop_mode=clone:stop_duration=${freeze.toFixed(3)}` : '');
 					parts.push(`[${i * 2}:v]${vchain}[v${i}]`);
 					parts.push(`[${i * 2 + 1}:a]${MONO},atrim=duration=${d},asetpts=PTS-STARTPTS,apad=whole_dur=${d}[a${i}]`);

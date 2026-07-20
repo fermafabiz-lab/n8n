@@ -47,6 +47,10 @@ export type FinalVideoProps = {
 	outroDurationInSeconds: number;
 	/** How long the cinematic title stays over the hook scene. */
 	hookTitleDurationInSeconds: number;
+	/** "16:9" (landscape, default) or "9:16" (vertical/Shorts). */
+	aspectRatio: string;
+	/** Master switch for karaoke captions. */
+	showCaptions: boolean;
 };
 
 export const defaultFinalVideoProps: FinalVideoProps = {
@@ -60,6 +64,8 @@ export const defaultFinalVideoProps: FinalVideoProps = {
 	introDurationInSeconds: 0,
 	outroDurationInSeconds: 4,
 	hookTitleDurationInSeconds: 3.5,
+	aspectRatio: '16:9',
+	showCaptions: true,
 };
 
 /** Tone → visual language. Lowercased, diacritics-insensitive lookup. */

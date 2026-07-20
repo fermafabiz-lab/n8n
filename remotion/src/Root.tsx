@@ -12,10 +12,9 @@ export const RemotionRoot: React.FC = () => {
 			component={FinalVideo}
 			durationInFrames={300}
 			fps={FPS}
-			// 720p, not 1080p: Railway's plan caps this container at 1GB RAM, and
-			// decoding+re-encoding 1080p crashed Chromium outright ("Page crashed!",
-			// an OOM kill) even at concurrency=1. Bump back to 1920x1080 once
-			// hosted somewhere with more memory.
+			// 720p class, not 1080p: renders happen on a modest Railway box and
+			// the 720 pixel budget keeps Chromium comfortable. The real
+			// dimensions come from calculateMetadata based on the aspect ratio.
 			width={1280}
 			height={720}
 			defaultProps={defaultFinalVideoProps}
@@ -27,9 +26,12 @@ export const RemotionRoot: React.FC = () => {
 					: 0;
 				const totalSeconds =
 					p.introDurationInSeconds + videoDurationSeconds + p.outroDurationInSeconds;
+				const portrait = p.aspectRatio === '9:16';
 
 				return {
 					durationInFrames: Math.max(1, Math.round(totalSeconds * FPS)),
+					width: portrait ? 720 : 1280,
+					height: portrait ? 1280 : 720,
 				};
 			}}
 		/>

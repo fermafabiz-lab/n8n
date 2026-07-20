@@ -70,7 +70,9 @@ export const Captions: React.FC<{
 	preset: StylePreset;
 	/** Hide captions before this time (while the hook title owns the frame). */
 	suppressUntilSeconds?: number;
-}> = ({scenes, palette, preset, suppressUntilSeconds = 0}) => {
+	/** Vertical (9:16) framing: bigger type, raised safe-zone position. */
+	portrait?: boolean;
+}> = ({scenes, palette, preset, suppressUntilSeconds = 0, portrait = false}) => {
 	const frame = useCurrentFrame();
 	const {fps} = useVideoConfig();
 	const seconds = frame / fps;
@@ -87,12 +89,14 @@ export const Captions: React.FC<{
 		<AbsoluteFill style={{justifyContent: 'flex-end', alignItems: 'center'}}>
 			<div
 				style={{
-					marginBottom: 84,
-					maxWidth: '86%',
+					// Portrait: lift captions well above the platform UI (Shorts /
+					// Reels overlays live in the bottom ~20%).
+					marginBottom: portrait ? 280 : 84,
+					maxWidth: portrait ? '90%' : '86%',
 					textAlign: 'center',
 					fontFamily: preset.captionFont,
-					fontWeight: 600,
-					fontSize: 40,
+					fontWeight: portrait ? 700 : 600,
+					fontSize: portrait ? 44 : 40,
 					lineHeight: 1.35,
 					textShadow: '0 3px 14px rgba(0,0,0,0.9)',
 				}}

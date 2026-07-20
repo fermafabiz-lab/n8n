@@ -11,7 +11,9 @@ export const OutroCard: React.FC<{
 	channelName: string;
 	subscribeText: string;
 	palette: Palette;
-}> = ({channelName, subscribeText, palette}) => {
+	/** 9:16: stack identity above the next-video zone instead of side by side. */
+	portrait?: boolean;
+}> = ({channelName, subscribeText, palette, portrait = false}) => {
 	const frame = useCurrentFrame();
 	const {fps} = useVideoConfig();
 
@@ -33,16 +35,18 @@ export const OutroCard: React.FC<{
 			<div
 				style={{
 					display: 'flex',
+					flexDirection: portrait ? 'column' : 'row',
 					width: '100%',
 					height: '100%',
 					alignItems: 'center',
-					padding: '0 70px',
-					gap: 60,
+					justifyContent: 'center',
+					padding: portrait ? '80px 44px' : '0 70px',
+					gap: portrait ? 44 : 60,
 					transform: `translateY(${slideUp}px)`,
 				}}
 			>
 				{/* Channel identity + subscribe */}
-				<div style={{flex: 1, textAlign: 'center'}}>
+				<div style={{flex: portrait ? 'none' : 1, textAlign: 'center'}}>
 					<div
 						style={{
 							width: 120,
@@ -92,7 +96,7 @@ export const OutroCard: React.FC<{
 				</div>
 
 				{/* Reserved zone for YouTube's clickable next-video element */}
-				<div style={{flex: 1.15}}>
+				<div style={{flex: portrait ? 'none' : 1.15, width: portrait ? '84%' : undefined}}>
 					<div
 						style={{
 							aspectRatio: '16/9',

@@ -25,6 +25,8 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 	tone,
 	outroDurationInSeconds,
 	hookTitleDurationInSeconds,
+	aspectRatio,
+	showCaptions,
 }) => {
 	const {fps} = useVideoConfig();
 	const frame = useCurrentFrame();
@@ -76,12 +78,15 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 					</AbsoluteFill>
 					<FilmLayer tone={tone} />
 					<Transitions scenes={scenes} tone={tone} />
-					<Captions
-						scenes={scenes}
-						palette={palette}
-						preset={preset}
-						suppressUntilSeconds={hookSeconds - 0.4}
-					/>
+					{showCaptions && (
+						<Captions
+							scenes={scenes}
+							palette={palette}
+							preset={preset}
+							suppressUntilSeconds={hookSeconds - 0.4}
+							portrait={aspectRatio === '9:16'}
+						/>
+					)}
 					{chapterStarts.map((s) => (
 						<Sequence
 							key={`ch-${s.chapter}`}
@@ -107,7 +112,12 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 			</Sequence>
 
 			<Sequence from={videoFrames} durationInFrames={outroFrames}>
-				<OutroCard channelName={channelName} subscribeText={subscribeText} palette={palette} />
+				<OutroCard
+					channelName={channelName}
+					subscribeText={subscribeText}
+					palette={palette}
+					portrait={aspectRatio === '9:16'}
+				/>
 			</Sequence>
 		</AbsoluteFill>
 	);

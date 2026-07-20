@@ -135,6 +135,8 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     Pace: String(formData.get("pace") ?? "Normal"),
     Style: String(formData.get("style") ?? ""),
     voice_id: String(formData.get("voice_id") ?? ""),
+    aspect: String(formData.get("aspect") ?? "16:9"),
+    captions: String(formData.get("captions") ?? "yes"),
   };
   try {
     const res = await fetch(webhook, {

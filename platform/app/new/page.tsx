@@ -74,6 +74,22 @@ export default function NewVideo() {
         </div>
 
         <div className="field">
+          <label htmlFor="aspect">Format</label>
+          <select id="aspect" name="aspect" defaultValue="16:9">
+            <option value="16:9">16:9 — orizontal (YouTube)</option>
+            <option value="9:16">9:16 — vertical (Shorts / TikTok / Reels)</option>
+          </select>
+        </div>
+
+        <div className="field">
+          <label htmlFor="captions">Subtitrări</label>
+          <select id="captions" name="captions" defaultValue="yes">
+            <option value="yes">Da — karaoke pe fiecare scenă</option>
+            <option value="no">Nu — doar imagine și narație</option>
+          </select>
+        </div>
+
+        <div className="field">
           <label htmlFor="tone">Tonalitate</label>
           <select id="tone" name="tone" defaultValue="Dark">
             {TONES.map((t) => (

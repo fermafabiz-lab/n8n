@@ -4,6 +4,7 @@ import { getProject, getProjectScriptInfo, getScenes, type Scene } from "@/lib/d
 import SceneBoard from "@/components/SceneBoard";
 import ScriptReview from "@/components/ScriptReview";
 import AutoRefresh from "@/components/AutoRefresh";
+import MediaPlayer from "@/components/MediaPlayer";
 
 export const dynamic = "force-dynamic";
 
@@ -69,7 +70,13 @@ export default async function ProductionRoom({
 
         {project.finalVideoUrl && project.finalVideoUrl.startsWith("http") && (
           <div className="finalvideo">
-            <video src={project.finalVideoUrl} controls preload="metadata" />
+            <div className="vwrap">
+              <MediaPlayer
+                url={project.finalVideoUrl}
+                portrait={project.aspect === "9:16"}
+                maxHeight={560}
+              />
+            </div>
             <div className="vbar">
               <span>Final video</span>
               <a
@@ -103,7 +110,11 @@ export default async function ProductionRoom({
         )}
 
         {scenes.length > 0 ? (
-          <SceneBoard projectId={id} scenes={scenes} />
+          <SceneBoard
+            projectId={id}
+            scenes={scenes}
+            portrait={project.aspect === "9:16"}
+          />
         ) : !script ? (
           <div className="empty">
             <h3>Production is warming up</h3>

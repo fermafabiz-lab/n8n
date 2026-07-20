@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { approveAllImages, sceneAction, type ActionResult } from "@/app/actions";
 import type { Scene, StatusKind } from "@/lib/data";
+import MediaPlayer from "@/components/MediaPlayer";
 
 function frClass(kind: StatusKind): string {
   switch (kind) {
@@ -33,9 +34,11 @@ function chipClass(kind: StatusKind): string {
 export default function SceneBoard({
   projectId,
   scenes,
+  portrait = false,
 }: {
   projectId: string;
   scenes: Scene[];
+  portrait?: boolean;
 }) {
   const running = scenes.find((s) => s.statusKind === "run");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -53,7 +56,7 @@ export default function SceneBoard({
   return (
     <div className="stage">
       <div>
-        <div className="monitor">
+        <div className={`monitor${portrait ? " portrait" : ""}`}>
           <div className="scr">
             <div
               className={`art ${active?.imageUrl ? "" : "fallback1"}`}
@@ -159,19 +162,8 @@ export default function SceneBoard({
               </div>
             )}
             {active.videoUrl && (
-              <div style={{ marginTop: 16 }}>
-                <video
-                  key={active.id}
-                  src={active.videoUrl}
-                  controls
-                  preload="metadata"
-                  style={{
-                    width: "100%",
-                    borderRadius: 12,
-                    background: "#000",
-                    aspectRatio: "16/9",
-                  }}
-                />
+              <div style={{ marginTop: 16 }} key={active.id}>
+                <MediaPlayer url={active.videoUrl} portrait={portrait} />
               </div>
             )}
             {active.videoUrl && !active.videoApproved && (

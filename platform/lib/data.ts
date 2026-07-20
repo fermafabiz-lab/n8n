@@ -20,6 +20,7 @@ export interface Project {
   statusKind: StatusKind;
   progress: number; // 0..1
   finalVideoUrl: string | null;
+  aspect: "16:9" | "9:16";
   updatedAt: string | null;
 }
 
@@ -72,6 +73,7 @@ const F = {
   projectLength: ["Lenght", "Length", "Durata"],
   projectTone: ["Tonalitate", "Tone"],
   projectFinalVideo: ["Link Video Final", "Final Video URL"],
+  projectAspect: ["Format"],
   sceneOrder: ["Ordine Scenă", "Ordine Scena"],
   sceneNarration: ["Script Scenă", "Narration", "Narațiune"],
   sceneImage: ["Imagine Scenă", "Imagine Scena"],
@@ -144,6 +146,7 @@ function toProject(r: AirtableRecord): Project {
     statusKind: kind,
     progress,
     finalVideoUrl: (pick(r.fields, F.projectFinalVideo) as string) ?? null,
+    aspect: pick(r.fields, F.projectAspect) === "9:16" ? "9:16" : "16:9",
     updatedAt: r.createdTime,
   };
 }
@@ -208,6 +211,7 @@ const DEMO_PROJECTS: Project[] = [
     statusKind: "wait",
     progress: 0.62,
     finalVideoUrl: null,
+    aspect: "16:9" as const,
     updatedAt: null,
   },
   {
@@ -219,6 +223,7 @@ const DEMO_PROJECTS: Project[] = [
     statusKind: "run",
     progress: 0.58,
     finalVideoUrl: null,
+    aspect: "16:9" as const,
     updatedAt: null,
   },
   {
@@ -230,6 +235,7 @@ const DEMO_PROJECTS: Project[] = [
     statusKind: "err",
     progress: 0.31,
     finalVideoUrl: null,
+    aspect: "16:9" as const,
     updatedAt: null,
   },
   {
@@ -241,6 +247,7 @@ const DEMO_PROJECTS: Project[] = [
     statusKind: "done",
     progress: 1,
     finalVideoUrl: "#",
+    aspect: "16:9" as const,
     updatedAt: null,
   },
 ];

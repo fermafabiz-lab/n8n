@@ -471,6 +471,25 @@ a {
   aspect-ratio: 16/8.6;
   position: relative;
 }
+/* 9:16 projects: show the whole vertical frame instead of cropping to 16:9 */
+.monitor.portrait .scr {
+  aspect-ratio: auto;
+  height: 520px;
+}
+.monitor.portrait .scr .art {
+  position: absolute;
+  inset: 0;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-color: #000;
+}
+.monitor.portrait .fr {
+  width: 72px;
+}
+.monitor.portrait .fr .art {
+  aspect-ratio: 9/16;
+}
 .monitor .scr .art {
   position: absolute;
   inset: 0;
@@ -878,6 +897,9 @@ a {
   width: 100%;
   aspect-ratio: 16/9;
   background: #000;
+}
+.finalvideo .vwrap {
+  padding: 14px 14px 0;
 }
 .finalvideo .vbar {
   display: flex;

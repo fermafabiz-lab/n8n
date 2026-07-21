@@ -6,6 +6,7 @@ import ScriptReview from "@/components/ScriptReview";
 import SceneReview from "@/components/SceneReview";
 import AutoRefresh from "@/components/AutoRefresh";
 import MediaPlayer from "@/components/MediaPlayer";
+import StageChime from "@/components/StageChime";
 
 export const dynamic = "force-dynamic";
 
@@ -56,9 +57,27 @@ export default async function ProductionRoom({
       ? scriptInfo
       : null;
 
+  // Which gate (if any) is waiting on the user — drives the notification
+  // chime when a generation step finishes and hands control back.
+  const stage =
+    project.statusKind === "err"
+      ? "error"
+      : project.statusKind === "done"
+        ? "finished"
+        : script
+          ? "script-review"
+          : scenes.length > 0 && scenes.some((s) => !s.sceneApproved)
+            ? "scene-review"
+            : scenes.some((s) => s.imageUrl && !s.imageApproved)
+              ? "image-review"
+              : scenes.some((s) => s.videoUrl && !s.videoApproved)
+                ? "video-review"
+                : "working";
+
   return (
     <main className="page">
       <AutoRefresh seconds={10} />
+      <StageChime items={[{ key: id, stage }]} />
       <div className="room">
         <div className="crumb">
           <Link href="/">Projects</Link> / <b>{project.name}</b>

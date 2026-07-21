@@ -57,20 +57,28 @@ export default function SceneBoard({
     <div className="stage">
       <div>
         <div className={`monitor${portrait ? " portrait" : ""}`}>
-          <div className="scr">
-            <div
-              className={`art ${active?.imageUrl ? "" : "fallback1"}`}
-              style={
-                active?.imageUrl
-                  ? { backgroundImage: `url(${active.imageUrl})` }
-                  : undefined
-              }
-            />
-            <span className="tc">{active?.label ?? "—"}</span>
-            <div className="cap">
-              <h4>{active?.narration?.slice(0, 70) ?? "No scene selected"}</h4>
-              <p>{active?.status}</p>
-            </div>
+          <div className={`scr${active?.videoUrl ? " video" : ""}`}>
+            {active?.videoUrl ? (
+              // The clip plays in the big monitor so the whole frame is
+              // visible; the inspector keeps only the approve/regen controls.
+              <MediaPlayer key={active.id} url={active.videoUrl} portrait={portrait} fill />
+            ) : (
+              <>
+                <div
+                  className={`art ${active?.imageUrl ? "" : "fallback1"}`}
+                  style={
+                    active?.imageUrl
+                      ? { backgroundImage: `url(${active.imageUrl})` }
+                      : undefined
+                  }
+                />
+                <span className="tc">{active?.label ?? "—"}</span>
+                <div className="cap">
+                  <h4>{active?.narration?.slice(0, 70) ?? "No scene selected"}</h4>
+                  <p>{active?.status}</p>
+                </div>
+              </>
+            )}
           </div>
           <div className="filmstrip">
             {scenes.map((s, i) => (
@@ -161,11 +169,6 @@ export default function SceneBoard({
                 </button>
               </div>
             )}
-            {active.videoUrl && (
-              <div style={{ marginTop: 16 }} key={active.id}>
-                <MediaPlayer url={active.videoUrl} portrait={portrait} />
-              </div>
-            )}
             {active.videoUrl && !active.videoApproved && (
               <div className="abtns">
                 <button
@@ -202,7 +205,7 @@ export default function SceneBoard({
               <textarea
                 value={feedback}
                 onChange={(e) => setFeedback(e.target.value)}
-                placeholder="Opțional: ce să schimbe la regenerare? (ex. „mai multă lumină, camera mai aproape de personaj”)"
+                placeholder="Optional: what should change on regeneration? (e.g. “more light, camera closer to the character”)"
                 rows={2}
                 style={{
                   width: "100%",

@@ -42,7 +42,7 @@ export default function NewVideo() {
 
       <form className="form" action={formAction}>
         <div className="field">
-          <label htmlFor="name">Tema / titlu</label>
+          <label htmlFor="name">Topic / title</label>
           <input
             id="name"
             name="name"
@@ -51,14 +51,14 @@ export default function NewVideo() {
             required
           />
           <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--dim)" }}>
-            Scurt — devine titlul afișat în video. Detaliile de stil merg la
-            câmpul Style, nu aici.
+            Keep it short — it becomes the title shown in the video. Style
+            details go in the Style field, not here.
           </p>
         </div>
 
         <div className="field">
           <label htmlFor="length">
-            Length (secunde) — ≈ {scenes} scene a câte 8s
+            Length (seconds) — ≈ {scenes} scenes of 8s each
           </label>
           <input
             id="length"
@@ -76,21 +76,21 @@ export default function NewVideo() {
         <div className="field">
           <label htmlFor="aspect">Format</label>
           <select id="aspect" name="aspect" defaultValue="16:9">
-            <option value="16:9">16:9 — orizontal (YouTube)</option>
+            <option value="16:9">16:9 — horizontal (YouTube)</option>
             <option value="9:16">9:16 — vertical (Shorts / TikTok / Reels)</option>
           </select>
         </div>
 
         <div className="field">
-          <label htmlFor="captions">Subtitrări</label>
+          <label htmlFor="captions">Captions</label>
           <select id="captions" name="captions" defaultValue="yes">
-            <option value="yes">Da — karaoke pe fiecare scenă</option>
-            <option value="no">Nu — doar imagine și narație</option>
+            <option value="yes">Yes — on-screen captions per scene</option>
+            <option value="no">No — visuals and narration only</option>
           </select>
         </div>
 
         <div className="field">
-          <label htmlFor="tone">Tonalitate</label>
+          <label htmlFor="tone">Tone</label>
           <select id="tone" name="tone" defaultValue="Dark">
             {TONES.map((t) => (
               <option key={t}>{t}</option>
@@ -108,7 +108,7 @@ export default function NewVideo() {
         </div>
 
         <div className="field">
-          <label htmlFor="style">Style (opțional)</label>
+          <label htmlFor="style">Style (optional)</label>
           <input
             id="style"
             name="style"

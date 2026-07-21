@@ -47,9 +47,10 @@ export default function ScriptReview({
         </div>
       </div>
       <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--soft)" }}>
-        Poți edita textul direct aici — păstrează marcajele{" "}
-        <code style={{ color: "var(--amber)" }}>[CHAPTER n: titlu]</code>, ele
-        despart capitolele. Approve trimite exact ce vezi mai jos în producție.
+        You can edit the text right here — keep the{" "}
+        <code style={{ color: "var(--amber)" }}>[CHAPTER n: title]</code>{" "}
+        markers, they separate the chapters. Approve sends exactly what you see
+        below into production.
       </p>
       {msg && <p className={`formmsg ${msg.ok ? "ok" : "err"}`}>{msg.message}</p>}
       <textarea
@@ -72,8 +73,8 @@ export default function ScriptReview({
         }}
       />
       <div style={{ marginTop: 8, fontSize: 12, color: "var(--dim)", textAlign: "right" }}>
-        {text.trim().split(/\s+/).filter(Boolean).length} cuvinte
-        {dirty ? " · modificat" : ""}
+        {text.trim().split(/\s+/).filter(Boolean).length} words
+        {dirty ? " · edited" : ""}
       </div>
     </div>
   );

@@ -17,25 +17,40 @@ export default function MediaPlayer({
   url,
   portrait = false,
   maxHeight = 420,
+  fill = false,
 }: {
   url: string;
   portrait?: boolean;
   maxHeight?: number;
+  // fill: stretch to the parent (e.g. the monitor screen area); the embedded
+  // player letterboxes internally, so nothing gets cropped.
+  fill?: boolean;
 }) {
   const ratio = portrait ? "9 / 16" : "16 / 9";
   const id = url.includes("drive.google.com") ? driveId(url) : null;
 
-  const frameStyle: React.CSSProperties = {
-    aspectRatio: ratio,
-    width: portrait ? "auto" : "100%",
-    height: portrait ? maxHeight : "auto",
-    maxWidth: "100%",
-    margin: "0 auto",
-    display: "block",
-    borderRadius: 12,
-    background: "#000",
-    border: "none",
-  };
+  const frameStyle: React.CSSProperties = fill
+    ? {
+        position: "absolute",
+        inset: 0,
+        width: "100%",
+        height: "100%",
+        background: "#000",
+        border: "none",
+        display: "block",
+        objectFit: "contain",
+      }
+    : {
+        aspectRatio: ratio,
+        width: portrait ? "auto" : "100%",
+        height: portrait ? maxHeight : "auto",
+        maxWidth: "100%",
+        margin: "0 auto",
+        display: "block",
+        borderRadius: 12,
+        background: "#000",
+        border: "none",
+      };
 
   if (id) {
     return (

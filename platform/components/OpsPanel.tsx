@@ -19,10 +19,10 @@ export default async function OpsPanel() {
   if (!n8nConfigured) {
     return (
       <div className="setupnote">
-        <b>Production health este oprit.</b> Setează <code>N8N_API_URL</code>{" "}
-        (ex. <code>https://fermafabiz.app.n8n.cloud/api/v1</code>) și{" "}
-        <code>N8N_API_KEY</code> (n8n → Settings → n8n API) ca să vezi aici
-        execuțiile în desfășurare, erorile și butonul de Stop.
+        <b>Production health is off.</b> Set <code>N8N_API_URL</code>{" "}
+        (e.g. <code>https://fermafabiz.app.n8n.cloud/api/v1</code>) and{" "}
+        <code>N8N_API_KEY</code> (n8n → Settings → n8n API) to see running
+        executions, errors and the Stop button here.
       </div>
     );
   }
@@ -54,7 +54,7 @@ export default async function OpsPanel() {
     return (
       <div className="card errcard" style={{ marginBottom: 32 }}>
         <h5>Production health</h5>
-        <p>Nu pot citi API-ul n8n: {apiError}</p>
+        <p>Can&apos;t reach the n8n API: {apiError}</p>
       </div>
     );
   }
@@ -65,7 +65,7 @@ export default async function OpsPanel() {
     <div style={{ marginBottom: 36, display: "flex", flexDirection: "column", gap: 14 }}>
       {running.length > 0 && (
         <div className="card">
-          <h5>În lucru acum</h5>
+          <h5>Running now</h5>
           {running.map((r) => (
             <div className="kv" key={r.id}>
               <span>
@@ -96,14 +96,14 @@ export default async function OpsPanel() {
 
       {withErrors.length > 0 && (
         <div className="card errcard">
-          <h5>Erori recente (24h)</h5>
+          <h5>Recent errors (24h)</h5>
           {withErrors.map((f) => (
             <div className="kv" key={f.id} style={{ alignItems: "flex-start" }}>
               <span style={{ maxWidth: "75%" }}>
                 <b style={{ color: "var(--ink)" }}>{f.workflowName}</b> · {ago(f.stoppedAt)}
                 <br />
                 <span style={{ fontSize: 12.5 }}>
-                  {f.errorMessage ?? "Fără detalii — deschide execuția în n8n."}
+                  {f.errorMessage ?? "No details — open the execution in n8n."}
                 </span>
               </span>
               <span className="chip err">failed</span>

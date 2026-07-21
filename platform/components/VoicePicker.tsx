@@ -13,9 +13,9 @@ interface Voice {
 }
 
 const PROVIDERS = [
-  { id: "elevenlabs", label: "ElevenLabs (calitate maximă)" },
+  { id: "elevenlabs", label: "ElevenLabs (best quality)" },
   { id: "minimax", label: "Minimax" },
-  { id: "edge", label: "Edge (gratuit)" },
+  { id: "edge", label: "Edge (free)" },
   { id: "kokoro", label: "Kokoro" },
 ];
 
@@ -72,7 +72,7 @@ export default function VoicePicker({ name = "voice_id" }: { name?: string }) {
 
   return (
     <div className="field">
-      <label>Voce narator — apasă ▶ ca să asculți</label>
+      <label>Narrator voice — press ▶ to listen</label>
       <input type="hidden" name={name} value={selected} />
       <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
         <select
@@ -87,14 +87,14 @@ export default function VoicePicker({ name = "voice_id" }: { name?: string }) {
           ))}
         </select>
         <input
-          placeholder="Caută: warm, deep, narration, british…"
+          placeholder="Search: warm, deep, narration, british…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
       </div>
 
       {error && <p className="formmsg err">{error}</p>}
-      {loading && <p style={{ fontSize: 13, color: "var(--soft)" }}>Se încarcă vocile…</p>}
+      {loading && <p style={{ fontSize: 13, color: "var(--soft)" }}>Loading voices…</p>}
 
       <div
         style={{
@@ -153,7 +153,7 @@ export default function VoicePicker({ name = "voice_id" }: { name?: string }) {
                   {v.name}
                   {isSel && (
                     <span className="chip ok" style={{ marginLeft: 10 }}>
-                      selectată
+                      selected
                     </span>
                   )}
                 </div>
@@ -175,7 +175,7 @@ export default function VoicePicker({ name = "voice_id" }: { name?: string }) {
         })}
         {!loading && voices.length === 0 && !error && (
           <p style={{ fontSize: 13, color: "var(--soft)", margin: 8 }}>
-            Nicio voce găsită pentru căutarea asta.
+            No voices found for this search.
           </p>
         )}
       </div>

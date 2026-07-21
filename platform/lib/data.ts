@@ -29,8 +29,10 @@ export interface Scene {
   order: number;
   label: string;
   narration: string | null;
+  imagePrompt: string | null;
   imageUrl: string | null;
   videoUrl: string | null;
+  sceneApproved: boolean;
   imageApproved: boolean;
   videoApproved: boolean;
   status: string;
@@ -118,6 +120,8 @@ const F = {
   // Scenă" attachment.
   sceneVideo: ["Scene Final URL"],
   sceneVideoAttachment: ["Video Scenă"],
+  sceneImagePrompt: ["Imagine First Frame"],
+  sceneApproved: ["Aprobare Scenă", "Aprobare Scena"],
   sceneImageApproved: ["Aprobare Imagine"],
   sceneVideoApproved: ["Aprobare Video"],
   sceneStatus: ["Status Producție Scenă", "Status"],
@@ -199,8 +203,10 @@ function toScene(r: AirtableRecord, index: number): Scene {
     order,
     label: `S${index + 1}`,
     narration: (pick(r.fields, F.sceneNarration) as string) ?? null,
+    imagePrompt: (pick(r.fields, F.sceneImagePrompt) as string) ?? null,
     imageUrl: firstAttachmentUrl(pick(r.fields, F.sceneImage)),
     videoUrl,
+    sceneApproved: Boolean(pick(r.fields, F.sceneApproved)),
     imageApproved: Boolean(pick(r.fields, F.sceneImageApproved)),
     videoApproved: Boolean(pick(r.fields, F.sceneVideoApproved)),
     status: displayStatus(status),
@@ -305,8 +311,10 @@ const DEMO_SCENES: Scene[] = Array.from({ length: 8 }, (_, i) => {
     order: i + 1,
     label: `S${i + 1}`,
     narration: names[i],
+    imagePrompt: null,
     imageUrl: null,
     videoUrl: null,
+    sceneApproved: true,
     imageApproved: i < 4,
     videoApproved: i < 2,
     status: kinds[i] === "run" ? "Generating Video" : kinds[i] === "err" ? "Error" : kinds[i] === "done" ? "Video Ready" : "Queued",
@@ -440,4 +448,19 @@ export async function writeScriptFields(
 /** Reviewer feedback consumed (and cleared) by the n8n regen chains. */
 export async function writeSceneFeedback(sceneId: string, feedback: string): Promise<void> {
   await airtablePatch(SCENES_TABLE, sceneId, { "Observații Scenă": feedback });
+}
+
+// Scene-script review: edits land in the same fields n8n reads after the
+// "Aprobare Scenă" gate, so approved text/prompts flow straight to TTS and
+// image generation.
+export async function writeSceneScript(
+  sceneId: string,
+  fields: { narration?: string; imagePrompt?: string; approve?: boolean },
+): Promise<void> {
+  const patch: Record<string, unknown> = {};
+  if (typeof fields.narration === "string") patch["Script Scenă"] = fields.narration;
+  if (typeof fields.imagePrompt === "string") patch["Imagine First Frame"] = fields.imagePrompt;
+  if (fields.approve) patch["Aprobare Scenă"] = true;
+  if (Object.keys(patch).length === 0) return;
+  await airtablePatch(SCENES_TABLE, sceneId, patch);
 }

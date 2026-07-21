@@ -8,6 +8,7 @@ import {
   writeProjectFields,
   writeSceneApproval,
   writeSceneFeedback,
+  writeSceneScript,
   writeScriptFields,
 } from "@/lib/data";
 import { stopExecution } from "@/lib/n8n";
@@ -72,6 +73,50 @@ export async function approveAllImages(
     }
     revalidatePath(`/projects/${projectId}`);
     return { ok: true, message: `Approved ${sceneIds.length} images.` };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+export async function saveSceneScript(
+  projectId: string,
+  sceneId: string,
+  narration: string,
+  imagePrompt: string,
+  approve: boolean,
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    await writeSceneScript(sceneId, { narration, imagePrompt, approve });
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message: approve
+        ? "Scene approved — production continues once every scene is approved."
+        : "Scene saved.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+export async function approveAllScenes(
+  projectId: string,
+  sceneIds: string[],
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    for (const id of sceneIds) {
+      await writeSceneScript(id, { approve: true });
+      // Airtable rate limit is 5 req/s per base.
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    revalidatePath(`/projects/${projectId}`);
+    return { ok: true, message: `Approved ${sceneIds.length} scenes — production continues.` };
   } catch (e) {
     return { ok: false, message: friendlyError(e) };
   }

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getProject, getProjectScriptInfo, getScenes, type Scene } from "@/lib/data";
 import SceneBoard from "@/components/SceneBoard";
 import ScriptReview from "@/components/ScriptReview";
+import SceneReview from "@/components/SceneReview";
 import AutoRefresh from "@/components/AutoRefresh";
 import MediaPlayer from "@/components/MediaPlayer";
 
@@ -10,17 +11,22 @@ export const dynamic = "force-dynamic";
 
 // Pipeline position derived from scene states: images → video → assembly.
 function pipeline(scenes: Scene[], projectDone: boolean) {
+  const scenesApproved = scenes.filter((s) => s.sceneApproved).length;
   const imagesApproved = scenes.filter((s) => s.imageApproved).length;
   const videosDone = scenes.filter((s) => s.videoUrl).length;
   const total = scenes.length || 1;
+  const scenesDone = scenesApproved === total && total > 0;
   const imagesDone = imagesApproved === total && total > 0;
   const videoDone = videosDone === total && total > 0;
   return [
     { name: "Script", state: "done" },
-    { name: "Scenes", state: "done" },
+    {
+      name: scenesDone ? "Scenes" : `Scenes · ${scenesApproved}/${total}`,
+      state: scenesDone ? "done" : "act",
+    },
     {
       name: imagesDone ? "Images" : `Images · ${imagesApproved}/${total}`,
-      state: imagesDone ? "done" : "act",
+      state: imagesDone ? "done" : scenesDone ? "act" : "next",
     },
     {
       name: videoDone ? "Video" : `Video · ${videosDone}/${total}`,
@@ -109,7 +115,11 @@ export default async function ProductionRoom({
           <ScriptReview projectId={id} scriptId={script.id} content={script.content} />
         )}
 
-        {scenes.length > 0 ? (
+        {scenes.length > 0 && scenes.some((s) => !s.sceneApproved) ? (
+          // Scene text review phase: scripts are split into scenes but not
+          // all approved yet — media generation hasn't started.
+          <SceneReview projectId={id} scenes={scenes} />
+        ) : scenes.length > 0 ? (
           <SceneBoard
             projectId={id}
             scenes={scenes}

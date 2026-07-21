@@ -72,17 +72,37 @@ export async function getExecutions(
   return (data.data ?? []).map(toSummary);
 }
 
-export async function getExecutionError(id: string): Promise<string | null> {
+export interface ExecutionError {
+  node: string | null;
+  message: string;
+}
+
+export async function getExecutionError(id: string): Promise<ExecutionError | null> {
   if (!n8nConfigured) return null;
   const res = await api(`/executions/${id}?includeData=true`);
   if (!res.ok) return null;
   const data = (await res.json()) as {
-    data?: {resultData?: {error?: {message?: string}; lastNodeExecuted?: string}};
+    data?: {
+      resultData?: {
+        error?: { message?: string; node?: { name?: string } };
+        lastNodeExecuted?: string;
+      };
+    };
   };
   const rd = data.data?.resultData;
   if (!rd) return null;
   const msg = rd.error?.message ?? null;
-  return msg ? `${rd.lastNodeExecuted ? `[${rd.lastNodeExecuted}] ` : ""}${msg}` : null;
+  if (!msg) return null;
+  // The error object's own node name is the most precise; lastNodeExecuted
+  // is the fallback (they match except for sub-workflow bubbles).
+  return { node: rd.error?.node?.name ?? rd.lastNodeExecuted ?? null, message: msg };
+}
+
+/** Deep link into the n8n editor for a specific execution. */
+export function executionUrl(workflowId: string, executionId: string): string | null {
+  if (!BASE) return null;
+  const editor = BASE.replace(/\/api\/v1\/?$/, "");
+  return `${editor}/workflow/${workflowId}/executions/${executionId}`;
 }
 
 /**

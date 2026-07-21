@@ -1,4 +1,4 @@
-import { getExecutionError, getExecutions, n8nConfigured } from "@/lib/n8n";
+import { executionUrl, getExecutionError, getExecutions, n8nConfigured } from "@/lib/n8n";
 import { stopExecutionAction } from "@/app/actions";
 
 function ago(iso: string | null): string {
@@ -46,7 +46,7 @@ export default async function OpsPanel() {
   const withErrors = await Promise.all(
     recentFailed.map(async (f) => ({
       ...f,
-      errorMessage: await getExecutionError(f.id),
+      error: await getExecutionError(f.id),
     })),
   );
 
@@ -100,13 +100,45 @@ export default async function OpsPanel() {
           {withErrors.map((f) => (
             <div className="kv" key={f.id} style={{ alignItems: "flex-start" }}>
               <span style={{ maxWidth: "75%" }}>
-                <b style={{ color: "var(--ink)" }}>{f.workflowName}</b> · {ago(f.stoppedAt)}
+                <b style={{ color: "var(--ink)" }}>{f.workflowName}</b>
+                {f.error?.node && (
+                  <>
+                    {" "}
+                    <span
+                      style={{
+                        fontFamily: "ui-monospace, Menlo, monospace",
+                        fontSize: 11.5,
+                        color: "var(--amber)",
+                        background: "rgba(245,184,65,0.08)",
+                        border: "1px solid rgba(245,184,65,0.25)",
+                        borderRadius: 6,
+                        padding: "1px 7px",
+                      }}
+                    >
+                      node: {f.error.node}
+                    </span>
+                  </>
+                )}{" "}
+                · {ago(f.stoppedAt)}
                 <br />
                 <span style={{ fontSize: 12.5 }}>
-                  {f.errorMessage ?? "No details — open the execution in n8n."}
+                  {f.error?.message ?? "No details — open the execution in n8n."}
                 </span>
               </span>
-              <span className="chip err">failed</span>
+              <span style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <span className="chip err">failed</span>
+                {executionUrl(f.workflowId, f.id) && (
+                  <a
+                    className="abtn"
+                    style={{ padding: "5px 12px", fontSize: 12, textDecoration: "none" }}
+                    href={executionUrl(f.workflowId, f.id)!}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Open in n8n ↗
+                  </a>
+                )}
+              </span>
             </div>
           ))}
         </div>

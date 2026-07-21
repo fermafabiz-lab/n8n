@@ -53,6 +53,42 @@ const STATUS_MAP: Array<{ match: RegExp; kind: StatusKind; progress: number }> =
   { match: /planificare|planificat/, kind: "wait", progress: 0.05 },
 ];
 
+// Airtable status values are Romanian (n8n writes them); the UI is English.
+// Translate at display time so nothing in Airtable/n8n has to change.
+const STATUS_LABELS: Array<{ match: RegExp; label: string }> = [
+  { match: /^finalizat/, label: "Finished" },
+  { match: /asteapta aprobare video/, label: "Awaiting Video Approval" },
+  { match: /asteapta aprobare imagine/, label: "Awaiting Image Approval" },
+  { match: /asteapta aprobare script|aprobare script/, label: "Awaiting Script Approval" },
+  { match: /generare video/, label: "Generating Video" },
+  { match: /generare imagine/, label: "Generating Image" },
+  { match: /generare script|scriere script/, label: "Writing Script" },
+  { match: /video gata/, label: "Video Ready" },
+  { match: /^eroare/, label: "Error" },
+  { match: /in lucru|in desfasurare/, label: "In Progress" },
+  { match: /in asteptare/, label: "Queued" },
+  { match: /planificare|planificat/, label: "Planned" },
+];
+
+function normalizeStatus(raw: string): string {
+  return raw
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
+}
+
+function displayStatus(raw: string): string {
+  const s = normalizeStatus(raw);
+  for (const { match, label } of STATUS_LABELS) {
+    if (match.test(s)) {
+      // Keep any suffix like " · 7/12" that follows the known status text.
+      const extra = raw.match(/\s*[·:]\s*\d.*$/);
+      return extra ? `${label}${extra[0]}` : label;
+    }
+  }
+  return raw;
+}
+
 function classifyStatus(raw: string): { kind: StatusKind; progress: number } {
   const s = raw
     .toLowerCase()
@@ -142,7 +178,7 @@ function toProject(r: AirtableRecord): Project {
     name: String(pick(r.fields, F.projectName) ?? "Untitled project"),
     lengthSeconds: Number(pick(r.fields, F.projectLength)) || null,
     tone: (pick(r.fields, F.projectTone) as string) ?? null,
-    status,
+    status: displayStatus(status),
     statusKind: kind,
     progress,
     finalVideoUrl: (pick(r.fields, F.projectFinalVideo) as string) ?? null,
@@ -167,7 +203,7 @@ function toScene(r: AirtableRecord, index: number): Scene {
     videoUrl,
     imageApproved: Boolean(pick(r.fields, F.sceneImageApproved)),
     videoApproved: Boolean(pick(r.fields, F.sceneVideoApproved)),
-    status,
+    status: displayStatus(status),
     statusKind: kind,
   };
 }
@@ -207,7 +243,7 @@ const DEMO_PROJECTS: Project[] = [
     name: "History of Germany in WW2",
     lengthSeconds: 64,
     tone: "Dark",
-    status: "Așteaptă Aprobare Imagine",
+    status: "Awaiting Image Approval",
     statusKind: "wait",
     progress: 0.62,
     finalVideoUrl: null,
@@ -219,7 +255,7 @@ const DEMO_PROJECTS: Project[] = [
     name: "Lost Cities of the Amazon",
     lengthSeconds: 96,
     tone: "Mystery",
-    status: "Generare Video · 7/12",
+    status: "Generating Video · 7/12",
     statusKind: "run",
     progress: 0.58,
     finalVideoUrl: null,
@@ -231,7 +267,7 @@ const DEMO_PROJECTS: Project[] = [
     name: "Fall of Constantinople",
     lengthSeconds: 64,
     tone: "Epic",
-    status: "Eroare la scena 3",
+    status: "Error at scene 3",
     statusKind: "err",
     progress: 0.31,
     finalVideoUrl: null,
@@ -243,7 +279,7 @@ const DEMO_PROJECTS: Project[] = [
     name: "The Silk Road Merchants",
     lengthSeconds: 64,
     tone: "Epic",
-    status: "Finalizat",
+    status: "Finished",
     statusKind: "done",
     progress: 1,
     finalVideoUrl: "#",
@@ -255,14 +291,14 @@ const DEMO_PROJECTS: Project[] = [
 const DEMO_SCENES: Scene[] = Array.from({ length: 8 }, (_, i) => {
   const kinds: StatusKind[] = ["done", "done", "done", "run", "err", "idle", "idle", "idle"];
   const names = [
-    "Hook — dune de cenușă",
+    "Hook — dunes of ash",
     "Berlin 1936",
     "Blitzkrieg",
-    "Frontul de est",
+    "The Eastern Front",
     "Stalingrad",
-    "Debarcarea",
-    "Căderea Berlinului",
-    "Epilog",
+    "D-Day",
+    "The Fall of Berlin",
+    "Epilogue",
   ];
   return {
     id: `demo-s${i + 1}`,
@@ -273,7 +309,7 @@ const DEMO_SCENES: Scene[] = Array.from({ length: 8 }, (_, i) => {
     videoUrl: null,
     imageApproved: i < 4,
     videoApproved: i < 2,
-    status: kinds[i] === "run" ? "Generare Video" : kinds[i] === "err" ? "Eroare" : kinds[i] === "done" ? "Video gata" : "În așteptare",
+    status: kinds[i] === "run" ? "Generating Video" : kinds[i] === "err" ? "Error" : kinds[i] === "done" ? "Video Ready" : "Queued",
     statusKind: kinds[i],
   };
 });

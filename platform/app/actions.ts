@@ -197,6 +197,33 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
   }
 }
 
+export async function resumeProject(projectId: string): Promise<ActionResult> {
+  const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
+  const webhook =
+    process.env.N8N_RESUME_WEBHOOK_URL ??
+    // Same n8n instance, sibling path — avoids one more env var.
+    newProject?.replace(/new-project\/?$/, "resume-project");
+  if (!webhook || !webhook.includes("resume-project")) {
+    return { ok: false, message: "N8N_RESUME_WEBHOOK_URL is not configured." };
+  }
+  try {
+    const res = await fetch(webhook, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project_id: projectId }),
+    });
+    if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message:
+        "Production resumed — already-generated images, voices and clips are kept; only missing pieces are regenerated.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
 export async function stopExecutionAction(formData: FormData): Promise<void> {
   const id = String(formData.get("executionId") ?? "");
   if (id) await stopExecution(id);

@@ -7,6 +7,7 @@ import SceneReview from "@/components/SceneReview";
 import AutoRefresh from "@/components/AutoRefresh";
 import MediaPlayer from "@/components/MediaPlayer";
 import StageChime from "@/components/StageChime";
+import ResumeButton from "@/components/ResumeButton";
 
 export const dynamic = "force-dynamic";
 
@@ -91,6 +92,9 @@ export default async function ProductionRoom({
               {project.status}
             </span>
           </div>
+          {project.statusKind !== "done" && scenes.length > 0 && (
+            <ResumeButton projectId={id} />
+          )}
         </div>
 
         {project.finalVideoUrl && project.finalVideoUrl.startsWith("http") && (

@@ -6,8 +6,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxrandr2 libxkbcommon0 libxfixes3 libxcomposite1 \
     libxdamage1 libatk-bridge2.0-0 libpango-1.0-0 libcairo2 \
     libcups2 fonts-liberation ca-certificates \
-    ffmpeg \
+    ffmpeg curl \
     && rm -rf /var/lib/apt/lists/*
+
+# yt-dlp standalone binary (no Python needed) — powers /transcript.
+RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux \
+    -o /usr/local/bin/yt-dlp && chmod +x /usr/local/bin/yt-dlp
 
 WORKDIR /app
 COPY package.json ./

@@ -12,6 +12,7 @@ import {bundle} from '@remotion/bundler';
 import {renderMedia, selectComposition} from '@remotion/renderer';
 import {registerAssemble} from './assemble.mjs';
 import {registerInspect} from './inspect.mjs';
+import {registerTranscript} from './transcript.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OUTPUT_DIR = path.join(__dirname, 'output');
@@ -110,6 +111,7 @@ app.post('/render', async (req, res) => {
 
 registerAssemble(app, {jobs, outputDir: OUTPUT_DIR});
 registerInspect(app);
+registerTranscript(app);
 
 // Shared status endpoint for render and assemble jobs.
 app.get(['/render/:jobId/status', '/assemble/:jobId/status'], (req, res) => {

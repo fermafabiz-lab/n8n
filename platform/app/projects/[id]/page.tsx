@@ -8,6 +8,7 @@ import AutoRefresh from "@/components/AutoRefresh";
 import MediaPlayer from "@/components/MediaPlayer";
 import StageChime from "@/components/StageChime";
 import ResumeButton from "@/components/ResumeButton";
+import { getExecutions, n8nConfigured } from "@/lib/n8n";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +59,16 @@ export default async function ProductionRoom({
       ? scriptInfo
       : null;
 
+  // Pause/Resume toggle state: is any production workflow running right now?
+  let hasRunning = false;
+  if (n8nConfigured) {
+    try {
+      hasRunning = (await getExecutions("running", 5)).length > 0;
+    } catch {
+      // n8n API unreachable — fall back to showing Resume.
+    }
+  }
+
   // Which gate (if any) is waiting on the user — drives the notification
   // chime when a generation step finishes and hands control back.
   const stage =
@@ -93,7 +104,7 @@ export default async function ProductionRoom({
             </span>
           </div>
           {project.statusKind !== "done" && scenes.length > 0 && (
-            <ResumeButton projectId={id} />
+            <ResumeButton projectId={id} running={hasRunning} />
           )}
         </div>
 

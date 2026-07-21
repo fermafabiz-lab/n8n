@@ -1,27 +1,40 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { resumeProject, type ActionResult } from "@/app/actions";
+import { pauseProduction, resumeProject, type ActionResult } from "@/app/actions";
 
 /**
- * Restarts production for a project whose run died (rate limit, crash…).
- * The n8n resume flow skips every scene that already has its image/clip,
- * so this never regenerates finished work.
+ * One toggle for the whole factory line:
+ *  - work running  → "⏸ Pause" stops the running n8n executions (assets
+ *    already produced stay in Airtable/Drive, nothing is lost);
+ *  - nothing running → "⟳ Resume" re-enters the pipeline, which skips every
+ *    scene that already has its image/clip, so only missing pieces are made.
  */
-export default function ResumeButton({ projectId }: { projectId: string }) {
+export default function ResumeButton({
+  projectId,
+  running,
+}: {
+  projectId: string;
+  running: boolean;
+}) {
   const [msg, setMsg] = useState<ActionResult | null>(null);
   const [pending, startTransition] = useTransition();
 
+  const act = () =>
+    startTransition(async () =>
+      setMsg(await (running ? pauseProduction(projectId) : resumeProject(projectId))),
+    );
+
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-      <button
-        className="btn"
-        disabled={pending}
-        onClick={() =>
-          startTransition(async () => setMsg(await resumeProject(projectId)))
-        }
-      >
-        {pending ? "Resuming…" : "⟳ Resume production"}
+      <button className="btn" disabled={pending} onClick={act}>
+        {pending
+          ? running
+            ? "Pausing…"
+            : "Resuming…"
+          : running
+            ? "⏸ Pause production"
+            : "⟳ Resume production"}
       </button>
       {msg && (
         <span className={`formmsg ${msg.ok ? "ok" : "err"}`} style={{ margin: 0 }}>

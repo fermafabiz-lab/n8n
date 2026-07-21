@@ -11,7 +11,7 @@ import {
   writeSceneScript,
   writeScriptFields,
 } from "@/lib/data";
-import { stopExecution } from "@/lib/n8n";
+import { getExecutions, stopExecution } from "@/lib/n8n";
 
 export interface ActionResult {
   ok: boolean;
@@ -218,6 +218,35 @@ export async function resumeProject(projectId: string): Promise<ActionResult> {
       ok: true,
       message:
         "Production resumed — already-generated images, voices and clips are kept; only missing pieces are regenerated.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+export async function pauseProduction(projectId: string): Promise<ActionResult> {
+  try {
+    // Stop children before the orchestrator so nothing re-spawns work.
+    // Nothing is lost: every finished asset is already in Airtable/Drive,
+    // and Resume picks up exactly where this left off.
+    const running = await getExecutions("running", 20);
+    if (running.length === 0) {
+      return { ok: false, message: "Nothing is running right now." };
+    }
+    const order = ["Media Generation", "Final Assembly", "Scripting", "Master Orchestrator"];
+    const sorted = [...running].sort(
+      (a, b) => order.indexOf(a.workflowName) - order.indexOf(b.workflowName),
+    );
+    let stopped = 0;
+    for (const r of sorted) {
+      const res = await stopExecution(r.id);
+      if (res.ok) stopped++;
+    }
+    revalidatePath(`/projects/${projectId}`);
+    revalidatePath("/");
+    return {
+      ok: true,
+      message: `Paused — stopped ${stopped} running execution${stopped === 1 ? "" : "s"}. Press Resume to continue from where it left off.`,
     };
   } catch (e) {
     return { ok: false, message: friendlyError(e) };

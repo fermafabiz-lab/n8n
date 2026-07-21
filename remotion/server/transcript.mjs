@@ -13,6 +13,26 @@ import {randomUUID} from 'crypto';
 const run = promisify(execFile);
 const YTDLP = process.env.YTDLP_PATH || 'yt-dlp';
 
+// YouTube blocks datacenter IPs ("Sign in to confirm you're not a bot")
+// unless requests carry real browser cookies. Set YT_COOKIES on the host to
+// the contents of a Netscape cookies.txt export (raw or base64) and every
+// yt-dlp call sends them.
+let cookieArgsCache;
+function cookieArgs() {
+	if (cookieArgsCache !== undefined) return cookieArgsCache;
+	const raw = process.env.YT_COOKIES;
+	if (!raw) return (cookieArgsCache = []);
+	let content = raw;
+	if (!raw.includes('\t') && !raw.startsWith('#')) {
+		try {
+			content = Buffer.from(raw, 'base64').toString('utf8');
+		} catch {}
+	}
+	const file = path.join(os.tmpdir(), 'yt-cookies.txt');
+	fs.writeFileSync(file, content);
+	return (cookieArgsCache = ['--cookies', file]);
+}
+
 // ---------- SRT helpers ----------
 
 function parseSrt(srt) {
@@ -89,6 +109,7 @@ async function fetchSubtitles(url, dir) {
 	await run(
 		YTDLP,
 		[
+			...cookieArgs(),
 			'--skip-download',
 			'--write-subs',
 			'--write-auto-subs',
@@ -108,7 +129,7 @@ async function extractAudio(url, dir) {
 	const audioPath = path.join(dir, 'audio.mp3');
 	await run(
 		YTDLP,
-		['-f', 'bestaudio', '-x', '--audio-format', 'mp3', '--audio-quality', '64K', '-o', audioPath, url],
+		[...cookieArgs(), '-f', 'bestaudio', '-x', '--audio-format', 'mp3', '--audio-quality', '64K', '-o', audioPath, url],
 		{timeout: 300000},
 	);
 	return audioPath;

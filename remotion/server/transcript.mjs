@@ -104,19 +104,52 @@ async function fetchSubtitles(url, dir) {
 	return fs.readFileSync(path.join(dir, srtFile), 'utf8');
 }
 
-async function whisperTranscribe(url, dir) {
-	const key = process.env.OPENAI_API_KEY;
-	if (!key) {
-		throw new Error(
-			'No subtitles on this video and OPENAI_API_KEY is not set on the render server, so the Whisper fallback is unavailable.',
-		);
-	}
+async function extractAudio(url, dir) {
 	const audioPath = path.join(dir, 'audio.mp3');
 	await run(
 		YTDLP,
 		['-f', 'bestaudio', '-x', '--audio-format', 'mp3', '--audio-quality', '64K', '-o', audioPath, url],
 		{timeout: 300000},
 	);
+	return audioPath;
+}
+
+// Whisper via fal.ai (wizper) — the account already used for image
+// generation, so no OpenAI balance is needed. The extracted audio is
+// parked under our public /output dir so fal can fetch it by URL.
+async function falTranscribe(url, dir, {outputDir, baseUrl}) {
+	const key = process.env.FAL_KEY;
+	const audioPath = await extractAudio(url, dir);
+	const parkedName = `${randomUUID()}.mp3`;
+	const parkedPath = path.join(outputDir, parkedName);
+	fs.copyFileSync(audioPath, parkedPath);
+	try {
+		const res = await fetch('https://fal.run/fal-ai/wizper', {
+			method: 'POST',
+			headers: {Authorization: `Key ${key}`, 'Content-Type': 'application/json'},
+			body: JSON.stringify({audio_url: `${baseUrl}/output/${parkedName}`, task: 'transcribe', chunk_level: 'segment'}),
+		});
+		if (!res.ok) throw new Error(`fal wizper: HTTP ${res.status} — ${(await res.text()).slice(0, 300)}`);
+		const data = await res.json();
+		const chunks = data.chunks || [];
+		if (!chunks.length && data.text) {
+			return `1\n00:00:00,000 --> 00:59:59,000\n${data.text}`;
+		}
+		return chunks
+			.map((c, i) => {
+				const [s, e] = c.timestamp || [i * 5, i * 5 + 5];
+				return `${i + 1}\n${fmtTime(s || 0)} --> ${fmtTime(e || (s || 0) + 5)}\n${(c.text || '').trim()}`;
+			})
+			.join('\n\n');
+	} finally {
+		fs.rmSync(parkedPath, {force: true});
+	}
+}
+
+// OpenAI Whisper — used only when OPENAI_API_KEY is set and FAL_KEY isn't.
+async function openaiTranscribe(url, dir) {
+	const key = process.env.OPENAI_API_KEY;
+	const audioPath = await extractAudio(url, dir);
 	const size = fs.statSync(audioPath).size;
 	if (size > 24 * 1024 * 1024) {
 		throw new Error(`Audio is ${(size / 1e6).toFixed(0)}MB — over Whisper's 25MB limit. Use a shorter video.`);
@@ -134,9 +167,17 @@ async function whisperTranscribe(url, dir) {
 	return res.text();
 }
 
+async function whisperTranscribe(url, dir, hostCtx) {
+	if (process.env.FAL_KEY) return falTranscribe(url, dir, hostCtx);
+	if (process.env.OPENAI_API_KEY) return openaiTranscribe(url, dir);
+	throw new Error(
+		'No subtitles on this video, and neither FAL_KEY nor OPENAI_API_KEY is set on the render server, so the Whisper fallback is unavailable.',
+	);
+}
+
 // ---------- endpoint ----------
 
-export function registerTranscript(app) {
+export function registerTranscript(app, {outputDir}) {
 	app.post('/transcript', async (req, res) => {
 		const url = req.body && req.body.url;
 		if (!url || !/^https?:\/\//.test(url)) {
@@ -154,7 +195,8 @@ export function registerTranscript(app) {
 			}
 			if (!rawSrt) {
 				source = 'whisper';
-				rawSrt = await whisperTranscribe(url, dir);
+				const baseUrl = `${req.protocol}://${req.get('host')}`;
+				rawSrt = await whisperTranscribe(url, dir, {outputDir, baseUrl});
 			}
 			const cues = dedupeCues(parseSrt(rawSrt));
 			if (!cues.length) throw new Error('Transcript came back empty after cleaning.');

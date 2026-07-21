@@ -111,7 +111,7 @@ app.post('/render', async (req, res) => {
 
 registerAssemble(app, {jobs, outputDir: OUTPUT_DIR});
 registerInspect(app);
-registerTranscript(app);
+registerTranscript(app, {outputDir: OUTPUT_DIR});
 
 // Shared status endpoint for render and assemble jobs.
 app.get(['/render/:jobId/status', '/assemble/:jobId/status'], (req, res) => {

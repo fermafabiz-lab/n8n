@@ -90,6 +90,30 @@ export default function NewVideo() {
         </div>
 
         <div className="field">
+          <label htmlFor="hook_title">Opening title (typed-on hook text)</label>
+          <select id="hook_title" name="hook_title" defaultValue="yes">
+            <option value="yes">Yes — cinematic title over the first scene</option>
+            <option value="no">No — clean opening</option>
+          </select>
+        </div>
+
+        <div className="field">
+          <label htmlFor="chapter_cards">Chapter cards</label>
+          <select id="chapter_cards" name="chapter_cards" defaultValue="yes">
+            <option value="yes">Yes — full-screen card at each chapter</option>
+            <option value="no">No — straight cuts between chapters</option>
+          </select>
+        </div>
+
+        <div className="field">
+          <label htmlFor="end_screen">End screen</label>
+          <select id="end_screen" name="end_screen" defaultValue="yes">
+            <option value="yes">Yes — channel outro after the last scene</option>
+            <option value="no">No — video ends on the last scene</option>
+          </select>
+        </div>
+
+        <div className="field">
           <label htmlFor="tone">Tone</label>
           <select id="tone" name="tone" defaultValue="Dark">
             {TONES.map((t) => (

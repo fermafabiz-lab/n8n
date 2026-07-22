@@ -24,8 +24,9 @@ export const RemotionRoot: React.FC = () => {
 					? p.scenes[p.scenes.length - 1].startSeconds +
 						p.scenes[p.scenes.length - 1].durationSeconds
 					: 0;
+				const outroSeconds = p.showEndScreen === false ? 0 : p.outroDurationInSeconds;
 				const totalSeconds =
-					p.introDurationInSeconds + videoDurationSeconds + p.outroDurationInSeconds;
+					p.introDurationInSeconds + videoDurationSeconds + outroSeconds;
 				const portrait = p.aspectRatio === '9:16';
 
 				return {

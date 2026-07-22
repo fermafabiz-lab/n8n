@@ -51,6 +51,12 @@ export type FinalVideoProps = {
 	aspectRatio: string;
 	/** Master switch for karaoke captions. */
 	showCaptions: boolean;
+	/** Individual overlay toggles — omitted/true keeps the element. */
+	showHookTitle?: boolean;
+	showChapterCards?: boolean;
+	showEndScreen?: boolean;
+	/** Chapter number -> real chapter title (from the script's [CHAPTER n: title] markers). */
+	chapterTitles?: Record<string, string>;
 };
 
 export const defaultFinalVideoProps: FinalVideoProps = {
@@ -66,6 +72,10 @@ export const defaultFinalVideoProps: FinalVideoProps = {
 	hookTitleDurationInSeconds: 3.5,
 	aspectRatio: '16:9',
 	showCaptions: true,
+	showHookTitle: true,
+	showChapterCards: true,
+	showEndScreen: true,
+	chapterTitles: {},
 };
 
 /** Tone → visual language. Lowercased, diacritics-insensitive lookup. */

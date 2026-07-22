@@ -140,6 +140,22 @@ export default function NewVideo() {
           />
         </div>
 
+        <div className="field">
+          <label htmlFor="lore">Lore / canon context (optional)</label>
+          <textarea
+            id="lore"
+            name="lore"
+            rows={4}
+            maxLength={8000}
+            placeholder="For niche topics (Backrooms levels, SCP, game/franchise lore): paste the actual wiki/canon details here. The script treats this as ground truth — names, entities and mechanics come from this text, not invented."
+            style={{ resize: "vertical" }}
+          />
+          <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--dim)" }}>
+            Leave empty for well-known topics — the AI&apos;s own knowledge is
+            enough for history, science, brands etc.
+          </p>
+        </div>
+
         <VoicePicker />
 
         <div className="field">

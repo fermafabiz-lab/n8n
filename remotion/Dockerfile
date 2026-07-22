@@ -13,6 +13,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux \
     -o /usr/local/bin/yt-dlp && chmod +x /usr/local/bin/yt-dlp
 
+# Deno: the JS runtime yt-dlp uses for YouTube's player challenges —
+# without one, extraction is deprecated and more likely to be blocked.
+RUN curl -fsSL https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip -o /tmp/deno.zip \
+    && apt-get update && apt-get install -y --no-install-recommends unzip \
+    && unzip -o /tmp/deno.zip -d /usr/local/bin && chmod +x /usr/local/bin/deno \
+    && rm /tmp/deno.zip && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 COPY package.json ./
 RUN npm install

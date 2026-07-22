@@ -10,6 +10,7 @@ import {
   writeSceneFeedback,
   writeSceneScript,
   writeScriptFields,
+  requestVoiceRegen,
 } from "@/lib/data";
 import { getExecutions, stopExecution } from "@/lib/n8n";
 
@@ -55,6 +56,35 @@ export async function sceneAction(
     };
   } catch (e) {
     return { ok: false, message: friendlyError(e) };
+  }
+}
+
+export async function regenerateVoice(
+  projectId: string,
+  sceneId: string,
+  narration: string,
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    await requestVoiceRegen(sceneId, narration);
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message:
+        "Voice regeneration queued — a new voiceover is synthesized and re-muxed onto the existing clip (~1-2 min).",
+    };
+  } catch (e) {
+    const msg = friendlyError(e);
+    if (msg.includes("UNKNOWN_FIELD_NAME")) {
+      return {
+        ok: false,
+        message:
+          "Airtable is missing the „Regenerează Voce” checkbox on the Scene table — create it, then try again.",
+      };
+    }
+    return { ok: false, message: msg };
   }
 }
 

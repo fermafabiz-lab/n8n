@@ -34,6 +34,7 @@ export interface Scene {
   imagePrompt: string | null;
   imageUrl: string | null;
   videoUrl: string | null;
+  voiceUrl: string | null;
   sceneApproved: boolean;
   imageApproved: boolean;
   videoApproved: boolean;
@@ -122,6 +123,7 @@ const F = {
   // Scenă" attachment.
   sceneVideo: ["Scene Final URL"],
   sceneVideoAttachment: ["Video Scenă"],
+  sceneVoice: ["Voiceover URL"],
   sceneImagePrompt: ["Imagine First Frame"],
   sceneApproved: ["Aprobare Scenă", "Aprobare Scena"],
   sceneImageApproved: ["Aprobare Imagine"],
@@ -208,6 +210,7 @@ function toScene(r: AirtableRecord, index: number): Scene {
     imagePrompt: (pick(r.fields, F.sceneImagePrompt) as string) ?? null,
     imageUrl: firstAttachmentUrl(pick(r.fields, F.sceneImage)),
     videoUrl,
+    voiceUrl: (pick(r.fields, F.sceneVoice) as string) ?? null,
     sceneApproved: Boolean(pick(r.fields, F.sceneApproved)),
     imageApproved: Boolean(pick(r.fields, F.sceneImageApproved)),
     videoApproved: Boolean(pick(r.fields, F.sceneVideoApproved)),
@@ -339,6 +342,7 @@ const DEMO_SCENES: Scene[] = Array.from({ length: 8 }, (_, i) => {
     imagePrompt: null,
     imageUrl: null,
     videoUrl: null,
+    voiceUrl: null,
     sceneApproved: true,
     imageApproved: i < 4,
     videoApproved: i < 2,
@@ -487,5 +491,22 @@ export async function writeSceneScript(
   if (typeof fields.imagePrompt === "string") patch["Imagine First Frame"] = fields.imagePrompt;
   if (fields.approve) patch["Aprobare Scenă"] = true;
   if (Object.keys(patch).length === 0) return;
+  await airtablePatch(SCENES_TABLE, sceneId, patch);
+}
+
+// Voice regeneration: n8n's video-approval cycle picks up the flag, runs a
+// fresh TTS on the (possibly edited) narration and re-muxes the existing
+// clip — no image/video regeneration involved.
+export async function requestVoiceRegen(
+  sceneId: string,
+  narration?: string,
+): Promise<void> {
+  const patch: Record<string, unknown> = {
+    "Regenerează Voce": true,
+    "Aprobare Video": false,
+  };
+  if (typeof narration === "string" && narration.trim()) {
+    patch["Script Scenă"] = narration.trim();
+  }
   await airtablePatch(SCENES_TABLE, sceneId, patch);
 }

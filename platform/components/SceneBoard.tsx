@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { approveAllOfKind, sceneAction, type ActionResult } from "@/app/actions";
+import { approveAllOfKind, regenerateVoice, sceneAction, type ActionResult } from "@/app/actions";
 import type { Scene, StatusKind } from "@/lib/data";
 import MediaPlayer from "@/components/MediaPlayer";
 
@@ -44,6 +44,9 @@ export default function SceneBoard({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [msg, setMsg] = useState<ActionResult | null>(null);
   const [feedback, setFeedback] = useState("");
+  // Narration drafts per scene for the voice editor (falls back to the
+  // stored text until edited).
+  const [voiceDrafts, setVoiceDrafts] = useState<Record<string, string>>({});
   const [pending, startTransition] = useTransition();
 
   const active =
@@ -178,6 +181,71 @@ export default function SceneBoard({
                 >
                   Regenerate
                 </button>
+              </div>
+            )}
+            {active.voiceUrl && !active.videoApproved && (
+              <div style={{ marginTop: 16, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
+                <label
+                  style={{ display: "block", fontSize: 12, color: "var(--dim)", marginBottom: 6 }}
+                >
+                  Voiceover — listen, edit the narration, regenerate if needed
+                </label>
+                <iframe
+                  key={`voice-${active.id}-${active.voiceUrl}`}
+                  src={`https://drive.google.com/file/d/${
+                    active.voiceUrl.match(/[?&]id=([\w-]+)/)?.[1] ?? ""
+                  }/preview`}
+                  style={{
+                    width: "100%",
+                    height: 64,
+                    border: "none",
+                    borderRadius: 10,
+                    background: "var(--bg2)",
+                  }}
+                />
+                <textarea
+                  value={voiceDrafts[active.id] ?? active.narration ?? ""}
+                  onChange={(e) =>
+                    setVoiceDrafts((p) => ({ ...p, [active.id]: e.target.value }))
+                  }
+                  rows={3}
+                  spellCheck={false}
+                  style={{
+                    width: "100%",
+                    marginTop: 10,
+                    background: "var(--bg2)",
+                    border: "1px solid var(--line2)",
+                    borderRadius: 10,
+                    color: "var(--ink)",
+                    font: "inherit",
+                    fontSize: 13,
+                    lineHeight: 1.6,
+                    padding: "10px 12px",
+                    resize: "vertical",
+                    outline: "none",
+                  }}
+                />
+                <div className="abtns" style={{ marginTop: 8 }}>
+                  <button
+                    className="abtn"
+                    disabled={pending}
+                    onClick={() =>
+                      run(() =>
+                        regenerateVoice(
+                          projectId,
+                          active.id,
+                          voiceDrafts[active.id] ?? active.narration ?? "",
+                        ),
+                      )
+                    }
+                  >
+                    🎙 Regenerate voice
+                  </button>
+                </div>
+                <p style={{ margin: "6px 0 0", fontSize: 11.5, color: "var(--dim)" }}>
+                  New voice is synthesized from the text above and re-muxed onto
+                  the existing clip — image and video are NOT regenerated.
+                </p>
               </div>
             )}
             {active.videoUrl && !active.videoApproved && (

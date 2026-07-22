@@ -10,6 +10,7 @@ import StageChime from "@/components/StageChime";
 import ResumeButton from "@/components/ResumeButton";
 import AutoResume from "@/components/AutoResume";
 import ExpandableTitle from "@/components/ExpandableTitle";
+import OpsPanel from "@/components/OpsPanel";
 import { getExecutions, n8nConfigured } from "@/lib/n8n";
 
 export const dynamic = "force-dynamic";
@@ -179,7 +180,17 @@ export default async function ProductionRoom({
             scenes={scenes}
             portrait={project.aspect === "9:16"}
           />
-        ) : !script ? (
+        ) : null}
+
+        {scenes.length > 0 && (
+          <div style={{ marginTop: 24 }}>
+            {/* Same failure list as the dashboard, so a broken generation
+                is visible right where you're watching the scenes. */}
+            <OpsPanel errorsOnly />
+          </div>
+        )}
+
+        {scenes.length === 0 && !script ? (
           <div className="empty">
             <h3>Production is warming up</h3>
             <p>

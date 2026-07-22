@@ -15,8 +15,15 @@ function ago(iso: string | null): string {
  * recent failures with their real error message — so nobody has to open the
  * n8n editor to know something broke.
  */
-export default async function OpsPanel() {
+export default async function OpsPanel({
+  errorsOnly = false,
+}: {
+  // Project pages embed just the failure list under the scene board;
+  // the dashboard shows the full panel (running + stop + setup note).
+  errorsOnly?: boolean;
+} = {}) {
   if (!n8nConfigured) {
+    if (errorsOnly) return null;
     return (
       <div className="setupnote">
         <b>Production health is off.</b> Set <code>N8N_API_URL</code>{" "}
@@ -32,7 +39,7 @@ export default async function OpsPanel() {
   let apiError: string | null = null;
   try {
     [running, failed] = await Promise.all([
-      getExecutions("running", 10),
+      errorsOnly ? Promise.resolve([]) : getExecutions("running", 10),
       getExecutions("error", 5),
     ]);
   } catch (e) {
@@ -63,7 +70,7 @@ export default async function OpsPanel() {
 
   return (
     <div style={{ marginBottom: 36, display: "flex", flexDirection: "column", gap: 14 }}>
-      {running.length > 0 && (
+      {!errorsOnly && running.length > 0 && (
         <div className="card">
           <h5>Running now</h5>
           {running.map((r) => (

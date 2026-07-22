@@ -3,6 +3,7 @@ import { getProjects, isConfigured, type Project } from "@/lib/data";
 import AutoRefresh from "@/components/AutoRefresh";
 import OpsPanel from "@/components/OpsPanel";
 import StageChime from "@/components/StageChime";
+import ExpandableTitle from "@/components/ExpandableTitle";
 
 export const dynamic = "force-dynamic";
 
@@ -108,13 +109,18 @@ export default async function Dashboard() {
           {projects.map((p, i) => (
             <Link href={`/projects/${p.id}`} className="proj" key={p.id}>
               <div className="cover">
-                <div className={`art fallback${(i % 4) + 1}`} />
+                <div
+                  className={`art ${p.coverUrl ? "" : `fallback${(i % 4) + 1}`}`}
+                  style={
+                    p.coverUrl ? { backgroundImage: `url(${p.coverUrl})` } : undefined
+                  }
+                />
                 <span className={`badge ${p.statusKind === "idle" ? "run" : p.statusKind}`}>
                   {badgeLabel(p)}
                 </span>
               </div>
               <div className="body">
-                <h3>{p.name}</h3>
+                <ExpandableTitle text={p.name} as="h3" clampChars={80} />
                 <div className="meta">
                   {p.lengthSeconds ? `${p.lengthSeconds}s` : "—"}
                   {p.tone ? ` · ${p.tone}` : ""}

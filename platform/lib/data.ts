@@ -22,6 +22,8 @@ export interface Project {
   finalVideoUrl: string | null;
   aspect: "16:9" | "9:16";
   updatedAt: string | null;
+  /** First scene's generated image — the dashboard card cover. */
+  coverUrl?: string | null;
 }
 
 export interface Scene {
@@ -217,8 +219,31 @@ function toScene(r: AirtableRecord, index: number): Scene {
 export async function getProjects(): Promise<Project[]> {
   if (!isConfigured) return DEMO_PROJECTS;
   const records = await airtableList(PROJECTS_TABLE, "pageSize=100");
+
+  // One extra query gets every scene image; the earliest scene (by "Ordine
+  // Scenă") per project becomes that project's card cover.
+  const covers = new Map<string, { order: number; url: string }>();
+  try {
+    const sceneRecs = await airtableList(
+      SCENES_TABLE,
+      `filterByFormula=${encodeURIComponent("{Imagine Scenă}!=''")}` +
+        `&fields%5B%5D=${encodeURIComponent("Imagine Scenă")}` +
+        `&fields%5B%5D=Project_ID&fields%5B%5D=${encodeURIComponent("Ordine Scenă")}`,
+    );
+    for (const r of sceneRecs) {
+      const pid = String(r.fields["Project_ID"] ?? "");
+      const url = firstAttachmentUrl(r.fields["Imagine Scenă"]);
+      if (!pid || !url) continue;
+      const order = Number(r.fields["Ordine Scenă"]) || 9999;
+      const cur = covers.get(pid);
+      if (!cur || order < cur.order) covers.set(pid, { order, url });
+    }
+  } catch {
+    // Covers are decoration — never fail the dashboard over them.
+  }
+
   return records
-    .map(toProject)
+    .map((r) => ({ ...toProject(r), coverUrl: covers.get(r.id)?.url ?? null }))
     .sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""));
 }
 

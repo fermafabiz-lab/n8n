@@ -9,6 +9,7 @@ import MediaPlayer from "@/components/MediaPlayer";
 import StageChime from "@/components/StageChime";
 import ResumeButton from "@/components/ResumeButton";
 import AutoResume from "@/components/AutoResume";
+import ExpandableTitle from "@/components/ExpandableTitle";
 import { getExecutions, n8nConfigured } from "@/lib/n8n";
 
 export const dynamic = "force-dynamic";
@@ -110,11 +111,12 @@ export default async function ProductionRoom({
       <AutoResume projectId={id} stalled={stalled} />
       <div className="room">
         <div className="crumb">
-          <Link href="/">Projects</Link> / <b>{project.name}</b>
+          <Link href="/">Projects</Link> /{" "}
+          <b>{project.name.length > 60 ? project.name.slice(0, 60).trimEnd() + "…" : project.name}</b>
         </div>
         <div className="roomhead">
           <div>
-            <h1>{project.name}</h1>
+            <ExpandableTitle text={project.name} as="h1" clampChars={110} />
             <span className="sub">
               {project.lengthSeconds ? `${project.lengthSeconds} seconds · ` : ""}
               {scenes.length > 0 ? `${scenes.length} scenes · ` : ""}

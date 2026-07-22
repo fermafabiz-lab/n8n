@@ -163,6 +163,33 @@ export async function approveScript(
   }
 }
 
+export async function regenerateScript(
+  projectId: string,
+  scriptId: string,
+  feedback: string,
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    // The scripting workflow polls this record: Status 'rejected' routes it
+    // to an AI rewrite using the feedback, then flips back to
+    // awaiting_approval with the new draft.
+    await writeScriptFields(scriptId, {
+      Status: "rejected",
+      "Observații Script": feedback.trim() || "Improve pacing, concreteness and flow.",
+    });
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message:
+        "Rewrite requested — a new draft appears here in ~1 minute (the page refreshes itself).",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
 export async function createProject(formData: FormData): Promise<ActionResult> {
   const webhook = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
   if (!webhook) {

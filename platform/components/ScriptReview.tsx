@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { approveScript, saveScript, type ActionResult } from "@/app/actions";
+import { approveScript, regenerateScript, saveScript, type ActionResult } from "@/app/actions";
 
 /**
  * Editable script review. The text keeps its [CHAPTER n: title] markers —
@@ -18,6 +18,7 @@ export default function ScriptReview({
   content: string;
 }) {
   const [text, setText] = useState(content);
+  const [feedback, setFeedback] = useState("");
   const [msg, setMsg] = useState<ActionResult | null>(null);
   const [pending, startTransition] = useTransition();
   const dirty = text !== content;
@@ -75,6 +76,41 @@ export default function ScriptReview({
       <div style={{ marginTop: 8, fontSize: 12, color: "var(--dim)", textAlign: "right" }}>
         {text.trim().split(/\s+/).filter(Boolean).length} words
         {dirty ? " · edited" : ""}
+      </div>
+
+      <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--line)" }}>
+        <p style={{ margin: "0 0 8px", fontSize: 13, color: "var(--soft)" }}>
+          Not happy with the whole draft? Describe what should change and the
+          AI rewrites it from scratch — small fixes are faster done by editing
+          the text above.
+        </p>
+        <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+          <textarea
+            value={feedback}
+            onChange={(e) => setFeedback(e.target.value)}
+            placeholder="e.g. “less flowery language, more concrete dates and events, stronger ending”"
+            rows={2}
+            style={{
+              flex: 1,
+              background: "var(--bg2)",
+              border: "1px solid var(--line2)",
+              borderRadius: 10,
+              color: "var(--ink)",
+              font: "inherit",
+              fontSize: 13,
+              padding: "10px 12px",
+              resize: "vertical",
+              outline: "none",
+            }}
+          />
+          <button
+            className="btn"
+            disabled={pending}
+            onClick={() => run(() => regenerateScript(projectId, scriptId, feedback))}
+          >
+            {pending ? "…" : "↻ Regenerate script"}
+          </button>
+        </div>
       </div>
     </div>
   );

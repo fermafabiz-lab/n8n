@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { approveAllImages, sceneAction, type ActionResult } from "@/app/actions";
+import { approveAllOfKind, sceneAction, type ActionResult } from "@/app/actions";
 import type { Scene, StatusKind } from "@/lib/data";
 import MediaPlayer from "@/components/MediaPlayer";
 
@@ -48,7 +48,18 @@ export default function SceneBoard({
 
   const active =
     scenes.find((s) => s.id === selectedId) ?? running ?? scenes[0] ?? null;
-  const unapproved = scenes.filter((s) => !s.imageApproved).map((s) => s.id);
+
+  // Bulk approval only unlocks once EVERY scene has the asset generated —
+  // approving placeholders early used to open the n8n gate prematurely and
+  // start the next phase with missing images.
+  const imagesMissing = scenes.filter((s) => !s.imageUrl).length;
+  const clipsMissing = scenes.filter((s) => !s.videoUrl).length;
+  const unapprovedImages = scenes
+    .filter((s) => s.imageUrl && !s.imageApproved)
+    .map((s) => s.id);
+  const unapprovedVideos = scenes
+    .filter((s) => s.videoUrl && !s.videoApproved)
+    .map((s) => s.id);
 
   const run = (fn: () => Promise<ActionResult>) =>
     startTransition(async () => setMsg(await fn()));
@@ -225,22 +236,57 @@ export default function SceneBoard({
           </div>
         )}
 
-        {unapproved.length > 1 && (
+        {(unapprovedImages.length > 1 || unapprovedVideos.length > 1 || imagesMissing > 0) && (
           <div className="card">
             <h5>Bulk review</h5>
-            <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--soft)" }}>
-              {unapproved.length} images are waiting. Approve everything that
-              looks right in one go — regenerate individual scenes first if
-              needed.
-            </p>
-            <button
-              className="abtn ok"
-              style={{ width: "100%" }}
-              disabled={pending}
-              onClick={() => run(() => approveAllImages(projectId, unapproved))}
-            >
-              Approve all {unapproved.length} images
-            </button>
+            {imagesMissing > 0 ? (
+              <p style={{ margin: 0, fontSize: 13, color: "var(--soft)" }}>
+                {imagesMissing} image{imagesMissing === 1 ? " is" : "s are"} still
+                generating — bulk approval unlocks when every scene has its
+                image, so nothing starts half-done. You can still approve
+                finished scenes one by one.
+              </p>
+            ) : unapprovedImages.length > 1 ? (
+              <>
+                <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--soft)" }}>
+                  All {scenes.length} images are generated, {unapprovedImages.length} still
+                  need review. Regenerate individual scenes first if needed.
+                </p>
+                <button
+                  className="abtn ok"
+                  style={{ width: "100%" }}
+                  disabled={pending}
+                  onClick={() =>
+                    run(() => approveAllOfKind(projectId, unapprovedImages, "image"))
+                  }
+                >
+                  Approve all {unapprovedImages.length} images
+                </button>
+              </>
+            ) : clipsMissing > 0 ? (
+              <p style={{ margin: 0, fontSize: 13, color: "var(--soft)" }}>
+                {clipsMissing} video clip{clipsMissing === 1 ? " is" : "s are"} still
+                generating — bulk approval unlocks when every scene has its
+                clip.
+              </p>
+            ) : (
+              <>
+                <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--soft)" }}>
+                  All {scenes.length} clips are generated, {unapprovedVideos.length} still
+                  need review.
+                </p>
+                <button
+                  className="abtn ok"
+                  style={{ width: "100%" }}
+                  disabled={pending}
+                  onClick={() =>
+                    run(() => approveAllOfKind(projectId, unapprovedVideos, "video"))
+                  }
+                >
+                  Approve all {unapprovedVideos.length} videos
+                </button>
+              </>
+            )}
           </div>
         )}
 

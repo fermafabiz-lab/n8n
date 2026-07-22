@@ -58,21 +58,25 @@ export async function sceneAction(
   }
 }
 
-export async function approveAllImages(
+export async function approveAllOfKind(
   projectId: string,
   sceneIds: string[],
+  kind: "image" | "video",
 ): Promise<ActionResult> {
   if (!isConfigured) {
     return { ok: true, message: "Demo mode — nothing was written." };
   }
   try {
     for (const id of sceneIds) {
-      await writeSceneApproval(id, "image", "approve");
+      await writeSceneApproval(id, kind, "approve");
       // Airtable rate limit is 5 req/s per base; n8n polls concurrently.
       await new Promise((r) => setTimeout(r, 250));
     }
     revalidatePath(`/projects/${projectId}`);
-    return { ok: true, message: `Approved ${sceneIds.length} images.` };
+    return {
+      ok: true,
+      message: `Approved ${sceneIds.length} ${kind === "image" ? "images" : "videos"}.`,
+    };
   } catch (e) {
     return { ok: false, message: friendlyError(e) };
   }

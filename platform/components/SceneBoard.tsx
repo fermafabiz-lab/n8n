@@ -190,18 +190,16 @@ export default function SceneBoard({
                 >
                   Voiceover — listen, edit the narration, regenerate if needed
                 </label>
-                <iframe
+                {/* Native player via our Railway media proxy — Drive's embed
+                    player overlaps its own controls at this column width. */}
+                <audio
                   key={`voice-${active.id}-${active.voiceUrl}`}
-                  src={`https://drive.google.com/file/d/${
+                  controls
+                  preload="none"
+                  src={`https://n8n-production-55dd.up.railway.app/media?id=${
                     active.voiceUrl.match(/[?&]id=([\w-]+)/)?.[1] ?? ""
-                  }/preview`}
-                  style={{
-                    width: "100%",
-                    height: 64,
-                    border: "none",
-                    borderRadius: 10,
-                    background: "var(--bg2)",
-                  }}
+                  }`}
+                  style={{ width: "100%", height: 40, display: "block" }}
                 />
                 <textarea
                   value={voiceDrafts[active.id] ?? active.narration ?? ""}

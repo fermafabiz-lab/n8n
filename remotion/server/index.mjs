@@ -32,7 +32,10 @@ app.use((req, res, next) => {
 	// assembled video from our own /output URL and cannot send headers, and
 	// Airtable/browsers need to fetch results too. Filenames are UUIDs and
 	// files are ephemeral, so unauthenticated reads are acceptable.
-	if (req.method === 'GET' && (req.path.startsWith('/output/') || req.path === '/health')) {
+	if (
+		req.method === 'GET' &&
+		(req.path.startsWith('/output/') || req.path === '/health' || req.path === '/media')
+	) {
 		return next();
 	}
 	if (req.headers['x-api-key'] !== API_KEY) {
@@ -131,6 +134,33 @@ app.get(['/render/:jobId/status', '/assemble/:jobId/status'], (req, res) => {
 app.use('/output', express.static(OUTPUT_DIR));
 
 app.get('/health', (req, res) => res.json({ok: true}));
+
+// GET /media?id=<driveFileId> — streams a Google Drive file with a proper
+// Content-Type so the site's native <audio>/<video> tags can play it (Drive's
+// own uc?export=download links answer with redirects/HTML and no usable MIME).
+// Drive-only by construction (the id is interpolated into a Drive URL), so
+// this is not an open proxy; file ids are unguessable, hence key-free like
+// /output.
+app.get('/media', async (req, res) => {
+	const id = String(req.query.id || '');
+	if (!/^[\w-]{10,}$/.test(id)) return res.status(400).json({error: 'invalid id'});
+	try {
+		const r = await fetch(`https://drive.google.com/uc?export=download&id=${id}`, {
+			redirect: 'follow',
+		});
+		if (!r.ok) return res.status(502).json({error: `drive: HTTP ${r.status}`});
+		const buf = Buffer.from(await r.arrayBuffer());
+		if (buf.slice(0, 15).toString().toLowerCase().includes('<!doctype html')) {
+			return res.status(502).json({error: 'drive returned an HTML page, not media'});
+		}
+		const ct = r.headers.get('content-type');
+		res.set('Content-Type', ct && !ct.includes('html') ? ct : 'application/octet-stream');
+		res.set('Cache-Control', 'public, max-age=3600');
+		res.send(buf);
+	} catch (err) {
+		res.status(500).json({error: String((err && err.message) || err)});
+	}
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Remotion render server listening on :${PORT}`));

@@ -131,11 +131,33 @@ export function registerAssemble(app, {jobs, outputDir}) {
 						// this, not on the (silence-padded) scene length.
 						voiceDur = await probeDuration(a, 'a:0').catch(() => null);
 					}
-					// If the narration outlasts the clip (long scenes), extend the
-					// scene by freeze-framing the last frame instead of cutting the
-					// voice mid-sentence.
-					const eff = voiceDur && voiceDur > dur ? voiceDur + 0.25 : dur;
-					items.push({v, a, dur, voiceDur, eff});
+					// Elastic timing: every scene lasts exactly as long as its own
+					// narration (+ a small breath), and the clip is TIME-STRETCHED to
+					// that length so all frames stay in motion — no freeze-frames when
+					// the voice runs long, no dead air when it runs short. The stretch
+					// factor is clamped to a range that stays visually invisible on
+					// ambient footage; only extreme mismatches fall back to trimming
+					// (very short voice) or a residual freeze (very long voice).
+					const STRETCH_MIN = 0.65; // fastest allowed playback (voice much shorter)
+					const STRETCH_MAX = 1.5;  // slowest allowed playback (voice much longer)
+					let eff = dur;
+					let stretch = 1;
+					let freeze = 0;
+					if (voiceDur) {
+						eff = voiceDur + 0.35;
+						stretch = eff / dur;
+						if (stretch > STRETCH_MAX) {
+							// Even at max slow-motion the clip can't cover the voice —
+							// freeze only the uncoverable remainder.
+							stretch = STRETCH_MAX;
+							freeze = eff - dur * STRETCH_MAX;
+						} else if (stretch < STRETCH_MIN) {
+							// Voice is far shorter than the clip — play at max speed-up
+							// and cut the leftover tail.
+							stretch = STRETCH_MIN;
+						}
+					}
+					items.push({v, a, dur, voiceDur, eff, stretch, freeze});
 					const job = jobs.get(jobId);
 					if (job) job.progress = 0.35 * ((i + 1) / scenes.length);
 				}
@@ -179,12 +201,17 @@ export function registerAssemble(app, {jobs, outputDir}) {
 				const labels = [];
 				items.forEach((it, i) => {
 					const d = it.eff.toFixed(3);
-					const freeze = Math.max(0, it.eff - it.dur);
 					// Cover-fit to the target canvas: scale up to fill, center-crop
 					// the overflow. A 16:9 clip on a 9:16 canvas crops the sides.
 					const vchain =
-						`scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},fps=24,trim=duration=${it.dur.toFixed(3)},setpts=PTS-STARTPTS` +
-						(freeze > 0.01 ? `,tpad=stop_mode=clone:stop_duration=${freeze.toFixed(3)}` : '');
+						// Elastic retime: setpts stretches/compresses playback to the
+						// scene's narration-driven length, fps=24 AFTER it resamples
+						// frames evenly, and the final trim pins the exact duration
+						// (it also cuts the leftover tail when the speed-up clamped).
+						`scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},` +
+						`trim=duration=${it.dur.toFixed(3)},setpts=${it.stretch.toFixed(5)}*(PTS-STARTPTS),fps=24` +
+						(it.freeze > 0.01 ? `,tpad=stop_mode=clone:stop_duration=${it.freeze.toFixed(3)}` : '') +
+						`,trim=duration=${d},setpts=PTS-STARTPTS`;
 					parts.push(`[${i * 2}:v]${vchain}[v${i}]`);
 					parts.push(`[${i * 2 + 1}:a]${MONO},atrim=duration=${d},asetpts=PTS-STARTPTS,apad=whole_dur=${d}[a${i}]`);
 					labels.push(`[v${i}][a${i}]`);
@@ -259,6 +286,9 @@ export function registerAssemble(app, {jobs, outputDir}) {
 						voiceDurationsSeconds: items.map((it) =>
 							it.voiceDur ? Number(Math.min(it.voiceDur, it.eff).toFixed(3)) : null,
 						),
+						// Per-scene playback retime applied (1 = untouched) — lets the
+						// QC pass confirm the elastic timing stayed in the subtle range.
+						stretchFactors: items.map((it) => Number(it.stretch.toFixed(3))),
 					},
 				});
 			} catch (err) {

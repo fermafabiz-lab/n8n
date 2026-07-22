@@ -8,6 +8,7 @@ import AutoRefresh from "@/components/AutoRefresh";
 import MediaPlayer from "@/components/MediaPlayer";
 import StageChime from "@/components/StageChime";
 import ResumeButton from "@/components/ResumeButton";
+import AutoResume from "@/components/AutoResume";
 import { getExecutions, n8nConfigured } from "@/lib/n8n";
 
 export const dynamic = "force-dynamic";
@@ -86,10 +87,27 @@ export default async function ProductionRoom({
                 ? "video-review"
                 : "working";
 
+  // Stalled: the pipeline should be producing (nothing waits on the user)
+  // but no n8n execution is running and the project isn't finished.
+  const stalled =
+    n8nConfigured &&
+    !hasRunning &&
+    stage === "working" &&
+    scenes.length > 0;
+
   return (
     <main className="page">
       <AutoRefresh seconds={10} />
-      <StageChime items={[{ key: id, stage }]} />
+      <StageChime
+        items={[
+          { key: id, stage },
+          // Count items ding on every newly landed asset.
+          { key: `${id}:scenes`, stage: `count:${scenes.length}` },
+          { key: `${id}:images`, stage: `count:${scenes.filter((s) => s.imageUrl).length}` },
+          { key: `${id}:clips`, stage: `count:${scenes.filter((s) => s.videoUrl).length}` },
+        ]}
+      />
+      <AutoResume projectId={id} stalled={stalled} />
       <div className="room">
         <div className="crumb">
           <Link href="/">Projects</Link> / <b>{project.name}</b>

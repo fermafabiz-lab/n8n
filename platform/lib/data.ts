@@ -36,6 +36,7 @@ export interface Scene {
   videoUrl: string | null;
   voiceUrl: string | null;
   sceneApproved: boolean;
+  rewriteRequested: boolean;
   imageApproved: boolean;
   videoApproved: boolean;
   status: string;
@@ -212,6 +213,7 @@ function toScene(r: AirtableRecord, index: number): Scene {
     videoUrl,
     voiceUrl: (pick(r.fields, F.sceneVoice) as string) ?? null,
     sceneApproved: Boolean(pick(r.fields, F.sceneApproved)),
+    rewriteRequested: status === "Regenerare Text",
     imageApproved: Boolean(pick(r.fields, F.sceneImageApproved)),
     videoApproved: Boolean(pick(r.fields, F.sceneVideoApproved)),
     status: displayStatus(status),
@@ -344,6 +346,7 @@ const DEMO_SCENES: Scene[] = Array.from({ length: 8 }, (_, i) => {
     videoUrl: null,
     voiceUrl: null,
     sceneApproved: true,
+    rewriteRequested: false,
     imageApproved: i < 4,
     videoApproved: i < 2,
     status: kinds[i] === "run" ? "Generating Video" : kinds[i] === "err" ? "Error" : kinds[i] === "done" ? "Video Ready" : "Queued",
@@ -370,7 +373,9 @@ async function airtablePatch(
         Authorization: `Bearer ${API_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ fields }),
+      // typecast lets writes introduce new select options (e.g. the
+      // "Regenerare Text" scene status) instead of failing with 422.
+      body: JSON.stringify({ fields, typecast: true }),
     },
   );
   if (!res.ok) {
@@ -492,6 +497,20 @@ export async function writeSceneScript(
   if (fields.approve) patch["Aprobare Scenă"] = true;
   if (Object.keys(patch).length === 0) return;
   await airtablePatch(SCENES_TABLE, sceneId, patch);
+}
+
+/**
+ * Ask the scripting workflow for a fresh AI take on one scene's text.
+ * No dedicated flag field exists (the token can't create fields), so the
+ * request rides on the scene status select — the n8n scene-approval loop
+ * watches for "Regenerare Text", rewrites narration + prompts, then sets
+ * the status back and leaves the scene unapproved for review.
+ */
+export async function requestSceneRewrite(sceneId: string): Promise<void> {
+  await airtablePatch(SCENES_TABLE, sceneId, {
+    "Status Producție Scenă": "Regenerare Text",
+    "Aprobare Scenă": false,
+  });
 }
 
 async function airtableDelete(table: string, ids: string[]): Promise<void> {

@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import {
   approveAllScenes,
+  regenerateSceneText,
   saveSceneScript,
   type ActionResult,
 } from "@/app/actions";
@@ -107,6 +108,8 @@ export default function SceneReview({
                 </h5>
                 {s.sceneApproved ? (
                   <span className="chip ok">Approved</span>
+                ) : s.rewriteRequested ? (
+                  <span className="chip run">Rewriting…</span>
                 ) : (
                   <span className="chip wait">Awaiting review</span>
                 )}
@@ -144,7 +147,7 @@ export default function SceneReview({
                 <div className="abtns">
                   <button
                     className="abtn ok"
-                    disabled={pending}
+                    disabled={pending || s.rewriteRequested}
                     onClick={() =>
                       run(() =>
                         saveSceneScript(projectId, s.id, d.narration, d.imagePrompt, true),
@@ -163,6 +166,13 @@ export default function SceneReview({
                     }
                   >
                     Save draft
+                  </button>
+                  <button
+                    className="abtn"
+                    disabled={pending || s.rewriteRequested}
+                    onClick={() => run(() => regenerateSceneText(projectId, s.id))}
+                  >
+                    {s.rewriteRequested ? "Rewriting…" : "↻ Regenerate scene"}
                   </button>
                 </div>
               )}

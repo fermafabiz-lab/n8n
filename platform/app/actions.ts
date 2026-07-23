@@ -9,6 +9,7 @@ import {
   writeSceneApproval,
   writeSceneFeedback,
   writeSceneScript,
+  requestSceneRewrite,
   writeScriptFields,
   requestVoiceRegen,
   deleteProjectDeep,
@@ -131,6 +132,26 @@ export async function saveSceneScript(
       message: approve
         ? "Scene approved — production continues once every scene is approved."
         : "Scene saved.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+export async function regenerateSceneText(
+  projectId: string,
+  sceneId: string,
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    await requestSceneRewrite(sceneId);
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message:
+        "Rewrite requested — a fresh take on this scene appears here in ~1 minute (the page refreshes itself).",
     };
   } catch (e) {
     return { ok: false, message: friendlyError(e) };

@@ -291,6 +291,26 @@ export async function deleteProjects(projectIds: string[]): Promise<ActionResult
   if (!isConfigured) {
     return { ok: true, message: "Demo mode — nothing was deleted." };
   }
+  // Stop any running production first, children before orchestrator —
+  // otherwise a live execution would error (or recreate records) when it
+  // next writes to the rows we're about to delete. The API can't map an
+  // execution to a project, so this pauses everything; Resume on another
+  // project picks up exactly where it left off.
+  let stoppedRuns = 0;
+  try {
+    const running = await getExecutions("running", 20);
+    const order = ["Media Generation", "Final Assembly", "Scripting", "Master Orchestrator"];
+    const sorted = [...running].sort(
+      (a, b) => order.indexOf(a.workflowName) - order.indexOf(b.workflowName),
+    );
+    for (const r of sorted) {
+      const res = await stopExecution(r.id);
+      if (res.ok) stoppedRuns++;
+    }
+  } catch {
+    // n8n API unreachable — proceed with the delete; worst case a running
+    // execution errors against the missing records, which is harmless.
+  }
   let deleted = 0;
   try {
     for (const id of projectIds) {
@@ -300,7 +320,9 @@ export async function deleteProjects(projectIds: string[]): Promise<ActionResult
     revalidatePath("/");
     return {
       ok: true,
-      message: `Deleted ${deleted} project${deleted === 1 ? "" : "s"} (scenes and scripts included).`,
+      message:
+        `Deleted ${deleted} project${deleted === 1 ? "" : "s"} (scenes and scripts included).` +
+        (stoppedRuns > 0 ? ` Stopped ${stoppedRuns} running workflow${stoppedRuns === 1 ? "" : "s"} first.` : ""),
     };
   } catch (e) {
     revalidatePath("/");

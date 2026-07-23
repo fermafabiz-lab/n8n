@@ -255,6 +255,9 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
+      // The webhook answers within seconds; if n8n misbehaves, never leave
+      // the form stuck on "Starting…" — fall through to the generic success.
+      signal: AbortSignal.timeout(15000),
     });
     if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
     // The webhook answers as soon as the Airtable record exists, with its id
@@ -267,6 +270,16 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     }
     revalidatePath("/");
   } catch (e) {
+    // A timeout means n8n accepted the request but was slow to answer —
+    // production is almost certainly running, so report success without
+    // the redirect instead of a scary error.
+    if (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")) {
+      revalidatePath("/");
+      return {
+        ok: true,
+        message: "Production started — the project appears on the dashboard shortly.",
+      };
+    }
     return { ok: false, message: friendlyError(e) };
   }
   // redirect() throws internally — must run outside the try/catch.

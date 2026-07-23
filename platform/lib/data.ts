@@ -494,6 +494,50 @@ export async function writeSceneScript(
   await airtablePatch(SCENES_TABLE, sceneId, patch);
 }
 
+async function airtableDelete(table: string, ids: string[]): Promise<void> {
+  // Airtable deletes at most 10 records per call.
+  for (let i = 0; i < ids.length; i += 10) {
+    const batch = ids.slice(i, i + 10);
+    const qs = batch.map((id) => `records[]=${id}`).join("&");
+    const res = await fetch(
+      `https://api.airtable.com/v0/${BASE_ID}/${encodeURIComponent(table)}?${qs}`,
+      { method: "DELETE", headers: { Authorization: `Bearer ${API_KEY}` } },
+    );
+    if (!res.ok) {
+      throw new Error(`Airtable delete ${table}: HTTP ${res.status} — ${(await res.text()).slice(0, 200)}`);
+    }
+    if (i + 10 < ids.length) await new Promise((r) => setTimeout(r, 250));
+  }
+}
+
+/**
+ * Permanently removes a project and everything attached to it: its scene
+ * records, its Scripturi records, then the project itself. Media files on
+ * Drive are intentionally left alone (cheap storage, and finished videos
+ * may already be published from there).
+ */
+export async function deleteProjectDeep(projectId: string): Promise<void> {
+  // Linked scripts come from the project record itself.
+  const projRes = await fetch(
+    `https://api.airtable.com/v0/${BASE_ID}/${encodeURIComponent(PROJECTS_TABLE)}/${projectId}`,
+    { headers: { Authorization: `Bearer ${API_KEY}` }, cache: "no-store" },
+  );
+  let scriptIds: string[] = [];
+  if (projRes.ok) {
+    const proj = (await projRes.json()) as AirtableRecord;
+    const linked = proj.fields["scripts"];
+    if (Array.isArray(linked)) scriptIds = linked.filter((v) => typeof v === "string");
+  }
+
+  const scenes = await airtableList(
+    SCENES_TABLE,
+    `filterByFormula=${encodeURIComponent(`{Project_ID}='${projectId}'`)}&fields%5B%5D=Project_ID`,
+  );
+  await airtableDelete(SCENES_TABLE, scenes.map((s) => s.id));
+  if (scriptIds.length) await airtableDelete("Scripturi", scriptIds);
+  await airtableDelete(PROJECTS_TABLE, [projectId]);
+}
+
 // Voice regeneration: n8n's video-approval cycle picks up the flag, runs a
 // fresh TTS on the (possibly edited) narration and re-muxes the existing
 // clip — no image/video regeneration involved.

@@ -11,6 +11,7 @@ import {
   writeSceneScript,
   writeScriptFields,
   requestVoiceRegen,
+  deleteProjectDeep,
 } from "@/lib/data";
 import { getExecutions, stopExecution } from "@/lib/n8n";
 
@@ -248,6 +249,7 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     chapter_cards: String(formData.get("chapter_cards") ?? "yes"),
     end_screen: String(formData.get("end_screen") ?? "yes"),
   };
+  let newProjectId: string | null = null;
   try {
     const res = await fetch(webhook, {
       method: "POST",
@@ -255,11 +257,34 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
       body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
+    // The webhook answers as soon as the Airtable record exists, with its id
+    // — used to land the user straight in the production room.
+    try {
+      const data = (await res.json()) as { project_id?: string };
+      if (data?.project_id?.startsWith("rec")) newProjectId = data.project_id;
+    } catch {
+      // Older webhook response ("Workflow got started") — no id, no redirect.
+    }
     revalidatePath("/");
-    return { ok: true, message: "Production started — the project appears on the dashboard shortly." };
   } catch (e) {
     return { ok: false, message: friendlyError(e) };
   }
+  // redirect() throws internally — must run outside the try/catch.
+  if (newProjectId) redirect(`/projects/${newProjectId}`);
+  return { ok: true, message: "Production started — the project appears on the dashboard shortly." };
+}
+
+export async function deleteProject(projectId: string): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was deleted." };
+  }
+  try {
+    await deleteProjectDeep(projectId);
+    revalidatePath("/");
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+  redirect("/");
 }
 
 export async function resumeProject(projectId: string): Promise<ActionResult> {

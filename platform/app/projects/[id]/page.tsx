@@ -11,7 +11,6 @@ import ResumeButton from "@/components/ResumeButton";
 import AutoResume from "@/components/AutoResume";
 import ExpandableTitle from "@/components/ExpandableTitle";
 import OpsPanel from "@/components/OpsPanel";
-import DeleteProjectButton from "@/components/DeleteProjectButton";
 import { getExecutions, n8nConfigured } from "@/lib/n8n";
 
 export const dynamic = "force-dynamic";
@@ -125,12 +124,9 @@ export default async function ProductionRoom({
               {project.status}
             </span>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-            {project.statusKind !== "done" && scenes.length > 0 && (
-              <ResumeButton projectId={id} running={hasRunning} />
-            )}
-            <DeleteProjectButton projectId={id} />
-          </div>
+          {project.statusKind !== "done" && scenes.length > 0 && (
+            <ResumeButton projectId={id} running={hasRunning} />
+          )}
         </div>
 
         {project.finalVideoUrl && project.finalVideoUrl.startsWith("http") && (

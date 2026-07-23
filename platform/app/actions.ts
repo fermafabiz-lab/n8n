@@ -274,17 +274,28 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
   return { ok: true, message: "Production started — the project appears on the dashboard shortly." };
 }
 
-export async function deleteProject(projectId: string): Promise<ActionResult> {
+export async function deleteProjects(projectIds: string[]): Promise<ActionResult> {
   if (!isConfigured) {
     return { ok: true, message: "Demo mode — nothing was deleted." };
   }
+  let deleted = 0;
   try {
-    await deleteProjectDeep(projectId);
+    for (const id of projectIds) {
+      await deleteProjectDeep(id);
+      deleted++;
+    }
     revalidatePath("/");
+    return {
+      ok: true,
+      message: `Deleted ${deleted} project${deleted === 1 ? "" : "s"} (scenes and scripts included).`,
+    };
   } catch (e) {
-    return { ok: false, message: friendlyError(e) };
+    revalidatePath("/");
+    return {
+      ok: false,
+      message: `Deleted ${deleted}/${projectIds.length}, then failed: ${friendlyError(e)}`,
+    };
   }
-  redirect("/");
 }
 
 export async function resumeProject(projectId: string): Promise<ActionResult> {

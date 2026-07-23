@@ -1,26 +1,10 @@
-import Link from "next/link";
-import { getProjects, isConfigured, type Project } from "@/lib/data";
+import { getProjects, isConfigured } from "@/lib/data";
 import AutoRefresh from "@/components/AutoRefresh";
 import OpsPanel from "@/components/OpsPanel";
 import StageChime from "@/components/StageChime";
-import ExpandableTitle from "@/components/ExpandableTitle";
+import ProjectsGrid from "@/components/ProjectsGrid";
 
 export const dynamic = "force-dynamic";
-
-function badgeLabel(p: Project): string {
-  switch (p.statusKind) {
-    case "wait":
-      return "Needs review";
-    case "run":
-      return "Rendering";
-    case "done":
-      return "Finished";
-    case "err":
-      return "Needs a fix";
-    default:
-      return p.status;
-  }
-}
 
 export default async function Dashboard() {
   const projects = await getProjects();
@@ -95,50 +79,18 @@ export default async function Dashboard() {
 
       <OpsPanel />
 
-      <div className="sechead">
-        <h2>Projects</h2>
-      </div>
-
       {projects.length === 0 ? (
-        <div className="empty">
-          <h3>No projects yet</h3>
-          <p>Projects created through the n8n form will appear here.</p>
-        </div>
+        <>
+          <div className="sechead">
+            <h2>Projects</h2>
+          </div>
+          <div className="empty">
+            <h3>No projects yet</h3>
+            <p>Projects created through the n8n form will appear here.</p>
+          </div>
+        </>
       ) : (
-        <div className="projects">
-          {projects.map((p, i) => (
-            <Link href={`/projects/${p.id}`} className="proj" key={p.id}>
-              <div className="cover">
-                <div
-                  className={`art ${p.coverUrl ? "" : `fallback${(i % 4) + 1}`}`}
-                  style={
-                    p.coverUrl ? { backgroundImage: `url(${p.coverUrl})` } : undefined
-                  }
-                />
-                <span className={`badge ${p.statusKind === "idle" ? "run" : p.statusKind}`}>
-                  {badgeLabel(p)}
-                </span>
-              </div>
-              <div className="body">
-                <ExpandableTitle text={p.name} as="h3" clampChars={80} />
-                <div className="meta">
-                  {p.lengthSeconds ? `${p.lengthSeconds}s` : "—"}
-                  {p.tone ? ` · ${p.tone}` : ""}
-                </div>
-                <div className="track">
-                  <i
-                    className={p.statusKind === "idle" ? "" : p.statusKind}
-                    style={{ width: `${Math.round(p.progress * 100)}%` }}
-                  />
-                </div>
-                <div className="foot">
-                  <span>{p.status}</span>
-                  <span className="go">Open →</span>
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
+        <ProjectsGrid projects={projects} />
       )}
     </main>
   );

@@ -1,0 +1,121 @@
+{
+  "meta": {
+    "purpose": "Measured editing rhythm of reference videos, used as the target spec for the montage planner. Our own output is measured with the same method so every iteration is comparable.",
+    "measuredAt": "2026-07-25",
+    "tool": "POST /analyze on the Railway render server (remotion/server/analyze.mjs); our own baseline measured locally with the same logic",
+    "method": {
+      "cutDetection": "ffmpeg select='gt(scene,THRESHOLD)' + showinfo; cuts closer than 0.15s merged",
+      "defaultThreshold": 0.25,
+      "window": "first 240s of each reference video",
+      "variability": "standard deviation of shot durations divided by their mean — 0 means every shot is the same length",
+      "cutsWithAudioAccentPct": "share of cuts where loudness right after the cut exceeds loudness 0.3s before it by >60% (SFX/impact hits landing on the cut)",
+      "cutsOnSpeechBoundaryPct": "share of cuts falling within 0.4s of a caption cue start/end (cutting on the narration beat)",
+      "duckingRatioCaveat": "ratio of loudness with no speech vs under speech. Unreliable when talkTimePct approaches 100, because the no-speech sample becomes tiny."
+    }
+  },
+
+  "references": [
+    {
+      "id": "ref1",
+      "url": "https://www.youtube.com/watch?v=2mMza3HMohw",
+      "analyzedSeconds": 240,
+      "shotStats": {"count": 47, "cutsPerMinute": 11.7, "medianSeconds": 4.2, "meanSeconds": 5.11, "p10Seconds": 1.73, "p90Seconds": 10.38, "shortestSeconds": 0.4, "longestSeconds": 18.08, "variability": 0.74, "under2sPct": 13, "over6sPct": 28},
+      "speech": {"wpm": 142, "talkTimePct": 90, "cutsOnSpeechBoundaryPct": 57},
+      "audio": {"medianRms": 0.0733, "dynamicRange": 3.61, "quietMomentsPerMin": 0.26, "cutsWithAudioAccentPct": 65, "underNarrationRms": 0.0746, "inTheClearRms": 0.0582, "duckingRatio": 0.78},
+      "shotDurations": [3.07, 18.08, 4.67, 5.51, 13.28, 6.01, 3.94, 4.5, 6.44, 8.64, 0.4, 9.21, 5.84, 10.08, 2.27, 2.64, 1.37, 0.57, 1.77, 0.53, 2.74, 3.37, 2.47, 5.44, 2.84, 2.37, 3.37, 3.14, 4.77, 1.73, 2.24, 4.44, 3.37, 2.3, 2.6, 4.77, 5.47, 10.38, 11.48, 5.07, 8.01, 6.74, 7.64, 2.94, 4.2, 2.64, 14.68]
+    },
+    {
+      "id": "ref2",
+      "url": "https://www.youtube.com/watch?v=xV82vkJ5Pjw",
+      "analyzedSeconds": 240,
+      "shotStats": {"count": 126, "cutsPerMinute": 31.5, "medianSeconds": 1.28, "meanSeconds": 1.9, "p10Seconds": 0.36, "p90Seconds": 3.8, "shortestSeconds": 0.2, "longestSeconds": 14.08, "variability": 1.13, "under2sPct": 72, "over6sPct": 6},
+      "speech": {"wpm": 159, "talkTimePct": 100, "cutsOnSpeechBoundaryPct": 27},
+      "audio": {"medianRms": 0.0685, "dynamicRange": 2.87, "quietMomentsPerMin": 0.35, "cutsWithAudioAccentPct": 42, "underNarrationRms": 0.0656, "inTheClearRms": 0.0582, "duckingRatio": 0.89},
+      "shotDurations": [2.68, 0.44, 0.48, 0.4, 0.44, 3.52, 2.6, 0.44, 0.48, 0.44, 0.44, 0.36, 1.36, 1.44, 0.4, 0.64, 0.48, 0.64, 0.8, 7.08, 6.28, 0.32, 0.28, 0.24, 0.28, 0.32, 0.36, 0.68, 3.8, 1.08, 2.08, 1.44, 1.28, 1.32, 1.0, 0.8, 0.76, 1.28, 0.84, 1.16, 0.72, 1.16, 2.28, 1.0, 0.72, 0.76, 1.04, 1.16, 0.84, 0.72, 1.16, 0.8, 0.8, 1.2, 0.88, 0.84, 1.6, 0.48, 0.36, 0.36, 0.32, 0.84, 0.28, 0.2, 1.64, 0.72, 0.56, 0.32, 0.24, 0.72, 5.88, 3.64, 7.2, 1.64, 1.48, 0.8, 1.24, 1.88, 1.2, 4.4, 7.96, 0.96, 1.08, 1.28, 1.32, 1.0, 1.48, 1.64, 1.72, 12.48, 2.24, 1.52, 1.96, 2.44, 1.96, 2.28, 4.16, 1.2, 2.44, 6.48, 1.96, 1.84, 1.24, 1.28, 0.96, 1.76, 1.72, 2.36, 1.88, 2.36, 2.64, 2.28, 2.2, 3.36, 4.28, 3.28, 3.76, 3.44, 14.08, 6.68, 3.76, 1.92, 2.08, 1.44, 1.32, 2.76]
+    },
+    {
+      "id": "ref3",
+      "url": "https://www.youtube.com/watch?v=za34HuD8ca4",
+      "analyzedSeconds": 240,
+      "note": "Illustrated/animated documentary (Alcatraz escape). Contains the clearest examples of the devices we lack: a black frame used as punctuation, a run of four ~1s archival headline cards, and eight consecutive 0.50s action inserts followed by a 34s hold.",
+      "shotStats": {"count": 43, "cutsPerMinute": 10.7, "medianSeconds": 2.37, "meanSeconds": 5.58, "p10Seconds": 0.5, "p90Seconds": 10.33, "shortestSeconds": 0.5, "longestSeconds": 35.93, "variability": 1.46, "under2sPct": 49, "over6sPct": 30},
+      "speech": {"wpm": 135, "talkTimePct": 98, "cutsOnSpeechBoundaryPct": 24},
+      "audio": {"medianRms": 0.1134, "dynamicRange": 2.24, "quietMomentsPerMin": 0.22, "cutsWithAudioAccentPct": 36, "underNarrationRms": 0.1062, "inTheClearRms": 0.1072, "duckingRatio": 1.01},
+      "shotDurations": [9.67, 1.8, 1.97, 1.47, 2.47, 1.13, 1.03, 1.0, 1.07, 4.63, 2.63, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 1.0, 1.17, 8.43, 34.3, 10.33, 3.27, 3.87, 3.6, 1.6, 7.83, 9.5, 1.4, 24.6, 7.23, 6.3, 35.93, 2.37, 7.4, 2.87, 1.83, 3.2, 1.37, 17.83, 9.9],
+      "observedShotContent": {
+        "1": "wide establishing — figure running on the shore (9.67s)",
+        "4": "BLACK FRAME used as punctuation (1.47s)",
+        "6-9": "four consecutive archival newspaper headline cards, ~1s each",
+        "12-19": "eight consecutive 0.50s action inserts — hand tool, vent shaft, drilling, corridor, yard, climbing a pipe, tunnel",
+        "23": "34.3s uninterrupted hold immediately after the burst"
+      }
+    },
+    {
+      "id": "ref4",
+      "url": "https://youtu.be/Oi-J0ArLZy8",
+      "analyzedSeconds": 240,
+      "note": "The slowest of the five — median shot longer than ours. Proves the problem is not shot length but the absence of variation.",
+      "shotStats": {"count": 19, "cutsPerMinute": 4.7, "medianSeconds": 9.07, "meanSeconds": 12.62, "p10Seconds": 2.63, "p90Seconds": 34.53, "shortestSeconds": 1.33, "longestSeconds": 38.3, "variability": 0.84, "under2sPct": 5, "over6sPct": 74},
+      "speech": {"wpm": 150, "talkTimePct": 99, "cutsOnSpeechBoundaryPct": 26},
+      "audio": {"medianRms": 0.1368, "dynamicRange": 2.72, "quietMomentsPerMin": 0.16, "cutsWithAudioAccentPct": 58, "underNarrationRms": 0.1357, "inTheClearRms": 0.0659, "duckingRatio": 0.49},
+      "shotDurations": [16.47, 5.57, 1.33, 29.47, 6.37, 10.1, 6.3, 8.33, 9.83, 4.3, 7.73, 34.53, 11.2, 23.63, 38.3, 9.07, 2.83, 2.63, 11.83]
+    },
+    {
+      "id": "ref5",
+      "url": "https://www.youtube.com/watch?v=sA6G70M4hrs",
+      "analyzedSeconds": 240,
+      "note": "Narration pace closest to ours (117 wpm) and the most breathing room of the five.",
+      "shotStats": {"count": 61, "cutsPerMinute": 15.2, "medianSeconds": 3.33, "meanSeconds": 3.93, "p10Seconds": 1.93, "p90Seconds": 6.8, "shortestSeconds": 0.43, "longestSeconds": 13.3, "variability": 0.58, "under2sPct": 13, "over6sPct": 15},
+      "speech": {"wpm": 117, "talkTimePct": 99, "cutsOnSpeechBoundaryPct": 27},
+      "audio": {"medianRms": 0.049, "dynamicRange": 3.1, "quietMomentsPerMin": 0.53, "cutsWithAudioAccentPct": 63, "underNarrationRms": 0.0454, "inTheClearRms": 0.0441, "duckingRatio": 0.97},
+      "shotDurations": [3.77, 7.2, 2.53, 6.9, 3.77, 2.53, 5.43, 1.33, 3.1, 2.23, 1.93, 4.1, 5.03, 2.1, 1.57, 4.27, 3.3, 3.4, 2.3, 3.6, 3.5, 3.47, 3.1, 2.7, 6.07, 6.37, 2.33, 10.07, 5.03, 3.0, 2.23, 4.9, 5.2, 3.33, 2.97, 1.23, 1.97, 3.2, 5.93, 5.03, 4.37, 13.3, 3.5, 2.53, 1.37, 3.2, 1.83, 9.2, 4.23, 4.07, 2.83, 6.8, 4.63, 3.97, 3.13, 2.43, 2.6, 8.47, 2.1, 2.97, 0.43]
+    }
+  ],
+
+  "ourBaseline": {
+    "project": "History of Hookah (final render, 9:16)",
+    "analyzedSeconds": 46.9,
+    "atReferenceThreshold": {
+      "threshold": 0.25,
+      "note": "At the same threshold used for all five references, the whole body of the video registers as ONE 42.9s shot. Our scene changes do not read as cuts because consecutive scenes share subject, location, framing and lighting.",
+      "shotStats": {"count": 2, "cutsPerMinute": 2.6, "medianSeconds": 42.93, "meanSeconds": 23.46, "shortestSeconds": 4.0, "longestSeconds": 42.93, "under2sPct": 0, "over6sPct": 50},
+      "shotDurations": [42.93, 4.0]
+    },
+    "atLoweredThreshold": {
+      "threshold": 0.15,
+      "note": "Only when the detector is made far more sensitive do the scene boundaries appear — and they land on an 8-second grid.",
+      "cutTimes": [8.0, 10.2, 16.0, 24.0, 32.5, 42.9],
+      "shotDurations": [8.0, 2.2, 5.8, 8.0, 8.5, 10.4, 4.03],
+      "gridEvidence": "cuts at 8.0 / 16.0 / 24.0 / 32.5 — the 8s scene metronome, measured"
+    },
+    "audio": {"quietMomentsPerMin": 0.28, "cutsWithAudioAccentPct": 0},
+    "distinctVisualSetups": 4,
+    "defectsFound": [
+      "Chapter card title truncated mid-word: rendered 'In the dimly lit Anci' — a sentence fragment is reaching the card instead of a title",
+      "Inconsistent framing: the final scene is letterboxed with black bands covering ~21% of frame height (measured at t=36s and t=42s), while scenes at t=3/12/20/27s fill the frame"
+    ]
+  },
+
+  "styleCard": {
+    "principle": "Do not copy a speed — copy the structure. Reference medians span 1.3s to 9.1s (a 7x spread), so there is no single correct shot length. What all five share is extreme variation and a montage bound to the soundtrack.",
+    "rules": [
+      "Variability at or above 0.6 (every reference: 0.58-1.46)",
+      "Shortest-to-longest ratio of at least 1:10 within one video",
+      "At least one burst of 3-8 short shots (0.4-1.2s) per minute",
+      "At least one held shot above 10s per minute",
+      "Never three consecutive shots of equal duration — except inside a deliberate rhythmic burst, where equal duration IS the effect",
+      "Bind picture to sound: 36-65% of cuts carry an audio accent in the references, 0% in ours",
+      "Punctuate with black frames of 0.3-1.5s before a reveal",
+      "Use typographic cards held ~1s in runs of 3-5 — as declared graphics, never photoreal fake newspaper scans, which would fabricate documents even when the underlying fact is true"
+    ]
+  },
+
+  "acceptanceTargets": {
+    "note": "Re-measure our render with the same tool after each montage change.",
+    "variability": ">= 0.6",
+    "shortestShotSeconds": "<= 1.5",
+    "longestShotSeconds": ">= 10",
+    "cutsDetectedAtThreshold": "cuts must register at threshold 0.25, not only at 0.15",
+    "cutsWithAudioAccentPct": ">= 40"
+  }
+}

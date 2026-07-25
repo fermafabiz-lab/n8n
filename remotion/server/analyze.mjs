@@ -39,10 +39,23 @@ const round = (n, d = 2) => Math.round(n * 10 ** d) / 10 ** d;
 
 // ---------- acquisition ----------
 
+// YouTube blocks datacenter IPs, and exported cookies get rotated by the
+// browser within days — so no single approach stays working. Try the cheap
+// ones in order and keep whichever gets through: alternative player clients
+// often pass the bot check with no cookies at all.
+const DOWNLOAD_STRATEGIES = [
+	{name: 'cookies', extra: () => cookieArgs()},
+	{name: 'no-cookies', extra: () => []},
+	{name: 'alt-client', extra: () => ['--extractor-args', 'youtube:player_client=tv,mweb,ios']},
+	{
+		name: 'cookies+alt-client',
+		extra: () => [...cookieArgs(), '--extractor-args', 'youtube:player_client=tv,mweb,ios'],
+	},
+];
+
 async function downloadVideo(url, dir, maxSeconds) {
 	const out = path.join(dir, 'video.mp4');
-	const args = [
-		...cookieArgs(),
+	const base = [
 		// 480p is plenty to read framing and cuts, and keeps this fast.
 		'-f', 'bv*[height<=480]+ba/b[height<=480]/b',
 		'--merge-output-format', 'mp4',
@@ -53,12 +66,23 @@ async function downloadVideo(url, dir, maxSeconds) {
 		// bounds download + processing time on 30-minute videos.
 		// No --force-keyframes-at-cuts: the section starts at 0, which is already
 		// a keyframe, so skipping it avoids a full re-encode.
-		args.push('--download-sections', `*0-${maxSeconds}`);
+		base.push('--download-sections', `*0-${maxSeconds}`);
 	}
-	args.push(url);
-	await mustRun(YTDLP, args, 8 * 60 * 1000);
-	if (!fs.existsSync(out)) throw new Error('yt-dlp produced no file');
-	return out;
+
+	const failures = [];
+	for (const s of DOWNLOAD_STRATEGIES) {
+		const extra = s.extra();
+		// Skip cookie strategies entirely when no cookies are configured.
+		if (s.name.includes('cookies') && !extra.includes('--cookies')) continue;
+		const r = await run(YTDLP, [...extra, ...base, url], 8 * 60 * 1000);
+		if (!r.err && fs.existsSync(out) && fs.statSync(out).size > 0) {
+			return {file: out, strategy: s.name};
+		}
+		fs.rmSync(out, {force: true});
+		const why = (r.stderr.match(/ERROR:.*/g) || []).slice(-1)[0] || (r.err && r.err.message) || 'unknown';
+		failures.push(`${s.name} → ${why.slice(0, 200)}`);
+	}
+	throw new Error(`yt-dlp could not download this video.\n${failures.join('\n')}`);
 }
 
 async function probeDuration(file) {
@@ -200,7 +224,7 @@ export function registerAnalyze(app, {outputDir}) {
 		const tag = randomUUID().slice(0, 8);
 		const dir = fs.mkdtempSync(path.join(os.tmpdir(), `an-${tag}-`));
 		try {
-			const file = await downloadVideo(url, dir, Number(maxSeconds) || 0);
+			const {file, strategy} = await downloadVideo(url, dir, Number(maxSeconds) || 0);
 			const duration = await probeDuration(file);
 			const cuts = await detectCuts(file, Number(threshold) || 0.25);
 			const shots = buildShots(cuts, duration);
@@ -268,6 +292,7 @@ export function registerAnalyze(app, {outputDir}) {
 
 			res.json({
 				url,
+				downloadStrategy: strategy,
 				analyzedSeconds: round(duration, 1),
 				shotStats,
 				speech,

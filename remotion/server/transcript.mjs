@@ -106,23 +106,37 @@ function stats(cues) {
 
 export async function fetchSubtitles(url, dir) {
 	// Manual subs first, auto-captions second; English/Romanian preferred.
-	await run(
-		YTDLP,
-		[
-			...cookieArgs(),
-			'--skip-download',
-			'--write-subs',
-			'--write-auto-subs',
-			'--sub-langs', 'en.*,ro.*',
-			'--convert-subs', 'srt',
-			'-o', path.join(dir, 'subs.%(ext)s'),
-			url,
-		],
-		{timeout: 120000},
-	);
-	const srtFile = fs.readdirSync(dir).find((f) => f.endsWith('.srt'));
-	if (!srtFile) return null;
-	return fs.readFileSync(path.join(dir, srtFile), 'utf8');
+	// Cookies get rotated by the browser within days and stale ones make
+	// YouTube's bot check *worse* than sending none, so fall back to a
+	// cookie-less attempt and then to an alternative player client.
+	const attempts = [
+		cookieArgs(),
+		[],
+		['--extractor-args', 'youtube:player_client=tv,mweb,ios'],
+	];
+	for (const extra of attempts) {
+		try {
+			await run(
+				YTDLP,
+				[
+					...extra,
+					'--skip-download',
+					'--write-subs',
+					'--write-auto-subs',
+					'--sub-langs', 'en.*,ro.*',
+					'--convert-subs', 'srt',
+					'-o', path.join(dir, 'subs.%(ext)s'),
+					url,
+				],
+				{timeout: 120000},
+			);
+		} catch {
+			// This strategy was blocked — try the next one.
+		}
+		const srtFile = fs.readdirSync(dir).find((f) => f.endsWith('.srt'));
+		if (srtFile) return fs.readFileSync(path.join(dir, srtFile), 'utf8');
+	}
+	return null;
 }
 
 async function extractAudio(url, dir) {

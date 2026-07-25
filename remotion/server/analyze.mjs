@@ -51,7 +51,9 @@ async function downloadVideo(url, dir, maxSeconds) {
 	if (maxSeconds > 0) {
 		// Only the opening stretch — style is established early and this
 		// bounds download + processing time on 30-minute videos.
-		args.push('--download-sections', `*0-${maxSeconds}`, '--force-keyframes-at-cuts');
+		// No --force-keyframes-at-cuts: the section starts at 0, which is already
+		// a keyframe, so skipping it avoids a full re-encode.
+		args.push('--download-sections', `*0-${maxSeconds}`);
 	}
 	args.push(url);
 	await mustRun(YTDLP, args, 8 * 60 * 1000);

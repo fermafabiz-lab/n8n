@@ -18,7 +18,7 @@ const YTDLP = process.env.YTDLP_PATH || 'yt-dlp';
 // the contents of a Netscape cookies.txt export (raw or base64) and every
 // yt-dlp call sends them.
 let cookieArgsCache;
-function cookieArgs() {
+export function cookieArgs() {
 	if (cookieArgsCache !== undefined) return cookieArgsCache;
 	const raw = process.env.YT_COOKIES;
 	if (!raw) return (cookieArgsCache = []);
@@ -35,7 +35,7 @@ function cookieArgs() {
 
 // ---------- SRT helpers ----------
 
-function parseSrt(srt) {
+export function parseSrt(srt) {
 	// -> [{start, end, text}] in seconds. Tolerates VTT-ish timestamps too.
 	const cues = [];
 	const blocks = srt.replace(/\r/g, '').split(/\n\n+/);
@@ -58,7 +58,7 @@ function parseSrt(srt) {
 
 // YouTube auto-captions repeat text across rolling cues ("hello world" /
 // "hello world how are you"). Keep a cue only for the part it adds.
-function dedupeCues(cues) {
+export function dedupeCues(cues) {
 	const out = [];
 	let prevText = '';
 	for (const c of cues) {
@@ -104,7 +104,7 @@ function stats(cues) {
 
 // ---------- acquisition ----------
 
-async function fetchSubtitles(url, dir) {
+export async function fetchSubtitles(url, dir) {
 	// Manual subs first, auto-captions second; English/Romanian preferred.
 	await run(
 		YTDLP,

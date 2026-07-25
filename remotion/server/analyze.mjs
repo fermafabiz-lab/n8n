@@ -72,8 +72,8 @@ async function downloadVideo(url, dir, maxSeconds) {
 	const failures = [];
 	for (const s of DOWNLOAD_STRATEGIES) {
 		const extra = s.extra();
-		// Skip cookie strategies entirely when no cookies are configured.
-		if (s.name.includes('cookies') && !extra.includes('--cookies')) continue;
+		// Skip the cookie-bearing strategies when no cookies are configured.
+		if (s.name.startsWith('cookies') && !extra.includes('--cookies')) continue;
 		const r = await run(YTDLP, [...extra, ...base, url], 8 * 60 * 1000);
 		if (!r.err && fs.existsSync(out) && fs.statSync(out).size > 0) {
 			return {file: out, strategy: s.name};
@@ -83,6 +83,58 @@ async function downloadVideo(url, dir, maxSeconds) {
 		failures.push(`${s.name} → ${why.slice(0, 200)}`);
 	}
 	throw new Error(`yt-dlp could not download this video.\n${failures.join('\n')}`);
+}
+
+// Google Drive links/ids, or any plain media URL — the escape hatch for when
+// YouTube blocks this host's IP. Drive's large-file interstitial needs the
+// confirm flag, otherwise it answers with an HTML page instead of the file.
+async function downloadDirect(url, dir) {
+	const out = path.join(dir, 'video.mp4');
+	const drive = String(url).match(/(?:drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?[^]*id=))([\w-]{10,})/);
+	const candidates = drive
+		? [
+				`https://drive.google.com/uc?export=download&id=${drive[1]}&confirm=t`,
+				`https://drive.usercontent.google.com/download?id=${drive[1]}&export=download&confirm=t`,
+			]
+		: [url];
+
+	let lastErr = 'unknown';
+	for (const target of candidates) {
+		try {
+			const r = await fetch(target, {redirect: 'follow'});
+			if (!r.ok) {
+				lastErr = `HTTP ${r.status}`;
+				continue;
+			}
+			const buf = Buffer.from(await r.arrayBuffer());
+			if (buf.slice(0, 200).toString('utf8').toLowerCase().includes('<!doctype html')) {
+				lastErr = 'the link answered with an HTML page, not a video file';
+				continue;
+			}
+			fs.writeFileSync(out, buf);
+			return {file: out, strategy: drive ? 'drive' : 'direct-url'};
+		} catch (e) {
+			lastErr = String((e && e.message) || e);
+		}
+	}
+	throw new Error(`Could not download the file: ${lastErr}`);
+}
+
+// Direct downloads arrive whole; trim to the requested opening stretch so the
+// rest of the pipeline behaves the same as for a yt-dlp section download.
+async function trimTo(file, dir, maxSeconds) {
+	if (!(maxSeconds > 0)) return file;
+	const trimmed = path.join(dir, 'trimmed.mp4');
+	const r = await run('ffmpeg', ['-y', '-i', file, '-t', String(maxSeconds), '-c', 'copy', trimmed]);
+	return !r.err && fs.existsSync(trimmed) && fs.statSync(trimmed).size > 0 ? trimmed : file;
+}
+
+async function acquire(url, dir, maxSeconds) {
+	if (/(?:youtube\.com|youtu\.be)\//i.test(url)) {
+		return downloadVideo(url, dir, maxSeconds);
+	}
+	const got = await downloadDirect(url, dir);
+	return {file: await trimTo(got.file, dir, maxSeconds), strategy: got.strategy};
 }
 
 async function probeDuration(file) {
@@ -224,7 +276,7 @@ export function registerAnalyze(app, {outputDir}) {
 		const tag = randomUUID().slice(0, 8);
 		const dir = fs.mkdtempSync(path.join(os.tmpdir(), `an-${tag}-`));
 		try {
-			const {file, strategy} = await downloadVideo(url, dir, Number(maxSeconds) || 0);
+			const {file, strategy} = await acquire(url, dir, Number(maxSeconds) || 0);
 			const duration = await probeDuration(file);
 			const cuts = await detectCuts(file, Number(threshold) || 0.25);
 			const shots = buildShots(cuts, duration);

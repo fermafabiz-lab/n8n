@@ -268,6 +268,28 @@ function loudnessStats(env, windowSec, cuts, speechSpans) {
 // ---------- endpoint ----------
 
 export function registerAnalyze(app, {outputDir}) {
+	// GET /thumb?file=sheet-xxx-01.jpg&w=760 — re-encodes an existing output
+	// image smaller. Contact sheets are large; this makes them cheap to pull
+	// through the n8n bridge for inspection.
+	app.get('/thumb', async (req, res) => {
+		const file = String(req.query.file || '');
+		if (!/^[\w.-]+\.(jpg|jpeg|png)$/i.test(file)) return res.status(400).json({error: 'invalid file'});
+		const src = path.join(outputDir, file);
+		if (!fs.existsSync(src)) return res.status(404).json({error: 'not found'});
+		const w = Math.min(1600, Math.max(200, Number(req.query.w) || 760));
+		const out = path.join(os.tmpdir(), `thumb-${randomUUID().slice(0, 8)}.jpg`);
+		try {
+			const r = await run('ffmpeg', ['-y', '-i', src, '-vf', `scale=${w}:-2`, '-q:v', '7', out]);
+			if (r.err || !fs.existsSync(out)) throw new Error('resize failed');
+			res.set('Content-Type', 'image/jpeg');
+			res.send(fs.readFileSync(out));
+		} catch (err) {
+			res.status(500).json({error: String((err && err.message) || err)});
+		} finally {
+			fs.rmSync(out, {force: true});
+		}
+	});
+
 	app.post('/analyze', async (req, res) => {
 		const {url, maxSeconds = 300, threshold = 0.25} = req.body || {};
 		if (!url || !/^https?:\/\//.test(url)) {

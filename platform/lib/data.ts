@@ -221,6 +221,32 @@ function toScene(r: AirtableRecord, index: number): Scene {
   };
 }
 
+/**
+ * Ground truth for "did the project actually get created?".
+ *
+ * The n8n webhook's answer is not evidence — it can time out, or return 200
+ * while a later node fails. This asks Airtable directly for a project with
+ * this name created in the last few minutes, so the UI never claims success
+ * for a record that does not exist.
+ */
+export async function findRecentProjectByName(
+  name: string,
+  withinMs = 5 * 60 * 1000,
+): Promise<string | null> {
+  if (!isConfigured || !name.trim()) return null;
+  const escaped = name.trim().replace(/'/g, "\\'");
+  const formula = encodeURIComponent(`{Nume Proiect}='${escaped}'`);
+  const records = await airtableList(
+    PROJECTS_TABLE,
+    `pageSize=20&filterByFormula=${formula}`,
+  );
+  const cutoff = Date.now() - withinMs;
+  const fresh = records
+    .filter((r) => new Date(r.createdTime).getTime() >= cutoff)
+    .sort((a, b) => new Date(b.createdTime).getTime() - new Date(a.createdTime).getTime());
+  return fresh[0]?.id ?? null;
+}
+
 export async function getProjects(): Promise<Project[]> {
   if (!isConfigured) return DEMO_PROJECTS;
   const records = await airtableList(PROJECTS_TABLE, "pageSize=100");

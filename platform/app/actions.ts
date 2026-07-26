@@ -10,6 +10,7 @@ import {
   writeSceneFeedback,
   writeSceneScript,
   requestSceneRewrite,
+  findRecentProjectByName,
   writeScriptFields,
   requestVoiceRegen,
   deleteProjectDeep,
@@ -270,42 +271,55 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     chapter_cards: String(formData.get("chapter_cards") ?? "yes"),
     end_screen: String(formData.get("end_screen") ?? "yes"),
   };
+  const projectName = payload["Nume Proiect"];
   let newProjectId: string | null = null;
+  let webhookError: string | null = null;
+
   try {
     const res = await fetch(webhook, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
-      // The webhook answers within seconds; if n8n misbehaves, never leave
-      // the form stuck on "Starting…" — fall through to the generic success.
-      signal: AbortSignal.timeout(15000),
+      // Never leave the form stuck on "Starting…" — but a timeout is NOT
+      // success. It just means we have to go ask Airtable ourselves.
+      signal: AbortSignal.timeout(20000),
     });
     if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
-    // The webhook answers as soon as the Airtable record exists, with its id
-    // — used to land the user straight in the production room.
     try {
       const data = (await res.json()) as { project_id?: string };
       if (data?.project_id?.startsWith("rec")) newProjectId = data.project_id;
     } catch {
-      // Older webhook response ("Workflow got started") — no id, no redirect.
+      // Older webhook response ("Workflow got started") — no id in the body.
     }
-    revalidatePath("/");
   } catch (e) {
-    // A timeout means n8n accepted the request but was slow to answer —
-    // production is almost certainly running, so report success without
-    // the redirect instead of a scary error.
-    if (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")) {
-      revalidatePath("/");
-      return {
-        ok: true,
-        message: "Production started — the project appears on the dashboard shortly.",
-      };
-    }
-    return { ok: false, message: friendlyError(e) };
+    webhookError =
+      e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")
+        ? "n8n did not answer within 20s"
+        : friendlyError(e);
   }
-  // redirect() throws internally — must run outside the try/catch.
-  if (newProjectId) redirect(`/projects/${newProjectId}`);
-  return { ok: true, message: "Production started — the project appears on the dashboard shortly." };
+
+  // The webhook's word is not evidence. Confirm against Airtable — n8n can
+  // answer 200 and still fail at a later node, and it can time out after
+  // having created the record. Only a real record counts as success.
+  if (!newProjectId && isConfigured) {
+    for (let attempt = 0; attempt < 6 && !newProjectId; attempt++) {
+      await new Promise((r) => setTimeout(r, attempt === 0 ? 0 : 2000));
+      try {
+        newProjectId = await findRecentProjectByName(projectName);
+      } catch {
+        // Airtable unreachable — fall through to the honest failure below.
+      }
+    }
+  }
+
+  revalidatePath("/");
+  if (newProjectId) redirect(`/projects/${newProjectId}`); // throws — keep outside try
+  return {
+    ok: false,
+    message:
+      `The project was NOT created — no record exists in Airtable${webhookError ? ` (${webhookError})` : ""}. ` +
+      `Nothing is running. Check the failed executions in Production health on the dashboard, then try again.`,
+  };
 }
 
 export async function deleteProjects(projectIds: string[]): Promise<ActionResult> {

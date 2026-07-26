@@ -274,6 +274,9 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
   const projectName = payload["Nume Proiect"];
   let newProjectId: string | null = null;
   let webhookError: string | null = null;
+  // What n8n actually replied. Surfaced in the failure message so a broken
+  // webhook can be diagnosed from the UI alone, without n8n access.
+  let webhookReply: string | null = null;
 
   try {
     const res = await fetch(webhook, {
@@ -284,12 +287,15 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
       // success. It just means we have to go ask Airtable ourselves.
       signal: AbortSignal.timeout(20000),
     });
-    if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
+    const body = (await res.text()).trim();
+    webhookReply = `HTTP ${res.status}${body ? ` — ${body.slice(0, 180)}` : " — empty body"}`;
+    if (!res.ok) throw new Error(`n8n webhook: ${webhookReply}`);
     try {
-      const data = (await res.json()) as { project_id?: string };
+      const data = JSON.parse(body) as { project_id?: string };
       if (data?.project_id?.startsWith("rec")) newProjectId = data.project_id;
     } catch {
-      // Older webhook response ("Workflow got started") — no id in the body.
+      // Not JSON — e.g. n8n's immediate "Workflow got started." reply, which
+      // means the webhook is answering before the record is created.
     }
   } catch (e) {
     webhookError =
@@ -317,8 +323,8 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
   return {
     ok: false,
     message:
-      `The project was NOT created — no record exists in Airtable${webhookError ? ` (${webhookError})` : ""}. ` +
-      `Nothing is running. Check the failed executions in Production health on the dashboard, then try again.`,
+      `The project was NOT created — no record exists in Airtable. Nothing is running. ` +
+      `n8n replied: ${webhookError ?? webhookReply ?? "no reply captured"}`,
   };
 }
 

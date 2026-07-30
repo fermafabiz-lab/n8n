@@ -22,9 +22,35 @@ export default function SceneReview({
   projectId: string;
   scenes: Scene[];
 }) {
+  // Drafts survive remounts via sessionStorage — the page auto-refreshes
+  // every 10s and a component remount used to silently discard in-progress
+  // edits back to the server's version (same failure as ScriptReview).
+  const draftKey = `vf-scene-drafts:${projectId}`;
   const [drafts, setDrafts] = useState<
     Record<string, { narration: string; imagePrompt: string }>
-  >({});
+  >(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem(draftKey) ?? "{}");
+    } catch {
+      return {};
+    }
+  });
+  const persistDrafts = (next: Record<string, { narration: string; imagePrompt: string }>) => {
+    setDrafts(next);
+    try {
+      sessionStorage.setItem(draftKey, JSON.stringify(next));
+    } catch {}
+  };
+  const dropDraft = (sceneId: string) => {
+    setDrafts((prev) => {
+      const next = { ...prev };
+      delete next[sceneId];
+      try {
+        sessionStorage.setItem(draftKey, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
   const [msg, setMsg] = useState<ActionResult | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -42,7 +68,7 @@ export default function SceneReview({
     );
   };
   const setDraft = (s: Scene, patch: Partial<{ narration: string; imagePrompt: string }>) =>
-    setDrafts((prev) => ({ ...prev, [s.id]: { ...draftFor(s), ...patch } }));
+    persistDrafts({ ...drafts, [s.id]: { ...draftFor(s), ...patch } });
 
   const run = (fn: () => Promise<ActionResult>) =>
     startTransition(async () => setMsg(await fn()));
@@ -149,9 +175,11 @@ export default function SceneReview({
                     className="abtn ok"
                     disabled={pending || s.rewriteRequested}
                     onClick={() =>
-                      run(() =>
-                        saveSceneScript(projectId, s.id, d.narration, d.imagePrompt, true),
-                      )
+                      run(async () => {
+                        const r = await saveSceneScript(projectId, s.id, d.narration, d.imagePrompt, true);
+                        if (r.ok) dropDraft(s.id);
+                        return r;
+                      })
                     }
                   >
                     Approve scene
@@ -160,9 +188,11 @@ export default function SceneReview({
                     className="abtn"
                     disabled={pending || !isDirty(s)}
                     onClick={() =>
-                      run(() =>
-                        saveSceneScript(projectId, s.id, d.narration, d.imagePrompt, false),
-                      )
+                      run(async () => {
+                        const r = await saveSceneScript(projectId, s.id, d.narration, d.imagePrompt, false);
+                        if (r.ok) dropDraft(s.id);
+                        return r;
+                      })
                     }
                   >
                     Save draft

@@ -1,12 +1,18 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { approveScript, regenerateScript, saveScript, type ActionResult } from "@/app/actions";
 
 /**
  * Editable script review. The text keeps its [CHAPTER n: title] markers —
  * the scripting workflow re-parses chapters from exactly this text after
  * approval, so edits flow straight into production.
+ *
+ * The draft lives in sessionStorage, not only in React state: the page
+ * auto-refreshes every 10s, and a remount of this component (stage flicker,
+ * data hiccup) used to silently reset the textarea to the server's version —
+ * the user then approved what LOOKED like their edit but wasn't (seen in
+ * production: scenes generated from the unedited script).
  */
 export default function ScriptReview({
   projectId,
@@ -17,11 +23,33 @@ export default function ScriptReview({
   scriptId: string;
   content: string;
 }) {
+  const draftKey = `vf-script-draft:${scriptId}`;
   const [text, setText] = useState(content);
   const [feedback, setFeedback] = useState("");
   const [msg, setMsg] = useState<ActionResult | null>(null);
   const [pending, startTransition] = useTransition();
   const dirty = text !== content;
+
+  // Restore a surviving draft after any remount; keep it saved while typing.
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(draftKey);
+      if (saved !== null && saved !== content) setText(saved);
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey]);
+  const update = (v: string) => {
+    setText(v);
+    try {
+      if (v === content) sessionStorage.removeItem(draftKey);
+      else sessionStorage.setItem(draftKey, v);
+    } catch {}
+  };
+  const clearDraft = () => {
+    try {
+      sessionStorage.removeItem(draftKey);
+    } catch {}
+  };
 
   const run = (fn: () => Promise<ActionResult>) =>
     startTransition(async () => setMsg(await fn()));
@@ -34,14 +62,26 @@ export default function ScriptReview({
           <button
             className="btn"
             disabled={pending || !dirty}
-            onClick={() => run(() => saveScript(projectId, scriptId, text))}
+            onClick={() =>
+              run(async () => {
+                const r = await saveScript(projectId, scriptId, text);
+                if (r.ok) clearDraft();
+                return r;
+              })
+            }
           >
             {pending ? "…" : "Save draft"}
           </button>
           <button
             className="btn gold"
             disabled={pending}
-            onClick={() => run(() => approveScript(projectId, scriptId, text))}
+            onClick={() =>
+              run(async () => {
+                const r = await approveScript(projectId, scriptId, text);
+                if (r.ok) clearDraft();
+                return r;
+              })
+            }
           >
             {pending ? "Approving…" : "Approve script"}
           </button>
@@ -56,7 +96,7 @@ export default function ScriptReview({
       {msg && <p className={`formmsg ${msg.ok ? "ok" : "err"}`}>{msg.message}</p>}
       <textarea
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => update(e.target.value)}
         spellCheck={false}
         style={{
           width: "100%",

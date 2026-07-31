@@ -98,6 +98,35 @@ export async function getExecutionError(id: string): Promise<ExecutionError | nu
   return { node: rd.error?.node?.name ?? rd.lastNodeExecuted ?? null, message: msg };
 }
 
+export const FINAL_ASSEMBLY_WORKFLOW_ID = "y8ZPxgUFOxdRpva8";
+
+export interface AssemblyState {
+  /** The render happening right now, if any. */
+  running: ExecutionSummary | null;
+  /** A recent failure, surfaced only when nothing is running. */
+  failed: (ExecutionSummary & { detail: ExecutionError | null }) | null;
+}
+
+/**
+ * What the final render is doing. Used to tell "still working" apart from
+ * "died half an hour ago" — from the project page, without opening n8n.
+ */
+export async function getAssemblyState(): Promise<AssemblyState> {
+  if (!n8nConfigured) return { running: null, failed: null };
+  const isAssembly = (e: ExecutionSummary) =>
+    e.workflowId === FINAL_ASSEMBLY_WORKFLOW_ID;
+  const running = (await getExecutions("running", 20)).find(isAssembly) ?? null;
+  if (running) return { running, failed: null };
+
+  const recent = Date.now() - 6 * 60 * 60 * 1000;
+  const failed =
+    (await getExecutions("error", 10)).find(
+      (e) => isAssembly(e) && new Date(e.startedAt ?? 0).getTime() > recent,
+    ) ?? null;
+  if (!failed) return { running: null, failed: null };
+  return { running: null, failed: { ...failed, detail: await getExecutionError(failed.id) } };
+}
+
 /** Deep link into the n8n editor for a specific execution. */
 export function executionUrl(workflowId: string, executionId: string): string | null {
   if (!BASE) return null;

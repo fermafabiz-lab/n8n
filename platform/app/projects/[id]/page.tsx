@@ -13,7 +13,14 @@ import ResumeButton from "@/components/ResumeButton";
 import AutoResume from "@/components/AutoResume";
 import ExpandableTitle from "@/components/ExpandableTitle";
 import OpsPanel from "@/components/OpsPanel";
-import { getExecutions, n8nConfigured } from "@/lib/n8n";
+import AssemblyStatus from "@/components/AssemblyStatus";
+import {
+  executionUrl,
+  getAssemblyState,
+  getExecutions,
+  n8nConfigured,
+  FINAL_ASSEMBLY_WORKFLOW_ID,
+} from "@/lib/n8n";
 
 export const dynamic = "force-dynamic";
 
@@ -115,6 +122,13 @@ export default async function ProductionRoom({
       // n8n API unreachable — fall back to showing Resume.
     }
   }
+
+  // The render reports nothing while it works, so the page asks n8n directly
+  // whether it is alive.
+  const assembly =
+    assembling && !project.finalVideoUrl
+      ? await getAssemblyState().catch(() => null)
+      : null;
 
   // Which gate (if any) is waiting on the user — drives the notification
   // chime when a generation step finishes and hands control back.
@@ -225,6 +239,30 @@ export default async function ProductionRoom({
 
         {project.awaitingFinalSettings && (
           <FinalSettings projectId={id} initial={project.editing} />
+        )}
+
+        {assembling && !project.finalVideoUrl && (
+          <AssemblyStatus
+            projectId={id}
+            startedAt={assembly?.running?.startedAt ?? null}
+            failure={
+              assembly?.failed?.detail
+                ? {
+                    message: assembly.failed.detail.message,
+                    node: assembly.failed.detail.node,
+                  }
+                : null
+            }
+            missing={!!assembly && !assembly.running}
+            n8nUrl={
+              assembly?.running || assembly?.failed
+                ? executionUrl(
+                    FINAL_ASSEMBLY_WORKFLOW_ID,
+                    (assembly.running ?? assembly.failed)!.id,
+                  )
+                : null
+            }
+          />
         )}
 
         {/* Voice gate: images are signed off, so synthesis is the current

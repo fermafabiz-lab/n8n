@@ -344,6 +344,33 @@ export async function confirmFinalSettings(
   }
 }
 
+/** Re-trigger the final render after it died, without redoing production. */
+export async function retryAssembly(projectId: string): Promise<ActionResult> {
+  const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
+  const webhook =
+    process.env.N8N_ASSEMBLE_WEBHOOK_URL ??
+    newProject?.replace(/new-project\/?$/, "assemble");
+  if (!webhook?.includes("assemble")) {
+    return { ok: false, message: "The assembly webhook URL is not configured." };
+  }
+  try {
+    const res = await fetch(webhook, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ Project_ID: projectId }),
+      signal: AbortSignal.timeout(20000),
+    });
+    if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message: "Render restarted — it picks up the approved clips, nothing is regenerated.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
 export async function approveAllScenes(
   projectId: string,
   sceneIds: string[],

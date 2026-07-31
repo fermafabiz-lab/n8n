@@ -39,6 +39,8 @@ export interface Scene {
   rewriteRequested: boolean;
   imageApproved: boolean;
   videoApproved: boolean;
+  /** Voice review gate, before any video is generated. */
+  voiceApproved: boolean;
   /** n8n clears these once the regeneration lands (or is rejected), so a
    *  set flag means "a regeneration is in flight right now". */
   regenImage: boolean;
@@ -134,6 +136,7 @@ const F = {
   sceneVoice: ["Voiceover URL"],
   sceneImagePrompt: ["Imagine First Frame"],
   sceneApproved: ["Aprobare Scenă", "Aprobare Scena"],
+  sceneVoiceApproved: ["Aprobare Voce"],
   sceneImageApproved: ["Aprobare Imagine"],
   sceneVideoApproved: ["Aprobare Video"],
   sceneRegenImage: ["Regenerează Imagine", "Regenereaza Imagine"],
@@ -225,6 +228,7 @@ function toScene(r: AirtableRecord, index: number): Scene {
     voiceUrl: (pick(r.fields, F.sceneVoice) as string) ?? null,
     sceneApproved: Boolean(pick(r.fields, F.sceneApproved)),
     rewriteRequested: status === "Regenerare Text",
+    voiceApproved: Boolean(pick(r.fields, F.sceneVoiceApproved)),
     imageApproved: Boolean(pick(r.fields, F.sceneImageApproved)),
     videoApproved: Boolean(pick(r.fields, F.sceneVideoApproved)),
     regenImage: Boolean(pick(r.fields, F.sceneRegenImage)),
@@ -392,6 +396,7 @@ const DEMO_SCENES: Scene[] = Array.from({ length: 8 }, (_, i) => {
     regenVideo: false,
     regenVoice: false,
     note: null,
+    voiceApproved: i < 3,
     imageApproved: i < 4,
     videoApproved: i < 2,
     status: kinds[i] === "run" ? "Generating Video" : kinds[i] === "err" ? "Error" : kinds[i] === "done" ? "Video Ready" : "Queued",
@@ -605,12 +610,23 @@ export async function deleteProjectDeep(projectId: string): Promise<void> {
 // Voice regeneration: n8n's video-approval cycle picks up the flag, runs a
 // fresh TTS on the (possibly edited) narration and re-muxes the existing
 // clip — no image/video regeneration involved.
+/** Generic scene field write, for gates that don't need their own helper. */
+export async function writeSceneFields(
+  sceneId: string,
+  fields: Record<string, unknown>,
+): Promise<void> {
+  await airtablePatch(SCENES_TABLE, sceneId, fields);
+}
+
 export async function requestVoiceRegen(
   sceneId: string,
   narration?: string,
 ): Promise<void> {
   const patch: Record<string, unknown> = {
     "Regenerează Voce": true,
+    // A fresh take has to be listened to again, and any clip built on the
+    // old audio is stale.
+    "Aprobare Voce": false,
     "Aprobare Video": false,
   };
   if (typeof narration === "string" && narration.trim()) {

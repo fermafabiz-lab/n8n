@@ -4,6 +4,7 @@ import { getProject, getProjectScriptInfo, getScenes, type Scene } from "@/lib/d
 import SceneBoard from "@/components/SceneBoard";
 import ScriptReview from "@/components/ScriptReview";
 import SceneReview from "@/components/SceneReview";
+import AudioReview from "@/components/AudioReview";
 import AutoRefresh from "@/components/AutoRefresh";
 import MediaPlayer from "@/components/MediaPlayer";
 import StageChime from "@/components/StageChime";
@@ -89,7 +90,9 @@ export default async function ProductionRoom({
           ? "script-review"
           : scenes.length > 0 && scenes.some((s) => !s.sceneApproved)
             ? "scene-review"
-            : scenes.some((s) => s.imageUrl && !s.imageApproved)
+            : scenes.some((s) => s.voiceUrl) && scenes.some((s) => !s.voiceApproved)
+              ? "voice-review"
+              : scenes.some((s) => s.imageUrl && !s.imageApproved)
               ? "image-review"
               : scenes.some((s) => s.videoUrl && !s.videoApproved)
                 ? "video-review"
@@ -180,6 +183,15 @@ export default async function ProductionRoom({
             regenerating={scriptRewriting}
           />
         )}
+
+        {/* Voice gate: scenes are approved and voiceovers exist, but not all
+            are signed off yet — video generation waits on this. */}
+        {scenes.length > 0 &&
+          scenes.every((s) => s.sceneApproved) &&
+          scenes.some((s) => s.voiceUrl) &&
+          scenes.some((s) => !s.voiceApproved) && (
+            <AudioReview projectId={id} scenes={scenes} />
+          )}
 
         {scenes.length > 0 && scenes.some((s) => !s.sceneApproved) ? (
           // Scene text review phase: scripts are split into scenes but not

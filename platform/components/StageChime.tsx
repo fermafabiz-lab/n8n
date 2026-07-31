@@ -19,6 +19,7 @@ import { useEffect } from "react";
 const ALERT_STAGES = new Set([
   "script-review",
   "scene-review",
+  "voice-review",
   "image-review",
   "video-review",
   "needs-review",

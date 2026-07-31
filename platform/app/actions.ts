@@ -9,6 +9,7 @@ import {
   writeSceneApproval,
   writeSceneFeedback,
   writeSceneScript,
+  writeSceneFields,
   requestSceneRewrite,
   findRecentProjectByName,
   writeScriptFields,
@@ -217,6 +218,63 @@ export async function regenerateSceneText(
       ok: true,
       message:
         "Rewrite requested — a fresh take on this scene appears here in ~30s (the page refreshes itself).",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/** Voice review gate — approving here lets video generation start. */
+export async function approveVoices(
+  projectId: string,
+  sceneIds: string[],
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    for (const id of sceneIds) {
+      await writeSceneFields(id, { "Aprobare Voce": true, "Regenerează Voce": false });
+      // Airtable rate limit is 5 req/s per base; n8n polls concurrently.
+      if (sceneIds.length > 1) await new Promise((r) => setTimeout(r, 250));
+    }
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message:
+        sceneIds.length === 1
+          ? "Voice approved."
+          : `Approved ${sceneIds.length} voice lines — video generation starts once all are approved.`,
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/**
+ * Swap the narrator for the whole project and re-synthesize every line.
+ * Writes the new voice on the project (so Resume and later regenerations use
+ * it too), then flags every scene for voice regeneration.
+ */
+export async function changeProjectVoice(
+  projectId: string,
+  voiceId: string,
+  sceneIds: string[],
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  if (!voiceId) return { ok: false, message: "Pick a voice first." };
+  try {
+    await writeProjectFields(projectId, { "Voice ID": voiceId });
+    for (const id of sceneIds) {
+      await regenerateVoice(projectId, id, "");
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message: `Narrator changed — re-synthesizing all ${sceneIds.length} lines with the new voice.`,
     };
   } catch (e) {
     return { ok: false, message: friendlyError(e) };

@@ -20,10 +20,12 @@ export const dynamic = "force-dynamic";
 function pipeline(scenes: Scene[], projectDone: boolean) {
   const scenesApproved = scenes.filter((s) => s.sceneApproved).length;
   const imagesApproved = scenes.filter((s) => s.imageApproved).length;
+  const voicesApproved = scenes.filter((s) => s.voiceApproved).length;
   const videosDone = scenes.filter((s) => s.videoUrl).length;
   const total = scenes.length || 1;
   const scenesDone = scenesApproved === total && total > 0;
   const imagesDone = imagesApproved === total && total > 0;
+  const audioDone = voicesApproved === total && total > 0;
   const videoDone = videosDone === total && total > 0;
   return [
     { name: "Script", state: "done" },
@@ -36,8 +38,12 @@ function pipeline(scenes: Scene[], projectDone: boolean) {
       state: imagesDone ? "done" : scenesDone ? "act" : "next",
     },
     {
+      name: audioDone ? "Audio" : `Audio · ${voicesApproved}/${total}`,
+      state: audioDone ? "done" : imagesDone ? "act" : "next",
+    },
+    {
       name: videoDone ? "Video" : `Video · ${videosDone}/${total}`,
-      state: videoDone ? "done" : imagesDone ? "act" : "next",
+      state: videoDone ? "done" : audioDone ? "act" : "next",
     },
     { name: "Assembly", state: projectDone ? "done" : videoDone ? "act" : "next" },
   ];
@@ -90,10 +96,10 @@ export default async function ProductionRoom({
           ? "script-review"
           : scenes.length > 0 && scenes.some((s) => !s.sceneApproved)
             ? "scene-review"
-            : scenes.some((s) => s.voiceUrl) && scenes.some((s) => !s.voiceApproved)
-              ? "voice-review"
-              : scenes.some((s) => s.imageUrl && !s.imageApproved)
+            : scenes.some((s) => s.imageUrl && !s.imageApproved)
               ? "image-review"
+              : scenes.some((s) => s.voiceUrl) && scenes.some((s) => !s.voiceApproved)
+                ? "voice-review"
               : scenes.some((s) => s.videoUrl && !s.videoApproved)
                 ? "video-review"
                 : "working";

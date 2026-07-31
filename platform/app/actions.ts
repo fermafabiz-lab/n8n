@@ -91,12 +91,32 @@ export async function regenerateVoice(
     return { ok: true, message: "Demo mode — nothing was written." };
   }
   try {
+    // Flag first — it drives the "Re-synthesizing…" badge, and n8n clears it.
     await requestVoiceRegen(sceneId, narration);
+
+    // Then fire the standalone re-synthesis webhook, for the same reason as
+    // the scene-text rewrite: relying on a long-lived media-generation
+    // execution to notice the flag means the feature dies the moment that
+    // execution is stopped or finishes.
+    const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
+    const webhook =
+      process.env.N8N_VOICE_REGEN_WEBHOOK_URL ??
+      newProject?.replace(/new-project\/?$/, "scene-voice-regen");
+    if (webhook?.includes("scene-voice-regen")) {
+      const res = await fetch(webhook, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scene_id: sceneId }),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
+    }
+
     revalidatePath(`/projects/${projectId}`);
     return {
       ok: true,
       message:
-        "Voice regeneration queued — a new voiceover is synthesized and re-muxed onto the existing clip (~1-2 min).",
+        "Voice regeneration queued — a new take is synthesized in ~30-60s (the page refreshes itself).",
     };
   } catch (e) {
     const msg = friendlyError(e);

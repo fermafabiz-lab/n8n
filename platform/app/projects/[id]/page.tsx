@@ -22,12 +22,15 @@ function pipeline(scenes: Scene[], projectDone: boolean) {
   const scenesApproved = scenes.filter((s) => s.sceneApproved).length;
   const imagesApproved = scenes.filter((s) => s.imageApproved).length;
   const voicesApproved = scenes.filter((s) => s.voiceApproved).length;
-  const videosDone = scenes.filter((s) => s.videoUrl).length;
+  // Every other step counts approvals, so this one must too — counting
+  // clips that merely exist made "Video" tick green while they were all
+  // still waiting to be reviewed.
+  const videosApproved = scenes.filter((s) => s.videoApproved).length;
   const total = scenes.length || 1;
   const scenesDone = scenesApproved === total && total > 0;
   const imagesDone = imagesApproved === total && total > 0;
   const audioDone = voicesApproved === total && total > 0;
-  const videoDone = videosDone === total && total > 0;
+  const videoDone = videosApproved === total && total > 0;
   return [
     { name: "Script", state: "done" },
     {
@@ -43,7 +46,7 @@ function pipeline(scenes: Scene[], projectDone: boolean) {
       state: audioDone ? "done" : imagesDone ? "act" : "next",
     },
     {
-      name: videoDone ? "Video" : `Video · ${videosDone}/${total}`,
+      name: videoDone ? "Video" : `Video · ${videosApproved}/${total}`,
       state: videoDone ? "done" : audioDone ? "act" : "next",
     },
     { name: "Assembly", state: projectDone ? "done" : videoDone ? "act" : "next" },

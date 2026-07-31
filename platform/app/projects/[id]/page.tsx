@@ -57,8 +57,14 @@ export default async function ProductionRoom({
   // Script review phase: the Scripturi record is still awaiting approval.
   const scriptInfo =
     project.statusKind !== "done" ? await getProjectScriptInfo(id) : null;
+  // 'rejected' means the producer asked for a rewrite and the workflow is
+  // producing a new draft. The panel must stay on screen showing that state —
+  // it used to vanish entirely, which read as the app losing the script.
+  const scriptRewriting = scriptInfo?.status === "rejected";
   const script =
-    scriptInfo && scriptInfo.status === "awaiting_approval" && scriptInfo.content
+    scriptInfo &&
+    (scriptInfo.status === "awaiting_approval" || scriptRewriting) &&
+    scriptInfo.content
       ? scriptInfo
       : null;
 
@@ -167,7 +173,12 @@ export default async function ProductionRoom({
         )}
 
         {script && (
-          <ScriptReview projectId={id} scriptId={script.id} content={script.content} />
+          <ScriptReview
+            projectId={id}
+            scriptId={script.id}
+            content={script.content}
+            regenerating={scriptRewriting}
+          />
         )}
 
         {scenes.length > 0 && scenes.some((s) => !s.sceneApproved) ? (

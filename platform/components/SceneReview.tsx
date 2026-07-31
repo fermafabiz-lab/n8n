@@ -8,6 +8,7 @@ import {
   type ActionResult,
 } from "@/app/actions";
 import type { Scene } from "@/lib/data";
+import RegenBadge from "@/components/RegenBadge";
 
 /**
  * Scene review stage — mirrors the script review: after the main script is
@@ -187,7 +188,10 @@ export default function SceneReview({
                 style={{ ...taStyle, opacity: s.sceneApproved ? 0.6 : 1 }}
               />
 
-              {!s.sceneApproved && (
+              {!s.sceneApproved && s.rewriteRequested && (
+                <RegenBadge label="Rewriting scene…" note={s.note} />
+              )}
+              {!s.sceneApproved && !s.rewriteRequested && (
                 <div className="abtns">
                   <button
                     className="abtn ok"

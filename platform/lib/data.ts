@@ -39,6 +39,13 @@ export interface Scene {
   rewriteRequested: boolean;
   imageApproved: boolean;
   videoApproved: boolean;
+  /** n8n clears these once the regeneration lands (or is rejected), so a
+   *  set flag means "a regeneration is in flight right now". */
+  regenImage: boolean;
+  regenVideo: boolean;
+  regenVoice: boolean;
+  /** "Observații Scenă" — reviewer feedback in, rejection reasons back out. */
+  note: string | null;
   status: string;
   statusKind: StatusKind;
 }
@@ -129,6 +136,10 @@ const F = {
   sceneApproved: ["Aprobare Scenă", "Aprobare Scena"],
   sceneImageApproved: ["Aprobare Imagine"],
   sceneVideoApproved: ["Aprobare Video"],
+  sceneRegenImage: ["Regenerează Imagine", "Regenereaza Imagine"],
+  sceneRegenVideo: ["Regenerează Video", "Regenereaza Video"],
+  sceneRegenVoice: ["Regenerează Voce", "Regenereaza Voce"],
+  sceneNote: ["Observații Scenă", "Observatii Scena"],
   sceneStatus: ["Status Producție Scenă", "Status"],
 };
 
@@ -216,6 +227,10 @@ function toScene(r: AirtableRecord, index: number): Scene {
     rewriteRequested: status === "Regenerare Text",
     imageApproved: Boolean(pick(r.fields, F.sceneImageApproved)),
     videoApproved: Boolean(pick(r.fields, F.sceneVideoApproved)),
+    regenImage: Boolean(pick(r.fields, F.sceneRegenImage)),
+    regenVideo: Boolean(pick(r.fields, F.sceneRegenVideo)),
+    regenVoice: Boolean(pick(r.fields, F.sceneRegenVoice)),
+    note: (pick(r.fields, F.sceneNote) as string) ?? null,
     status: displayStatus(status),
     statusKind: kind,
   };
@@ -373,6 +388,10 @@ const DEMO_SCENES: Scene[] = Array.from({ length: 8 }, (_, i) => {
     voiceUrl: null,
     sceneApproved: true,
     rewriteRequested: false,
+    regenImage: false,
+    regenVideo: false,
+    regenVoice: false,
+    note: null,
     imageApproved: i < 4,
     videoApproved: i < 2,
     status: kinds[i] === "run" ? "Generating Video" : kinds[i] === "err" ? "Error" : kinds[i] === "done" ? "Video Ready" : "Queued",

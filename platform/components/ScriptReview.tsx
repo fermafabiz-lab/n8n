@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { approveScript, regenerateScript, saveScript, type ActionResult } from "@/app/actions";
+import RegenBadge from "@/components/RegenBadge";
 
 /**
  * Editable script review. The text keeps its [CHAPTER n: title] markers —
@@ -18,10 +19,14 @@ export default function ScriptReview({
   projectId,
   scriptId,
   content,
+  regenerating = false,
 }: {
   projectId: string;
   scriptId: string;
   content: string;
+  /** The workflow is rewriting this draft right now (Airtable Status =
+   *  'rejected'); it flips back to 'awaiting_approval' with the new text. */
+  regenerating?: boolean;
 }) {
   const draftKey = `vf-script-draft:${scriptId}`;
   const [text, setText] = useState(content);
@@ -58,6 +63,9 @@ export default function ScriptReview({
     <div className="script">
       <div className="sechead">
         <h2>Script review</h2>
+        {regenerating ? (
+          <RegenBadge label="Rewriting script…" />
+        ) : (
         <div style={{ display: "flex", gap: 10 }}>
           <button
             className="btn"
@@ -86,6 +94,7 @@ export default function ScriptReview({
             {pending ? "Approving…" : "Approve script"}
           </button>
         </div>
+        )}
       </div>
       <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--soft)" }}>
         You can edit the text right here — keep the{" "}
@@ -98,6 +107,7 @@ export default function ScriptReview({
         value={text}
         onChange={(e) => update(e.target.value)}
         spellCheck={false}
+        readOnly={regenerating}
         style={{
           width: "100%",
           minHeight: 420,
@@ -118,6 +128,7 @@ export default function ScriptReview({
         {dirty ? " · edited" : ""}
       </div>
 
+      {!regenerating && (
       <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--line)" }}>
         <p style={{ margin: "0 0 8px", fontSize: 13, color: "var(--soft)" }}>
           Not happy with the whole draft? Describe what should change and the
@@ -152,6 +163,7 @@ export default function ScriptReview({
           </button>
         </div>
       </div>
+      )}
     </div>
   );
 }

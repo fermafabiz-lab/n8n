@@ -10,6 +10,7 @@ import {
 } from "@/app/actions";
 import type { Scene, StatusKind } from "@/lib/data";
 import MediaPlayer from "@/components/MediaPlayer";
+import RegenBadge from "@/components/RegenBadge";
 
 function frClass(kind: StatusKind): string {
   switch (kind) {
@@ -216,6 +217,9 @@ export default function SceneBoard({
                       Edited — Regenerate saves this prompt and renders it.
                     </div>
                   )}
+                {active.regenImage ? (
+                  <RegenBadge label="Regenerating image…" note={active.note} />
+                ) : (
                 <div className="abtns">
                   <button
                     className="abtn ok"
@@ -255,6 +259,7 @@ export default function SceneBoard({
                     Regenerate
                   </button>
                 </div>
+                )}
               </>
             )}
             {active.voiceUrl && !active.videoApproved && (
@@ -297,23 +302,27 @@ export default function SceneBoard({
                     outline: "none",
                   }}
                 />
-                <div className="abtns" style={{ marginTop: 8 }}>
-                  <button
-                    className="abtn"
-                    disabled={pending}
-                    onClick={() =>
-                      run(() =>
-                        regenerateVoice(
-                          projectId,
-                          active.id,
-                          voiceDrafts[active.id] ?? active.narration ?? "",
-                        ),
-                      )
-                    }
-                  >
-                    🎙 Regenerate voice
-                  </button>
-                </div>
+                {active.regenVoice ? (
+                  <RegenBadge label="Regenerating voice…" note={active.note} />
+                ) : (
+                  <div className="abtns" style={{ marginTop: 8 }}>
+                    <button
+                      className="abtn"
+                      disabled={pending}
+                      onClick={() =>
+                        run(() =>
+                          regenerateVoice(
+                            projectId,
+                            active.id,
+                            voiceDrafts[active.id] ?? active.narration ?? "",
+                          ),
+                        )
+                      }
+                    >
+                      🎙 Regenerate voice
+                    </button>
+                  </div>
+                )}
                 <p style={{ margin: "6px 0 0", fontSize: 11.5, color: "var(--dim)" }}>
                   New voice is synthesized from the text above and re-muxed onto
                   the existing clip — image and video are NOT regenerated.
@@ -321,6 +330,9 @@ export default function SceneBoard({
               </div>
             )}
             {active.videoUrl && !active.videoApproved && (
+              active.regenVideo ? (
+                <RegenBadge label="Regenerating video…" note={active.note} />
+              ) : (
               <div className="abtns">
                 <button
                   className="abtn ok"
@@ -351,6 +363,7 @@ export default function SceneBoard({
                   Regenerate video
                 </button>
               </div>
+              )
             )}
             {(!active.imageApproved || (active.videoUrl && !active.videoApproved)) && (
               <textarea

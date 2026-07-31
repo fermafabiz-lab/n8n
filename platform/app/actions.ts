@@ -49,6 +49,25 @@ export async function sceneAction(
       await writeSceneFeedback(sceneId, feedback.trim());
     }
     await writeSceneApproval(sceneId, kind, action);
+
+    // Image regeneration runs on its own webhook, so it no longer depends on
+    // a live media-generation execution being alive to notice the flag.
+    // Video still rides the batch loop (it needs Flow + the mux server).
+    if (action === "regenerate" && kind === "image") {
+      const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
+      const webhook =
+        process.env.N8N_IMAGE_REGEN_WEBHOOK_URL ??
+        newProject?.replace(/new-project\/?$/, "scene-image-regen");
+      if (webhook?.includes("scene-image-regen")) {
+        const res = await fetch(webhook, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ scene_id: sceneId }),
+          signal: AbortSignal.timeout(15000),
+        });
+        if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
+      }
+    }
     revalidatePath(`/projects/${projectId}`);
     return {
       ok: true,

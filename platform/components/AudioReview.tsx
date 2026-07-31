@@ -9,6 +9,7 @@ import {
 } from "@/app/actions";
 import type { Scene } from "@/lib/data";
 import RegenBadge from "@/components/RegenBadge";
+import VoicePicker from "@/components/VoicePicker";
 
 /**
  * Voice review gate — sits between scene approval and video generation.
@@ -191,26 +192,12 @@ export default function AudioReview({
       <div style={{ marginBottom: 14 }}>
         {showVoice ? (
           <div className="card" style={{ padding: "14px 16px" }}>
-            <label style={{ display: "block", fontSize: 12, color: "var(--dim)", marginBottom: 6 }}>
-              New narrator for the whole project — every line is re-synthesized
-            </label>
+            <VoicePicker
+              label="New narrator for the whole project — press ▶ to listen"
+              value={newVoice}
+              onChange={setNewVoice}
+            />
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-              <input
-                value={newVoice}
-                onChange={(e) => setNewVoice(e.target.value)}
-                placeholder="e.g. elevenlabs_JBFqnCBsd6RMkjVDRZzb"
-                style={{
-                  flex: "1 1 300px",
-                  background: "var(--bg2)",
-                  border: "1px solid var(--line2)",
-                  borderRadius: 10,
-                  color: "var(--ink)",
-                  font: "inherit",
-                  fontSize: 13,
-                  padding: "9px 12px",
-                  outline: "none",
-                }}
-              />
               <button
                 className="abtn"
                 disabled={pending || !newVoice.trim()}
@@ -233,7 +220,6 @@ export default function AudioReview({
               </button>
             </div>
             <p style={{ margin: "8px 0 0", fontSize: 11.5, color: "var(--dim)" }}>
-              Paste a voice id from the new-project form&apos;s voice picker.
               This replaces the narrator for every line, so it discards all the
               current takes.
             </p>

@@ -23,11 +23,27 @@ const PROVIDERS = [
  * Voice picker with inline audio previews. The chosen prefixed voice_id is
  * submitted with the form and flows n8n -> ai33 TTS unchanged.
  */
-export default function VoicePicker({ name = "voice_id" }: { name?: string }) {
+export default function VoicePicker({
+  name = "voice_id",
+  label = "Narrator voice — press ▶ to listen",
+  /** Controlled mode: the parent owns the choice (used outside forms, e.g.
+   *  swapping the narrator of a project that already exists). */
+  value,
+  onChange,
+}: {
+  name?: string;
+  label?: string;
+  value?: string;
+  onChange?: (voiceId: string) => void;
+}) {
   const [provider, setProvider] = useState("elevenlabs");
   const [q, setQ] = useState("");
   const [voices, setVoices] = useState<Voice[]>([]);
-  const [selected, setSelected] = useState("elevenlabs_hpp4J3VqNfWAUOO0d1Us");
+  const [internal, setInternal] = useState("elevenlabs_hpp4J3VqNfWAUOO0d1Us");
+  const controlled = onChange !== undefined;
+  const selected = controlled ? (value ?? "") : internal;
+  const setSelected = (id: string) =>
+    controlled ? onChange!(id) : setInternal(id);
   const [playing, setPlaying] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,8 +88,8 @@ export default function VoicePicker({ name = "voice_id" }: { name?: string }) {
 
   return (
     <div className="field">
-      <label>Narrator voice — press ▶ to listen</label>
-      <input type="hidden" name={name} value={selected} />
+      <label>{label}</label>
+      {!controlled && <input type="hidden" name={name} value={selected} />}
       <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
         <select
           value={provider}

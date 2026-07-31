@@ -18,7 +18,12 @@ import { getExecutions, n8nConfigured } from "@/lib/n8n";
 export const dynamic = "force-dynamic";
 
 // Pipeline position derived from scene states: images → video → assembly.
-function pipeline(scenes: Scene[], projectDone: boolean) {
+function pipeline(
+  scenes: Scene[],
+  projectDone: boolean,
+  awaitingSettings: boolean,
+  assembling: boolean,
+) {
   const scenesApproved = scenes.filter((s) => s.sceneApproved).length;
   const imagesApproved = scenes.filter((s) => s.imageApproved).length;
   const voicesApproved = scenes.filter((s) => s.voiceApproved).length;
@@ -49,7 +54,23 @@ function pipeline(scenes: Scene[], projectDone: boolean) {
       name: videoDone ? "Video" : `Video · ${videosApproved}/${total}`,
       state: videoDone ? "done" : audioDone ? "act" : "next",
     },
-    { name: "Assembly", state: projectDone ? "done" : videoDone ? "act" : "next" },
+    {
+      // Its own step, because it is the one place the pipeline stops and
+      // waits on a decision that isn't an approval.
+      name: "Final touches",
+      state:
+        projectDone || assembling
+          ? "done"
+          : awaitingSettings
+            ? "act"
+            : videoDone
+              ? "act"
+              : "next",
+    },
+    {
+      name: "Assembly",
+      state: projectDone ? "done" : assembling ? "act" : "next",
+    },
   ];
 }
 
@@ -63,7 +84,13 @@ export default async function ProductionRoom({
   if (!project) notFound();
 
   const scenes = await getScenes(id);
-  const steps = pipeline(scenes, project.statusKind === "done");
+  const assembling = /assembling/i.test(project.status);
+  const steps = pipeline(
+    scenes,
+    project.statusKind === "done",
+    project.awaitingFinalSettings,
+    assembling,
+  );
 
   // Script review phase: the Scripturi record is still awaiting approval.
   const scriptInfo =

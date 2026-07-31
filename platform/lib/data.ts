@@ -211,7 +211,15 @@ function toProject(r: AirtableRecord): Project {
 }
 
 function toScene(r: AirtableRecord, index: number): Scene {
-  const status = String(pick(r.fields, F.sceneStatus) ?? "—");
+  const rawStatus = String(pick(r.fields, F.sceneStatus) ?? "—");
+  const imageApproved = Boolean(pick(r.fields, F.sceneImageApproved));
+  // n8n only rewrites the status text when its loop reaches a scene, so an
+  // already-approved image can sit under "Awaiting Image Approval" for
+  // minutes. The checkbox is the truth; show that instead of stale text.
+  const status =
+    imageApproved && /aprobare imagine/.test(normalizeStatus(rawStatus))
+      ? "In Asteptare"
+      : rawStatus;
   const { kind } = classifyStatus(status);
   const order = Number(pick(r.fields, F.sceneOrder)) || index + 1;
   const videoUrl =

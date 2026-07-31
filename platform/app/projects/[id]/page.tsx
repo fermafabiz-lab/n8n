@@ -190,11 +190,13 @@ export default async function ProductionRoom({
           />
         )}
 
-        {/* Voice gate: scenes are approved and voiceovers exist, but not all
-            are signed off yet — video generation waits on this. */}
+        {/* Voice gate: images are signed off, so synthesis is the current
+            step — the panel appears as soon as the pipeline reaches it, even
+            before the first take exists, otherwise the stepper points at an
+            "Audio" stage with nothing under it. */}
         {scenes.length > 0 &&
           scenes.every((s) => s.sceneApproved) &&
-          scenes.some((s) => s.voiceUrl) &&
+          scenes.every((s) => s.imageApproved) &&
           scenes.some((s) => !s.voiceApproved) && (
             <AudioReview projectId={id} scenes={scenes} />
           )}

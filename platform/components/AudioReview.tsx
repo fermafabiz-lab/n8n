@@ -172,13 +172,19 @@ export default function AudioReview({
         )}
       </p>
 
-      {missing > 0 && (
+      {withAudio.length === 0 ? (
+        <p className="formmsg" style={{ marginBottom: 12 }}>
+          Narration is being synthesized for all {scenes.length} scenes — the
+          takes appear here one by one, usually within a couple of minutes. The
+          page refreshes itself.
+        </p>
+      ) : missing > 0 ? (
         <p className="formmsg" style={{ marginBottom: 12 }}>
           {missing} scene{missing === 1 ? "" : "s"} still being synthesized —
           approving unlocks video generation, so it stays locked until every
           line exists.
         </p>
-      )}
+      ) : null}
       {msg && <p className={`formmsg ${msg.ok ? "ok" : "err"}`}>{msg.message}</p>}
 
       {/* Project-wide narrator swap. */}

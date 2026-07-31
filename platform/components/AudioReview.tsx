@@ -5,6 +5,7 @@ import {
   approveVoices,
   changeProjectVoice,
   regenerateVoice,
+  sceneAction,
   type ActionResult,
 } from "@/app/actions";
 import type { Scene } from "@/lib/data";
@@ -47,6 +48,26 @@ function flagFor(scene: Scene, duration: number | undefined): string | null {
   return null;
 }
 
+/**
+ * Assembly retimes each shot to its own narration, but only within
+ * 0.65×–1.5× (see remotion/server/assemble.mjs). Outside that band the shot
+ * either freezes on its last frame or gets its tail cut — the only case where
+ * a new take actually justifies re-generating the video.
+ */
+const STRETCH_MAX = 1.5;
+const STRETCH_MIN = 0.65;
+
+function fitProblem(voice: number | undefined, clip: number | undefined): string | null {
+  if (!voice || !clip) return null;
+  const needed = (voice + 0.35) / clip;
+  if (needed > STRETCH_MAX) {
+    const frozen = voice + 0.35 - clip * STRETCH_MAX;
+    return `Longer than its shot — the picture would hold still for ~${frozen.toFixed(1)}s`;
+  }
+  if (needed < STRETCH_MIN) return "Much shorter than its shot — the tail gets cut";
+  return null;
+}
+
 export default function AudioReview({
   projectId,
   scenes,
@@ -59,6 +80,7 @@ export default function AudioReview({
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [playAll, setPlayAll] = useState(false);
   const [durations, setDurations] = useState<Record<string, number>>({});
+  const [clipDurations, setClipDurations] = useState<Record<string, number>>({});
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [showVoice, setShowVoice] = useState(false);
   const [newVoice, setNewVoice] = useState("");
@@ -91,6 +113,27 @@ export default function AudioReview({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [withAudio.length]);
+
+  // Shot lengths, for the same reason: knowing both sides is what tells us
+  // whether a take still fits the picture it belongs to.
+  useEffect(() => {
+    let cancelled = false;
+    for (const s of scenes) {
+      if (!s.videoUrl || clipDurations[s.id] !== undefined) continue;
+      const v = document.createElement("video");
+      v.preload = "metadata";
+      v.src = audioSrc(s.videoUrl);
+      v.addEventListener("loadedmetadata", () => {
+        if (!cancelled && Number.isFinite(v.duration)) {
+          setClipDurations((d) => ({ ...d, [s.id]: v.duration }));
+        }
+      });
+    }
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scenes.filter((s) => s.videoUrl).length]);
 
   const stop = () => {
     audioRef.current?.pause();
@@ -234,6 +277,7 @@ export default function AudioReview({
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {scenes.map((s, i) => {
           const flag = flagFor(s, durations[s.id]);
+          const fit = fitProblem(durations[s.id], clipDurations[s.id]);
           const isPlaying = playingId === s.id;
           const draft = drafts[s.id];
           const dirty = draft !== undefined && draft !== (s.narration ?? "");
@@ -275,6 +319,7 @@ export default function AudioReview({
                     </span>
                     {s.voiceApproved && <span className="chip ok">Approved</span>}
                     {flag && <span className="chip wait">{flag}</span>}
+                    {fit && <span className="chip wait">{fit}</span>}
                   </div>
                   <textarea
                     value={draft ?? s.narration ?? ""}
@@ -319,6 +364,21 @@ export default function AudioReview({
                       >
                         {dirty ? "🎙 Save text & re-synthesize" : "🎙 Regenerate"}
                       </button>
+                      {/* Only offered when the shot genuinely can't cover the
+                          take — every other length difference is absorbed by
+                          retiming at assembly, so re-rendering would be
+                          paying Flow for nothing. */}
+                      {fit && !s.regenVideo && (
+                        <button
+                          className="abtn"
+                          disabled={pending}
+                          onClick={() =>
+                            run(() => sceneAction(projectId, s.id, "video", "regenerate"))
+                          }
+                        >
+                          🎬 Regenerate video for this scene
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

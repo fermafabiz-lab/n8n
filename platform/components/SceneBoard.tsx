@@ -109,7 +109,13 @@ export default function SceneBoard({
             {active?.videoUrl ? (
               // The clip plays in the big monitor so the whole frame is
               // visible; the inspector keeps only the approve/regen controls.
-              <MediaPlayer key={active.id} url={active.videoUrl} portrait={portrait} fill />
+              <MediaPlayer
+                key={active.id}
+                url={active.videoUrl}
+                audioUrl={active.voiceUrl}
+                portrait={portrait}
+                fill
+              />
             ) : (
               <>
                 <div

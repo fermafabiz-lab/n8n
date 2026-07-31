@@ -28,6 +28,8 @@ export interface Project {
   editing: EditingOptions;
   /** The batch is holding, waiting for those options to be confirmed. */
   awaitingFinalSettings: boolean;
+  /** Video category id (lib/categories.ts); older projects have none. */
+  category: string | null;
 }
 
 export interface EditingOptions {
@@ -239,6 +241,9 @@ function toProject(r: AirtableRecord): Project {
       endScreen: opts.endScreen !== false,
     },
     awaitingFinalSettings: /setari finale/.test(normalizeStatus(status)),
+    category: typeof (opts as { category?: unknown }).category === "string"
+      ? String((opts as { category?: string }).category)
+      : null,
   };
 }
 
@@ -372,6 +377,7 @@ const DEMO_PROJECTS: Project[] = [
     updatedAt: null,
     editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true },
     awaitingFinalSettings: false,
+    category: "story",
   },
   {
     id: "demo-2",
@@ -386,6 +392,7 @@ const DEMO_PROJECTS: Project[] = [
     updatedAt: null,
     editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true },
     awaitingFinalSettings: false,
+    category: "story",
   },
   {
     id: "demo-3",
@@ -400,6 +407,7 @@ const DEMO_PROJECTS: Project[] = [
     updatedAt: null,
     editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true },
     awaitingFinalSettings: false,
+    category: "story",
   },
   {
     id: "demo-4",
@@ -414,6 +422,7 @@ const DEMO_PROJECTS: Project[] = [
     updatedAt: null,
     editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true },
     awaitingFinalSettings: false,
+    category: "story",
   },
 ];
 

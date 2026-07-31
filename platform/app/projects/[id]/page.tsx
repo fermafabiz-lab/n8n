@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProject, getProjectScriptInfo, getScenes, type Scene } from "@/lib/data";
+import { getCategory } from "@/lib/categories";
 import SceneBoard from "@/components/SceneBoard";
 import ScriptReview from "@/components/ScriptReview";
 import SceneReview from "@/components/SceneReview";
@@ -181,6 +182,9 @@ export default async function ProductionRoom({
           <div>
             <ExpandableTitle text={project.name} as="h1" clampChars={110} />
             <span className="sub">
+              {project.category
+                ? `${getCategory(project.category).icon} ${getCategory(project.category).label} · `
+                : ""}
               {project.lengthSeconds ? `${project.lengthSeconds} seconds · ` : ""}
               {scenes.length > 0 ? `${scenes.length} scenes · ` : ""}
               {project.status}

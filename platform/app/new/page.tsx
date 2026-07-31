@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { createProject, type ActionResult } from "@/app/actions";
 import VoicePicker from "@/components/VoicePicker";
+import CategoryPicker from "@/components/CategoryPicker";
 
 async function submit(_prev: ActionResult | null, formData: FormData) {
   return createProject(formData);
@@ -55,6 +56,8 @@ export default function NewVideo() {
             details go in the Style field, not here.
           </p>
         </div>
+
+        <CategoryPicker />
 
         <div className="field">
           <label htmlFor="length">

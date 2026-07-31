@@ -1,0 +1,109 @@
+// Video categories — each one is a production recipe: which extra options
+// the form shows, and (as they get wired into n8n) how audio and video are
+// produced. Adding a category here is enough for it to appear on the site.
+//
+// "story" is the reference category: it is exactly today's pipeline and must
+// stay that way — everything else is introduced around it, never by
+// changing it.
+
+export interface CategoryOption {
+  /** Form field name — travels to n8n inside the category_options JSON. */
+  name: string;
+  label: string;
+  /** One-line explanation shown under the control. */
+  hint: string;
+  type: "select" | "toggle";
+  choices?: Array<{ value: string; label: string }>;
+  default: string | boolean;
+  /** Declared but not yet wired into the pipeline — shown, saved, inert. */
+  comingSoon?: boolean;
+}
+
+export interface Category {
+  id: string;
+  label: string;
+  icon: string;
+  description: string;
+  /** Fully functional today. Unready ones are selectable but say so. */
+  ready: boolean;
+  options: CategoryOption[];
+}
+
+export const CATEGORIES: Category[] = [
+  {
+    id: "story",
+    label: "Story",
+    icon: "📖",
+    description:
+      "A narrated fictional story — hook, chapters, cinematic scenes. This is the classic Video Factory pipeline.",
+    ready: true,
+    options: [
+      {
+        name: "voice_roles",
+        label: "Multiple voices",
+        hint: "Give characters their own voice next to the narrator. You pick each voice yourself.",
+        type: "toggle",
+        default: false,
+        comingSoon: true,
+      },
+    ],
+  },
+  {
+    id: "documentary",
+    label: "Documentary",
+    icon: "🎥",
+    description:
+      "Fact-driven storytelling: researched narration built like a real documentary, with room for real footage between generated scenes.",
+    ready: false,
+    options: [
+      {
+        name: "real_footage",
+        label: "Real images between scenes",
+        hint: "Interleave real photos/archive stills (uploaded by you) as B-roll over the narration.",
+        type: "toggle",
+        default: false,
+        comingSoon: true,
+      },
+      {
+        name: "source_rigor",
+        label: "Research depth",
+        hint: "How aggressively the script hunts for dates, names and verifiable facts.",
+        type: "select",
+        choices: [
+          { value: "standard", label: "Standard" },
+          { value: "deep", label: "Deep — slower, more specific" },
+        ],
+        default: "standard",
+        comingSoon: true,
+      },
+    ],
+  },
+  {
+    id: "kids",
+    label: "Kids story",
+    icon: "🧸",
+    description:
+      "Gentle pacing for young listeners: slower narration, longer pauses between scenes, softer scene transitions.",
+    ready: false,
+    options: [
+      {
+        name: "narration_pace",
+        label: "Narration pace",
+        hint: "Slower speech and longer breaths between scenes, so children can follow along.",
+        type: "select",
+        choices: [
+          { value: "relaxed", label: "Relaxed" },
+          { value: "very_slow", label: "Very slow — read-along" },
+        ],
+        default: "relaxed",
+        comingSoon: true,
+      },
+    ],
+  },
+];
+
+export const DEFAULT_CATEGORY = "story";
+
+export function getCategory(id: string | null | undefined): Category {
+  return CATEGORIES.find((c) => c.id === id) ?? CATEGORIES[0];
+}

@@ -468,8 +468,17 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
         "N8N_NEW_PROJECT_WEBHOOK_URL is not set. Add the n8n form/webhook URL to the environment to start projects from here.",
     };
   }
+  // Category + its options (cat_* fields, defined in lib/categories.ts).
+  // They ride along inside the webhook payload; n8n stores them in the
+  // project's Editing Options JSON, so no Airtable schema change is needed.
+  const categoryOptions: Record<string, string> = {};
+  for (const [k, v] of formData.entries()) {
+    if (k.startsWith("cat_")) categoryOptions[k.slice(4)] = String(v);
+  }
   const payload = {
     "Nume Proiect": String(formData.get("name") ?? ""),
+    category: String(formData.get("category") ?? "story"),
+    category_options: categoryOptions,
     Language: String(formData.get("language") ?? "English"),
     Lenght: Number(formData.get("length") ?? 64),
     Tonalitate: String(formData.get("tone") ?? "Dark"),

@@ -103,12 +103,30 @@ export default function SceneReview({
               className="btn gold"
               disabled={pending}
               onClick={() =>
-                run(() =>
-                  approveAllScenes(
-                    projectId,
-                    unapproved.map((s) => s.id),
-                  ),
-                )
+                run(async () => {
+                  // Scenes with unsaved edits must be approved WITH their
+                  // edits — the bulk action alone only flips the checkbox,
+                  // and silently discarding drafts is how an edited image
+                  // prompt once never reached production.
+                  const dirtyScenes = unapproved.filter((s) => isDirty(s));
+                  for (const s of dirtyScenes) {
+                    const d = draftFor(s);
+                    const r = await saveSceneScript(projectId, s.id, d.narration, d.imagePrompt, true);
+                    if (!r.ok) return r;
+                    dropDraft(s.id);
+                  }
+                  const rest = unapproved.filter((s) => !isDirty(s)).map((s) => s.id);
+                  if (rest.length === 0) {
+                    return {
+                      ok: true,
+                      message: `Approved ${dirtyScenes.length} scenes (with your edits) — production continues.`,
+                    };
+                  }
+                  const r = await approveAllScenes(projectId, rest);
+                  return r.ok && dirtyScenes.length > 0
+                    ? { ...r, message: `${r.message} Your edits on ${dirtyScenes.length} scene(s) were saved too.` }
+                    : r;
+                })
               }
             >
               {pending ? "…" : `Approve all ${unapproved.length} scenes`}

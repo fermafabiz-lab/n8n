@@ -139,6 +139,31 @@ export async function saveSceneScript(
   }
 }
 
+/**
+ * Replace a scene's image prompt at the image-approval stage.
+ *
+ * n8n's regeneration reads "Imagine First Frame" for the new prompt, so a
+ * rewritten prompt saved here is what actually gets rendered. Without this
+ * the only lever at this stage was the free-text feedback box, and a fully
+ * rewritten prompt pasted anywhere else silently never reached Airtable.
+ */
+export async function saveImagePrompt(
+  projectId: string,
+  sceneId: string,
+  imagePrompt: string,
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    await writeSceneScript(sceneId, { imagePrompt });
+    revalidatePath(`/projects/${projectId}`);
+    return { ok: true, message: "Image prompt saved." };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
 export async function regenerateSceneText(
   projectId: string,
   sceneId: string,

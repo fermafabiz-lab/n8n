@@ -1,7 +1,13 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { approveAllOfKind, regenerateVoice, sceneAction, type ActionResult } from "@/app/actions";
+import {
+  approveAllOfKind,
+  regenerateVoice,
+  saveImagePrompt,
+  sceneAction,
+  type ActionResult,
+} from "@/app/actions";
 import type { Scene, StatusKind } from "@/lib/data";
 import MediaPlayer from "@/components/MediaPlayer";
 
@@ -47,6 +53,33 @@ export default function SceneBoard({
   // Narration drafts per scene for the voice editor (falls back to the
   // stored text until edited).
   const [voiceDrafts, setVoiceDrafts] = useState<Record<string, string>>({});
+  // Image-prompt drafts, kept in sessionStorage so the 10s auto-refresh
+  // can't quietly reset a rewritten prompt to the stored one.
+  const promptKey = `vf-imgprompt-drafts:${projectId}`;
+  const [promptDrafts, setPromptDrafts] = useState<Record<string, string>>(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem(promptKey) ?? "{}");
+    } catch {
+      return {};
+    }
+  });
+  const setPromptDraft = (sceneId: string, v: string) =>
+    setPromptDrafts((prev) => {
+      const next = { ...prev, [sceneId]: v };
+      try {
+        sessionStorage.setItem(promptKey, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  const dropPromptDraft = (sceneId: string) =>
+    setPromptDrafts((prev) => {
+      const next = { ...prev };
+      delete next[sceneId];
+      try {
+        sessionStorage.setItem(promptKey, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
   const [pending, startTransition] = useTransition();
 
   const active =
@@ -152,36 +185,77 @@ export default function SceneBoard({
             </div>
 
             {!active.imageApproved && (
-              <div className="abtns">
-                <button
-                  className="abtn ok"
-                  disabled={pending}
-                  onClick={() =>
-                    run(() => sceneAction(projectId, active.id, "image", "approve"))
-                  }
+              <>
+                <label
+                  style={{ display: "block", fontSize: 12, color: "var(--dim)", margin: "14px 0 6px" }}
                 >
-                  Approve image
-                </button>
-                <button
-                  className="abtn"
-                  disabled={pending}
-                  onClick={() =>
-                    run(async () => {
-                      const r = await sceneAction(
-                        projectId,
-                        active.id,
-                        "image",
-                        "regenerate",
-                        feedback,
-                      );
-                      if (r.ok) setFeedback("");
-                      return r;
-                    })
-                  }
-                >
-                  Regenerate
-                </button>
-              </div>
+                  Image prompt — edit it and Regenerate to render exactly this
+                </label>
+                <textarea
+                  value={promptDrafts[active.id] ?? active.imagePrompt ?? ""}
+                  onChange={(e) => setPromptDraft(active.id, e.target.value)}
+                  rows={6}
+                  spellCheck={false}
+                  style={{
+                    width: "100%",
+                    background: "var(--bg2)",
+                    border: "1px solid var(--line2)",
+                    borderRadius: 10,
+                    color: "var(--ink)",
+                    font: "inherit",
+                    fontSize: 12.5,
+                    lineHeight: 1.55,
+                    padding: "10px 12px",
+                    resize: "vertical",
+                    outline: "none",
+                  }}
+                />
+                {promptDrafts[active.id] !== undefined &&
+                  promptDrafts[active.id] !== (active.imagePrompt ?? "") && (
+                    <div style={{ fontSize: 11.5, color: "var(--amber)", marginTop: 5 }}>
+                      Edited — Regenerate saves this prompt and renders it.
+                    </div>
+                  )}
+                <div className="abtns">
+                  <button
+                    className="abtn ok"
+                    disabled={pending}
+                    onClick={() =>
+                      run(() => sceneAction(projectId, active.id, "image", "approve"))
+                    }
+                  >
+                    Approve image
+                  </button>
+                  <button
+                    className="abtn"
+                    disabled={pending}
+                    onClick={() =>
+                      run(async () => {
+                        // Save the rewritten prompt FIRST — n8n reads
+                        // "Imagine First Frame" when it regenerates, so the
+                        // edit has to be in Airtable before the flag flips.
+                        const draft = promptDrafts[active.id];
+                        if (draft !== undefined && draft !== (active.imagePrompt ?? "")) {
+                          const s = await saveImagePrompt(projectId, active.id, draft);
+                          if (!s.ok) return s;
+                          dropPromptDraft(active.id);
+                        }
+                        const r = await sceneAction(
+                          projectId,
+                          active.id,
+                          "image",
+                          "regenerate",
+                          feedback,
+                        );
+                        if (r.ok) setFeedback("");
+                        return r;
+                      })
+                    }
+                  >
+                    Regenerate
+                  </button>
+                </div>
+              </>
             )}
             {active.voiceUrl && !active.videoApproved && (
               <div style={{ marginTop: 16, paddingTop: 12, borderTop: "1px solid var(--line)" }}>

@@ -172,12 +172,32 @@ export async function regenerateSceneText(
     return { ok: true, message: "Demo mode — nothing was written." };
   }
   try {
+    // Flag first — it drives the "Rewriting…" badge, and n8n clears it.
     await requestSceneRewrite(sceneId);
+
+    // Then fire the standalone rewrite webhook. This used to rely on the
+    // scene-approval polling loop inside a live scripting execution: once
+    // that execution was stopped or crashed, the flag sat there forever and
+    // the feature was silently dead (Resume only restarts media generation).
+    const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
+    const webhook =
+      process.env.N8N_SCENE_REGEN_WEBHOOK_URL ??
+      newProject?.replace(/new-project\/?$/, "scene-text-regen");
+    if (webhook?.includes("scene-text-regen")) {
+      const res = await fetch(webhook, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scene_id: sceneId }),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
+    }
+
     revalidatePath(`/projects/${projectId}`);
     return {
       ok: true,
       message:
-        "Rewrite requested — a fresh take on this scene appears here in ~1 minute (the page refreshes itself).",
+        "Rewrite requested — a fresh take on this scene appears here in ~30s (the page refreshes itself).",
     };
   } catch (e) {
     return { ok: false, message: friendlyError(e) };

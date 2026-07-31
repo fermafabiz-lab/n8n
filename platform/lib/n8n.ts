@@ -118,7 +118,10 @@ export async function getAssemblyState(): Promise<AssemblyState> {
   const running = (await getExecutions("running", 20)).find(isAssembly) ?? null;
   if (running) return { running, failed: null };
 
-  const recent = Date.now() - 6 * 60 * 60 * 1000;
+  // Only a failure from the last few minutes can belong to the render the
+  // page is currently watching — executions carry no project id, so an older
+  // one would be attributed to the wrong project.
+  const recent = Date.now() - 20 * 60 * 1000;
   const failed =
     (await getExecutions("error", 10)).find(
       (e) => isAssembly(e) && new Date(e.startedAt ?? 0).getTime() > recent,

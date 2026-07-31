@@ -29,6 +29,49 @@ function useElapsed(startedAt: string | null): number | null {
   return Math.max(0, Math.floor((now - new Date(startedAt).getTime()) / 1000));
 }
 
+/** How long a trouble signal must persist before it is believed. */
+const GRACE_MS = 75_000;
+
+/**
+ * True once the trouble signal has been continuously present for GRACE_MS.
+ *
+ * There are two normal gaps where nothing is running yet everything is fine:
+ * between the batch releasing and the orchestrator starting the render, and
+ * between the render finishing and the video URL landing in Airtable.
+ * Announcing a failure in those windows cried wolf on every healthy project.
+ *
+ * The first-seen timestamp lives in sessionStorage because the page
+ * auto-refreshes every 10s and remounts this component, which would reset a
+ * plain timer forever.
+ */
+function useSettled(projectId: string, trouble: boolean): boolean {
+  const key = `vf-assembly-trouble:${projectId}`;
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (!trouble) {
+      try {
+        sessionStorage.removeItem(key);
+      } catch {}
+      return;
+    }
+    try {
+      if (!sessionStorage.getItem(key)) {
+        sessionStorage.setItem(key, String(Date.now()));
+      }
+    } catch {}
+    const t = setInterval(() => tick((n) => n + 1), 5000);
+    return () => clearInterval(t);
+  }, [trouble, key]);
+
+  if (!trouble) return false;
+  try {
+    const since = Number(sessionStorage.getItem(key) ?? Date.now());
+    return Date.now() - since >= GRACE_MS;
+  } catch {
+    return true;
+  }
+}
+
 const mmss = (s: number) =>
   `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
 
@@ -49,11 +92,13 @@ export default function AssemblyStatus({
   const elapsed = useElapsed(startedAt);
   const [msg, setMsg] = useState<ActionResult | null>(null);
   const [pending, setPending] = useState(false);
+  const settled = useSettled(projectId, missing || !!failure);
 
   // A render is minutes, not tens of minutes. Past that something is wrong
   // even though n8n still calls the execution "running".
   const slow = elapsed !== null && elapsed > 15 * 60;
-  const broken = !!failure || missing;
+  // Only after the signal has held for the grace period — see useSettled.
+  const broken = (!!failure || missing) && settled;
   // Which step it is plausibly on — honest pacing, not a fake progress bar:
   // the render reports no intermediate progress, so this is presented as an
   // estimate, never as measured truth.

@@ -5,6 +5,7 @@ import SceneBoard from "@/components/SceneBoard";
 import ScriptReview from "@/components/ScriptReview";
 import SceneReview from "@/components/SceneReview";
 import AudioReview from "@/components/AudioReview";
+import FinalSettings from "@/components/FinalSettings";
 import AutoRefresh from "@/components/AutoRefresh";
 import MediaPlayer from "@/components/MediaPlayer";
 import StageChime from "@/components/StageChime";
@@ -92,7 +93,9 @@ export default async function ProductionRoom({
       ? "error"
       : project.statusKind === "done"
         ? "finished"
-        : script
+        : project.awaitingFinalSettings
+          ? "final-settings"
+          : script
           ? "script-review"
           : scenes.length > 0 && scenes.some((s) => !s.sceneApproved)
             ? "scene-review"
@@ -188,6 +191,10 @@ export default async function ProductionRoom({
             content={script.content}
             regenerating={scriptRewriting}
           />
+        )}
+
+        {project.awaitingFinalSettings && (
+          <FinalSettings projectId={id} initial={project.editing} />
         )}
 
         {/* Voice gate: images are signed off, so synthesis is the current

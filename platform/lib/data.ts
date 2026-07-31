@@ -24,6 +24,17 @@ export interface Project {
   updatedAt: string | null;
   /** First scene's generated image — the dashboard card cover. */
   coverUrl?: string | null;
+  /** Overlay options, editable right up to final assembly. */
+  editing: EditingOptions;
+  /** The batch is holding, waiting for those options to be confirmed. */
+  awaitingFinalSettings: boolean;
+}
+
+export interface EditingOptions {
+  captions: boolean;
+  hookTitle: boolean;
+  chapterCards: boolean;
+  endScreen: boolean;
 }
 
 export interface Scene {
@@ -58,6 +69,8 @@ export interface Scene {
 const STATUS_MAP: Array<{ match: RegExp; kind: StatusKind; progress: number }> = [
   { match: /finalizat|finished|done/, kind: "done", progress: 1 },
   { match: /eroare|failed|error/, kind: "err", progress: 0.3 },
+  { match: /setari finale/, kind: "wait", progress: 0.92 },
+  { match: /asamblare/, kind: "run", progress: 0.95 },
   { match: /aprobare video/, kind: "wait", progress: 0.85 },
   { match: /generare video/, kind: "run", progress: 0.7 },
   { match: /aprobare imagine/, kind: "wait", progress: 0.55 },
@@ -72,6 +85,8 @@ const STATUS_MAP: Array<{ match: RegExp; kind: StatusKind; progress: number }> =
 // Translate at display time so nothing in Airtable/n8n has to change.
 const STATUS_LABELS: Array<{ match: RegExp; label: string }> = [
   { match: /^finalizat/, label: "Finished" },
+  { match: /setari finale/, label: "Awaiting Final Settings" },
+  { match: /asamblare/, label: "Assembling" },
   { match: /asteapta aprobare video/, label: "Awaiting Video Approval" },
   { match: /asteapta aprobare imagine/, label: "Awaiting Image Approval" },
   { match: /asteapta aprobare script|aprobare script/, label: "Awaiting Script Approval" },
@@ -125,6 +140,8 @@ const F = {
   projectTone: ["Tonalitate", "Tone"],
   projectFinalVideo: ["Link Video Final", "Final Video URL"],
   projectAspect: ["Format"],
+  projectNoCaptions: ["Fără Subtitrări", "Fara Subtitrari"],
+  projectEditing: ["Editing Options"],
   sceneOrder: ["Ordine Scenă", "Ordine Scena"],
   sceneNarration: ["Script Scenă", "Narration", "Narațiune"],
   sceneImage: ["Imagine Scenă", "Imagine Scena"],
@@ -196,6 +213,14 @@ async function airtableList(table: string, params: string): Promise<AirtableReco
 function toProject(r: AirtableRecord): Project {
   const status = String(pick(r.fields, F.projectStatus) ?? "—");
   const { kind, progress } = classifyStatus(status);
+  // Stored as JSON by n8n; anything missing (or an older project) means the
+  // overlay was on.
+  let opts: Partial<EditingOptions> = {};
+  try {
+    opts = JSON.parse(String(pick(r.fields, F.projectEditing) ?? "{}")) ?? {};
+  } catch {
+    opts = {};
+  }
   return {
     id: r.id,
     name: String(pick(r.fields, F.projectName) ?? "Untitled project"),
@@ -207,6 +232,13 @@ function toProject(r: AirtableRecord): Project {
     finalVideoUrl: (pick(r.fields, F.projectFinalVideo) as string) ?? null,
     aspect: pick(r.fields, F.projectAspect) === "9:16" ? "9:16" : "16:9",
     updatedAt: r.createdTime,
+    editing: {
+      captions: pick(r.fields, F.projectNoCaptions) !== true,
+      hookTitle: opts.hookTitle !== false,
+      chapterCards: opts.chapterCards !== false,
+      endScreen: opts.endScreen !== false,
+    },
+    awaitingFinalSettings: /setari finale/.test(normalizeStatus(status)),
   };
 }
 
@@ -338,6 +370,8 @@ const DEMO_PROJECTS: Project[] = [
     finalVideoUrl: null,
     aspect: "16:9" as const,
     updatedAt: null,
+    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true },
+    awaitingFinalSettings: false,
   },
   {
     id: "demo-2",
@@ -350,6 +384,8 @@ const DEMO_PROJECTS: Project[] = [
     finalVideoUrl: null,
     aspect: "16:9" as const,
     updatedAt: null,
+    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true },
+    awaitingFinalSettings: false,
   },
   {
     id: "demo-3",
@@ -362,6 +398,8 @@ const DEMO_PROJECTS: Project[] = [
     finalVideoUrl: null,
     aspect: "16:9" as const,
     updatedAt: null,
+    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true },
+    awaitingFinalSettings: false,
   },
   {
     id: "demo-4",
@@ -374,6 +412,8 @@ const DEMO_PROJECTS: Project[] = [
     finalVideoUrl: "#",
     aspect: "16:9" as const,
     updatedAt: null,
+    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true },
+    awaitingFinalSettings: false,
   },
 ];
 

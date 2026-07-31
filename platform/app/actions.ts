@@ -301,6 +301,49 @@ export async function changeProjectVoice(
   }
 }
 
+/**
+ * Last stop before assembly: the overlay options chosen at creation time can
+ * still be changed here, because the graphics pass reads them from the
+ * project record at render time. Flipping the status to "Asamblare" is what
+ * releases the batch, so both buttons end there — "keep" simply skips the
+ * write.
+ */
+export async function confirmFinalSettings(
+  projectId: string,
+  settings?: {
+    captions: boolean;
+    hookTitle: boolean;
+    chapterCards: boolean;
+    endScreen: boolean;
+  },
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    if (settings) {
+      await writeProjectFields(projectId, {
+        "Fără Subtitrări": !settings.captions,
+        "Editing Options": JSON.stringify({
+          hookTitle: settings.hookTitle,
+          chapterCards: settings.chapterCards,
+          endScreen: settings.endScreen,
+        }),
+      });
+    }
+    await writeProjectFields(projectId, { "Status General": "Asamblare" });
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message: settings
+        ? "Settings saved — final assembly starts within ~15s."
+        : "Keeping the original settings — final assembly starts within ~15s.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
 export async function approveAllScenes(
   projectId: string,
   sceneIds: string[],

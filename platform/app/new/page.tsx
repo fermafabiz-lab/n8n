@@ -2,7 +2,6 @@
 
 import { useActionState, useState } from "react";
 import { createProject, type ActionResult } from "@/app/actions";
-import VoicePicker from "@/components/VoicePicker";
 import CategoryPicker from "@/components/CategoryPicker";
 
 async function submit(_prev: ActionResult | null, formData: FormData) {
@@ -164,8 +163,6 @@ export default function NewVideo() {
             enough for history, science, brands etc.
           </p>
         </div>
-
-        <VoicePicker />
 
         <div className="field">
           <label htmlFor="language">Language</label>

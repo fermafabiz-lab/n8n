@@ -34,6 +34,7 @@ export default function VoicePicker({
   multi = false,
   selectedIds,
   onToggle,
+  chipLabel = "cast",
 }: {
   name?: string;
   label?: string;
@@ -42,6 +43,8 @@ export default function VoicePicker({
   multi?: boolean;
   selectedIds?: string[];
   onToggle?: (voiceId: string) => void;
+  /** Chip prefix in multi mode: "cast" (default) or "narrator". */
+  chipLabel?: string;
 }) {
   const [provider, setProvider] = useState("elevenlabs");
   const [q, setQ] = useState("");
@@ -181,7 +184,7 @@ export default function VoicePicker({
                   {isSel && (
                     <span className="chip ok" style={{ marginLeft: 10 }}>
                       {multi
-                        ? `cast #${(selectedIds ?? []).indexOf(v.voice_id) + 1}`
+                        ? `${chipLabel} #${(selectedIds ?? []).indexOf(v.voice_id) + 1}`
                         : "selected"}
                     </span>
                   )}

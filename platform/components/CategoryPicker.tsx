@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { CATEGORIES, DEFAULT_CATEGORY, getCategory } from "@/lib/categories";
 import CastPicker from "@/components/CastPicker";
+import VoicePicker from "@/components/VoicePicker";
 
 /**
  * Category cards + the selected category's own options. The choice and every
@@ -84,10 +85,6 @@ export default function CategoryPicker() {
           {cat.options.map((o) => {
             const v = val(o.name, o.default);
             const on = v === true || v === "true";
-            // Selects with a cast reveal it on any mode except "off".
-            const revealed =
-              o.reveals === "cast" &&
-              (o.type === "toggle" ? on : String(v) !== "off");
             return (
               <div key={`${o.name}-wrap`}>
               <div
@@ -137,12 +134,62 @@ export default function CategoryPicker() {
                   </select>
                 )}
               </div>
-              {revealed && <CastPicker mode={o.type === "toggle" ? "characters" : String(v)} />}
               </div>
             );
           })}
         </div>
       )}
+
+      {/* Voice setup — ONE place, shaped by the multi-voice choice above:
+          off       -> the classic single narrator picker
+          chapters  -> only the cast (they ARE the narrators)
+          characters-> narrator yes/no, then narrator picker + cast */}
+      {(() => {
+        const mv = cat.options.find((o) => o.name === "multi_voice");
+        const mode = mv ? String(val("multi_voice", mv.default)) : "off";
+        const narr = String(val("narration", "with"));
+        const withNarrator = mode === "characters" && narr !== "none";
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 12 }}>
+            {mode === "characters" && (
+              <div
+                className="card"
+                style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 14px" }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>
+                    Narration between dialogue
+                  </div>
+                  <div style={{ fontSize: 12, color: "var(--soft)" }}>
+                    With a narrator, the story keeps [NARRATOR] beats between
+                    the characters&apos; lines. Without one, the characters
+                    carry everything themselves.
+                  </div>
+                </div>
+                <select
+                  name="cat_narration"
+                  value={narr}
+                  onChange={(e) => setVal("narration", e.target.value)}
+                  style={{ width: "auto", flex: "none" }}
+                >
+                  <option value="with">With narrator</option>
+                  <option value="none">No narrator</option>
+                </select>
+              </div>
+            )}
+            {(mode === "off" || withNarrator) && (
+              <VoicePicker
+                label={
+                  mode === "off"
+                    ? "Narrator voice — press ▶ to listen"
+                    : "Narrator voice — reads the parts between the characters' lines"
+                }
+              />
+            )}
+            {mode !== "off" && <CastPicker mode={mode} hasNarrator={withNarrator} />}
+          </div>
+        );
+      })()}
     </div>
   );
 }

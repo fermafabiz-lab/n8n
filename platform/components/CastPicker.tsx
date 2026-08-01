@@ -16,8 +16,11 @@ export default function CastPicker({
   /** "characters" — the cast plays characters; "chapters" — each cast voice
    *  narrates a whole chapter. Changes only the wording, not the data. */
   mode = "characters",
+  /** characters mode: whether a separate narrator voice exists above. */
+  hasNarrator = true,
 }: {
   mode?: string;
+  hasNarrator?: boolean;
 }) {
   const [cast, setCast] = useState<string[]>([]);
   const toggle = (id: string) =>
@@ -32,6 +35,7 @@ export default function CastPicker({
         multi
         selectedIds={cast}
         onToggle={toggle}
+        chipLabel={mode === "chapters" ? "narrator" : "cast"}
         label={
           mode === "chapters"
             ? `Chapter narrators — in chapter order (${cast.length} selected)`
@@ -40,8 +44,10 @@ export default function CastPicker({
       />
       <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--dim)" }}>
         {mode === "chapters"
-          ? "Chapter 1 gets cast #1, chapter 2 gets cast #2 and so on (looping if there are more chapters than voices). The hook at the start keeps the main narrator you chose below."
-          : "These are the voices characters can speak with, alongside the narrator you chose below. The story's characters aren't written yet, so each one gets assigned a voice from this pool once the script exists — you can reassign any of them in the audio panel before anything is rendered."}
+          ? "Chapter 1 is read by narrator #1, chapter 2 by narrator #2 and so on (looping if there are more chapters than voices). The opening hook is read by narrator #1 — there is no separate narrator voice in this mode."
+          : hasNarrator
+            ? "These are the voices characters speak with, alongside the narrator you chose above. The story's characters aren't written yet, so each one gets assigned a voice from this pool once the script exists — you can reassign any of them in the audio panel before anything is rendered."
+            : "No narrator in this story — everything is spoken by the characters, each with a voice from this pool (assigned once the script exists, changeable in the audio panel)."}
       </p>
       {cast.length === 1 && mode !== "chapters" && (
         <p className="formmsg" style={{ marginTop: 8 }}>

@@ -516,7 +516,10 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     Tonalitate: String(formData.get("tone") ?? "Dark"),
     Pace: String(formData.get("pace") ?? "Normal"),
     Style: String(formData.get("style") ?? ""),
-    voice_id: String(formData.get("voice_id") ?? ""),
+    // In chapters mode (and no-narrator characters mode) there is no
+    // narrator picker; the first cast voice doubles as the project voice so
+    // n8n's fallbacks (hook, legacy paths) stay sensible.
+    voice_id: String(formData.get("voice_id") ?? "") || cast[0] || "",
     aspect: String(formData.get("aspect") ?? "16:9"),
     captions: String(formData.get("captions") ?? "yes"),
     lore: String(formData.get("lore") ?? ""),

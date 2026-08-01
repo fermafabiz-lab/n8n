@@ -5,6 +5,7 @@ import {
   approveVoices,
   changeProjectVoice,
   regenerateVoice,
+  saveCastAssignments,
   sceneAction,
   type ActionResult,
 } from "@/app/actions";
@@ -68,12 +69,47 @@ function fitProblem(voice: number | undefined, clip: number | undefined): string
   return null;
 }
 
+/** Speaker names in a tagged line, in speaking order (characters mode). */
+function speakersOf(narration: string | null): string[] {
+  const out: string[] = [];
+  for (const m of String(narration ?? "").matchAll(/\[\s*(NARRATOR|CHARACTER:\s*([^\]]+))\s*\]/gi)) {
+    const name = m[2] ? m[2].trim() : "Narrator";
+    if (!out.includes(name)) out.push(name);
+  }
+  return out;
+}
+
+/** All characters across the project, in first-appearance order — the same
+ *  deterministic rule n8n uses to auto-assign cast voices. */
+function discoverCharacters(scenes: Scene[]): string[] {
+  const out: string[] = [];
+  for (const s of [...scenes].sort((a, b) => a.order - b.order)) {
+    for (const name of speakersOf(s.narration)) {
+      if (name !== "Narrator" && !out.includes(name)) out.push(name);
+    }
+  }
+  return out;
+}
+
+const shortVoice = (id: string) => {
+  const [provider, ...rest] = id.split("_");
+  const tail = rest.join("_");
+  return `${provider} · …${tail.slice(-6)}`;
+};
+
 export default function AudioReview({
   projectId,
   scenes,
+  mode = "off",
+  cast = [],
+  castAssign = {},
 }: {
   projectId: string;
   scenes: Scene[];
+  /** Project multi-voice mode: "off" | "characters" | "chapters". */
+  mode?: string;
+  cast?: string[];
+  castAssign?: Record<string, string>;
 }) {
   const [msg, setMsg] = useState<ActionResult | null>(null);
   const [pending, setPending] = useState(false);
@@ -83,6 +119,17 @@ export default function AudioReview({
   const [clipDurations, setClipDurations] = useState<Record<string, number>>({});
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [showVoice, setShowVoice] = useState(false);
+  const [assign, setAssign] = useState<Record<string, string>>(castAssign);
+  const characters = useMemo(() => discoverCharacters(scenes), [scenes]);
+  const assignDirty =
+    mode === "characters" &&
+    characters.some((c) => (assign[c] ?? "") !== (castAssign[c] ?? ""));
+  const voiceOf = (name: string): string => {
+    const a = assign[name];
+    if (a && a.includes("_")) return a;
+    const i = characters.indexOf(name);
+    return cast[(i >= 0 ? i : 0) % Math.max(1, cast.length)] ?? "";
+  };
   const [newVoice, setNewVoice] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -231,6 +278,66 @@ export default function AudioReview({
       ) : null}
       {msg && <p className={`formmsg ${msg.ok ? "ok" : "err"}`}>{msg.message}</p>}
 
+      {mode === "chapters" && cast.length > 0 && (
+        <p className="formmsg ok" style={{ marginBottom: 12 }}>
+          Narrator-per-chapter is on: chapter 1 is read by voice #1, chapter 2
+          by voice #2… ({cast.length} narrator{cast.length === 1 ? "" : "s"} in
+          the cast; the hook keeps the main narrator).
+        </p>
+      )}
+
+      {mode === "characters" && (
+        <div className="card" style={{ padding: "14px 16px", marginBottom: 14 }}>
+          <div className="kv" style={{ borderBottom: "none", paddingBottom: 8 }}>
+            <h5 style={{ margin: 0 }}>Cast — who speaks with which voice</h5>
+            {assignDirty && (
+              <button
+                className="abtn ok"
+                disabled={pending}
+                onClick={() => run(() => saveCastAssignments(projectId, assign))}
+              >
+                Save cast
+              </button>
+            )}
+          </div>
+          {characters.length === 0 ? (
+            <p style={{ margin: 0, fontSize: 12.5, color: "var(--soft)" }}>
+              No character tags found in the scenes yet — dialogue lines appear
+              here as <code>[CHARACTER: Name]</code> once the script is written.
+            </p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {characters.map((name, i) => (
+                <div
+                  key={name}
+                  style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}
+                >
+                  <b style={{ fontSize: 13, minWidth: 140 }}>{name}</b>
+                  <select
+                    value={voiceOf(name)}
+                    onChange={(e) => setAssign((p) => ({ ...p, [name]: e.target.value }))}
+                    style={{ width: "auto" }}
+                  >
+                    {cast.map((v, k) => (
+                      <option key={v} value={v}>
+                        Voice #{k + 1} — {shortVoice(v)}
+                      </option>
+                    ))}
+                  </select>
+                  {i < cast.length ? null : (
+                    <span className="chip wait">shares a voice — cast is smaller than the cast list</span>
+                  )}
+                </div>
+              ))}
+              <p style={{ margin: "4px 0 0", fontSize: 11.5, color: "var(--dim)" }}>
+                Changing a voice applies to lines you regenerate afterwards —
+                already-synthesized takes keep their audio until regenerated.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Project-wide narrator swap. */}
       <div style={{ marginBottom: 14 }}>
         {showVoice ? (
@@ -317,6 +424,22 @@ export default function AudioReview({
                     >
                       {fmt(durations[s.id])}
                     </span>
+                    {mode === "chapters" && cast.length > 0 && (() => {
+                      const ch = Math.floor(s.order / 100);
+                      return ch > 0 ? (
+                        <span className="chip">
+                          Ch. {ch} · Voice #{((ch - 1) % cast.length) + 1}
+                        </span>
+                      ) : (
+                        <span className="chip">Hook · main narrator</span>
+                      );
+                    })()}
+                    {mode === "characters" &&
+                      speakersOf(s.narration).map((name) => (
+                        <span key={name} className="chip">
+                          {name === "Narrator" ? "Narrator" : `🗣 ${name}`}
+                        </span>
+                      ))}
                     {s.voiceApproved && <span className="chip ok">Approved</span>}
                     {flag && <span className="chip wait">{flag}</span>}
                     {fit && <span className="chip wait">{fit}</span>}

@@ -277,7 +277,13 @@ export default async function ProductionRoom({
           scenes.every((s) => s.sceneApproved) &&
           scenes.every((s) => s.imageApproved) &&
           scenes.some((s) => !s.voiceApproved) && (
-            <AudioReview projectId={id} scenes={scenes} />
+            <AudioReview
+              projectId={id}
+              scenes={scenes}
+              mode={project.multiVoiceMode}
+              cast={project.cast}
+              castAssign={project.castAssign}
+            />
           )}
 
         {scenes.length > 0 && scenes.some((s) => !s.sceneApproved) ? (

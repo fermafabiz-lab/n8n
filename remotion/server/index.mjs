@@ -14,6 +14,7 @@ import {registerAssemble} from './assemble.mjs';
 import {registerInspect} from './inspect.mjs';
 import {registerTranscript} from './transcript.mjs';
 import {registerAnalyze} from './analyze.mjs';
+import {registerTts} from './tts.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OUTPUT_DIR = path.join(__dirname, 'output');
@@ -117,9 +118,10 @@ registerAssemble(app, {jobs, outputDir: OUTPUT_DIR});
 registerInspect(app);
 registerTranscript(app, {outputDir: OUTPUT_DIR});
 registerAnalyze(app, {outputDir: OUTPUT_DIR});
+registerTts(app, {jobs, outputDir: OUTPUT_DIR});
 
 // Shared status endpoint for render and assemble jobs.
-app.get(['/render/:jobId/status', '/assemble/:jobId/status'], (req, res) => {
+app.get(['/render/:jobId/status', '/assemble/:jobId/status', '/tts-multi/:jobId/status'], (req, res) => {
 	const job = jobs.get(req.params.jobId);
 	if (!job) return res.status(404).json({error: 'job not found'});
 

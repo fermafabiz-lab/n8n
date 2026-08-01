@@ -30,6 +30,12 @@ export interface Project {
   awaitingFinalSettings: boolean;
   /** Video category id (lib/categories.ts); older projects have none. */
   category: string | null;
+  /** "off" | "characters" | "chapters" — how narration voices work. */
+  multiVoiceMode: string;
+  /** Extra voice ids picked on the form (characters or chapter narrators). */
+  cast: string[];
+  /** Character name -> voice id overrides (characters mode). */
+  castAssign: Record<string, string>;
 }
 
 export interface EditingOptions {
@@ -244,6 +250,17 @@ function toProject(r: AirtableRecord): Project {
     category: typeof (opts as { category?: unknown }).category === "string"
       ? String((opts as { category?: string }).category)
       : null,
+    multiVoiceMode: String((opts as { multiVoiceMode?: string }).multiVoiceMode ?? "off"),
+    cast: Array.isArray((opts as { cast?: unknown }).cast)
+      ? ((opts as { cast?: unknown[] }).cast as unknown[]).filter(
+          (v): v is string => typeof v === "string" && v.includes("_"),
+        )
+      : [],
+    castAssign:
+      typeof (opts as { castAssign?: unknown }).castAssign === "object" &&
+      (opts as { castAssign?: unknown }).castAssign !== null
+        ? ((opts as { castAssign?: Record<string, string> }).castAssign as Record<string, string>)
+        : {},
   };
 }
 
@@ -378,6 +395,9 @@ const DEMO_PROJECTS: Project[] = [
     editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true },
     awaitingFinalSettings: false,
     category: "story",
+    multiVoiceMode: "off",
+    cast: [],
+    castAssign: {},
   },
   {
     id: "demo-2",
@@ -393,6 +413,9 @@ const DEMO_PROJECTS: Project[] = [
     editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true },
     awaitingFinalSettings: false,
     category: "story",
+    multiVoiceMode: "off",
+    cast: [],
+    castAssign: {},
   },
   {
     id: "demo-3",
@@ -408,6 +431,9 @@ const DEMO_PROJECTS: Project[] = [
     editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true },
     awaitingFinalSettings: false,
     category: "story",
+    multiVoiceMode: "off",
+    cast: [],
+    castAssign: {},
   },
   {
     id: "demo-4",
@@ -423,6 +449,9 @@ const DEMO_PROJECTS: Project[] = [
     editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true },
     awaitingFinalSettings: false,
     category: "story",
+    multiVoiceMode: "off",
+    cast: [],
+    castAssign: {},
   },
 ];
 
@@ -514,6 +543,32 @@ export async function writeProjectFields(
   fields: Record<string, unknown>,
 ): Promise<void> {
   await airtablePatch(PROJECTS_TABLE, projectId, fields);
+}
+
+/**
+ * Merge a patch into the project's Editing Options JSON (read-modify-write).
+ * The JSON is the schema-free home of category/multi-voice settings, so
+ * writers must never blindly overwrite it.
+ */
+export async function updateEditingOptions(
+  projectId: string,
+  patch: Record<string, unknown>,
+): Promise<void> {
+  const res = await fetch(
+    `https://api.airtable.com/v0/${BASE_ID}/${encodeURIComponent(PROJECTS_TABLE)}/${projectId}`,
+    { headers: { Authorization: `Bearer ${API_KEY}` }, cache: "no-store" },
+  );
+  if (!res.ok) throw new Error(`Airtable: HTTP ${res.status}`);
+  const rec = (await res.json()) as AirtableRecord;
+  let opts: Record<string, unknown> = {};
+  try {
+    opts = JSON.parse(String(pick(rec.fields, F.projectEditing) ?? "{}")) ?? {};
+  } catch {
+    opts = {};
+  }
+  await airtablePatch(PROJECTS_TABLE, projectId, {
+    "Editing Options": JSON.stringify({ ...opts, ...patch }),
+  });
 }
 
 export async function getProjectScript(projectId: string): Promise<string | null> {

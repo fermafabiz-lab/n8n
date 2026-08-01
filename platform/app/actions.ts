@@ -15,6 +15,7 @@ import {
   writeScriptFields,
   requestVoiceRegen,
   deleteProjectDeep,
+  updateEditingOptions,
 } from "@/lib/data";
 import { getExecutions, stopExecution } from "@/lib/n8n";
 
@@ -365,6 +366,31 @@ export async function retryAssembly(projectId: string): Promise<ActionResult> {
     return {
       ok: true,
       message: "Render restarted — it picks up the approved clips, nothing is regenerated.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/**
+ * Characters mode: save which voice plays each character. n8n reads this
+ * (castAssign in Editing Options) on every synthesis, so it applies to the
+ * next regeneration of any line.
+ */
+export async function saveCastAssignments(
+  projectId: string,
+  assign: Record<string, string>,
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    await updateEditingOptions(projectId, { castAssign: assign });
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message:
+        "Cast saved — it applies to every line you regenerate from now on.",
     };
   } catch (e) {
     return { ok: false, message: friendlyError(e) };

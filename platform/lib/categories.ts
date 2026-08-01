@@ -43,7 +43,7 @@ export const CATEGORIES: Category[] = [
       {
         name: "multi_voice",
         label: "Multiple voices",
-        hint: "Off = the classic single narrator. Characters = the cast speaks its own lines, with the narrator only in between. Narrator per chapter = each chapter is read by a different narrator from your cast.",
+        hint: "Off = the classic single narrator. Characters = the script becomes real dialogue between the story's characters (per-character voices are being wired in — for now one narrator reads it). Narrator per chapter = each chapter is read by a different narrator from your cast, working today.",
         type: "select",
         choices: [
           { value: "off", label: "Off — one narrator" },

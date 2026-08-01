@@ -223,6 +223,16 @@ export default function SceneBoard({
                       Edited — Regenerate saves this prompt and renders it.
                     </div>
                   )}
+                {/* Rejection/auto-rewrite reasons must survive outside the
+                    regenerating state — a Flow refusal clears the flag but
+                    the WHY is exactly what the reviewer needs. */}
+                {!active.regenImage &&
+                  active.note &&
+                  /REJECTED|AUTO-REWRITE|failed|error/i.test(active.note) && (
+                    <p className="formmsg err" style={{ marginTop: 8 }}>
+                      {active.note}
+                    </p>
+                  )}
                 {active.regenImage ? (
                   <RegenBadge label="Regenerating image…" note={active.note} />
                 ) : (

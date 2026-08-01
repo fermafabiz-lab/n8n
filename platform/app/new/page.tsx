@@ -59,6 +59,21 @@ export default function NewVideo() {
 
         <CategoryPicker />
 
+        {/* Tone sits right after the category: the category decides what kind
+            of video it is, the tone decides how it feels. */}
+        <div className="field">
+          <label htmlFor="tone">Tone — how it should feel</label>
+          <select id="tone" name="tone" defaultValue="Dark">
+            {TONES.map((t) => (
+              <option key={t}>{t}</option>
+            ))}
+          </select>
+          <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--dim)" }}>
+            Independent of the category: it shapes the writing, the palette
+            and the music inside whichever format you picked above.
+          </p>
+        </div>
+
         <div className="field">
           <label htmlFor="length">
             Length (seconds) — ≈ {scenes} scenes of 8s each
@@ -113,15 +128,6 @@ export default function NewVideo() {
           <select id="end_screen" name="end_screen" defaultValue="yes">
             <option value="yes">Yes — channel outro after the last scene</option>
             <option value="no">No — video ends on the last scene</option>
-          </select>
-        </div>
-
-        <div className="field">
-          <label htmlFor="tone">Tone</label>
-          <select id="tone" name="tone" defaultValue="Dark">
-            {TONES.map((t) => (
-              <option key={t}>{t}</option>
-            ))}
           </select>
         </div>
 

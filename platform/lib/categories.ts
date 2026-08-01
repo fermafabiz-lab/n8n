@@ -17,6 +17,8 @@ export interface CategoryOption {
   default: string | boolean;
   /** Declared but not yet wired into the pipeline — shown, saved, inert. */
   comingSoon?: boolean;
+  /** Extra UI this option switches on when enabled. */
+  reveals?: "cast";
 }
 
 export interface Category {
@@ -41,10 +43,11 @@ export const CATEGORIES: Category[] = [
       {
         name: "voice_roles",
         label: "Multiple voices",
-        hint: "Give characters their own voice next to the narrator. You pick each voice yourself.",
+        hint: "Characters speak in their own voices next to the narrator. You choose the cast yourself.",
         type: "toggle",
         default: false,
-        comingSoon: true,
+        // Reveals the cast picker below (see CategoryPicker).
+        reveals: "cast",
       },
     ],
   },

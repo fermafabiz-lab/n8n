@@ -475,10 +475,16 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
   for (const [k, v] of formData.entries()) {
     if (k.startsWith("cat_")) categoryOptions[k.slice(4)] = String(v);
   }
+  // The cast is a comma-separated list of voice ids (multi-voice stories).
+  const cast = String(formData.get("cast_voices") ?? "")
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
   const payload = {
     "Nume Proiect": String(formData.get("name") ?? ""),
     category: String(formData.get("category") ?? "story"),
     category_options: categoryOptions,
+    cast_voices: cast,
     Language: String(formData.get("language") ?? "English"),
     Lenght: Number(formData.get("length") ?? 64),
     Tonalitate: String(formData.get("tone") ?? "Dark"),

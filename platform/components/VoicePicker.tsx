@@ -30,11 +30,18 @@ export default function VoicePicker({
    *  swapping the narrator of a project that already exists). */
   value,
   onChange,
+  /** Multi mode: pick a cast of voices instead of one. */
+  multi = false,
+  selectedIds,
+  onToggle,
 }: {
   name?: string;
   label?: string;
   value?: string;
   onChange?: (voiceId: string) => void;
+  multi?: boolean;
+  selectedIds?: string[];
+  onToggle?: (voiceId: string) => void;
 }) {
   const [provider, setProvider] = useState("elevenlabs");
   const [q, setQ] = useState("");
@@ -42,8 +49,12 @@ export default function VoicePicker({
   const [internal, setInternal] = useState("elevenlabs_hpp4J3VqNfWAUOO0d1Us");
   const controlled = onChange !== undefined;
   const selected = controlled ? (value ?? "") : internal;
-  const setSelected = (id: string) =>
-    controlled ? onChange!(id) : setInternal(id);
+  const setSelected = (id: string) => {
+    if (multi) return onToggle?.(id);
+    return controlled ? onChange!(id) : setInternal(id);
+  };
+  const isSelected = (id: string) =>
+    multi ? (selectedIds ?? []).includes(id) : selected === id;
   const [playing, setPlaying] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -89,7 +100,7 @@ export default function VoicePicker({
   return (
     <div className="field">
       <label>{label}</label>
-      {!controlled && <input type="hidden" name={name} value={selected} />}
+      {!controlled && !multi && <input type="hidden" name={name} value={selected} />}
       <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
         <select
           value={provider}
@@ -126,7 +137,7 @@ export default function VoicePicker({
         }}
       >
         {voices.map((v) => {
-          const isSel = selected === v.voice_id;
+          const isSel = isSelected(v.voice_id);
           return (
             <div
               key={v.voice_id}
@@ -169,7 +180,9 @@ export default function VoicePicker({
                   {v.name}
                   {isSel && (
                     <span className="chip ok" style={{ marginLeft: 10 }}>
-                      selected
+                      {multi
+                        ? `cast #${(selectedIds ?? []).indexOf(v.voice_id) + 1}`
+                        : "selected"}
                     </span>
                   )}
                 </div>

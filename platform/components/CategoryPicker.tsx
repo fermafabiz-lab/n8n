@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CATEGORIES, DEFAULT_CATEGORY, getCategory } from "@/lib/categories";
+import CastPicker from "@/components/CastPicker";
 
 /**
  * Category cards + the selected category's own options. The choice and every
@@ -82,7 +83,9 @@ export default function CategoryPicker() {
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
           {cat.options.map((o) => {
             const v = val(o.name, o.default);
+            const on = v === true || v === "true";
             return (
+              <div key={`${o.name}-wrap`}>
               <div
                 key={o.name}
                 className="card"
@@ -109,7 +112,7 @@ export default function CategoryPicker() {
                   <input
                     type="checkbox"
                     name={`cat_${o.name}`}
-                    checked={v === true || v === "true"}
+                    checked={on}
                     disabled={o.comingSoon}
                     onChange={(e) => setVal(o.name, e.target.checked)}
                     style={{ width: 17, height: 17, accentColor: "var(--amber)", flex: "none" }}
@@ -129,6 +132,8 @@ export default function CategoryPicker() {
                     ))}
                   </select>
                 )}
+              </div>
+              {o.reveals === "cast" && on && <CastPicker />}
               </div>
             );
           })}

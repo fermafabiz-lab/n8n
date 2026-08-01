@@ -12,7 +12,13 @@ import VoicePicker from "@/components/VoicePicker";
  * character found in it is assigned one of these voices, and that assignment
  * is changeable in the audio panel.
  */
-export default function CastPicker() {
+export default function CastPicker({
+  /** "characters" — the cast plays characters; "chapters" — each cast voice
+   *  narrates a whole chapter. Changes only the wording, not the data. */
+  mode = "characters",
+}: {
+  mode?: string;
+}) {
   const [cast, setCast] = useState<string[]>([]);
   const toggle = (id: string) =>
     setCast((prev) =>
@@ -26,16 +32,18 @@ export default function CastPicker() {
         multi
         selectedIds={cast}
         onToggle={toggle}
-        label={`Character voices — pick as many as you want (${cast.length} selected)`}
+        label={
+          mode === "chapters"
+            ? `Chapter narrators — in chapter order (${cast.length} selected)`
+            : `Character voices — pick as many as you want (${cast.length} selected)`
+        }
       />
       <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--dim)" }}>
-        These are the voices characters can speak with, alongside the narrator
-        you chose above. The story&apos;s characters aren&apos;t written yet, so
-        each one gets assigned a voice from this pool once the script exists —
-        you can reassign any of them in the audio panel before anything is
-        rendered.
+        {mode === "chapters"
+          ? "Chapter 1 gets cast #1, chapter 2 gets cast #2 and so on (looping if there are more chapters than voices). The hook at the start keeps the main narrator you chose below."
+          : "These are the voices characters can speak with, alongside the narrator you chose below. The story's characters aren't written yet, so each one gets assigned a voice from this pool once the script exists — you can reassign any of them in the audio panel before anything is rendered."}
       </p>
-      {cast.length === 1 && (
+      {cast.length === 1 && mode !== "chapters" && (
         <p className="formmsg" style={{ marginTop: 8 }}>
           With a single character voice every character will sound the same.
           Pick one per character you expect, or leave this empty to keep a

@@ -84,6 +84,10 @@ export default function CategoryPicker() {
           {cat.options.map((o) => {
             const v = val(o.name, o.default);
             const on = v === true || v === "true";
+            // Selects with a cast reveal it on any mode except "off".
+            const revealed =
+              o.reveals === "cast" &&
+              (o.type === "toggle" ? on : String(v) !== "off");
             return (
               <div key={`${o.name}-wrap`}>
               <div
@@ -133,7 +137,7 @@ export default function CategoryPicker() {
                   </select>
                 )}
               </div>
-              {o.reveals === "cast" && on && <CastPicker />}
+              {revealed && <CastPicker mode={o.type === "toggle" ? "characters" : String(v)} />}
               </div>
             );
           })}

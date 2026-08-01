@@ -41,12 +41,17 @@ export const CATEGORIES: Category[] = [
     ready: true,
     options: [
       {
-        name: "voice_roles",
+        name: "multi_voice",
         label: "Multiple voices",
-        hint: "Characters speak in their own voices next to the narrator. You choose the cast yourself.",
-        type: "toggle",
-        default: false,
-        // Reveals the cast picker below (see CategoryPicker).
+        hint: "Off = the classic single narrator. Characters = the cast speaks its own lines, with the narrator only in between. Narrator per chapter = each chapter is read by a different narrator from your cast.",
+        type: "select",
+        choices: [
+          { value: "off", label: "Off — one narrator" },
+          { value: "characters", label: "Characters speak" },
+          { value: "chapters", label: "Narrator per chapter" },
+        ],
+        default: "off",
+        // Any mode except "off" reveals the cast picker (see CategoryPicker).
         reveals: "cast",
       },
     ],
@@ -59,6 +64,18 @@ export const CATEGORIES: Category[] = [
       "Fact-driven storytelling: researched narration built like a real documentary, with room for real footage between generated scenes.",
     ready: false,
     options: [
+      {
+        name: "multi_voice",
+        label: "Multiple narrators",
+        hint: "Each chapter is read by a different narrator from your cast — the classic multi-host documentary feel. (Character voices don't apply here.)",
+        type: "select",
+        choices: [
+          { value: "off", label: "Off — one narrator" },
+          { value: "chapters", label: "Narrator per chapter" },
+        ],
+        default: "off",
+        reveals: "cast",
+      },
       {
         name: "real_footage",
         label: "Real images between scenes",

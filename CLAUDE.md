@@ -14,7 +14,7 @@ conversation. Keep it updated when a hard-won lesson is learned.
 | Piece | Where | Role |
 |---|---|---|
 | **Website** | `platform/` — Next.js on Vercel | The producer's whole interface: create projects, approve each stage, watch progress |
-| **n8n** | self-hosted at `house-of-videos.com` | All orchestration. 4 workflows, see below |
+| **n8n** | self-hosted at `wf7.house-of-videos.com` | All orchestration. 4 workflows, see below |
 | **Airtable** | base "Database Video" | The single source of truth for project + scene state |
 | **Render server** | `remotion/server/` on Railway | ffmpeg + Remotion: `/assemble`, `/tts-multi`, `/media`, `/transcript`, `/inspect` |
 
@@ -27,12 +27,17 @@ useapi** (video clips, Veo 3.1), **OpenAI** (scripting), **Google Drive**
 `Execute Workflow` nodes reference these **by id**, so an id that changes
 during an import silently breaks orchestration.
 
-| id | Name |
-|---|---|
-| `a9eyVteQcP1ZxtZH` | 1. Master Orchestrator |
-| `auz2GejSQAhvLkCA` | Claude Scripting |
-| `u5eVcB6VOGNdTMom` | 3. Media Generation (Batch) |
-| `y8ZPxgUFOxdRpva8` | 4. Final Assembly |
+| Name | id on n8n Cloud (dead) | id on self-hosted |
+|---|---|---|
+| 1. Master Orchestrator | `a9eyVteQcP1ZxtZH` | `8CienBFfG6SgbB1A` |
+| Claude Scripting | `auz2GejSQAhvLkCA` | *imported later — re-read it* |
+| 3. Media Generation (Batch) | `u5eVcB6VOGNdTMom` | `yHG4DBCDjR3RJzav` |
+| 4. Final Assembly | `y8ZPxgUFOxdRpva8` | `BY22Vlhh20Xdkr5Z` |
+
+**The import did NOT preserve ids** — every workflow got a new one, while the
+`Execute Workflow` nodes kept pointing at the cloud ids. That combination
+fails silently: the orchestrator starts, then calls into nothing. The cloud
+column is kept only so a stale reference is recognisable on sight.
 
 Webhooks the site calls: `new-project`, `resume-project`, `scene-text-regen`,
 `scene-image-regen`, `scene-voice-regen`, `assemble`. The site derives all of
@@ -61,9 +66,13 @@ These each cost hours. Do not rediscover them.
   in `platform/lib/n8n.ts` threads this needle: `running` always counts;
   `waiting` counts only for worker workflows with a genuinely near wake-up.
 - **`execute_workflow` targets the first enabled webhook** in a workflow.
-- **`WEBHOOK_URL=https://house-of-videos.com`** must be set as an env var on
-  the instance. Without it n8n hands out `localhost` webhook URLs and Vercel
-  can't start anything — which presents as "the site is broken".
+- **`WEBHOOK_URL=https://wf7.house-of-videos.com`** must be set as an env var
+  on the instance. Without it n8n hands out `localhost` webhook URLs and
+  Vercel can't start anything — which presents as "the site is broken".
+- **The n8n host is `wf7.house-of-videos.com`, not the bare domain.** The bare
+  domain is the website. Everything that must reach n8n — Vercel's three env
+  vars, the Google OAuth redirect URI, the MCP connector — needs the `wf7.`
+  prefix, and fails in a way that looks unrelated when it's missing.
 - **Credentials never survive an export/import** (encrypted per-instance).
   They must be recreated and re-attached to nodes by hand.
 
@@ -121,7 +130,7 @@ These each cost hours. Do not rediscover them.
 See `platform/README.md`.
 
 **Google OAuth** (Drive credential): redirect URI is
-`https://house-of-videos.com/rest/oauth2-credential/callback`, JavaScript
+`https://wf7.house-of-videos.com/rest/oauth2-credential/callback`, JavaScript
 origins empty. The app is **Published**, not in Testing — Testing mode expires
 refresh tokens after 7 days. The "Google hasn't verified this app" warning is
 expected and harmless for an app touching only its own Drive.

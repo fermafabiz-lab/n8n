@@ -41,3 +41,32 @@ npm run dev
 - ~~Phase C: new-project form, script review, shared-password gate~~ ✓
 - Phase D: Google login (Supabase), multi-user roles, workspaces, Postgres
   adapter.
+
+## Pointing the site at a different n8n instance
+
+Moving between n8n Cloud and self-hosted touches **three** environment
+variables on Vercel — every other webhook URL is derived from the first by
+replacing the trailing path, so they stay in sync automatically:
+
+| Variable | Value |
+| --- | --- |
+| `N8N_NEW_PROJECT_WEBHOOK_URL` | `https://<host>/webhook/new-project` |
+| `N8N_API_URL` | `https://<host>/api/v1` |
+| `N8N_API_KEY` | a key generated on the new instance (Settings → n8n API) |
+
+On the n8n side, two things never travel with an export:
+
+- **Credentials** are encrypted with the instance's own key, so they must be
+  re-created and re-attached (Airtable, Google Drive, OpenAI, FAL).
+- **`WEBHOOK_URL`** must be set to the public HTTPS address, otherwise n8n
+  registers its webhooks under `localhost` and nothing from Vercel reaches
+  them.
+
+Verify the whole thing in one command — it checks reachability, that the
+workflow ids survived the import (Execute Workflow nodes reference them),
+that every webhook the site calls is registered, and which credentials are
+still missing:
+
+```sh
+N8N_API_URL=https://<host>/api/v1 N8N_API_KEY=... node scripts/check-n8n.mjs
+```

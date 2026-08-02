@@ -27,7 +27,7 @@ export default async function OpsPanel({
     return (
       <div className="setupnote">
         <b>Production health is off.</b> Set <code>N8N_API_URL</code>{" "}
-        (e.g. <code>https://fermafabiz.app.n8n.cloud/api/v1</code>) and{" "}
+        (e.g. <code>https://your-n8n-host/api/v1</code>) and{" "}
         <code>N8N_API_KEY</code> (n8n → Settings → n8n API) to see running
         executions, errors and the Stop button here.
       </div>

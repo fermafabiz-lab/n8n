@@ -2,7 +2,7 @@
 // running/failed executions and lets the team stop a runaway workflow.
 //
 // Env (Vercel → Settings → Environment Variables):
-//   N8N_API_URL  e.g. https://fermafabiz.app.n8n.cloud/api/v1
+//   N8N_API_URL  e.g. https://your-n8n-host/api/v1  (cloud or self-hosted)
 //   N8N_API_KEY  n8n → Settings → n8n API → Create API key
 
 const BASE = process.env.N8N_API_URL;

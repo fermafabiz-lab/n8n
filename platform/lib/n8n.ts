@@ -11,11 +11,15 @@ const KEY = process.env.N8N_API_KEY;
 export const n8nConfigured = Boolean(BASE && KEY);
 
 // Workflow ids → human names, so the panel doesn't show raw ids.
+//
+// These are the SELF-HOSTED ids. The move off n8n Cloud did not preserve the
+// originals, and every id below is matched against live execution records —
+// a stale one matches nothing at all, silently.
 const WORKFLOW_NAMES: Record<string, string> = {
-  a9eyVteQcP1ZxtZH: "Master Orchestrator",
-  auz2GejSQAhvLkCA: "Scripting",
-  u5eVcB6VOGNdTMom: "Media Generation",
-  y8ZPxgUFOxdRpva8: "Final Assembly",
+  "8CienBFfG6SgbB1A": "Master Orchestrator",
+  gkEtGMecv4TC3ZHp: "Scripting",
+  yHG4DBCDjR3RJzav: "Media Generation",
+  BY22Vlhh20Xdkr5Z: "Final Assembly",
 };
 
 export interface ExecutionSummary {
@@ -101,7 +105,7 @@ export async function getExecutionError(id: string): Promise<ExecutionError | nu
   return { node: rd.error?.node?.name ?? rd.lastNodeExecuted ?? null, message: msg };
 }
 
-export const FINAL_ASSEMBLY_WORKFLOW_ID = "y8ZPxgUFOxdRpva8";
+export const FINAL_ASSEMBLY_WORKFLOW_ID = "BY22Vlhh20Xdkr5Z";
 
 /**
  * Executions doing actual production work right now.
@@ -116,9 +120,9 @@ export const FINAL_ASSEMBLY_WORKFLOW_ID = "y8ZPxgUFOxdRpva8";
  * (not the orchestrator) and only when the wake-up is genuinely near.
  */
 const WORKER_WORKFLOWS = new Set([
-  "u5eVcB6VOGNdTMom", // Media Generation
-  "y8ZPxgUFOxdRpva8", // Final Assembly
-  "auz2GejSQAhvLkCA", // Scripting
+  "yHG4DBCDjR3RJzav", // Media Generation
+  "BY22Vlhh20Xdkr5Z", // Final Assembly
+  "gkEtGMecv4TC3ZHp", // Scripting
 ]);
 
 export async function getAliveProduction(): Promise<ExecutionSummary[]> {

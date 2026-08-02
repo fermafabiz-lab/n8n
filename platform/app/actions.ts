@@ -640,6 +640,19 @@ export async function resumeProject(projectId: string): Promise<ActionResult> {
     return { ok: false, message: "N8N_RESUME_WEBHOOK_URL is not configured." };
   }
   try {
+    // A waiting execution (paused in a Wait node) IS alive — resuming on top
+    // of one starts a duplicate batch: double Flow spend and racing statuses.
+    const alive = [
+      ...(await getExecutions("running", 10).catch(() => [])),
+      ...(await getExecutions("waiting", 10).catch(() => [])),
+    ].filter((e) => e.workflowName === "Media Generation" || e.workflowName === "Master Orchestrator");
+    if (alive.length > 0) {
+      return {
+        ok: false,
+        message:
+          "Production is already running (an execution is active in n8n) — nothing was restarted. The page refreshes itself; if it looks stuck for more than a few minutes, use Pause first, then Resume.",
+      };
+    }
     const res = await fetch(webhook, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

@@ -271,7 +271,7 @@ function toScene(r: AirtableRecord, index: number): Scene {
   // already-approved image can sit under "Awaiting Image Approval" for
   // minutes. The checkbox is the truth; show that instead of stale text.
   const status =
-    imageApproved && /aprobare imagine/.test(normalizeStatus(rawStatus))
+    imageApproved && /(aprobare|generare) imagine/.test(normalizeStatus(rawStatus))
       ? "In Asteptare"
       : rawStatus;
   const { kind } = classifyStatus(status);

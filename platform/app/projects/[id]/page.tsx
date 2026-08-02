@@ -118,7 +118,13 @@ export default async function ProductionRoom({
   let hasRunning = false;
   if (n8nConfigured) {
     try {
-      hasRunning = (await getExecutions("running", 5)).length > 0;
+      // Waiting (paused in a Wait node) counts as running: the execution is
+      // alive and resuming on top of it would start a duplicate batch.
+      const [running, waiting] = await Promise.all([
+        getExecutions("running", 5),
+        getExecutions("waiting", 5),
+      ]);
+      hasRunning = running.length > 0 || waiting.length > 0;
     } catch {
       // n8n API unreachable — fall back to showing Resume.
     }

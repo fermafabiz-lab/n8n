@@ -3,7 +3,7 @@ import Link from "next/link";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Video Factory",
+  title: "House of Videos",
   description: "AI video production, supervised by you.",
 };
 
@@ -16,7 +16,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <nav className="nav">
           <div className="in">
             <Link href="/" className="brand">
-              <span className="mk">▶</span>Video Factory
+              <span className="mk">▶</span>House of Videos
             </Link>
             <Link href="/" className="navlink on">
               Projects

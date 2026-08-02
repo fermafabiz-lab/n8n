@@ -13,7 +13,7 @@ export default function Login() {
     <main className="page">
       <div className="login">
         <form className="card" action={formAction}>
-          <h1>Video Factory</h1>
+          <h1>House of Videos</h1>
           <p>Enter the team password to continue.</p>
           <div className="field">
             <input

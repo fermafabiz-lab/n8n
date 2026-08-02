@@ -1,4 +1,4 @@
-# Video Factory — web platform
+# House of Videos — web platform
 
 The web interface for the AI video automation pipeline. Airtable + n8n stay
 as the invisible backend; this app is where daily work happens.

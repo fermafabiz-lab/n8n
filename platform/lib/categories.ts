@@ -37,7 +37,7 @@ export const CATEGORIES: Category[] = [
     label: "Story",
     icon: "📖",
     description:
-      "A narrated fictional story — hook, chapters, cinematic scenes. This is the classic Video Factory pipeline.",
+      "A narrated fictional story — hook, chapters, cinematic scenes. This is the classic House of Videos pipeline.",
     ready: true,
     options: [
       {

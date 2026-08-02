@@ -1,4 +1,4 @@
-import { executionUrl, getExecutionError, getExecutions, n8nConfigured } from "@/lib/n8n";
+import { executionUrl, getExecutionError, getExecutions, n8nConfigured, getAliveProduction } from "@/lib/n8n";
 import { stopExecutionAction } from "@/app/actions";
 
 function ago(iso: string | null): string {
@@ -41,15 +41,11 @@ export default async function OpsPanel({
     // "waiting" = alive but paused in a Wait node (polling loops live there
     // most of the time). Hiding those made the panel claim nothing was
     // running while the Pause button correctly said otherwise.
-    const [runningNow, waitingNow, failedNow] = await Promise.all([
-      errorsOnly ? Promise.resolve([]) : getExecutions("running", 10),
-      errorsOnly ? Promise.resolve([]) : getExecutions("waiting", 10),
+    const [aliveNow, failedNow] = await Promise.all([
+      errorsOnly ? Promise.resolve([]) : getAliveProduction(),
       getExecutions("error", 5),
     ]);
-    running = [
-      ...runningNow,
-      ...waitingNow.map((w) => ({ ...w, status: "waiting" })),
-    ];
+    running = aliveNow;
     failed = failedNow;
   } catch (e) {
     apiError = String((e as Error).message ?? e);

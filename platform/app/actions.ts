@@ -17,7 +17,7 @@ import {
   deleteProjectDeep,
   updateEditingOptions,
 } from "@/lib/data";
-import { getExecutions, stopExecution } from "@/lib/n8n";
+import { getAliveProduction, getExecutions, stopExecution } from "@/lib/n8n";
 
 export interface ActionResult {
   ok: boolean;
@@ -640,12 +640,9 @@ export async function resumeProject(projectId: string): Promise<ActionResult> {
     return { ok: false, message: "N8N_RESUME_WEBHOOK_URL is not configured." };
   }
   try {
-    // A waiting execution (paused in a Wait node) IS alive — resuming on top
-    // of one starts a duplicate batch: double Flow spend and racing statuses.
-    const alive = [
-      ...(await getExecutions("running", 10).catch(() => [])),
-      ...(await getExecutions("waiting", 10).catch(() => [])),
-    ].filter((e) => e.workflowName === "Media Generation" || e.workflowName === "Master Orchestrator");
+    // A live execution means resuming would start a duplicate batch —
+    // zombie-filtered, so ancient stuck "waiting" parents don't block us.
+    const alive = await getAliveProduction().catch(() => []);
     if (alive.length > 0) {
       return {
         ok: false,

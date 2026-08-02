@@ -26,6 +26,7 @@ export interface ExecutionSummary {
   startedAt: string | null;
   stoppedAt: string | null;
   errorMessage: string | null;
+  waitTill: string | null;
 }
 
 interface RawExecution {
@@ -35,6 +36,7 @@ interface RawExecution {
   startedAt?: string;
   stoppedAt?: string;
   finished?: boolean;
+  waitTill?: string | null;
 }
 
 async function api(path: string, init?: RequestInit): Promise<Response> {
@@ -58,6 +60,7 @@ function toSummary(r: RawExecution): ExecutionSummary {
     startedAt: r.startedAt ?? null,
     stoppedAt: r.stoppedAt ?? null,
     errorMessage: null,
+    waitTill: r.waitTill ?? null,
   };
 }
 
@@ -99,6 +102,42 @@ export async function getExecutionError(id: string): Promise<ExecutionError | nu
 }
 
 export const FINAL_ASSEMBLY_WORKFLOW_ID = "y8ZPxgUFOxdRpva8";
+
+/**
+ * Executions doing actual production work right now.
+ *
+ * Two traps hide in n8n's execution list:
+ * - Work paused in a Wait node reports as "waiting", not "running" — but it
+ *   IS alive (polling loops live there most of the time).
+ * - The instance accumulates ZOMBIES: orchestrator parents stuck "waiting"
+ *   with waitTill in the year 3000 for sub-workflows that died months ago.
+ *   Counting those as alive makes Pause/Resume permanently wrong.
+ * So: running always counts; waiting counts only for the worker workflows
+ * (not the orchestrator) and only when the wake-up is genuinely near.
+ */
+const WORKER_WORKFLOWS = new Set([
+  "u5eVcB6VOGNdTMom", // Media Generation
+  "y8ZPxgUFOxdRpva8", // Final Assembly
+  "auz2GejSQAhvLkCA", // Scripting
+]);
+
+export async function getAliveProduction(): Promise<ExecutionSummary[]> {
+  if (!n8nConfigured) return [];
+  const [running, waiting] = await Promise.all([
+    getExecutions("running", 20),
+    getExecutions("waiting", 20),
+  ]);
+  const soon = Date.now() + 2 * 3600 * 1000;
+  return [
+    ...running.filter((e) => WORKER_WORKFLOWS.has(e.workflowId)),
+    ...waiting.filter(
+      (e) =>
+        WORKER_WORKFLOWS.has(e.workflowId) &&
+        e.waitTill !== null &&
+        new Date(e.waitTill).getTime() < soon,
+    ),
+  ];
+}
 
 export interface AssemblyState {
   /** The render happening right now, if any. */

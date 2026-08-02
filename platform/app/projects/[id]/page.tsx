@@ -17,8 +17,8 @@ import OpsPanel from "@/components/OpsPanel";
 import AssemblyStatus from "@/components/AssemblyStatus";
 import {
   executionUrl,
+  getAliveProduction,
   getAssemblyState,
-  getExecutions,
   n8nConfigured,
   FINAL_ASSEMBLY_WORKFLOW_ID,
 } from "@/lib/n8n";
@@ -118,13 +118,8 @@ export default async function ProductionRoom({
   let hasRunning = false;
   if (n8nConfigured) {
     try {
-      // Waiting (paused in a Wait node) counts as running: the execution is
-      // alive and resuming on top of it would start a duplicate batch.
-      const [running, waiting] = await Promise.all([
-        getExecutions("running", 5),
-        getExecutions("waiting", 5),
-      ]);
-      hasRunning = running.length > 0 || waiting.length > 0;
+      // Alive = really working (zombie-filtered) — see getAliveProduction.
+      hasRunning = (await getAliveProduction()).length > 0;
     } catch {
       // n8n API unreachable — fall back to showing Resume.
     }

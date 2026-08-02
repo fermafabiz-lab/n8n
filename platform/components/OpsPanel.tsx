@@ -38,10 +38,19 @@ export default async function OpsPanel({
   let failed: Awaited<ReturnType<typeof getExecutions>> = [];
   let apiError: string | null = null;
   try {
-    [running, failed] = await Promise.all([
+    // "waiting" = alive but paused in a Wait node (polling loops live there
+    // most of the time). Hiding those made the panel claim nothing was
+    // running while the Pause button correctly said otherwise.
+    const [runningNow, waitingNow, failedNow] = await Promise.all([
       errorsOnly ? Promise.resolve([]) : getExecutions("running", 10),
+      errorsOnly ? Promise.resolve([]) : getExecutions("waiting", 10),
       getExecutions("error", 5),
     ]);
+    running = [
+      ...runningNow,
+      ...waitingNow.map((w) => ({ ...w, status: "waiting" })),
+    ];
+    failed = failedNow;
   } catch (e) {
     apiError = String((e as Error).message ?? e);
   }
@@ -80,7 +89,9 @@ export default async function OpsPanel({
                 {ago(r.startedAt)}
               </span>
               <span style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                <span className="chip run">running</span>
+                <span className="chip run">
+                  {r.status === "waiting" ? "working (in a wait step)" : "running"}
+                </span>
                 <form action={stopExecutionAction}>
                   <input type="hidden" name="executionId" value={r.id} />
                   <button

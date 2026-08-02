@@ -20,11 +20,24 @@ const RAILWAY = process.env.RENDER_SERVER_URL || 'https://n8n-production-55dd.up
 
 // The pipeline references these by id from inside Execute Workflow nodes, so
 // an id that changed during import silently breaks the orchestration.
+//
+// These are the SELF-HOSTED ids. The import off n8n Cloud did not preserve the
+// originals, so every id here was re-read from the instance after the move.
 const EXPECTED_WORKFLOWS = {
-	a9eyVteQcP1ZxtZH: {name: '1. Master Orchestrator', mustBeActive: true},
-	auz2GejSQAhvLkCA: {name: 'Claude Scripting', mustBeActive: true},
-	u5eVcB6VOGNdTMom: {name: '3. Media Generation (Batch)', mustBeActive: true},
-	y8ZPxgUFOxdRpva8: {name: '4. Final Assembly', mustBeActive: true},
+	'8CienBFfG6SgbB1A': {name: '1. Master Orchestrator', mustBeActive: true},
+	gkEtGMecv4TC3ZHp: {name: 'Claude Scripting', mustBeActive: true},
+	yHG4DBCDjR3RJzav: {name: '3. Media Generation (Batch)', mustBeActive: true},
+	BY22Vlhh20Xdkr5Z: {name: '4. Final Assembly', mustBeActive: true},
+};
+
+// Dead n8n Cloud ids. Nothing may reference these any more — an Execute
+// Workflow node still pointing at one starts the orchestrator and then calls
+// into nothing, which fails silently.
+const DEAD_CLOUD_IDS = {
+	a9eyVteQcP1ZxtZH: '1. Master Orchestrator',
+	auz2GejSQAhvLkCA: 'Claude Scripting',
+	u5eVcB6VOGNdTMom: '3. Media Generation (Batch)',
+	y8ZPxgUFOxdRpva8: '4. Final Assembly',
 };
 
 // Every webhook the website calls. The site derives all of them from
@@ -101,10 +114,12 @@ async function main() {
 	// 3. Webhooks registered, and registered under the PUBLIC url.
 	const host = BASE.replace(/\/api\/v1$/, '');
 	const allNodes = [];
+	const fullById = new Map();
 	for (const id of Object.keys(EXPECTED_WORKFLOWS)) {
 		if (!byId.has(id)) continue;
 		try {
 			const full = await api(`/workflows/${id}`);
+			fullById.set(id, full);
 			allNodes.push(...(full.nodes ?? []));
 		} catch {
 			warnings.push(`Could not read nodes of workflow ${id}.`);
@@ -120,7 +135,32 @@ async function main() {
 		else problems.push(`Webhook /${p} is missing — the site calls ${host}/webhook/${p}.`);
 	}
 
-	// 4. Credentials — the one thing an import can never bring along.
+	// 4. Execute Workflow nodes actually point at ids that exist here. This is
+	// the failure the import causes and the one that hides best: the parent
+	// starts, calls into a dead cloud id, and nothing downstream ever runs.
+	for (const [id, full] of fullById) {
+		for (const n of full.nodes ?? []) {
+			if (n.type !== 'n8n-nodes-base.executeWorkflow' || n.disabled) continue;
+			const target = n.parameters?.workflowId?.value ?? n.parameters?.workflowId;
+			const where = `"${EXPECTED_WORKFLOWS[id].name}" → node "${n.name}"`;
+			if (typeof target !== 'string' || !target) {
+				warnings.push(`${where} has no static workflow id (expression?) — check it by hand.`);
+			} else if (DEAD_CLOUD_IDS[target]) {
+				problems.push(
+					`${where} still points at the DEAD n8n Cloud id ${target} ` +
+						`(${DEAD_CLOUD_IDS[target]}). It will call into nothing — repoint it.`,
+				);
+			} else if (!byId.has(target)) {
+				problems.push(`${where} points at ${target}, which does not exist on this instance.`);
+			} else {
+				ok.push(`${where} → "${byId.get(target).name}".`);
+			}
+		}
+	}
+
+	// 5. Credentials — the one thing an import can never bring along. The API
+	// redacts per-node credential bindings, so this only proves the credentials
+	// exist; that each node is wired to one still has to be trusted or eyeballed.
 	try {
 		const creds = (await api('/credentials?limit=200')).data ?? [];
 		const haveTypes = new Set(creds.map((c) => c.type));
@@ -133,7 +173,7 @@ async function main() {
 		warnings.push('Could not list credentials over the API — check them by hand in the UI.');
 	}
 
-	// 5. The render server the workflows call.
+	// 6. The render server the workflows call.
 	try {
 		const res = await fetch(`${RAILWAY}/health`, {signal: AbortSignal.timeout(10000)});
 		if (res.ok) ok.push('Render server (Railway) healthy.');

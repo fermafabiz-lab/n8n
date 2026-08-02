@@ -30,7 +30,7 @@ during an import silently breaks orchestration.
 | Name | id on n8n Cloud (dead) | id on self-hosted |
 |---|---|---|
 | 1. Master Orchestrator | `a9eyVteQcP1ZxtZH` | `8CienBFfG6SgbB1A` |
-| Claude Scripting | `auz2GejSQAhvLkCA` | *imported later — re-read it* |
+| Claude Scripting | `auz2GejSQAhvLkCA` | `gkEtGMecv4TC3ZHp` |
 | 3. Media Generation (Batch) | `u5eVcB6VOGNdTMom` | `yHG4DBCDjR3RJzav` |
 | 4. Final Assembly | `y8ZPxgUFOxdRpva8` | `BY22Vlhh20Xdkr5Z` |
 
@@ -39,13 +39,28 @@ during an import silently breaks orchestration.
 fails silently: the orchestrator starts, then calls into nothing. The cloud
 column is kept only so a stale reference is recognisable on sight.
 
+All five `Execute Workflow` nodes in the Master Orchestrator now point at the
+self-hosted column and are published. Note the **resume path is a second set
+of references** — `Execute Media Generation (Resume)` and `Execute Final
+Assembly (Resume)`, fed by the `resume-project` webhook. Fixing only the three
+on the happy path leaves Pause/Resume broken while new projects look fine.
+
+There is also an inactive legacy `2. Scripting Sub-Workflow`
+(`5YWpycnnL6OaDWIx`) — superseded by Claude Scripting, referenced by nothing.
+Leave it alone or archive it; do not repoint anything at it.
+
 Webhooks the site calls: `new-project`, `resume-project`, `scene-text-regen`,
 `scene-image-regen`, `scene-voice-regen`, `assemble`. The site derives all of
 them from `N8N_NEW_PROJECT_WEBHOOK_URL`, so they must live on the same host.
 
 Run `node scripts/check-n8n.mjs` (needs `N8N_API_URL` + `N8N_API_KEY`) to
-verify all of the above in one shot — ids, active state, webhooks,
-credentials, Railway health.
+verify all of the above in one shot — ids, active state, webhooks, every
+`Execute Workflow` target, credentials, Railway health.
+
+**It has to be run from a machine that can reach `wf7.house-of-videos.com`.**
+Claude Code web sessions egress through a proxy that answers 403 to that host,
+so the script cannot run there — the n8n MCP connector still works, and is the
+way to check things from inside such a session.
 
 ## Hard-won lessons — read before debugging
 
@@ -74,7 +89,21 @@ These each cost hours. Do not rediscover them.
   vars, the Google OAuth redirect URI, the MCP connector — needs the `wf7.`
   prefix, and fails in a way that looks unrelated when it's missing.
 - **Credentials never survive an export/import** (encrypted per-instance).
-  They must be recreated and re-attached to nodes by hand.
+  They must be recreated and re-attached to nodes by hand. Four exist on the
+  self-hosted instance and every node that needs one has been re-bound:
+  Airtable PAT `TPSvrVbCvTyOfNpL`, OpenAI `oPGuXelJ6pnDePIs`, Google Drive
+  `dv4yT9vojdPQoO17`, FAL (`httpHeaderAuth`) `0gWTGtLd2dJKO4Yc`.
+- **The API redacts per-node credential bindings.** Neither the REST API nor
+  the MCP connector returns a node's `credentials` object — every node reads
+  back as if it had none. So you cannot *verify* a binding by reading it; you
+  can only set it (setting is idempotent) or open the node in the UI. Do not
+  conclude from an empty read that credentials are missing.
+- **ai33 / useapi / Railway keys are hardcoded into node headers**, not
+  credentials — `Submit Render`, `Check Render`, `Submit Mux*`, `Poll Mux*`,
+  `Upload*To Flow`, `Submit Video*`, `AB Submit Multi`, `VR Submit Multi` and
+  friends carry a literal `x-api-key` / `Authorization`. They work, but they
+  live in the workflow JSON, so a rotation means editing nodes and any export
+  leaks them.
 
 ### Content filters — deterministic, never blindly retry
 

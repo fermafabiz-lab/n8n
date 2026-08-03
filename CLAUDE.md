@@ -162,6 +162,30 @@ This interacted viciously with the zeroing bug above: processed scenes lost
 their order to `0`, so the one *un*processed scene held the only non-zero
 order, sorted last, and fell off the end forever.
 
+### Multi-voice
+
+`chapters` mode needs **no tags in the script** — `AB Pick Voice` derives the
+chapter arithmetically from `Ordine Scenă` (`chapter*100 + scene`), so the
+model never has to know a cast exists. It was dead until the zeroing bug
+above was fixed: with the order wiped to `0` every scene read as chapter 0
+and quietly used the default narrator.
+
+But chapter count is `ceil(Lenght / 120)`, so **anything under two minutes is
+one chapter** and a per-chapter rule could only ever reach the first voice.
+When there are fewer chapters than voices the voices now rotate per scene, so
+every voice the producer picked is heard; with enough chapters the original
+per-chapter behaviour is untouched. The count is read from the project's
+linked `Capitole`, never counted inside the loop — `Sort & Cap` hands it at
+most 8 scenes, so a locally-counted total would differ per batch and a
+chapter could change narrator halfway. `AB Pick Voice` and `VR Pick Voice`
+hold the same rule and must be edited together, or a regenerated scene gets a
+different voice from the one the batch gave it.
+
+`characters` mode is a different story: it splits on `[NARRATOR]` and
+`[CHARACTER: Name]` markers in `Script Scenă`, and **nothing in Scripting
+ever asks the model to emit them**. Until the segmentation prompt does, that
+mode always collapses to the single narrator.
+
 ### The stage chain in Media Generation
 
 The three stages are gated the same way — a loop, then a Wait/Fetch/Evaluate/If

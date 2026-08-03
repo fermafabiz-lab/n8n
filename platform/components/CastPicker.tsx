@@ -44,7 +44,7 @@ export default function CastPicker({
       />
       <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--dim)" }}>
         {mode === "chapters"
-          ? "Chapter 1 is read by narrator #1, chapter 2 by narrator #2 and so on (looping if there are more chapters than voices). The opening hook is read by narrator #1 — there is no separate narrator voice in this mode."
+          ? "Chapter 1 is read by narrator #1, chapter 2 by narrator #2 and so on (looping if there are more chapters than voices). A short video is a single chapter, so when there are fewer chapters than voices they take turns scene by scene instead — every voice you pick is always used. The opening hook is read by narrator #1; there is no separate narrator voice in this mode."
           : hasNarrator
             ? "These are the voices characters speak with, alongside the narrator you chose above. The story's characters aren't written yet, so each one gets assigned a voice from this pool once the script exists — you can reassign any of them in the audio panel before anything is rendered."
             : "No narrator in this story — everything is spoken by the characters, each with a voice from this pool (assigned once the script exists, changeable in the audio panel)."}

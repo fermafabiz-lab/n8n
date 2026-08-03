@@ -19,13 +19,14 @@ export const HookTitle: React.FC<{
 	const {fps, width} = useVideoConfig();
 	const t = frame / fps;
 
-	// Everything below was tuned against the 1920-wide landscape canvas. On a
-	// 1080-wide vertical canvas the same pixel sizes are 1.8x larger relative
-	// to the frame, which is why long titles ran off the sides and clipped
-	// words. Scale every length by the canvas so the title occupies the same
-	// fraction of the frame in both orientations; at 1920 the scale is 1 and
-	// nothing about the landscape render changes.
-	const scale = width / 1920;
+	// Every length here was tuned against the landscape canvas, which
+	// calculateMetadata sizes at 1280x720; the vertical one is 720x1280. The
+	// same pixel sizes are therefore 1.78x larger relative to a vertical
+	// frame, which is why long titles ran off the sides and clipped words.
+	// Scale by the canvas so the title takes the same fraction of frame in
+	// both orientations — at 1280 the scale is exactly 1, so the landscape
+	// render is unchanged.
+	const scale = width / 1280;
 	const px = (n: number) => n * scale;
 
 	// Words are unbreakable inline-blocks so the line can only wrap BETWEEN
@@ -81,10 +82,6 @@ export const HookTitle: React.FC<{
 						color: '#FFFFFF',
 						lineHeight: 1.2,
 						margin: 0,
-						// Last-resort guard: a single word longer than the line box
-						// would otherwise overflow the frame rather than wrap, since
-						// each word is an unbreakable inline-block above.
-						overflowWrap: 'anywhere',
 						letterSpacing: preset.uppercaseTitle ? px(2) : px(0.5),
 						textTransform: preset.uppercaseTitle ? 'uppercase' : 'none',
 						textShadow: `0 ${px(4)}px ${px(24)}px rgba(0,0,0,0.85)`,
@@ -92,7 +89,21 @@ export const HookTitle: React.FC<{
 				>
 					{words.map((word, wi) => (
 						<React.Fragment key={wi}>
-							<span style={{display: 'inline-block', whiteSpace: 'pre'}}>
+							<span
+								style={{
+									display: 'inline-block',
+									// 'pre' here made a word unbreakable, so one longer than
+									// the line box ran off the frame and got cut instead of
+									// wrapping — the whole point of the inline-block is to
+									// stop breaks BETWEEN characters, not to forbid them when
+									// there is no other way to fit. pre-wrap keeps that
+									// behaviour (a word holds no spaces to collapse anyway)
+									// while letting 'anywhere' break as a last resort.
+									whiteSpace: 'pre-wrap',
+									overflowWrap: 'anywhere',
+									maxWidth: '100%',
+								}}
+							>
 								{Array.from(word).map((ch, ci) => {
 									const start = (wordStarts[wi] + ci) * perChar;
 									const p = interpolate(t, [start, start + 0.22], [0, 1], {

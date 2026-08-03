@@ -27,9 +27,9 @@ export const ImpactCard: React.FC<{
 	const frame = useCurrentFrame();
 	const {fps, width} = useVideoConfig();
 	// Same canvas-relative scaling as HookTitle: these sizes were tuned on
-	// the 1920-wide landscape canvas, and are 1.8x too large relative to a
-	// 1080-wide vertical frame. At 1920 the scale is 1 and nothing changes.
-	const px = (n: number) => n * (width / 1920);
+	// the 1280-wide landscape canvas and are 1.78x too large relative to the
+	// 720-wide vertical one. At 1280 the scale is 1 and nothing changes.
+	const px = (n: number) => n * (width / 1280);
 
 	const t = frame / fps;
 

@@ -181,10 +181,20 @@ chapter could change narrator halfway. `AB Pick Voice` and `VR Pick Voice`
 hold the same rule and must be edited together, or a regenerated scene gets a
 different voice from the one the batch gave it.
 
-`characters` mode is a different story: it splits on `[NARRATOR]` and
-`[CHARACTER: Name]` markers in `Script Scenă`, and **nothing in Scripting
-ever asks the model to emit them**. Until the segmentation prompt does, that
-mode always collapses to the single narrator.
+`characters` mode splits on `[NARRATOR]` and `[CHARACTER: Name]` markers in
+`Script Scenă`, and Scripting **does** ask for them — the chain is
+`Receive Project Data → Fetch Project Record → Voice Mode`, where `Voice Mode`
+reads `Editing Options` and emits `narrationRules` + `segmentRules`, which
+`Write Chapter Narration` and `Segment Chapter Into Scenes` interpolate. Both
+TTS paths already strip `[...]` before synthesis, so a tag is never spoken.
+It was blocked only by `/tts-multi` missing on Railway; that endpoint now
+exists. Untested end to end.
+
+Do not conclude a prompt lacks an instruction because grep does not find the
+literal text in it — the writing prompts are assembled from expressions
+(`{{ $('Voice Mode').first().json.segmentRules }}`), so the words live in a
+different node. Follow the expression, not the string. This exact mistake
+produced a confident and completely wrong "the feature was never built".
 
 ### The stage chain in Media Generation
 
@@ -246,11 +256,18 @@ expected and harmless for an app touching only its own Drive.
 
 ## Open work
 
-- Merge `claude/hello-7o90qh` to the production branch so the House of Videos
-  rename and all fixes actually deploy.
-- Redeploy Railway so `/tts-multi` exists — Characters multi-voice synthesis is
-  dead without it.
+- Test `characters` multi-voice end to end. Everything it needs is in place —
+  the prompts ask for the tags, both TTS paths strip them, `/tts-multi` is
+  live — but no project has ever run in that mode.
+- Test `chapters` multi-voice on a project with 2+ chapters (over 120s), which
+  is the branch the per-scene rotation does *not* cover.
 - Codify the "no visible faces" rule into Documentary image prompts.
+- `Generate Scene Image` has no `onError`, so one content refusal from fal
+  kills the whole batch. The auto-rewrite chain already exists for Google Flow
+  rejections (`Prep Flow Reject → Rewrite Prompt AI → Apply Rewritten Prompt`);
+  wire fal's 422 into it.
+- The ambience level in `assemble.mjs` (`nativeVolume`, 0.22) and its
+  sidechain settings were never heard on a real montage — tune by ear once.
 - Optional: `channelName: 'Video Factory'` → `'House of Videos'` in
   `remotion/src/types.ts` and the n8n "Build Remotion Props" node (affects
   rendered end screens).

@@ -418,6 +418,24 @@ a {
   font-weight: 550;
   white-space: nowrap;
 }
+/* The steps are links now — each one goes back to its own stage. */
+.ps {
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.ps:hover {
+  border-color: var(--line2);
+  transform: translateY(-1px);
+}
+/* Currently being revisited: reads as "you are looking at this one", which
+   is deliberately distinct from .act ("the pipeline is here"). */
+.ps.sel {
+  border-color: rgba(120, 170, 255, 0.55);
+  box-shadow: 0 0 0 3px rgba(120, 170, 255, 0.1);
+  color: var(--text);
+}
 .ps .ic {
   width: 22px;
   height: 22px;

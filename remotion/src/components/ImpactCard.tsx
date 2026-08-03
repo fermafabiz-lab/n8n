@@ -25,7 +25,12 @@ export const ImpactCard: React.FC<{
 	preset: StylePreset;
 }> = ({chapter, keyLine, preset}) => {
 	const frame = useCurrentFrame();
-	const {fps} = useVideoConfig();
+	const {fps, width} = useVideoConfig();
+	// Same canvas-relative scaling as HookTitle: these sizes were tuned on
+	// the 1920-wide landscape canvas, and are 1.8x too large relative to a
+	// 1080-wide vertical frame. At 1920 the scale is 1 and nothing changes.
+	const px = (n: number) => n * (width / 1920);
+
 	const t = frame / fps;
 
 	const hold = 2.2;
@@ -67,11 +72,11 @@ export const ImpactCard: React.FC<{
 						style={{
 							fontFamily: preset.captionFont,
 							fontWeight: 600,
-							fontSize: 17,
-							letterSpacing: 5,
+							fontSize: px(17),
+							letterSpacing: px(5),
 							textTransform: 'uppercase',
 							color: preset.cardInk,
-							marginBottom: 18,
+							marginBottom: px(18),
 						}}
 					>
 						Chapter {ROMAN[chapter] ?? chapter}
@@ -80,7 +85,7 @@ export const ImpactCard: React.FC<{
 						style={{
 							fontFamily: preset.displayFont,
 							fontWeight: preset.displayWeight,
-							fontSize: 52,
+							fontSize: px(52),
 							lineHeight: 1.25,
 							color: preset.cardBg === '#F6EFE3' || preset.cardBg === '#F4F1EA' ? '#221D14' : '#F5F2EA',
 						}}

@@ -62,6 +62,27 @@ async function probeDuration(file, stream) {
 	return n;
 }
 
+/**
+ * Does this file carry an audio stream at all? Veo clips do, but a clip that
+ * came back through a re-mux or a still-image fallback may not — and concat
+ * needs every segment to expose the same streams, so a missing one has to be
+ * substituted with silence rather than discovered mid-render.
+ */
+async function hasAudioStream(file) {
+	try {
+		const {stdout} = await run('ffprobe', [
+			'-v', 'error',
+			'-select_streams', 'a:0',
+			'-show_entries', 'stream=codec_type',
+			'-of', 'csv=p=0',
+			file,
+		]);
+		return String(stdout).trim().startsWith('audio');
+	} catch {
+		return false;
+	}
+}
+
 // Synthesize the SFX bank once. Pure ffmpeg — no downloaded assets.
 let sfxReady = null;
 function ensureSfx() {
@@ -98,6 +119,18 @@ export function registerAssemble(app, {jobs, outputDir}) {
 		const sceneChapters = (req.body && req.body.sceneChapters) || [];
 		// "16:9" (default) or "9:16" — decides the output canvas.
 		const portrait = (req.body && req.body.aspect) === '9:16';
+		// The clips arrive from Veo with their own ambience on board. It used
+		// to be dropped on the floor: the per-scene audio chain only ever read
+		// the voiceover input, so the montage carried narration and nothing
+		// else. Mixed back in under the narration by default; pass
+		// nativeAudio: false (or 0) to go back to voice-only.
+		const rawNative = req.body ? req.body.nativeAudio : undefined;
+		const nativeVolume =
+			rawNative === false || rawNative === 0
+				? 0
+				: typeof rawNative === 'number' && rawNative > 0
+					? Math.min(1, rawNative)
+					: 0.22;
 		const W = portrait ? 720 : 1280;
 		const H = portrait ? 1280 : 720;
 		if (!Array.isArray(scenes) || scenes.length === 0) {
@@ -157,7 +190,13 @@ export function registerAssemble(app, {jobs, outputDir}) {
 							stretch = STRETCH_MIN;
 						}
 					}
-					items.push({v, a, dur, voiceDur, eff, stretch, freeze});
+					// Only worth carrying the clip's own track when there is a
+					// separate narration to sit under: with no voiceover the clip
+					// audio is already the scene's main track (see the `it.a ?? it.v`
+					// fallback below), and mixing it twice would just double it.
+					const nativeAudio =
+						nativeVolume > 0 && a !== null && (await hasAudioStream(v));
+					items.push({v, a, dur, voiceDur, eff, stretch, freeze, nativeAudio});
 					const job = jobs.get(jobId);
 					if (job) job.progress = 0.35 * ((i + 1) / scenes.length);
 				}
@@ -194,8 +233,13 @@ export function registerAssemble(app, {jobs, outputDir}) {
 				const boomIdx = idx++;
 				const whooshIdx = idx++;
 				const riserIdx = idx++;
+				// concat wants the same stream count from every segment, so scenes
+				// without usable clip audio borrow silence from here.
+				const nativeOn = items.some((it) => it.nativeAudio);
+				const silenceIdx = nativeOn ? idx++ : -1;
 				if (music) args.push('-i', music);
 				args.push('-i', sfx.boom, '-i', sfx.whoosh, '-i', sfx.riser);
+				if (nativeOn) args.push('-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=mono');
 
 				const parts = [];
 				const labels = [];
@@ -214,14 +258,45 @@ export function registerAssemble(app, {jobs, outputDir}) {
 						`,trim=duration=${d},setpts=PTS-STARTPTS`;
 					parts.push(`[${i * 2}:v]${vchain}[v${i}]`);
 					parts.push(`[${i * 2 + 1}:a]${MONO},atrim=duration=${d},asetpts=PTS-STARTPTS,apad=whole_dur=${d}[a${i}]`);
-					labels.push(`[v${i}][a${i}]`);
+					if (nativeOn) {
+						// The clip's own ambience has to follow the same elastic retime
+						// as its picture or it drifts out of sync: setpts stretches the
+						// video by `stretch`, so the audio needs the reciprocal tempo.
+						// The clamp upstream keeps 1/stretch inside atempo's range.
+						if (it.nativeAudio) {
+							parts.push(
+								`[${i * 2}:a]${MONO},atrim=duration=${it.dur.toFixed(3)},asetpts=PTS-STARTPTS,` +
+									`atempo=${(1 / it.stretch).toFixed(5)},atrim=duration=${d},asetpts=PTS-STARTPTS,` +
+									`apad=whole_dur=${d}[n${i}]`,
+							);
+						} else {
+							parts.push(`[${silenceIdx}:a]${MONO},atrim=duration=${d},asetpts=PTS-STARTPTS[n${i}]`);
+						}
+					}
+					labels.push(nativeOn ? `[v${i}][a${i}][n${i}]` : `[v${i}][a${i}]`);
 				});
-				parts.push(`${labels.join('')}concat=n=${items.length}:v=1:a=1[outv][voiceraw]`);
+				parts.push(
+					nativeOn
+						? `${labels.join('')}concat=n=${items.length}:v=1:a=2[outv][voiceraw][natraw]`
+						: `${labels.join('')}concat=n=${items.length}:v=1:a=1[outv][voiceraw]`,
+				);
 
 				// Mix bus: narration first (defines length), then ducked music, then SFX.
 				const mixInputs = [];
-				parts.push(`[voiceraw]asplit=2[vmain][vside]`);
+				parts.push(`[voiceraw]asplit=3[vmain][vside][vsidenat]`);
 				mixInputs.push('[vmain]');
+				if (nativeOn) {
+					// Ambience sits under the narration the same way the music does:
+					// ducked by the voice so it never competes with a spoken line,
+					// but audible in the gaps between them.
+					parts.push(`[natraw]${MONO},volume=${nativeVolume}[natlvl]`);
+					parts.push(
+						`[natlvl][vsidenat]sidechaincompress=threshold=0.05:ratio=8:attack=10:release=350:makeup=1[natduck]`,
+					);
+					mixInputs.push('[natduck]');
+				} else {
+					parts.push(`[vsidenat]anullsink`);
+				}
 				if (music) {
 					const fadeStart = Math.max(0, totalDur - 2.5).toFixed(3);
 					parts.push(

@@ -16,8 +16,17 @@ export const HookTitle: React.FC<{
 	durationInSeconds: number;
 }> = ({title, palette, preset, durationInSeconds}) => {
 	const frame = useCurrentFrame();
-	const {fps} = useVideoConfig();
+	const {fps, width} = useVideoConfig();
 	const t = frame / fps;
+
+	// Everything below was tuned against the 1920-wide landscape canvas. On a
+	// 1080-wide vertical canvas the same pixel sizes are 1.8x larger relative
+	// to the frame, which is why long titles ran off the sides and clipped
+	// words. Scale every length by the canvas so the title occupies the same
+	// fraction of the frame in both orientations; at 1920 the scale is 1 and
+	// nothing about the landscape render changes.
+	const scale = width / 1920;
+	const px = (n: number) => n * scale;
 
 	// Words are unbreakable inline-blocks so the line can only wrap BETWEEN
 	// words — per-character inline-blocks allowed mid-word line breaks.
@@ -41,17 +50,17 @@ export const HookTitle: React.FC<{
 	if (blockOpacity <= 0) return null;
 
 	// Whole-block slow drift: rises ~14px over the full hold, barely felt.
-	const drift = interpolate(t, [0, durationInSeconds], [8, -6], {
+	const drift = interpolate(t, [0, durationInSeconds], [px(8), px(-6)], {
 		extrapolateLeft: 'clamp',
 		extrapolateRight: 'clamp',
 	});
-	const ruleWidth = interpolate(t, [typeDone * 0.6, typeDone + 0.5], [0, 200], {
+	const ruleWidth = interpolate(t, [typeDone * 0.6, typeDone + 0.5], [0, px(200)], {
 		extrapolateLeft: 'clamp',
 		extrapolateRight: 'clamp',
 	});
 
 	const len = title.length;
-	const fontSize = len <= 24 ? 72 : len <= 44 ? 58 : len <= 70 ? 46 : 38;
+	const fontSize = px(len <= 24 ? 72 : len <= 44 ? 58 : len <= 70 ? 46 : 38);
 
 	return (
 		<AbsoluteFill
@@ -72,9 +81,13 @@ export const HookTitle: React.FC<{
 						color: '#FFFFFF',
 						lineHeight: 1.2,
 						margin: 0,
-						letterSpacing: preset.uppercaseTitle ? 2 : 0.5,
+						// Last-resort guard: a single word longer than the line box
+						// would otherwise overflow the frame rather than wrap, since
+						// each word is an unbreakable inline-block above.
+						overflowWrap: 'anywhere',
+						letterSpacing: preset.uppercaseTitle ? px(2) : px(0.5),
 						textTransform: preset.uppercaseTitle ? 'uppercase' : 'none',
-						textShadow: '0 4px 24px rgba(0,0,0,0.85)',
+						textShadow: `0 ${px(4)}px ${px(24)}px rgba(0,0,0,0.85)`,
 					}}
 				>
 					{words.map((word, wi) => (
@@ -94,7 +107,7 @@ export const HookTitle: React.FC<{
 											style={{
 												display: 'inline-block',
 												opacity: e,
-												transform: `translateY(${(1 - e) * 14}px)`,
+												transform: `translateY(${(1 - e) * px(14)}px)`,
 											}}
 										>
 											{ch}
@@ -109,11 +122,11 @@ export const HookTitle: React.FC<{
 				<div
 					style={{
 						width: ruleWidth,
-						height: 3,
+						height: px(3),
 						background: palette.primary,
-						margin: '24px auto 0',
+						margin: `${px(24)}px auto 0`,
 						borderRadius: 2,
-						boxShadow: `0 0 18px ${palette.primary}`,
+						boxShadow: `0 0 ${px(18)}px ${palette.primary}`,
 					}}
 				/>
 			</div>

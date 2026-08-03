@@ -4,7 +4,12 @@ import type {Palette} from '../types';
 
 export const IntroCard: React.FC<{title: string; palette: Palette}> = ({title, palette}) => {
 	const frame = useCurrentFrame();
-	const {fps, durationInFrames} = useVideoConfig();
+	const {fps, durationInFrames, width} = useVideoConfig();
+	// Same canvas-relative scaling as HookTitle: these sizes were tuned on
+	// the 1920-wide landscape canvas, and are 1.8x too large relative to a
+	// 1080-wide vertical frame. At 1920 the scale is 1 and nothing changes.
+	const px = (n: number) => n * (width / 1920);
+
 
 	const scale = spring({frame, fps, config: {damping: 200, stiffness: 120}});
 	const opacity = interpolate(frame, [0, fps * 0.4], [0, 1], {extrapolateRight: 'clamp'});
@@ -29,15 +34,15 @@ export const IntroCard: React.FC<{title: string; palette: Palette}> = ({title, p
 				style={{
 					transform: `scale(${scale})`,
 					textAlign: 'center',
-					padding: '0 120px',
+					padding: `0 ${px(120)}px`,
 				}}
 			>
 				<div
 					style={{
-						width: 64,
-						height: 4,
+						width: px(64),
+						height: px(4),
 						background: palette.primary,
-						margin: '0 auto 32px',
+						margin: `0 auto ${px(32)}px`,
 						borderRadius: 2,
 					}}
 				/>
@@ -45,7 +50,7 @@ export const IntroCard: React.FC<{title: string; palette: Palette}> = ({title, p
 					style={{
 						fontFamily: 'Arial, sans-serif',
 						fontWeight: 800,
-						fontSize: 72,
+						fontSize: px(72),
 						color: palette.text,
 						lineHeight: 1.15,
 						margin: 0,

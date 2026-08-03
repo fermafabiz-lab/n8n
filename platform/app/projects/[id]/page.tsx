@@ -45,26 +45,31 @@ function pipeline(
   const audioDone = voicesApproved === total && total > 0;
   const videoDone = videosApproved === total && total > 0;
   return [
-    { name: "Script", state: "done" },
+    { key: "script", name: "Script", state: "done" },
     {
+      key: "scenes",
       name: scenesDone ? "Scenes" : `Scenes · ${scenesApproved}/${total}`,
       state: scenesDone ? "done" : "act",
     },
     {
+      key: "images",
       name: imagesDone ? "Images" : `Images · ${imagesApproved}/${total}`,
       state: imagesDone ? "done" : scenesDone ? "act" : "next",
     },
     {
+      key: "audio",
       name: audioDone ? "Audio" : `Audio · ${voicesApproved}/${total}`,
       state: audioDone ? "done" : imagesDone ? "act" : "next",
     },
     {
+      key: "video",
       name: videoDone ? "Video" : `Video · ${videosApproved}/${total}`,
       state: videoDone ? "done" : audioDone ? "act" : "next",
     },
     {
       // Its own step, because it is the one place the pipeline stops and
       // waits on a decision that isn't an approval.
+      key: "final",
       name: "Final touches",
       state:
         projectDone || assembling
@@ -76,18 +81,41 @@ function pipeline(
               : "next",
     },
     {
+      key: "assembly",
       name: "Assembly",
       state: projectDone ? "done" : assembling ? "act" : "next",
     },
   ];
 }
 
+const STAGE_KEYS = [
+  "script",
+  "scenes",
+  "images",
+  "audio",
+  "video",
+  "final",
+  "assembly",
+] as const;
+type StageKey = (typeof STAGE_KEYS)[number];
+
 export default async function ProductionRoom({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ stage?: string }>;
 }) {
   const { id } = await params;
+  // Revisiting an earlier step. Without it the page shows only whatever the
+  // pipeline is waiting on right now, which meant a project at "Final
+  // touches" had no way back to its script. Absent => today's behaviour,
+  // exactly: every panel keeps its own automatic condition.
+  const stageParam = (await searchParams)?.stage;
+  const viewing: StageKey | null = STAGE_KEYS.includes(stageParam as StageKey)
+    ? (stageParam as StageKey)
+    : null;
+  const showing = (k: StageKey, auto: boolean) => (viewing ? viewing === k : auto);
   const project = await getProject(id);
   if (!project) notFound();
 
@@ -101,15 +129,21 @@ export default async function ProductionRoom({
   );
 
   // Script review phase: the Scripturi record is still awaiting approval.
+  // Fetched for finished projects too, so the Script step stays readable
+  // after the fact instead of the panel vanishing with the record.
   const scriptInfo =
-    project.statusKind !== "done" ? await getProjectScriptInfo(id) : null;
+    project.statusKind !== "done" || viewing === "script"
+      ? await getProjectScriptInfo(id)
+      : null;
   // 'rejected' means the producer asked for a rewrite and the workflow is
   // producing a new draft. The panel must stay on screen showing that state —
   // it used to vanish entirely, which read as the app losing the script.
   const scriptRewriting = scriptInfo?.status === "rejected";
   const script =
     scriptInfo &&
-    (scriptInfo.status === "awaiting_approval" || scriptRewriting) &&
+    (scriptInfo.status === "awaiting_approval" ||
+      scriptRewriting ||
+      viewing === "script") &&
     scriptInfo.content
       ? scriptInfo
       : null;
@@ -222,18 +256,39 @@ export default async function ProductionRoom({
         {scenes.length > 0 && (
           <div className="pipe">
             {steps.map((s, i) => (
-              <span key={s.name} style={{ display: "contents" }}>
-                <span className={`ps ${s.state}`}>
+              <span key={s.key} style={{ display: "contents" }}>
+                {/* Each step is a link to itself: that is the whole way back
+                    to an earlier stage. The active one links to the bare page
+                    so clicking it again returns to "whatever is live now". */}
+                <Link
+                  href={
+                    viewing === s.key
+                      ? `/projects/${id}`
+                      : `/projects/${id}?stage=${s.key}`
+                  }
+                  className={`ps ${s.state}${viewing === s.key ? " sel" : ""}`}
+                  scroll={false}
+                >
                   <span className="ic">{s.state === "done" ? "✓" : i + 1}</span>
                   {s.name}
-                </span>
+                </Link>
                 {i < steps.length - 1 && <span className="pl" />}
               </span>
             ))}
           </div>
         )}
 
-        {script && (
+        {viewing && (
+          // Without this the page just looks stale: the panel on screen is
+          // not the one the pipeline is waiting on, and nothing said so.
+          <div className="setupnote" style={{ marginBottom: 20 }}>
+            Looking back at an earlier step. Production carries on in the
+            background — regenerating anything here still works.{" "}
+            <Link href={`/projects/${id}`}>Back to the live step</Link>
+          </div>
+        )}
+
+        {showing("script", !!script) && script && (
           <ScriptReview
             projectId={id}
             scriptId={script.id}
@@ -242,11 +297,12 @@ export default async function ProductionRoom({
           />
         )}
 
-        {project.awaitingFinalSettings && (
+        {showing("final", project.awaitingFinalSettings) && (
           <FinalSettings projectId={id} initial={project.editing} />
         )}
 
-        {assembling && !project.finalVideoUrl && (
+        {showing("assembly", assembling && !project.finalVideoUrl) &&
+          !project.finalVideoUrl && (
           <AssemblyStatus
             projectId={id}
             startedAt={assembly?.running?.startedAt ?? null}
@@ -275,9 +331,12 @@ export default async function ProductionRoom({
             before the first take exists, otherwise the stepper points at an
             "Audio" stage with nothing under it. */}
         {scenes.length > 0 &&
-          scenes.every((s) => s.sceneApproved) &&
-          scenes.every((s) => s.imageApproved) &&
-          scenes.some((s) => !s.voiceApproved) && (
+          showing(
+            "audio",
+            scenes.every((s) => s.sceneApproved) &&
+              scenes.every((s) => s.imageApproved) &&
+              scenes.some((s) => !s.voiceApproved),
+          ) && (
             <AudioReview
               projectId={id}
               scenes={scenes}
@@ -287,11 +346,13 @@ export default async function ProductionRoom({
             />
           )}
 
-        {scenes.length > 0 && scenes.some((s) => !s.sceneApproved) ? (
+        {scenes.length > 0 &&
+        showing("scenes", scenes.some((s) => !s.sceneApproved)) ? (
           // Scene text review phase: scripts are split into scenes but not
           // all approved yet — media generation hasn't started.
           <SceneReview projectId={id} scenes={scenes} />
-        ) : scenes.length > 0 ? (
+        ) : scenes.length > 0 &&
+          (!viewing || viewing === "images" || viewing === "video") ? (
           <SceneBoard
             projectId={id}
             scenes={scenes}

@@ -15,7 +15,12 @@ export const OutroCard: React.FC<{
 	portrait?: boolean;
 }> = ({channelName, subscribeText, palette, portrait = false}) => {
 	const frame = useCurrentFrame();
-	const {fps} = useVideoConfig();
+	const {fps, width} = useVideoConfig();
+	// Same canvas-relative scaling as HookTitle: these sizes were tuned on
+	// the 1920-wide landscape canvas, and are 1.8x too large relative to a
+	// 1080-wide vertical frame. At 1920 the scale is 1 and nothing changes.
+	const px = (n: number) => n * (width / 1920);
+
 
 	const opacity = interpolate(frame, [0, fps * 0.4], [0, 1], {extrapolateRight: 'clamp'});
 	const slideUp = interpolate(frame, [0, fps * 0.5], [24, 0], {
@@ -59,7 +64,7 @@ export const OutroCard: React.FC<{
 							justifyContent: 'center',
 							fontFamily: 'Arial, sans-serif',
 							fontWeight: 800,
-							fontSize: 52,
+							fontSize: px(52),
 							color: palette.secondary,
 							boxShadow: `0 8px 40px ${palette.primary}55`,
 						}}
@@ -70,7 +75,7 @@ export const OutroCard: React.FC<{
 						style={{
 							fontFamily: 'Georgia, serif',
 							fontWeight: 700,
-							fontSize: 38,
+							fontSize: px(38),
 							color: palette.text,
 							marginBottom: 26,
 						}}
@@ -85,7 +90,7 @@ export const OutroCard: React.FC<{
 							color: '#FFFFFF',
 							fontFamily: 'Arial, sans-serif',
 							fontWeight: 800,
-							fontSize: 28,
+							fontSize: px(28),
 							padding: '16px 44px',
 							borderRadius: 999,
 							boxShadow: '0 6px 30px rgba(230,33,23,0.45)',
@@ -124,7 +129,7 @@ export const OutroCard: React.FC<{
 						<div
 							style={{
 								fontFamily: 'Arial, sans-serif',
-								fontSize: 19,
+								fontSize: px(19),
 								letterSpacing: 3,
 								color: `${palette.text}99`,
 								textTransform: 'uppercase',

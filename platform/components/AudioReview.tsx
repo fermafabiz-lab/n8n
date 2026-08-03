@@ -69,6 +69,24 @@ function fitProblem(voice: number | undefined, clip: number | undefined): string
   return null;
 }
 
+/**
+ * Which cast voice reads a scene, in chapters mode. This MUST mirror
+ * AB Pick Voice / VR Pick Voice in n8n exactly: the label is a promise about
+ * what the producer is going to hear, and a label computed from a different
+ * rule than the audio is worse than no label at all.
+ *
+ * Per chapter when the script produced enough chapters; otherwise per scene,
+ * so a short single-chapter video still uses every voice. The hook is
+ * narrator #1.
+ */
+export function castIndexFor(order: number, chapters: number, castSize: number): number {
+  if (castSize <= 0) return 0;
+  const ch = Math.floor(order / 100);
+  if (ch <= 0) return 0;
+  if (chapters >= castSize) return (ch - 1) % castSize;
+  return Math.max(0, (order % 100) - 1) % castSize;
+}
+
 /** Speaker names in a tagged line, in speaking order (characters mode). */
 function speakersOf(narration: string | null): string[] {
   const out: string[] = [];
@@ -111,6 +129,14 @@ export default function AudioReview({
   cast?: string[];
   castAssign?: Record<string, string>;
 }) {
+  // How many real chapters the script produced — the hook (order < 100) is not
+  // one. n8n reads this from the project's linked chapters because its own
+  // loop only ever sees a capped batch; here the whole project is in hand, so
+  // counting the scenes gives the same answer.
+  const chapterCount =
+    new Set(
+      scenes.map((s) => Math.floor(s.order / 100)).filter((c) => c > 0),
+    ).size || 1;
   const [msg, setMsg] = useState<ActionResult | null>(null);
   const [pending, setPending] = useState(false);
   const [playingId, setPlayingId] = useState<string | null>(null);
@@ -280,9 +306,12 @@ export default function AudioReview({
 
       {mode === "chapters" && cast.length > 0 && (
         <p className="formmsg ok" style={{ marginBottom: 12 }}>
-          Narrator-per-chapter is on: chapter 1 is read by voice #1, chapter 2
-          by voice #2… ({cast.length} narrator{cast.length === 1 ? "" : "s"} in
-          the cast; the hook keeps the main narrator).
+          Narrator-per-chapter is on with {cast.length} narrator
+          {cast.length === 1 ? "" : "s"}.{" "}
+          {chapterCount >= cast.length
+            ? "Chapter 1 is read by voice #1, chapter 2 by voice #2, and so on."
+            : `This script came out as ${chapterCount} chapter${chapterCount === 1 ? "" : "s"}, fewer than the voices you picked, so they take turns scene by scene instead — that way every voice is actually used.`}{" "}
+          The hook is read by voice #1.
         </p>
       )}
 
@@ -426,12 +455,11 @@ export default function AudioReview({
                     </span>
                     {mode === "chapters" && cast.length > 0 && (() => {
                       const ch = Math.floor(s.order / 100);
-                      return ch > 0 ? (
+                      const vi = castIndexFor(s.order, chapterCount, cast.length);
+                      return (
                         <span className="chip">
-                          Ch. {ch} · Voice #{((ch - 1) % cast.length) + 1}
+                          {ch > 0 ? `Ch. ${ch}` : "Hook"} · Voice #{vi + 1}
                         </span>
-                      ) : (
-                        <span className="chip">Hook · main narrator</span>
                       );
                     })()}
                     {mode === "characters" &&

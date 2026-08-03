@@ -158,8 +158,30 @@ export async function getAssemblyState(): Promise<AssemblyState> {
   if (!n8nConfigured) return { running: null, failed: null };
   const isAssembly = (e: ExecutionSummary) =>
     e.workflowId === FINAL_ASSEMBLY_WORKFLOW_ID;
-  const running = (await getExecutions("running", 20)).find(isAssembly) ?? null;
+  const [runningNow, waitingNow] = await Promise.all([
+    getExecutions("running", 20),
+    getExecutions("waiting", 20),
+  ]);
+  // A render polling the render server sits in a Wait node, and n8n reports
+  // that as "waiting", not "running". Looking only at "running" made the
+  // panel cry failure on a healthy render between two polls. Same near
+  // wake-up test as getAliveProduction, for the same zombie reason.
+  const soon = Date.now() + 2 * 3600 * 1000;
+  const alive = [
+    ...runningNow,
+    ...waitingNow.filter(
+      (e) => e.waitTill !== null && new Date(e.waitTill).getTime() < soon,
+    ),
+  ];
+  const running = alive.find(isAssembly) ?? null;
   if (running) return { running, failed: null };
+
+  // Production is still upstream: media generation marks the project as
+  // assembling when it reaches the final-settings gate, long before there is
+  // any render to watch. That gap is normal, not a stopped render.
+  if (alive.some((e) => WORKER_WORKFLOWS.has(e.workflowId))) {
+    return { running: null, failed: null };
+  }
 
   // Only a failure from the last few minutes can belong to the render the
   // page is currently watching — executions carry no project id, so an older

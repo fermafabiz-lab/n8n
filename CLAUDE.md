@@ -104,6 +104,10 @@ These each cost hours. Do not rediscover them.
   friends carry a literal `x-api-key` / `Authorization`. They work, but they
   live in the workflow JSON, so a rotation means editing nodes and any export
   leaks them.
+- **The import also strips `parameters.operation` from Google Drive nodes**,
+  leaving them with no resolvable action rather than an error. Every upload
+  node needed `resource: file` + `operation: upload` re-set by hand, and
+  `VR Find Audio Folder` needed `operation: search`.
 
 ### Content filters — deterministic, never blindly retry
 

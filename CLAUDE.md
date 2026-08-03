@@ -135,6 +135,32 @@ These each cost hours. Do not rediscover them.
   never the status string. Stale-status overrides live in `platform/lib/data.ts`.
 - Use `typecast: true` on writes. Airtable re-hosts uploaded attachment URLs,
   which is what keeps assets alive after Flow's signed CDN URLs expire (~hours).
+- **A numeric field left in an Airtable node's column mapping with no value
+  writes a literal `0`.** It does not skip the field — it destroys it. Fifteen
+  nodes across all three workflows were silently zeroing `Ordine Scenă`,
+  `Durată Scenă (secunde)` and the project's `Lenght` on every single write.
+  The damage always surfaces far from its cause: scenes shuffled on the site,
+  the render built from zero-length scenes, and scripting computing chapter
+  counts from a length of 0. If you add a mapped field, either give it a value
+  or take it out of the mapping. Nothing warns you.
+
+### The batch cap
+
+`Sort & Cap Scenes` in Media Generation ends with `items.slice(0, CAP)`,
+CAP = 8 — and the cap is applied **before** anything checks what is already
+done. A project with more approved scenes than the cap used to be unfixable:
+every run picked the same finished head, found nothing to do, and the tail
+stayed invisible rather than pending. Regenerating did nothing, because the
+scene was never in the batch to begin with.
+
+Pending scenes now sort ahead of finished ones, so the cap always covers
+outstanding work and repeated runs converge. The cap itself still stands: a
+20-scene project needs several passes. The drop is logged — do not make it
+silent again.
+
+This interacted viciously with the zeroing bug above: processed scenes lost
+their order to `0`, so the one *un*processed scene held the only non-zero
+order, sorted last, and fell off the end forever.
 
 ### The site
 

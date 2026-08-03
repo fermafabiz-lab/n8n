@@ -267,13 +267,18 @@ function toProject(r: AirtableRecord): Project {
 function toScene(r: AirtableRecord, index: number): Scene {
   const rawStatus = String(pick(r.fields, F.sceneStatus) ?? "—");
   const imageApproved = Boolean(pick(r.fields, F.sceneImageApproved));
+  const videoApproved = Boolean(pick(r.fields, F.sceneVideoApproved));
   // n8n only rewrites the status text when its loop reaches a scene, so an
   // already-approved image can sit under "Awaiting Image Approval" for
-  // minutes. The checkbox is the truth; show that instead of stale text.
+  // minutes — and a scene whose clip was approved after the batch ended
+  // stays on "Awaiting Video Approval" forever. The checkboxes are the
+  // truth; show them instead of stale text.
   const status =
-    imageApproved && /(aprobare|generare) imagine/.test(normalizeStatus(rawStatus))
-      ? "In Asteptare"
-      : rawStatus;
+    videoApproved && /(aprobare|generare) video/.test(normalizeStatus(rawStatus))
+      ? "Finalizat"
+      : imageApproved && /(aprobare|generare) imagine/.test(normalizeStatus(rawStatus))
+        ? "In Asteptare"
+        : rawStatus;
   const { kind } = classifyStatus(status);
   const order = Number(pick(r.fields, F.sceneOrder)) || index + 1;
   const videoUrl =
@@ -291,8 +296,8 @@ function toScene(r: AirtableRecord, index: number): Scene {
     sceneApproved: Boolean(pick(r.fields, F.sceneApproved)),
     rewriteRequested: status === "Regenerare Text",
     voiceApproved: Boolean(pick(r.fields, F.sceneVoiceApproved)),
-    imageApproved: Boolean(pick(r.fields, F.sceneImageApproved)),
-    videoApproved: Boolean(pick(r.fields, F.sceneVideoApproved)),
+    imageApproved,
+    videoApproved,
     regenImage: Boolean(pick(r.fields, F.sceneRegenImage)),
     regenVideo: Boolean(pick(r.fields, F.sceneRegenVideo)),
     regenVoice: Boolean(pick(r.fields, F.sceneRegenVoice)),
@@ -374,8 +379,18 @@ export async function getScenes(projectId: string): Promise<Scene[]> {
   // Scene records link to their project via a Project_ID text field.
   const formula = encodeURIComponent(`{Project_ID} = "${projectId}"`);
   const records = await airtableList(SCENES_TABLE, `pageSize=100&filterByFormula=${formula}`);
+  // Without an explicit sort, Airtable returns records in an unspecified
+  // order that can differ between polls — which made scenes shuffle on
+  // every 10s refresh. Sort BEFORE mapping: "Ordine Scenă" is the truth,
+  // creation time breaks ties and places records that never got an order
+  // (added by hand in Airtable) at the end instead of at random.
+  records.sort((a, b) => {
+    const ao = Number(pick(a.fields, F.sceneOrder)) || Infinity;
+    const bo = Number(pick(b.fields, F.sceneOrder)) || Infinity;
+    if (ao !== bo) return ao - bo;
+    return new Date(a.createdTime).getTime() - new Date(b.createdTime).getTime();
+  });
   const scenes = records.map(toScene);
-  scenes.sort((a, b) => a.order - b.order);
   return scenes.map((s, i) => ({ ...s, label: `S${i + 1}` }));
 }
 

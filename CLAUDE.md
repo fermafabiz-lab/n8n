@@ -256,9 +256,27 @@ expected and harmless for an app touching only its own Drive.
 
 ## Open work
 
-- Test `characters` multi-voice end to end. Everything it needs is in place —
-  the prompts ask for the tags, both TTS paths strip them, `/tts-multi` is
-  live — but no project has ever run in that mode.
+- Test `characters` multi-voice end to end again after the first run's three
+  findings were fixed: the hook prompt now receives `hookRules` (no-narrator
+  films tag the hook too), rule (e) bans third-person narration inside a
+  character tag, and captions strip `[...]` like both TTS paths do. Note the
+  site deliberately sets the project `Voice ID` to `cast[0]` when no narrator
+  is picked — any untagged line falls back to the first character's voice.
+- The audio panel can pin a voice per scene: the regen webhook accepts
+  `voice_id`, which beats every mode rule in `VR Pick Voice` for that one
+  synthesis. The batch never overwrites an existing voiceover, so the pin
+  sticks.
+- **Auto-assembly has NEVER fired on wf7** — every Final Assembly execution
+  is `mode: webhook` (the site's Restart button). The orchestrator only calls
+  assembly after the batch returns, and batches don't return: today's sat in
+  the settings gate unreleased 30+ minutes after the status moved past
+  'Setări Finale', on gate code verified to release on any such move, while a
+  prior run proved the same 15s loop can poll for 2h. The in-memory Wait
+  timer appears to die. Separately, `page.tsx` computes
+  `missing={!!assembly && !assembly.running}`, which turns getAssemblyState's
+  deliberate "production is upstream, no verdict" answer back into "render
+  stopped" — so the panel pushes the manual restart that then papers over the
+  broken auto path. Diagnosed, not yet fixed.
 - Test `chapters` multi-voice on a project with 2+ chapters (over 120s), which
   is the branch the per-scene rotation does *not* cover.
 - Codify the "no visible faces" rule into Documentary image prompts.

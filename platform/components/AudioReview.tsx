@@ -152,6 +152,11 @@ export default function AudioReview({
     return cast[(i >= 0 ? i : 0) % Math.max(1, cast.length)] ?? "";
   };
   const [newVoice, setNewVoice] = useState("");
+  // Per-scene voice choice for the next regeneration. Empty = the mode's own
+  // rule (chapter narrator / character voice / project narrator) — exactly
+  // today's behaviour. A concrete id is sent with the regen webhook and wins
+  // over every rule in n8n, for this one synthesis.
+  const [voiceSel, setVoiceSel] = useState<Record<string, string>>({});
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const withAudio = useMemo(() => scenes.filter((s) => s.voiceUrl), [scenes]);
@@ -511,12 +516,35 @@ export default function AudioReview({
                           Approve
                         </button>
                       )}
+                      {cast.length > 0 && (
+                        <select
+                          className="abtn"
+                          value={voiceSel[s.id] ?? ""}
+                          disabled={pending}
+                          onChange={(e) =>
+                            setVoiceSel((v) => ({ ...v, [s.id]: e.target.value }))
+                          }
+                          title="Which voice the next regeneration uses for this scene"
+                        >
+                          <option value="">Voice: auto</option>
+                          {cast.map((v, k) => (
+                            <option key={v} value={v}>
+                              Voice #{k + 1} — {shortVoice(v)}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                       <button
                         className="abtn"
                         disabled={pending}
                         onClick={() =>
                           run(() =>
-                            regenerateVoice(projectId, s.id, draft ?? s.narration ?? ""),
+                            regenerateVoice(
+                              projectId,
+                              s.id,
+                              draft ?? s.narration ?? "",
+                              voiceSel[s.id] || undefined,
+                            ),
                           )
                         }
                       >

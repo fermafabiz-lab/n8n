@@ -87,6 +87,8 @@ export async function regenerateVoice(
   projectId: string,
   sceneId: string,
   narration: string,
+  /** Explicit voice for this one synthesis — wins over the mode's rule. */
+  voiceId?: string,
 ): Promise<ActionResult> {
   if (!isConfigured) {
     return { ok: true, message: "Demo mode — nothing was written." };
@@ -107,7 +109,13 @@ export async function regenerateVoice(
       const res = await fetch(webhook, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scene_id: sceneId }),
+        // voice_id, when present, overrides the mode's voice rule in n8n for
+        // this one synthesis — it's the audio panel's per-scene voice choice.
+        body: JSON.stringify(
+          voiceId && voiceId.includes("_")
+            ? { scene_id: sceneId, voice_id: voiceId }
+            : { scene_id: sceneId },
+        ),
         signal: AbortSignal.timeout(15000),
       });
       if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);

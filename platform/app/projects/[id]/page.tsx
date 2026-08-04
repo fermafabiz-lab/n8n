@@ -341,6 +341,7 @@ export default async function ProductionRoom({
               projectId={id}
               scenes={scenes}
               mode={project.multiVoiceMode}
+              narratorVoice={project.narratorVoice}
               cast={project.cast}
               castAssign={project.castAssign}
             />

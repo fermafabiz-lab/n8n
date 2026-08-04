@@ -114,6 +114,7 @@ export default function AudioReview({
   projectId,
   scenes,
   mode = "off",
+  narratorVoice = "",
   cast = [],
   castAssign = {},
 }: {
@@ -121,6 +122,8 @@ export default function AudioReview({
   scenes: Scene[];
   /** Project multi-voice mode: "off" | "characters" | "chapters". */
   mode?: string;
+  /** The project narrator's voice id — offered in the per-scene picker. */
+  narratorVoice?: string;
   cast?: string[];
   castAssign?: Record<string, string>;
 }) {
@@ -157,6 +160,20 @@ export default function AudioReview({
   // today's behaviour. A concrete id is sent with the regen webhook and wins
   // over every rule in n8n, for this one synthesis.
   const [voiceSel, setVoiceSel] = useState<Record<string, string>>({});
+  // Scene whose "any other voice" search is open (full library picker).
+  const [voiceSearchFor, setVoiceSearchFor] = useState<string | null>(null);
+  // The pickable set: the narrator first, then the cast (deduplicated).
+  // Narrator alone still yields a useful menu on single-voice projects —
+  // offering ONLY the cast made the selector a list of one on exactly the
+  // projects that needed it.
+  const knownVoices: Array<{ id: string; label: string }> = [
+    ...(narratorVoice.includes("_")
+      ? [{ id: narratorVoice, label: `Narrator — ${shortVoice(narratorVoice)}` }]
+      : []),
+    ...cast
+      .filter((v) => v !== narratorVoice)
+      .map((v, k) => ({ id: v, label: `Voice #${k + 1} — ${shortVoice(v)}` })),
+  ];
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const withAudio = useMemo(() => scenes.filter((s) => s.voiceUrl), [scenes]);
@@ -516,22 +533,36 @@ export default function AudioReview({
                           Approve
                         </button>
                       )}
-                      {cast.length > 0 && (
+                      {knownVoices.length > 0 && (
                         <select
                           className="abtn"
-                          value={voiceSel[s.id] ?? ""}
-                          disabled={pending}
-                          onChange={(e) =>
-                            setVoiceSel((v) => ({ ...v, [s.id]: e.target.value }))
+                          value={
+                            voiceSearchFor === s.id ? "__search" : (voiceSel[s.id] ?? "")
                           }
+                          disabled={pending}
+                          onChange={(e) => {
+                            if (e.target.value === "__search") {
+                              setVoiceSearchFor(s.id);
+                              return;
+                            }
+                            setVoiceSearchFor((cur) => (cur === s.id ? null : cur));
+                            setVoiceSel((v) => ({ ...v, [s.id]: e.target.value }));
+                          }}
                           title="Which voice the next regeneration uses for this scene"
                         >
                           <option value="">Voice: auto</option>
-                          {cast.map((v, k) => (
-                            <option key={v} value={v}>
-                              Voice #{k + 1} — {shortVoice(v)}
+                          {knownVoices.map((v) => (
+                            <option key={v.id} value={v.id}>
+                              {v.label}
                             </option>
                           ))}
+                          {voiceSel[s.id] &&
+                            !knownVoices.some((v) => v.id === voiceSel[s.id]) && (
+                              <option value={voiceSel[s.id]}>
+                                {shortVoice(voiceSel[s.id])}
+                              </option>
+                            )}
+                          <option value="__search">Any other voice…</option>
                         </select>
                       )}
                       <button
@@ -554,6 +585,18 @@ export default function AudioReview({
                           take — every other length difference is absorbed by
                           retiming at assembly, so re-rendering would be
                           paying Flow for nothing. */}
+                      {voiceSearchFor === s.id && (
+                        <div style={{ flexBasis: "100%", marginTop: 8 }}>
+                          <VoicePicker
+                            label="Voice for this scene — press ▶ to listen, then Regenerate"
+                            value={voiceSel[s.id] ?? ""}
+                            onChange={(id) => {
+                              setVoiceSel((v) => ({ ...v, [s.id]: id }));
+                              setVoiceSearchFor(null);
+                            }}
+                          />
+                        </div>
+                      )}
                       {fit && !s.regenVideo && (
                         <button
                           className="abtn"

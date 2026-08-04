@@ -30,6 +30,8 @@ export interface Project {
   awaitingFinalSettings: boolean;
   /** Video category id (lib/categories.ts); older projects have none. */
   category: string | null;
+  /** The project's main narrator voice id (empty when none was picked). */
+  narratorVoice: string;
   /** "off" | "characters" | "chapters" — how narration voices work. */
   multiVoiceMode: string;
   /** Extra voice ids picked on the form (characters or chapter narrators). */
@@ -250,6 +252,7 @@ function toProject(r: AirtableRecord): Project {
     category: typeof (opts as { category?: unknown }).category === "string"
       ? String((opts as { category?: string }).category)
       : null,
+    narratorVoice: String(r.fields["Voice ID"] ?? ""),
     multiVoiceMode: String((opts as { multiVoiceMode?: string }).multiVoiceMode ?? "off"),
     cast: Array.isArray((opts as { cast?: unknown }).cast)
       ? ((opts as { cast?: unknown[] }).cast as unknown[]).filter(
@@ -410,6 +413,7 @@ const DEMO_PROJECTS: Project[] = [
     editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true },
     awaitingFinalSettings: false,
     category: "story",
+    narratorVoice: "",
     multiVoiceMode: "off",
     cast: [],
     castAssign: {},
@@ -428,6 +432,7 @@ const DEMO_PROJECTS: Project[] = [
     editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true },
     awaitingFinalSettings: false,
     category: "story",
+    narratorVoice: "",
     multiVoiceMode: "off",
     cast: [],
     castAssign: {},
@@ -446,6 +451,7 @@ const DEMO_PROJECTS: Project[] = [
     editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true },
     awaitingFinalSettings: false,
     category: "story",
+    narratorVoice: "",
     multiVoiceMode: "off",
     cast: [],
     castAssign: {},
@@ -464,6 +470,7 @@ const DEMO_PROJECTS: Project[] = [
     editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true },
     awaitingFinalSettings: false,
     category: "story",
+    narratorVoice: "",
     multiVoiceMode: "off",
     cast: [],
     castAssign: {},

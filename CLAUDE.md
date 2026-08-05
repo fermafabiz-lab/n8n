@@ -268,6 +268,51 @@ next stage. `Submit TTS` and the `Submit Mux*` nodes are leftovers from an
 older inline audio path and are deliberately disconnected — n8n warns about
 them on every publish. Ignore those four; do not wire them back.
 
+### Remotion / the edit
+
+- **Nothing that moves may be linear.** `remotion/src/easing.ts` holds the whole
+  vocabulary — `outExpo` for entrances, `outQuart` for settles, `inOutCubic` for
+  exits and sweeps — plus `eased()` (clamped + eased interpolate) and
+  `curveAt()`. Constant-speed ramps are the clearest tell that a graphic was
+  generated rather than designed. The one deliberate exception is the base Ken
+  Burns push in `kenBurnsTransform`: a constant-velocity zoom is what a real
+  rostrum move looks like, and easing it makes it visibly decelerate for no
+  reason. Punch-ins are discrete events and do get shaped.
+- **`latin-ext` is mandatory on every font load.** ș (U+0219) and ț (U+021B) are
+  not in `latin`, so a Romanian chapter title renders as missing-glyph boxes
+  without it. Naming subsets also cut one family from 21 network requests per
+  render down to a handful — left to its default it pulls cyrillic, greek and
+  vietnamese too. The subset list is repeated at each `loadFont` call on purpose:
+  every family declares its own subset union, so a shared constant will not
+  typecheck.
+- **Anton has exactly one weight (400).** Asking for 700 makes the browser
+  synthesise a fake bold, which smears the letterforms. Same care for any
+  single-weight display face.
+- **A chapter boundary has exactly one owner.** With cards on, `ImpactCard`'s own
+  light leak IS the transition, so `Transitions` skips that boundary entirely —
+  that is what the `chapterCards` prop is for. With cards off, `Transitions`
+  flares instead of dipping to black. Wire a second effect onto the same frame
+  and you get a flash inside a dip.
+- **The card is revealed by light, not by movement.** It used to slide in on a
+  linear `translateX`; now it swaps at the peak of a `LightLeak` flash
+  (`FLASH_PEAK`), where the frame is blown out and the change cannot be seen.
+  `LightLeak` owns no timing — the caller passes the envelope — and
+  `mixBlendMode: 'screen'` goes on each layer, never the wrapper, or the layers
+  blend with each other first and most of the light is lost.
+  `IMPACT_CARD_SECONDS` is exported because FinalVideo's Sequence must cover the
+  whole window; a shorter one cuts the exit flash off mid-burn.
+- **Verifying a render from a Claude Code web session:** the proxy answers 403
+  for `remotion.media`, so Remotion cannot download its Chrome Headless Shell.
+  Use the Playwright one that is already on the box —
+  `--browser-executable=/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell`
+  — plus `--ignore-certificate-errors`, because headless Chromium does not trust
+  the proxy CA and every `fonts.gstatic.com` fetch fails with
+  `ERR_CERT_AUTHORITY_INVALID` otherwise. Neither flag is needed on Railway.
+  `npx remotion still` on a throwaway probe entry that renders the overlays over
+  synthetic bands is the fastest way to actually look at typography and the leak
+  without real footage; the Playwright ffmpeg on the box has no PNG decoder, so
+  fabricating test footage with it does not work.
+
 ### The site
 
 - The project page auto-refreshes every 10s, which remounts components. Drafts

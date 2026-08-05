@@ -1,6 +1,8 @@
 import React from 'react';
-import {AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig} from 'remotion';
+import {AbsoluteFill, useCurrentFrame, useVideoConfig} from 'remotion';
 import type {StylePreset} from '../style';
+import {CURVES, curveAt, eased} from '../easing';
+import {FLASH_PEAK, LightLeak, flashEnvelope} from './LightLeak';
 
 const ROMAN = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
 
@@ -14,10 +16,24 @@ export const keyLineFor = (narration: string): string => {
 };
 
 /**
- * Director-style stop-frame at each chapter start: full-screen opaque card
- * in the preset palette, chapter eyebrow + the chapter's key line typing on.
- * Runs ~2s as an overlay (footage and narration continue underneath), then
- * wipes away — a hard visual reset that re-hooks attention.
+ * Total on-screen window. Exported because FinalVideo's Sequence has to be at
+ * least this long — a shorter Sequence cuts the exit flash off mid-burn and
+ * the card vanishes on a hard frame.
+ */
+export const IMPACT_CARD_SECONDS = 2.8;
+/** Entrance and exit flash durations. */
+const IN = 0.55;
+const OUT = 0.55;
+
+/**
+ * Director-style stop-frame at each chapter start: chapter eyebrow + the
+ * chapter's title, held ~1.7s over the narration, which continues underneath.
+ *
+ * The card used to slide in and out on a linear translateX. Both halves of
+ * that were wrong: the slide announced the graphic, and the constant speed
+ * made it read as a template. Now the card is revealed and taken away by a
+ * light leak — it swaps at the peak of the flash, where the frame is blown out
+ * and the change is invisible.
  */
 export const ImpactCard: React.FC<{
 	chapter: number;
@@ -26,25 +42,29 @@ export const ImpactCard: React.FC<{
 }> = ({chapter, keyLine, preset}) => {
 	const frame = useCurrentFrame();
 	const {fps, width} = useVideoConfig();
-	// Same canvas-relative scaling as HookTitle: these sizes were tuned on
-	// the 1280-wide landscape canvas and are 1.78x too large relative to the
+	// Same canvas-relative scaling as HookTitle: these sizes were tuned on the
+	// 1280-wide landscape canvas and are 1.78x too large relative to the
 	// 720-wide vertical one. At 1280 the scale is 1 and nothing changes.
 	const px = (n: number) => n * (width / 1280);
 
 	const t = frame / fps;
+	if (t > IMPACT_CARD_SECONDS) return null;
 
-	const hold = 2.2;
-	// Card slides in as a wipe, holds, wipes out.
-	const wipeIn = interpolate(t, [0, 0.3], [100, 0], {
-		extrapolateLeft: 'clamp',
-		extrapolateRight: 'clamp',
-	});
-	const wipeOut = interpolate(t, [hold, hold + 0.35], [0, -100], {
-		extrapolateLeft: 'clamp',
-		extrapolateRight: 'clamp',
-	});
-	const x = wipeIn + wipeOut;
-	if (t > hold + 0.4) return null;
+	const outStart = IMPACT_CARD_SECONDS - OUT;
+	const inProgress = t / IN;
+	const outProgress = (t - outStart) / OUT;
+	const inFlash = flashEnvelope(inProgress);
+	const outFlash = flashEnvelope(outProgress);
+
+	// The card appears at the peak of the entrance flash and leaves at the peak
+	// of the exit flash. The 0.07s eased crossfade is insurance: on an already
+	// bright shot the leak may not fully overexpose, and a hard switch there
+	// would pop.
+	const appearAt = IN * FLASH_PEAK;
+	const vanishAt = outStart + OUT * FLASH_PEAK;
+	const cardOpacity =
+		eased(t, [appearAt - 0.07, appearAt + 0.07], [0, 1], CURVES.inOutCubic) *
+		(1 - eased(t, [vanishAt - 0.07, vanishAt + 0.07], [0, 1], CURVES.inOutCubic));
 
 	// Words are unbreakable inline-blocks; the spaces BETWEEN them are plain
 	// breakable text nodes. Per-character spans with white-space:pre killed
@@ -58,10 +78,15 @@ export const ImpactCard: React.FC<{
 		return s;
 	});
 
+	const lightInk =
+		preset.cardBg === '#F6EFE3' || preset.cardBg === '#F4F1EA' ? '#221D14' : '#F5F2EA';
+	const ruleWidth = eased(t, [appearAt + 0.12, appearAt + 0.7], [0, px(74)], CURVES.outExpo);
+
 	return (
-		<AbsoluteFill style={{transform: `translateX(${x}%)`}}>
+		<AbsoluteFill>
 			<AbsoluteFill
 				style={{
+					opacity: cardOpacity,
 					background: preset.cardBg,
 					justifyContent: 'center',
 					alignItems: 'center',
@@ -70,10 +95,10 @@ export const ImpactCard: React.FC<{
 				<div style={{width: '74%', textAlign: 'left'}}>
 					<div
 						style={{
-							fontFamily: preset.captionFont,
-							fontWeight: 600,
+							fontFamily: preset.kickerFont,
+							fontWeight: 500,
 							fontSize: px(17),
-							letterSpacing: px(5),
+							letterSpacing: px(6),
 							textTransform: 'uppercase',
 							color: preset.cardInk,
 							marginBottom: px(18),
@@ -87,20 +112,29 @@ export const ImpactCard: React.FC<{
 							fontWeight: preset.displayWeight,
 							fontSize: px(52),
 							lineHeight: 1.25,
-							color: preset.cardBg === '#F6EFE3' || preset.cardBg === '#F4F1EA' ? '#221D14' : '#F5F2EA',
+							color: lightInk,
 						}}
 					>
 						{words.map((word, wi) => (
 							<React.Fragment key={wi}>
-								<span style={{display: 'inline-block', whiteSpace: 'pre'}}>
+								<span
+									style={{
+										display: 'inline-block',
+										// 'pre' here made a word unbreakable, so a long chapter
+										// title ran off the frame instead of wrapping — the same
+										// bug HookTitle already carries a note about.
+										whiteSpace: 'pre-wrap',
+										overflowWrap: 'anywhere',
+										maxWidth: '100%',
+									}}
+								>
 									{Array.from(word).map((ch, ci) => {
-										const start = 0.25 + (wordStarts[wi] + ci) * perChar;
-										const o = interpolate(t, [start, start + 0.12], [0, 1], {
-											extrapolateLeft: 'clamp',
-											extrapolateRight: 'clamp',
-										});
+										const start = appearAt + 0.08 + (wordStarts[wi] + ci) * perChar;
 										return (
-											<span key={ci} style={{opacity: o}}>
+											<span
+												key={ci}
+												style={{opacity: eased(t, [start, start + 0.14], [0, 1])}}
+											>
 												{ch}
 											</span>
 										);
@@ -112,15 +146,20 @@ export const ImpactCard: React.FC<{
 					</div>
 					<div
 						style={{
-							width: 74,
-							height: 4,
+							width: ruleWidth,
+							height: px(4),
 							background: preset.cardInk,
-							marginTop: 24,
+							marginTop: px(24),
 							borderRadius: 2,
 						}}
 					/>
 				</div>
 			</AbsoluteFill>
+
+			{/* Entrance and exit flares. Each returns null outside its window, so
+			    only one is ever composited. */}
+			<LightLeak amount={inFlash} sweep={curveAt(inProgress, CURVES.inOutCubic)} />
+			<LightLeak amount={outFlash} sweep={1 - curveAt(outProgress, CURVES.inOutCubic)} />
 		</AbsoluteFill>
 	);
 };

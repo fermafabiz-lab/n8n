@@ -1,7 +1,8 @@
 import React from 'react';
-import {AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig} from 'remotion';
+import {AbsoluteFill, useCurrentFrame, useVideoConfig} from 'remotion';
 import type {Palette} from '../types';
 import type {StylePreset} from '../style';
+import {CURVES, curveAt, eased} from '../easing';
 
 /**
  * Hook title as an After-Effects-style text animator: characters type on
@@ -44,21 +45,13 @@ export const HookTitle: React.FC<{
 	// the last 0.6s never cuts the animation short.
 	const outStart = Math.max(0.5, durationInSeconds - 0.6);
 
-	const blockOpacity = interpolate(t, [outStart, durationInSeconds], [1, 0], {
-		extrapolateLeft: 'clamp',
-		extrapolateRight: 'clamp',
-	});
+	const blockOpacity = eased(t, [outStart, durationInSeconds], [1, 0], CURVES.inOutCubic);
 	if (blockOpacity <= 0) return null;
 
 	// Whole-block slow drift: rises ~14px over the full hold, barely felt.
-	const drift = interpolate(t, [0, durationInSeconds], [px(8), px(-6)], {
-		extrapolateLeft: 'clamp',
-		extrapolateRight: 'clamp',
-	});
-	const ruleWidth = interpolate(t, [typeDone * 0.6, typeDone + 0.5], [0, px(200)], {
-		extrapolateLeft: 'clamp',
-		extrapolateRight: 'clamp',
-	});
+	// Eased so it settles instead of still travelling when it fades out.
+	const drift = eased(t, [0, durationInSeconds], [px(8), px(-6)], CURVES.outQuart);
+	const ruleWidth = eased(t, [typeDone * 0.6, typeDone + 0.5], [0, px(200)], CURVES.outExpo);
 
 	const len = title.length;
 	const fontSize = px(len <= 24 ? 72 : len <= 44 ? 58 : len <= 70 ? 46 : 38);
@@ -106,12 +99,10 @@ export const HookTitle: React.FC<{
 							>
 								{Array.from(word).map((ch, ci) => {
 									const start = (wordStarts[wi] + ci) * perChar;
-									const p = interpolate(t, [start, start + 0.22], [0, 1], {
-										extrapolateLeft: 'clamp',
-										extrapolateRight: 'clamp',
-									});
-									// Ease-out on both channels: soft landing, no pop.
-									const e = 1 - (1 - p) * (1 - p);
+									// Ease-out on both channels: soft landing, no pop. This was a
+									// hand-rolled easeOutQuad; outExpo lands harder and matches
+									// every other reveal in the project.
+									const e = curveAt((t - start) / 0.22, CURVES.outExpo);
 									return (
 										<span
 											key={ci}

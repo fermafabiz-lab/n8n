@@ -7,7 +7,7 @@ import {
 	useVideoConfig,
 } from 'remotion';
 import {HookTitle} from './components/HookTitle';
-import {ImpactCard, keyLineFor} from './components/ImpactCard';
+import {IMPACT_CARD_SECONDS, ImpactCard, keyLineFor} from './components/ImpactCard';
 import {OutroCard} from './components/OutroCard';
 import {Captions} from './components/Captions';
 import {FilmLayer, gradeForTone} from './components/FilmLayer';
@@ -84,7 +84,7 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 						<OffthreadVideo src={finalVideoUrl} />
 					</AbsoluteFill>
 					<FilmLayer tone={tone} />
-					<Transitions scenes={scenes} tone={tone} />
+					<Transitions scenes={scenes} tone={tone} chapterCards={showChapterCards} />
 					{showCaptions && (
 						<Captions
 							scenes={scenes}
@@ -99,7 +99,11 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 							<Sequence
 								key={`ch-${s.chapter}`}
 								from={Math.round(s.startSeconds * fps)}
-								durationInFrames={Math.round(2.8 * fps)}
+								// The card owns its own in/out light leak now, so the
+								// Sequence has to cover the whole window — a shorter one cuts
+								// the exit flash off mid-burn and the card vanishes on a hard
+								// frame.
+								durationInFrames={Math.round(IMPACT_CARD_SECONDS * fps)}
 							>
 								<ImpactCard
 									chapter={s.chapter ?? 1}

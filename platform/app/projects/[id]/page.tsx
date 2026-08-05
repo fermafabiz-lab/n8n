@@ -314,7 +314,11 @@ export default async function ProductionRoom({
                   }
                 : null
             }
-            missing={!!assembly && !assembly.running}
+            // Only a real verdict counts as missing. `!assembly.running`
+            // also covered "production is still upstream" — n8n's deliberate
+            // no-verdict answer — which is what kept the false restart
+            // button on screen.
+            missing={!!assembly?.stopped}
             n8nUrl={
               assembly?.running || assembly?.failed
                 ? executionUrl(

@@ -148,6 +148,16 @@ export interface AssemblyState {
   running: ExecutionSummary | null;
   /** A recent failure, surfaced only when nothing is running. */
   failed: (ExecutionSummary & { detail: ExecutionError | null }) | null;
+  /**
+   * True only when n8n answered and there is genuinely nothing at work:
+   * no render running, no upstream production alive, no recent failure.
+   * "No running render" alone is NOT a verdict — production still being
+   * upstream, or n8n not being configured, both look identical to a dead
+   * render if the caller only checks `running`. Collapsing those into
+   * "stopped" is exactly what made the panel push a manual restart on
+   * every healthy project.
+   */
+  stopped: boolean;
 }
 
 /**
@@ -155,7 +165,8 @@ export interface AssemblyState {
  * "died half an hour ago" — from the project page, without opening n8n.
  */
 export async function getAssemblyState(): Promise<AssemblyState> {
-  if (!n8nConfigured) return { running: null, failed: null };
+  // Can't see n8n at all — no verdict, never "stopped".
+  if (!n8nConfigured) return { running: null, failed: null, stopped: false };
   const isAssembly = (e: ExecutionSummary) =>
     e.workflowId === FINAL_ASSEMBLY_WORKFLOW_ID;
   const [runningNow, waitingNow] = await Promise.all([
@@ -174,13 +185,13 @@ export async function getAssemblyState(): Promise<AssemblyState> {
     ),
   ];
   const running = alive.find(isAssembly) ?? null;
-  if (running) return { running, failed: null };
+  if (running) return { running, failed: null, stopped: false };
 
   // Production is still upstream: media generation marks the project as
   // assembling when it reaches the final-settings gate, long before there is
   // any render to watch. That gap is normal, not a stopped render.
   if (alive.some((e) => WORKER_WORKFLOWS.has(e.workflowId))) {
-    return { running: null, failed: null };
+    return { running: null, failed: null, stopped: false };
   }
 
   // Only a failure from the last few minutes can belong to the render the
@@ -191,8 +202,12 @@ export async function getAssemblyState(): Promise<AssemblyState> {
     (await getExecutions("error", 10)).find(
       (e) => isAssembly(e) && new Date(e.startedAt ?? 0).getTime() > recent,
     ) ?? null;
-  if (!failed) return { running: null, failed: null };
-  return { running: null, failed: { ...failed, detail: await getExecutionError(failed.id) } };
+  if (!failed) return { running: null, failed: null, stopped: true };
+  return {
+    running: null,
+    failed: { ...failed, detail: await getExecutionError(failed.id) },
+    stopped: false,
+  };
 }
 
 /** Deep link into the n8n editor for a specific execution. */

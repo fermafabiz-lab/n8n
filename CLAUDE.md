@@ -272,11 +272,12 @@ expected and harmless for an app touching only its own Drive.
   the settings gate unreleased 30+ minutes after the status moved past
   'Setări Finale', on gate code verified to release on any such move, while a
   prior run proved the same 15s loop can poll for 2h. The in-memory Wait
-  timer appears to die. Separately, `page.tsx` computes
-  `missing={!!assembly && !assembly.running}`, which turns getAssemblyState's
-  deliberate "production is upstream, no verdict" answer back into "render
-  stopped" — so the panel pushes the manual restart that then papers over the
-  broken auto path. Diagnosed, not yet fixed.
+  timer appears to die. Diagnosed, not yet fixed — this half lives in n8n.
+  The site half is fixed: `getAssemblyState()` now returns an explicit
+  `stopped` verdict (true only when n8n answered and nothing is alive
+  anywhere), and `page.tsx` shows the "render stopped" panel only on that
+  verdict — "no running render" alone (production upstream, n8n
+  unconfigured) is no longer treated as a stop.
 - Test `chapters` multi-voice on a project with 2+ chapters (over 120s), which
   is the branch the per-scene rotation does *not* cover.
 - Codify the "no visible faces" rule into Documentary image prompts.

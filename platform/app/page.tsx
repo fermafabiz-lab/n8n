@@ -12,9 +12,15 @@ export default async function Dashboard() {
   const running = projects.filter((p) => p.statusKind === "run").length;
   const finished = projects.filter((p) => p.statusKind === "done").length;
 
+  // Titles come from a free-text field and people paste whole prompts into it
+  // (a ~3000-char master prompt has been seen in production). The hero sets
+  // this in display type, so it has to be cut before it becomes the page.
+  const short = (s: string, n = 42) =>
+    s.length > n ? s.slice(0, n).trimEnd() + "…" : s;
+
   const heroLine =
     waiting.length === 1
-      ? `${waiting[0].name} is waiting on you.`
+      ? `${short(waiting[0].name)} is waiting on you.`
       : waiting.length > 1
         ? `${waiting.length} videos are waiting on you.`
         : running > 0
@@ -38,9 +44,9 @@ export default async function Dashboard() {
         }))}
       />
       <div className="hero">
+        {/* The em is a block in CSS — the serif line breaks itself. */}
         <h1>
           Welcome back.
-          <br />
           <em>{heroLine}</em>
         </h1>
         <p>
@@ -81,8 +87,9 @@ export default async function Dashboard() {
 
       {projects.length === 0 ? (
         <>
-          <div className="sechead">
-            <h2>Projects</h2>
+          <div className="eyebrow">
+            <span>Projects</span>
+            <span className="n">(00)</span>
           </div>
           <div className="empty">
             <h3>No projects yet</h3>

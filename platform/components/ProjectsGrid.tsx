@@ -49,8 +49,10 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
 
   return (
     <>
-      <div className="sechead">
-        <h2>Projects</h2>
+      <div className="eyebrow">
+        <span>Projects</span>
+        <span className="n">({String(projects.length).padStart(2, "0")})</span>
+        <span className="sp" />
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {msg && (
             <span className={`formmsg ${msg.ok ? "ok" : "err"}`} style={{ margin: 0 }}>

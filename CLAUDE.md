@@ -395,6 +395,14 @@ them on every publish. Ignore those four; do not wire them back.
 
 - The project page auto-refreshes every 10s, which remounts components. Drafts
   in progress must be backed by `sessionStorage` to survive it.
+- **The app and the render share one type system.** Fraunces / Inter Tight /
+  IBM Plex Mono are loaded in `platform/app/layout.tsx` via `next/font` and
+  mirror `remotion/src/style.ts`, so the site looks like the films it makes.
+  `latin-ext` is required here for the same reason as in the render — Romanian
+  project names carry ș and ț. Direction is "editorial": hairlines and tracked
+  mono labels instead of nested bordered boxes, one bloom behind the headline,
+  no gradient-filled text. Review and approval surfaces deliberately kept their
+  density — only the chrome changed.
 - **Drive-hosted media must go through `platform/app/api/media`, never the
   Railway `/media`.** The render server's version buffers the whole file and
   answers a plain 200: no `Accept-Ranges` and the `Range` header ignored. A

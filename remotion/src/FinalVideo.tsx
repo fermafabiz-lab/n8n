@@ -12,6 +12,7 @@ import {OutroCard} from './components/OutroCard';
 import {Captions} from './components/Captions';
 import {FilmLayer, gradeForTone} from './components/FilmLayer';
 import {Transitions, kenBurnsTransform} from './components/Transitions';
+import {PreviewBackdrop} from './components/PreviewBackdrop';
 import {presetForTone} from './style';
 import type {FinalVideoProps} from './types';
 
@@ -81,7 +82,16 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 							filter: gradeForTone(tone),
 						}}
 					>
-						<OffthreadVideo src={finalVideoUrl} />
+						{/* No source video means we are previewing the graphics in
+						    Studio — the assembled video is ephemeral, so a fixture
+						    pointing at one rots within days and used to take the whole
+						    preview down with a MediaPlaybackError. Production cannot
+						    land here: /render rejects a body without finalVideoUrl. */}
+						{finalVideoUrl ? (
+							<OffthreadVideo src={finalVideoUrl} />
+						) : (
+							<PreviewBackdrop />
+						)}
 					</AbsoluteFill>
 					<FilmLayer tone={tone} />
 					<Transitions scenes={scenes} tone={tone} chapterCards={showChapterCards} />

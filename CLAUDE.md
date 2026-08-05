@@ -196,6 +196,29 @@ literal text in it — the writing prompts are assembled from expressions
 different node. Follow the expression, not the string. This exact mistake
 produced a confident and completely wrong "the feature was never built".
 
+### Scene splitting is code, not a prompt request
+
+`Plan Scene Splits` (between `Create Chapter Records` and `Segment Chapter
+Into Scenes`) cuts each chapter's `Script Capitol` into scene-sized chunks
+and hands the segmenter a numbered list to copy **verbatim**. Do not move
+this back into the prompt.
+
+Why: the prompt used to compute `SCENE COUNT: output EXACTLY N scenes` and
+trust the model. Execution 877 proves that fails — the prompt correctly
+said 5, gpt-5.4 returned **one** scene holding the first sentence, and the
+other 83 of 96 narration words vanished. A 32s video shipped as 2 scenes
+(hook + 1). The failure is silent: no error, valid JSON, just less film.
+
+The chunker is sentence-aware, falls back to clause punctuation and then to
+word boundaries for run-ons, folds runt chunks (<40% of average) into a
+neighbour so no 8-second shot carries four words, and is **lossless** — the
+chunks rejoin to exactly the input. Tags like `[CHARACTER: X]` survive it.
+`Validate Evidence Refs` logs `SCENE SHORTFALL` if the model still returns
+fewer scenes than were planned.
+
+Note the count can differ from the naive `ceil(words/22)` after runt
+folding (95 words → 4 scenes, not 5). That is intended.
+
 ### Evidence retrieval (Claude Scripting)
 
 Scripts on researched topics are written against a pack of sourced claims,

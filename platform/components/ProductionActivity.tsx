@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { resumeProject, type ActionResult } from "@/app/actions";
 import type { Scene } from "@/lib/data";
 import type { ExecutionSummary } from "@/lib/n8n";
+import { explainRefusal } from "@/lib/refusals";
 
 /**
  * What production is actually doing, while it does it.
@@ -161,12 +162,21 @@ export default function ProductionActivity({
 
       {refusals.length > 0 && (
         <div style={{ marginTop: 10 }}>
-          {refusals.map((s) => (
-            <p key={s.id} className="formmsg err" style={{ margin: "6px 0 0" }}>
-              <b>{s.label}</b> — the generator refused this scene:{" "}
-              {s.note!.length > 160 ? s.note!.slice(0, 160).trimEnd() + "…" : s.note}
-            </p>
-          ))}
+          {refusals.map((s) => {
+            const why = explainRefusal(s.note!);
+            return (
+              <div key={s.id} className="formmsg err" style={{ margin: "6px 0 0" }}>
+                <b>{s.label}</b> —{" "}
+                {s.note!.length > 160 ? s.note!.slice(0, 160).trimEnd() + "…" : s.note}
+                {why && (
+                  // The raw code says what failed; this says what to DO.
+                  <span style={{ display: "block", marginTop: 5, color: "var(--soft)", fontSize: 12 }}>
+                    {why.cause}. {why.advice}
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 

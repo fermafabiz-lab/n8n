@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { deleteProjects, type ActionResult } from "@/app/actions";
 import ExpandableTitle from "@/components/ExpandableTitle";
 import type { Project, StatusKind } from "@/lib/data";
+import { mediaSrc } from "@/lib/media";
 
 function badgeLabel(p: Project): string {
   switch (p.statusKind) {
@@ -47,6 +48,33 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
   const [pending, startTransition] = useTransition();
   const [filter, setFilter] = useState<"all" | StatusKind>("all");
   const [view, setView] = useState<"grid" | "list">("grid");
+  // Hover preview on finished covers: the final video plays muted in the
+  // card. Mounted only after ~350ms of hover intent — the bytes come through
+  // our own /api/media proxy (Drive-hosted), so drive-by hovers must not
+  // start downloads.
+  const [preview, setPreview] = useState<string | null>(null);
+  const previewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (previewTimer.current) clearTimeout(previewTimer.current);
+  }, []);
+  const canPreview = (p: Project) =>
+    !manage && p.statusKind === "done" && !!p.finalVideoUrl?.startsWith("http");
+  const armPreview = (p: Project) => {
+    if (!canPreview(p)) return;
+    // Reduced motion: the reveal animation is stripped globally, which would
+    // leave the video invisible while it still streams through our proxy.
+    // Skip the preview entirely — no download for zero visible effect.
+    try {
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    } catch {}
+    if (previewTimer.current) clearTimeout(previewTimer.current);
+    previewTimer.current = setTimeout(() => setPreview(p.id), 350);
+  };
+  const disarmPreview = () => {
+    if (previewTimer.current) clearTimeout(previewTimer.current);
+    previewTimer.current = null;
+    setPreview(null);
+  };
 
   // The view survives visits; a preference, not a state.
   useEffect(() => {
@@ -218,6 +246,8 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
               className="proj"
               key={p.id}
               onClick={(e) => onCardClick(e, p.id)}
+              onMouseEnter={() => armPreview(p)}
+              onMouseLeave={disarmPreview}
               style={manageStyle(p.id)}
             >
               <div className="cover">
@@ -225,6 +255,19 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
                   className={`art ${p.coverUrl ? "" : `fallback${(i % 4) + 1}`}`}
                   style={p.coverUrl ? { backgroundImage: `url(${p.coverUrl})` } : undefined}
                 />
+                {/* Re-checked at render, not just at arm time: a manage
+                    toggle or the 15s refetch can invalidate a hover that
+                    never got its mouseleave. */}
+                {preview === p.id && canPreview(p) && (
+                  <video
+                    className="hoverprev"
+                    src={mediaSrc(p.finalVideoUrl!)}
+                    muted
+                    loop
+                    playsInline
+                    autoPlay
+                  />
+                )}
                 <span className={`badge ${p.statusKind === "idle" ? "run" : p.statusKind}`}>
                   {badgeLabel(p)}
                 </span>

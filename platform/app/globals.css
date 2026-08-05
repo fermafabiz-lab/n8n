@@ -1674,3 +1674,183 @@ a {
     display: none;
   }
 }
+
+/* ============================================================
+   Experience pass: skeletons, the finished flash, hover
+   previews, and the small-screen fit.
+   ============================================================ */
+
+/* --- loading skeletons --- */
+.skel {
+  background: linear-gradient(
+    100deg,
+    rgba(255, 255, 255, 0.045) 40%,
+    rgba(255, 255, 255, 0.09) 50%,
+    rgba(255, 255, 255, 0.045) 60%
+  );
+  background-size: 300% 100%;
+  border-radius: 8px;
+  animation: skel 1.4s ease infinite;
+}
+@keyframes skel {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -80% 0;
+  }
+}
+
+/* --- the finished moment: one warm flash over the whole page, in the
+   films' own transition language. Fast attack, slow decay — the same
+   asymmetric envelope as remotion's LightLeak. --- */
+.finflash {
+  position: fixed;
+  inset: 0;
+  /* Lives inside .page's stacking context (z 1), so it paints UNDER the
+     frosted nav pill — whose backdrop-filter samples it as a warm blur.
+     That under-the-glass look is the accepted behaviour, not an accident. */
+  z-index: 60;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  /* Base opacity matters: keyframe values exist only while the animation
+     runs, and prefers-reduced-motion strips animations globally — without
+     this, those users got the flash at FULL strength for 1.5s instead of
+     not at all. */
+  opacity: 0;
+  background:
+    radial-gradient(ellipse 65% 120% at 30% 45%, rgba(255, 226, 178, 0.9) 0%, rgba(255, 150, 64, 0.4) 40%, rgba(255, 150, 64, 0) 70%),
+    linear-gradient(101deg, rgba(255, 244, 214, 0) 15%, rgba(255, 244, 214, 0.6) 32%, rgba(255, 244, 214, 0) 48%);
+  animation: finflash 1.4s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+@keyframes finflash {
+  0% {
+    opacity: 0;
+    transform: translateX(-24%);
+  }
+  16% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(30%);
+  }
+}
+
+/* --- hover preview on finished covers --- */
+.hoverprev {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  animation: hoverprev 0.4s ease 0.12s forwards;
+}
+@keyframes hoverprev {
+  to {
+    opacity: 1;
+  }
+}
+
+/* --- paired form fields that stack on small screens --- */
+.cols2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+/* On a phone, minmax(340px, …) forces a track wider than the viewport and
+   the whole grid sidescrolls. min() caps the floor at the container. */
+.projects {
+  grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr));
+}
+
+/* --- small screens: the approval loop finally treated as a first-class
+   surface, not a shrunken desktop --- */
+@media (max-width: 900px) {
+  /* .stats drops to 2x2 here (rule above); redraw its hairlines for the
+     new geometry: left edge stays clean, second row gets a top rule. */
+  .stat:nth-child(odd) {
+    border-left: none;
+    padding-left: 0;
+  }
+  .stat:nth-child(n + 3) {
+    border-top: 1px solid var(--line);
+  }
+}
+@media (max-width: 720px) {
+  .page {
+    padding: 0 18px;
+  }
+  .nav {
+    padding: 10px 10px 0;
+  }
+  .nav .in {
+    gap: 14px;
+    height: 50px;
+    padding: 0 8px 0 18px;
+  }
+  .nav a.navlink {
+    display: none; /* the brand is the same link */
+  }
+  .navfade {
+    height: 84px;
+  }
+  .hero {
+    padding: 48px 0 24px;
+  }
+  .hero h1 {
+    font-size: clamp(32px, 9.4vw, 44px);
+  }
+  .room {
+    padding: 28px 0 56px;
+  }
+  .ptitle {
+    font-size: clamp(24px, 7.6vw, 34px);
+  }
+  .eyebrow {
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+  .ftabs {
+    gap: 14px;
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .specs {
+    gap: 6px 16px;
+  }
+  .cols2 {
+    grid-template-columns: 1fr;
+  }
+  .plrow {
+    grid-template-columns: 96px minmax(0, 1fr);
+    /* The base 20px gap doubles as row-gap once .st wraps to row 2 —
+       tighten so the status hugs the title instead of floating below it. */
+    gap: 2px 14px;
+  }
+  .plrow .th {
+    width: 96px;
+  }
+  .plrow .st {
+    /* No third column on a phone — the status drops under the title
+       instead of vanishing. */
+    grid-column: 2;
+    text-align: left;
+    margin-top: 2px;
+  }
+  .swrow {
+    grid-template-columns: 24px minmax(0, 1fr) auto;
+    gap: 12px;
+  }
+  .monitor.portrait .scr {
+    height: 420px;
+  }
+  .fsec > header {
+    flex-wrap: wrap;
+  }
+  .fsec .fhint {
+    display: none;
+  }
+}

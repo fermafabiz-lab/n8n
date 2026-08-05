@@ -14,6 +14,7 @@ import StageChime from "@/components/StageChime";
 import ResumeButton from "@/components/ResumeButton";
 import AutoResume from "@/components/AutoResume";
 import ExpandableTitle from "@/components/ExpandableTitle";
+import FinishedFlash from "@/components/FinishedFlash";
 import OpsPanel from "@/components/OpsPanel";
 import AssemblyStatus from "@/components/AssemblyStatus";
 import ProductionActivity from "@/components/ProductionActivity";
@@ -215,6 +216,13 @@ export default async function ProductionRoom({
         ]}
       />
       <AutoResume projectId={id} stalled={stalled} />
+      {/* Mounted on every visit (not just when finished): it has to see the
+          project unfinished first, or it could never tell "just landed" from
+          "was always done". */}
+      <FinishedFlash
+        projectId={id}
+        finished={!!project.finalVideoUrl && project.finalVideoUrl.startsWith("http")}
+      />
       <div className="room">
         {/* Breadcrumb + live status in one tracked line; the name itself is
             the title right below, not crumb text. */}

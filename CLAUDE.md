@@ -416,6 +416,24 @@ them on every publish. Ignore those four; do not wire them back.
   vocabularies byte-identical — the 2026-08 editorial rebuild moved them into
   hidden inputs bound to React state, nothing more. Every non-submit button
   inside the form must carry `type="button"`.
+- **Refusal notes get translated to next steps** by `platform/lib/refusals.ts`
+  (wired into ProductionActivity and SceneBoard). Match only literal pipeline
+  codes, never bare words or bare numbers: `\bminor\b` hit ordinary reviewer
+  feedback (and Romanian "minoră"), and `\b5\d\d\b` hit scene ORDERS — the
+  chapters convention is `chapter*100+scene`, so "scene 503" is data, not an
+  HTTP status. The deterministic-refusal branch must stay ahead of the
+  transient branch.
+- **Verifying mobile from a Claude Code web session:** headless Chromium
+  refuses windows narrower than 500px — `--window-size=390,...` silently
+  renders a 500px viewport and CROPS the screenshot to 390, which looks like
+  catastrophic overflow that isn't there. Simulate a real 390px viewport with
+  `--window-size=500,H --force-device-scale-factor=1.282` instead.
+- **prefers-reduced-motion strips ALL animations globally** (the `*` rule in
+  globals.css). Anything revealed by animation must set its resting state in
+  the BASE rule (`.finflash` needs `opacity: 0` there, or reduced-motion users
+  get the flash at full strength), and anything that starts a download for an
+  animated payoff (hover video previews) must skip the download entirely when
+  the media query matches.
 - **Drive-hosted media must go through `platform/app/api/media`, never the
   Railway `/media`.** The render server's version buffers the whole file and
   answers a plain 200: no `Accept-Ranges` and the `Range` header ignored. A

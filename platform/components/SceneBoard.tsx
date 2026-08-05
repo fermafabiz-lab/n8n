@@ -10,6 +10,7 @@ import {
 } from "@/app/actions";
 import type { Scene, StatusKind } from "@/lib/data";
 import { mediaSrc } from "@/lib/media";
+import { explainRefusal } from "@/lib/refusals";
 import MediaPlayer from "@/components/MediaPlayer";
 import RegenBadge from "@/components/RegenBadge";
 
@@ -290,9 +291,19 @@ export default function SceneBoard({
                 {!active.regenImage &&
                   active.note &&
                   /REJECTED|AUTO-REWRITE|failed|error/i.test(active.note) && (
-                    <p className="formmsg err" style={{ marginTop: 8 }}>
+                    <div className="formmsg err" style={{ marginTop: 8 }}>
                       {active.note}
-                    </p>
+                      {(() => {
+                        const why = explainRefusal(active.note);
+                        return why ? (
+                          <span
+                            style={{ display: "block", marginTop: 5, color: "var(--soft)", fontSize: 12 }}
+                          >
+                            {why.cause}. {why.advice}
+                          </span>
+                        ) : null;
+                      })()}
+                    </div>
                   )}
                 {active.regenImage ? (
                   <RegenBadge label="Regenerating image…" note={active.note} />

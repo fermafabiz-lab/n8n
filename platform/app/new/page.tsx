@@ -248,14 +248,7 @@ export default function NewVideo() {
                 <h2>Format &amp; voices</h2>
               </header>
               <CategoryPicker onMeta={setCatMeta} />
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: 18,
-                  marginTop: 18,
-                }}
-              >
+              <div className="cols2" style={{ marginTop: 18 }}>
                 <div className="field">
                   <label htmlFor="length">
                     Length (seconds) — ≈ {scenes} scenes of 8s

@@ -196,6 +196,43 @@ literal text in it — the writing prompts are assembled from expressions
 different node. Follow the expression, not the string. This exact mistake
 produced a confident and completely wrong "the feature was never built".
 
+### Evidence retrieval (Claude Scripting)
+
+Scripts on researched topics are written against a pack of sourced claims,
+not from model memory. The chain, all inside Claude Scripting:
+
+```
+If Needs Research → Research Tema ──┐
+                    No Research ────┴→ Extract Claims → Generate Story Bible
+                                              └→ Prep Evidence Rows → Save Evidence
+Split All Scenes → Validate Evidence Refs → Save scenes To Airtable1
+```
+
+- `Research Tema` (GPT with built-in web search — no Tavily/Brave, no extra
+  keys) outputs `NOTES:` plus a `CLAIMS:` section, one claim per line:
+  `CLAIM: … | SOURCE: … | URL: … | DATE: …`. Claims without a resolvable URL
+  are dropped by `Extract Claims`, never invented.
+- `Extract Claims` assigns refs `E1..E20` and sits on BOTH branches, so
+  `$('Extract Claims')` is always safe to reference downstream — the
+  fiction/No-Research branch just yields zero claims. Its `output` field
+  (notes + claims list) is what `Generate Story Bible` reads as
+  RESEARCH NOTES; do not rename it.
+- The claims list is interpolated into `Write Chapter Narration`
+  (VERIFIED FACTS) and `Segment Chapter Into Scenes` (EVIDENCE TAGGING).
+  The segmenter marks each scene `evidence_required` + `evidence_ref`.
+- `Validate Evidence Refs` keeps only refs that exist in the pack; a scene
+  that claimed a fact it can't back gets `Needs Fact Check` in Airtable.
+  This validation is code, not another model — an invented ID cannot survive.
+- Evidence rows live in Airtable table `Evidence` (`tblU26cUiQQV2eNdg`),
+  linked to the project. Fewer than 6 claims on a researched topic sets the
+  project's `Research Thin` checkbox (script proceeds, human reviews).
+- `Save Evidence` is `onError: continueRegularOutput` — evidence storage is
+  an audit trail and must never kill scripting. It writes via HTTP with the
+  Airtable PAT credential, batched 10 records per request.
+- Known gaps: re-running scripting for the same project duplicates its
+  Evidence rows, and the scene-text regen path rewrites narration without
+  revalidating its `evidence_ref`.
+
 ### The stage chain in Media Generation
 
 The three stages are gated the same way — a loop, then a Wait/Fetch/Evaluate/If

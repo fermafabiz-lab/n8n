@@ -28,6 +28,9 @@ export interface Category {
   description: string;
   /** Fully functional today. Unready ones are selectable but say so. */
   ready: boolean;
+  /** No spoken words at all: no narrator picker, no TTS, captions forced
+   *  off — the film carries only its own sound effects. */
+  noNarration?: boolean;
   options: CategoryOption[];
 }
 
@@ -97,6 +100,16 @@ export const CATEGORIES: Category[] = [
         comingSoon: true,
       },
     ],
+  },
+  {
+    id: "cinematic",
+    label: "Cinematic",
+    icon: "🎬",
+    description:
+      "No narration at all — a pure visual film carried by its own sound: engines, tires, rain, impacts. For car scenes, action sequences, atmosphere pieces.",
+    ready: true,
+    noNarration: true,
+    options: [],
   },
   {
     id: "kids",

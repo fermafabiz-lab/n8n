@@ -539,6 +539,13 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     chapter_cards: String(formData.get("chapter_cards") ?? "yes"),
     end_screen: String(formData.get("end_screen") ?? "yes"),
   };
+  // A no-narration category has nothing to speak and nothing to caption —
+  // enforce that server-side no matter what the form controls held.
+  if (payload.category === "cinematic") {
+    payload.voice_id = "";
+    payload.cast_voices = [];
+    payload.captions = "no";
+  }
   const projectName = payload["Nume Proiect"];
   let newProjectId: string | null = null;
   let webhookError: string | null = null;

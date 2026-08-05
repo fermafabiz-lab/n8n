@@ -271,6 +271,32 @@ So "sound effects" = the Veo clips' own generated ambience:
   ships with the repo but Railway deploys are manual), then check whether
   the veo-3.1-lite clips actually carry an audio stream (`/inspect`).
 
+### The Cinematic category (silent film)
+
+`category: 'cinematic'` in Editing Options = no spoken words anywhere. How
+each piece handles it:
+
+- **Site**: the category has `noNarration: true` in `categories.ts` — no
+  narrator/cast pickers; `createProject` force-clears `voice_id`/`cast` and
+  forces captions off server-side.
+- **Scripting**: `Voice Mode` emits silent-film rules. The "narration" is
+  written anyway but as an unspoken VISUAL BEAT SHEET — the word-count
+  math still drives scene count, so do not remove it. Scenes are created
+  with **`Aprobare Voce` already checked**.
+- **Media Generation**: `AB No Speech?` (after `AB Load Project`) loops
+  past TTS entirely; `Evaluate Voice Approval` waives the Voiceover-URL
+  requirement for cinematic. The audio stage therefore completes on its
+  own and video starts immediately.
+- **Final Assembly**: scenes have no `audioUrl`; `/assemble`'s `it.a ??
+  it.v` fallback makes each clip's own track the scene's main audio (the
+  Veo prompt guardrail keeps it speech/music-free), scene length = clip
+  length (no elastic retime). `Build Remotion Props` forces
+  `showCaptions: false` for cinematic — `Script Scenă` holds the beat
+  sheet, and captioning it would print stage directions on screen.
+- Untested end to end as of writing. Watch for: the site's Audio stage
+  shows green immediately (correct); hook title still works (on-screen
+  text only).
+
 ### The stage chain in Media Generation
 
 The three stages are gated the same way — a loop, then a Wait/Fetch/Evaluate/If

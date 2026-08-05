@@ -143,8 +143,22 @@ export default function CategoryPicker() {
       {/* Voice setup — ONE place, shaped by the multi-voice choice above:
           off       -> the classic single narrator picker
           chapters  -> only the cast (they ARE the narrators)
-          characters-> narrator yes/no, then narrator picker + cast */}
-      {(() => {
+          characters-> narrator yes/no, then narrator picker + cast
+          noNarration categories skip all of it — nobody speaks. */}
+      {cat.noNarration ? (
+        <div
+          className="card"
+          style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "12px 14px", marginTop: 12 }}
+        >
+          <span style={{ fontSize: 16 }}>🔇</span>
+          <div style={{ fontSize: 12.5, color: "var(--soft)", lineHeight: 1.55 }}>
+            No voices in this category — there is no narrator to pick and
+            nothing is synthesized. The finished film carries only each
+            scene&apos;s own sound (engines, weather, impacts…), and captions
+            are off since there are no spoken words to caption.
+          </div>
+        </div>
+      ) : (() => {
         const mv = cat.options.find((o) => o.name === "multi_voice");
         const mode = mv ? String(val("multi_voice", mv.default)) : "off";
         const narr = String(val("narration", "with"));

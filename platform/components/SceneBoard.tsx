@@ -9,6 +9,7 @@ import {
   type ActionResult,
 } from "@/app/actions";
 import type { Scene, StatusKind } from "@/lib/data";
+import { mediaSrc } from "@/lib/media";
 import MediaPlayer from "@/components/MediaPlayer";
 import RegenBadge from "@/components/RegenBadge";
 
@@ -345,15 +346,14 @@ export default function SceneBoard({
                 >
                   Voiceover — listen, edit the narration, regenerate if needed
                 </label>
-                {/* Native player via our Railway media proxy — Drive's embed
-                    player overlaps its own controls at this column width. */}
+                {/* Native player via /api/media — Drive's embed player overlaps
+                    its own controls at this column width, and the proxy is what
+                    keeps the take seekable. */}
                 <audio
                   key={`voice-${active.id}-${active.voiceUrl}`}
                   controls
                   preload="none"
-                  src={`https://n8n-production-55dd.up.railway.app/media?id=${
-                    active.voiceUrl.match(/[?&]id=([\w-]+)/)?.[1] ?? ""
-                  }`}
+                  src={mediaSrc(active.voiceUrl)}
                   style={{ width: "100%", height: 40, display: "block" }}
                 />
                 <textarea

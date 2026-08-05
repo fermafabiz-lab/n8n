@@ -10,6 +10,7 @@ import {
   type ActionResult,
 } from "@/app/actions";
 import type { Scene } from "@/lib/data";
+import { mediaSrc } from "@/lib/media";
 import RegenBadge from "@/components/RegenBadge";
 import VoicePicker from "@/components/VoicePicker";
 
@@ -26,11 +27,11 @@ import VoicePicker from "@/components/VoicePicker";
  * the lines worth stopping on so the rest never need to be opened.
  */
 
-/** Drive links are proxied — the native player needs a real MIME type. */
-const audioSrc = (voiceUrl: string): string => {
-  const id = voiceUrl.match(/[?&]id=([\w-]+)/)?.[1] ?? "";
-  return id ? `https://n8n-production-55dd.up.railway.app/media?id=${id}` : voiceUrl;
-};
+/**
+ * Drive links are proxied — the native player needs a real MIME type, and
+ * /api/media keeps byte ranges intact so a take can actually be scrubbed.
+ */
+const audioSrc = mediaSrc;
 
 /**
  * Narration is written to ~22 words per 8s scene, so a line's duration should

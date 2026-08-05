@@ -372,6 +372,19 @@ them on every publish. Ignore those four; do not wire them back.
 
 - The project page auto-refreshes every 10s, which remounts components. Drafts
   in progress must be backed by `sessionStorage` to survive it.
+- **Drive-hosted media must go through `platform/app/api/media`, never the
+  Railway `/media`.** The render server's version buffers the whole file and
+  answers a plain 200: no `Accept-Ranges` and the `Range` header ignored. A
+  browser plays such a response progressively but **cannot seek**, which
+  presented as "the player is broken — I can't scrub the final video". Final
+  videos (`Link Video Final`) and voiceovers are Drive URLs, so all three
+  players were affected; scene clips are on fal.media and were always fine
+  because a CDN honours ranges. `mediaSrc()` in `platform/lib/media.ts` is the
+  single place that decides, and it deliberately proxies **only**
+  `drive.google.com` — pushing CDN-hosted clips through our own function would
+  cost Vercel bandwidth for nothing. A 206 is returned `private, no-store`: a
+  cache keyed on URL alone would serve one partial response for a different
+  range, which looks like a corrupt file rather than a caching bug.
 - Count **approvals**, not asset existence, for pipeline progress. Counting
   clips that merely exist made "Video" tick green before review.
 - Transient states need a grace period. The render-error panel fires on healthy

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { driveId, mediaSrc } from "@/lib/media";
 
 /**
  * Plays a clip regardless of where it's hosted.
@@ -12,22 +13,12 @@ import { useEffect, useRef, useState } from "react";
  * instead of whatever was baked in at generation time.
  *
  * Google Drive's uc?export=download links answer with redirects/HTML instead
- * of a video MIME type, so <video> refuses them. They go through the Railway
- * /media proxy, which re-serves them with a real Content-Type; if that fails,
- * we fall back to Drive's own embed player (which can't carry the overlay).
+ * of a video MIME type, so <video> refuses them. They go through /api/media,
+ * which re-serves them with a real Content-Type and — unlike the old Railway
+ * proxy — with byte ranges intact, which is what makes the clip seekable. If
+ * that fails, we fall back to Drive's own embed player (which can't carry the
+ * overlay).
  */
-const PROXY = "https://n8n-production-55dd.up.railway.app/media?id=";
-
-const driveId = (url: string): string | null => {
-  const m = url.match(/[?&]id=([\w-]+)/) ?? url.match(/\/file\/d\/([\w-]+)/);
-  return m ? m[1] : null;
-};
-
-/** Playable source for a Drive-hosted or direct URL. */
-const playable = (url: string): string => {
-  const id = url.includes("drive.google.com") ? driveId(url) : null;
-  return id ? PROXY + id : url;
-};
 
 export default function MediaPlayer({
   url,
@@ -118,7 +109,7 @@ export default function MediaPlayer({
     <>
       <video
         ref={videoRef}
-        src={playable(url)}
+        src={mediaSrc(url)}
         controls
         preload="metadata"
         // The clip carries no narration; muting also stops any residual
@@ -127,7 +118,7 @@ export default function MediaPlayer({
         onError={() => setFailed(true)}
         style={frameStyle}
       />
-      {audioUrl && <audio ref={audioRef} src={playable(audioUrl)} preload="metadata" />}
+      {audioUrl && <audio ref={audioRef} src={mediaSrc(audioUrl)} preload="metadata" />}
     </>
   );
 }

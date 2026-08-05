@@ -203,10 +203,19 @@ not from model memory. The chain, all inside Claude Scripting:
 
 ```
 If Needs Research → Research Tema ──┐
-                    No Research ────┴→ Extract Claims → Generate Story Bible
-                                              └→ Prep Evidence Rows → Save Evidence
+                    No Research ────┴→ Extract Claims → Prep Evidence Rows
+   → Save Evidence → Evidence Done → Generate Story Bible
 Split All Scenes → Validate Evidence Refs → Save scenes To Airtable1
 ```
+
+Save Evidence is deliberately IN-LINE before the Story Bible, not a side
+branch: n8n flushes parallel branches at the very end of the run, so a
+scripting execution canceled mid-way (844) kept its scenes but silently
+lost its evidence rows. In-line, claims land in Airtable during the first
+minute. `Evidence Done` collapses the per-batch items back to the Extract
+Claims payload so the Story Bible prompt keeps reading `$json.output`;
+`Prep Evidence Rows` emits a `records: []` passthrough when there are no
+claims so fiction projects flow through unharmed.
 
 - `Research Tema` (GPT with built-in web search — no Tavily/Brave, no extra
   keys) outputs `NOTES:` plus a `CLAIMS:` section, one claim per line:

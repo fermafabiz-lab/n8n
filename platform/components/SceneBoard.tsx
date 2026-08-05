@@ -86,6 +86,26 @@ export default function SceneBoard({
   const active =
     scenes.find((s) => s.id === selectedId) ?? running ?? scenes[0] ?? null;
 
+  // A 44-scene project turned the filmstrip into a wall of unreadable
+  // thumbnails. Page it by 8 with arrows; picking a scene from the list in
+  // the inspector jumps the strip to that scene's page.
+  const PAGE_SIZE = 8;
+  const pageCount = Math.max(1, Math.ceil(scenes.length / PAGE_SIZE));
+  const activeIndex = Math.max(
+    0,
+    scenes.findIndex((s) => s.id === active?.id),
+  );
+  const [pageRaw, setPage] = useState(() => Math.floor(activeIndex / PAGE_SIZE));
+  const page = Math.min(pageRaw, pageCount - 1);
+  const select = (id: string) => {
+    setSelectedId(id);
+    const i = scenes.findIndex((s) => s.id === id);
+    if (i >= 0) setPage(Math.floor(i / PAGE_SIZE));
+  };
+  const visible = scenes
+    .map((s, i) => ({ s, i }))
+    .slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+
   // Bulk approval only unlocks once EVERY scene has the asset generated —
   // approving placeholders early used to open the n8n gate prematurely and
   // start the next phase with missing images.
@@ -135,7 +155,17 @@ export default function SceneBoard({
             )}
           </div>
           <div className="filmstrip">
-            {scenes.map((s, i) => (
+            {pageCount > 1 && (
+              <button
+                className="fsnav"
+                onClick={() => setPage(Math.max(0, page - 1))}
+                disabled={page === 0}
+                aria-label="Previous scenes"
+              >
+                ‹
+              </button>
+            )}
+            {visible.map(({ s, i }) => (
               <div
                 className={`fr ${frClass(s.statusKind)} ${s.id === active?.id ? "act" : ""}`}
                 key={s.id}
@@ -154,7 +184,23 @@ export default function SceneBoard({
                 <span className="dot" />
               </div>
             ))}
+            {pageCount > 1 && (
+              <button
+                className="fsnav"
+                onClick={() => setPage(Math.min(pageCount - 1, page + 1))}
+                disabled={page === pageCount - 1}
+                aria-label="Next scenes"
+              >
+                ›
+              </button>
+            )}
           </div>
+          {pageCount > 1 && (
+            <div className="fspage">
+              Scenes {page * PAGE_SIZE + 1}–
+              {Math.min(scenes.length, (page + 1) * PAGE_SIZE)} of {scenes.length}
+            </div>
+          )}
         </div>
       </div>
 
@@ -190,6 +236,20 @@ export default function SceneBoard({
               <span>Status</span>
               <b>{active.status}</b>
             </div>
+            {active.evidenceRef && (
+              <div className="kv">
+                <span>Evidence</span>
+                <span className="chip ok" title="Sourced claims backing this scene — full sources in the Airtable Evidence table">
+                  {active.evidenceRef}
+                </span>
+              </div>
+            )}
+            {active.needsFactCheck && (
+              <p className="formmsg err" style={{ marginTop: 8 }}>
+                Fact check needed — this scene states a fact the research pack
+                could not back with a source. Verify the narration by hand.
+              </p>
+            )}
 
             {!active.imageApproved && (
               <>
@@ -465,7 +525,7 @@ export default function SceneBoard({
             <div
               className="kv"
               key={s.id}
-              onClick={() => setSelectedId(s.id)}
+              onClick={() => select(s.id)}
               style={{ cursor: "pointer" }}
             >
               <span>

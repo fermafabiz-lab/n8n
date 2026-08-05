@@ -69,6 +69,11 @@ export interface Scene {
   regenVoice: boolean;
   /** "Observații Scenă" — reviewer feedback in, rejection reasons back out. */
   note: string | null;
+  /** Refs (E1, E3…) of the Evidence claims backing this scene's narration.
+   *  Validated by the scripting workflow — an invented ID never lands here. */
+  evidenceRef: string | null;
+  /** Scripting couldn't back this scene's factual claim with a real source. */
+  needsFactCheck: boolean;
   status: string;
   statusKind: StatusKind;
 }
@@ -170,6 +175,8 @@ const F = {
   sceneRegenVideo: ["Regenerează Video", "Regenereaza Video"],
   sceneRegenVoice: ["Regenerează Voce", "Regenereaza Voce"],
   sceneNote: ["Observații Scenă", "Observatii Scena"],
+  sceneEvidenceRef: ["Evidence Ref"],
+  sceneNeedsFactCheck: ["Needs Fact Check"],
   sceneStatus: ["Status Producție Scenă", "Status"],
 };
 
@@ -305,6 +312,8 @@ function toScene(r: AirtableRecord, index: number): Scene {
     regenVideo: Boolean(pick(r.fields, F.sceneRegenVideo)),
     regenVoice: Boolean(pick(r.fields, F.sceneRegenVoice)),
     note: (pick(r.fields, F.sceneNote) as string) ?? null,
+    evidenceRef: (pick(r.fields, F.sceneEvidenceRef) as string) || null,
+    needsFactCheck: Boolean(pick(r.fields, F.sceneNeedsFactCheck)),
     status: displayStatus(status),
     statusKind: kind,
   };
@@ -504,6 +513,8 @@ const DEMO_SCENES: Scene[] = Array.from({ length: 8 }, (_, i) => {
     regenVideo: false,
     regenVoice: false,
     note: null,
+    evidenceRef: i === 1 ? "E1, E2" : null,
+    needsFactCheck: false,
     voiceApproved: i < 3,
     imageApproved: i < 4,
     videoApproved: i < 2,

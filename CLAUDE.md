@@ -433,12 +433,12 @@ expected and harmless for an app touching only its own Drive.
   synthesis. The batch never overwrites an existing voiceover, so the pin
   sticks.
 - **Auto-assembly has NEVER fired on wf7** — every Final Assembly execution
-  is `mode: webhook` (the site's Restart button). The orchestrator only calls
-  assembly after the batch returns, and batches don't return: today's sat in
-  the settings gate unreleased 30+ minutes after the status moved past
-  'Setări Finale', on gate code verified to release on any such move, while a
-  prior run proved the same 15s loop can poll for 2h. The in-memory Wait
-  timer appears to die. Diagnosed, not yet fixed — this half lives in n8n.
+  is `mode: webhook`. The batch's settings gate (15s Wait loop) dies rather
+  than release, proven again on the first cinematic project. **Bypassed, not
+  fixed**: `confirmFinalSettings` now fires the assemble webhook itself
+  right after flipping the status, so the manual Restart click became the
+  automatic path. The n8n gate still exists and still never fires — if it
+  is ever repaired, add dedup or the same project renders twice.
   The site half is fixed: `getAssemblyState()` now returns an explicit
   `stopped` verdict (true only when n8n answered and nothing is alive
   anywhere), and `page.tsx` shows the "render stopped" panel only on that

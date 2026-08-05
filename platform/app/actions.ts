@@ -345,20 +345,31 @@ export async function confirmFinalSettings(
       });
     }
     await writeProjectFields(projectId, { "Status General": "Asamblare" });
+    // Start the render OURSELVES via the assemble webhook — the proven path
+    // every successful render has used. The n8n settings gate (a 15s Wait
+    // loop in the batch that should notice the status change and release)
+    // has never fired on its own on this instance: its in-memory timer dies,
+    // production sits "Assembling" forever, and the producer ends up pressing
+    // Restart render by hand on every single video. Firing here makes that
+    // manual click the automatic behaviour.
+    const fired = await fireAssembleWebhook(projectId);
     revalidatePath(`/projects/${projectId}`);
     return {
       ok: true,
-      message: settings
-        ? "Settings saved — final assembly starts within ~15s."
-        : "Keeping the original settings — final assembly starts within ~15s.",
+      message: fired.ok
+        ? settings
+          ? "Settings saved — rendering started."
+          : "Keeping the original settings — rendering started."
+        : `Settings saved, but starting the render failed (${fired.message}) — press Restart render below.`,
     };
   } catch (e) {
     return { ok: false, message: friendlyError(e) };
   }
 }
 
-/** Re-trigger the final render after it died, without redoing production. */
-export async function retryAssembly(projectId: string): Promise<ActionResult> {
+/** POST the Final Assembly webhook for a project. Shared by the
+ *  final-settings confirm and the manual Restart render button. */
+async function fireAssembleWebhook(projectId: string): Promise<ActionResult> {
   const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
   const webhook =
     process.env.N8N_ASSEMBLE_WEBHOOK_URL ??
@@ -374,14 +385,21 @@ export async function retryAssembly(projectId: string): Promise<ActionResult> {
       signal: AbortSignal.timeout(20000),
     });
     if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
-    revalidatePath(`/projects/${projectId}`);
-    return {
-      ok: true,
-      message: "Render restarted — it picks up the approved clips, nothing is regenerated.",
-    };
+    return { ok: true, message: "started" };
   } catch (e) {
     return { ok: false, message: friendlyError(e) };
   }
+}
+
+/** Re-trigger the final render after it died, without redoing production. */
+export async function retryAssembly(projectId: string): Promise<ActionResult> {
+  const fired = await fireAssembleWebhook(projectId);
+  if (!fired.ok) return fired;
+  revalidatePath(`/projects/${projectId}`);
+  return {
+    ok: true,
+    message: "Render restarted — it picks up the approved clips, nothing is regenerated.",
+  };
 }
 
 /**

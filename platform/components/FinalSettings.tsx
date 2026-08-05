@@ -49,6 +49,13 @@ const OPTIONS: Array<{
     off: "The video ends on the last scene",
     icon: "🎬",
   },
+  {
+    key: "sfx",
+    label: "Sound effects",
+    on: "Each scene's own ambience plays quietly under the narration — no voices or music from the clips, effects only",
+    off: "Narration and background music only — the clips stay silent",
+    icon: "🔊",
+  },
 ];
 
 export default function FinalSettings({

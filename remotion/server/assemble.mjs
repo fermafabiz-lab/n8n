@@ -13,8 +13,12 @@
 //     into the final seconds. SFX are generated locally with ffmpeg at first
 //     use (no asset files needed).
 //
-// POST /assemble { scenes: [{videoUrl, audioUrl}], musicUrl?, sceneChapters? }
-//   -> { jobId }
+// POST /assemble { scenes: [{videoUrl, audioUrl}], musicUrl?, sceneChapters?,
+//   nativeAudio? } -> { jobId }
+//   nativeAudio controls the clips' own tracks (Veo's generated ambience):
+//   false/0 silences them (narration + music only), a number sets their
+//   level (ducked under the narration), absent defaults to 0.22. The site's
+//   "Sound effects" toggle maps to this via n8n's Build Timeline.
 // GET  /assemble/:jobId/status -> { status, outputUrl, verify: {videoSeconds,
 //   audioSeconds, sceneStartsSeconds} } — verify comes from ffprobe on the
 //   result, so callers can confirm alignment numerically.

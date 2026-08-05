@@ -45,6 +45,9 @@ export interface EditingOptions {
   hookTitle: boolean;
   chapterCards: boolean;
   endScreen: boolean;
+  /** Scene sound effects in the final mix — the Veo clips' own ambience,
+   *  ducked under the narration. Off = narration (+ music) only. */
+  sfx: boolean;
 }
 
 export interface Scene {
@@ -254,6 +257,8 @@ function toProject(r: AirtableRecord): Project {
       hookTitle: opts.hookTitle !== false,
       chapterCards: opts.chapterCards !== false,
       endScreen: opts.endScreen !== false,
+      // Unlike the overlays, sound effects are opt-IN: absent means off.
+      sfx: opts.sfx === true,
     },
     awaitingFinalSettings: /setari finale/.test(normalizeStatus(status)),
     category: typeof (opts as { category?: unknown }).category === "string"
@@ -419,7 +424,7 @@ const DEMO_PROJECTS: Project[] = [
     finalVideoUrl: null,
     aspect: "16:9" as const,
     updatedAt: null,
-    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true },
+    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: false },
     awaitingFinalSettings: false,
     category: "story",
     narratorVoice: "",
@@ -438,7 +443,7 @@ const DEMO_PROJECTS: Project[] = [
     finalVideoUrl: null,
     aspect: "16:9" as const,
     updatedAt: null,
-    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true },
+    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: false },
     awaitingFinalSettings: false,
     category: "story",
     narratorVoice: "",
@@ -457,7 +462,7 @@ const DEMO_PROJECTS: Project[] = [
     finalVideoUrl: null,
     aspect: "16:9" as const,
     updatedAt: null,
-    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true },
+    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: false },
     awaitingFinalSettings: false,
     category: "story",
     narratorVoice: "",
@@ -476,7 +481,7 @@ const DEMO_PROJECTS: Project[] = [
     finalVideoUrl: "#",
     aspect: "16:9" as const,
     updatedAt: null,
-    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true },
+    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: false },
     awaitingFinalSettings: false,
     category: "story",
     narratorVoice: "",

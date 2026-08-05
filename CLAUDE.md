@@ -242,6 +242,35 @@ claims so fiction projects flow through unharmed.
   Evidence rows, and the scene-text regen path rewrites narration without
   revalidating its `evidence_ref`.
 
+### Sound effects (the `sfx` toggle)
+
+`Scene Final URL` is the RAW Veo clip re-hosted on Drive — there is no
+per-scene mux. The `Submit TTS` / `Submit Mux*` chains in Media Generation
+are dead leftovers (no input; CLAUDE.md already said to ignore them), and
+the narration is layered onto the clips only at Final Assembly (`/assemble`
+takes videoUrl + audioUrl per scene). The site's MediaPlayer does the same
+trick client-side, which is why scene previews have voice without any mux.
+
+So "sound effects" = the Veo clips' own generated ambience:
+
+- Both `Submit Video` nodes append a hard audio direction to every Veo
+  prompt: natural ambient sound effects only — no speech, no voices, no
+  singing, no narration, no music. Unconditional, so voices can never leak
+  into a clip regardless of the toggle.
+- `Editing Options.sfx` (set in the site's Final Settings panel, merged —
+  never overwritten — into the JSON) drives `Build Timeline` in Final
+  Assembly: ON → `nativeAudio: 0.25`, OFF → `nativeAudio: false`, always
+  explicit. The server sidechain-ducks the ambience under the narration, so
+  narration stays predominant by construction.
+- `confirmFinalSettings` used to REPLACE the whole Editing Options JSON
+  with three overlay keys, silently wiping `category`/`cast`/
+  `multiVoiceMode` at the final-settings step. It now merges via
+  `updateEditingOptions`. Never write that field wholesale.
+- If SFX are enabled and the final video still has none: check that the
+  Railway render server runs current `assemble.mjs` (the nativeAudio code
+  ships with the repo but Railway deploys are manual), then check whether
+  the veo-3.1-lite clips actually carry an audio stream (`/inspect`).
+
 ### The stage chain in Media Generation
 
 The three stages are gated the same way — a loop, then a Wait/Fetch/Evaluate/If

@@ -324,6 +324,7 @@ export async function confirmFinalSettings(
     hookTitle: boolean;
     chapterCards: boolean;
     endScreen: boolean;
+    sfx: boolean;
   },
 ): Promise<ActionResult> {
   if (!isConfigured) {
@@ -333,11 +334,14 @@ export async function confirmFinalSettings(
     if (settings) {
       await writeProjectFields(projectId, {
         "Fără Subtitrări": !settings.captions,
-        "Editing Options": JSON.stringify({
-          hookTitle: settings.hookTitle,
-          chapterCards: settings.chapterCards,
-          endScreen: settings.endScreen,
-        }),
+      });
+      // MERGED into the existing JSON, never overwritten — Editing Options
+      // also carries category/multi-voice state that this panel doesn't own.
+      await updateEditingOptions(projectId, {
+        hookTitle: settings.hookTitle,
+        chapterCards: settings.chapterCards,
+        endScreen: settings.endScreen,
+        sfx: settings.sfx,
       });
     }
     await writeProjectFields(projectId, { "Status General": "Asamblare" });

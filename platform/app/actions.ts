@@ -538,6 +538,7 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     hook_title: String(formData.get("hook_title") ?? "yes"),
     chapter_cards: String(formData.get("chapter_cards") ?? "yes"),
     end_screen: String(formData.get("end_screen") ?? "yes"),
+    sfx: String(formData.get("sfx") ?? "no"),
   };
   // A no-narration category has nothing to speak and nothing to caption —
   // enforce that server-side no matter what the form controls held.

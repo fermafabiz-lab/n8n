@@ -131,6 +131,16 @@ export default function NewVideo() {
         </div>
 
         <div className="field">
+          <label htmlFor="sfx">Sound effects</label>
+          <select id="sfx" name="sfx" defaultValue="no">
+            <option value="no">No — narration and music only</option>
+            <option value="yes">
+              Yes — each scene&apos;s own ambience plays quietly under the narration
+            </option>
+          </select>
+        </div>
+
+        <div className="field">
           <label htmlFor="pace">Pace</label>
           <select id="pace" name="pace" defaultValue="Normal">
             <option>Slow</option>

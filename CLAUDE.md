@@ -231,6 +231,13 @@ them on every publish. Ignore those four; do not wire them back.
 - Transient states need a grace period. The render-error panel fires on healthy
   gaps between executions; `AssemblyStatus` uses a 75s sessionStorage-backed
   grace before crying failure.
+- `ProductionActivity` (project page) mirrors the batch rule from `Sort & Cap
+  Scenes`: a scene is done for the batch once its clip exists, pending scenes
+  sort first, and `MEDIA_BATCH_CAP` in `platform/lib/n8n.ts` is a display
+  mirror of the CAP in that node — if Dan changes the cap in n8n, update the
+  constant too or the "N more runs needed" hint goes stale. The panel's
+  "likely on scene X" line is an estimate from landed assets and is labeled
+  as such; the batch reports no per-scene progress.
 
 ## Conventions
 

@@ -15,12 +15,15 @@ import AutoResume from "@/components/AutoResume";
 import ExpandableTitle from "@/components/ExpandableTitle";
 import OpsPanel from "@/components/OpsPanel";
 import AssemblyStatus from "@/components/AssemblyStatus";
+import ProductionActivity from "@/components/ProductionActivity";
 import {
   executionUrl,
   getAliveProduction,
   getAssemblyState,
   n8nConfigured,
   FINAL_ASSEMBLY_WORKFLOW_ID,
+  MEDIA_BATCH_CAP,
+  type ExecutionSummary,
 } from "@/lib/n8n";
 
 export const dynamic = "force-dynamic";
@@ -148,16 +151,19 @@ export default async function ProductionRoom({
       ? scriptInfo
       : null;
 
-  // Pause/Resume toggle state: is any production workflow running right now?
-  let hasRunning = false;
+  // What production is doing right now — drives Pause/Resume and the
+  // activity panel. null = the n8n API didn't answer (distinct from "nothing
+  // is running", which the panel is allowed to act on).
+  let aliveNow: ExecutionSummary[] | null = null;
   if (n8nConfigured) {
     try {
       // Alive = really working (zombie-filtered) — see getAliveProduction.
-      hasRunning = (await getAliveProduction()).length > 0;
+      aliveNow = await getAliveProduction();
     } catch {
       // n8n API unreachable — fall back to showing Resume.
     }
   }
+  const hasRunning = (aliveNow?.length ?? 0) > 0;
 
   // The render reports nothing while it works, so the page asks n8n directly
   // whether it is alive.
@@ -329,6 +335,23 @@ export default async function ProductionRoom({
             }
           />
         )}
+
+        {/* Live production activity: shown once media generation is the
+            phase (every scene approved) and until production hands over to
+            final settings/assembly. Answers what the batch is doing, whether
+            anything was refused, and how much tail is beyond the batch cap. */}
+        {scenes.length > 0 &&
+          scenes.every((s) => s.sceneApproved) &&
+          !project.awaitingFinalSettings &&
+          !assembling &&
+          project.statusKind !== "done" && (
+            <ProductionActivity
+              projectId={id}
+              alive={aliveNow}
+              scenes={scenes}
+              cap={MEDIA_BATCH_CAP}
+            />
+          )}
 
         {/* Voice gate: images are signed off, so synthesis is the current
             step — the panel appears as soon as the pipeline reaches it, even

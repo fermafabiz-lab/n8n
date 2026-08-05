@@ -108,6 +108,15 @@ export async function getExecutionError(id: string): Promise<ExecutionError | nu
 export const FINAL_ASSEMBLY_WORKFLOW_ID = "BY22Vlhh20Xdkr5Z";
 
 /**
+ * Display mirror of the CAP in Media Generation's "Sort & Cap Scenes" node:
+ * each batch run takes at most this many unfinished scenes (pending sort
+ * ahead of finished ones, so repeated runs converge). The real cap lives in
+ * the n8n workflow — changing it there without updating this constant only
+ * makes the "N more runs needed" hint wrong, nothing worse.
+ */
+export const MEDIA_BATCH_CAP = 8;
+
+/**
  * Executions doing actual production work right now.
  *
  * Two traps hide in n8n's execution list:

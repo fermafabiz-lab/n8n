@@ -381,6 +381,38 @@ export async function getProjects(): Promise<Project[]> {
     .sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""));
 }
 
+/**
+ * Just the production pulse — feeds the nav ticker. Fetches only the status
+ * column, so polling it every half minute costs a fraction of getProjects()
+ * (which also sweeps the whole Scene table for covers).
+ */
+export async function getStatusCounts(): Promise<{ run: number; wait: number; err: number }> {
+  const counts = { run: 0, wait: 0, err: 0 };
+  const tally = (status: string) => {
+    const { kind } = classifyStatus(status);
+    if (kind === "run") counts.run += 1;
+    else if (kind === "wait") counts.wait += 1;
+    else if (kind === "err") counts.err += 1;
+  };
+  if (!isConfigured) {
+    // Demo records carry a pre-translated English status string that the
+    // Romanian STATUS_MAP won't classify — their statusKind is the truth.
+    for (const p of DEMO_PROJECTS) {
+      if (p.statusKind === "run" || p.statusKind === "wait" || p.statusKind === "err")
+        counts[p.statusKind] += 1;
+    }
+    return counts;
+  }
+  // No fields[] restriction: Airtable answers 422 for an unknown field name,
+  // and the status column has two candidate names (F.projectStatus). A base
+  // using the fallback name would kill the ticker while the dashboard —
+  // which fetches full records — worked fine. Full records cost more bytes,
+  // but they can't disagree with the rest of the app about field names.
+  const records = await airtableList(PROJECTS_TABLE, "pageSize=100");
+  for (const r of records) tally(String(pick(r.fields, F.projectStatus) ?? ""));
+  return counts;
+}
+
 export async function getProject(id: string): Promise<Project | null> {
   if (!isConfigured) return DEMO_PROJECTS.find((p) => p.id === id) ?? DEMO_PROJECTS[0];
   const res = await fetch(

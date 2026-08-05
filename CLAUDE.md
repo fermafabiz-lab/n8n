@@ -403,6 +403,19 @@ them on every publish. Ignore those four; do not wire them back.
   mono labels instead of nested bordered boxes, one bloom behind the headline,
   no gradient-filled text. Review and approval surfaces deliberately kept their
   density — only the chrome changed.
+- **Project titles wear the film's own typeface.** `platform/lib/tone-type.ts`
+  mirrors `presetForTone()` from the render (Bodoni for dark, Anton for
+  motivational, etc. — keep the two maps in lockstep) and dresses the project
+  page title and the /new call-sheet preview. Anton is single-weight: nothing
+  may force a font-weight onto `.ptitle` (the old `.roomhead h1` rule did
+  exactly that and was deleted for it).
+- **The /new form's field names are a frozen contract.** `createProject()`
+  posts `name, category, cat_*, cast_voices, language, length, tone, pace,
+  style, voice_id, aspect, captions/hook_title/chapter_cards/end_screen/sfx
+  (yes|no)` to the n8n webhook. Any redesign keeps those names and value
+  vocabularies byte-identical — the 2026-08 editorial rebuild moved them into
+  hidden inputs bound to React state, nothing more. Every non-submit button
+  inside the form must carry `type="button"`.
 - **Drive-hosted media must go through `platform/app/api/media`, never the
   Railway `/media`.** The render server's version buffers the whole file and
   answers a plain 200: no `Accept-Ranges` and the `Range` header ignored. A

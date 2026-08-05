@@ -1,17 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CATEGORIES, DEFAULT_CATEGORY, getCategory } from "@/lib/categories";
 import CastPicker from "@/components/CastPicker";
 import VoicePicker from "@/components/VoicePicker";
 
+/** What the live call sheet needs to know about this picker's state. */
+export interface CategoryMeta {
+  category: string;
+  categoryLabel: string;
+  /** "silent" for no-narration categories, else the multi_voice mode. */
+  voiceMode: string;
+  ready: boolean;
+}
+
 /**
- * Category cards + the selected category's own options. The choice and every
+ * Category rows + the selected category's own options. The choice and every
  * option value are submitted with the form as hidden/named inputs
  * (`category`, `cat_<option>`); the server action packs them into the
- * payload for n8n.
+ * payload for n8n — nothing about that contract changes with the styling.
+ *
+ * Categories render as an editorial index (hairline rows, serif names, a mono
+ * tag for the unfinished ones) rather than a grid of boxes; the selected row
+ * is marked by an amber dot and full-ink type, not by a border.
  */
-export default function CategoryPicker() {
+export default function CategoryPicker({
+  onMeta,
+}: {
+  /** Reports selection changes upward so the call sheet can mirror them. */
+  onMeta?: (meta: CategoryMeta) => void;
+}) {
   const [selected, setSelected] = useState(DEFAULT_CATEGORY);
   const [values, setValues] = useState<Record<string, string | boolean>>({});
   const cat = getCategory(selected);
@@ -21,59 +39,48 @@ export default function CategoryPicker() {
   const setVal = (name: string, v: string | boolean) =>
     setValues((p) => ({ ...p, [`${selected}:${name}`]: v }));
 
+  const mv = cat.options.find((o) => o.name === "multi_voice");
+  const mode = mv ? String(val("multi_voice", mv.default)) : "off";
+  const narr = String(val("narration", "with"));
+  const withNarrator = mode === "characters" && narr !== "none";
+
+  useEffect(() => {
+    onMeta?.({
+      category: selected,
+      categoryLabel: cat.label,
+      voiceMode: cat.noNarration ? "silent" : mode,
+      ready: cat.ready,
+    });
+    // onMeta is a stable setter from the form page.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, mode]);
+
   return (
     <div className="field">
-      <label>Category — what kind of video this is</label>
       <input type="hidden" name="category" value={selected} />
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-          gap: 10,
-        }}
-      >
+      <div className="catrows">
         {CATEGORIES.map((c) => {
           const isSel = c.id === selected;
           return (
-            <div
+            <button
+              type="button"
               key={c.id}
+              className={`catrow ${isSel ? "on" : ""}`}
               onClick={() => setSelected(c.id)}
-              style={{
-                padding: "13px 14px",
-                borderRadius: 12,
-                cursor: "pointer",
-                background: isSel ? "rgba(245,184,65,0.08)" : "var(--card2)",
-                border: `1px solid ${isSel ? "rgba(245,184,65,0.45)" : "var(--line)"}`,
-              }}
             >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  fontSize: 13.5,
-                  fontWeight: 600,
-                  marginBottom: 4,
-                }}
-              >
-                <span style={{ fontSize: 16 }}>{c.icon}</span>
+              <h4>
+                <span className="dotmk">●</span>
                 {c.label}
-                {!c.ready && (
-                  <span className="chip wait" style={{ marginLeft: "auto" }}>
-                    in development
-                  </span>
-                )}
-              </div>
-              <div style={{ fontSize: 12, color: "var(--soft)", lineHeight: 1.5 }}>
-                {c.description}
-              </div>
-            </div>
+              </h4>
+              <span className="tag">{c.ready ? "" : "in development"}</span>
+              <p>{c.description}</p>
+            </button>
           );
         })}
       </div>
 
       {!cat.ready && (
-        <p className="formmsg" style={{ marginTop: 10 }}>
+        <p className="formmsg" style={{ marginTop: 12 }}>
           This category is being built. You can start a project with it — for
           now it produces a video the same way as Story, and its special
           options below switch on as they&apos;re finished.
@@ -81,35 +88,27 @@ export default function CategoryPicker() {
       )}
 
       {cat.options.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
+        <div style={{ marginTop: 6 }}>
           {cat.options.map((o) => {
             const v = val(o.name, o.default);
             const on = v === true || v === "true";
             return (
-              <div key={`${o.name}-wrap`}>
-              <div
-                key={o.name}
-                className="card"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: "11px 14px",
-                  opacity: o.comingSoon ? 0.75 : 1,
-                }}
-              >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>
+              <div key={o.name} className="optrow" style={{ opacity: o.comingSoon ? 0.6 : 1 }}>
+                <div className="txt">
+                  <h5>
                     {o.label}
                     {o.comingSoon && (
-                      <span className="chip wait" style={{ marginLeft: 8 }}>
+                      <span className="tag" style={{ marginLeft: 10 }}>
                         coming soon
                       </span>
                     )}
-                  </div>
-                  <div style={{ fontSize: 12, color: "var(--soft)" }}>{o.hint}</div>
+                  </h5>
+                  <p>{o.hint}</p>
                 </div>
                 {o.type === "toggle" ? (
+                  // Kept as a native checkbox on purpose: it submits "on"
+                  // exactly like the old form did, so the n8n payload shape
+                  // doesn't change under the redesign.
                   <input
                     type="checkbox"
                     name={`cat_${o.name}`}
@@ -134,7 +133,6 @@ export default function CategoryPicker() {
                   </select>
                 )}
               </div>
-              </div>
             );
           })}
         </div>
@@ -146,64 +144,47 @@ export default function CategoryPicker() {
           characters-> narrator yes/no, then narrator picker + cast
           noNarration categories skip all of it — nobody speaks. */}
       {cat.noNarration ? (
-        <div
-          className="card"
-          style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "12px 14px", marginTop: 12 }}
-        >
-          <span style={{ fontSize: 16 }}>🔇</span>
-          <div style={{ fontSize: 12.5, color: "var(--soft)", lineHeight: 1.55 }}>
-            No voices in this category — there is no narrator to pick and
-            nothing is synthesized. The finished film carries only each
-            scene&apos;s own sound (engines, weather, impacts…), and captions
-            are off since there are no spoken words to caption.
-          </div>
-        </div>
-      ) : (() => {
-        const mv = cat.options.find((o) => o.name === "multi_voice");
-        const mode = mv ? String(val("multi_voice", mv.default)) : "off";
-        const narr = String(val("narration", "with"));
-        const withNarrator = mode === "characters" && narr !== "none";
-        return (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 12 }}>
-            {mode === "characters" && (
-              <div
-                className="card"
-                style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 14px" }}
-              >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>
-                    Narration between dialogue
-                  </div>
-                  <div style={{ fontSize: 12, color: "var(--soft)" }}>
-                    With a narrator, the story keeps [NARRATOR] beats between
-                    the characters&apos; lines. Without one, the characters
-                    carry everything themselves.
-                  </div>
-                </div>
-                <select
-                  name="cat_narration"
-                  value={narr}
-                  onChange={(e) => setVal("narration", e.target.value)}
-                  style={{ width: "auto", flex: "none" }}
-                >
-                  <option value="with">With narrator</option>
-                  <option value="none">No narrator</option>
-                </select>
+        <p className="csnote" style={{ padding: "12px 2px", borderBottom: "1px solid var(--line)", margin: 0 }}>
+          No voices in this category — there is no narrator to pick and nothing
+          is synthesized. The finished film carries only each scene&apos;s own
+          sound (engines, weather, impacts…), and captions are off since there
+          are no spoken words to caption.
+        </p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 12 }}>
+          {mode === "characters" && (
+            <div className="optrow">
+              <div className="txt">
+                <h5>Narration between dialogue</h5>
+                <p>
+                  With a narrator, the story keeps [NARRATOR] beats between the
+                  characters&apos; lines. Without one, the characters carry
+                  everything themselves.
+                </p>
               </div>
-            )}
-            {(mode === "off" || withNarrator) && (
-              <VoicePicker
-                label={
-                  mode === "off"
-                    ? "Narrator voice — press ▶ to listen"
-                    : "Narrator voice — reads the parts between the characters' lines"
-                }
-              />
-            )}
-            {mode !== "off" && <CastPicker mode={mode} hasNarrator={withNarrator} />}
-          </div>
-        );
-      })()}
+              <select
+                name="cat_narration"
+                value={narr}
+                onChange={(e) => setVal("narration", e.target.value)}
+                style={{ width: "auto", flex: "none" }}
+              >
+                <option value="with">With narrator</option>
+                <option value="none">No narrator</option>
+              </select>
+            </div>
+          )}
+          {(mode === "off" || withNarrator) && (
+            <VoicePicker
+              label={
+                mode === "off"
+                  ? "Narrator voice — press ▶ to listen"
+                  : "Narrator voice — reads the parts between the characters' lines"
+              }
+            />
+          )}
+          {mode !== "off" && <CastPicker mode={mode} hasNarrator={withNarrator} />}
+        </div>
+      )}
     </div>
   );
 }

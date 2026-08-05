@@ -11,17 +11,22 @@ export default function ExpandableTitle({
   text,
   as: Tag = "h3",
   clampChars = 90,
+  className,
+  style,
 }: {
   text: string;
   as?: "h1" | "h3";
   clampChars?: number;
+  /** Lets the project page dress the title in the film's own typeface. */
+  className?: string;
+  style?: React.CSSProperties;
 }) {
   const [open, setOpen] = useState(false);
   const isLong = text.length > clampChars;
   const shown = open || !isLong ? text : text.slice(0, clampChars).trimEnd() + "…";
 
   return (
-    <Tag style={{ margin: 0 }}>
+    <Tag className={className} style={{ margin: 0, ...style }}>
       {shown}
       {isLong && (
         <button

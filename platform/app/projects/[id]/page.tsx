@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProject, getProjectScriptInfo, getScenes, type Scene } from "@/lib/data";
 import { getCategory } from "@/lib/categories";
+import { toneType } from "@/lib/tone-type";
 import SceneBoard from "@/components/SceneBoard";
 import ScriptReview from "@/components/ScriptReview";
 import SceneReview from "@/components/SceneReview";
@@ -215,21 +216,38 @@ export default async function ProductionRoom({
       />
       <AutoResume projectId={id} stalled={stalled} />
       <div className="room">
-        <div className="crumb">
-          <Link href="/">Projects</Link> /{" "}
-          <b>{project.name.length > 60 ? project.name.slice(0, 60).trimEnd() + "…" : project.name}</b>
+        {/* Breadcrumb + live status in one tracked line; the name itself is
+            the title right below, not crumb text. */}
+        <div className="eyebrow" style={{ marginBottom: 20 }}>
+          <Link href="/">Projects</Link>
+          <span style={{ color: "var(--dim)" }}>/</span>
+          <span>
+            <span className={`stdot ${project.statusKind}`}>●</span>{" "}
+            {project.status}
+          </span>
         </div>
         <div className="roomhead">
-          <div>
-            <ExpandableTitle text={project.name} as="h1" clampChars={110} />
-            <span className="sub">
-              {project.category
-                ? `${getCategory(project.category).icon} ${getCategory(project.category).label} · `
-                : ""}
-              {project.lengthSeconds ? `${project.lengthSeconds} seconds · ` : ""}
-              {scenes.length > 0 ? `${scenes.length} scenes · ` : ""}
-              {project.status}
-            </span>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            {/* The title wears the film's own typeface for this tone — the
+                same face the hook and chapter cards will render in. */}
+            <ExpandableTitle
+              text={project.name}
+              as="h1"
+              clampChars={110}
+              className={`ptitle ${toneType(project.tone).className}`}
+              style={
+                toneType(project.tone).uppercase
+                  ? { textTransform: "uppercase" }
+                  : undefined
+              }
+            />
+            <div className="specs">
+              {project.category && <span>{getCategory(project.category).label}</span>}
+              {project.lengthSeconds && <span>{project.lengthSeconds}s</span>}
+              {scenes.length > 0 && <span>{scenes.length} scenes</span>}
+              <span>{project.aspect}</span>
+              {project.tone && <span>{project.tone}</span>}
+            </div>
           </div>
           {project.statusKind !== "done" && scenes.length > 0 && (
             <ResumeButton projectId={id} running={hasRunning} />

@@ -1,5 +1,6 @@
 import { executionUrl, getExecutionError, getExecutions, n8nConfigured, getAliveProduction } from "@/lib/n8n";
 import { stopExecutionAction } from "@/app/actions";
+import Disclosure from "@/components/Disclosure";
 
 function ago(iso: string | null): string {
   if (!iso) return "—";
@@ -109,8 +110,20 @@ export default async function OpsPanel({
       )}
 
       {withErrors.length > 0 && (
+        // Collapsed to one hairline by default: failures are usually already
+        // dealt with, and the full red panel stood between the producer and
+        // their projects on every visit.
+        <Disclosure
+          storageKey={errorsOnly ? "errors-project" : "errors-dash"}
+          summary={
+            <>
+              <span className="tdot red" />
+              {withErrors.length} failure{withErrors.length === 1 ? "" : "s"} in the
+              last 24h
+            </>
+          }
+        >
         <div className="card errcard">
-          <h5>Recent errors (24h)</h5>
           {withErrors.map((f) => (
             <div className="kv" key={f.id} style={{ alignItems: "flex-start" }}>
               <span style={{ maxWidth: "75%" }}>
@@ -156,6 +169,7 @@ export default async function OpsPanel({
             </div>
           ))}
         </div>
+        </Disclosure>
       )}
     </div>
   );

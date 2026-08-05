@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Fraunces, IBM_Plex_Mono, Inter_Tight } from "next/font/google";
+import ProductionTicker from "@/components/ProductionTicker";
 import "./globals.css";
 
 /**
@@ -48,19 +49,24 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div className="glow g1" />
         <div className="glow g2" />
         <div className="vignette" />
+        <div className="navfade" />
         <nav className="nav">
           <div className="in">
-            <Link href="/" className="brand">
-              <span className="mk">▶</span>House of Videos
+            {/* The wordmark is the type pairing itself — the brand speaks the
+                same grotesque + italic serif the whole app (and the films) do. */}
+            <Link href="/" className="brand wm">
+              <span className="w1">House</span>
+              <span className="w2">of Videos</span>
             </Link>
             <Link href="/" className="navlink on">
               Projects
             </Link>
             <span className="sp" />
+            <ProductionTicker />
+            <span className="sp" />
             <Link href="/new" className="btn gold navcta">
               New video
             </Link>
-            <span className="av">F</span>
           </div>
         </nav>
         {children}

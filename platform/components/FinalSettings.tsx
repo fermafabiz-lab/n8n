@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { confirmFinalSettings, type ActionResult } from "@/app/actions";
+import Toggle from "@/components/Toggle";
 import type { EditingOptions } from "@/lib/data";
 
 /**
@@ -85,9 +86,7 @@ export default function FinalSettings({
       }}
     >
       <div className="sechead">
-        <h2>
-          <span style={{ marginRight: 8 }}>🎞</span>Final touches
-        </h2>
+        <h2>Final touches</h2>
         <span className="chip wait">Waiting on you</span>
       </div>
 
@@ -102,72 +101,35 @@ export default function FinalSettings({
 
       {msg && <p className={`formmsg ${msg.ok ? "ok" : "err"}`}>{msg.message}</p>}
 
+      {/* The last five decisions as a numbered index — hairlines and a drawn
+          switch, not a grid of boxed checkboxes. A changed row says so in
+          amber right next to its name. */}
       <div
+        className="swlist"
         style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-          gap: 10,
           opacity: done ? 0.5 : 1,
           pointerEvents: done ? "none" : undefined,
         }}
       >
-        {OPTIONS.map((o) => {
+        {OPTIONS.map((o, i) => {
           const on = opts[o.key];
           const moved = on !== initial[o.key];
           return (
-            <label
-              key={o.key}
-              className="card"
-              style={{
-                display: "flex",
-                alignItems: "flex-start",
-                gap: 12,
-                padding: "14px 15px",
-                cursor: "pointer",
-                borderColor: moved ? "rgba(245,184,65,0.5)" : undefined,
-                background: on ? undefined : "var(--bg2)",
-              }}
-            >
-              <span style={{ fontSize: 18, lineHeight: 1.2 }}>{o.icon}</span>
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    fontSize: 13.5,
-                    fontWeight: 600,
-                    marginBottom: 3,
-                  }}
-                >
+            <div key={o.key} className={`swrow ${on ? "on" : ""}`}>
+              <span className="no">{String(i + 1).padStart(2, "0")}</span>
+              <div>
+                <h4>
                   {o.label}
-                  {moved && <span className="chip wait">changed</span>}
-                </span>
-                <span
-                  style={{
-                    display: "block",
-                    fontSize: 12,
-                    color: on ? "var(--soft)" : "var(--dim)",
-                    lineHeight: 1.5,
-                  }}
-                >
-                  {on ? o.on : o.off}
-                </span>
-              </span>
-              <input
-                type="checkbox"
+                  {moved && <span className="chg">changed</span>}
+                </h4>
+                <p>{on ? o.on : o.off}</p>
+              </div>
+              <Toggle
                 checked={on}
-                onChange={(e) => setOpts((p) => ({ ...p, [o.key]: e.target.checked }))}
-                style={{
-                  width: 18,
-                  height: 18,
-                  marginTop: 2,
-                  flex: "none",
-                  accentColor: "var(--amber)",
-                  cursor: "pointer",
-                }}
+                ariaLabel={o.label}
+                onChange={(v) => setOpts((p) => ({ ...p, [o.key]: v }))}
               />
-            </label>
+            </div>
           );
         })}
       </div>

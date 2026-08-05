@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "start": "remotion studio src/index.ts",
+    "studio": "remotion studio src/index.ts --props=trigger/studio-props.json",
     "render": "remotion render src/index.ts FinalVideo out/final-video.mp4",
     "start:server": "node server/index.mjs",
     "lambda:deploy-function": "remotion lambda functions deploy",

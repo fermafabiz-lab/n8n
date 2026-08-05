@@ -1,1 +1,6 @@
 node_modules/
+out/
+# Test footage dropped in for Studio — big, and never worth committing.
+public/*.mp4
+public/*.webm
+public/*.mov

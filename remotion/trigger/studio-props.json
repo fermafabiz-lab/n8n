@@ -1,0 +1,76 @@
+{
+	"_comment": [
+		"Real props from Final Assembly execution 598 (project 'A man and a woman",
+		"talking about equality', 9:16, Emotional, 41.8s, one chapter card at 7.7s).",
+		"Captured so `npm run studio` opens on a genuine project with real scene",
+		"timings instead of invented ones. Fields n8n does not send (palette,",
+		"outro/hook durations, subscribeText) fall back to defaultFinalVideoProps.",
+		"",
+		"Two deliberate changes from what that render actually used: showHookTitle",
+		"and showChapterCards were false there, and are true here — they are the",
+		"overlays worth looking at. Flip them back in the props panel to see the",
+		"render as it shipped.",
+		"",
+		"finalVideoUrl points at the render server's /output, which is ephemeral:",
+		"Railway loses that directory on redeploy. When it 404s, drop any assembled",
+		"mp4 into remotion/public/ and set finalVideoUrl to '/<filename>.mp4' — a",
+		"relative URL resolves against the Studio server, same as staticFile()."
+	],
+	"finalVideoUrl": "http://n8n-production-55dd.up.railway.app/output/6c22affb-cf2b-49c6-997b-3af7f31d3a66.mp4",
+	"projectTitle": "A man and a woman talking about equality",
+	"tone": "Emotional",
+	"channelName": "Video Factory",
+	"aspectRatio": "9:16",
+	"showCaptions": true,
+	"showHookTitle": true,
+	"showChapterCards": true,
+	"showEndScreen": true,
+	"chapterTitles": {
+		"0": "HOOK",
+		"1": "What Fairness Costs"
+	},
+	"scenes": [
+		{
+			"narratorText": "Daniel's jacket pocket holds the pay stub, creased and ready. Maya’s notebook waits, pages filled.",
+			"startSeconds": 0,
+			"durationSeconds": 7.664,
+			"chapter": 0,
+			"speechSeconds": 7.314
+		},
+		{
+			"narratorText": "I brought this home again. Look—overtime, three extra nights.",
+			"startSeconds": 7.664,
+			"durationSeconds": 5,
+			"chapter": 1,
+			"speechSeconds": 4.65
+		},
+		{
+			"narratorText": "The bills are on the fridge, Maya. I keep pointing at the same proof.",
+			"startSeconds": 12.664,
+			"durationSeconds": 4.477,
+			"chapter": 1,
+			"speechSeconds": 4.127
+		},
+		{
+			"narratorText": "Then look here. I wrote the daycare calls, your mother’s appointments, the hours I miss, the smaller check. Don’t make my work disappear because it isn’t printed.",
+			"startSeconds": 17.141,
+			"durationSeconds": 10.564,
+			"chapter": 1,
+			"speechSeconds": 10.214
+		},
+		{
+			"narratorText": "On the roof, he stops reaching for the stub, slides it into her notebook,",
+			"startSeconds": 27.705,
+			"durationSeconds": 4.922,
+			"chapter": 1,
+			"speechSeconds": 4.571
+		},
+		{
+			"narratorText": "and stands beside her until their joined reflection in the rooftop glass turns equality from a debate into a shared burden they will both name honestly.",
+			"startSeconds": 32.627,
+			"durationSeconds": 9.206,
+			"chapter": 1,
+			"speechSeconds": 8.803
+		}
+	]
+}

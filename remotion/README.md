@@ -4,16 +4,34 @@ Adaugă peste videoul deja lipit de fal (`Link Video Final`): intro cu titlu, su
 sincronizate pe scenă, progress bar, outro cu subscribe. Dacă rezultatul convinge,
 Faza 2 înlocuiește fal complet (Remotion face și tăierea scenelor, cu tranziții).
 
-## 1. Preview local
+## 1. Preview local — Remotion Studio
+
+Studio e un player în browser cu timeline, scrubbing pe cadru și **reload la salvare**:
+schimbi o valoare în `src/`, salvezi, și cadrul se redesenează. E singurul mod sensibil
+de a regla grafica — o randare completă doar ca să vezi cum arată un card e risipă.
 
 ```
 cd remotion
 npm install
-npm start        # deschide Remotion Studio în browser
+npm run studio        # deschide http://localhost:3000 pe un proiect REAL
 ```
 
-Editează `trigger/example-props.json` cu date reale (un `finalVideoUrl` valid, scenele
-tale) și încarcă-le în Studio ca să vezi exact ce va ieși înainte de a plăti o randare.
+`npm run studio` încarcă `trigger/studio-props.json` — props capturate dintr-o execuție
+reală de Final Assembly (proiect 9:16, ton Emotional, 41,8s, un card de capitol la 7,7s),
+ca să nu te uiți la scene inventate. Panoul de props din dreapta e editabil live: comută
+`showHookTitle` / `showChapterCards` / `showCaptions`, schimbă `tone` ca să vezi alt preset
+tipografic, sau `aspectRatio` pe `16:9`. Nimic din ce editezi acolo nu se scrie pe disc.
+
+`npm start` pornește Studio fără props, pe `defaultProps` din `src/types.ts`.
+
+**Videoul sursă e efemer.** `finalVideoUrl` din fixture arată spre `/output` de pe
+serverul de randare, iar Railway pierde directorul ăla la redeploy. Când dă 404, pune
+orice mp4 asamblat în `remotion/public/` și schimbă `finalVideoUrl` pe `/<fișier>.mp4` —
+un URL relativ se resolvă față de serverul Studio, exact ca `staticFile()`. Fișierele
+media din `public/` sunt gitignorate, deci nu ajung în repo.
+
+Ca să prinzi props proaspete pentru alt proiect: execuția de Final Assembly din n8n →
+nodul `Build Remotion Props` → copiază `body` din output.
 
 ## 2. Deploy pe Railway (fără AWS — calea aleasă acum)
 

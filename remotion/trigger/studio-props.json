@@ -21,7 +21,12 @@
 		"To preview over real footage, drop an mp4 into remotion/public/ and set",
 		"finalVideoUrl to '/<filename>.mp4' — a relative URL resolves against the",
 		"Studio server, same as staticFile(). Any video works; it does not have to",
-		"be this project's."
+		"be this project's.",
+		"",
+		"montageIntensity is spelled out here on purpose, even though it is",
+		"optional in the type: set it to 0 in the props panel and you get the",
+		"pre-montage edit (one continuous framing per scene), 1 the default, 2",
+		"aggressive. Flipping it on the same footage is the whole before/after."
 	],
 	"finalVideoUrl": "",
 	"projectTitle": "A man and a woman talking about equality",
@@ -32,6 +37,7 @@
 	"showHookTitle": true,
 	"showChapterCards": true,
 	"showEndScreen": true,
+	"montageIntensity": 1,
 	"chapterTitles": {
 		"0": "HOOK",
 		"1": "What Fairness Costs"

@@ -82,7 +82,16 @@ cod diferit de zero la orice tăietură slabă. Rulează-l după orice modificar
 planner.
 
 `montageIntensity` (0 / 1 / 2) vine din props; implicit se ia din energia
-tonului. 0 lasă scenele întregi, ca înainte.
+tonului. **0 lasă scenele întregi, exact ca înainte de montaj** — deci
+comutarea lui în panoul de props din Studio, pe același footage, e chiar
+comparația înainte/după. E scris explicit în `studio-props.json` ca să-l
+găsești fără să știi numele câmpului.
+
+Ca să-l vezi pe un video real deja făcut: descarcă `Link Video Final` al
+proiectului, pune-l în `remotion/public/test.mp4`, copiază fixture-ul în
+`trigger/studio-props.local.json` și pune acolo `"finalVideoUrl": "/test.mp4"`.
+Nu trebuie generat nimic — montajul se aplică la randare, peste videoul deja
+asamblat.
 
 ## 2. Deploy pe Railway (fără AWS — calea aleasă acum)
 

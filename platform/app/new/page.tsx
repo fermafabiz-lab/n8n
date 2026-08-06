@@ -5,6 +5,7 @@ import { createProject, type ActionResult } from "@/app/actions";
 import CategoryPicker, { type CategoryMeta } from "@/components/CategoryPicker";
 import Toggle from "@/components/Toggle";
 import FormProgress from "@/components/FormProgress";
+import GenreSpiral from "@/components/GenreSpiral";
 import { toneType } from "@/lib/tone-type";
 
 async function submit(_prev: ActionResult | null, formData: FormData) {
@@ -421,7 +422,9 @@ export default function NewVideo() {
           {/* Reserved for the illustrated stickers. Empty on purpose — it
               holds the form's centre line, so adding the art later won't
               shift a layout the producer has already learned. */}
-          <aside className="briefart" aria-hidden="true" />
+          <aside className="briefart" aria-hidden="true">
+            <GenreSpiral />
+          </aside>
         </div>
       </form>
     </main>

@@ -19,7 +19,7 @@
  * that aren't there would mean 32 failed requests on every page load, and
  * the fallback is what would render anyway.
  */
-const HAS_STILLS = false;
+const HAS_STILLS = true;
 
 export interface Genre {
   slug: string;

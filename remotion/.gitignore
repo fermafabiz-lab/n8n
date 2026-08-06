@@ -4,3 +4,4 @@ out/
 public/*.mp4
 public/*.webm
 public/*.mov
+trigger/studio-props.local.json

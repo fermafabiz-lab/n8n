@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "start": "remotion studio src/index.ts",
-    "studio": "git pull --ff-only || echo '--- pull skipped (local changes or offline) \u2014 running the current checkout ---' && remotion studio src/index.ts --props=trigger/studio-props.json",
+    "studio": "node scripts/studio.mjs",
     "render": "remotion render src/index.ts FinalVideo out/final-video.mp4",
     "start:server": "node server/index.mjs",
     "lambda:deploy-function": "remotion lambda functions deploy",

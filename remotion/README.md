@@ -16,11 +16,22 @@ npm install
 npm run studio        # trage ultimele modificări, apoi deschide localhost:3000
 ```
 
-`npm run studio` face `git pull` înainte să pornească, ca să nu te uiți la cod
-vechi fără să-ți dai seama. Dacă ai modificări locale (de exemplu ai schimbat
-`finalVideoUrl` în fixture ca să arate spre footage-ul tău), pull-ul e sărit cu
-un mesaj și Studio pornește oricum pe checkout-ul curent. `npm start` nu trage
-nimic niciodată.
+`npm run studio` (vezi `scripts/studio.mjs`) trage ultimele modificări înainte
+să pornească și **scrie într-un banner ce s-a întâmplat** — ce commit-uri au
+intrat, sau, dacă pull-ul a eșuat, faptul că rulezi cod vechi. Un pull sărit în
+tăcere e cel mai prost rezultat posibil: preview-ul arată vechi și pare că
+reparația n-a funcționat.
+
+Trage cu `--autostash`, deci modificările tale locale nu-l pot bloca — nici
+măcar un `package-lock.json` atins de `npm install`, care singur era de ajuns
+înainte ca să te țină pe cod vechi la nesfârșit.
+
+Ca să arăți preview-ul spre footage-ul tău, **nu edita fixture-ul urmărit de
+git**: copiază-l în `trigger/studio-props.local.json` (gitignorat) și schimbă
+acolo `finalVideoUrl`. Scriptul îl preferă automat dacă există, deci nu se
+ciocnește niciodată cu un pull.
+
+`npm start` nu trage nimic niciodată.
 
 **Studio se reîncarcă singur la salvare**, deci după un `git pull` cu fișiere
 *modificate* nu trebuie repornit. Repornește-l doar când apare un fișier

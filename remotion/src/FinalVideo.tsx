@@ -35,12 +35,11 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 	// Titles come from a free-text form field, and people paste entire
 	// prompts into it (seen in production: a ~3000-char master prompt became
 	// the title, which stretched the hook past the whole video and
-	// suppressed every caption). Display a sane excerpt: first line, cut at
-	// a word boundary around 70 chars.
-	// 72 characters cut real titles mid-sentence ("...COMING INTO SPAIN IN…"),
-	// which is worse than a small type size. The card now shows the whole
-	// title and shrinks to fit; the excerpt only guards the pathological
-	// paste, which is an order of magnitude longer than any real title.
+	// suppressed every caption). But the old 72-char excerpt cut real titles
+	// mid-sentence ("...COMING INTO SPAIN IN…"), which reads worse than small
+	// type. The card now shows the whole title and shrinks to fit; this
+	// excerpt only guards the pathological paste, an order of magnitude
+	// longer than any real title.
 	const displayTitle = (() => {
 		const firstLine = projectTitle.split(/\r?\n/)[0].trim();
 		if (firstLine.length <= 200) return firstLine;
@@ -48,13 +47,11 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 		return cut.slice(0, Math.max(60, cut.lastIndexOf(' '))) + '…';
 	})();
 
-	// Give long titles time to finish typing, but never let the hook eat
-	// the video: hard cap at 7s. Disabled hook = no title window at all
-	// (captions start immediately).
 	// A longer title needs longer on screen to be read, but the hook must
 	// never eat the film — hence a ceiling that only rises to 9s for titles
 	// that genuinely need it. HookTitle paces its own typing to whatever
 	// window it gets, so the text always finishes regardless of this cap.
+	// Disabled hook = no title window at all (captions start immediately).
 	const hookSeconds = showHookTitle
 		? Math.min(
 				displayTitle.length > 90 ? 9 : 7,

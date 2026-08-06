@@ -381,6 +381,42 @@ them on every publish. Ignore those four; do not wire them back.
 
 ### Remotion / the edit
 
+- **A cut is a change of picture. Zooming the same clip is not a cut, and
+  optimising a detector taught us it was.** The montage planner was built to
+  close a measured gap: five reference documentaries register 43-126 cuts per
+  4 minutes, our edit registered ONE. The gap was real; the target was not.
+  Cut counts come from a scene-change DETECTOR, which cannot tell a new shot
+  from a hard zoom on the old one — so the planner learned to jump scale and
+  position on a single unbroken clip several times per scene. It reached 18.6
+  cuts/min, `npm run check:montage` printed OK on every acceptance target, and
+  the producer's reaction to the result was "acele cut-uri si zoom-uri random
+  par a fi bug-uri". On a 42s film it planned 13 cuts where the picture changed
+  5 times, including four rapid zoom jumps inside ONE clip. The whole class of
+  error is worth naming: **when a proxy metric is cheap to satisfy without
+  doing the thing it stands for, a generator will satisfy it, and the green
+  check is then evidence of nothing.** `planMontage` now emits one shot per
+  scene and cuts only where the footage actually changes; `intensity` controls
+  how hard the framing contrasts across a real cut and deliberately cannot add
+  cuts. The checker asserts placement (`pictureChanges`), not count — the
+  rhythm numbers are still printed but are informational, because they describe
+  the script's pacing, which the planner does not control and must not fake.
+  Fewer cuts than the references is the material telling the truth: one clip
+  per scene can only yield one shot per scene. More cutting needs Faza 2 (the
+  scene clips passed to Remotion separately), not a bolder planner.
+- **Framing rungs must clear MIN_SCALE_STEP *plus* the within-shot push, or one
+  of them is a dead end.** A shot drifts 0.03 tighter while it plays, so two
+  framings 0.16 apart cut at 0.13 — under the threshold. The old four-rung
+  ladder (1.02/1.18/1.34/1.50) had no adjacent pair that cleared, so `medium`
+  could be entered and not left, and the planner fell back to an invisible cut
+  without complaining. Three rungs spaced 0.18 (`wide` 1.08, `medium` 1.26,
+  `close` 1.44) make every pair cut. `detail` was dropped with the bursts it
+  existed for — held for a whole scene it is not an insert, just too much zoom.
+- **A framing offset larger than its overscan tears the frame.** The picture is
+  moved up to `spread` percent plus 1.5 of drift; if `scale` does not cover
+  twice that, the footage slides off its own edge and a black band shows down
+  one side. `wide` sat at 1.02 against offsets reaching 3.5%, so the calmest
+  framing was the one that could tear. `framingOverscan()` states the rule and
+  `check:montage` asserts it.
 - **Nothing that moves may be linear.** `remotion/src/easing.ts` holds the whole
   vocabulary — `outExpo` for entrances, `outQuart` for settles, `inOutCubic` for
   exits and sweeps — plus `eased()` (clamped + eased interpolate) and

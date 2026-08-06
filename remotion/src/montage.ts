@@ -1,24 +1,48 @@
 import type {SceneCaption} from './types';
 
 /**
- * Montage planner — turns the continuous assembled video into a cut edit.
+ * Montage planner — chooses a framing for each shot of the assembled video.
  *
- * Measured against five reference documentaries (remotion/reference/
- * editing-benchmarks.json), our output had a fatal signature: at the scene
- * threshold every reference registers 43-126 cuts per 4 minutes, ours
- * registered ONE, because consecutive scenes shared subject, location and
- * framing, and the only "cut" was a luminance dip. Reference medians span
- * 1.3s to 9.1s — there is no correct shot length — but every one of them has
- * variability >= 0.58 and a shortest:longest ratio of at least 1:10.
+ * ## A cut is a change of picture, not a change of zoom
  *
- * So we do not touch the media. The audio timeline is fixed (narration is
- * already muxed per scene), so shots only ever re-frame the same footage:
- * a discontinuous jump in scale/position reads as a genuine cut, exactly the
- * way a documentary editor punches into a single take. Shots therefore tile
- * the timeline contiguously and never reorder or drop time.
+ * This planner used to manufacture cuts. Measured against five reference
+ * documentaries (remotion/reference/editing-benchmarks.json), our edit
+ * registered ONE cut where they register 43-126 per 4 minutes, so the planner
+ * was built to close that gap by jumping the scale and position of the SAME
+ * footage several times per scene — "exactly the way a documentary editor
+ * punches into a single take".
+ *
+ * That was wrong, and the way it was wrong is worth remembering. The cut count
+ * came from a scene-change DETECTOR, and a detector cannot tell a new shot from
+ * a hard zoom on the old one. Optimising against it produced an edit that
+ * scored 18.6 cuts/min, passed every acceptance target, and read to a human as
+ * a rendering fault: on a 42s film with 6 scenes it planned 13 cuts where the
+ * picture only changed 5 times, including four rapid zoom jumps inside one
+ * unbroken clip. What the references actually have at those timestamps is a
+ * different SHOT — new subject, new angle — not the previous one enlarged.
+ *
+ * So the rule is now the honest one: **a cut may only land where the footage
+ * itself changes.** With one clip per scene that means scene boundaries, and
+ * the planner's job is not to invent more of them but to make each one read —
+ * consecutive scenes get deliberately contrasting framings, so a real change of
+ * picture is reinforced by a real change of frame. Within a shot the framing
+ * moves continuously and never jumps.
+ *
+ * The consequence is fewer cuts than the references, and that is not a defect
+ * to be engineered away: it is the material telling the truth. One clip per
+ * scene can only ever yield one shot per scene. More cutting needs more
+ * footage — the Faza 2 plan in README.md, where Remotion receives the scene
+ * clips separately and can cut between them.
  */
 
-export type ShotKind = 'wide' | 'medium' | 'close' | 'detail' | 'black';
+/**
+ * `detail` used to sit at the tight end of this list, for the sub-second
+ * inserts a burst was made of. Every shot is now a whole scene, and a "detail"
+ * framing held for ten seconds is not an insert — it is the picture zoomed too
+ * far. Dropping it also lets the three that remain be spaced far enough apart
+ * that any two of them cut; see FRAMINGS.
+ */
+export type ShotKind = 'wide' | 'medium' | 'close' | 'black';
 
 export type Shot = {
 	startSeconds: number;
@@ -54,14 +78,27 @@ function hashString(s: string): number {
 	return h >>> 0;
 }
 
-// Framing repertoire. Scale stays <= 1.5 so a punch-in never turns soft on
-// 1080p footage; detail inserts sit at the top of the range but are always
-// short, where softness does not register.
+// Framing repertoire. Three rungs, spaced 0.18 apart, and the spacing is the
+// load-bearing part: a shot pushes 0.03 inward while it plays (HELD_PUSH), so
+// two framings only cut if their BASE gap exceeds MIN_SCALE_STEP plus that
+// push. The old four-rung ladder was spaced 0.10-0.16, which meant NO pair of
+// neighbours cleared the step — `medium` was a dead end you could enter and
+// not leave, and the planner silently fell back to a 0.13 cut nobody sees.
+// Any two rungs here cut, so there is no dead end to fall out of.
+//
+// Every scale must also be large enough to HIDE its own framing offset. The
+// frame is moved by up to `spread` percent plus 1.5 of drift, and an offset
+// that exceeds the overscan drags the picture off its own edge and shows a
+// black band down one side. `wide` used to sit at 1.02 — barely 1% of overscan
+// per side against offsets reaching 3.5% — so the calmest framing in the
+// repertoire was the one that could tear. Required: scale >= 1 + 2 * (spread +
+// 1.5) / 100, asserted by scripts/check-montage.mjs.
+//
+// The tightest rung stays under 1.5 so a punch-in never turns soft.
 const FRAMINGS: Record<Exclude<ShotKind, 'black'>, {scale: number; spread: number}> = {
-	wide: {scale: 1.02, spread: 2},
-	medium: {scale: 1.18, spread: 5},
-	close: {scale: 1.34, spread: 7},
-	detail: {scale: 1.5, spread: 10},
+	wide: {scale: 1.08, spread: 2},
+	medium: {scale: 1.26, spread: 5},
+	close: {scale: 1.44, spread: 7},
 };
 
 /**
@@ -90,20 +127,6 @@ const endScaleOf = (shot: {scale: number; durationSeconds: number; kind: ShotKin
 
 type Framing = Exclude<ShotKind, 'black'>;
 
-/**
- * First candidate that clears the threshold against where the previous shot
- * ended, else the furthest one available. Used wherever the rhythm dictates
- * the framing (holds, burst inserts): the mode chooses the *kind* of shot,
- * this makes sure it still cuts.
- */
-function clearing(prevEndScale: number | null, candidates: Framing[]): Framing {
-	if (prevEndScale === null) return candidates[0];
-	for (const k of candidates) {
-		if (Math.abs(FRAMINGS[k].scale - prevEndScale) >= MIN_SCALE_STEP) return k;
-	}
-	return furthest(prevEndScale, candidates);
-}
-
 function furthest(prevEndScale: number, candidates: Framing[]): Framing {
 	return candidates.reduce((best, k) =>
 		Math.abs(FRAMINGS[k].scale - prevEndScale) > Math.abs(FRAMINGS[best].scale - prevEndScale)
@@ -112,59 +135,74 @@ function furthest(prevEndScale: number, candidates: Framing[]): Framing {
 	);
 }
 
-function pickKind(rand: () => number, prevEndScale: number | null, duration: number): Framing {
-	// Short shots are inserts; long shots need room to breathe.
-	const pool: Framing[] =
-		duration < 1.2
-			? ['detail', 'close', 'detail']
-			: duration < 2.5
-				? ['close', 'medium', 'detail']
-				: duration > 6
-					? ['wide', 'medium']
-					: ['medium', 'wide', 'close'];
-	for (let attempt = 0; attempt < 6; attempt++) {
-		const k = pool[Math.floor(rand() * pool.length)];
-		if (prevEndScale === null || Math.abs(FRAMINGS[k].scale - prevEndScale) >= MIN_SCALE_STEP) {
-			return k;
-		}
-	}
-	// Fall back to whatever is furthest from where we actually are — across the
-	// whole repertoire, not just the duration-appropriate pool, because a
-	// visible cut outranks an ideally-sized framing.
-	return furthest(prevEndScale as number, Object.keys(FRAMINGS) as Framing[]);
+/**
+ * Framings that suit a shot of this length. A long shot needs room to breathe;
+ * a brief one can afford to sit close, where there is less frame to read.
+ */
+function poolFor(duration: number): Framing[] {
+	// Every pool keeps at least two rungs that cut against each other, so the
+	// planner can never be cornered into a framing it cannot leave.
+	if (duration >= 7) return ['wide', 'medium', 'close'];
+	if (duration <= 3) return ['close', 'medium'];
+	return ['medium', 'close', 'wide'];
+}
+
+/**
+ * The framing for the next real shot, chosen to CROSS the previous one.
+ *
+ * Merely clearing `MIN_SCALE_STEP` is not enough to make a change of picture
+ * land: stepping 1.18 -> 1.34 -> 1.50 clears the threshold three times while
+ * moving steadily in one direction, which the eye reads as one long push
+ * rather than three shots. Alternating sides — out after in, in after out — is
+ * what makes each new scene announce itself as new.
+ */
+function crossing(
+	rand: () => number,
+	prevEndScale: number,
+	candidates: Framing[],
+): Framing | null {
+	const wentTight = candidates.filter(
+		(k) => FRAMINGS[k].scale > prevEndScale + MIN_SCALE_STEP,
+	);
+	const wentWide = candidates.filter(
+		(k) => FRAMINGS[k].scale < prevEndScale - MIN_SCALE_STEP,
+	);
+	// Prefer the side we are NOT already on. Above the middle of the repertoire
+	// the only way to cross is outward, and vice versa.
+	const mid = (FRAMINGS.wide.scale + FRAMINGS.close.scale) / 2;
+	const first = prevEndScale >= mid ? wentWide : wentTight;
+	const second = prevEndScale >= mid ? wentTight : wentWide;
+	const side = first.length ? first : second;
+	if (!side.length) return null;
+	// Usually the boldest available crossing, sometimes the mildest one that
+	// still clears the step. Always taking the furthest made the edit ping-pong
+	// between the two extremes of the pool — legible on six scenes, a metronome
+	// on twenty. Every option here is already a visible cut; which one is a
+	// matter of variety, not of whether the cut lands.
+	if (side.length === 1 || rand() < 0.65) return furthest(prevEndScale, side);
+	return side.reduce((best, k) =>
+		Math.abs(FRAMINGS[k].scale - prevEndScale) < Math.abs(FRAMINGS[best].scale - prevEndScale)
+			? k
+			: best,
+	);
 }
 
 export type MontageOptions = {
-	/** 0 = leave scenes whole, 1 = default cutting, 2 = aggressive. */
+	/**
+	 * How hard each real cut is reinforced by the framing: 0 leaves the footage
+	 * alone, 1 contrasts within what the shot length suits, 2 always takes the
+	 * furthest framing available.
+	 *
+	 * It deliberately cannot add cuts. How often the picture changes is a
+	 * property of the footage, not a dial — the previous version treated it as
+	 * one, and manufactured the zoom jumps this planner exists to avoid.
+	 */
 	intensity?: 0 | 1 | 2;
 	/** Seed source, so two projects do not get an identical rhythm. */
 	seed?: string;
 	/** Insert short black frames before chapter changes. */
 	blackPunctuation?: boolean;
 };
-
-/**
- * Splits a span into sub-shot durations with a dominant piece and short
- * companions, reproducing the reference shape (median well below the mean)
- * instead of equal slices.
- */
-function weightedSplit(rand: () => number, duration: number, pieces: number): number[] {
-	if (pieces <= 1) return [duration];
-	const weights = Array.from({length: pieces}, (_, i) =>
-		i === Math.floor(rand() * pieces) ? 2.2 + rand() : 0.45 + rand() * 0.6,
-	);
-	const total = weights.reduce((a, b) => a + b, 0);
-	let out = weights.map((w) => Math.max(0.4, (w / total) * duration));
-	// No three consecutive equal durations — outside a burst that reads as
-	// a metronome, which is exactly the defect being fixed.
-	for (let i = 2; i < out.length; i++) {
-		if (Math.abs(out[i] - out[i - 1]) < 0.15 && Math.abs(out[i - 1] - out[i - 2]) < 0.15) {
-			out[i] += 0.45;
-		}
-	}
-	const scale = duration / out.reduce((a, b) => a + b, 0);
-	return out.map((d) => d * scale);
-}
 
 export function planMontage(scenes: SceneCaption[], opts: MontageOptions = {}): Shot[] {
 	const {intensity = 1, seed = 'video-factory', blackPunctuation = true} = opts;
@@ -189,50 +227,11 @@ export function planMontage(scenes: SceneCaption[], opts: MontageOptions = {}): 
 	// after a black, where the cut is total whatever follows it.
 	let prevEndScale: number | null = null;
 
-	// Rhythm is planned across the whole timeline, not per scene. A single
-	// scene is far too short to contain both a burst and a hold, so the
-	// planner walks the scene list in modes: a HOLD may swallow several
-	// scenes whole (the framing simply does not change at the boundary,
-	// which is what produces shots longer than any one scene), a BURST
-	// chops one scene into rapid inserts, and NORMAL does light cutting.
-	const BURST_EVERY = intensity === 2 ? 35 : 50; // seconds
-	const HOLD_EVERY = 55;
-	// The references hold shots past 10s, but that target comes from 4-minute
-	// windows: on a 30s short a 10s shot would be a third of the film. Scale
-	// it, capped at the reference figure.
-	const totalDuration =
-		scenes[scenes.length - 1].startSeconds + scenes[scenes.length - 1].durationSeconds;
-	const HOLD_TARGET = Math.min(11, Math.max(4, totalDuration * 0.25));
-	let sinceBurst = BURST_EVERY * 0.55; // don't open on a burst
-	let sinceHold = HOLD_EVERY * 0.7;
-
-	/**
-	 * `candidates` lets a mode state its preference in order while the
-	 * threshold still has the last word; a bare `push` lets the planner choose.
-	 */
-	const push = (start: number, duration: number, candidates?: Framing[]) => {
-		const kind = candidates
-			? clearing(prevEndScale, candidates)
-			: pickKind(rand, prevEndScale, duration);
-		const {scale, spread} = FRAMINGS[kind];
-		const prevX = shots.length ? shots[shots.length - 1].offsetXPct : 0;
-		const dirX = prevX > 0 ? -1 : prevX < 0 ? 1 : rand() < 0.5 ? -1 : 1;
-		const shot: Shot = {
-			startSeconds: start,
-			durationSeconds: duration,
-			kind,
-			scale,
-			offsetXPct: dirX * spread * (0.55 + rand() * 0.45),
-			offsetYPct: (rand() < 0.5 ? -1 : 1) * spread * 0.45 * (0.4 + rand() * 0.6),
-			driftX: (rand() < 0.5 ? -1 : 1) * (0.6 + rand() * 0.9),
-			driftY: (rand() < 0.5 ? -1 : 1) * (0.4 + rand() * 0.7),
-		};
-		shots.push(shot);
-		prevEndScale = endScaleOf(shot);
-	};
-
-	let i = 0;
-	while (i < scenes.length) {
+	// One shot per scene, because one clip per scene is what the footage gives
+	// us. There is no rhythm to plan across the timeline: the rhythm IS the
+	// scene list, which the script already paced to the narration. What the
+	// planner controls is how each real change of picture is framed.
+	for (let i = 0; i < scenes.length; i++) {
 		const scene = scenes[i];
 		const isChapterStart = i > 0 && (scene.chapter ?? 0) !== (scenes[i - 1].chapter ?? 0);
 		let cursor = scene.startSeconds;
@@ -258,84 +257,60 @@ export function planMontage(scenes: SceneCaption[], opts: MontageOptions = {}): 
 			prevEndScale = null;
 		}
 
-		// HOLD — let one framing run across scene boundaries. This is the
-		// only way to reach the 10s+ shots every reference has, since our
-		// scenes are one narration beat each (~7-9s).
-		if (sinceHold >= HOLD_EVERY && remaining > 2) {
-			let end = cursor + remaining;
-			let j = i;
-			// Absorb following scenes until the hold is long enough, but stop
-			// at a chapter change — a chapter turn always deserves a cut.
-			while (
-				end - cursor < HOLD_TARGET &&
-				j + 1 < scenes.length &&
-				(scenes[j + 1].chapter ?? 0) === (scene.chapter ?? 0)
-			) {
-				j++;
-				end = scenes[j].startSeconds + scenes[j].durationSeconds;
-			}
-			push(cursor, end - cursor, remaining > 6 ? ['wide', 'medium'] : ['medium', 'wide']);
-			sinceHold = 0;
-			sinceBurst += end - cursor;
-			i = j + 1;
-			continue;
-		}
-
-		// BURST — 4-8 rapid inserts, near-equal by design. Reference 3 runs
-		// eight consecutive 0.50s shots: inside a burst, equal duration IS
-		// the effect, so the no-three-equal rule is suspended here.
-		if (sinceBurst >= BURST_EVERY && remaining >= 2.4) {
-			const n = 4 + Math.floor(rand() * 5);
-			const each = Math.min(0.9, Math.max(0.4, (remaining * 0.65) / n));
-			for (let k = 0; k < n; k++) {
-				// Tight framings only — but they must still differ from each other.
-				// Eight consecutive inserts all at `detail` share one scale, so the
-				// burst produced no framing jump at all between its members: the
-				// fastest passage in the film was the one a detector read as a
-				// single shot. Listing the preference lets `clearing` alternate.
-				push(cursor, each, ['detail', 'close', 'medium']);
-				cursor += each;
-			}
-			const rest = scene.startSeconds + scene.durationSeconds - cursor;
-			if (rest > 0.4) push(cursor, rest);
-			sinceBurst = 0;
-			sinceHold += scene.durationSeconds;
-			i++;
-			continue;
-		}
-
-		// NORMAL — light cutting, most scenes stay one or two shots.
-		//
-		// This is also where intensity has to bite. `BURST_EVERY` used to be its
-		// only lever, and a burst fires at most once on a 40s film — so
-		// intensity 2 planned a shot-for-shot identical edit to intensity 1 on
-		// exactly the length we make most often.
-		const pieces =
-			remaining < 2.4
-				? 1
-				: remaining < 6
-					? intensity === 2
-						? 2
-						: rand() < 0.45
-							? 1
-							: 2
-					: intensity === 2
-						? rand() < 0.5
-							? 3
-							: 4
-						: rand() < 0.35
-							? 2
-							: 3;
-		for (const d of weightedSplit(rand, remaining, pieces)) {
-			push(cursor, d);
-			cursor += d;
-		}
-		sinceBurst += scene.durationSeconds;
-		sinceHold += scene.durationSeconds;
-		i++;
+		// Intensity 2 picks from the whole repertoire rather than the framings
+		// that suit the length: a stronger contrast at the cost of sitting
+		// closer than a long shot really wants.
+		const pool = intensity === 2 ? (Object.keys(FRAMINGS) as Framing[]) : poolFor(remaining);
+		const kind =
+			prevEndScale === null
+				? pool[0]
+				: (crossing(rand, prevEndScale, pool) ?? furthest(prevEndScale, pool));
+		const {scale, spread} = FRAMINGS[kind];
+		// Offsets alternate sides, so successive scenes are not all framed off
+		// the same edge — another way the change reads as deliberate.
+		const prevX = shots.length ? shots[shots.length - 1].offsetXPct : 0;
+		const dirX = prevX > 0 ? -1 : prevX < 0 ? 1 : rand() < 0.5 ? -1 : 1;
+		const shot: Shot = {
+			startSeconds: cursor,
+			durationSeconds: remaining,
+			kind,
+			scale,
+			offsetXPct: dirX * spread * (0.55 + rand() * 0.45),
+			offsetYPct: (rand() < 0.5 ? -1 : 1) * spread * 0.45 * (0.4 + rand() * 0.6),
+			driftX: (rand() < 0.5 ? -1 : 1) * (0.6 + rand() * 0.9),
+			driftY: (rand() < 0.5 ? -1 : 1) * (0.4 + rand() * 0.7),
+		};
+		shots.push(shot);
+		prevEndScale = endScaleOf(shot);
 	}
 
 	return shots;
+}
+
+/**
+ * Seconds at which the FOOTAGE changes — scene starts, which is the only place
+ * a cut is honest. Exported so the checker can assert that every planned cut
+ * lands on one instead of measuring cut COUNT, the metric that produced the
+ * zoom-jump edit in the first place.
+ */
+export function pictureChanges(scenes: SceneCaption[]): number[] {
+	return scenes.map((s) => s.startSeconds);
+}
+
+/**
+ * Per framing: the scale it has, and the least it needs so its own offset and
+ * drift stay inside the picture. `short` is how much it is missing — anything
+ * above zero can show a black band down one edge.
+ */
+export function framingOverscan(): {kind: string; scale: number; needs: number; short: number}[] {
+	// The largest excursion `planMontage` can produce: offsetXPct peaks at the
+	// full spread, and driftX adds up to 1.5 more over the shot.
+	const MAX_DRIFT = 1.5;
+	return (Object.keys(FRAMINGS) as Framing[]).map((kind) => {
+		const {scale, spread} = FRAMINGS[kind];
+		const needs = 1 + (2 * (spread + MAX_DRIFT)) / 100;
+		return {kind, scale, needs: +needs.toFixed(3), short: +Math.max(0, needs - scale).toFixed(3)};
+	});
 }
 
 /** The shot covering `seconds` (binary search — called every frame). */

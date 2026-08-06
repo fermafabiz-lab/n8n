@@ -14,7 +14,7 @@ import {CURVES, curveAt, eased} from '../easing';
  * generated no matter how well the words were chosen.
  *
  * Now the title fills the frame. Type is sized to the text instead of picked
- * from a ladder, words are revealed by a mask sliding up rather than typed,
+ * from a ladder, words rise and fade in on one curve rather than being typed,
  * the block settles out of a slight scale and blur, and there is no rule at
  * all. The frame darkens behind it and clears when it leaves.
  */
@@ -91,10 +91,12 @@ export const HookTitle: React.FC<{
 		}
 	}
 
-	// Entrance: each word masked up in turn. Exit: the block lifts and blurs
-	// away faster than it arrived, which is what makes an exit feel decisive.
+	// Entrance: each word rises and fades in turn, both on the same curve so
+	// they read as one movement. Exit: the block lifts and blurs away faster
+	// than it arrived, which is what makes an exit feel decisive.
 	const STAGGER = 0.07;
 	const WORD_REVEAL = 0.55;
+	const RISE_EM = 0.38;
 	const outStart = Math.max(0.8, durationInSeconds - 0.45);
 	const outP = curveAt((t - outStart) / 0.45, CURVES.inOutCubic);
 
@@ -147,31 +149,25 @@ export const HookTitle: React.FC<{
 						const e = curveAt((t - wi * STAGGER) / WORD_REVEAL, CURVES.outExpo);
 						return (
 							<React.Fragment key={wi}>
-								{/* The clip box is grown by padding and pulled back by an
-								    equal negative margin: layout is untouched, but ascenders
-								    and descenders are no longer sliced off mid-reveal. */}
+								{/* Rise and fade on ONE curve. The previous version revealed
+								    each word through an `overflow: hidden` clip box, so the
+								    word was visibly sliced by an invisible edge the whole way
+								    up — a hard cut moving across the letterforms. Nothing on
+								    screen explains that edge, so it reads as a bug. Fading the
+								    word in over the same travel needs no mask at all: at every
+								    frame the glyphs are whole, just lower and lighter. */}
 								<span
 									style={{
 										display: 'inline-block',
-										overflow: 'hidden',
-										padding: '0.18em 0.04em',
-										margin: '-0.18em -0.04em',
-										verticalAlign: 'bottom',
+										opacity: e,
+										// A short travel — the fade carries the reveal, so a long
+										// slide would only look like the word arrived late.
+										transform: `translateY(${((1 - e) * RISE_EM).toFixed(4)}em)`,
+										overflowWrap: 'anywhere',
 										maxWidth: '100%',
 									}}
 								>
-									<span
-										style={{
-											display: 'inline-block',
-											// 120%, not 100%: the padded clip box extends below the
-											// glyphs, and a word parked at exactly its own height
-											// would peek into that band before its turn.
-											transform: `translateY(${((1 - e) * 120).toFixed(2)}%)`,
-											overflowWrap: 'anywhere',
-										}}
-									>
-										{word}
-									</span>
+									{word}
 								</span>
 								{wi < words.length - 1 ? ' ' : null}
 							</React.Fragment>

@@ -38,6 +38,12 @@ export interface Project {
   cast: string[];
   /** Character name -> voice id overrides (characters mode). */
   castAssign: Record<string, string>;
+  /**
+   * Chapter number -> voice id overrides (chapters mode), plus "hook" for the
+   * opening scene. Without an entry a chapter falls back to its positional
+   * cast voice, which is how every project behaved before this existed.
+   */
+  chapterVoices: Record<string, string>;
 }
 
 export interface EditingOptions {
@@ -276,6 +282,12 @@ function toProject(r: AirtableRecord): Project {
       (opts as { castAssign?: unknown }).castAssign !== null
         ? ((opts as { castAssign?: Record<string, string> }).castAssign as Record<string, string>)
         : {},
+    chapterVoices:
+      typeof (opts as { chapterVoices?: unknown }).chapterVoices === "object" &&
+      (opts as { chapterVoices?: unknown }).chapterVoices !== null
+        ? ((opts as { chapterVoices?: Record<string, string> })
+            .chapterVoices as Record<string, string>)
+        : {},
   };
 }
 
@@ -463,6 +475,7 @@ const DEMO_PROJECTS: Project[] = [
     multiVoiceMode: "off",
     cast: [],
     castAssign: {},
+    chapterVoices: {},
   },
   {
     id: "demo-2",
@@ -482,6 +495,7 @@ const DEMO_PROJECTS: Project[] = [
     multiVoiceMode: "off",
     cast: [],
     castAssign: {},
+    chapterVoices: {},
   },
   {
     id: "demo-3",
@@ -501,6 +515,7 @@ const DEMO_PROJECTS: Project[] = [
     multiVoiceMode: "off",
     cast: [],
     castAssign: {},
+    chapterVoices: {},
   },
   {
     id: "demo-4",
@@ -520,6 +535,7 @@ const DEMO_PROJECTS: Project[] = [
     multiVoiceMode: "off",
     cast: [],
     castAssign: {},
+    chapterVoices: {},
   },
 ];
 

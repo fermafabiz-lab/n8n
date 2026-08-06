@@ -407,6 +407,80 @@ export async function retryAssembly(projectId: string): Promise<ActionResult> {
  * (castAssign in Editing Options) on every synthesis, so it applies to the
  * next regeneration of any line.
  */
+/**
+ * Chapter narrators (chapters mode). Saves the per-chapter voice map, then
+ * re-synthesizes only the lines whose chapter actually changed — leaving
+ * every other take, and its approval, untouched.
+ */
+export async function saveChapterVoices(
+  projectId: string,
+  voices: Record<string, string>,
+  sceneIds: string[],
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    await updateEditingOptions(projectId, { chapterVoices: voices });
+    for (const id of sceneIds) {
+      // Regenerating replaces the take, so the old approval can't stand.
+      await writeSceneFields(id, { "Aprobare Voce": false });
+      await regenerateVoice(projectId, id, "");
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message: sceneIds.length
+        ? `Chapter narrators saved — re-synthesizing ${sceneIds.length} line${sceneIds.length === 1 ? "" : "s"}.`
+        : "Chapter narrators saved.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/**
+ * Collapse a multi-voice project back to a single narrator: the mode goes to
+ * "off" and every line is re-synthesized with the chosen voice. The chapter
+ * map is deliberately kept, so switching back restores the old assignment
+ * instead of losing it.
+ */
+export async function useSingleNarrator(
+  projectId: string,
+  voiceId: string,
+  sceneIds: string[],
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  if (!voiceId) return { ok: false, message: "Pick a voice first." };
+  try {
+    await updateEditingOptions(projectId, { multiVoiceMode: "off" });
+    return await changeProjectVoice(projectId, voiceId, sceneIds);
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/** The way back: re-enable narrator-per-chapter with the saved assignment. */
+export async function useChapterNarrators(projectId: string): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    await updateEditingOptions(projectId, { multiVoiceMode: "chapters" });
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message:
+        "Narrator-per-chapter is back on — pick the voices, then apply to re-synthesize.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
 export async function saveCastAssignments(
   projectId: string,
   assign: Record<string, string>,

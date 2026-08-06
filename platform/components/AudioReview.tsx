@@ -6,7 +6,10 @@ import {
   changeProjectVoice,
   regenerateVoice,
   saveCastAssignments,
+  saveChapterVoices,
   sceneAction,
+  useChapterNarrators,
+  useSingleNarrator,
   type ActionResult,
 } from "@/app/actions";
 import type { Scene } from "@/lib/data";
@@ -118,6 +121,7 @@ export default function AudioReview({
   narratorVoice = "",
   cast = [],
   castAssign = {},
+  chapterVoices = {},
 }: {
   projectId: string;
   scenes: Scene[];
@@ -127,6 +131,8 @@ export default function AudioReview({
   narratorVoice?: string;
   cast?: string[];
   castAssign?: Record<string, string>;
+  /** Chapter number (and "hook") -> voice id, overriding the cast order. */
+  chapterVoices?: Record<string, string>;
 }) {
   // How many real chapters the script produced — the hook (order < 100) is not
   // one. n8n reads this from the project's linked chapters because its own
@@ -176,6 +182,41 @@ export default function AudioReview({
       .map((v, k) => ({ id: v, label: `Voice #${k + 1} — ${shortVoice(v)}` })),
   ];
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // ---- chapters mode -------------------------------------------------
+  // Scene order encodes the chapter: 101/102 are chapter 1, 201 chapter 2,
+  // anything under 100 is the hook. n8n derives it the same way, and so
+  // does castIndexFor above.
+  const chapterOf = (s: Scene): number =>
+    Number.isFinite(s.order) ? Math.floor(s.order / 100) : 0;
+  // Every chapter present, in order, with "hook" first when one exists.
+  const chapterKeys = useMemo(() => {
+    const nums = [...new Set(scenes.map(chapterOf).filter((c) => c > 0))].sort(
+      (a, b) => a - b,
+    );
+    const keys = nums.map(String);
+    return scenes.some((s) => chapterOf(s) === 0) ? ["hook", ...keys] : keys;
+  }, [scenes]);
+  /** What a chapter is read by today: an explicit pick, else the cast order. */
+  const chapterVoiceOf = (key: string): string => {
+    const set = chapterVoices[key];
+    if (set && set.includes("_")) return set;
+    if (key === "hook" || cast.length === 0) return "";
+    return cast[(Number(key) - 1) % cast.length] ?? "";
+  };
+  const [showChapters, setShowChapters] = useState(false);
+  const [chapDraft, setChapDraft] = useState<Record<string, string>>({});
+  const chapterPick = (key: string): string => chapDraft[key] ?? chapterVoiceOf(key);
+  const changedChapters = chapterKeys.filter(
+    (k) => chapterPick(k) !== chapterVoiceOf(k) && chapterPick(k).includes("_"),
+  );
+  // Only the lines whose own chapter changed get re-synthesized; every other
+  // take (and its approval) is left alone.
+  const scenesToResynth = scenes.filter((s) => {
+    const key = chapterOf(s) === 0 ? "hook" : String(chapterOf(s));
+    return changedChapters.includes(key);
+  });
+  const [showSingle, setShowSingle] = useState(false);
 
   const withAudio = useMemo(() => scenes.filter((s) => s.voiceUrl), [scenes]);
   const unapproved = scenes.filter((s) => !s.voiceApproved && s.voiceUrl);
@@ -322,12 +363,164 @@ export default function AudioReview({
       ) : null}
       {msg && <p className={`formmsg ${msg.ok ? "ok" : "err"}`}>{msg.message}</p>}
 
-      {mode === "chapters" && cast.length > 0 && (
-        <p className="formmsg ok" style={{ marginBottom: 12 }}>
-          Narrator-per-chapter is on: chapter 1 is read by voice #1, chapter 2
-          by voice #2… ({cast.length} narrator{cast.length === 1 ? "" : "s"} in
-          the cast; the hook keeps the main narrator).
-        </p>
+      {mode === "chapters" && chapterKeys.length > 0 && (
+        <div className="card" style={{ padding: "14px 16px", marginBottom: 14 }}>
+          <div className="kv" style={{ borderBottom: "none", paddingBottom: 8 }}>
+            <h5 style={{ margin: 0 }}>Narrators — who reads which chapter</h5>
+            {!showChapters && (
+              <button className="abtn" onClick={() => setShowChapters(true)}>
+                🎚 Change chapter narrators
+              </button>
+            )}
+          </div>
+
+          {!showChapters ? (
+            <p style={{ margin: 0, fontSize: 12, color: "var(--dim)" }}>
+              {chapterKeys.length} section{chapterKeys.length === 1 ? "" : "s"}
+              {cast.length > 0
+                ? ` · ${cast.length} narrator${cast.length === 1 ? "" : "s"} in the cast`
+                : ""}
+              . The hook is read by the project&apos;s main narrator unless you
+              give it its own voice.
+            </p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {chapterKeys.map((key) => {
+                const lines = scenes.filter(
+                  (s) => (chapterOf(s) === 0 ? "hook" : String(chapterOf(s))) === key,
+                ).length;
+                const changed = changedChapters.includes(key);
+                return (
+                  <div key={key}>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 8,
+                        alignItems: "center",
+                        marginBottom: 4,
+                      }}
+                    >
+                      <b style={{ fontSize: 12.5 }}>
+                        {key === "hook" ? "Hook" : `Chapter ${key}`}
+                      </b>
+                      <span className="chip">
+                        {lines} line{lines === 1 ? "" : "s"}
+                      </span>
+                      {changed && <span className="chip wait">will re-synthesize</span>}
+                    </div>
+                    <VoicePicker
+                      label={
+                        key === "hook" && !chapterPick(key)
+                          ? "Currently the main narrator — pick a voice to override it"
+                          : "Press ▶ to listen"
+                      }
+                      value={chapterPick(key)}
+                      onChange={(v) => setChapDraft((p) => ({ ...p, [key]: v }))}
+                    />
+                  </div>
+                );
+              })}
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <button
+                  className="abtn ok"
+                  disabled={pending || changedChapters.length === 0}
+                  onClick={() =>
+                    run(async () => {
+                      const next: Record<string, string> = { ...chapterVoices };
+                      for (const k of chapterKeys) {
+                        const v = chapterPick(k);
+                        if (v.includes("_")) next[k] = v;
+                      }
+                      const r = await saveChapterVoices(
+                        projectId,
+                        next,
+                        scenesToResynth.map((s) => s.id),
+                      );
+                      if (r.ok) {
+                        setShowChapters(false);
+                        setChapDraft({});
+                      }
+                      return r;
+                    })
+                  }
+                >
+                  {changedChapters.length === 0
+                    ? "Nothing changed yet"
+                    : `Apply — re-synthesize ${scenesToResynth.length} line${scenesToResynth.length === 1 ? "" : "s"}`}
+                </button>
+                <button
+                  className="abtn"
+                  onClick={() => {
+                    setShowChapters(false);
+                    setChapDraft({});
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+              <p style={{ margin: 0, fontSize: 11.5, color: "var(--dim)" }}>
+                Only the chapters you actually change are re-synthesized — every
+                other take keeps its audio and its approval.
+              </p>
+            </div>
+          )}
+
+          {/* Changed your mind entirely: collapse back to one narrator. */}
+          <div style={{ marginTop: 12, borderTop: "1px solid var(--line)", paddingTop: 12 }}>
+            {showSingle ? (
+              <>
+                <VoicePicker
+                  label="One narrator for the whole video — press ▶ to listen"
+                  value={newVoice}
+                  onChange={setNewVoice}
+                />
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <button
+                    className="abtn"
+                    disabled={pending || !newVoice.trim()}
+                    onClick={() =>
+                      run(async () => {
+                        const r = await useSingleNarrator(
+                          projectId,
+                          newVoice.trim(),
+                          scenes.map((s) => s.id),
+                        );
+                        if (r.ok) setShowSingle(false);
+                        return r;
+                      })
+                    }
+                  >
+                    Use this voice everywhere
+                  </button>
+                  <button className="abtn" onClick={() => setShowSingle(false)}>
+                    Cancel
+                  </button>
+                </div>
+                <p style={{ margin: "8px 0 0", fontSize: 11.5, color: "var(--dim)" }}>
+                  This turns multi-voice off and re-synthesizes every line. Your
+                  chapter assignment is kept, so you can switch back.
+                </p>
+              </>
+            ) : (
+              <button className="abtn" onClick={() => setShowSingle(true)}>
+                🎙 Use a single narrator for the whole video
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* The way back, offered only to projects that were multi-voice. */}
+      {mode === "off" && cast.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <button
+            className="abtn"
+            disabled={pending}
+            onClick={() => run(() => useChapterNarrators(projectId))}
+          >
+            ↩ Back to a narrator per chapter
+          </button>
+        </div>
       )}
 
       {mode === "chapters" && cast.length > chapterCount && (
@@ -481,14 +674,16 @@ export default function AudioReview({
                     >
                       {fmt(durations[s.id])}
                     </span>
-                    {mode === "chapters" && cast.length > 0 && (() => {
-                      const ch = Math.floor(s.order / 100);
-                      const vi = castIndexFor(s.order, cast.length);
+                    {mode === "chapters" && chapterKeys.length > 0 && (() => {
+                      const ch = chapterOf(s);
+                      const key = ch === 0 ? "hook" : String(ch);
+                      const v = chapterVoiceOf(key);
+                      // Naming the voice beats "Voice #2": once chapters can
+                      // be reassigned, the position stops matching the cast.
                       return (
                         <span className="chip">
-                          {vi < 0
-                            ? "Hook · main narrator"
-                            : `Ch. ${ch} · Voice #${vi + 1}`}
+                          {ch === 0 ? "Hook" : `Ch. ${ch}`} ·{" "}
+                          {v ? shortVoice(v) : "main narrator"}
                         </span>
                       );
                     })()}

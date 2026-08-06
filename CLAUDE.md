@@ -314,10 +314,18 @@ is built only inside that guard (a `-1` input index would break the graph).
   with three overlay keys, silently wiping `category`/`cast`/
   `multiVoiceMode` at the final-settings step. It now merges via
   `updateEditingOptions`. Never write that field wholesale.
-- If SFX are enabled and the final video still has none: check that the
-  Railway render server runs current `assemble.mjs` (the nativeAudio code
-  ships with the repo but Railway deploys are manual), then check whether
-  the veo-3.1-lite clips actually carry an audio stream (`/inspect`).
+- **Railway auto-deploys `claude/hello-7o90qh` on push** — verified against
+  the deployment list: each deploy names the commit that triggered it,
+  landing a minute or two after the push. An earlier note here said deploys
+  were manual; they are not. So a change to `remotion/server/` is live once
+  the branch is pushed and the build goes green, and the way to check which
+  code is running is the deployment's commit hash, not a guess.
+- If SFX are enabled and the final video still has none, check whether the
+  veo-3.1-lite clips actually carry an audio stream (`/inspect`).
+- The ffmpeg bundled with Remotion in `node_modules` is a **stripped build**
+  — no `sidechaincompress`, `alimiter`, `asplit`, `afade`, `anullsink`,
+  `aloop`. The mix graph cannot be rehearsed locally with it; validate the
+  graph by reading it, and test on Railway.
 
 ### The Cinematic category (silent film)
 

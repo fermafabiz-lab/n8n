@@ -39,14 +39,22 @@ import {PreviewBackdrop} from './PreviewBackdrop';
  * handler is what stops Remotion raising MediaPlaybackError there.
  */
 
-/** The backdrop plus an explanation — what Studio shows for a dead source. */
-const MissingSource: React.FC<{explain: boolean}> = ({explain}) => {
+/**
+ * The backdrop plus an explanation — what Studio shows for a dead source.
+ *
+ * The explanation names the URL that failed and how. It used to say only
+ * "Source video unreachable", which is a guess dressed as a finding: the last
+ * time this box appeared the URL was reachable, answered 200, and simply was
+ * not a video. That one wrong word sent a debugging session looking at props
+ * files, codecs and localStorage before anyone tried fetching the URL.
+ */
+const MissingSource: React.FC<{why?: string; url?: string}> = ({why, url}) => {
 	const {width} = useVideoConfig();
 	const px = (n: number) => n * (width / 1280);
 	return (
 		<AbsoluteFill>
 			<PreviewBackdrop />
-			{explain && (
+			{why && (
 				<AbsoluteFill style={{justifyContent: 'flex-start', alignItems: 'center', padding: px(24)}}>
 					<div
 						style={{
@@ -62,10 +70,24 @@ const MissingSource: React.FC<{explain: boolean}> = ({explain}) => {
 							textAlign: 'center',
 						}}
 					>
-						Source video unreachable — the graphics are drawn over a test
-						backdrop. Drop an mp4 into remotion/public/ and restart{' '}
-						<span style={{whiteSpace: 'nowrap'}}>npm run studio</span>; it is
-						picked up automatically.
+						{why} — the graphics are drawn over a test backdrop.
+						{url && (
+							<div
+								style={{
+									marginTop: px(6),
+									color: '#ffeec2',
+									opacity: 0.85,
+									wordBreak: 'break-all',
+								}}
+							>
+								{url}
+							</div>
+						)}
+						<div style={{marginTop: px(6)}}>
+							Drop an mp4 into remotion/public/ and restart{' '}
+							<span style={{whiteSpace: 'nowrap'}}>npm run studio</span>; it is
+							picked up automatically.
+						</div>
 					</div>
 				</AbsoluteFill>
 			)}
@@ -73,7 +95,7 @@ const MissingSource: React.FC<{explain: boolean}> = ({explain}) => {
 	);
 };
 
-type Probe = 'checking' | 'ok' | 'dead';
+type Probe = {state: 'checking'} | {state: 'ok'} | {state: 'dead'; why: string};
 
 /**
  * A file dropped into `public/` is addressed as `/name.mp4` in the props, but
@@ -93,21 +115,41 @@ const resolveSrc = (src: string): string =>
 
 export const SourceVideo: React.FC<{src: string}> = ({src}) => {
 	const {isRendering} = getRemotionEnvironment();
-	const [probe, setProbe] = useState<Probe>('checking');
+	const [probe, setProbe] = useState<Probe>({state: 'checking'});
 	const url = useMemo(() => resolveSrc(src), [src]);
 
 	useEffect(() => {
 		if (isRendering || !src) return;
 		let alive = true;
-		setProbe('checking');
+		setProbe({state: 'checking'});
 		// One byte is enough to know the URL resolves, and costs nothing even
 		// when the file is hundreds of megabytes.
 		fetch(url, {headers: {Range: 'bytes=0-0'}})
 			.then((r) => {
-				if (alive) setProbe(r.ok || r.status === 206 ? 'ok' : 'dead');
+				if (!alive) return;
+				if (!r.ok && r.status !== 206) {
+					setProbe({state: 'dead', why: `Source video: HTTP ${r.status}`});
+					return;
+				}
+				// Studio's dev server answers 200 + text/html for EVERY path it does
+				// not recognise — its single-page app fallback. So a status check
+				// alone cannot tell a served video from a path that does not exist,
+				// and this probe, whose entire job is exactly that, passed anything.
+				// The failure then surfaced one step later as an undecodable video,
+				// under the wrong label. Checking the type is what makes the probe
+				// mean something in the environment it actually runs in.
+				const type = r.headers.get('content-type') ?? '';
+				if (/^text\/html/i.test(type)) {
+					setProbe({
+						state: 'dead',
+						why: 'Source video: that path served a web page, not a video (nothing is there)',
+					});
+					return;
+				}
+				setProbe({state: 'ok'});
 			})
 			.catch(() => {
-				if (alive) setProbe('dead');
+				if (alive) setProbe({state: 'dead', why: 'Source video unreachable'});
 			});
 		return () => {
 			alive = false;
@@ -117,13 +159,22 @@ export const SourceVideo: React.FC<{src: string}> = ({src}) => {
 	// A render gets the bare component: no probe, no handler, so any failure
 	// surfaces as a failed render.
 	if (isRendering) {
-		return src ? <OffthreadVideo src={url} /> : <MissingSource explain={false} />;
+		return src ? <OffthreadVideo src={url} /> : <MissingSource />;
 	}
 
-	if (!src) return <MissingSource explain={false} />;
+	if (!src) return <MissingSource />;
 	// Silent while probing: a flash of "unreachable" on every load would be
 	// its own kind of noise.
-	if (probe !== 'ok') return <MissingSource explain={probe === 'dead'} />;
+	if (probe.state !== 'ok') {
+		return probe.state === 'dead' ? <MissingSource why={probe.why} url={url} /> : <MissingSource />;
+	}
 
-	return <OffthreadVideo src={url} onError={() => setProbe('dead')} />;
+	return (
+		<OffthreadVideo
+			src={url}
+			onError={() =>
+				setProbe({state: 'dead', why: 'Source video served, but the browser could not decode it'})
+			}
+		/>
+	);
 };

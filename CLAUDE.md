@@ -501,6 +501,29 @@ them on every publish. Ignore those four; do not wire them back.
   no guard at all and fails loudly (verified: a 403 source aborts the render
   with the status code and writes no file), because shipping graphics over a
   test backdrop is far worse than a failed job.
+- **Studio answers 200 + text/html for every path it does not know.** Its
+  single-page-app fallback means a status check can never tell a served video
+  from a path that does not exist — `curl -I localhost:3000/test.mp4` returns
+  `200` and looks fine, while the bytes are the Studio HTML page. This defeated
+  the pre-flight probe above, whose whole job is that distinction: it passed,
+  `OffthreadVideo` then choked on HTML, and the box reported "Source video
+  unreachable" — a URL that was perfectly reachable and simply was not a video.
+  The probe now rejects `text/html`, and the box names the URL it tried and how
+  it failed. **When that box appears, read the URL in it before touching props,
+  codecs or localStorage.** The real address is `/static-<hash>/<file>` (the
+  hash changes per Studio start; `window.remotion_staticBase` in the page source
+  holds it) — never `/file.mp4` and never `/public/file.mp4`.
+- **A stale Studio outlives every fix you make.** The instance that showed this
+  bug had been up since before the fixing commit existed. `npm run studio`
+  refuses to start when 3000 is busy and says so loudly — but the refusal
+  scrolls past, the old tab keeps rendering the old bundle, and it looks exactly
+  like "the fix did nothing". Before debugging a Studio symptom at all, check
+  `ps -o lstart -p $(lsof -ti:3000)` against the commit date. `git log -1
+  --format=%cd` on the fix is the other half of the comparison.
+- **A symlink in `public/` 404s in a render.** Remotion's static server does not
+  follow it: `staticFile()` resolves, the compositor gets `404 while downloading
+  file .../public/x.mp4`, and the render dies. Only relevant when wiring up test
+  footage — copy the file, do not link it.
 - **Remotion Studio cannot be inspected from a Claude Code web session.** The
   proxy resets `fonts.gstatic.com` for any Chrome we launch (with or without
   `--proxy-server`/`--ignore-certificate-errors`), and a failed font fetch

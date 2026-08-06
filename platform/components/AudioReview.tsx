@@ -13,6 +13,7 @@ import {
   type ActionResult,
 } from "@/app/actions";
 import type { Scene } from "@/lib/data";
+import { useVoiceNames } from "@/lib/voice-names";
 import { mediaSrc } from "@/lib/media";
 import RegenBadge from "@/components/RegenBadge";
 import VoicePicker from "@/components/VoicePicker";
@@ -108,11 +109,6 @@ function discoverCharacters(scenes: Scene[]): string[] {
   return out;
 }
 
-const shortVoice = (id: string) => {
-  const [provider, ...rest] = id.split("_");
-  const tail = rest.join("_");
-  return `${provider} · …${tail.slice(-6)}`;
-};
 
 export default function AudioReview({
   projectId,
@@ -169,17 +165,28 @@ export default function AudioReview({
   const [voiceSel, setVoiceSel] = useState<Record<string, string>>({});
   // Scene whose "any other voice" search is open (full library picker).
   const [voiceSearchFor, setVoiceSearchFor] = useState<string | null>(null);
+  // Every voice this panel can name: the narrator, the cast, and whatever
+  // the chapters were reassigned to.
+  const voiceName = useVoiceNames([
+    narratorVoice,
+    ...cast,
+    ...Object.values(chapterVoices),
+    // Voices pinned to a single line come from the whole library, so they
+    // are not in the cast and have to be looked up too.
+    ...Object.values(voiceSel),
+  ]);
+  const shortVoice = (id: string) => voiceName(id);
   // The pickable set: the narrator first, then the cast (deduplicated).
   // Narrator alone still yields a useful menu on single-voice projects —
   // offering ONLY the cast made the selector a list of one on exactly the
   // projects that needed it.
   const knownVoices: Array<{ id: string; label: string }> = [
     ...(narratorVoice.includes("_")
-      ? [{ id: narratorVoice, label: `Narrator — ${shortVoice(narratorVoice)}` }]
+      ? [{ id: narratorVoice, label: `${shortVoice(narratorVoice)} — narrator` }]
       : []),
     ...cast
       .filter((v) => v !== narratorVoice)
-      .map((v, k) => ({ id: v, label: `Voice #${k + 1} — ${shortVoice(v)}` })),
+      .map((v) => ({ id: v, label: shortVoice(v) })),
   ];
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -395,14 +402,17 @@ export default function AudioReview({
           </div>
 
           {!showChapters ? (
-            <p style={{ margin: 0, fontSize: 12, color: "var(--dim)" }}>
-              {chapterKeys.length} section{chapterKeys.length === 1 ? "" : "s"}
-              {cast.length > 0
-                ? ` · ${cast.length} narrator${cast.length === 1 ? "" : "s"} in the cast`
-                : ""}
-              . The hook is read by the project&apos;s main narrator unless you
-              give it its own voice.
-            </p>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {chapterKeys.map((key) => {
+                const v = chapterVoiceOf(key);
+                return (
+                  <span key={key} className="chip">
+                    {key === "hook" ? "Hook" : `Ch. ${key}`} ·{" "}
+                    {v ? shortVoice(v) : "main narrator"}
+                  </span>
+                );
+              })}
+            </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {chapterKeys.map((key) => {
@@ -614,9 +624,9 @@ export default function AudioReview({
                     onChange={(e) => setAssign((p) => ({ ...p, [name]: e.target.value }))}
                     style={{ width: "auto" }}
                   >
-                    {cast.map((v, k) => (
+                    {cast.map((v) => (
                       <option key={v} value={v}>
-                        Voice #{k + 1} — {shortVoice(v)}
+                        {shortVoice(v)}
                       </option>
                     ))}
                   </select>

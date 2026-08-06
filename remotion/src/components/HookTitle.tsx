@@ -5,91 +5,127 @@ import type {StylePreset} from '../style';
 import {CURVES, curveAt, eased} from '../easing';
 
 /**
- * Hook title as an After-Effects-style text animator: characters type on
- * sequentially, each with its own opacity + y-offset ramp, while the whole
- * block drifts up gently. Layout is fixed from frame 0 (invisible characters
- * still occupy their space), so nothing ever re-wraps mid-animation.
+ * Opening title, as a statement.
+ *
+ * The previous version typed the text on character by character, centred it at
+ * medium size, and underlined it with a glowing amber rule. Every one of those
+ * is a tell: a typewriter reveal is the signature of template video tools, and
+ * centred-text-over-a-glowing-underline is a wedding invitation. It read as
+ * generated no matter how well the words were chosen.
+ *
+ * Now the title fills the frame. Type is sized to the text instead of picked
+ * from a ladder, words are revealed by a mask sliding up rather than typed,
+ * the block settles out of a slight scale and blur, and there is no rule at
+ * all. The frame darkens behind it and clears when it leaves.
  */
+
+/**
+ * Whether a project name can carry a title card at all.
+ *
+ * The form's Tema field is a description, not a headline — "A man and a woman
+ * talking about equality" is a brief, and no typography rescues a brief set in
+ * 100px. A statement card only works on a real title, so anything that reads
+ * as a sentence opens clean instead. n8n passing a written `hookTitle` skips
+ * this test entirely: a line authored to be a title is trusted as one.
+ */
+export const isTitleLike = (s: string): boolean => {
+	const t = s.trim();
+	const words = t.split(/\s+/).filter(Boolean);
+	return words.length > 0 && words.length <= 7 && t.length <= 46;
+};
+
 export const HookTitle: React.FC<{
 	title: string;
 	palette: Palette;
 	preset: StylePreset;
 	durationInSeconds: number;
-}> = ({title, palette, preset, durationInSeconds}) => {
+}> = ({title, preset, durationInSeconds}) => {
 	const frame = useCurrentFrame();
-	const {fps, width} = useVideoConfig();
+	const {fps, width, height} = useVideoConfig();
 	const t = frame / fps;
 
-	// Every length here was tuned against the landscape canvas, which
-	// calculateMetadata sizes at 1280x720; the vertical one is 720x1280. The
-	// same pixel sizes are therefore 1.78x larger relative to a vertical
-	// frame, which is why long titles ran off the sides and clipped words.
-	// Scale by the canvas so the title takes the same fraction of frame in
-	// both orientations — at 1280 the scale is exactly 1, so the landscape
-	// render is unchanged.
-	const scale = width / 1280;
-	const px = (n: number) => n * scale;
+	const words = title.split(/\s+/).filter(Boolean);
 
-	// Words are unbreakable inline-blocks so the line can only wrap BETWEEN
-	// words — per-character inline-blocks allowed mid-word line breaks.
-	const words = title.split(' ');
-	// The preset's typing speed is the ideal, not a promise: a long title at
-	// 14 chars/sec would still be typing when the hook window closes, so the
-	// last words would never appear. Type faster when the title demands it,
-	// leaving ~1.1s of the window to read the finished card.
-	const perChar = Math.min(
-		1 / preset.typeSpeed,
-		Math.max(0.012, (durationInSeconds - 1.1) / Math.max(1, title.length)),
-	);
-	const typeDone = title.length * perChar;
-	let charOffset = 0;
-	const wordStarts = words.map((w) => {
-		const s = charOffset;
-		charOffset += w.length + 1;
-		return s;
-	});
-	// The parent sizes the hook window to fit the typing, so fading out in
-	// the last 0.6s never cuts the animation short.
-	const outStart = Math.max(0.5, durationInSeconds - 0.6);
+	// Size to the text, not from a table — and by SIMULATING the line breaks
+	// rather than dividing by a character count. Solving `chars per line`
+	// algebraically ignores that words don't split: it put a five-word title
+	// on four lines when two were right, because one long word wrapped early.
+	// The greedy pass below is the same thing the browser does.
+	const avail = width * (width < height ? 0.88 : 0.84);
+	const advance = preset.titleAdvance;
+	const MAX_LINES = 3;
+	const maxHeight = height * 0.6;
 
-	const blockOpacity = eased(t, [outStart, durationInSeconds], [1, 0], CURVES.inOutCubic);
+	// Two numbers measured off a real render rather than assumed: a word space
+	// costs ~0.58 of an average glyph (0.42em in Fraunces caps, far more than
+	// the 0.25em a body face would use), and the wrap width carries a 6%
+	// margin so that whatever the estimate still gets wrong pushes the type
+	// one notch SMALLER instead of spilling onto an extra line.
+	const wrapWidth = avail * 0.94;
+	const linesAt = (size: number): number => {
+		const space = advance * size * 0.58;
+		let lines = 1;
+		let cur = -1;
+		for (const w of words) {
+			const ww = w.length * advance * size;
+			if (cur < 0) {
+				cur = ww;
+			} else if (cur + space + ww <= wrapWidth) {
+				cur += space + ww;
+			} else {
+				lines += 1;
+				cur = ww;
+			}
+		}
+		return lines;
+	};
+
+	const maxSize = width * 0.094;
+	const minSize = width * 0.03;
+	let fontSize = minSize;
+	for (let s = maxSize; s >= minSize; s -= maxSize / 60) {
+		const lines = linesAt(s);
+		if (lines <= MAX_LINES && lines * s * 1.04 <= maxHeight) {
+			fontSize = s;
+			break;
+		}
+	}
+
+	// Entrance: each word masked up in turn. Exit: the block lifts and blurs
+	// away faster than it arrived, which is what makes an exit feel decisive.
+	const STAGGER = 0.07;
+	const WORD_REVEAL = 0.55;
+	const outStart = Math.max(0.8, durationInSeconds - 0.45);
+	const outP = curveAt((t - outStart) / 0.45, CURVES.inOutCubic);
+
+	const settle = curveAt(t / 0.9, CURVES.outExpo);
+	const blockScale = 1.045 - 0.045 * settle;
+	const blockBlur = (1 - settle) * width * 0.005 + outP * width * 0.004;
+	const blockLift = -outP * height * 0.03;
+	const blockOpacity = 1 - outP;
 	if (blockOpacity <= 0) return null;
 
-	// Whole-block slow drift: rises ~14px over the full hold, barely felt.
-	// Eased so it settles instead of still travelling when it fades out.
-	const drift = eased(t, [0, durationInSeconds], [px(8), px(-6)], CURVES.outQuart);
-	const ruleWidth = eased(t, [typeDone * 0.6, typeDone + 0.5], [0, px(200)], CURVES.outExpo);
-
-	// The ladder now runs all the way down instead of bottoming out at 38 —
-	// that floor is what forced the title to be cut rather than shrunk.
-	const len = title.length;
-	const fontSize = px(
-		len <= 24 ? 72
-		: len <= 44 ? 58
-		: len <= 70 ? 46
-		: len <= 100 ? 38
-		: len <= 140 ? 32
-		: len <= 180 ? 27
-		: 23,
-	);
+	// The frame darkens under the title and clears with it — a band across the
+	// middle rather than the old radial blob, which sat on the picture instead
+	// of behind the type.
+	const scrim = Math.min(settle, 1 - outP);
 
 	return (
-		<AbsoluteFill
-			style={{justifyContent: 'center', alignItems: 'center', opacity: blockOpacity}}
-		>
+		<AbsoluteFill style={{justifyContent: 'center', alignItems: 'center'}}>
 			<AbsoluteFill
 				style={{
+					opacity: scrim,
 					background:
-						'radial-gradient(ellipse at center, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0.14) 55%, rgba(0,0,0,0) 75%)',
+						'linear-gradient(180deg, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0.58) 34%, rgba(0,0,0,0.58) 66%, rgba(0,0,0,0.12) 100%)',
 				}}
 			/>
-			{/* Vertical frames are narrow enough that 80% wastes the little width
-			    there is, which pushed long titles into more lines than needed. */}
 			<div
 				style={{
+					width: `${(avail / width) * 100}%`,
 					textAlign: 'center',
-					width: width < 900 ? '88%' : '80%',
-					transform: `translateY(${drift}px)`,
+					opacity: blockOpacity,
+					transform: `translateY(${blockLift}px) scale(${blockScale.toFixed(4)})`,
+					filter: blockBlur > 0.3 ? `blur(${blockBlur.toFixed(2)}px)` : undefined,
 				}}
 			>
 				<h1
@@ -98,64 +134,50 @@ export const HookTitle: React.FC<{
 						fontWeight: preset.displayWeight,
 						fontSize,
 						color: '#FFFFFF',
-						lineHeight: 1.2,
+						lineHeight: 1.04,
 						margin: 0,
-						letterSpacing: preset.uppercaseTitle ? px(2) : px(0.5),
+						// Uppercase needs air between the caps; mixed case at this size
+						// wants the opposite, or the words drift apart.
+						letterSpacing: preset.uppercaseTitle ? '0.005em' : '-0.022em',
 						textTransform: preset.uppercaseTitle ? 'uppercase' : 'none',
-						textShadow: `0 ${px(4)}px ${px(24)}px rgba(0,0,0,0.85)`,
+						textShadow: `0 ${fontSize * 0.03}px ${fontSize * 0.18}px rgba(0,0,0,0.55)`,
 					}}
 				>
-					{words.map((word, wi) => (
-						<React.Fragment key={wi}>
-							<span
-								style={{
-									display: 'inline-block',
-									// 'pre' here made a word unbreakable, so one longer than
-									// the line box ran off the frame and got cut instead of
-									// wrapping — the whole point of the inline-block is to
-									// stop breaks BETWEEN characters, not to forbid them when
-									// there is no other way to fit. pre-wrap keeps that
-									// behaviour (a word holds no spaces to collapse anyway)
-									// while letting 'anywhere' break as a last resort.
-									whiteSpace: 'pre-wrap',
-									overflowWrap: 'anywhere',
-									maxWidth: '100%',
-								}}
-							>
-								{Array.from(word).map((ch, ci) => {
-									const start = (wordStarts[wi] + ci) * perChar;
-									// Ease-out on both channels: soft landing, no pop. This was a
-									// hand-rolled easeOutQuad; outExpo lands harder and matches
-									// every other reveal in the project.
-									const e = curveAt((t - start) / 0.22, CURVES.outExpo);
-									return (
-										<span
-											key={ci}
-											style={{
-												display: 'inline-block',
-												opacity: e,
-												transform: `translateY(${(1 - e) * px(14)}px)`,
-											}}
-										>
-											{ch}
-										</span>
-									);
-								})}
-							</span>
-							{wi < words.length - 1 ? ' ' : null}
-						</React.Fragment>
-					))}
+					{words.map((word, wi) => {
+						const e = curveAt((t - wi * STAGGER) / WORD_REVEAL, CURVES.outExpo);
+						return (
+							<React.Fragment key={wi}>
+								{/* The clip box is grown by padding and pulled back by an
+								    equal negative margin: layout is untouched, but ascenders
+								    and descenders are no longer sliced off mid-reveal. */}
+								<span
+									style={{
+										display: 'inline-block',
+										overflow: 'hidden',
+										padding: '0.18em 0.04em',
+										margin: '-0.18em -0.04em',
+										verticalAlign: 'bottom',
+										maxWidth: '100%',
+									}}
+								>
+									<span
+										style={{
+											display: 'inline-block',
+											// 120%, not 100%: the padded clip box extends below the
+											// glyphs, and a word parked at exactly its own height
+											// would peek into that band before its turn.
+											transform: `translateY(${((1 - e) * 120).toFixed(2)}%)`,
+											overflowWrap: 'anywhere',
+										}}
+									>
+										{word}
+									</span>
+								</span>
+								{wi < words.length - 1 ? ' ' : null}
+							</React.Fragment>
+						);
+					})}
 				</h1>
-				<div
-					style={{
-						width: ruleWidth,
-						height: px(3),
-						background: palette.primary,
-						margin: `${px(24)}px auto 0`,
-						borderRadius: 2,
-						boxShadow: `0 0 ${px(18)}px ${palette.primary}`,
-					}}
-				/>
 			</div>
 		</AbsoluteFill>
 	);

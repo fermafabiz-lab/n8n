@@ -2,6 +2,7 @@ import React from 'react';
 import {AbsoluteFill, Sequence, useCurrentFrame, useVideoConfig} from 'remotion';
 import {HookTitle} from './components/HookTitle';
 import {IMPACT_CARD_SECONDS, ImpactCard, keyLineFor} from './components/ImpactCard';
+import {isTitleLike} from './components/HookTitle';
 import {OutroCard} from './components/OutroCard';
 import {Captions} from './components/Captions';
 import {FilmLayer, gradeForTone} from './components/FilmLayer';
@@ -23,6 +24,7 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 	aspectRatio,
 	showCaptions,
 	showHookTitle = true,
+	hookTitle = '',
 	showChapterCards = true,
 	showEndScreen = true,
 	chapterTitles = {},
@@ -41,21 +43,37 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 	// excerpt only guards the pathological paste, an order of magnitude
 	// longer than any real title.
 	const displayTitle = (() => {
-		const firstLine = projectTitle.split(/\r?\n/)[0].trim();
-		if (firstLine.length <= 200) return firstLine;
-		const cut = firstLine.slice(0, 200);
+		// A written hook line always wins: if Scripting produced one, it was
+		// authored to be a title and needs no rescuing.
+		const raw = (hookTitle || projectTitle).split(/\r?\n/)[0].trim();
+		if (raw.length <= 200) return raw;
+		const cut = raw.slice(0, 200);
 		return cut.slice(0, Math.max(60, cut.lastIndexOf(' '))) + '…';
 	})();
+
+	// The statement card only works on a real title. A Tema field holding a
+	// brief ("A man and a woman talking about equality") opens clean instead —
+	// a description set 100px tall is worse than no card at all.
+	const titleWorks = Boolean(hookTitle) || isTitleLike(displayTitle);
+	const wantsHook = showHookTitle && titleWorks && displayTitle.length > 0;
 
 	// A longer title needs longer on screen to be read, but the hook must
 	// never eat the film — hence a ceiling that only rises to 9s for titles
 	// that genuinely need it. HookTitle paces its own typing to whatever
 	// window it gets, so the text always finishes regardless of this cap.
 	// Disabled hook = no title window at all (captions start immediately).
-	const hookSeconds = showHookTitle
+	// No typing to wait for any more — the whole title is up within a second.
+	// The window only has to be long enough to read it, so it scales with the
+	// word count rather than the character count, and stays well short of
+	// eating the film.
+	const hookSeconds = wantsHook
 		? Math.min(
-				displayTitle.length > 90 ? 9 : 7,
-				Math.max(hookTitleDurationInSeconds, displayTitle.length / preset.typeSpeed + 1.6),
+				6.5,
+				Math.max(
+					2.8,
+					hookTitleDurationInSeconds,
+					1.9 + displayTitle.split(/\s+/).filter(Boolean).length * 0.32,
+				),
 			)
 		: 0;
 
@@ -120,7 +138,7 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 								/>
 							</Sequence>
 						))}
-					{showHookTitle && (
+					{wantsHook && (
 						<Sequence from={0} durationInFrames={Math.round(hookSeconds * fps)}>
 							<HookTitle
 								title={displayTitle}

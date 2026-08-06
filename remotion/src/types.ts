@@ -51,6 +51,12 @@ export type FinalVideoProps = {
 	aspectRatio: string;
 	/** Master switch for karaoke captions. */
 	showCaptions: boolean;
+	/**
+	 * A hook line written FOR the screen, if Scripting produced one. Falls
+	 * back to the project title — but that field holds a brief far more often
+	 * than a title, so the card judges it before showing anything.
+	 */
+	hookTitle?: string;
 	/** Individual overlay toggles — omitted/true keeps the element. */
 	showHookTitle?: boolean;
 	showChapterCards?: boolean;
@@ -72,6 +78,7 @@ export const defaultFinalVideoProps: FinalVideoProps = {
 	hookTitleDurationInSeconds: 3.5,
 	aspectRatio: '16:9',
 	showCaptions: true,
+	hookTitle: '',
 	showHookTitle: true,
 	showChapterCards: true,
 	showEndScreen: true,

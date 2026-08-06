@@ -65,6 +65,14 @@ export type StylePreset = {
 	cardInk: string;
 	/** Editing energy: 0 = calm (no punch-ins), 1 = moderate, 2 = punchy. */
 	energy: 0 | 1 | 2;
+	/**
+	 * Average glyph advance as a fraction of font size, for THIS face in the
+	 * case the title card sets it. The hook sizes itself by simulating the
+	 * line breaks, and a simulation is only as good as this number — a shared
+	 * guess put Fraunces caps on four lines when two were right. Measured per
+	 * family: condensed faces (Anton) sit far below the serifs.
+	 */
+	titleAdvance: number;
 };
 
 /**
@@ -87,6 +95,7 @@ export const presetForTone = (tone: string): StylePreset => {
 			cardBg: '#0D0B10',
 			cardInk: '#C8452E',
 			energy: 0,
+			titleAdvance: 0.7, // Bodoni Moda, uppercase
 		};
 	}
 	if (/epic|documentary|dramatic/.test(k)) {
@@ -102,6 +111,7 @@ export const presetForTone = (tone: string): StylePreset => {
 			cardBg: '#101826',
 			cardInk: '#E8B84B',
 			energy: 1,
+			titleAdvance: 0.72, // Fraunces, uppercase
 		};
 	}
 	if (/motivational/.test(k)) {
@@ -115,6 +125,7 @@ export const presetForTone = (tone: string): StylePreset => {
 			cardBg: '#0B0B0B',
 			cardInk: '#FFD400',
 			energy: 2,
+			titleAdvance: 0.46, // Anton is condensed — nearly half a serif's width
 		};
 	}
 	if (/educativ|educational|corporate/.test(k)) {
@@ -128,6 +139,7 @@ export const presetForTone = (tone: string): StylePreset => {
 			cardBg: '#F4F1EA',
 			cardInk: '#1D4ED8',
 			energy: 0,
+			titleAdvance: 0.6, // Space Grotesk, mixed case
 		};
 	}
 	// Cinematic / Emotional / Inspirational — the "two cats in Paris" family:
@@ -143,5 +155,6 @@ export const presetForTone = (tone: string): StylePreset => {
 		cardBg: '#F6EFE3',
 		cardInk: '#C77B32',
 		energy: 1,
+		titleAdvance: 0.44, // Cormorant is narrow
 	};
 };

@@ -1551,6 +1551,59 @@ a {
   color: #ffd98a;
 }
 
+/* --- the brief's title screen ---
+   The dashboard headline is left-aligned on purpose (the bloom sits behind
+   the type rather than lighting an empty half). This page is different: the
+   form below it is centred, and a left-aligned headline above a centred form
+   gives the page two competing axes. Centred, full width, it sets the single
+   vertical line everything else follows.
+
+   Height is deliberately ~55vh, not 100vh: the top of the form stays visible
+   at the bottom edge, so the page invites the scroll instead of hiding the
+   only work it exists for. */
+.hero.titlescreen {
+  /* Capped as well as proportional: on a very tall window 55vh turns into
+     dead space rather than presence. */
+  min-height: min(55vh, 600px);
+  padding: 0 0 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.hero.titlescreen h1 {
+  font-size: clamp(46px, 8.5vw, 104px);
+  margin-bottom: 24px;
+}
+.hero.titlescreen h1 em {
+  max-width: none;
+  margin-top: 0.1em;
+}
+.hero.titlescreen p {
+  max-width: 52ch;
+  font-size: 16.5px;
+}
+/* A quiet mark that there is more below — the title screen's whole bargain is
+   that it fills the view without hiding the form. */
+.scrollcue {
+  margin-top: 34px;
+  font-family: var(--f-mono), ui-monospace, Menlo, monospace;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--dim);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.scrollcue::after {
+  content: "";
+  width: 1px;
+  height: 26px;
+  background: linear-gradient(180deg, var(--line2), transparent);
+}
+
 /* --- the brief: form centred, preview to one side ---
    Three tracks with EQUAL outer rails, so the form sits on the page's real
    centre line rather than merely to the right of a sidebar. Sized to fit the
@@ -1565,10 +1618,95 @@ a {
   align-items: start;
   padding-bottom: 90px;
 }
+/* The one interactive region on the page gets the only surface. The house
+   style is hairlines-not-boxes, and this is the deliberate exception: depth
+   reads as "you touch this", flat reads as "you read this", and that single
+   distinction does more than any label could. Everything beside it — the
+   preview, the art rail — stays flat on the page. */
 .brief .form {
   max-width: none;
-  padding-bottom: 0;
+  padding: 30px 34px 0;
   gap: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.028), rgba(255, 255, 255, 0.012));
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 18px 50px rgba(0, 0, 0, 0.35);
+}
+
+/* --- "you are here" rail at the head of the form --- */
+.fprog {
+  position: sticky;
+  top: 84px;
+  z-index: 5;
+  margin: -30px -34px 0;
+  padding: 14px 34px;
+  background: rgba(20, 20, 22, 0.86);
+  backdrop-filter: blur(18px) saturate(1.4);
+  border-bottom: 1px solid var(--line);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.fprog-lead {
+  font-family: var(--f-mono), ui-monospace, Menlo, monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--amber);
+}
+.fprog ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: 11px;
+  flex-wrap: wrap;
+}
+.fprog li a {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-family: var(--f-mono), ui-monospace, Menlo, monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+  transition: color 0.2s;
+}
+/* Five labels don't fit one line on a 600px column, and a rail that wraps
+   costs height in a sticky element. Only the step you're on needs naming —
+   the numbers alone still carry "five, you're on two". */
+@media (max-width: 1500px) {
+  .fprog li:not(.on) .l {
+    display: none;
+  }
+}
+.fprog li.past a {
+  color: var(--soft);
+}
+.fprog li.on a {
+  color: var(--ink);
+}
+.fprog li.on .n {
+  color: var(--amber);
+}
+.fprog li a:hover {
+  color: var(--ink);
+}
+
+/* The action stays attached to the form instead of hiding at the end of it. */
+.fsubmit {
+  position: sticky;
+  bottom: 0;
+  margin: 28px -34px 0;
+  padding: 18px 34px;
+  background: rgba(20, 20, 22, 0.86);
+  backdrop-filter: blur(18px) saturate(1.4);
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 var(--r-lg) var(--r-lg);
 }
 .callsheet {
   position: sticky;
@@ -1576,8 +1714,14 @@ a {
   /* Held back deliberately: it's a running confirmation of what you typed,
      not somewhere to look. It comes up to full strength when you actually
      turn to it. */
-  opacity: 0.55;
+  opacity: 0.4;
   transition: opacity 0.25s ease;
+}
+/* Amber is the app's "act here" colour — inside a read-only panel it points
+   at the wrong thing. The preview keeps its rule, in a neutral tone. */
+.callsheet .srule {
+  background: var(--line2);
+  box-shadow: none;
 }
 .callsheet:hover,
 .callsheet:focus-within {

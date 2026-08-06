@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { createProject, type ActionResult } from "@/app/actions";
 import CategoryPicker, { type CategoryMeta } from "@/components/CategoryPicker";
 import Toggle from "@/components/Toggle";
+import FormProgress from "@/components/FormProgress";
 import { toneType } from "@/lib/tone-type";
 
 async function submit(_prev: ActionResult | null, formData: FormData) {
@@ -127,7 +128,7 @@ export default function NewVideo() {
 
   return (
     <main className="page">
-      <div className="hero" style={{ padding: "72px 0 30px" }}>
+      <div className="hero titlescreen">
         <h1>
           Start a <em>new video</em>
         </h1>
@@ -135,6 +136,7 @@ export default function NewVideo() {
           Fill in the brief and the factory takes it from there. You&apos;ll be
           asked to review the script, then the images, then the videos.
         </p>
+        <span className="scrollcue">The brief</span>
       </div>
 
       <form action={formAction}>
@@ -201,8 +203,9 @@ export default function NewVideo() {
             </p>
           </aside>
 
-          {/* ---- the form ---- */}
+          {/* ---- the form: the one thing on this page to fill in ---- */}
           <div className="form">
+            <FormProgress />
             <section className="fsec" style={{ marginTop: 0 }}>
               <header>
                 <span className="no">01</span>
@@ -408,7 +411,7 @@ export default function NewVideo() {
               </p>
             )}
 
-            <div style={{ marginTop: 28 }}>
+            <div className="fsubmit">
               <button className="btn gold" disabled={pending} style={{ padding: "12px 26px" }}>
                 {pending ? "Starting…" : "Start production"}
               </button>

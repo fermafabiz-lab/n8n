@@ -49,7 +49,9 @@ tipografic, sau `aspectRatio` pe `16:9`. Nimic din ce editezi acolo nu se scrie 
 serverul de randare, iar Railway pierde directorul ăla la redeploy. Când dă 404, pune
 orice mp4 asamblat în `remotion/public/` și schimbă `finalVideoUrl` pe `/<fișier>.mp4` —
 un URL relativ se resolvă față de serverul Studio, exact ca `staticFile()`. Fișierele
-media din `public/` sunt gitignorate, deci nu ajung în repo.
+media din `public/` sunt gitignorate, deci nu ajung în repo; folderul însuși vine cu
+repo-ul doar pentru că are un `README.md` în el — git nu urmărește directoare goale, iar
+fără el calea din instrucțiuni pur și simplu nu exista.
 
 Ca să prinzi props proaspete pentru alt proiect: execuția de Final Assembly din n8n →
 nodul `Build Remotion Props` → copiază `body` din output.
@@ -87,11 +89,17 @@ comutarea lui în panoul de props din Studio, pe același footage, e chiar
 comparația înainte/după. E scris explicit în `studio-props.json` ca să-l
 găsești fără să știi numele câmpului.
 
-Ca să-l vezi pe un video real deja făcut: descarcă `Link Video Final` al
-proiectului, pune-l în `remotion/public/test.mp4`, copiază fixture-ul în
-`trigger/studio-props.local.json` și pune acolo `"finalVideoUrl": "/test.mp4"`.
-Nu trebuie generat nimic — montajul se aplică la randare, peste videoul deja
-asamblat.
+Ca să-l vezi pe un video real deja făcut — nu trebuie generat nimic, montajul
+se aplică la randare, peste videoul deja asamblat:
+
+```
+cd remotion
+mkdir -p public                                   # dacă nu există deja
+cp ~/Downloads/<Link Video Final>.mp4 public/test.mp4
+cp trigger/studio-props.json trigger/studio-props.local.json
+#   … și în .local.json:  "finalVideoUrl": "/test.mp4"
+npm run studio
+```
 
 ## 2. Deploy pe Railway (fără AWS — calea aleasă acum)
 

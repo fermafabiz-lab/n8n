@@ -400,6 +400,29 @@ them on every publish. Ignore those four; do not wire them back.
   synthetic bands is the fastest way to actually look at typography and the leak
   without real footage; the Playwright ffmpeg on the box has no PNG decoder, so
   fabricating test footage with it does not work.
+- **A dead source video cannot be caught, only pre-empted.** `SourceVideo`
+  guards the footage layer, and it took three attempts to get right: the
+  `<video>` element's own failure is suppressed by passing `onError` (Remotion
+  calls the handler instead of raising MediaPlaybackError), but a dead URL
+  ALSO fails as a rejected promise inside OffthreadVideo's own effect — which
+  neither `onError` nor a React error boundary can intercept, so Studio's
+  global handler shows "NetworkError: A network error occurred." and the whole
+  composition disappears. The only fix is a pre-flight `fetch(src, {Range:
+  'bytes=0-0'})` and never mounting the video until it answers. CORS is not a
+  problem: the render server sends the headers and public/ files are
+  same-origin, and if a probe is blocked, Remotion's own fetch is blocked too.
+  `getRemotionEnvironment().isRendering` gates all of it — a real render keeps
+  no guard at all and fails loudly (verified: a 403 source aborts the render
+  with the status code and writes no file), because shipping graphics over a
+  test backdrop is far worse than a failed job.
+- **Remotion Studio cannot be inspected from a Claude Code web session.** The
+  proxy resets `fonts.gstatic.com` for any Chrome we launch (with or without
+  `--proxy-server`/`--ignore-certificate-errors`), and a failed font fetch
+  throws NetworkError before anything renders — so a Studio screenshot shows
+  the error overlay no matter what the composition does. Remotion's OWN Chrome
+  during `remotion still` does get the fonts, so verify through stills, not
+  Studio. Also note Chromium's `--screenshot` flag hangs forever on Studio (a
+  live app never goes idle); driving CDP directly is the way to capture it.
 
 ### The site
 

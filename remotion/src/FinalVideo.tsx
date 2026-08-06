@@ -1,18 +1,12 @@
 import React from 'react';
-import {
-	AbsoluteFill,
-	OffthreadVideo,
-	Sequence,
-	useCurrentFrame,
-	useVideoConfig,
-} from 'remotion';
+import {AbsoluteFill, Sequence, useCurrentFrame, useVideoConfig} from 'remotion';
 import {HookTitle} from './components/HookTitle';
 import {IMPACT_CARD_SECONDS, ImpactCard, keyLineFor} from './components/ImpactCard';
 import {OutroCard} from './components/OutroCard';
 import {Captions} from './components/Captions';
 import {FilmLayer, gradeForTone} from './components/FilmLayer';
 import {Transitions, kenBurnsTransform} from './components/Transitions';
-import {PreviewBackdrop} from './components/PreviewBackdrop';
+import {SourceVideo} from './components/SourceVideo';
 import {presetForTone} from './style';
 import type {FinalVideoProps} from './types';
 
@@ -82,16 +76,10 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 							filter: gradeForTone(tone),
 						}}
 					>
-						{/* No source video means we are previewing the graphics in
-						    Studio — the assembled video is ephemeral, so a fixture
-						    pointing at one rots within days and used to take the whole
-						    preview down with a MediaPlaybackError. Production cannot
-						    land here: /render rejects a body without finalVideoUrl. */}
-						{finalVideoUrl ? (
-							<OffthreadVideo src={finalVideoUrl} />
-						) : (
-							<PreviewBackdrop />
-						)}
+						{/* SourceVideo owns the "no usable source" decision: backdrop in
+						    Studio (the assembled video is ephemeral and a dead URL used
+						    to take the whole preview down), loud failure in a render. */}
+						<SourceVideo src={finalVideoUrl} />
 					</AbsoluteFill>
 					<FilmLayer tone={tone} />
 					<Transitions scenes={scenes} tone={tone} chapterCards={showChapterCards} />

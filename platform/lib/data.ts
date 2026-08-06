@@ -54,6 +54,9 @@ export interface EditingOptions {
   /** Scene sound effects in the final mix — the Veo clips' own ambience,
    *  ducked under the narration. Off = narration (+ music) only. */
   sfx: boolean;
+  /** Background music AND the synthesized boom/whoosh/riser accents. Both
+   *  are composed here, not in the footage, so they ride one switch. */
+  music: boolean;
 }
 
 export interface Scene {
@@ -263,8 +266,13 @@ function toProject(r: AirtableRecord): Project {
       hookTitle: opts.hookTitle !== false,
       chapterCards: opts.chapterCards !== false,
       endScreen: opts.endScreen !== false,
-      // Unlike the overlays, sound effects are opt-IN: absent means off.
-      sfx: opts.sfx === true,
+      // The clips' own sound is the footage's natural audio, so it is ON
+      // unless switched off — a film over silent clips sounds dead. Music
+      // is the opposite: nothing in it comes from the scene, so it is
+      // opt-IN. Both were wrong the other way round once and the result
+      // was unrelated stingers over stripped-out ambience.
+      sfx: opts.sfx !== false,
+      music: opts.music === true,
     },
     awaitingFinalSettings: /setari finale/.test(normalizeStatus(status)),
     category: typeof (opts as { category?: unknown }).category === "string"
@@ -468,7 +476,7 @@ const DEMO_PROJECTS: Project[] = [
     finalVideoUrl: null,
     aspect: "16:9" as const,
     updatedAt: null,
-    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: false },
+    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: true, music: false },
     awaitingFinalSettings: false,
     category: "story",
     narratorVoice: "",
@@ -488,7 +496,7 @@ const DEMO_PROJECTS: Project[] = [
     finalVideoUrl: null,
     aspect: "16:9" as const,
     updatedAt: null,
-    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: false },
+    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: true, music: false },
     awaitingFinalSettings: false,
     category: "story",
     narratorVoice: "",
@@ -508,7 +516,7 @@ const DEMO_PROJECTS: Project[] = [
     finalVideoUrl: null,
     aspect: "16:9" as const,
     updatedAt: null,
-    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: false },
+    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: true, music: false },
     awaitingFinalSettings: false,
     category: "story",
     narratorVoice: "",
@@ -528,7 +536,7 @@ const DEMO_PROJECTS: Project[] = [
     finalVideoUrl: "#",
     aspect: "16:9" as const,
     updatedAt: null,
-    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: false },
+    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: true, music: false },
     awaitingFinalSettings: false,
     category: "story",
     narratorVoice: "",

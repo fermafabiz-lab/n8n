@@ -35,7 +35,7 @@ const PACES = ["Slow", "Normal", "Fast"];
  * redesign must never change that contract.
  */
 const FINISHES: Array<{
-  name: "captions" | "hook_title" | "chapter_cards" | "end_screen" | "sfx";
+  name: "captions" | "hook_title" | "chapter_cards" | "end_screen" | "sfx" | "music";
   label: string;
   sheet: string;
   on: string;
@@ -79,7 +79,15 @@ const FINISHES: Array<{
     label: "Sound effects",
     sheet: "SFX",
     on: "Each scene's own ambience plays quietly under the narration",
-    off: "Narration and background music only — the clips stay silent",
+    off: "The clips stay silent — narration only",
+    default: true,
+  },
+  {
+    name: "music",
+    label: "Music",
+    sheet: "Music",
+    on: "Background track plus whoosh/boom accents at the cuts",
+    off: "No added music or accents",
     default: false,
   },
 ];

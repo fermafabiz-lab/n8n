@@ -19,6 +19,9 @@
 //   false/0 silences them (narration + music only), a number sets their
 //   level (ducked under the narration), absent defaults to 0.22. The site's
 //   "Sound effects" toggle maps to this via n8n's Build Timeline.
+//   stingers (default OFF) adds the synthesized boom/whoosh/riser accents;
+//   musicUrl adds the background track. Both are "music" from the
+//   producer's point of view and ride the site's one music toggle.
 // GET  /assemble/:jobId/status -> { status, outputUrl, verify: {videoSeconds,
 //   audioSeconds, sceneStartsSeconds} } — verify comes from ffprobe on the
 //   result, so callers can confirm alignment numerically.
@@ -128,6 +131,13 @@ export function registerAssemble(app, {jobs, outputDir}) {
 		// the voiceover input, so the montage carried narration and nothing
 		// else. Mixed back in under the narration by default; pass
 		// nativeAudio: false (or 0) to go back to voice-only.
+		// Editorial stingers — the boom under the hook, a whoosh at every
+		// chapter boundary, a riser into the end screen. They are SYNTHESIZED
+		// here and bear no relation to what is on screen, so they are music,
+		// not the footage's own sound. They used to play on every render
+		// unconditionally, which is exactly what "music that has nothing to do
+		// with the clip" was. Opt-in now, alongside the background track.
+		const stingers = Boolean(req.body && req.body.stingers);
 		const rawNative = req.body ? req.body.nativeAudio : undefined;
 		const nativeVolume =
 			rawNative === false || rawNative === 0
@@ -151,7 +161,7 @@ export function registerAssemble(app, {jobs, outputDir}) {
 		(async () => {
 			const work = fs.mkdtempSync(path.join(os.tmpdir(), 'assemble-'));
 			try {
-				const sfx = await ensureSfx();
+				const sfx = stingers ? await ensureSfx() : null;
 
 				// 1. Download everything and measure each clip's real video length.
 				const items = [];
@@ -234,15 +244,15 @@ export function registerAssemble(app, {jobs, outputDir}) {
 				}
 				let idx = items.length * 2;
 				const musicIdx = music ? idx++ : -1;
-				const boomIdx = idx++;
-				const whooshIdx = idx++;
-				const riserIdx = idx++;
+				const boomIdx = stingers ? idx++ : -1;
+				const whooshIdx = stingers ? idx++ : -1;
+				const riserIdx = stingers ? idx++ : -1;
 				// concat wants the same stream count from every segment, so scenes
 				// without usable clip audio borrow silence from here.
 				const nativeOn = items.some((it) => it.nativeAudio);
 				const silenceIdx = nativeOn ? idx++ : -1;
 				if (music) args.push('-i', music);
-				args.push('-i', sfx.boom, '-i', sfx.whoosh, '-i', sfx.riser);
+				if (stingers) args.push('-i', sfx.boom, '-i', sfx.whoosh, '-i', sfx.riser);
 				if (nativeOn) args.push('-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=mono');
 
 				const parts = [];
@@ -313,23 +323,25 @@ export function registerAssemble(app, {jobs, outputDir}) {
 				} else {
 					parts.push(`[vside]anullsink`);
 				}
-				// Boom under the hook title.
-				parts.push(`[${boomIdx}:a]adelay=150|150,volume=0.45[sfxboom]`);
-				mixInputs.push('[sfxboom]');
-				// Whoosh at every chapter boundary (one input, split as needed).
-				if (chapterBoundaries.length) {
-					const n = chapterBoundaries.length;
-					parts.push(`[${whooshIdx}:a]asplit=${n}${chapterBoundaries.map((_, i) => `[w${i}]`).join('')}`);
-					chapterBoundaries.forEach((b, i) => {
-						const ms = Math.max(0, Math.round((b - 0.45) * 1000));
-						parts.push(`[w${i}]adelay=${ms}|${ms},volume=0.4[sw${i}]`);
-						mixInputs.push(`[sw${i}]`);
-					});
+				if (stingers) {
+					// Boom under the hook title.
+					parts.push(`[${boomIdx}:a]adelay=150|150,volume=0.45[sfxboom]`);
+					mixInputs.push('[sfxboom]');
+					// Whoosh at every chapter boundary (one input, split as needed).
+					if (chapterBoundaries.length) {
+						const n = chapterBoundaries.length;
+						parts.push(`[${whooshIdx}:a]asplit=${n}${chapterBoundaries.map((_, i) => `[w${i}]`).join('')}`);
+						chapterBoundaries.forEach((b, i) => {
+							const ms = Math.max(0, Math.round((b - 0.45) * 1000));
+							parts.push(`[w${i}]adelay=${ms}|${ms},volume=0.4[sw${i}]`);
+							mixInputs.push(`[sw${i}]`);
+						});
+					}
+					// Riser into the last two seconds (leads into the end screen).
+					const riserMs = Math.max(0, Math.round((totalDur - 2.4) * 1000));
+					parts.push(`[${riserIdx}:a]adelay=${riserMs}|${riserMs},volume=0.35[sfxriser]`);
+					mixInputs.push('[sfxriser]');
 				}
-				// Riser into the last two seconds (leads into the end screen).
-				const riserMs = Math.max(0, Math.round((totalDur - 2.4) * 1000));
-				parts.push(`[${riserIdx}:a]adelay=${riserMs}|${riserMs},volume=0.35[sfxriser]`);
-				mixInputs.push('[sfxriser]');
 
 				parts.push(
 					`${mixInputs.join('')}amix=inputs=${mixInputs.length}:duration=first:normalize=0,alimiter=limit=0.95[outa]`,

@@ -290,11 +290,26 @@ So "sound effects" = the Veo clips' own generated ambience:
   prompt: natural ambient sound effects only — no speech, no voices, no
   singing, no narration, no music. Unconditional, so voices can never leak
   into a clip regardless of the toggle.
-- `Editing Options.sfx` (set in the site's Final Settings panel, merged —
-  never overwritten — into the JSON) drives `Build Timeline` in Final
-  Assembly: ON → `nativeAudio: 0.25`, OFF → `nativeAudio: false`, always
-  explicit. The server sidechain-ducks the ambience under the narration, so
-  narration stays predominant by construction.
+- `Editing Options.sfx` (set on the creation form and again in Final
+  Settings, merged — never overwritten — into the JSON) drives
+  `Build Timeline`: ON → `nativeAudio: 0.25`, OFF → `nativeAudio: false`,
+  always explicit. The server sidechain-ducks the ambience under the
+  narration, so narration stays predominant by construction. **Default ON**
+  — footage under a voice with no sound of its own is dead air.
+
+**Music is a SEPARATE, opt-IN switch (`Editing Options.music`)**, and it
+covers two things that both come from us rather than from the scene: the
+background track from the Drive `Muzica` folder, and the synthesized
+boom/whoosh/riser accents at the hook, the chapter cuts and the end screen.
+
+Those accents used to be added to **every** render unconditionally, while
+`sfx` defaulted off — so a film could carry a low boom and a 2-second riser
+that had nothing to do with its footage, over clips whose own sound had
+been stripped. That combination is exactly what "music that has nothing to
+do with the clip, and the clip's effects are gone" was. `Build Timeline`
+now sends `stingers: musicOn` and only resolves `musicUrl` when music is
+on; `/assemble` defaults `stingers` to **false**, and every stinger index
+is built only inside that guard (a `-1` input index would break the graph).
 - `confirmFinalSettings` used to REPLACE the whole Editing Options JSON
   with three overlay keys, silently wiping `category`/`cast`/
   `multiVoiceMode` at the final-settings step. It now merges via

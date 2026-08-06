@@ -335,6 +335,7 @@ export async function confirmFinalSettings(
     chapterCards: boolean;
     endScreen: boolean;
     sfx: boolean;
+    music: boolean;
   },
 ): Promise<ActionResult> {
   if (!isConfigured) {
@@ -352,6 +353,7 @@ export async function confirmFinalSettings(
         chapterCards: settings.chapterCards,
         endScreen: settings.endScreen,
         sfx: settings.sfx,
+        music: settings.music,
       });
     }
     await writeProjectFields(projectId, { "Status General": "Asamblare" });
@@ -640,7 +642,8 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     hook_title: String(formData.get("hook_title") ?? "yes"),
     chapter_cards: String(formData.get("chapter_cards") ?? "yes"),
     end_screen: String(formData.get("end_screen") ?? "yes"),
-    sfx: String(formData.get("sfx") ?? "no"),
+    sfx: String(formData.get("sfx") ?? "yes"),
+    music: String(formData.get("music") ?? "no"),
   };
   // A no-narration category has nothing to speak and nothing to caption —
   // enforce that server-side no matter what the form controls held.

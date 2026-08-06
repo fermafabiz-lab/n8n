@@ -54,8 +54,15 @@ const OPTIONS: Array<{
     key: "sfx",
     label: "Sound effects",
     on: "Each scene's own ambience plays quietly under the narration — no voices or music from the clips, effects only",
-    off: "Narration and background music only — the clips stay silent",
+    off: "The clips stay silent — narration only",
     icon: "🔊",
+  },
+  {
+    key: "music",
+    label: "Music",
+    on: "A background track plus whoosh/boom accents at the cuts — composed here, unrelated to what the scenes show",
+    off: "No added music or accents",
+    icon: "🎵",
   },
 ];
 

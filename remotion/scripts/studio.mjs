@@ -10,6 +10,7 @@
 // loud enough to survive the scrollback either way.
 import {execFileSync, spawn} from 'node:child_process';
 import {existsSync, readdirSync, readFileSync, statSync, writeFileSync} from 'node:fs';
+import {connect} from 'node:net';
 import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
@@ -23,6 +24,41 @@ const banner = (lines) => {
 
 const git = (args) =>
 	execFileSync('git', args, {cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']}).trim();
+
+// A Studio already on port 3000 makes everything below pointless: Remotion
+// prints one line — "Already running on port 3000" — and just opens a browser
+// onto the OLD instance, with the old code and the old props. Same class of
+// silent-stale failure this script exists to prevent, so it gets the same
+// treatment: stop, and say exactly what to run.
+//
+// Deliberately does not kill it. The site (platform/, Next.js) defaults to
+// port 3000 too, and killing that instead would be a far worse surprise.
+const portBusy = await new Promise((resolve) => {
+	const sock = connect({port: 3000, host: '127.0.0.1'});
+	const done = (v) => {
+		sock.destroy();
+		resolve(v);
+	};
+	sock.setTimeout(600);
+	sock.on('connect', () => done(true));
+	sock.on('error', () => done(false));
+	sock.on('timeout', () => done(false));
+});
+if (portBusy) {
+	banner([
+		'!! SOMETHING IS ALREADY ON PORT 3000 !!',
+		'',
+		'Remotion would just reopen THAT instance — old code, old props —',
+		'and nothing you changed would show up.',
+		'',
+		'See what it is:   lsof -i:3000',
+		'If it is Studio:  lsof -ti:3000 | xargs kill',
+		'Then:             npm run studio',
+		'',
+		'(The site in platform/ also uses 3000. Check before you kill.)',
+	]);
+	process.exit(1);
+}
 
 let before = '';
 try {

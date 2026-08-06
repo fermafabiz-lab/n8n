@@ -9,7 +9,7 @@
 // So: --autostash, so ordinary local churn can't block the update, and a banner
 // loud enough to survive the scrollback either way.
 import {execFileSync, spawn} from 'node:child_process';
-import {existsSync} from 'node:fs';
+import {existsSync, readdirSync, readFileSync, statSync, writeFileSync} from 'node:fs';
 import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
@@ -59,10 +59,53 @@ try {
 // file, and never collides with a pull.
 const local = join(root, 'trigger', 'studio-props.local.json');
 const props = existsSync(local) ? local : join(root, 'trigger', 'studio-props.json');
-console.log('props: ' + props.replace(root + '/', '') + '\n');
+
+// Footage: whatever is in public/, picked up automatically.
+//
+// The old instruction was "drop an mp4 in public/, then copy the fixture and
+// edit finalVideoUrl in it" — three steps, two of them hand-editing JSON, to
+// express one thing the directory listing already knows. Now dropping the file
+// in is the whole procedure. An explicit finalVideoUrl always wins, so nothing
+// here can override a deliberate choice.
+const publicDir = join(root, 'public');
+const pickFootage = () => {
+	if (!existsSync(publicDir)) return null;
+	const media = readdirSync(publicDir).filter((f) => /\.(mp4|webm|mov)$/i.test(f));
+	if (!media.length) return null;
+	// test.mp4 by convention, else the newest file — dropping a second video in
+	// should switch the preview to it, not leave you staring at the old one.
+	const preferred =
+		media.find((f) => f.toLowerCase() === 'test.mp4') ??
+		media.sort(
+			(a, b) => statSync(join(publicDir, b)).mtimeMs - statSync(join(publicDir, a)).mtimeMs,
+		)[0];
+	return '/' + preferred;
+};
+
+let propsPath = props;
+const parsed = JSON.parse(readFileSync(props, 'utf8'));
+if (parsed.finalVideoUrl) {
+	console.log('props:   ' + props.replace(root + '/', ''));
+	console.log('footage: ' + parsed.finalVideoUrl + '  (set in the props file)\n');
+} else {
+	const footage = pickFootage();
+	if (footage) {
+		// Resolved copy, gitignored, rewritten on every start — never the
+		// tracked fixture, so a pull can't collide with it.
+		parsed.finalVideoUrl = footage;
+		propsPath = join(root, 'trigger', '.studio-props.resolved.json');
+		writeFileSync(propsPath, JSON.stringify(parsed, null, '\t'));
+		console.log('props:   ' + props.replace(root + '/', ''));
+		console.log('footage: public' + footage + '  (found automatically)\n');
+	} else {
+		console.log('props:   ' + props.replace(root + '/', ''));
+		console.log('footage: none — synthetic backdrop.');
+		console.log('         Drop an mp4 into remotion/public/ and restart to use real footage.\n');
+	}
+}
 
 spawn(
 	'npx',
-	['remotion', 'studio', 'src/index.ts', `--props=${props}`],
+	['remotion', 'studio', 'src/index.ts', `--props=${propsPath}`],
 	{cwd: root, stdio: 'inherit', shell: false},
 ).on('exit', (code) => process.exit(code ?? 0));

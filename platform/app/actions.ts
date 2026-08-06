@@ -17,7 +17,12 @@ import {
   deleteProjectDeep,
   updateEditingOptions,
 } from "@/lib/data";
-import { getAliveProduction, getExecutions, stopExecution } from "@/lib/n8n";
+import {
+  getAliveProduction,
+  getExecutions,
+  getStalledProduction,
+  stopExecution,
+} from "@/lib/n8n";
 
 export interface ActionResult {
   ok: boolean;
@@ -766,6 +771,12 @@ export async function resumeProject(projectId: string): Promise<ActionResult> {
         message:
           "Production is already running (an execution is active in n8n) — nothing was restarted. The page refreshes itself; if it looks stuck for more than a few minutes, use Pause first, then Resume.",
       };
+    }
+    // Clear out executions n8n created but never ran. They report as running
+    // forever, so left alone they pile up and each one keeps its parent
+    // orchestrator wedged in waitForSubWorkflow.
+    for (const dead of await getStalledProduction().catch(() => [])) {
+      await stopExecution(dead.id).catch(() => {});
     }
     const res = await fetch(webhook, {
       method: "POST",

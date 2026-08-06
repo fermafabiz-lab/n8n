@@ -134,6 +134,35 @@ const WORKER_WORKFLOWS = new Set([
   "gkEtGMecv4TC3ZHp", // Scripting
 ]);
 
+/**
+ * A "running" execution that never actually started.
+ *
+ * n8n occasionally creates an execution, hands it its input, and then never
+ * executes a single node. It reports as `running` forever: the parent sits in
+ * `waitForSubWorkflow`, the batch never moves, and the site — which trusts
+ * `running` — refuses to Resume because it believes work is in progress. That
+ * combination is unrecoverable from the UI, and it has now cost two separate
+ * production stalls.
+ *
+ * The tell is exact, not a guess: a healthy execution runs its first node
+ * within seconds, so an empty `runData` after the grace period means no node
+ * ever ran. Age alone would be wrong — a real media batch legitimately runs
+ * for the best part of an hour.
+ */
+const STALL_GRACE_MS = 3 * 60 * 1000;
+
+export async function isStalled(e: ExecutionSummary): Promise<boolean> {
+  if (!e.startedAt) return false;
+  if (Date.now() - new Date(e.startedAt).getTime() < STALL_GRACE_MS) return false;
+  const res = await api(`/executions/${e.id}?includeData=true`);
+  if (!res.ok) return false; // Can't tell — treat as alive, never kill on doubt.
+  const data = (await res.json()) as {
+    data?: { resultData?: { runData?: Record<string, unknown> } };
+  };
+  const runData = data.data?.resultData?.runData;
+  return Boolean(runData) && Object.keys(runData as object).length === 0;
+}
+
 export async function getAliveProduction(): Promise<ExecutionSummary[]> {
   if (!n8nConfigured) return [];
   const [running, waiting] = await Promise.all([
@@ -141,7 +170,7 @@ export async function getAliveProduction(): Promise<ExecutionSummary[]> {
     getExecutions("waiting", 20),
   ]);
   const soon = Date.now() + 2 * 3600 * 1000;
-  return [
+  const candidates = [
     ...running.filter((e) => WORKER_WORKFLOWS.has(e.workflowId)),
     ...waiting.filter(
       (e) =>
@@ -150,6 +179,22 @@ export async function getAliveProduction(): Promise<ExecutionSummary[]> {
         new Date(e.waitTill).getTime() < soon,
     ),
   ];
+  // Drop the ones that never executed a node, so Pause/Resume works again.
+  const stalled = await Promise.all(candidates.map((e) => isStalled(e).catch(() => false)));
+  return candidates.filter((_, i) => !stalled[i]);
+}
+
+/**
+ * Executions that look alive but never ran a node — surfaced so the producer
+ * can stop them instead of staring at a batch that will never move.
+ */
+export async function getStalledProduction(): Promise<ExecutionSummary[]> {
+  if (!n8nConfigured) return [];
+  const running = (await getExecutions("running", 20)).filter((e) =>
+    WORKER_WORKFLOWS.has(e.workflowId),
+  );
+  const stalled = await Promise.all(running.map((e) => isStalled(e).catch(() => false)));
+  return running.filter((_, i) => stalled[i]);
 }
 
 export interface AssemblyState {

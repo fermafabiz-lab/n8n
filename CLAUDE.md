@@ -81,6 +81,16 @@ These each cost hours. Do not rediscover them.
   in `platform/lib/n8n.ts` threads this needle: `running` always counts;
   `waiting` counts only for worker workflows with a genuinely near wake-up.
 - **`execute_workflow` targets the first enabled webhook** in a workflow.
+- **Some executions never start at all.** n8n creates the execution, stores its
+  input, and then runs nothing: `runData` stays `{}` while the status says
+  `running`, forever. Seen twice (5639, and 1175 on the Vikings project). The
+  parent sits in `waitForSubWorkflow`, the batch never moves, and the site used
+  to hide Resume because it trusted `running` — leaving no way out of the UI.
+  `isStalled()` in `platform/lib/n8n.ts` detects it by the empty `runData`
+  after a 3-minute grace, never by age: a real media batch legitimately runs
+  for the best part of an hour. Stalled executions are excluded from
+  `getAliveProduction()`, listed in the ops panel with a Stop button, and
+  stopped automatically before a Resume so they can't accumulate.
 - **`WEBHOOK_URL=https://wf7.house-of-videos.com`** must be set as an env var
   on the instance. Without it n8n hands out `localhost` webhook URLs and
   Vercel can't start anything — which presents as "the site is broken".

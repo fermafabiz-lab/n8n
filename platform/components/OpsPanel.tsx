@@ -1,4 +1,11 @@
-import { executionUrl, getExecutionError, getExecutions, n8nConfigured, getAliveProduction } from "@/lib/n8n";
+import {
+  executionUrl,
+  getExecutionError,
+  getExecutions,
+  n8nConfigured,
+  getAliveProduction,
+  getStalledProduction,
+} from "@/lib/n8n";
 import { stopExecutionAction } from "@/app/actions";
 import Disclosure from "@/components/Disclosure";
 
@@ -36,17 +43,20 @@ export default async function OpsPanel({
   }
 
   let running: Awaited<ReturnType<typeof getExecutions>> = [];
+  let stalled: Awaited<ReturnType<typeof getExecutions>> = [];
   let failed: Awaited<ReturnType<typeof getExecutions>> = [];
   let apiError: string | null = null;
   try {
     // "waiting" = alive but paused in a Wait node (polling loops live there
     // most of the time). Hiding those made the panel claim nothing was
     // running while the Pause button correctly said otherwise.
-    const [aliveNow, failedNow] = await Promise.all([
+    const [aliveNow, stalledNow, failedNow] = await Promise.all([
       errorsOnly ? Promise.resolve([]) : getAliveProduction(),
+      getStalledProduction(),
       getExecutions("error", 5),
     ]);
     running = aliveNow;
+    stalled = stalledNow;
     failed = failedNow;
   } catch (e) {
     apiError = String((e as Error).message ?? e);
@@ -72,10 +82,39 @@ export default async function OpsPanel({
     );
   }
 
-  if (running.length === 0 && withErrors.length === 0) return null;
+  if (running.length === 0 && stalled.length === 0 && withErrors.length === 0) return null;
 
   return (
     <div style={{ marginBottom: 36, display: "flex", flexDirection: "column", gap: 14 }}>
+      {/* An execution n8n reports as running that never executed a node. It
+          will never move on its own, and while it exists the Resume button
+          stays hidden — so this panel has to be the way out. */}
+      {stalled.length > 0 && (
+        <div className="card errcard">
+          <h5>Stuck — never started</h5>
+          {stalled.map((r) => (
+            <div className="kv" key={r.id}>
+              <span>
+                <b style={{ color: "var(--ink)" }}>{r.workflowName}</b> · started{" "}
+                {ago(r.startedAt)}, still hasn&apos;t run a single step
+              </span>
+              <span style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <form action={stopExecutionAction}>
+                  <input type="hidden" name="executionId" value={r.id} />
+                  <button className="abtn" style={{ padding: "6px 14px", fontSize: 12 }}>
+                    ■ Stop it
+                  </button>
+                </form>
+              </span>
+            </div>
+          ))}
+          <p style={{ margin: "10px 0 0", fontSize: 12, color: "var(--dim)" }}>
+            n8n sometimes creates an execution and never runs it. Stop it, then
+            press Resume — the batch skips whatever already has a clip, so
+            nothing finished gets regenerated.
+          </p>
+        </div>
+      )}
       {!errorsOnly && running.length > 0 && (
         <div className="card">
           <h5>Running now</h5>

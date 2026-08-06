@@ -389,6 +389,18 @@ them on every publish. Ignore those four; do not wire them back.
   blend with each other first and most of the light is lost.
   `IMPACT_CARD_SECONDS` is exported because FinalVideo's Sequence must cover the
   whole window; a shorter one cuts the exit flash off mid-burn.
+- **A shrink-to-fit flex item ignores `maxWidth`.** Captions were a `<div>`
+  with `maxWidth: '90%'` centred by `alignItems` inside an `AbsoluteFill`, and
+  a four-long-word chunk ran clean off the right edge, cut mid-word, at
+  720x1280 — reproduced on a still. Percentages are not a wrapping guarantee:
+  the safe margin now lives as padding on the frame, and the text box is an
+  explicit `width: 100%` flex-wrap row. Check overlays at **720x1280**, not
+  1280x720 — vertical is the narrow case and every overflow shows up there
+  first.
+- **`src/probe.tsx`** renders the overlays over synthetic bands as stills
+  (`CaptionsPortrait`, `CaptionsLandscape`, `TitlePortrait`) so typography can
+  be inspected without any footage. It is not part of the production bundle
+  (`src/index.ts` is) — change its text/dimensions freely.
 - **Verifying a render from a Claude Code web session:** the proxy answers 403
   for `remotion.media`, so Remotion cannot download its Chrome Headless Shell.
   Use the Playwright one that is already on the box —

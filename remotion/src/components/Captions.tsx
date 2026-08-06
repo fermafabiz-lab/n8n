@@ -86,18 +86,39 @@ export const Captions: React.FC<{
 	if (!active) return null;
 
 	return (
-		<AbsoluteFill style={{justifyContent: 'flex-end', alignItems: 'center'}}>
+		<AbsoluteFill
+			style={{
+				justifyContent: 'flex-end',
+				alignItems: 'center',
+				// The safe margin belongs to the frame, not the text box: padding
+				// here is what a percentage max-width failed to guarantee.
+				paddingLeft: portrait ? 44 : 90,
+				paddingRight: portrait ? 44 : 90,
+				boxSizing: 'border-box',
+			}}
+		>
 			<div
 				style={{
 					// Portrait: lift captions well above the platform UI (Shorts /
 					// Reels overlays live in the bottom ~20%).
 					marginBottom: portrait ? 280 : 84,
-					maxWidth: portrait ? '90%' : '86%',
+					// A shrink-to-fit flex item ignored `maxWidth` and ran a long
+					// chunk clean off the right edge, cut mid-word — reproduced at
+					// 720x1280 with four long words. An explicit full-width box that
+					// wraps between words cannot do that, whatever the font metrics
+					// turn out to be.
+					width: '100%',
+					boxSizing: 'border-box',
+					display: 'flex',
+					flexWrap: 'wrap',
+					justifyContent: 'center',
+					columnGap: 14,
+					rowGap: 2,
 					textAlign: 'center',
 					fontFamily: preset.captionFont,
 					fontWeight: portrait ? 700 : 600,
-					fontSize: portrait ? 44 : 40,
-					lineHeight: 1.35,
+					fontSize: portrait ? 42 : 40,
+					lineHeight: 1.3,
 					textShadow: '0 3px 14px rgba(0,0,0,0.9)',
 				}}
 			>
@@ -110,7 +131,10 @@ export const Captions: React.FC<{
 							style={{
 								color: activeNow || keyword ? palette.primary : '#FFFFFF',
 								opacity: activeNow ? 1 : 0.92,
-								marginRight: 14,
+								// Last resort for a single word longer than the line box
+								// (compound German/Romanian nouns, URLs read aloud).
+								overflowWrap: 'anywhere',
+								maxWidth: '100%',
 							}}
 						>
 							{word}

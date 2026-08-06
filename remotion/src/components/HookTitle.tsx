@@ -33,7 +33,14 @@ export const HookTitle: React.FC<{
 	// Words are unbreakable inline-blocks so the line can only wrap BETWEEN
 	// words — per-character inline-blocks allowed mid-word line breaks.
 	const words = title.split(' ');
-	const perChar = 1 / preset.typeSpeed;
+	// The preset's typing speed is the ideal, not a promise: a long title at
+	// 14 chars/sec would still be typing when the hook window closes, so the
+	// last words would never appear. Type faster when the title demands it,
+	// leaving ~1.1s of the window to read the finished card.
+	const perChar = Math.min(
+		1 / preset.typeSpeed,
+		Math.max(0.012, (durationInSeconds - 1.1) / Math.max(1, title.length)),
+	);
 	const typeDone = title.length * perChar;
 	let charOffset = 0;
 	const wordStarts = words.map((w) => {
@@ -53,8 +60,18 @@ export const HookTitle: React.FC<{
 	const drift = eased(t, [0, durationInSeconds], [px(8), px(-6)], CURVES.outQuart);
 	const ruleWidth = eased(t, [typeDone * 0.6, typeDone + 0.5], [0, px(200)], CURVES.outExpo);
 
+	// The ladder now runs all the way down instead of bottoming out at 38 —
+	// that floor is what forced the title to be cut rather than shrunk.
 	const len = title.length;
-	const fontSize = px(len <= 24 ? 72 : len <= 44 ? 58 : len <= 70 ? 46 : 38);
+	const fontSize = px(
+		len <= 24 ? 72
+		: len <= 44 ? 58
+		: len <= 70 ? 46
+		: len <= 100 ? 38
+		: len <= 140 ? 32
+		: len <= 180 ? 27
+		: 23,
+	);
 
 	return (
 		<AbsoluteFill
@@ -66,7 +83,15 @@ export const HookTitle: React.FC<{
 						'radial-gradient(ellipse at center, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0.14) 55%, rgba(0,0,0,0) 75%)',
 				}}
 			/>
-			<div style={{textAlign: 'center', width: '80%', transform: `translateY(${drift}px)`}}>
+			{/* Vertical frames are narrow enough that 80% wastes the little width
+			    there is, which pushed long titles into more lines than needed. */}
+			<div
+				style={{
+					textAlign: 'center',
+					width: width < 900 ? '88%' : '80%',
+					transform: `translateY(${drift}px)`,
+				}}
+			>
 				<h1
 					style={{
 						fontFamily: preset.displayFont,

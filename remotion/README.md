@@ -13,8 +13,18 @@ de a regla grafica — o randare completă doar ca să vezi cum arată un card e
 ```
 cd remotion
 npm install
-npm run studio        # deschide http://localhost:3000 pe un proiect REAL
+npm run studio        # trage ultimele modificări, apoi deschide localhost:3000
 ```
+
+`npm run studio` face `git pull` înainte să pornească, ca să nu te uiți la cod
+vechi fără să-ți dai seama. Dacă ai modificări locale (de exemplu ai schimbat
+`finalVideoUrl` în fixture ca să arate spre footage-ul tău), pull-ul e sărit cu
+un mesaj și Studio pornește oricum pe checkout-ul curent. `npm start` nu trage
+nimic niciodată.
+
+**Studio se reîncarcă singur la salvare**, deci după un `git pull` cu fișiere
+*modificate* nu trebuie repornit. Repornește-l doar când apare un fișier
+**nou** — watcher-ul îl ratează uneori.
 
 `npm run studio` încarcă `trigger/studio-props.json` — props capturate dintr-o execuție
 reală de Final Assembly (proiect 9:16, ton Emotional, 41,8s, un card de capitol la 7,7s),

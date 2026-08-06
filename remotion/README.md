@@ -26,10 +26,18 @@ Trage cu `--autostash`, deci modificările tale locale nu-l pot bloca — nici
 măcar un `package-lock.json` atins de `npm install`, care singur era de ajuns
 înainte ca să te țină pe cod vechi la nesfârșit.
 
-Ca să arăți preview-ul spre footage-ul tău, **nu edita fixture-ul urmărit de
-git**: copiază-l în `trigger/studio-props.local.json` (gitignorat) și schimbă
-acolo `finalVideoUrl`. Scriptul îl preferă automat dacă există, deci nu se
-ciocnește niciodată cu un pull.
+Ca să arăți preview-ul spre footage-ul tău, **pune un mp4 în `remotion/public/`
+și atât** — scriptul îl găsește singur (`test.mp4` prin convenție, altfel cel
+mai recent) și ți-o spune în banner. Nu edita niciun JSON.
+
+Dacă vrei totuși alte props (alt proiect, alte scene), **nu edita fixture-ul
+urmărit de git**: copiază-l în `trigger/studio-props.local.json` (gitignorat).
+Scriptul îl preferă automat dacă există, deci nu se ciocnește cu un pull. Un
+`finalVideoUrl` scris explicit acolo bate detectarea automată.
+
+Scriptul refuză să pornească dacă portul 3000 e deja ocupat. Altfel Remotion
+doar redeschide instanța veche — cod vechi, props vechi — și pare că nimic nu
+s-a schimbat. Notă: site-ul din `platform/` folosește tot 3000.
 
 `npm start` nu trage nimic niciodată.
 
@@ -47,11 +55,16 @@ tipografic, sau `aspectRatio` pe `16:9`. Nimic din ce editezi acolo nu se scrie 
 
 **Videoul sursă e efemer.** `finalVideoUrl` din fixture arată spre `/output` de pe
 serverul de randare, iar Railway pierde directorul ăla la redeploy. Când dă 404, pune
-orice mp4 asamblat în `remotion/public/` și schimbă `finalVideoUrl` pe `/<fișier>.mp4` —
-un URL relativ se resolvă față de serverul Studio, exact ca `staticFile()`. Fișierele
-media din `public/` sunt gitignorate, deci nu ajung în repo; folderul însuși vine cu
-repo-ul doar pentru că are un `README.md` în el — git nu urmărește directoare goale, iar
-fără el calea din instrucțiuni pur și simplu nu exista.
+orice mp4 asamblat în `remotion/public/` și repornește — restul se rezolvă singur.
+Fișierele media din `public/` sunt gitignorate, deci nu ajung în repo; folderul însuși
+vine cu repo-ul doar pentru că are un `README.md` în el — git nu urmărește directoare
+goale, iar fără el calea din instrucțiuni pur și simplu nu exista.
+
+**O cale ca `/test.mp4` nu se resolvă singură** — Remotion nu servește `public/` de la
+rădăcina site-ului, dă `"/test.mp4" was requested but not found` și randarea moare.
+`SourceVideo` o trece acum prin `staticFile()` automat (orice nu e `http(s):` / `blob:` /
+`data:`), deci scrierea evidentă funcționează și URL-urile de producție trec neatinse.
+Ce scria aici înainte — „un URL relativ se resolvă exact ca staticFile()" — era fals.
 
 Ca să prinzi props proaspete pentru alt proiect: execuția de Final Assembly din n8n →
 nodul `Build Remotion Props` → copiază `body` din output.

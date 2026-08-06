@@ -1,6 +1,6 @@
 # Remotion — grafică peste videoul asamblat (Faza 1)
 
-Adaugă peste videoul deja lipit de fal (`Link Video Final`): intro cu titlu, subtitrări
+Adaugă peste montajul deja lipit (ieșirea lui `/assemble`): intro cu titlu, subtitrări
 sincronizate pe scenă, progress bar, outro cu subscribe. Dacă rezultatul convinge,
 Faza 2 înlocuiește fal complet (Remotion face și tăierea scenelor, cu tranziții).
 
@@ -108,11 +108,15 @@ se aplică la randare, peste videoul deja asamblat:
 ```
 cd remotion
 mkdir -p public                                   # dacă nu există deja
-cp ~/Downloads/<Link Video Final>.mp4 public/test.mp4
-cp trigger/studio-props.json trigger/studio-props.local.json
-#   … și în .local.json:  "finalVideoUrl": "/test.mp4"
+cp ~/Downloads/<montajul brut>.mp4 public/test.mp4
 npm run studio
 ```
+
+Fișierul trebuie să fie **montajul, fără grafică** — ieșirea lui `/assemble`,
+sau un clip de scenă brut. `Link Video Final` al unui proiect terminat este
+ieșirea pasului Remotion (vezi secțiunea 4, pasul 3: `outputUrl` suprascrie
+câmpul), deci are deja subtitrări și carduri arse, iar Studio va desena al
+doilea rând peste ele. Vezi `public/README.md`.
 
 ## 2. Deploy pe Railway (fără AWS — calea aleasă acum)
 

@@ -501,6 +501,19 @@ them on every publish. Ignore those four; do not wire them back.
   no guard at all and fails loudly (verified: a 403 source aborts the render
   with the status code and writes no file), because shipping graphics over a
   test backdrop is far worse than a failed job.
+- **`Link Video Final` means two different files depending on when you read it.**
+  Before the Remotion pass it holds the raw montage from `/assemble`; after the
+  render, `outputUrl` OVERWRITES it with the finished film. So on any completed
+  project the field yields the graphics-baked version — and `remotion/public/`'s
+  own README told you to download exactly that for Studio test footage. It was
+  right when written, and silently became wrong the day the render step was
+  wired in. The result is two sets of captions and a chapter card from a
+  DIFFERENT project (seen: props said "What Fairness Costs", the frame showed
+  "CHAPTER I — The Price of the Island"), which reads as a rendering bug and is
+  not one — `FinalVideo` is drawing over a frame that already has graphics.
+  Studio test footage must be the raw montage, or a single scene clip. **To
+  test any file: turn `showCaptions` and `showChapterCards` off in the props
+  panel. Text still on screen means it is baked in, so it is the wrong file.**
 - **Studio answers 200 + text/html for every path it does not know.** Its
   single-page-app fallback means a status check can never tell a served video
   from a path that does not exist — `curl -I localhost:3000/test.mp4` returns

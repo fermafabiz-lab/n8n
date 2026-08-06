@@ -132,7 +132,14 @@ if (parsed.finalVideoUrl) {
 		propsPath = join(root, 'trigger', '.studio-props.resolved.json');
 		writeFileSync(propsPath, JSON.stringify(parsed, null, '\t'));
 		console.log('props:   ' + props.replace(root + '/', ''));
-		console.log('footage: public' + footage + '  (found automatically)\n');
+		console.log('footage: public' + footage + '  (found automatically)');
+		// Named here because this is the moment the wrong file gets used, and the
+		// wrong file is the one our own docs used to recommend: "Link Video Final"
+		// of a finished project is the OUTPUT of this graphics pass, so Studio
+		// draws a second set of captions and chapter cards over the baked-in ones.
+		// It looks like a rendering bug and is not one.
+		console.log('         Must be the raw montage (/assemble output) or a scene');
+		console.log('         clip — NOT a finished film, or the graphics double up.\n');
 	} else {
 		console.log('props:   ' + props.replace(root + '/', ''));
 		console.log('footage: none — synthetic backdrop.');

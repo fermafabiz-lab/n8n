@@ -52,6 +52,12 @@ export type FinalVideoProps = {
 	/** Master switch for karaoke captions. */
 	showCaptions: boolean;
 	/**
+	 * How hard the montage cuts: 0 leaves every scene whole (the pre-montage
+	 * behaviour), 1 is the default, 2 is aggressive. Omitted = derived from
+	 * the tone's editing energy.
+	 */
+	montageIntensity?: 0 | 1 | 2;
+	/**
 	 * A hook line written FOR the screen, if Scripting produced one. Falls
 	 * back to the project title — but that field holds a brief far more often
 	 * than a title, so the card judges it before showing anything.

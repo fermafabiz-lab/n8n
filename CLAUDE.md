@@ -456,6 +456,58 @@ them on every publish. Ignore those four; do not wire them back.
   Studio. Also note Chromium's `--screenshot` flag hangs forever on Studio (a
   live app never goes idle); driving CDP directly is the way to capture it.
 
+### The montage (`remotion/src/montage.ts`)
+
+The films used to read as ONE shot. Measured against five reference
+documentaries (`remotion/reference/editing-benchmarks.json`), at the same
+detector threshold every reference registers 43-126 cuts per 4 minutes and
+ours registered **one** — consecutive scenes shared subject, location and
+framing, so the only "cut" was a luminance dip, and the scene boundaries
+only appeared at all when the detector was made twice as sensitive, landing
+on a visible 8-second grid.
+
+- **No pipeline change was needed, and none should be made.** The planner
+  never touches the media, never reorders and never drops time: shots tile
+  the timeline contiguously and only ever **re-frame the same continuous
+  footage**. A discontinuous jump in scale/position is what reads as a cut,
+  exactly the way an editor punches into a single take. The audio timeline
+  is fixed (narration is muxed per scene), so this is the only kind of
+  cutting available to us — and it is enough.
+- **Rhythm is planned across the whole timeline, not per scene.** A scene is
+  one narration beat (~7-9s), far too short to hold both a burst and a hold.
+  The planner walks the scene list in modes: HOLD swallows several scenes
+  whole (the only way to reach the 10s+ shots every reference has), BURST
+  chops one scene into 4-8 rapid inserts, NORMAL cuts lightly.
+- **A cut the detector cannot see is not a cut**, and rhythm statistics
+  cannot tell you the difference — a shot list with perfect variability still
+  reads as one take if consecutive framings happen to match. Two ways that
+  happened, both fixed, both invisible in the stats:
+  - `pickKind` enforced the 0.14 minimum scale step against the previous
+    shot's **base** framing, but `shotTransform` pushes in during the shot.
+    A shot that drifted 0.03 upward left a smaller gap than its base
+    suggested, so planned 14% cuts landed at 3%. `pushFor()`/`endScaleOf()`
+    now own that number and both the planner and the renderer read it.
+  - Every insert in a BURST was forced to `detail`, so all eight shared
+    scale 1.5 — the fastest passage in the film was the one a detector read
+    as a single shot. Modes now state a framing *preference list* and
+    `clearing()` picks the first entry that actually clears the threshold.
+- **`npm run check:montage`** reports rhythm AND `auditCuts()` — the real
+  jump at every planned cut, measured from where the outgoing shot ended.
+  It exits non-zero on any weak cut or missed acceptance target. Run it
+  after touching the planner; the numbers above are exactly what it caught.
+- `intensity` used to have `BURST_EVERY` as its only lever, and a burst fires
+  at most once on a 40s film — so intensity 2 planned a shot-for-shot
+  identical edit to intensity 1 on the length we make most often. It now also
+  drives the NORMAL piece count.
+- The remaining acceptance target, `cutsWithAudioAccentPct >= 40`, cannot be
+  checked here: it needs a rendered file, and it is **Dan's side** — SFX
+  accents have to land on these cut times. `auditCuts()` is where to get
+  them from.
+- Pixel-diffing a cut against the Studio fixture proves nothing:
+  `PreviewBackdrop` is a near-featureless gradient, so adjacent frames differ
+  by 0.07 vs 0.11 of 255 either way. That is a defect of the test, not the
+  montage — verify numerically, or over real footage.
+
 ### The site
 
 - The project page auto-refreshes every 10s, which remounts components. Drafts

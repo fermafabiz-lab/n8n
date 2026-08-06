@@ -54,6 +54,36 @@ media din `public/` sunt gitignorate, deci nu ajung în repo.
 Ca să prinzi props proaspete pentru alt proiect: execuția de Final Assembly din n8n →
 nodul `Build Remotion Props` → copiază `body` din output.
 
+### Montajul — `npm run check:montage`
+
+Videoclipurile ieșeau ca **o singură cadră**: la pragul folosit pe cele cinci
+documentare de referință, filmul nostru înregistra un singur cut, pentru că
+scene consecutive împart subiectul, locația și încadrarea.
+
+`src/montage.ts` rezolvă asta **fără să atingă media** — nu reordonează și nu
+taie nimic din timeline. Reîncadrează același footage continuu, iar saltul
+brusc de scală/poziție e ceea ce se citește ca tăietură, exact cum un monteur
+intră în plan pe aceeași dublă. Ritmul e planificat pe tot filmul, nu pe
+scenă: un HOLD înghite mai multe scene (singurul mod de a ajunge la cadrele de
+10s+ pe care le au toate referințele), un BURST taie o scenă în 4-8 inserturi
+rapide, restul se taie ușor.
+
+```
+npm run check:montage                      # fixture-ul de Studio, intensity 1 si 2
+npm run check:montage -- --intensity 2
+npm run check:montage -- trigger/altele.json
+```
+
+Raportează ritmul (variabilitate, cea mai scurtă/lungă cadră) **și** mărimea
+reală a saltului la fiecare tăietură planificată. A doua parte e cea care
+contează: statisticile de ritm pot arăta perfect în timp ce filmul se citește
+tot ca o singură dublă, dacă încadrările consecutive se nimeresc egale. Iese cu
+cod diferit de zero la orice tăietură slabă. Rulează-l după orice modificare în
+planner.
+
+`montageIntensity` (0 / 1 / 2) vine din props; implicit se ia din energia
+tonului. 0 lasă scenele întregi, ca înainte.
+
 ## 2. Deploy pe Railway (fără AWS — calea aleasă acum)
 
 Serverul din `server/index.mjs` randează pe cerere și servește fișierul rezultat prin

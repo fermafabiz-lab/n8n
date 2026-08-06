@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useMemo} from 'react';
 import {AbsoluteFill, Sequence, useCurrentFrame, useVideoConfig} from 'remotion';
 import {HookTitle} from './components/HookTitle';
 import {IMPACT_CARD_SECONDS, ImpactCard, keyLineFor} from './components/ImpactCard';
@@ -7,6 +7,7 @@ import {OutroCard} from './components/OutroCard';
 import {Captions} from './components/Captions';
 import {FilmLayer, gradeForTone} from './components/FilmLayer';
 import {Transitions, kenBurnsTransform} from './components/Transitions';
+import {planMontage, shotAt, shotTransform} from './montage';
 import {SourceVideo} from './components/SourceVideo';
 import {presetForTone} from './style';
 import type {FinalVideoProps} from './types';
@@ -23,6 +24,7 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 	hookTitleDurationInSeconds,
 	aspectRatio,
 	showCaptions,
+	montageIntensity,
 	showHookTitle = true,
 	hookTitle = '',
 	showChapterCards = true,
@@ -83,6 +85,37 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 	const videoFrames = Math.round(videoDurationSeconds * fps);
 	const outroFrames = showEndScreen ? Math.round(outroDurationInSeconds * fps) : 0;
 
+	// The montage: shot boundaries planned across the WHOLE timeline, not per
+	// scene. Nothing about the media changes — a shot only re-frames the same
+	// continuous footage, and a discontinuous jump in scale and position is
+	// what reads as a cut, to the eye and to a scene detector alike. That is
+	// how an 8-second scene grid produces bursts of half-second inserts and
+	// held shots past ten seconds without generating a single extra clip.
+	//
+	// Measured against five reference documentaries, our own output used to
+	// register as ONE 43-second shot (remotion/reference/editing-benchmarks.json).
+	// Intensity 0 restores exactly that, should a project ever want it.
+	const intensity: 0 | 1 | 2 =
+		montageIntensity !== undefined
+			? montageIntensity
+			: preset.energy === 2
+				? 2
+				: 1;
+	const shots = useMemo(
+		() =>
+			planMontage(scenes, {
+				intensity,
+				// Per project, so two films never share a rhythm, but stable so a
+				// re-render of the same project is identical.
+				seed: projectTitle || 'house-of-videos',
+				// A chapter card already owns its boundary with a light leak;
+				// a black frame there too would be two effects on one cut.
+				blackPunctuation: !showChapterCards,
+			}),
+		[scenes, intensity, projectTitle, showChapterCards],
+	);
+	const shot = intensity === 0 ? null : shotAt(shots, seconds);
+
 	// First scene of every chapter >= 1 gets an impact card.
 	const chapterStarts = scenes.filter(
 		(s, i) => (s.chapter ?? 0) >= 1 && (i === 0 || (scenes[i - 1].chapter ?? 0) !== s.chapter),
@@ -95,8 +128,13 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 				<AbsoluteFill style={{overflow: 'hidden'}}>
 					<AbsoluteFill
 						style={{
-							transform: kenBurnsTransform(scenes, seconds, preset.energy),
+							transform: shot
+								? shotTransform(shot, seconds)
+								: kenBurnsTransform(scenes, seconds, preset.energy),
 							filter: gradeForTone(tone),
+							// A planned black frame punctuates a chapter turn — the
+							// footage is simply hidden for its third of a second.
+							opacity: shot?.kind === 'black' ? 0 : 1,
 						}}
 					>
 						{/* SourceVideo owns the "no usable source" decision: backdrop in
@@ -105,7 +143,16 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 						<SourceVideo src={finalVideoUrl} />
 					</AbsoluteFill>
 					<FilmLayer tone={tone} />
-					<Transitions scenes={scenes} tone={tone} chapterCards={showChapterCards} />
+					{/* With the montage running, the framing jumps ARE the cuts, so
+					    the per-scene luminance dip has to go: a dip mid-HOLD would
+					    break the very shot that is meant to run across scenes. The
+					    chapter treatment stays. */}
+					<Transitions
+						scenes={scenes}
+						tone={tone}
+						chapterCards={showChapterCards}
+						sceneDips={intensity === 0}
+					/>
 					{showCaptions && (
 						<Captions
 							scenes={scenes}

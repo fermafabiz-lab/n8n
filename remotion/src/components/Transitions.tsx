@@ -26,7 +26,14 @@ export const Transitions: React.FC<{
 	 * same frame.
 	 */
 	chapterCards?: boolean;
-}> = ({scenes, tone, chapterCards = true}) => {
+	/**
+	 * Whether to dip at ordinary scene boundaries. Off once the montage is
+	 * planning shots: there the framing jumps are the cuts, scene boundaries
+	 * are no longer special, and a HOLD deliberately runs straight through
+	 * one — dipping there would break the shot it exists to create.
+	 */
+	sceneDips?: boolean;
+}> = ({scenes, tone, chapterCards = true, sceneDips = true}) => {
 	const frame = useCurrentFrame();
 	const {fps} = useVideoConfig();
 	const t = frame / fps;
@@ -43,6 +50,7 @@ export const Transitions: React.FC<{
 		const boundary = scenes[i].startSeconds;
 		const isChapterChange = (scenes[i].chapter ?? 0) !== (scenes[i - 1].chapter ?? 0);
 		if (isChapterChange && chapterCards) continue; // the card owns this frame
+		if (!isChapterChange && !sceneDips) continue; // the montage owns the cut
 		const half = isChapterChange ? chapterLeakHalf : cutHalf;
 		const d = Math.abs(t - boundary);
 		if (d >= half) continue;

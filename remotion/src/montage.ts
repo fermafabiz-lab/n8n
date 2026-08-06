@@ -69,15 +69,52 @@ const FRAMINGS: Record<Exclude<ShotKind, 'black'>, {scale: number; spread: numbe
  * 0.14 moves roughly a seventh of the frame, which reads as a cut both to
  * the eye and to a scene detector.
  */
-const MIN_SCALE_STEP = 0.14;
+export const MIN_SCALE_STEP = 0.14;
 
-function pickKind(
-	rand: () => number,
-	previous: ShotKind | null,
-	duration: number,
-): Exclude<ShotKind, 'black'> {
+/**
+ * Slow push applied *within* a shot by `shotTransform`. It matters to the
+ * planner because the cut happens between the END of one shot and the START
+ * of the next: a shot that drifted 0.03 upward leaves a smaller gap than its
+ * base framing suggests. Comparing base scales instead of end scales made
+ * planned 14% cuts land at 3% in practice — a cut the detector cannot see is
+ * not a cut. One function owns the number so the two can never disagree.
+ */
+const HELD_PUSH = 0.03;
+const INSERT_PUSH = 0.004;
+
+const pushFor = (durationSeconds: number) => (durationSeconds > 2 ? HELD_PUSH : INSERT_PUSH);
+
+/** The scale the footage has actually reached by the time a shot ends. */
+const endScaleOf = (shot: {scale: number; durationSeconds: number; kind: ShotKind}): number | null =>
+	shot.kind === 'black' ? null : shot.scale + pushFor(shot.durationSeconds);
+
+type Framing = Exclude<ShotKind, 'black'>;
+
+/**
+ * First candidate that clears the threshold against where the previous shot
+ * ended, else the furthest one available. Used wherever the rhythm dictates
+ * the framing (holds, burst inserts): the mode chooses the *kind* of shot,
+ * this makes sure it still cuts.
+ */
+function clearing(prevEndScale: number | null, candidates: Framing[]): Framing {
+	if (prevEndScale === null) return candidates[0];
+	for (const k of candidates) {
+		if (Math.abs(FRAMINGS[k].scale - prevEndScale) >= MIN_SCALE_STEP) return k;
+	}
+	return furthest(prevEndScale, candidates);
+}
+
+function furthest(prevEndScale: number, candidates: Framing[]): Framing {
+	return candidates.reduce((best, k) =>
+		Math.abs(FRAMINGS[k].scale - prevEndScale) > Math.abs(FRAMINGS[best].scale - prevEndScale)
+			? k
+			: best,
+	);
+}
+
+function pickKind(rand: () => number, prevEndScale: number | null, duration: number): Framing {
 	// Short shots are inserts; long shots need room to breathe.
-	const pool: Exclude<ShotKind, 'black'>[] =
+	const pool: Framing[] =
 		duration < 1.2
 			? ['detail', 'close', 'detail']
 			: duration < 2.5
@@ -87,19 +124,14 @@ function pickKind(
 					: ['medium', 'wide', 'close'];
 	for (let attempt = 0; attempt < 6; attempt++) {
 		const k = pool[Math.floor(rand() * pool.length)];
-		if (
-			!previous ||
-			previous === 'black' ||
-			Math.abs(FRAMINGS[k].scale - FRAMINGS[previous].scale) >= MIN_SCALE_STEP
-		) {
+		if (prevEndScale === null || Math.abs(FRAMINGS[k].scale - prevEndScale) >= MIN_SCALE_STEP) {
 			return k;
 		}
 	}
-	// Fall back to whatever is furthest from the previous framing.
-	const prevScale = previous && previous !== 'black' ? FRAMINGS[previous].scale : 1;
-	return (Object.keys(FRAMINGS) as Exclude<ShotKind, 'black'>[]).reduce((best, k) =>
-		Math.abs(FRAMINGS[k].scale - prevScale) > Math.abs(FRAMINGS[best].scale - prevScale) ? k : best,
-	);
+	// Fall back to whatever is furthest from where we actually are — across the
+	// whole repertoire, not just the duration-appropriate pool, because a
+	// visible cut outranks an ideally-sized framing.
+	return furthest(prevEndScale as number, Object.keys(FRAMINGS) as Framing[]);
 }
 
 export type MontageOptions = {
@@ -152,7 +184,10 @@ export function planMontage(scenes: SceneCaption[], opts: MontageOptions = {}): 
 
 	const rand = mulberry32(hashString(seed) ^ scenes.length);
 	const shots: Shot[] = [];
-	let previous: ShotKind | null = null;
+	// Where the previous shot left the footage, not which framing it started
+	// from. `null` means "anything cuts from here" — the opening frame, and
+	// after a black, where the cut is total whatever follows it.
+	let prevEndScale: number | null = null;
 
 	// Rhythm is planned across the whole timeline, not per scene. A single
 	// scene is far too short to contain both a burst and a hold, so the
@@ -171,12 +206,18 @@ export function planMontage(scenes: SceneCaption[], opts: MontageOptions = {}): 
 	let sinceBurst = BURST_EVERY * 0.55; // don't open on a burst
 	let sinceHold = HOLD_EVERY * 0.7;
 
-	const push = (start: number, duration: number, forceKind?: Exclude<ShotKind, 'black'>) => {
-		const kind = forceKind ?? pickKind(rand, previous, duration);
+	/**
+	 * `candidates` lets a mode state its preference in order while the
+	 * threshold still has the last word; a bare `push` lets the planner choose.
+	 */
+	const push = (start: number, duration: number, candidates?: Framing[]) => {
+		const kind = candidates
+			? clearing(prevEndScale, candidates)
+			: pickKind(rand, prevEndScale, duration);
 		const {scale, spread} = FRAMINGS[kind];
 		const prevX = shots.length ? shots[shots.length - 1].offsetXPct : 0;
 		const dirX = prevX > 0 ? -1 : prevX < 0 ? 1 : rand() < 0.5 ? -1 : 1;
-		shots.push({
+		const shot: Shot = {
 			startSeconds: start,
 			durationSeconds: duration,
 			kind,
@@ -185,8 +226,9 @@ export function planMontage(scenes: SceneCaption[], opts: MontageOptions = {}): 
 			offsetYPct: (rand() < 0.5 ? -1 : 1) * spread * 0.45 * (0.4 + rand() * 0.6),
 			driftX: (rand() < 0.5 ? -1 : 1) * (0.6 + rand() * 0.9),
 			driftY: (rand() < 0.5 ? -1 : 1) * (0.4 + rand() * 0.7),
-		});
-		previous = kind;
+		};
+		shots.push(shot);
+		prevEndScale = endScaleOf(shot);
 	};
 
 	let i = 0;
@@ -213,7 +255,7 @@ export function planMontage(scenes: SceneCaption[], opts: MontageOptions = {}): 
 			});
 			cursor += blackLen;
 			remaining -= blackLen;
-			previous = 'black';
+			prevEndScale = null;
 		}
 
 		// HOLD — let one framing run across scene boundaries. This is the
@@ -232,7 +274,7 @@ export function planMontage(scenes: SceneCaption[], opts: MontageOptions = {}): 
 				j++;
 				end = scenes[j].startSeconds + scenes[j].durationSeconds;
 			}
-			push(cursor, end - cursor, remaining > 6 ? 'wide' : 'medium');
+			push(cursor, end - cursor, remaining > 6 ? ['wide', 'medium'] : ['medium', 'wide']);
 			sinceHold = 0;
 			sinceBurst += end - cursor;
 			i = j + 1;
@@ -246,7 +288,12 @@ export function planMontage(scenes: SceneCaption[], opts: MontageOptions = {}): 
 			const n = 4 + Math.floor(rand() * 5);
 			const each = Math.min(0.9, Math.max(0.4, (remaining * 0.65) / n));
 			for (let k = 0; k < n; k++) {
-				push(cursor, each, 'detail');
+				// Tight framings only — but they must still differ from each other.
+				// Eight consecutive inserts all at `detail` share one scale, so the
+				// burst produced no framing jump at all between its members: the
+				// fastest passage in the film was the one a detector read as a
+				// single shot. Listing the preference lets `clearing` alternate.
+				push(cursor, each, ['detail', 'close', 'medium']);
 				cursor += each;
 			}
 			const rest = scene.startSeconds + scene.durationSeconds - cursor;
@@ -258,8 +305,27 @@ export function planMontage(scenes: SceneCaption[], opts: MontageOptions = {}): 
 		}
 
 		// NORMAL — light cutting, most scenes stay one or two shots.
+		//
+		// This is also where intensity has to bite. `BURST_EVERY` used to be its
+		// only lever, and a burst fires at most once on a 40s film — so
+		// intensity 2 planned a shot-for-shot identical edit to intensity 1 on
+		// exactly the length we make most often.
 		const pieces =
-			remaining < 2.4 ? 1 : remaining < 6 ? (rand() < 0.45 ? 1 : 2) : rand() < 0.35 ? 2 : 3;
+			remaining < 2.4
+				? 1
+				: remaining < 6
+					? intensity === 2
+						? 2
+						: rand() < 0.45
+							? 1
+							: 2
+					: intensity === 2
+						? rand() < 0.5
+							? 3
+							: 4
+						: rand() < 0.35
+							? 2
+							: 3;
 		for (const d of weightedSplit(rand, remaining, pieces)) {
 			push(cursor, d);
 			cursor += d;
@@ -294,12 +360,54 @@ export function shotAt(shots: Shot[], seconds: number): Shot | null {
 export function shotTransform(shot: Shot, seconds: number): string {
 	const p = Math.min(1, Math.max(0, (seconds - shot.startSeconds) / Math.max(0.1, shot.durationSeconds)));
 	// Held shots earn a slow push; short inserts stay still (a zoom inside a
-	// half-second insert only reads as a wobble).
-	const push = shot.durationSeconds > 2 ? 0.03 * p : 0.004 * p;
-	const scale = shot.scale + push;
+	// half-second insert only reads as a wobble). The amount comes from the
+	// same `pushFor` the planner uses to size its cuts.
+	const scale = shot.scale + pushFor(shot.durationSeconds) * p;
 	const tx = shot.offsetXPct + shot.driftX * p;
 	const ty = shot.offsetYPct + shot.driftY * p;
 	return `scale(${scale.toFixed(4)}) translate(${tx.toFixed(2)}%, ${ty.toFixed(2)}%)`;
+}
+
+export type CutAudit = {
+	atSeconds: number;
+	from: ShotKind;
+	to: ShotKind;
+	/**
+	 * Absolute scale difference across the cut, measured from where the
+	 * outgoing shot ACTUALLY ended (base framing plus its within-shot push),
+	 * which is what a detector sees.
+	 */
+	scaleJump: number;
+	/** Black on either side: the cut is total and framing does not matter. */
+	hardCut: boolean;
+	belowThreshold: boolean;
+};
+
+/**
+ * Every planned cut and how big a jump it really is. Rhythm statistics alone
+ * cannot tell you whether the edit is visible: a shot list with perfect
+ * variability still reads as one continuous take if consecutive framings
+ * happen to match. Run this after any change to the planner —
+ * `npm run check:montage` does exactly that.
+ */
+export function auditCuts(shots: Shot[]): CutAudit[] {
+	const out: CutAudit[] = [];
+	for (let i = 1; i < shots.length; i++) {
+		const a = shots[i - 1];
+		const b = shots[i];
+		const hardCut = a.kind === 'black' || b.kind === 'black';
+		const from = endScaleOf(a);
+		const scaleJump = hardCut || from === null ? Infinity : Math.abs(b.scale - from);
+		out.push({
+			atSeconds: +b.startSeconds.toFixed(2),
+			from: a.kind,
+			to: b.kind,
+			scaleJump: hardCut ? 0 : +scaleJump.toFixed(3),
+			hardCut,
+			belowThreshold: scaleJump < MIN_SCALE_STEP,
+		});
+	}
+	return out;
 }
 
 /** Rhythm statistics, so a render can be checked against the benchmark file. */

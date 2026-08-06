@@ -6,6 +6,7 @@
     "start": "remotion studio src/index.ts",
     "studio": "node scripts/studio.mjs",
     "render": "remotion render src/index.ts FinalVideo out/final-video.mp4",
+    "check:montage": "node --experimental-strip-types scripts/check-montage.mjs",
     "start:server": "node server/index.mjs",
     "lambda:deploy-function": "remotion lambda functions deploy",
     "lambda:deploy-site": "remotion lambda sites create src/index.ts --site-name=final-video"

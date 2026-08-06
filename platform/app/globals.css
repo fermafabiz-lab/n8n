@@ -1551,27 +1551,42 @@ a {
   color: #ffd98a;
 }
 
-/* --- the brief: form + sticky call sheet --- */
-/* Two columns that used to sit shoulder to shoulder. Now a hairline runs the
-   full height of the form between them, with ~60px of air on each side — the
-   call sheet reads as a separate document rather than a cramped first column. */
+/* --- the brief: form centred, preview to one side ---
+   Three tracks with EQUAL outer rails, so the form sits on the page's real
+   centre line rather than merely to the right of a sidebar. Sized to fit the
+   standard 1200px container: widening the route instead would push the brief
+   past the nav above it. The right rail is empty until the stickers land; it
+   exists now so adding them later doesn't move anything. */
 .brief {
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr);
-  gap: 60px;
+  grid-template-columns: 224px minmax(0, 600px) 224px;
+  justify-content: center;
+  gap: 48px;
   align-items: start;
   padding-bottom: 90px;
 }
 .brief .form {
-  max-width: 640px;
+  max-width: none;
   padding-bottom: 0;
   gap: 0;
-  border-left: 1px solid var(--line);
-  padding-left: 60px;
 }
 .callsheet {
   position: sticky;
   top: 104px;
+  /* Held back deliberately: it's a running confirmation of what you typed,
+     not somewhere to look. It comes up to full strength when you actually
+     turn to it. */
+  opacity: 0.55;
+  transition: opacity 0.25s ease;
+}
+.callsheet:hover,
+.callsheet:focus-within {
+  opacity: 1;
+}
+.briefart {
+  position: sticky;
+  top: 104px;
+  min-height: 1px;
 }
 /* The reserved height lives HERE, not on .sprev: a min-height on a
    -webkit-box (which the line clamp needs) makes Chromium report an 80px
@@ -1677,9 +1692,23 @@ a {
   font-weight: 500;
 }
 
+/* Drop the (empty) art rail first — losing it costs nothing, and the form
+   stays centred against the preview alone. */
+@media (max-width: 1320px) {
+  .brief {
+    grid-template-columns: 224px minmax(0, 600px);
+    /* Two tracks can't be centred as a pair without indenting them away from
+       the headline above — align to the same left edge instead. */
+    justify-content: start;
+  }
+  .briefart {
+    display: none;
+  }
+}
 @media (max-width: 980px) {
   .brief {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 600px);
+    justify-content: start;
   }
   .callsheet {
     display: none;

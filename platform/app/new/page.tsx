@@ -90,10 +90,13 @@ const VOICE_LABELS: Record<string, string> = {
 };
 
 /**
- * The brief. Left: a live call sheet that fills in as the form does — with
- * the title previewed in the exact typeface the film's titles will use for
- * the chosen tone (lib/tone-type.ts mirrors the render's presetForTone). The
- * site shows the film's own dress before a single frame is produced.
+ * The brief. The form holds the centre; a live project preview sits to its
+ * left, deliberately dimmed — it confirms what you typed rather than
+ * competing for attention — and the right rail is held for illustrated
+ * stickers. The preview's title uses the exact typeface the film's titles
+ * will use for the chosen tone (lib/tone-type.ts mirrors the render's
+ * presetForTone), so the site shows the film's own dress before a single
+ * frame is produced.
  */
 export default function NewVideo() {
   const [state, formAction, pending] = useActionState(submit, null);
@@ -136,10 +139,10 @@ export default function NewVideo() {
 
       <form action={formAction}>
         <div className="brief">
-          {/* ---- the live call sheet ---- */}
+          {/* ---- the live project preview ---- */}
           <aside className="callsheet">
             <div className="eyebrow">
-              <span>Call sheet</span>
+              <span>Project preview</span>
               <span className="sp" />
               <span className="n">LIVE</span>
             </div>
@@ -193,8 +196,8 @@ export default function NewVideo() {
               </div>
             </dl>
             <p className="csnote">
-              The slate fills in as you type. The title above is set in the
-              exact typeface your film&apos;s titles will use for this tone.
+              This fills in as you type. The title above is set in the exact
+              typeface your film&apos;s titles will use for this tone.
             </p>
           </aside>
 
@@ -310,8 +313,8 @@ export default function NewVideo() {
                 </div>
                 <p style={{ margin: "10px 0 0", fontSize: 12, color: "var(--dim)" }}>
                   Independent of the category: it shapes the writing, the
-                  palette, the music — and the typeface on the call sheet is
-                  the one this tone puts on screen.
+                  palette, the music — and the typeface in the preview is the
+                  one this tone puts on screen.
                 </p>
               </div>
               <div className="field" style={{ marginTop: 16 }}>
@@ -411,6 +414,11 @@ export default function NewVideo() {
               </button>
             </div>
           </div>
+
+          {/* Reserved for the illustrated stickers. Empty on purpose — it
+              holds the form's centre line, so adding the art later won't
+              shift a layout the producer has already learned. */}
+          <aside className="briefart" aria-hidden="true" />
         </div>
       </form>
     </main>

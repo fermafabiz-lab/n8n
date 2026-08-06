@@ -2,6 +2,7 @@ import React from 'react';
 import {AbsoluteFill, useCurrentFrame, useVideoConfig} from 'remotion';
 import type {StylePreset} from '../style';
 import {CURVES, curveAt, eased} from '../easing';
+import {fitTitleSize} from '../fitType';
 import {FLASH_PEAK, LightLeak, flashEnvelope} from './LightLeak';
 
 const ROMAN = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
@@ -24,6 +25,8 @@ export const IMPACT_CARD_SECONDS = 2.8;
 /** Entrance and exit flash durations. */
 const IN = 0.55;
 const OUT = 0.55;
+/** Set here rather than inline: the size fitter has to know it to budget height. */
+const LINE_HEIGHT = 1.25;
 
 /**
  * Director-style stop-frame at each chapter start: chapter eyebrow + the
@@ -41,7 +44,7 @@ export const ImpactCard: React.FC<{
 	preset: StylePreset;
 }> = ({chapter, keyLine, preset}) => {
 	const frame = useCurrentFrame();
-	const {fps, width} = useVideoConfig();
+	const {fps, width, height} = useVideoConfig();
 	// Same canvas-relative scaling as HookTitle: these sizes were tuned on the
 	// 1280-wide landscape canvas and are 1.78x too large relative to the
 	// 720-wide vertical one. At 1280 the scale is 1 and nothing changes.
@@ -70,7 +73,6 @@ export const ImpactCard: React.FC<{
 	// breakable text nodes. Per-character spans with white-space:pre killed
 	// every soft-wrap point and the line ran straight off the screen.
 	const words = keyLine.split(' ');
-	const perChar = 1 / Math.max(18, preset.typeSpeed * 1.4);
 	let charOffset = 0;
 	const wordStarts = words.map((w) => {
 		const s = charOffset;
@@ -78,9 +80,51 @@ export const ImpactCard: React.FC<{
 		return s;
 	});
 
+	// The reveal has to FINISH while the card is still up. At the preset's own
+	// rate an eight-word fallback line was still lighting its last characters
+	// when the exit flash began — the card left before it could be read, which
+	// is the whole point of holding it. So the rate is whichever is faster: the
+	// preset's, or the one that lands the final character with time to spare.
+	const revealStart = appearAt + 0.08;
+	const CHAR_FADE = 0.14;
+	const lastChar = Math.max(1, charOffset - 2);
+	const budget = vanishAt - 0.35 - revealStart - CHAR_FADE;
+	const perChar = Math.min(1 / Math.max(18, preset.typeSpeed * 1.4), budget / lastChar);
+
 	const lightInk =
 		preset.cardBg === '#F6EFE3' || preset.cardBg === '#F4F1EA' ? '#221D14' : '#F5F2EA';
-	const ruleWidth = eased(t, [appearAt + 0.12, appearAt + 0.7], [0, px(74)], CURVES.outExpo);
+
+	// The title is sized to the text, exactly as the hook is. It used to be a
+	// flat px(52) — a size that can only ever suit one length, and it was
+	// chosen for the long case: the eight-word narration excerpt this card
+	// falls back to on old projects. A real chapter title is three words, so
+	// it sat tiny in the middle of a full-frame card and read as an accident.
+	// The card is a stop-frame with nothing else on it; the title is meant to
+	// be the whole image.
+	const blockWidth = width * 0.74;
+	const fontSize = fitTitleSize({
+		words,
+		advance: preset.titleAdvance,
+		wrapWidth: blockWidth * 0.94,
+		// Deliberately above what any title actually reaches: the wrap and height
+		// tests below decide the real size, and a low ceiling would cap a short
+		// title before either of them had an opinion.
+		maxSize: width * 0.125,
+		minSize: width * 0.026,
+		maxLines: 3,
+		lineHeight: LINE_HEIGHT,
+		// Not the full frame: the eyebrow above and the rule below share the
+		// block, and the card needs air at top and bottom to read as a card
+		// rather than as text that overflowed onto one.
+		maxHeight: height * 0.46,
+	});
+
+	// Everything else on the card is proportional to the title, so the layout
+	// holds its shape at any fitted size. The ratios are the ones the old fixed
+	// sizes had against px(52), which is why the card still looks like itself.
+	const eyebrowSize = Math.max(px(15), fontSize * 0.2);
+	const ruleTarget = fontSize * 1.42;
+	const ruleWidth = eased(t, [appearAt + 0.12, appearAt + 0.7], [0, ruleTarget], CURVES.outExpo);
 
 	return (
 		<AbsoluteFill>
@@ -92,16 +136,16 @@ export const ImpactCard: React.FC<{
 					alignItems: 'center',
 				}}
 			>
-				<div style={{width: '74%', textAlign: 'left'}}>
+				<div style={{width: blockWidth, textAlign: 'left'}}>
 					<div
 						style={{
 							fontFamily: preset.kickerFont,
 							fontWeight: 500,
-							fontSize: px(17),
-							letterSpacing: px(6),
+							fontSize: eyebrowSize,
+							letterSpacing: eyebrowSize * 0.35,
 							textTransform: 'uppercase',
 							color: preset.cardInk,
-							marginBottom: px(18),
+							marginBottom: fontSize * 0.35,
 						}}
 					>
 						Chapter {ROMAN[chapter] ?? chapter}
@@ -110,8 +154,8 @@ export const ImpactCard: React.FC<{
 						style={{
 							fontFamily: preset.displayFont,
 							fontWeight: preset.displayWeight,
-							fontSize: px(52),
-							lineHeight: 1.25,
+							fontSize,
+							lineHeight: LINE_HEIGHT,
 							color: lightInk,
 						}}
 					>
@@ -129,11 +173,11 @@ export const ImpactCard: React.FC<{
 									}}
 								>
 									{Array.from(word).map((ch, ci) => {
-										const start = appearAt + 0.08 + (wordStarts[wi] + ci) * perChar;
+										const start = revealStart + (wordStarts[wi] + ci) * perChar;
 										return (
 											<span
 												key={ci}
-												style={{opacity: eased(t, [start, start + 0.14], [0, 1])}}
+												style={{opacity: eased(t, [start, start + CHAR_FADE], [0, 1])}}
 											>
 												{ch}
 											</span>
@@ -147,9 +191,9 @@ export const ImpactCard: React.FC<{
 					<div
 						style={{
 							width: ruleWidth,
-							height: px(4),
+							height: Math.max(3, fontSize * 0.075),
 							background: preset.cardInk,
-							marginTop: px(24),
+							marginTop: fontSize * 0.46,
 							borderRadius: 2,
 						}}
 					/>

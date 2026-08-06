@@ -440,7 +440,29 @@ them on every publish. Ignore those four; do not wire them back.
   space at 0.58 of that advance, which is 0.42em in Fraunces, far wider than
   the 0.25em a body face uses. Getting either wrong put a five-word title on
   four lines. The wrap width also carries a 6% margin so residual error shrinks
-  the type instead of spilling a line.
+  the type instead of spilling a line. The pass lives in `src/fitType.ts` and
+  is shared with the chapter card — one owner, because the two surfaces set the
+  same faces and would drift apart. A word WIDER than the whole line counts as
+  `ceil(width / wrapWidth)` lines, not one: both surfaces set `overflow-wrap:
+  anywhere`, so the browser splits it mid-word and a naive count approves a
+  size that then overflows.
+- **A card that holds a variable-length line cannot have a fixed type size.**
+  `ImpactCard`'s title was a flat `px(52)`, picked for the long case — the
+  eight-word narration excerpt it falls back to on projects rendered before
+  chapter titles were passed in. A real chapter title is three words, so
+  "What Fairness Costs" sat tiny in the middle of a full-frame card and read
+  as a mistake. It now fits itself with the same `fitTitleSize`, and the
+  eyebrow, rule and margins are proportional to the result so the layout keeps
+  its shape at any size. The ceiling is deliberately higher than anything
+  reached in practice: the wrap and height tests decide, and a low ceiling
+  silently caps short titles before either test has an opinion.
+- **A reveal must FINISH inside the hold.** The impact card lights its title
+  character by character at the preset's typing rate, and on a long line the
+  last characters were still arriving when the exit flash began — the card
+  left before it could be read, which defeats the entire point of stopping on
+  it. The rate is now `min(preset rate, budget / characters)` where the budget
+  ends 0.35s before the card vanishes. Verified on a still at t=2.1s: the old
+  version showed "actual" mid-word, the new one is complete.
 - **A dead source video cannot be caught, only pre-empted.** `SourceVideo`
   guards the footage layer, and it took three attempts to get right: the
   `<video>` element's own failure is suppressed by passing `onError` (Remotion

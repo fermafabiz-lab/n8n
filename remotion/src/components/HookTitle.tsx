@@ -2,7 +2,8 @@ import React from 'react';
 import {AbsoluteFill, useCurrentFrame, useVideoConfig} from 'remotion';
 import type {Palette} from '../types';
 import type {StylePreset} from '../style';
-import {CURVES, curveAt, eased} from '../easing';
+import {CURVES, curveAt} from '../easing';
+import {fitTitleSize} from '../fitType';
 
 /**
  * Opening title, as a statement.
@@ -46,50 +47,22 @@ export const HookTitle: React.FC<{
 
 	const words = title.split(/\s+/).filter(Boolean);
 
-	// Size to the text, not from a table — and by SIMULATING the line breaks
-	// rather than dividing by a character count. Solving `chars per line`
-	// algebraically ignores that words don't split: it put a five-word title
-	// on four lines when two were right, because one long word wrapped early.
-	// The greedy pass below is the same thing the browser does.
+	// Size to the text, not from a table. `fitTitleSize` simulates the line
+	// breaks rather than dividing by a character count, and is shared with the
+	// chapter card — see src/fitType.ts for why both need it. The wrap width
+	// carries a 6% margin so whatever the estimate still gets wrong pushes the
+	// type one notch SMALLER instead of spilling onto an extra line.
 	const avail = width * (width < height ? 0.88 : 0.84);
-	const advance = preset.titleAdvance;
-	const MAX_LINES = 3;
-	const maxHeight = height * 0.6;
-
-	// Two numbers measured off a real render rather than assumed: a word space
-	// costs ~0.58 of an average glyph (0.42em in Fraunces caps, far more than
-	// the 0.25em a body face would use), and the wrap width carries a 6%
-	// margin so that whatever the estimate still gets wrong pushes the type
-	// one notch SMALLER instead of spilling onto an extra line.
-	const wrapWidth = avail * 0.94;
-	const linesAt = (size: number): number => {
-		const space = advance * size * 0.58;
-		let lines = 1;
-		let cur = -1;
-		for (const w of words) {
-			const ww = w.length * advance * size;
-			if (cur < 0) {
-				cur = ww;
-			} else if (cur + space + ww <= wrapWidth) {
-				cur += space + ww;
-			} else {
-				lines += 1;
-				cur = ww;
-			}
-		}
-		return lines;
-	};
-
-	const maxSize = width * 0.094;
-	const minSize = width * 0.03;
-	let fontSize = minSize;
-	for (let s = maxSize; s >= minSize; s -= maxSize / 60) {
-		const lines = linesAt(s);
-		if (lines <= MAX_LINES && lines * s * 1.04 <= maxHeight) {
-			fontSize = s;
-			break;
-		}
-	}
+	const fontSize = fitTitleSize({
+		words,
+		advance: preset.titleAdvance,
+		wrapWidth: avail * 0.94,
+		maxSize: width * 0.094,
+		minSize: width * 0.03,
+		maxLines: 3,
+		lineHeight: 1.04,
+		maxHeight: height * 0.6,
+	});
 
 	// Entrance: each word rises and fades in turn, both on the same curve so
 	// they read as one movement. Exit: the block lifts and blurs away faster

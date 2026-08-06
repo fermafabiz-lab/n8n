@@ -5,6 +5,7 @@ import React from 'react';
 import {AbsoluteFill, Composition, registerRoot} from 'remotion';
 import {Captions} from './components/Captions';
 import {HookTitle} from './components/HookTitle';
+import {ImpactCard} from './components/ImpactCard';
 import {DEFAULT_PALETTE, type SceneCaption} from './types';
 import {presetForTone} from './style';
 
@@ -51,6 +52,13 @@ const TitleProbe: React.FC<{title: string}> = ({title}) => (
 	</AbsoluteFill>
 );
 
+const CardProbe: React.FC<{keyLine: string}> = ({keyLine}) => (
+	<AbsoluteFill>
+		<Backdrop />
+		<ImpactCard chapter={2} keyLine={keyLine} preset={presetForTone('Documentary')} />
+	</AbsoluteFill>
+);
+
 export const ProbeRoot: React.FC = () => (
 	<>
 		<Composition
@@ -82,6 +90,24 @@ export const ProbeRoot: React.FC = () => (
 				title:
 					'The current crisis of illegal Marrocan immigrants coming into Spain in 2026 and what it means for the border towns of Ceuta and Melilla across the coming decade of policy',
 			}}
+		/>
+		<Composition
+			id="CardPortrait"
+			component={CardProbe}
+			durationInFrames={90}
+			fps={30}
+			width={720}
+			height={1280}
+			defaultProps={{keyLine: 'What Fairness Costs'}}
+		/>
+		<Composition
+			id="CardLandscape"
+			component={CardProbe}
+			durationInFrames={90}
+			fps={30}
+			width={1280}
+			height={720}
+			defaultProps={{keyLine: 'What Fairness Costs'}}
 		/>
 	</>
 );

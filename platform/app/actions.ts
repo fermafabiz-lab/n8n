@@ -296,14 +296,19 @@ export async function changeProjectVoice(
   if (!voiceId) return { ok: false, message: "Pick a voice first." };
   try {
     await writeProjectFields(projectId, { "Voice ID": voiceId });
+    // The caller decides which lines actually need redoing — a line already
+    // read by this voice keeps its take, and its approval.
     for (const id of sceneIds) {
+      await writeSceneFields(id, { "Aprobare Voce": false });
       await regenerateVoice(projectId, id, "");
       await new Promise((r) => setTimeout(r, 250));
     }
     revalidatePath(`/projects/${projectId}`);
     return {
       ok: true,
-      message: `Narrator changed — re-synthesizing all ${sceneIds.length} lines with the new voice.`,
+      message: sceneIds.length
+        ? `Narrator changed — re-synthesizing ${sceneIds.length} line${sceneIds.length === 1 ? "" : "s"}.`
+        : "Narrator changed — every line already used this voice, so nothing needed redoing.",
     };
   } catch (e) {
     return { ok: false, message: friendlyError(e) };
@@ -442,9 +447,9 @@ export async function saveChapterVoices(
 
 /**
  * Collapse a multi-voice project back to a single narrator: the mode goes to
- * "off" and every line is re-synthesized with the chosen voice. The chapter
- * map is deliberately kept, so switching back restores the old assignment
- * instead of losing it.
+ * "off" and the caller's lines are re-synthesized with the chosen voice —
+ * normally only those not already read by it. The chapter map is deliberately
+ * kept, so switching back restores the old assignment instead of losing it.
  */
 export async function useSingleNarrator(
   projectId: string,

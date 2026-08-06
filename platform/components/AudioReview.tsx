@@ -218,6 +218,26 @@ export default function AudioReview({
   });
   const [showSingle, setShowSingle] = useState(false);
 
+  /**
+   * The voice a line is currently read by, derived from the same rules n8n
+   * applies. Used to re-synthesize only what would actually change: swapping
+   * the whole project to Charlie shouldn't touch the chapters Charlie
+   * already reads.
+   *
+   * Characters mode is deliberately excluded — a line there can carry several
+   * voices at once, so no single answer exists and every line is redone.
+   */
+  const effectiveVoiceOf = (s: Scene): string => {
+    if (mode !== "chapters") return narratorVoice;
+    const ch = chapterOf(s);
+    return chapterVoiceOf(ch === 0 ? "hook" : String(ch)) || narratorVoice;
+  };
+  /** Lines that would really sound different if the project moved to `voice`. */
+  const linesNeeding = (voice: string): Scene[] =>
+    mode === "characters"
+      ? scenes
+      : scenes.filter((s) => !s.voiceUrl || effectiveVoiceOf(s) !== voice);
+
   const withAudio = useMemo(() => scenes.filter((s) => s.voiceUrl), [scenes]);
   const unapproved = scenes.filter((s) => !s.voiceApproved && s.voiceUrl);
   const missing = scenes.filter((s) => !s.voiceUrl).length;
@@ -483,22 +503,48 @@ export default function AudioReview({
                         const r = await useSingleNarrator(
                           projectId,
                           newVoice.trim(),
-                          scenes.map((s) => s.id),
+                          linesNeeding(newVoice.trim()).map((s) => s.id),
                         );
                         if (r.ok) setShowSingle(false);
                         return r;
                       })
                     }
                   >
-                    Use this voice everywhere
+                    {newVoice.trim()
+                      ? `Use this voice everywhere — re-synthesize ${linesNeeding(newVoice.trim()).length} line${linesNeeding(newVoice.trim()).length === 1 ? "" : "s"}`
+                      : "Use this voice everywhere"}
                   </button>
+                  {/* Escape hatch: a line pinned to its own voice from the
+                      per-scene picker leaves no trace in the chapter map, so
+                      the count above can't see it. */}
+                  {newVoice.trim() &&
+                    linesNeeding(newVoice.trim()).length < scenes.length && (
+                      <button
+                        className="abtn"
+                        disabled={pending}
+                        onClick={() =>
+                          run(async () => {
+                            const r = await useSingleNarrator(
+                              projectId,
+                              newVoice.trim(),
+                              scenes.map((s) => s.id),
+                            );
+                            if (r.ok) setShowSingle(false);
+                            return r;
+                          })
+                        }
+                      >
+                        Redo all {scenes.length} anyway
+                      </button>
+                    )}
                   <button className="abtn" onClick={() => setShowSingle(false)}>
                     Cancel
                   </button>
                 </div>
                 <p style={{ margin: "8px 0 0", fontSize: 11.5, color: "var(--dim)" }}>
-                  This turns multi-voice off and re-synthesizes every line. Your
-                  chapter assignment is kept, so you can switch back.
+                  Multi-voice turns off, but only the lines that don&apos;t
+                  already use this voice are re-synthesized. Your chapter
+                  assignment is kept, so you can switch back.
                 </p>
               </>
             ) : (
@@ -588,8 +634,13 @@ export default function AudioReview({
         </div>
       )}
 
-      {/* Project-wide narrator swap. */}
-      <div style={{ marginBottom: 14 }}>
+      {/* Project-wide narrator swap — single-narrator projects only.
+          Under multi-voice this button was worse than redundant: it wrote a
+          new project Voice ID and redid every line, but the chapter (or
+          character) rule then overrode it on the way back, so the takes
+          returned unchanged and only the hook actually moved. The mode's own
+          panel above is the honest way to change those voices. */}
+      <div style={{ marginBottom: 14, display: mode === "off" ? undefined : "none" }}>
         {showVoice ? (
           <div className="card" style={{ padding: "14px 16px" }}>
             <VoicePicker
@@ -606,22 +657,24 @@ export default function AudioReview({
                     const r = await changeProjectVoice(
                       projectId,
                       newVoice.trim(),
-                      scenes.map((s) => s.id),
+                      linesNeeding(newVoice.trim()).map((s) => s.id),
                     );
                     if (r.ok) setShowVoice(false);
                     return r;
                   })
                 }
               >
-                Re-synthesize all with this voice
+                {newVoice.trim()
+                  ? `Re-synthesize ${linesNeeding(newVoice.trim()).length} line${linesNeeding(newVoice.trim()).length === 1 ? "" : "s"} with this voice`
+                  : "Re-synthesize with this voice"}
               </button>
               <button className="abtn" onClick={() => setShowVoice(false)}>
                 Cancel
               </button>
             </div>
             <p style={{ margin: "8px 0 0", fontSize: 11.5, color: "var(--dim)" }}>
-              This replaces the narrator for every line, so it discards all the
-              current takes.
+              Lines already read by this voice are left alone; the rest lose
+              their current take.
             </p>
           </div>
         ) : (

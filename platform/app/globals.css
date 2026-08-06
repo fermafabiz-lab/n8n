@@ -367,8 +367,11 @@ a {
 }
 .proj h3 {
   margin: 0 0 6px;
-  font-family: var(--f-display), Georgia, serif;
-  font-size: 19px;
+  /* Poppins here, not the display serif: at card size legibility wins, and a
+     project name is scanned, not read. The serif still owns section heads and
+     the project page's own title. */
+  font-family: var(--f-title), var(--f-ui), sans-serif;
+  font-size: 18px;
   font-weight: 600;
   letter-spacing: -0.01em;
   line-height: 1.25;
@@ -1190,9 +1193,9 @@ a {
 }
 .plrow h3 {
   margin: 0 0 4px;
-  font-family: var(--f-display), Georgia, serif;
-  font-size: 17px;
-  font-weight: 600;
+  font-family: var(--f-title), var(--f-ui), sans-serif;
+  font-size: 16.5px;
+  font-weight: 500;
   letter-spacing: -0.01em;
   white-space: nowrap;
   overflow: hidden;
@@ -1388,7 +1391,7 @@ a {
 
 /* --- numbered form sections (/new) --- */
 .fsec {
-  margin-top: 48px;
+  margin-top: 60px;
 }
 .fsec > header {
   display: flex;
@@ -1549,25 +1552,37 @@ a {
 }
 
 /* --- the brief: form + sticky call sheet --- */
+/* Two columns that used to sit shoulder to shoulder. Now a hairline runs the
+   full height of the form between them, with ~60px of air on each side — the
+   call sheet reads as a separate document rather than a cramped first column. */
 .brief {
   display: grid;
-  grid-template-columns: 340px minmax(0, 1fr);
-  gap: 72px;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 60px;
   align-items: start;
   padding-bottom: 90px;
 }
 .brief .form {
-  max-width: 620px;
+  max-width: 640px;
   padding-bottom: 0;
   gap: 0;
+  border-left: 1px solid var(--line);
+  padding-left: 60px;
 }
 .callsheet {
   position: sticky;
   top: 104px;
 }
+/* The reserved height lives HERE, not on .sprev: a min-height on a
+   -webkit-box (which the line clamp needs) makes Chromium report an 80px
+   phantom padding-top and drops the title into the middle of a hole. */
 .slate {
-  padding: 18px 0 20px;
+  padding: 18px 0 22px;
   border-bottom: 1px solid var(--line);
+  /* Room for a two-line title: the slate stops jumping as you type without
+     leaving a hole under the rule when the name is short. Three lines simply
+     grow it. */
+  min-height: 148px;
 }
 .slate .slabel {
   font-family: var(--f-mono), ui-monospace, Menlo, monospace;
@@ -1585,14 +1600,15 @@ a {
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--ink);
-  min-height: 96px;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
   overflow-wrap: anywhere;
 }
-.sprev.empty {
+/* NOT .empty — that is the app-wide empty-state block (padding: 80px 0),
+   and sharing the name dropped the title into the middle of a hole. */
+.sprev.blank {
   color: var(--dim);
   font-style: italic;
 }

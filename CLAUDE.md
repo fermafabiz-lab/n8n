@@ -448,12 +448,23 @@ them on every publish. Ignore those four; do not wire them back.
   mono labels instead of nested bordered boxes, one bloom behind the headline,
   no gradient-filled text. Review and approval surfaces deliberately kept their
   density — only the chrome changed.
+- **Generic class names are already taken.** `globals.css` has app-wide
+  blocks like `.empty` (an empty-state with `padding: 80px 0`), `.card`,
+  `.field`, `.chip`. Using one as a local modifier silently inherits it: the
+  /new call sheet's "no title yet" state was `sprev empty` and picked up 80px
+  of phantom padding, dropping the title into the middle of a hole. Modifiers
+  get their own word (`sprev blank`). Measure the computed box before blaming
+  the rule you just wrote — `getComputedStyle` plus a walk over
+  `document.styleSheets` naming every rule that matches the element finds this
+  in seconds, guessing does not.
 - **Project titles wear the film's own typeface.** `platform/lib/tone-type.ts`
   mirrors `presetForTone()` from the render (Bodoni for dark, Anton for
   motivational, etc. — keep the two maps in lockstep) and dresses the project
   page title and the /new call-sheet preview. Anton is single-weight: nothing
   may force a font-weight onto `.ptitle` (the old `.roomhead h1` rule did
-  exactly that and was deleted for it).
+  exactly that and was deleted for it). Titles in the LISTS are Poppins
+  (`--f-title`) instead — at 17px a high-contrast serif costs legibility on a
+  line that is scanned, not read.
 - **The /new form's field names are a frozen contract.** `createProject()`
   posts `name, category, cat_*, cast_voices, language, length, tone, pace,
   style, voice_id, aspect, captions/hook_title/chapter_cards/end_screen/sfx

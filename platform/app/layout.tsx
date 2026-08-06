@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Fraunces, IBM_Plex_Mono, Inter_Tight } from "next/font/google";
+import { Fraunces, IBM_Plex_Mono, Inter_Tight, Poppins } from "next/font/google";
 import ProductionTicker from "@/components/ProductionTicker";
 import "./globals.css";
 
@@ -37,6 +37,19 @@ const mono = IBM_Plex_Mono({
   display: "swap",
 });
 
+/**
+ * Project titles in the lists, where legibility beats character: at 17-19px a
+ * high-contrast serif costs more than it gives, especially on the index rows
+ * where a title is one clipped line among a hundred. The display serif still
+ * carries section headings and the project page's own title.
+ */
+const title = Poppins({
+  subsets: ["latin", "latin-ext"],
+  weight: ["500", "600"],
+  variable: "--f-title",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "House of Videos",
   description: "AI video production, supervised by you.",
@@ -45,7 +58,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={`${display.variable} ${ui.variable} ${mono.variable}`}>
+      <body className={`${display.variable} ${ui.variable} ${mono.variable} ${title.variable}`}>
         <div className="glow g1" />
         <div className="glow g2" />
         <div className="vignette" />

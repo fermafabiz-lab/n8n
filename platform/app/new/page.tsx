@@ -146,7 +146,7 @@ export default function NewVideo() {
             <div className="slate">
               <div className="slabel">Title preview · {tone}</div>
               <div
-                className={`sprev ${name ? "" : "empty"} ${tt.className}`}
+                className={`sprev ${name ? "" : "blank"} ${tt.className}`}
                 style={tt.uppercase ? { textTransform: "uppercase" } : undefined}
               >
                 {name || "Untitled film"}

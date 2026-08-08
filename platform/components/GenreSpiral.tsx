@@ -1,8 +1,13 @@
 "use client";
 
 /**
- * The genre strip — a column of film frames beside the form, turning like a
- * barber's pole.
+ * The genre strip — a barber's pole made of videos, turning beside the form.
+ *
+ * It is a real cylinder: the frames are laid on its surface as a multi-start
+ * helix, joined end to end along each thread and edge to edge across the
+ * threads, so the whole pole is covered in film. The pole spins about its own
+ * axis, and because the threads are helical the stripes appear to climb —
+ * which is exactly what a barber's pole does. Nothing translates.
  *
  * It is a shop window: every frame is a genre the factory can make, so the
  * page shows the range of the thing you are about to commission while you
@@ -114,110 +119,134 @@ export const GENRES: Genre[] = [
 ];
 
 /**
- * Enough frames to fill the column AND to have a whole spare set below it,
- * so the roll can travel one full set and snap back without anything
- * appearing to jump. The set length is what the animation translates by.
+ * The pole.
+ *
+ * `LEAN` is the angle the stripe makes with the horizontal, and everything
+ * follows from it: the rise per radian of turn is `R · tan(LEAN)`, so one
+ * thread descends `2π · rise` in a full turn. At 60° that pitch is six poles
+ * wide — far too much for a single thread to cover the surface, which is why
+ * a real barber's pole carries several stripes side by side. So does this
+ * one: `STARTS` threads, each offset down the axis by a share of the pitch,
+ * landing edge to edge.
  */
-const SETS = 3;
-const FRAMES = Array.from({ length: SETS }, () => GENRES).flat();
-
-const TILE_W = 330; // px — a little wider than the rail; the rest is clipped
-/* The reference's frames are far wider than they are tall — about 7:1 —
-   which is what makes a column of them read as film rather than as a stack
-   of postcards. */
-const TILE_H = 66;
-/** Frame to frame. The difference from TILE_H is the dark slot between them. */
-const PITCH = 80;
-/** One set of genres — the distance the roll travels before it repeats. */
-const SET_SPAN = GENRES.length * PITCH;
+const LEAN = 60; // degrees off horizontal
+const R = 104; // px, the pole's radius
+const RISE = R * Math.tan((LEAN * Math.PI) / 180); // px of descent per radian
+const PITCH_Y = 2 * Math.PI * RISE; // one turn of one thread
+/** Frames around the pole, per turn of one thread. */
+const AROUND = 8;
+const STEP = (2 * Math.PI) / AROUND;
 
 /**
- * The bow. Each frame is wrapped around an invisible vertical cylinder, so
- * its long edges are arcs and its middle stands closer to you than its ends.
- * That curve is the single most recognisable thing about the reference — a
- * flat rectangle, however tilted, does not read like a strip of film at all.
- * It costs one element per facet, which is why the count is small.
+ * The frame's own size, measured on the UNROLLED surface — arc length, not
+ * chord. The projection below does the foreshortening; building it into the
+ * size as well would count it twice and leave the frames short of each other.
  */
-const ARC = 30; // degrees the frame bends through
-const SLICES = 10;
-const SLICE_W = TILE_W / SLICES;
-const BEND_R = TILE_W / ((ARC * Math.PI) / 180);
+const ARC_LEN = R * STEP;
+const DROP = STEP * RISE;
+const TILE_W = Math.ceil(Math.hypot(ARC_LEN, DROP)) + 1;
+
+const STARTS = 7;
+const THREAD_GAP = PITCH_Y / STARTS;
+/**
+ * Across the stripe. The bare minimum is the axial gap between threads times
+ * cos(lean) — at which two neighbours meet on exactly one line and any
+ * rounding anywhere opens a seam. The overlap factor buys that margin back;
+ * overlapping frames simply layer, which costs nothing.
+ */
+const TILE_H = Math.ceil(THREAD_GAP * Math.cos((LEAN * Math.PI) / 180) * 1.45);
+
+/** Frames down each thread — enough to run the length of a long form. */
+const PER_THREAD = 26;
 
 /**
- * The frames do not sit level: each is rolled a few degrees, and the roll
- * alternates down the strip so the dark slots between them read as slanted
- * slivers rather than as ruled lines. Keyed off the index, so a frame keeps
- * its own angle for the whole roll instead of wobbling as it travels.
+ * The pole is projected by hand rather than with CSS `perspective`, and that
+ * is the whole reason this version works where the last one did not: a
+ * perspective is measured from ITS OWN box, and this box is as tall as the
+ * form — thousands of pixels — so every frame near the top was projected
+ * from a vanishing point a screen and a half below it and came out stretched
+ * and scattered. Orthographic projection has no such origin: x is
+ * `R·sin(a)`, the frame is squeezed by `cos(a)`, and the far half is simply
+ * not drawn. The squeeze is applied AFTER the frame's own lean, which is
+ * what makes the stripe steepen toward the edges the way a real one does.
+ *
+ * All of it lives in one shared keyframe walk, because every frame follows
+ * the same path and differs only in where it starts — so the pole spins for
+ * the cost of one animation, and `animation-delay` places each frame on it.
  */
-const rollFor = (i: number) => Math.sin(i * 1.1) * 4.6;
+const TURN = (() => {
+  const stops: string[] = [];
+  const STEPS = 48;
+  for (let i = 0; i <= STEPS; i++) {
+    const p = i / STEPS;
+    const a = p * 2 * Math.PI;
+    const c = Math.cos(a);
+    const front = c > 0.02;
+    stops.push(
+      `${(p * 100).toFixed(2)}%{transform:translateX(${(Math.sin(a) * R).toFixed(1)}px) ` +
+        `scaleX(${Math.max(c, 0.02).toFixed(4)}) rotate(${LEAN}deg);` +
+        `filter:brightness(${(0.34 + 0.66 * Math.max(c, 0)).toFixed(3)});` +
+        `opacity:${front ? 1 : 0}}`,
+    );
+  }
+  return `@keyframes gspole{${stops.join("")}}`;
+})();
 
-/** One facet of the frame's bend, carrying its slab of the still. */
-function Slice({ image, index }: { image: string; index: number }) {
-  const deg = -ARC / 2 + (index + 0.5) * (ARC / SLICES);
-  const facing = Math.cos((deg * Math.PI) / 180);
-  return (
-    <i
-      className="gsslice"
-      style={{
-        width: SLICE_W + 1,
-        // Every facet starts at the frame's centre and is swung out from
-        // there — that IS the bend. Offsetting it by its index as well
-        // double-counts the position and fans the facets across the page.
-        left: "50%",
-        marginLeft: -(SLICE_W + 1) / 2,
-        transform: `rotateY(${deg.toFixed(2)}deg) translateZ(${BEND_R.toFixed(1)}px)`,
-        backgroundImage: image,
-        // The still is laid across the WHOLE frame and each facet shows its
-        // own slab of it, so the picture is continuous over the bend rather
-        // than repeated ten times.
-        backgroundSize: `${TILE_W}px 100%`,
-        backgroundPosition: `${(-index * SLICE_W).toFixed(1)}px center`,
-        filter: `brightness(${(0.88 + 0.12 * facing ** 2).toFixed(3)})`,
-      }}
-    />
-  );
-}
+/** Fold any phase into one turn. `%` alone hands back negatives. */
+const wrap01 = (v: number) => ((v % 1) + 1) % 1;
 
-/**
- * `speedSeconds` is one genre set: the whole strip rolls by in that time and
- * repeats. The roll is a CSS animation on the stage, not per-frame work — it
- * is one composited transform however many frames are on screen.
- */
-export default function GenreSpiral({ speedSeconds = 90 }: { speedSeconds?: number }) {
+export default function GenreSpiral({ speedSeconds = 34 }: { speedSeconds?: number }) {
+  const rows: React.ReactElement[] = [];
+  for (let s = 0; s < STARTS; s++) {
+    for (let k = 0; k < PER_THREAD; k++) {
+      const g = GENRES[(s * PER_THREAD + k) % GENRES.length];
+      // Mid-angle and mid-height of the segment this frame covers, so its
+      // ends land on the segment's ends instead of overshooting one side.
+      //
+      // The `- lift` is what makes the pole SOLID, and leaving it out is the
+      // bug this cost the longest: a thread's height is tied to its angle, so
+      // starting every thread at the same frame index starts each one lower
+      // than the last, and the top of the pole ends up with only one or two
+      // of the seven threads present — black holes between them. Each thread
+      // is wound back by whole frames until it starts at the top like the
+      // first. Winding back by WHOLE frames matters: the angle moves with it,
+      // so the frame stays a genuine frame of that same thread.
+      const lift = Math.round((s * THREAD_GAP) / DROP);
+      const a = (k - lift + 0.5) * STEP;
+      const y = a * RISE + s * THREAD_GAP;
+      rows.push(
+        <span key={`${s}-${k}`} className="gsrow" style={{ top: y }}>
+          <i
+            className="gsband"
+            style={{
+              width: TILE_W,
+              height: TILE_H,
+              marginLeft: -TILE_W / 2,
+              marginTop: -TILE_H / 2,
+              backgroundImage: HAS_STILLS
+                ? `url(/genres/${g.slug}.webp), ${g.gradient}`
+                : g.gradient,
+              // Where on the turn this frame starts. The phase is folded
+              // into one turn FIRST: a wound-back thread has a negative
+              // angle, which would make the delay positive — and a positive
+              // delay means the frame simply sits untransformed, unrotated
+              // and at full brightness, until its turn comes round. That is
+              // what a flat stack of rectangles down one side of the pole
+              // was.
+              animationDelay: `${(-wrap01(a / (2 * Math.PI)) * speedSeconds).toFixed(3)}s`,
+              animationDuration: `${speedSeconds}s`,
+            }}
+          />
+        </span>,
+      );
+    }
+  }
+
   return (
     <div className="gspiral" aria-hidden="true">
-      <style>{`@keyframes gsroll{from{transform:translate3d(0,${-SET_SPAN}px,0)}to{transform:translate3d(0,0,0)}}`}</style>
-      <div
-        className="gsstage"
-        style={{ animationDuration: `${speedSeconds}s`, height: FRAMES.length * PITCH }}
-      >
-        {FRAMES.map((g, i) => {
-          const image = HAS_STILLS
-            ? `url(/genres/${g.slug}.webp), ${g.gradient}`
-            : g.gradient;
-          return (
-            <span
-              key={`${g.slug}-${i}`}
-              className="gsband"
-              style={{
-                width: TILE_W,
-                height: TILE_H,
-                marginLeft: -TILE_W / 2,
-                top: i * PITCH,
-                // Pulled back by the bend radius: the facets are pushed
-                // OUT by that much, so without this the whole frame flies
-                // toward the viewer and perspective blows it up to a
-                // full-screen slab. The two cancel and the arc sits in the
-                // frame's own plane.
-                transform: `translateZ(${(-BEND_R).toFixed(1)}px) rotate(${rollFor(i).toFixed(2)}deg)`,
-              }}
-            >
-              {Array.from({ length: SLICES }, (_, k) => (
-                <Slice key={k} image={image} index={k} />
-              ))}
-            </span>
-          );
-        })}
+      <style>{TURN}</style>
+      <div className="gsstage" style={{ height: PER_THREAD * DROP }}>
+        {rows}
       </div>
     </div>
   );

@@ -1744,68 +1744,61 @@ a {
 .callsheet:focus-within {
   opacity: 1;
 }
-/* --- the genre strip ---
-   A column of film frames turning like a barber's pole beside the form:
-   every frame is a genre the factory can make, so the page shows its range
-   while you commission from it.
-
-   It runs the height of the FORM and no further, fading out at both ends.
-   An earlier version was fixed to the viewport and ran to the top of the
-   screen, past the headline — the strip is company for the form, not a
-   backdrop for the whole page. */
+/* --- the genre strip: a barber's pole made of videos ---
+   It runs the height of the FORM and no further, fading out at both ends —
+   the pole is company for the form, not a backdrop for the whole page. */
 .briefart {
   position: relative;
-  /* Stretch the track: the strip is measured against the form's own height,
-     which is what makes both fades land where the form does. */
   align-self: stretch;
   min-height: 1px;
 }
 .gspiral {
   position: absolute;
   inset: 0;
-  /* Wider than the rail, and pushed toward the page edge: the overflow
-     belongs in the empty gutter, never over the form. */
+  /* A little wider than the pole, pushed toward the page edge so the
+     overflow lands in the empty gutter and never over the form. */
   width: 360px;
   left: 50%;
-  transform: translateX(-42%);
+  transform: translateX(-34%);
   overflow: hidden;
-  /* Deep enough that the bend reads as a curve and not as a fish-eye. */
-  perspective: 1600px;
-  perspective-origin: 50% 50%;
+  /* No `perspective`: the projection is done in the component. A CSS
+     perspective is measured from this box, and this box is as tall as the
+     form, so it would project the top of the pole from a vanishing point far
+     below it. */
   -webkit-mask-image: linear-gradient(180deg, transparent, #000 8%, #000 92%, transparent);
   mask-image: linear-gradient(180deg, transparent, #000 8%, #000 92%, transparent);
   pointer-events: none;
 }
-/* The roll. One composited transform carries every frame, so the cost does
-   not grow with the number of genres. */
 .gsstage {
   position: absolute;
   top: 0;
+  left: 50%;
+}
+/* The anchor: it holds the frame's height on the pole and never moves. Only
+   the frame inside it turns, which is why one keyframe walk serves them all. */
+.gsrow {
+  position: absolute;
   left: 0;
-  right: 0;
-  transform-style: preserve-3d;
-  animation-name: gsroll;
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
-  will-change: transform;
+  display: block;
+  width: 0;
+  height: 0;
 }
 .gsband {
   position: absolute;
-  left: 50%;
-  display: block;
-  transform-style: preserve-3d;
-}
-/* One facet of a frame's bend. Opaque, and its own slab of the still. */
-.gsslice {
-  position: absolute;
+  left: 0;
   top: 0;
-  height: 100%;
   display: block;
   background-repeat: no-repeat;
-  backface-visibility: visible;
-  /* No edge treatment per facet. An inset shadow here draws ten vertical
-     seams ACROSS the picture, which is the one thing the bend exists to
-     avoid — the frame's edges are the dark slots between frames. */
+  background-size: cover;
+  background-position: center;
+  animation-name: gspole;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform, filter;
+  /* The frame has thickness: a bright top lip and a dark under-edge. */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.13),
+    inset 0 -2px 5px rgba(0, 0, 0, 0.55);
 }
 
 /* The reserved height lives HERE, not on .sprev: a min-height on a

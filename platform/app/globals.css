@@ -1572,13 +1572,23 @@ a {
   justify-content: center;
   text-align: center;
 }
+/* One line, and never wider than the sentence under it — a headline that
+   overhangs its own paragraph reads as a mistake rather than as scale. The
+   size is bounded by the container as well as the viewport, so the line
+   shrinks to fit instead of pushing past. */
 .hero.titlescreen h1 {
-  font-size: clamp(46px, 8.5vw, 104px);
-  margin-bottom: 24px;
+  font-size: min(7.6vw, 68px);
+  white-space: nowrap;
+  margin-bottom: 22px;
+  max-width: 100%;
 }
 .hero.titlescreen h1 em {
+  /* Inline, so the serif answer sits ON the line rather than under it. */
+  display: inline;
   max-width: none;
-  margin-top: 0.1em;
+  margin-top: 0;
+  margin-left: 0.16em;
+  font-size: 0.62em;
 }
 .hero.titlescreen p {
   max-width: 52ch;
@@ -1741,6 +1751,11 @@ a {
 .gspiral {
   position: relative;
   height: calc(100vh - 140px);
+  /* Wider than the rail. The strand swings ±80px and its bands are 130 long,
+     so a 224px box clipped the turns to stubs and the chain read as scattered
+     tiles. The overflow goes into the empty gutter either side. */
+  width: 300px;
+  margin-inline: -38px;
   /* The coil is wider than the rail; clipping is what keeps the form's
      centre line untouched. */
   overflow: hidden;
@@ -1760,10 +1775,11 @@ a {
   transform: rotateX(11deg);
 }
 .gsband {
+  /* Sized by the component: the band is a strip along the path, not a
+     zero-width anchor for a ring. */
   position: absolute;
   left: 50%;
   top: 0;
-  width: 0;
   display: block;
   transform-style: preserve-3d;
   animation-name: gspiral;

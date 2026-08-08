@@ -1115,14 +1115,14 @@ a {
   height: 100px;
   z-index: 90;
   pointer-events: none;
-  background: linear-gradient(
-    180deg,
-    var(--bg) 0%,
-    var(--bg) 86%,
-    rgba(10, 10, 11, 0) 100%
-  );
-  -webkit-backdrop-filter: blur(9px) saturate(1.1);
-  backdrop-filter: blur(9px) saturate(1.1);
+  /* Flat and fully opaque, and it STOPS on the line where the form's rail
+     begins. Every softer version leaked: a gradient that starts fading above
+     the rail shows whatever passes under it however blurred, and one that
+     fades below the rail dims the rail itself, because the rail sits inside
+     the form and this sits above the whole page. There is nowhere left for a
+     fade to go, so there isn't one — and the edge is invisible anyway,
+     because the rail and the call sheet both start right underneath it. */
+  background: var(--bg);
   /* NO mask, and that is load-bearing. A mask here was meant to fade the
      blur's own bottom edge, but it made the whole strip translucent — form
      headings read straight through the solid part of the gradient, which is

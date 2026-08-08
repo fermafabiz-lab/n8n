@@ -212,6 +212,16 @@ These each cost hours. Do not rediscover them.
   frame until the regen loop fills it. Both are handled by the same chain
   because the cure is identical — rewrite, never resubmit — but do not read
   the empty frame as a second bug.
+- **On a scene flagged for regeneration, `Observații Scenă` is PROMPT, not a
+  comment.** `Evaluate Image Approval` appends it as
+  `ADJUSTMENT REQUEST — the new image MUST follow this: …` so reviewer
+  feedback can steer the re-roll. The trap: the natural thing to write in
+  that box after a refusal is a description of what was refused, which
+  re-injects the banned content and makes the retry fail for a reason the
+  writer added. Caught while unblocking `recCoZWsZBOrIU69L` — a note reading
+  "the depiction of hands seizing the man was replaced with…" would have been
+  sent straight back to fal. Clear the field, or write only what the new
+  image SHOULD contain.
 - **The refusal often is not in the shot, it is in the Story Bible.** The
   location description is appended to every scene set there, so one flagged
   phrase refuses every one of them. On `recCoZWsZBOrIU69L` the location

@@ -1112,21 +1112,25 @@ a {
   top: 0;
   left: 0;
   right: 0;
-  height: 118px;
+  height: 100px;
   z-index: 90;
   pointer-events: none;
   background: linear-gradient(
     180deg,
     var(--bg) 0%,
-    var(--bg) 58%,
-    rgba(10, 10, 11, 0.9) 74%,
+    var(--bg) 86%,
     rgba(10, 10, 11, 0) 100%
   );
   -webkit-backdrop-filter: blur(9px) saturate(1.1);
   backdrop-filter: blur(9px) saturate(1.1);
-  /* Solid as far as 85px, which is where the form's sticky rail starts. */
-  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 72%, rgba(0, 0, 0, 0) 100%);
-  mask-image: linear-gradient(180deg, #000 0%, #000 72%, rgba(0, 0, 0, 0) 100%);
+  /* NO mask, and that is load-bearing. A mask here was meant to fade the
+     blur's own bottom edge, but it made the whole strip translucent — form
+     headings read straight through the solid part of the gradient, which is
+     exactly the leak this element exists to stop. Proven by elimination:
+     with the mask removed and everything else untouched the band is clean;
+     with the mask on and the blur removed the text comes back. The gradient
+     already fades to nothing on its own, and the blur's edge lands on 100px,
+     where the form's own frosted rail takes over. */
 }
 
 /* --- eyebrow filter tabs (dashboard) --- */
@@ -1668,7 +1672,11 @@ a {
 /* --- "you are here" rail at the head of the form --- */
 .fprog {
   position: sticky;
-  top: 84px;
+  /* Low enough to clear the fade under the site's nav entirely. At 84 the
+     rail's own top edge sat inside that fade and the two washed into each
+     other; the scrim now finishes on exactly this line, so the rail begins
+     where the fade ends and never carries any of it. */
+  top: 100px;
   z-index: 5;
   margin: -30px -34px 0;
   padding: 14px 34px;

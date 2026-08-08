@@ -1819,16 +1819,15 @@ a {
   animation-timing-function: linear;
   animation-iteration-count: infinite;
   will-change: transform, filter;
-  /* The frame's two mask ramps MULTIPLY rather than replace one another:
-     that is what makes a corner fade twice as fast as an edge, and a corner
-     that fades is a corner you cannot see. Without this the second mask
-     simply wins and the frame keeps hard sides. */
-  -webkit-mask-composite: source-in;
-  mask-composite: intersect;
-  /* No inset edge, no lip, no shadow. Every side of the frame is a blend
-     now, and anything drawn on a blend is a line straight through it. The
-     roundness comes from the shading on the container instead, which is
-     fixed in space and so cannot smear a seam. */
+  /* No mask on a plain slab, and no edge treatment either. Along the thread
+     the slabs abut with a hairline of overlap, and across it there is a real
+     gap between the rows — so there is no seam anywhere that needs hiding.
+     Only the bridging slab carries a mask. */
+}
+/* Sits over the first slab of a picture, carrying the PREVIOUS one, so the
+   two dissolve into each other rather than cutting. */
+.gsbridge {
+  z-index: 1;
 }
 
 /* The reserved height lives HERE, not on .sprev: a min-height on a

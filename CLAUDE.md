@@ -189,6 +189,37 @@ These each cost hours. Do not rediscover them.
   any rejection.
 - A refusal is deterministic. Resubmitting the same input burns retries and
   then kills the batch. Always rewrite before retrying.
+- **fal refuses too, with HTTP 422 `content_policy_violation`** — and until
+  2026-08-08 `Generate Scene Image` had no `onError`, so one refused prompt
+  killed the whole media batch and every scene after it went untouched. The
+  symptom does not look like a crash: each Resume redoes the finished scenes,
+  makes at most ONE new image, and dies again, so the producer sees image
+  generation that "takes forever" rather than one that is failing. Five runs
+  over thirteen minutes produced four of six images that way (project
+  `recCoZWsZBOrIU69L`). Its error output now enters the SAME chain Google
+  Flow's upload refusals already used:
+  `Prep Flow Reject → Already Rewritten? → Rewrite Prompt AI → Apply
+  Rewritten Prompt`. That reuse is only possible because `Prep Flow Reject`
+  reads every scene field from `$('Loop Images')` and touches `$json` only to
+  sniff the reason — a chain that had read its context from the *upstream
+  node* could not have been shared. It now reports which service refused
+  (`service` in its output), because the two notes used to blame Google Flow
+  for fal's refusals.
+- **Note the two services fail at different moments**, which changes what the
+  scene looks like afterwards: Flow refuses at UPLOAD, so the image exists and
+  the rewrite replaces a picture; fal refuses at GENERATION, so there is no
+  image at all and the scene sits at "Așteaptă Aprobare Imagine" with an empty
+  frame until the regen loop fills it. Both are handled by the same chain
+  because the cure is identical — rewrite, never resubmit — but do not read
+  the empty frame as a second bug.
+- **The refusal often is not in the shot, it is in the Story Bible.** The
+  location description is appended to every scene set there, so one flagged
+  phrase refuses every one of them. On `recCoZWsZBOrIU69L` the location
+  carried "dark skeletal hands forcing their way up through the fractured
+  ground", which alone refused scenes 103, 104 and 105. The per-scene rewrite
+  clears the scene it runs on and cannot clear the source, so when several
+  consecutive scenes refuse, edit the LOCATION in the Story Bible — otherwise
+  every new scene on that set is born already refused.
 
 ### Airtable
 
@@ -845,10 +876,9 @@ expected and harmless for an app touching only its own Drive.
 - Test `chapters` multi-voice on a project with 2+ chapters (over 120s), which
   is the branch the per-scene rotation does *not* cover.
 - Codify the "no visible faces" rule into Documentary image prompts.
-- `Generate Scene Image` has no `onError`, so one content refusal from fal
-  kills the whole batch. The auto-rewrite chain already exists for Google Flow
-  rejections (`Prep Flow Reject → Rewrite Prompt AI → Apply Rewritten Prompt`);
-  wire fal's 422 into it.
+- Scene 104/105 of `recCoZWsZBOrIU69L` are the first scenes to go through the
+  new fal auto-rewrite path — worth watching once to confirm the rewritten
+  prompt clears fal and the regen loop picks the scene up.
 - The ambience level in `assemble.mjs` (`nativeVolume`, 0.22) and its
   sidechain settings were never heard on a real montage — tune by ear once.
 - Optional: `channelName: 'Video Factory'` → `'House of Videos'` in

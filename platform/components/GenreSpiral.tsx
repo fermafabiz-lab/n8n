@@ -119,90 +119,86 @@ export const GENRES: Genre[] = [
 const RINGS = [...GENRES, ...GENRES];
 
 /**
- * The strand, as a real helix — and as ONE continuous film strip.
+ * The strand, as a barber's pole.
  *
- * Every band is a whole video, and consecutive bands touch: a band is not
- * placed at a point of the path but spans the SEGMENT between its own point
- * and the next one, so the strip has no seams to leave gaps in. The helix is
- * then drawn purely by the direction each segment points — which is what the
- * strand is supposed to read as.
+ * The bands are a single ribbon wound around an invisible vertical cylinder:
+ * each one covers the segment of the helix between its own angle and the
+ * next, so they meet edge to edge, and the ribbon carries on around the BACK
+ * of the cylinder instead of turning around at the sides. That is the whole
+ * difference between a barber pole and a flat S drawn on the page — the
+ * stripe never reverses, it just goes away from you and comes back.
  *
- * Two things had to go for that to hold, and both are gaps waiting to happen:
- * the per-band `rotateY` twist (a turned band is foreshortened, so it no
- * longer reaches its neighbour) and the per-band depth `scale` (two adjacent
- * bands at different scales cannot share an edge). Depth is carried by
- * brightness and stacking order instead, which cost no length.
+ * Because the turn per band and the rise per band are both constant, so is
+ * the stripe's angle: every band is the same size and the same lean, exactly
+ * like a real pole. Nothing per-band may scale — two neighbours at different
+ * scales cannot share an edge, which is what used to leave the strand dotted.
  */
-const RADIUS = 80; // px — half the strand's width on screen
-/** Vertical rise per radian of turn: RADIUS/RISE sets the steepest lean. */
-const RISE = 56; // atan(80/56) ≈ 55°, inside the 45-60° the strand should read at
-const BAND_H = 48; // px, the width of the strip across its own path
-/** Fourteen bands per turn. */
+const RADIUS = 105; // px — the cylinder's radius
+/** Vertical rise per radian of turn. Sets the stripe's angle. */
+/* One full turn is 2π·RISE ≈ 190px of descent. That number is the whole
+   difference between reading as a pole and reading as a cord: the strand
+   only shows through a ~350px window above the fold, so a turn has to FIT in
+   it. At the previous rise a turn took 750px and all anyone ever saw was one
+   diagonal arc. */
+const RISE = 30;
+/* The stripe's width, and it is set against the PITCH (the ≈190px a full
+   turn descends), not against the drop between neighbouring bands. A barber
+   pole reads as alternating stripes: a thin ribbon on a wide pitch is a wire
+   winding through the air, not a pole. At 92 against 190 the ribbon and the
+   dark gap between its turns are about equal, which is the alternation the
+   eye is looking for. */
+const BAND_H = 92;
+/** Fourteen bands per full turn of the pole. */
 const TURN_PER_BAND = (2 * Math.PI) / 14;
 
 const SPAN = RINGS.length * TURN_PER_BAND * RISE;
+/** Straight-line distance across the face of the cylinder for one band. */
+const CHORD = 2 * RADIUS * Math.sin(TURN_PER_BAND / 2);
+const DROP = TURN_PER_BAND * RISE;
+/** +1: a hairline of overlap beats a hairline of gap. */
+const BAND_W = Math.ceil(Math.hypot(CHORD, DROP)) + 1;
+/** The stripe's angle — constant, the way a barber pole's is. ≈50°. */
+const LEAN = (Math.atan2(DROP, CHORD) * 180) / Math.PI;
 
-/** A point of the path, at fraction p of the descent. */
-function pointAt(p: number) {
-  const a = p * RINGS.length * TURN_PER_BAND;
-  return { x: Math.sin(a) * RADIUS, y: p * SPAN, depth: Math.cos(a) };
-}
-
-/**
- * The band's own length, fixed. It is the LONGEST segment the path produces
- * (steepest lean, where horizontal and vertical travel add up); every other
- * segment is reached by scaling this length DOWN along the strip's own axis,
- * so a band always covers its segment exactly and never falls short.
- */
-const STEP = 1 / RINGS.length;
-const BAND_W = (() => {
-  let max = 0;
-  for (let i = 0; i < RINGS.length; i++) {
-    const a = pointAt(i * STEP);
-    const b = pointAt((i + 1) * STEP);
-    max = Math.max(max, Math.hypot(b.x - a.x, b.y - a.y));
-  }
-  return Math.ceil(max) + 1; // +1: a hairline of overlap beats a hairline of gap
-})();
-
-/** Where the band covering the segment starting at p sits, and how it lies. */
+/** Where the band starting at fraction p of the descent sits on the pole. */
 function poseAt(p: number) {
-  const a = pointAt(p);
-  const b = pointAt(p + STEP);
-  const len = Math.hypot(b.x - a.x, b.y - a.y);
+  // Mid-angle of the segment this band covers, so its ends land on the
+  // segment's ends rather than overshooting one side.
+  const a = (p * RINGS.length + 0.5) * TURN_PER_BAND;
   return {
-    // The segment's midpoint — the band is centred on what it covers.
-    x: (a.x + b.x) / 2,
-    y: -BAND_H + (a.y + b.y) / 2,
-    depth: (a.depth + b.depth) / 2, // +1 at the front of the strand, -1 behind
-    // The direction of travel. This angle, alternating as the path swings
-    // left and right, is the only thing drawing the helix.
-    lean: (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI,
-    // Shrink along the strip's own axis so its ends land on the segment's
-    // ends. Never grow: the band is cut to the longest case.
-    squeeze: (len + 1) / BAND_W,
+    y: -BAND_H + p * SPAN,
+    turn: (a * 180) / Math.PI,
+    depth: Math.cos(a), // +1 at the front of the pole, -1 behind it
   };
 }
 
 const transformFor = (p: number) => {
-  const { x, y, lean, squeeze } = poseAt(p);
+  const { y, turn } = poseAt(p);
+  // Order is the whole trick: drop down the axis, turn around the axis, push
+  // out to the surface — and only then lean the band within the tangent plane
+  // it now lies in. Leaning earlier tilts the axis it is turned about and
+  // scatters the bands.
   return (
-    `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0) ` +
-    `rotate(${lean.toFixed(1)}deg) scaleX(${squeeze.toFixed(4)})`
+    `translate3d(0px, ${y.toFixed(1)}px, 0) ` +
+    `rotateY(${turn.toFixed(2)}deg) translateZ(${RADIUS}px) ` +
+    `rotate(${LEAN.toFixed(2)}deg)`
   );
 };
 
-const brightnessAt = (depth: number) => 0.45 + 0.55 * (0.5 + 0.5 * depth);
+/* The far side of the pole must stay VISIBLE, only dimmer. Dropping it to
+   0.4 on a black page hid it completely, and a barber pole with its back
+   half missing reads as a thin cord winding through the air rather than as a
+   cylinder. The range below is the shading that makes it look round. */
+const brightnessAt = (depth: number) => 0.66 + 0.44 * (0.5 + 0.5 * depth);
 
 /**
  * Generated, not hand-written: the keyframes have to trace the same path as
  * the resting pose, or the position a prefers-reduced-motion user sees —
  * animations are stripped globally — would not match the motion.
  *
- * The step count is a multiple of the band count on purpose. The tiling is
- * exact only where a keyframe lands on a segment boundary; between two stops
- * CSS interpolates the transform linearly, and a coarse grid would let the
- * strip breathe apart mid-tween.
+ * The step count is a multiple of the band count on purpose. Between two
+ * stops CSS interpolates linearly, and a rotation interpolated coarsely cuts
+ * the corner off the circle, pulling the ribbon inward and apart.
  */
 const KEYFRAMES = (() => {
   const stops: string[] = [];
@@ -212,8 +208,7 @@ const KEYFRAMES = (() => {
     const { depth } = poseAt(p);
     stops.push(
       `${(p * 100).toFixed(3)}%{transform:${transformFor(p)};` +
-        `filter:brightness(${brightnessAt(depth).toFixed(3)});` +
-        `z-index:${depth >= 0 ? 2 : 1}}`,
+        `filter:brightness(${brightnessAt(depth).toFixed(3)})}`,
     );
   }
   return `@keyframes gspiral{${stops.join("")}}`;
@@ -243,7 +238,6 @@ export default function GenreSpiral({ speedSeconds = 70 }: { speedSeconds?: numb
                 // keyframes — see KEYFRAMES.
                 transform: transformFor(p),
                 filter: `brightness(${brightnessAt(pose.depth).toFixed(3)})`,
-                zIndex: pose.depth >= 0 ? 2 : 1,
                 animationDelay: `${(-p * speedSeconds).toFixed(2)}s`,
                 animationDuration: `${speedSeconds}s`,
               }}

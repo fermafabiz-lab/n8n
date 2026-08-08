@@ -1590,7 +1590,10 @@ a {
   margin-left: 0.18em;
   /* Caps read larger than lowercase at the same size, and italic caps need
      air between them or they close up. */
-  font-size: 0.54em;
+  /* As big as the sans half: this is the important word. Caps in a serif
+     have a taller cap-height than the sans lowercase beside them, so 0.88
+     lands level rather than short. */
+  font-size: 0.88em;
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
@@ -1758,8 +1761,8 @@ a {
   /* Wider than the rail. The strand swings ±80px and its bands are 130 long,
      so a 224px box clipped the turns to stubs and the chain read as scattered
      tiles. The overflow goes into the empty gutter either side. */
-  width: 300px;
-  margin-inline: -38px;
+  width: 400px;
+  margin-inline: -88px;
   /* The coil is wider than the rail; clipping is what keeps the form's
      centre line untouched. */
   overflow: hidden;
@@ -1793,6 +1796,9 @@ a {
   background-repeat: no-repeat;
   background-size: cover;
   background-position: center;
+  /* The far half of the pole is the ribbon's back. It has to draw, or the
+     barber pole becomes a half-pole with holes where it wraps round. */
+  backface-visibility: visible;
   /* The strip has edges: a bright top lip and a dark under-edge give it
      thickness without a second element per band. */
   box-shadow:

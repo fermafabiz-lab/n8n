@@ -1744,64 +1744,68 @@ a {
 .callsheet:focus-within {
   opacity: 1;
 }
+/* --- the genre strip ---
+   A column of film frames turning like a barber's pole beside the form:
+   every frame is a genre the factory can make, so the page shows its range
+   while you commission from it.
+
+   It runs the height of the FORM and no further, fading out at both ends.
+   An earlier version was fixed to the viewport and ran to the top of the
+   screen, past the headline — the strip is company for the form, not a
+   backdrop for the whole page. */
 .briefart {
-  /* Only a spacer now: the strip itself is fixed to the viewport so it can
-     run the full height of the screen. This keeps the grid track, and with
-     it the form's centre line. */
+  position: relative;
+  /* Stretch the track: the strip is measured against the form's own height,
+     which is what makes both fades land where the form does. */
+  align-self: stretch;
   min-height: 1px;
 }
-
-/* --- the genre strip ---
-   A column of film frames running the FULL height of the screen down the
-   right of the page: every frame is a genre the factory can make, so the
-   page shows its range while you commission from it.
-
-   Fixed, not sticky, and deliberately not inside the grid cell it belongs
-   to: the strip has to reach the top of the viewport, and the column it
-   sits in starts below the hero. `.briefart` still holds the grid track, so
-   the form keeps its centre line. */
 .gspiral {
-  position: fixed;
-  top: 0;
-  height: 100vh;
-  /* Centred on the art track: half the form (300) + the gap (48) + half the
-     track (112), plus clearance so the frames never overlap the form's
-     surface. Below 1240px the track is dropped and so is this. */
-  left: 50%;
-  margin-left: 520px;
-  width: 420px;
-  transform: translateX(-50%);
-  overflow: hidden;
-  /* Deep enough that the ends of the barrel recede without fish-eyeing. */
-  perspective: 1500px;
-  perspective-origin: 50% 50%;
-  -webkit-mask-image: linear-gradient(180deg, transparent, #000 9%, #000 91%, transparent);
-  mask-image: linear-gradient(180deg, transparent, #000 9%, #000 91%, transparent);
-  pointer-events: none;
-  z-index: 0;
-}
-.gsstage {
   position: absolute;
   inset: 0;
+  /* Wider than the rail, and pushed toward the page edge: the overflow
+     belongs in the empty gutter, never over the form. */
+  width: 360px;
+  left: 50%;
+  transform: translateX(-42%);
+  overflow: hidden;
+  /* Deep enough that the bend reads as a curve and not as a fish-eye. */
+  perspective: 1600px;
+  perspective-origin: 50% 50%;
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 8%, #000 92%, transparent);
+  mask-image: linear-gradient(180deg, transparent, #000 8%, #000 92%, transparent);
+  pointer-events: none;
+}
+/* The roll. One composited transform carries every frame, so the cost does
+   not grow with the number of genres. */
+.gsstage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
   transform-style: preserve-3d;
+  animation-name: gsroll;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
 }
 .gsband {
-  /* Sized and placed by the component; the anchor is the top centre of the
-     strip and every frame is offset from it. */
   position: absolute;
   left: 50%;
+  display: block;
+  transform-style: preserve-3d;
+}
+/* One facet of a frame's bend. Opaque, and its own slab of the still. */
+.gsslice {
+  position: absolute;
   top: 0;
+  height: 100%;
   display: block;
   background-repeat: no-repeat;
-  background-size: cover;
-  background-position: center;
-  will-change: transform;
-  /* The frame has edges: a bright top lip and a dark under-edge give it
-     thickness without a second element each. */
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.14),
-    inset 0 -2px 4px rgba(0, 0, 0, 0.6),
-    0 10px 26px rgba(0, 0, 0, 0.5);
+  backface-visibility: visible;
+  /* No edge treatment per facet. An inset shadow here draws ten vertical
+     seams ACROSS the picture, which is the one thing the bend exists to
+     avoid — the frame's edges are the dark slots between frames. */
 }
 
 /* The reserved height lives HERE, not on .sprev: a min-height on a

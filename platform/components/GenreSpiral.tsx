@@ -1,10 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-
 /**
- * The genre strip — a column of film frames running the full height of the
- * screen, down the right of the page.
+ * The genre strip — a column of film frames beside the form, turning like a
+ * barber's pole.
  *
  * It is a shop window: every frame is a genre the factory can make, so the
  * page shows the range of the thing you are about to commission while you
@@ -116,111 +114,110 @@ export const GENRES: Genre[] = [
 ];
 
 /**
- * Every genre twice, so the column stays full on a tall screen and the wrap
- * point is always far off the bottom of the viewport.
+ * Enough frames to fill the column AND to have a whole spare set below it,
+ * so the roll can travel one full set and snap back without anything
+ * appearing to jump. The set length is what the animation translates by.
  */
-const FRAMES = [...GENRES, ...GENRES];
+const SETS = 3;
+const FRAMES = Array.from({ length: SETS }, () => GENRES).flat();
 
-const TILE_W = 340; // px — wider than the rail; the overflow is clipped
-const TILE_H = 78; // px
-/** Frame to frame. The difference from TILE_H is the dark gap between them. */
-const PITCH = 96;
-const LOOP = FRAMES.length * PITCH; // the whole column, before it repeats
-/** How far the column travels per pixel of page scroll. */
-const SCROLL_RATE = 0.45;
+const TILE_W = 330; // px — a little wider than the rail; the rest is clipped
+/* The reference's frames are far wider than they are tall — about 7:1 —
+   which is what makes a column of them read as film rather than as a stack
+   of postcards. */
+const TILE_H = 66;
+/** Frame to frame. The difference from TILE_H is the dark slot between them. */
+const PITCH = 80;
+/** One set of genres — the distance the roll travels before it repeats. */
+const SET_SPAN = GENRES.length * PITCH;
 
 /**
- * The barrel. Frames away from the middle of the screen tilt away and sink
- * back, so the column reads as wrapped around a very large cylinder lying
- * across the page rather than as a flat stack of rectangles. `t` is -1 at the
- * top of the viewport, 0 in the middle, +1 at the bottom.
+ * The bow. Each frame is wrapped around an invisible vertical cylinder, so
+ * its long edges are arcs and its middle stands closer to you than its ends.
+ * That curve is the single most recognisable thing about the reference — a
+ * flat rectangle, however tilted, does not read like a strip of film at all.
+ * It costs one element per facet, which is why the count is small.
  */
-const TILT = 30; // deg of rotateX at the very top and bottom
-const SINK = 150; // px the ends recede
-/** A slow sway, so the column is never a perfectly straight ruler. */
-const SWAY_X = 10; // px
-const SWAY_DEG = 3.2; // deg of roll
+const ARC = 30; // degrees the frame bends through
+const SLICES = 10;
+const SLICE_W = TILE_W / SLICES;
+const BEND_R = TILE_W / ((ARC * Math.PI) / 180);
 
-function transformFor(y: number, viewportH: number) {
-  const t = Math.max(-1.6, Math.min(1.6, (y - viewportH / 2) / (viewportH / 2)));
-  // The sway is a function of the frame's position ON THE STRIP, not of where
-  // it happens to be on screen — otherwise the whole column would ripple as
-  // you scroll instead of the frames riding through a fixed shape.
-  const phase = (y / LOOP) * Math.PI * 2;
+/**
+ * The frames do not sit level: each is rolled a few degrees, and the roll
+ * alternates down the strip so the dark slots between them read as slanted
+ * slivers rather than as ruled lines. Keyed off the index, so a frame keeps
+ * its own angle for the whole roll instead of wobbling as it travels.
+ */
+const rollFor = (i: number) => Math.sin(i * 1.1) * 4.6;
+
+/** One facet of the frame's bend, carrying its slab of the still. */
+function Slice({ image, index }: { image: string; index: number }) {
+  const deg = -ARC / 2 + (index + 0.5) * (ARC / SLICES);
+  const facing = Math.cos((deg * Math.PI) / 180);
   return (
-    `translate3d(${(Math.sin(phase * 3) * SWAY_X).toFixed(1)}px, ${y.toFixed(1)}px, ` +
-    `${(-Math.abs(t) * SINK).toFixed(1)}px) ` +
-    `rotateX(${(-t * TILT).toFixed(2)}deg) ` +
-    `rotate(${(Math.sin(phase * 3 + 1) * SWAY_DEG).toFixed(2)}deg)`
+    <i
+      className="gsslice"
+      style={{
+        width: SLICE_W + 1,
+        // Every facet starts at the frame's centre and is swung out from
+        // there — that IS the bend. Offsetting it by its index as well
+        // double-counts the position and fans the facets across the page.
+        left: "50%",
+        marginLeft: -(SLICE_W + 1) / 2,
+        transform: `rotateY(${deg.toFixed(2)}deg) translateZ(${BEND_R.toFixed(1)}px)`,
+        backgroundImage: image,
+        // The still is laid across the WHOLE frame and each facet shows its
+        // own slab of it, so the picture is continuous over the bend rather
+        // than repeated ten times.
+        backgroundSize: `${TILE_W}px 100%`,
+        backgroundPosition: `${(-index * SLICE_W).toFixed(1)}px center`,
+        filter: `brightness(${(0.88 + 0.12 * facing ** 2).toFixed(3)})`,
+      }}
+    />
   );
 }
 
-/** Positive modulo — `%` alone hands back negatives and drops a frame. */
-const wrap = (v: number, m: number) => ((v % m) + m) % m;
-
-export default function GenreSpiral() {
-  const tiles = useRef<(HTMLSpanElement | null)[]>([]);
-
-  useEffect(() => {
-    let raf = 0;
-    const paint = () => {
-      raf = 0;
-      const vh = window.innerHeight;
-      // Scroll drives the strip: the frames arrive as you read down the form,
-      // which is the point — it is the page's own motion, not a loop playing
-      // beside it. Nothing moves on its own, so there is no reduced-motion
-      // case to answer here.
-      const offset = window.scrollY * SCROLL_RATE;
-      for (let i = 0; i < tiles.current.length; i++) {
-        const el = tiles.current[i];
-        if (!el) continue;
-        // The modulus is the STRIP's own length, and only that: wrapping on
-        // anything else (LOOP + vh was the first attempt) inserts a gap the
-        // size of the difference and sends a hole travelling through the
-        // column. The −vh shift only decides where the seam sits — a screen
-        // above the top, so a frame is never seen appearing.
-        const y = wrap(i * PITCH - offset + vh, LOOP) - vh;
-        el.style.transform = transformFor(y, vh);
-      }
-    };
-    const onScroll = () => {
-      if (!raf) raf = requestAnimationFrame(paint);
-    };
-    paint();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
-      if (raf) cancelAnimationFrame(raf);
-    };
-  }, []);
-
+/**
+ * `speedSeconds` is one genre set: the whole strip rolls by in that time and
+ * repeats. The roll is a CSS animation on the stage, not per-frame work — it
+ * is one composited transform however many frames are on screen.
+ */
+export default function GenreSpiral({ speedSeconds = 90 }: { speedSeconds?: number }) {
   return (
     <div className="gspiral" aria-hidden="true">
-      <div className="gsstage">
-        {FRAMES.map((g, i) => (
-          <span
-            key={`${g.slug}-${i}`}
-            ref={(el) => {
-              tiles.current[i] = el;
-            }}
-            className="gsband"
-            style={{
-              width: TILE_W,
-              height: TILE_H,
-              marginLeft: -TILE_W / 2,
-              marginTop: -TILE_H / 2,
-              backgroundImage: HAS_STILLS
-                ? `url(/genres/${g.slug}.webp), ${g.gradient}`
-                : g.gradient,
-              // A resting pose for the server render and the first paint,
-              // against a nominal viewport. The effect above corrects it to
-              // the real one on the same frame the page becomes interactive.
-              transform: transformFor(i * PITCH, 900),
-            }}
-          />
-        ))}
+      <style>{`@keyframes gsroll{from{transform:translate3d(0,${-SET_SPAN}px,0)}to{transform:translate3d(0,0,0)}}`}</style>
+      <div
+        className="gsstage"
+        style={{ animationDuration: `${speedSeconds}s`, height: FRAMES.length * PITCH }}
+      >
+        {FRAMES.map((g, i) => {
+          const image = HAS_STILLS
+            ? `url(/genres/${g.slug}.webp), ${g.gradient}`
+            : g.gradient;
+          return (
+            <span
+              key={`${g.slug}-${i}`}
+              className="gsband"
+              style={{
+                width: TILE_W,
+                height: TILE_H,
+                marginLeft: -TILE_W / 2,
+                top: i * PITCH,
+                // Pulled back by the bend radius: the facets are pushed
+                // OUT by that much, so without this the whole frame flies
+                // toward the viewer and perspective blows it up to a
+                // full-screen slab. The two cancel and the arc sits in the
+                // frame's own plane.
+                transform: `translateZ(${(-BEND_R).toFixed(1)}px) rotate(${rollFor(i).toFixed(2)}deg)`,
+              }}
+            >
+              {Array.from({ length: SLICES }, (_, k) => (
+                <Slice key={k} image={image} index={k} />
+              ))}
+            </span>
+          );
+        })}
       </div>
     </div>
   );

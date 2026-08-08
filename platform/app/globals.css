@@ -1689,6 +1689,36 @@ a {
   gap: 16px;
   flex-wrap: wrap;
 }
+/* Once the rail is stuck, it grows upward to the top of the screen — same
+   surface, same blur, so it reads as one bar — and THAT is what the form's
+   text disappears into. It is the mirror of the bottom, where the form
+   dissolves into the "Start production" bar.
+
+   It has to be the rail's own extension rather than a strip belonging to the
+   page: a page-level strip either fades above the rail, and then blurred
+   headings show through it, or fades below it, and then it greys the rail
+   itself. Growing the bar has neither problem, because the bar is opaque and
+   ends exactly where its text begins.
+
+   Only when stuck. Unstuck, the rail sits in the middle of the page and this
+   would hang a dark slab over whatever is above the form. */
+.fprog::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 0;
+  background: inherit;
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  backdrop-filter: blur(18px) saturate(1.4);
+  pointer-events: none;
+}
+.fprog.stuck::before {
+  /* The rail's sticky top: exactly the distance from the screen's edge down
+     to the bar, so the two meet with no seam and no overshoot. */
+  height: 100px;
+}
 .fprog-lead {
   font-family: var(--f-mono), ui-monospace, Menlo, monospace;
   font-size: 10px;

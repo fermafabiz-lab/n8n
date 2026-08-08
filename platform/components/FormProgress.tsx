@@ -13,9 +13,19 @@ import { useEffect, useState } from "react";
  * Reads the sections out of the DOM rather than taking a prop list, so a
  * section added to the form can never leave the rail out of date.
  */
+/** Must match `.fprog`'s `top` in globals.css — the rail's sticky line. */
+const STICKY_TOP = 100;
+
 export default function FormProgress() {
   const [steps, setSteps] = useState<Array<{ id: string; label: string }>>([]);
   const [active, setActive] = useState(0);
+  /**
+   * Whether the rail has reached its sticky line. It matters because the bar
+   * grows upward to the top of the screen once it is stuck — that upward part
+   * is what the form's text disappears into — and growing it while the rail
+   * is still sitting in the page would hang a dark slab above the form.
+   */
+  const [stuck, setStuck] = useState(false);
 
   useEffect(() => {
     const sections = Array.from(document.querySelectorAll<HTMLElement>(".fsec"));
@@ -48,10 +58,33 @@ export default function FormProgress() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // The rail's own top edge against its sticky line. Measured from the element
+  // rather than from a sentinel: a sentinel would have to be placed in the
+  // form's markup and would drift the moment the rail's offset changes, while
+  // the rail always knows where it actually is.
+  useEffect(() => {
+    if (steps.length === 0) return;
+    const el = document.querySelector<HTMLElement>(".fprog");
+    if (!el) return;
+    const check = () => {
+      const top = el.getBoundingClientRect().top;
+      // A pixel of tolerance: sub-pixel layout means an exact comparison
+      // flickers between stuck and not on every other frame.
+      setStuck(top <= STICKY_TOP + 1);
+    };
+    check();
+    window.addEventListener("scroll", check, { passive: true });
+    window.addEventListener("resize", check);
+    return () => {
+      window.removeEventListener("scroll", check);
+      window.removeEventListener("resize", check);
+    };
+  }, [steps.length]);
+
   if (steps.length === 0) return null;
 
   return (
-    <nav className="fprog" aria-label="Brief sections">
+    <nav className={`fprog${stuck ? " stuck" : ""}`} aria-label="Brief sections">
       <span className="fprog-lead">Fill in</span>
       <ol>
         {steps.map((s, i) => (

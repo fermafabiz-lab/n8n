@@ -861,6 +861,31 @@ on a visible 8-second grid.
   The one coupling this creates: the board may route a scene to the audio step
   only when `AudioReview` is actually rendered, hence the `audioPanel` prop —
   routing to a step that isn't on the page shows no controls at all.
+- **A step-scoped panel needs step-scoped EVERYTHING**, and three things were
+  missed the first time. (a) The bulk-review card fell through one chain of
+  conditions — images missing → images to approve → clips missing → else
+  videos — so the Images step, with only its last image unreviewed and no
+  images branch to take, landed on "Approve all 6 videos": a one-click
+  sign-off of the whole next stage, offered from the page before it. Each step
+  now owns its own card. (b) The monitor keyed off `focus` (set only by
+  `?stage=`), so on the LIVE page a scene whose picture was still awaiting a
+  decision showed its clip instead; keying off the derived `step` means the
+  live page already shows the picture, and clicking "Images" changes nothing
+  rather than flashing the clip first. (c) The filmstrip dot came from the
+  Airtable status TEXT, which is display-only and lags the checkboxes — so the
+  strip could not answer the one question it is looked at for. It is now
+  per-step approval: green approved, grey awaiting, dimmed only when nothing
+  is generated yet. Note selection had to stop borrowing `.act`, which also
+  paints the blinking "generating" dot — the scene under review was the one
+  scene whose own light you could never see.
+- **`?stage=` navigation is a full server round-trip**, and the page is
+  `force-dynamic`: every click re-reads Airtable and asks n8n what is running
+  before one pixel changes, so the previous step sat on screen for a second
+  and the click read as ignored. Nothing about switching Images↔Video needs
+  the server — same mounted board, same scene data — so `StageNav` records
+  where the click is going and `SceneBoard` believes it immediately; the
+  server render arrives and agrees. The guess is dropped when the committed
+  stage changes, so a failed navigation cannot leave the UI lying.
 - **Approval used to be one-way, and "Make changes" is the door back.** Every
   control in a step is gated on the scene NOT being approved, so signing off
   froze it — however wrong it turned out three steps later. `reopenStep()`

@@ -18,6 +18,7 @@ import FinishedFlash from "@/components/FinishedFlash";
 import OpsPanel from "@/components/OpsPanel";
 import AssemblyStatus from "@/components/AssemblyStatus";
 import ProductionActivity from "@/components/ProductionActivity";
+import { StageLink, StageNavProvider } from "@/components/StageNav";
 import {
   executionUrl,
   getAliveProduction,
@@ -242,6 +243,10 @@ export default async function ProductionRoom({
         projectId={id}
         finished={!!project.finalVideoUrl && project.finalVideoUrl.startsWith("http")}
       />
+      {/* The stepper and the scene board share a guess about which step the
+          producer just clicked, so the switch happens on the click rather
+          than when the server round-trip lands. */}
+      <StageNavProvider current={viewing}>
       <div className="room">
         {/* Breadcrumb + live status in one tracked line; the name itself is
             the title right below, not crumb text. */}
@@ -316,18 +321,18 @@ export default async function ProductionRoom({
                 {/* Each step is a link to itself: that is the whole way back
                     to an earlier stage. The active one links to the bare page
                     so clicking it again returns to "whatever is live now". */}
-                <Link
+                <StageLink
+                  stage={viewing === s.key ? null : s.key}
                   href={
                     viewing === s.key
                       ? `/projects/${id}`
                       : `/projects/${id}?stage=${s.key}`
                   }
                   className={`ps ${s.state}${viewing === s.key ? " sel" : ""}`}
-                  scroll={false}
                 >
                   <span className="ic">{s.state === "done" ? "✓" : i + 1}</span>
                   {s.name}
-                </Link>
+                </StageLink>
                 {i < steps.length - 1 && <span className="pl" />}
               </span>
             ))}
@@ -459,6 +464,7 @@ export default async function ProductionRoom({
           </div>
         ) : null}
       </div>
+      </StageNavProvider>
     </main>
   );
 }

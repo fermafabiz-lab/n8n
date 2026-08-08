@@ -903,6 +903,19 @@ on a visible 8-second grid.
   producer then picks what to change. The initial script has no such button:
   it is written for the whole project, not per scene, and `restart-scripting`
   is its door.
+- **…and the script is the one step where approval is FINAL.** Every per-scene
+  step can be reopened; the script cannot, because the entire film is derived
+  from it — chapters, scenes, narration, image prompts — so editing it
+  afterwards would describe a film that no longer exists. `ScriptReview` takes
+  a `locked` prop (Airtable `Status === 'approved'`) and renders a read-only
+  record: no Save, no Approve, no Regenerate, and the text as a plain block
+  rather than a textarea, because clicking the Script step is how you go back
+  and READ it and a fixed-height scrollbox fights that. Two details that
+  matter: **only `'approved'` locks** — an unknown or empty status must leave
+  the gate usable, since freezing a script nobody signed off strands the
+  pipeline with no door at all — and the sessionStorage draft is DROPPED when
+  locked instead of restored, or an unsaved pre-approval edit reappears on top
+  of the approved text and reads as what production is running on.
 - **Refusal notes get translated to next steps** by `platform/lib/refusals.ts`
   (wired into ProductionActivity and SceneBoard). Match only literal pipeline
   codes, never bare words or bare numbers: `\bminor\b` hit ordinary reviewer

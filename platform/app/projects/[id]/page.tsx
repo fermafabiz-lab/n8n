@@ -157,6 +157,17 @@ export default async function ProductionRoom({
   // producing a new draft. The panel must stay on screen showing that state —
   // it used to vanish entirely, which read as the app losing the script.
   const scriptRewriting = scriptInfo?.status === "rejected";
+  // Approval is final for the script, unlike every per-scene step. The whole
+  // film is derived from this text — chapters, scenes, narration, image
+  // prompts — so editing it after the fact would describe a film that no
+  // longer exists. Past this point the panel is a read-only record of what
+  // production was built from; redoing it means `restart-scripting`, which
+  // rewrites the scenes too.
+  //
+  // ONLY "approved" locks. An unknown or empty status has to leave the gate
+  // usable: freezing a script nobody signed off would strand the pipeline
+  // with no door at all, which is far worse than an extra Approve button.
+  const scriptLocked = scriptInfo?.status === "approved";
   const script =
     scriptInfo &&
     (scriptInfo.status === "awaiting_approval" ||
@@ -355,6 +366,7 @@ export default async function ProductionRoom({
             scriptId={script.id}
             content={script.content}
             regenerating={scriptRewriting}
+            locked={scriptLocked}
           />
         )}
 

@@ -697,6 +697,11 @@ a {
   background: var(--green);
   box-shadow: 0 0 8px rgba(74, 222, 151, 0.7);
 }
+/* The frame being inspected. Separate from .act on purpose: that one also
+   paints the blinking "generating" dot, so while selection borrowed it the
+   scene under review was the one scene whose approval light you could not
+   see. */
+.fr.sel,
 .fr.act {
   border-color: var(--amber);
   box-shadow: 0 0 0 3px rgba(245, 184, 65, 0.15);
@@ -710,6 +715,12 @@ a {
   background: var(--red);
   box-shadow: 0 0 8px rgba(240, 101, 91, 0.8);
 }
+/* Generated and waiting on a decision. Full opacity deliberately: these are
+   the frames the producer is here to act on. */
+.fr.todo .dot {
+  background: var(--dim);
+}
+/* Nothing generated yet — nothing to look at, so it recedes. */
 .fr.q {
   opacity: 0.45;
 }

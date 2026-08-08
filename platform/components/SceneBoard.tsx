@@ -14,6 +14,26 @@ import type { Scene, StatusKind } from "@/lib/data";
 import { explainRefusal } from "@/lib/refusals";
 import MediaPlayer from "@/components/MediaPlayer";
 import RegenBadge from "@/components/RegenBadge";
+import { usePendingStage } from "@/components/StageNav";
+
+/** The three steps this board can serve, in the pipeline's own order. */
+type Step = "images" | "audio" | "video";
+
+/** Has this scene signed off the asset the given step is about? */
+function approvedFor(s: Scene, step: Step): boolean {
+  return step === "images"
+    ? s.imageApproved
+    : step === "audio"
+      ? s.voiceApproved
+      : s.videoApproved;
+}
+
+/** Does the asset that step reviews exist yet? */
+function assetFor(s: Scene, step: Step): boolean {
+  return Boolean(
+    step === "images" ? s.imageUrl : step === "audio" ? s.voiceUrl : s.videoUrl,
+  );
+}
 
 const approvedRow: React.CSSProperties = {
   display: "inline-flex",
@@ -49,17 +69,25 @@ function MakeChanges({
   );
 }
 
-function frClass(kind: StatusKind): string {
-  switch (kind) {
-    case "done":
-      return "done";
-    case "run":
-      return "act";
-    case "err":
-      return "err";
-    default:
-      return "q";
-  }
+/**
+ * How a filmstrip frame reads, for the step being reviewed.
+ *
+ * It used to be derived from the Airtable status TEXT, which is display-only
+ * and lags behind the checkboxes — so a scene could sit green while its image
+ * was waiting for a decision, and the strip could not answer the one question
+ * it is looked at for: which scenes still need me? Approval is the truth, and
+ * it is per-step, so the same scene is green on Images and grey on Video.
+ *
+ * "q" (dimmed to 45%) is reserved for scenes with nothing generated yet —
+ * there is genuinely nothing to look at. A scene AWAITING a decision must
+ * stay fully legible: dimming exactly the frames that need attention is
+ * backwards, and that is what the old status mapping did.
+ */
+function frClass(s: Scene, step: Step): string {
+  if (s.statusKind === "err") return "err";
+  if (approvedFor(s, step)) return "done";
+  if (s.statusKind === "run") return "act";
+  return assetFor(s, step) ? "todo" : "q";
 }
 
 function chipClass(kind: StatusKind): string {
@@ -140,11 +168,6 @@ export default function SceneBoard({
   const active =
     scenes.find((s) => s.id === selectedId) ?? running ?? scenes[0] ?? null;
 
-  // On the Images step the image IS the thing being judged, so it stays in
-  // the monitor even for a scene whose clip already exists. Everywhere else
-  // the clip is the fuller answer and wins when there is one.
-  const showClip = focus !== "images" && Boolean(active?.videoUrl);
-
   /**
    * Which step's controls this board carries — and only that step's.
    *
@@ -154,17 +177,32 @@ export default function SceneBoard({
    * while simultaneously offering to re-record the line and re-roll the
    * picture. Each of those belongs to a page of its own, one click away.
    *
-   * `focus` is the page being looked at. On the live page there is no
-   * parameter, so the step is the first thing this scene still owes —
-   * image, then voice, then clip, which is the pipeline's own order.
+   * `focus` is the page the SERVER rendered; `pendingStage` is the page the
+   * producer just clicked. The click wins, because the round-trip re-reads
+   * Airtable and n8n before anything changes and the stale step would sit on
+   * screen for a second — which looked like the click had been ignored.
+   *
+   * With neither, this is the live page: the step is the first thing the
+   * active scene still owes — image, then voice, then clip, the pipeline's
+   * own order.
    */
-  const step: "images" | "audio" | "video" =
-    focus ??
+  const pendingStage = usePendingStage();
+  const focusNow: "images" | "video" | null =
+    pendingStage === "images" || pendingStage === "video" ? pendingStage : focus;
+  const step: Step =
+    focusNow ??
     (active && !active.imageApproved
       ? "images"
       : audioPanel && active && !active.voiceApproved
         ? "audio"
         : "video");
+
+  // The monitor shows the asset the CURRENT step is deciding on, not simply
+  // the newest one that exists. Keying this off `step` rather than `focus`
+  // also means the live page already shows the picture when the picture is
+  // what a scene still owes — so clicking "Images" changes nothing, instead
+  // of flashing the clip first.
+  const showClip = step !== "images" && Boolean(active?.videoUrl);
 
   // The two blocks this board owns. Voice lives in AudioReview, and the
   // narration itself in SceneReview — neither belongs here.
@@ -253,7 +291,11 @@ export default function SceneBoard({
             )}
             {visible.map(({ s, i }) => (
               <div
-                className={`fr ${frClass(s.statusKind)} ${s.id === active?.id ? "act" : ""}`}
+                // Selection is its own class: it used to reuse "act", which
+                // also paints the blinking amber "generating" dot — so the
+                // scene you were looking at could never show its own
+                // green/grey approval light.
+                className={`fr ${frClass(s, step)} ${s.id === active?.id ? "sel" : ""}`}
                 key={s.id}
                 onClick={() => setSelectedId(s.id)}
                 role="button"
@@ -569,7 +611,13 @@ export default function SceneBoard({
           </div>
         )}
 
-        {(unapprovedImages.length > 1 || unapprovedVideos.length > 1 || imagesMissing > 0) && (
+        {/* Bulk review belongs to ONE step, like every other control here.
+            It used to fall through a single chain of conditions, so the
+            Images step — with its last image still unreviewed, hence no
+            images branch to take — landed on "Approve all 6 videos": a
+            one-click sign-off of the entire next stage, offered from the
+            page before it. */}
+        {step === "images" && (imagesMissing > 0 || unapprovedImages.length > 1) && (
           <div className="card">
             <h5>Bulk review</h5>
             {imagesMissing > 0 ? (
@@ -579,7 +627,7 @@ export default function SceneBoard({
                 image, so nothing starts half-done. You can still approve
                 finished scenes one by one.
               </p>
-            ) : unapprovedImages.length > 1 ? (
+            ) : (
               <>
                 <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--soft)" }}>
                   All {scenes.length} images are generated, {unapprovedImages.length} still
@@ -596,7 +644,14 @@ export default function SceneBoard({
                   Approve all {unapprovedImages.length} images
                 </button>
               </>
-            ) : clipsMissing > 0 ? (
+            )}
+          </div>
+        )}
+
+        {step === "video" && (clipsMissing > 0 || unapprovedVideos.length > 1) && (
+          <div className="card">
+            <h5>Bulk review</h5>
+            {clipsMissing > 0 ? (
               <p style={{ margin: 0, fontSize: 13, color: "var(--soft)" }}>
                 {clipsMissing} video clip{clipsMissing === 1 ? " is" : "s are"} still
                 generating — bulk approval unlocks when every scene has its

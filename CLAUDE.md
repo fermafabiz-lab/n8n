@@ -774,6 +774,12 @@ on a visible 8-second grid.
   vocabularies byte-identical — the 2026-08 editorial rebuild moved them into
   hidden inputs bound to React state, nothing more. Every non-submit button
   inside the form must carry `type="button"`.
+- **A step you stepped back to must show ITS OWN asset.** `SceneBoard`'s
+  monitor played the clip whenever one existed, so revisiting Images put a
+  video player over the picture being judged — the wrong asset for the
+  decision. `focus` (from the `?stage=` param) keeps the image in the monitor
+  on the Images step; everywhere else the clip still wins, because there it is
+  the fuller answer.
 - **Approval used to be one-way, and "Make changes" is the door back.** Every
   control in a step is gated on the scene NOT being approved, so signing off
   froze it — however wrong it turned out three steps later. `reopenStep()`
@@ -782,8 +788,11 @@ on a visible 8-second grid.
   scene approved" gates reopen with them, so the pipeline needed no change at
   all. Only the named scene is touched, so the batch gets exactly one piece
   of outstanding work and the rest of the film keeps its sign-off. What
-  cascades is what was derived from the changed thing — line → voice + video,
-  image → video, voice → video, clip → nothing. It deliberately does NOT
+  cascades is what was derived from the changed thing — the scene step owns
+  BOTH the narration and the image prompt, so it invalidates image + voice +
+  video; image → video, voice → video, clip → nothing. `saveSceneScript`
+  applies the same rule without any button: a changed image prompt un-approves
+  the picture, a changed line re-records the take. It deliberately does NOT
   start a regeneration: reopening means "this needs another look", and the
   producer then picks what to change. The initial script has no such button:
   it is written for the whole project, not per scene, and `restart-scripting`

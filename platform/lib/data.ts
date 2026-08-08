@@ -753,8 +753,14 @@ export async function writeSceneFeedback(sceneId: string, feedback: string): Pro
  */
 export async function readSceneNarration(
   sceneId: string,
-): Promise<{ narration: string; hasVoice: boolean }> {
-  if (!isConfigured) return { narration: "", hasVoice: false };
+): Promise<{
+  narration: string;
+  hasVoice: boolean;
+  imagePrompt: string;
+  imageApproved: boolean;
+}> {
+  if (!isConfigured)
+    return { narration: "", hasVoice: false, imagePrompt: "", imageApproved: false };
   const res = await fetch(
     `https://api.airtable.com/v0/${BASE_ID}/${encodeURIComponent(SCENES_TABLE)}/${sceneId}`,
     { headers: { Authorization: `Bearer ${API_KEY}` }, cache: "no-store" },
@@ -765,6 +771,8 @@ export async function readSceneNarration(
   return {
     narration: String(f["Script Scenă"] ?? ""),
     hasVoice: Boolean(f["Voiceover URL"]),
+    imagePrompt: String(f["Imagine First Frame"] ?? ""),
+    imageApproved: Boolean(f["Aprobare Imagine"]),
   };
 }
 

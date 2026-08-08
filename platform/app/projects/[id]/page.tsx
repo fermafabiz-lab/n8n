@@ -424,6 +424,11 @@ export default async function ProductionRoom({
             projectId={id}
             scenes={scenes}
             portrait={project.aspect === "9:16"}
+            // Which step the producer is actually looking at. Without it the
+            // monitor always played the clip once one existed, so stepping
+            // back to Images showed a video player instead of the image being
+            // reviewed.
+            focus={viewing === "images" ? "images" : viewing === "video" ? "video" : null}
           />
         ) : null}
 

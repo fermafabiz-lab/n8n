@@ -45,12 +45,28 @@ of references** — `Execute Media Generation (Resume)` and `Execute Final
 Assembly (Resume)`, fed by the `resume-project` webhook. Fixing only the three
 on the happy path leaves Pause/Resume broken while new projects look fine.
 
+**`restart-scripting` does not exist yet, and the site already calls it.**
+`resume-project` enters the pipeline at Media Generation, because it was
+built for a project whose scenes exist. A run that dies while the script is
+still being WRITTEN therefore has no way back: Pause stops it, and nothing
+can start it again. The site now shows "⟳ Restart writing" for that phase and
+posts `{project_id}` to `restart-scripting`; until the webhook exists the
+button answers with exactly that, rather than failing silently.
+
+To build it in the Master Orchestrator (`8CienBFfG6SgbB1A`), mirroring the
+resume path: a `Webhook` node on path `restart-scripting` → an Airtable
+`get` on Proiecte by `{{ $json.body.project_id }}` → `Execute Workflow`
+pointing at Claude Scripting (`gkEtGMecv4TC3ZHp`) with the same input mapping
+`Execute Scripting Sub-Workflow` uses → then into `Fetch Project Status`, so
+the run continues into media generation exactly as a new project does.
+
 There is also an inactive legacy `2. Scripting Sub-Workflow`
 (`5YWpycnnL6OaDWIx`) — superseded by Claude Scripting, referenced by nothing.
 Leave it alone or archive it; do not repoint anything at it.
 
 Webhooks the site calls: `new-project`, `resume-project`, `scene-text-regen`,
-`scene-image-regen`, `scene-voice-regen`, `assemble`. The site derives all of
+`scene-image-regen`, `scene-voice-regen`, `assemble`, and `restart-scripting`
+(**still to be built** — see below). The site derives all of
 them from `N8N_NEW_PROJECT_WEBHOOK_URL`, so they must live on the same host.
 
 Run `node scripts/check-n8n.mjs` (needs `N8N_API_URL` + `N8N_API_KEY`) to

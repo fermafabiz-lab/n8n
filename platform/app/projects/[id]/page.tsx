@@ -195,13 +195,20 @@ export default async function ProductionRoom({
                 ? "video-review"
                 : "working";
 
+  // Which half of the pipeline the project is in. Before any scene exists it
+  // is still being WRITTEN, and the two halves restart through different
+  // doors — production resumes at media generation, which has nothing to do
+  // when there are no scenes yet.
+  const writing = scenes.length === 0 || scenes.every((s) => !s.sceneApproved);
+
   // Stalled: the pipeline should be producing (nothing waits on the user)
-  // but no n8n execution is running and the project isn't finished.
-  const stalled =
-    n8nConfigured &&
-    !hasRunning &&
-    stage === "working" &&
-    scenes.length > 0;
+  // but no n8n execution is running and the project isn't finished. A project
+  // in its first couple of minutes is excluded — scripting takes a moment to
+  // spawn its execution, and a watchdog that fires into that gap would
+  // restart the writing of a project that was never broken.
+  const settledIn =
+    !project.updatedAt || Date.now() - new Date(project.updatedAt).getTime() > 2 * 60_000;
+  const stalled = n8nConfigured && !hasRunning && stage === "working" && settledIn;
 
   return (
     <main className="page">
@@ -257,8 +264,13 @@ export default async function ProductionRoom({
               {project.tone && <span>{project.tone}</span>}
             </div>
           </div>
-          {project.statusKind !== "done" && scenes.length > 0 && (
-            <ResumeButton projectId={id} running={hasRunning} />
+          {project.statusKind !== "done" && (
+            <ResumeButton
+              projectId={id}
+              running={hasRunning}
+              phase={writing ? "scripting" : "production"}
+              hasScenes={scenes.length > 0}
+            />
           )}
         </div>
 

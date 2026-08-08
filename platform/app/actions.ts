@@ -755,6 +755,65 @@ export async function deleteProjects(projectIds: string[]): Promise<ActionResult
   }
 }
 
+/**
+ * Restart the WRITING of a project — the script, and the split of each
+ * chapter into scenes.
+ *
+ * resumeProject cannot do this: the orchestrator's resume path enters at
+ * media generation, because it was built for a project whose scenes already
+ * exist. A run that dies while the script is still being written therefore
+ * had no way back at all — Pause could stop it, and then nothing could start
+ * it again. This is the missing half.
+ *
+ * Scripting rewrites the project's script and scenes, so it is only offered
+ * before any scene has been approved; past that point the production resume
+ * is the right door and this one would throw away reviewed work.
+ */
+export async function restartScripting(projectId: string): Promise<ActionResult> {
+  const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
+  const webhook =
+    process.env.N8N_RESTART_SCRIPTING_WEBHOOK_URL ??
+    newProject?.replace(/new-project\/?$/, "restart-scripting");
+  if (!webhook || !webhook.includes("restart-scripting")) {
+    return { ok: false, message: "N8N_NEW_PROJECT_WEBHOOK_URL is not configured." };
+  }
+  try {
+    const alive = await getAliveProduction().catch(() => []);
+    if (alive.length > 0) {
+      return {
+        ok: false,
+        message:
+          "Something is still running in n8n — pause it first, then restart the script.",
+      };
+    }
+    for (const dead of await getStalledProduction().catch(() => [])) {
+      await stopExecution(dead.id).catch(() => {});
+    }
+    const res = await fetch(webhook, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project_id: projectId }),
+      signal: AbortSignal.timeout(15000),
+    });
+    if (res.status === 404) {
+      return {
+        ok: false,
+        message:
+          "n8n has no „restart-scripting” webhook yet — add it to the Master Orchestrator (fetch the project, then Execute Scripting), and this button starts working.",
+      };
+    }
+    if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message:
+        "Writing restarted — the script and its scenes are being produced again. This page refreshes itself.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
 export async function resumeProject(projectId: string): Promise<ActionResult> {
   const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
   const webhook =

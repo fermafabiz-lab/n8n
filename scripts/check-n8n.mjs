@@ -52,6 +52,10 @@ const EXPECTED_WEBHOOKS = [
 	'assemble',
 ];
 
+// Called by the site but not built yet — reported as a gap, not a failure,
+// so the check stays green until it is deliberately added.
+const PLANNED_WEBHOOKS = ['restart-scripting'];
+
 // Credentials are encrypted per-instance and NEVER survive an export/import.
 const EXPECTED_CREDENTIAL_TYPES = [
 	'airtableTokenApi',
@@ -133,6 +137,13 @@ async function main() {
 	for (const p of EXPECTED_WEBHOOKS) {
 		if (paths.has(p)) ok.push(`Webhook /${p} registered.`);
 		else problems.push(`Webhook /${p} is missing — the site calls ${host}/webhook/${p}.`);
+	}
+	for (const p of PLANNED_WEBHOOKS) {
+		if (paths.has(p)) ok.push(`Webhook /${p} registered.`);
+		else
+			warnings.push(
+				`Webhook /${p} not built yet — the site's "Restart writing" button will say so. See CLAUDE.md.`,
+			);
 	}
 
 	// 4. Execute Workflow nodes actually point at ids that exist here. This is

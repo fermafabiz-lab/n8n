@@ -45,29 +45,50 @@ of references** — `Execute Media Generation (Resume)` and `Execute Final
 Assembly (Resume)`, fed by the `resume-project` webhook. Fixing only the three
 on the happy path leaves Pause/Resume broken while new projects look fine.
 
-**`restart-scripting` does not exist yet, and the site already calls it.**
-`resume-project` enters the pipeline at Media Generation, because it was
-built for a project whose scenes exist. A run that dies while the script is
-still being WRITTEN therefore has no way back: Pause stops it, and nothing
-can start it again. The site now shows "⟳ Restart writing" for that phase and
-posts `{project_id}` to `restart-scripting`; until the webhook exists the
-button answers with exactly that, rather than failing silently.
+**`restart-scripting` now exists** (built 2026-08-08, orchestrator
+`8CienBFfG6SgbB1A`). `resume-project` enters the pipeline at Media
+Generation, because it was built for a project whose scenes exist. A run that
+dies while the script is still being WRITTEN therefore had no way back: Pause
+stopped it, and nothing could start it again. The site shows "⟳ Restart
+writing" for that phase and posts `{project_id}` to `restart-scripting`.
 
-To build it in the Master Orchestrator (`8CienBFfG6SgbB1A`), mirroring the
-resume path: a `Webhook` node on path `restart-scripting` → an Airtable
-`get` on Proiecte by `{{ $json.body.project_id }}` → `Execute Workflow`
-pointing at Claude Scripting (`gkEtGMecv4TC3ZHp`) with the same input mapping
-`Execute Scripting Sub-Workflow` uses → then into `Fetch Project Status`, so
-the run continues into media generation exactly as a new project does.
+The chain is **self-contained**, nine nodes on their own canvas row:
+
+```
+Restart Scripting Webhook → Fetch Project For Restart → Prepare Restart Data
+  → Execute Scripting (Restart) → Fetch Project Status (Restart)
+  → Check Script Status (Restart) → Execute Media Generation (Restart)
+  → Execute Final Assembly (Restart) → Mark Finished (Restart)
+```
+
+**It could not simply join the happy path**, which is what the plan here used
+to say ("→ then into `Fetch Project Status`"). Every node in that tail —
+`Fetch Project Status`, `Execute Media Generation (Batch)`, `Execute Final
+Assembly`, `Update Status to Finished` — identifies the project as
+`$("Create Project in Airtable").item.json.id`. On a restart that node never
+executes, so the expression throws and the run dies one step after scripting.
+The resume path had already solved this by duplicating the tail off
+`$('Fetch Project For Resume')`; restart does the same off
+`$('Fetch Project For Restart')`. **Any third entry point needs its own tail
+for the same reason** — the shared tail is only shareable by the form.
+
+Two consequences worth knowing: `Lore` is passed empty, because it arrives
+with the creation form and is never stored on the project, so a restart
+cannot recover it; and restart re-runs Claude Scripting from the top, so it
+rewrites the script and its scenes. The site only offers it before any scene
+is approved — past that point Resume is the right door.
 
 There is also an inactive legacy `2. Scripting Sub-Workflow`
 (`5YWpycnnL6OaDWIx`) — superseded by Claude Scripting, referenced by nothing.
 Leave it alone or archive it; do not repoint anything at it.
 
-Webhooks the site calls: `new-project`, `resume-project`, `scene-text-regen`,
-`scene-image-regen`, `scene-voice-regen`, `assemble`, and `restart-scripting`
-(**still to be built** — see below). The site derives all of
-them from `N8N_NEW_PROJECT_WEBHOOK_URL`, so they must live on the same host.
+Webhooks the site calls: `new-project`, `resume-project`, `restart-scripting`
+(all three on the Master Orchestrator), `scene-text-regen`,
+`scene-image-regen`, `scene-voice-regen` (all three on Claude Scripting) and
+`assemble`. The site derives all of them from `N8N_NEW_PROJECT_WEBHOOK_URL`
+by string-replacing the last path segment, so they must live on the same host
+— and each new one must be a plain `path` with no path parameters, or the
+derived URL will not resolve.
 
 Run `node scripts/check-n8n.mjs` (needs `N8N_API_URL` + `N8N_API_KEY`) to
 verify all of the above in one shot — ids, active state, webhooks, every
@@ -169,6 +190,17 @@ These each cost hours. Do not rediscover them.
   the render built from zero-length scenes, and scripting computing chapter
   counts from a length of 0. If you add a mapped field, either give it a value
   or take it out of the mapping. Nothing warns you.
+- **A sixteenth one survived that sweep, and it was the worst placed:**
+  `Update Status to Finished` (Master Orchestrator) mapped `Lenght: 0`
+  *explicitly*, not as an empty cell — so every project that reached the end
+  of the happy path had its length wiped at the finish line. Silent while the
+  project stayed finished, and lethal the moment it was restarted: scripting
+  derives chapter count from `ceil(Lenght / 120)` and scene math from the
+  same number, so a restarted film would be written against a length of 0.
+  Removed 2026-08-08 while building `restart-scripting` — which is exactly
+  the feature that would have made the damage visible. `Mark Finished
+  (Resume)` and `Mark Finished (Restart)` map only `id` + `Status General`,
+  and must stay that way.
 
 ### The batch cap
 
@@ -754,6 +786,21 @@ expected and harmless for an app touching only its own Drive.
 
 ## Open work
 
+- **The OpenAI account is out of credits, and that is what stops the
+  pipeline today** — not any workflow defect. Execution 1783 (2026-08-08,
+  project "Death cominig up to take someone into the underworld",
+  `recCoZWsZBOrIU69L`) died at `Rebuild Story Bible` with *"You have no
+  credits remaining"*, after the script had been written, edited and
+  approved. Every writing path shares that account: the six langchain model
+  nodes (`Story Bible / Outline / Narration / Segment / Hook / Research
+  Model`) and the three raw HTTP calls (`Rewrite Script`, `Rewrite Scene
+  Text`, `Rewrite Scene Standalone`). So whole-script writing AND per-scene
+  rewriting are both dead until the account is topped up, and both fail in a
+  way that reads like a broken button. Per-scene regen at least fails
+  honestly — `Mark Scene Regen Failed` writes the reason into `Observații
+  Scenă` and releases the "Regenerare Text" status, so nothing hangs.
+  That project is mid-flight: Story Bible and approved script exist, no
+  chapters and no scenes. `restart-scripting` is the door back in.
 - **Ask Dan for `hookTitle`.** Scripting should write a 3-6 word line meant
   for the screen and n8n should pass it in `Build Remotion Props`; the prop
   already exists and bypasses the isTitleLike gate. Until then, projects whose

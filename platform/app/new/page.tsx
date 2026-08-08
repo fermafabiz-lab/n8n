@@ -95,7 +95,9 @@ const FINISHES: Array<{
 const VOICE_LABELS: Record<string, string> = {
   silent: "None — silent film",
   off: "Single narrator",
-  characters: "Character cast",
+  // Same name the mode is offered under in the form — the preview must not
+  // invent a second one for it.
+  characters: "Dialogue",
   chapters: "Narrator per chapter",
 };
 

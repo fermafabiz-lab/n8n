@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { confirmFinalSettings, type ActionResult } from "@/app/actions";
 import Toggle from "@/components/Toggle";
+import { useSetPendingStage } from "@/components/StageNav";
 import type { EditingOptions } from "@/lib/data";
 
 /**
@@ -79,9 +81,24 @@ export default function FinalSettings({
   const changedKeys = OPTIONS.filter((o) => opts[o.key] !== initial[o.key]);
   const changed = changedKeys.length > 0;
   const done = msg?.ok === true;
+  const router = useRouter();
+  const setPendingStage = useSetPendingStage();
 
-  const run = (fn: () => Promise<ActionResult>) =>
-    startTransition(async () => setMsg(await fn()));
+  /**
+   * Confirming is the last decision on this screen — the project leaves this
+   * gate the moment it succeeds. Staying put showed a panel that no longer
+   * had a job while the render it had just started was invisible one step
+   * away, so it carries the producer to Assembly itself.
+   */
+  const confirm = () =>
+    startTransition(async () => {
+      const r = await confirmFinalSettings(projectId, changed ? opts : undefined);
+      setMsg(r);
+      if (r.ok) {
+        setPendingStage("assembly");
+        router.push(`/projects/${projectId}?stage=assembly`, { scroll: false });
+      }
+    });
 
   return (
     <div
@@ -155,9 +172,7 @@ export default function FinalSettings({
         <button
           className="btn gold"
           disabled={pending || done}
-          onClick={() =>
-            run(() => confirmFinalSettings(projectId, changed ? opts : undefined))
-          }
+          onClick={confirm}
           style={{ fontSize: 14, padding: "11px 20px" }}
         >
           {done

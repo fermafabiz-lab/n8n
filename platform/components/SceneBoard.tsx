@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import {
   approveAllOfKind,
+  regenerateSceneText,
   regenerateVoice,
   saveImagePrompt,
   sceneAction,
@@ -391,6 +392,8 @@ export default function SceneBoard({
                 />
                 {active.regenVoice ? (
                   <RegenBadge label="Regenerating voice…" note={active.note} />
+                ) : active.rewriteRequested ? (
+                  <RegenBadge label="Rewriting the line…" note={active.note} />
                 ) : (
                   <div className="abtns" style={{ marginTop: 8 }}>
                     <button
@@ -408,11 +411,27 @@ export default function SceneBoard({
                     >
                       🎙 Regenerate voice
                     </button>
+                    {/*
+                      Going back a step from here. The writing stage is long
+                      past by the time anyone hears that a line is wrong, and
+                      until now the only way back was to type a replacement by
+                      hand. n8n re-reads the new line automatically, so this
+                      cannot leave text and audio disagreeing.
+                    */}
+                    <button
+                      className="abtn"
+                      disabled={pending}
+                      onClick={() => run(() => regenerateSceneText(projectId, active.id))}
+                    >
+                      ✎ Rewrite the line (AI)
+                    </button>
                   </div>
                 )}
                 <p style={{ margin: "6px 0 0", fontSize: 11.5, color: "var(--dim)" }}>
-                  New voice is synthesized from the text above and re-muxed onto
-                  the existing clip — image and video are NOT regenerated.
+                  Both re-record the voice and re-mux it onto the existing clip
+                  — image and video are NOT regenerated. Editing the text above
+                  and saving it anywhere else also re-records, so the take can
+                  never drift from the line.
                 </p>
               </div>
             )}

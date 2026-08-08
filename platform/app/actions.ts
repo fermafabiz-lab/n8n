@@ -12,6 +12,7 @@ import {
   writeSceneFields,
   requestSceneRewrite,
   releaseSceneRewrite,
+  readSceneNarration,
   findRecentProjectByName,
   writeScriptFields,
   requestVoiceRegen,
@@ -181,13 +182,35 @@ export async function saveSceneScript(
     return { ok: true, message: "Demo mode — nothing was written." };
   }
   try {
+    // Read BEFORE writing: if this edit changes a line that has already been
+    // read aloud, the existing take now says something else. The media batch
+    // never re-records over an existing voiceover, and nothing compares the
+    // two, so left alone the scene keeps a narration and an audio track that
+    // disagree — visible only by listening to the whole film.
+    const before = await readSceneNarration(sceneId).catch(() => null);
+    const staleVoice =
+      before !== null &&
+      before.hasVoice &&
+      narration.trim() !== "" &&
+      narration.trim() !== before.narration.trim();
+
     await writeSceneScript(sceneId, { narration, imagePrompt, approve });
+
+    if (staleVoice) {
+      // Same door the audio panel uses — saves the line and re-reads it.
+      await regenerateVoice(projectId, sceneId, narration);
+    }
+
     revalidatePath(`/projects/${projectId}`);
+    const suffix = staleVoice
+      ? " The line changed after it had been recorded, so the voice is being read again."
+      : "";
     return {
       ok: true,
-      message: approve
-        ? "Scene approved — production continues once every scene is approved."
-        : "Scene saved.",
+      message:
+        (approve
+          ? "Scene approved — production continues once every scene is approved."
+          : "Scene saved.") + suffix,
     };
   } catch (e) {
     return { ok: false, message: friendlyError(e) };

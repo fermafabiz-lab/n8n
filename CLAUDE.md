@@ -871,6 +871,18 @@ expected and harmless for an app touching only its own Drive.
   `voice_id`, which beats every mode rule in `VR Pick Voice` for that one
   synthesis. The batch never overwrites an existing voiceover, so the pin
   sticks.
+- **A line and its recording drift apart silently, and that same "never
+  overwrite" rule is why.** The take is synthesized from `Script Scenă`;
+  nothing downstream ever compares the two again. So any path that rewrote
+  the text after the audio existed left the film saying one thing and showing
+  another — visible only by watching the whole cut, which is exactly how it
+  was found. Three writers now all invalidate the voice, and only when a take
+  actually exists (a scene not yet voiced needs no flag; a cinematic project
+  has no speech): `requestVoiceRegen` already did, `saveSceneScript` now
+  reads the old line first and re-records when it changed, and n8n's `Write
+  Scene Rewrite` sets `Regenerează Voce` when `Voiceover URL` is present.
+  **Any fourth writer of `Script Scenă` must do the same** — grep for it
+  before adding one.
 - **Auto-assembly has NEVER fired on wf7** — every Final Assembly execution
   is `mode: webhook`. The batch's settings gate (15s Wait loop) dies rather
   than release, proven again on the first cinematic project. **Bypassed, not

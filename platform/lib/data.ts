@@ -740,6 +740,34 @@ export async function writeSceneFeedback(sceneId: string, feedback: string): Pro
   await airtablePatch(SCENES_TABLE, sceneId, { "Observații Scenă": feedback });
 }
 
+/**
+ * The narration a scene currently holds, and whether a take has already been
+ * read of it.
+ *
+ * Needed BEFORE writing new text: the voiceover is synthesized from
+ * "Script Scenă", the media batch never overwrites a voiceover that already
+ * exists, and nothing anywhere compares the two afterwards. So an edit made
+ * after the audio was recorded desynchronizes the film permanently and in
+ * silence — the page keeps showing the new line while the take says the old
+ * one. Reading the previous value is what lets the caller notice.
+ */
+export async function readSceneNarration(
+  sceneId: string,
+): Promise<{ narration: string; hasVoice: boolean }> {
+  if (!isConfigured) return { narration: "", hasVoice: false };
+  const res = await fetch(
+    `https://api.airtable.com/v0/${BASE_ID}/${encodeURIComponent(SCENES_TABLE)}/${sceneId}`,
+    { headers: { Authorization: `Bearer ${API_KEY}` }, cache: "no-store" },
+  );
+  if (!res.ok) throw new Error(`Airtable ${res.status}: ${await res.text()}`);
+  const rec = (await res.json()) as { fields?: Record<string, unknown> };
+  const f = rec.fields ?? {};
+  return {
+    narration: String(f["Script Scenă"] ?? ""),
+    hasVoice: Boolean(f["Voiceover URL"]),
+  };
+}
+
 // Scene-script review: edits land in the same fields n8n reads after the
 // "Aprobare Scenă" gate, so approved text/prompts flow straight to TTS and
 // image generation.

@@ -119,67 +119,76 @@ export const GENRES: Genre[] = [
 const RINGS = [...GENRES, ...GENRES];
 
 /**
- * The strand, as a real helix.
+ * The strand, as a real helix — and as ONE continuous film strip.
  *
- * A band is a film strip riding a helical path: it swings left and right as
- * the strand turns, faces the viewer at the front, turns edge-on at the
- * sides, and LEANS along the direction the strand is travelling. That lean is
- * the whole difference between a helix and a stack of hoops — the previous
- * version rotated bands about their own centres at a fixed horizontal angle,
- * which is why it read as images going round a circle rather than as a strand
- * going somewhere.
+ * Every band is a whole video, and consecutive bands touch: a band is not
+ * placed at a point of the path but spans the SEGMENT between its own point
+ * and the next one, so the strip has no seams to leave gaps in. The helix is
+ * then drawn purely by the direction each segment points — which is what the
+ * strand is supposed to read as.
  *
- * The lean is not a constant: it is the tangent of the path, steepest where
- * the strand crosses the middle and flattest at the far left and right where
- * it turns around — the way a drawn DNA backbone behaves.
+ * Two things had to go for that to hold, and both are gaps waiting to happen:
+ * the per-band `rotateY` twist (a turned band is foreshortened, so it no
+ * longer reaches its neighbour) and the per-band depth `scale` (two adjacent
+ * bands at different scales cannot share an edge). Depth is carried by
+ * brightness and stacking order instead, which cost no length.
  */
 const RADIUS = 80; // px — half the strand's width on screen
 /** Vertical rise per radian of turn: RADIUS/RISE sets the steepest lean. */
 const RISE = 56; // atan(80/56) ≈ 55°, inside the 45-60° the strand should read at
-const BAND_W = 112; // px, the length of one strip along the path
-const BAND_H = 48; // px, its width across the path
-const SLICES = 12;
-/** Fourteen bands per turn: short enough steps that they overlap into a
- *  continuous ribbon rather than a dotted line of tiles. */
+const BAND_H = 48; // px, the width of the strip across its own path
+/** Fourteen bands per turn. */
 const TURN_PER_BAND = (2 * Math.PI) / 14;
-/** How far a band turns away from the viewer at the sides of the strand. */
-const TWIST = 46;
-/** Arc the band bends through, in degrees — a gentle curve, not a curl. */
-const ARC = 84;
 
-const ARC_LEN = BAND_W;
-const SLICE_W = ARC_LEN / SLICES;
-const BEND_R = ARC_LEN / ((ARC * Math.PI) / 180);
 const SPAN = RINGS.length * TURN_PER_BAND * RISE;
 
-/** Where a band sits, and which way it leans, at a point of its descent. */
-function poseAt(p: number) {
+/** A point of the path, at fraction p of the descent. */
+function pointAt(p: number) {
   const a = p * RINGS.length * TURN_PER_BAND;
+  return { x: Math.sin(a) * RADIUS, y: p * SPAN, depth: Math.cos(a) };
+}
+
+/**
+ * The band's own length, fixed. It is the LONGEST segment the path produces
+ * (steepest lean, where horizontal and vertical travel add up); every other
+ * segment is reached by scaling this length DOWN along the strip's own axis,
+ * so a band always covers its segment exactly and never falls short.
+ */
+const STEP = 1 / RINGS.length;
+const BAND_W = (() => {
+  let max = 0;
+  for (let i = 0; i < RINGS.length; i++) {
+    const a = pointAt(i * STEP);
+    const b = pointAt((i + 1) * STEP);
+    max = Math.max(max, Math.hypot(b.x - a.x, b.y - a.y));
+  }
+  return Math.ceil(max) + 1; // +1: a hairline of overlap beats a hairline of gap
+})();
+
+/** Where the band covering the segment starting at p sits, and how it lies. */
+function poseAt(p: number) {
+  const a = pointAt(p);
+  const b = pointAt(p + STEP);
+  const len = Math.hypot(b.x - a.x, b.y - a.y);
   return {
-    x: Math.sin(a) * RADIUS,
-    y: -BAND_W + p * SPAN,
-    depth: Math.cos(a), // +1 at the front of the strand, -1 behind it
-    // dx/dy of the path: the direction of travel, which the band lies along.
-    lean: (Math.atan2(Math.cos(a) * RADIUS, RISE) * 180) / Math.PI,
-    // NOT the full turn. A band twisted a full 360° goes edge-on at the far
-    // left and right, vanishing to a sliver — which is what left gaps in the
-    // strand. Swinging ±TWIST instead keeps every video facing the viewer
-    // enough to be seen, while still reading as a strip that turns.
-    twist: TWIST * Math.sin(a),
+    // The segment's midpoint — the band is centred on what it covers.
+    x: (a.x + b.x) / 2,
+    y: -BAND_H + (a.y + b.y) / 2,
+    depth: (a.depth + b.depth) / 2, // +1 at the front of the strand, -1 behind
+    // The direction of travel. This angle, alternating as the path swings
+    // left and right, is the only thing drawing the helix.
+    lean: (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI,
+    // Shrink along the strip's own axis so its ends land on the segment's
+    // ends. Never grow: the band is cut to the longest case.
+    squeeze: (len + 1) / BAND_W,
   };
 }
 
 const transformFor = (p: number) => {
-  const { x, y, lean, twist, depth } = poseAt(p);
-  const scale = 0.8 + 0.2 * (0.5 + 0.5 * depth);
-  // Order matters, and getting it wrong is what turned the strand into
-  // scattered chips: the face has to be aimed outward from the strand's axis
-  // FIRST, in world space, and only then leaned along the path within its own
-  // plane. Leaning first makes the twist happen about a tilted axis, which
-  // throws every band to a different arbitrary angle.
+  const { x, y, lean, squeeze } = poseAt(p);
   return (
     `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0) ` +
-    `scale(${scale.toFixed(3)}) rotateY(${twist.toFixed(1)}deg) rotate(${lean.toFixed(1)}deg)`
+    `rotate(${lean.toFixed(1)}deg) scaleX(${squeeze.toFixed(4)})`
   );
 };
 
@@ -189,41 +198,26 @@ const brightnessAt = (depth: number) => 0.45 + 0.55 * (0.5 + 0.5 * depth);
  * Generated, not hand-written: the keyframes have to trace the same path as
  * the resting pose, or the position a prefers-reduced-motion user sees —
  * animations are stripped globally — would not match the motion.
+ *
+ * The step count is a multiple of the band count on purpose. The tiling is
+ * exact only where a keyframe lands on a segment boundary; between two stops
+ * CSS interpolates the transform linearly, and a coarse grid would let the
+ * strip breathe apart mid-tween.
  */
 const KEYFRAMES = (() => {
   const stops: string[] = [];
-  const STEPS = 72;
+  const STEPS = RINGS.length * 4;
   for (let i = 0; i <= STEPS; i++) {
     const p = i / STEPS;
     const { depth } = poseAt(p);
     stops.push(
-      `${(p * 100).toFixed(2)}%{transform:${transformFor(p)};` +
+      `${(p * 100).toFixed(3)}%{transform:${transformFor(p)};` +
         `filter:brightness(${brightnessAt(depth).toFixed(3)});` +
         `z-index:${depth >= 0 ? 2 : 1}}`,
     );
   }
   return `@keyframes gspiral{${stops.join("")}}`;
 })();
-
-/** One facet of the band's gentle bend, carrying its slab of the still. */
-function Slice({ image, index }: { image: string; index: number }) {
-  const deg = -ARC / 2 + (index + 0.5) * (ARC / SLICES);
-  const facing = Math.cos((deg * Math.PI) / 180);
-  return (
-    <i
-      className="gsslice"
-      style={{
-        width: SLICE_W + 1,
-        marginLeft: -(SLICE_W + 1) / 2,
-        transform: `rotateY(${deg.toFixed(2)}deg) translateZ(${BEND_R.toFixed(1)}px)`,
-        backgroundImage: image,
-        backgroundSize: `${ARC_LEN.toFixed(1)}px 100%`,
-        backgroundPosition: `${(-index * SLICE_W).toFixed(1)}px center`,
-        filter: `brightness(${(0.6 + 0.4 * facing ** 2).toFixed(3)})`,
-      }}
-    />
-  );
-}
 
 export default function GenreSpiral({ speedSeconds = 70 }: { speedSeconds?: number }) {
   return (
@@ -233,9 +227,6 @@ export default function GenreSpiral({ speedSeconds = 70 }: { speedSeconds?: numb
         {RINGS.map((g, i) => {
           const p = i / RINGS.length;
           const pose = poseAt(p);
-          const image = HAS_STILLS
-            ? `url(/genres/${g.slug}.webp), ${g.gradient}`
-            : g.gradient;
           return (
             <span
               key={`${g.slug}-${i}`}
@@ -244,6 +235,10 @@ export default function GenreSpiral({ speedSeconds = 70 }: { speedSeconds?: numb
                 width: BAND_W,
                 height: BAND_H,
                 marginLeft: -BAND_W / 2,
+                marginTop: -BAND_H / 2,
+                backgroundImage: HAS_STILLS
+                  ? `url(/genres/${g.slug}.webp), ${g.gradient}`
+                  : g.gradient,
                 // The resting pose lives on the element as well as in the
                 // keyframes — see KEYFRAMES.
                 transform: transformFor(p),
@@ -252,11 +247,7 @@ export default function GenreSpiral({ speedSeconds = 70 }: { speedSeconds?: numb
                 animationDelay: `${(-p * speedSeconds).toFixed(2)}s`,
                 animationDuration: `${speedSeconds}s`,
               }}
-            >
-              {Array.from({ length: SLICES }, (_, k) => (
-                <Slice key={k} image={image} index={k} />
-              ))}
-            </span>
+            />
           );
         })}
       </div>

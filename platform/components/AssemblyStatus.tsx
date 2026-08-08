@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { retryAssembly, type ActionResult } from "@/app/actions";
+import { useRouter } from "next/navigation";
+import { retryAssembly, stopAssembly, type ActionResult } from "@/app/actions";
+import { useSetPendingStage } from "@/components/StageNav";
 
 /**
  * What the final render is doing, in plain language.
@@ -92,7 +94,16 @@ export default function AssemblyStatus({
   const elapsed = useElapsed(startedAt);
   const [msg, setMsg] = useState<ActionResult | null>(null);
   const [pending, setPending] = useState(false);
+  const [confirmStop, setConfirmStop] = useState(false);
   const settled = useSettled(projectId, missing || !!failure);
+  const router = useRouter();
+  const setPendingStage = useSetPendingStage();
+
+  /** Back to the gate this render came from, to change what gets drawn. */
+  const backToFinal = () => {
+    setPendingStage("final");
+    router.push(`/projects/${projectId}?stage=final`, { scroll: false });
+  };
 
   // A render is minutes, not tens of minutes. Past that something is wrong
   // even though n8n still calls the execution "running".
@@ -109,6 +120,22 @@ export default function AssemblyStatus({
     setPending(true);
     setMsg(await retryAssembly(projectId));
     setPending(false);
+  };
+
+  /**
+   * Call the render off. Stopping is what makes leaving this screen safe:
+   * `confirmFinalSettings` fires the assemble webhook itself, so returning to
+   * Final touches with a render still alive and pressing render again would
+   * put two executions on the same project. Two-step on purpose — a stray
+   * click here throws away minutes of rendering.
+   */
+  const stop = async () => {
+    setPending(true);
+    const r = await stopAssembly(projectId);
+    setMsg(r);
+    setPending(false);
+    setConfirmStop(false);
+    if (r.ok) backToFinal();
   };
 
   return (
@@ -176,6 +203,40 @@ export default function AssemblyStatus({
               is worth restarting the render below.
             </p>
           )}
+          {/* The way out of the locked stepper. Rendering does not care what
+              you look at — it runs in n8n — but pressing render again from
+              Final touches would start a second one, so the stop and the
+              door back are the same button. */}
+          <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 16 }}>
+            {confirmStop ? (
+              <>
+                <button className="btn" disabled={pending} onClick={stop}>
+                  {pending ? "…" : "Yes, stop it"}
+                </button>
+                <button
+                  className="btn"
+                  disabled={pending}
+                  onClick={() => setConfirmStop(false)}
+                >
+                  Keep rendering
+                </button>
+                <span style={{ fontSize: 12, color: "var(--dim)" }}>
+                  The render is thrown away and the project goes back to Final
+                  touches. Clips, takes and approvals are untouched.
+                </span>
+              </>
+            ) : (
+              <>
+                <button className="btn" onClick={() => setConfirmStop(true)}>
+                  ■ Stop the render
+                </button>
+                <span style={{ fontSize: 12, color: "var(--dim)" }}>
+                  The other steps are locked while this runs — stop it to go
+                  back and change anything.
+                </span>
+              </>
+            )}
+          </div>
         </>
       )}
 
@@ -205,10 +266,27 @@ export default function AssemblyStatus({
       )}
 
       {(broken || slow) && (
-        <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 14 }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 10,
+            alignItems: "center",
+            flexWrap: "wrap",
+            marginTop: 14,
+          }}
+        >
           <button className="btn gold" disabled={pending} onClick={retry}>
             {pending ? "…" : "↻ Restart the render"}
           </button>
+          {/* A failed render is often a failed SETTING — captions, an end
+              screen, a track that isn't there. Restarting with the same
+              choices would fail the same way, so the gate that owns those
+              choices is one click from the error. */}
+          {broken && (
+            <button className="btn" disabled={pending} onClick={backToFinal}>
+              ← Back to Final touches
+            </button>
+          )}
           {n8nUrl && (
             <a className="btn" href={n8nUrl} target="_blank" rel="noreferrer">
               Open in n8n

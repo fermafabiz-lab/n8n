@@ -185,6 +185,28 @@ export async function getAliveProduction(): Promise<ExecutionSummary[]> {
 }
 
 /**
+ * Every Final Assembly execution currently alive.
+ *
+ * Same near-wake-up test as getAliveProduction: a render polling the render
+ * server sits in a Wait node and reports as "waiting", not "running", so
+ * looking only at "running" would leave half the renders unstoppable.
+ */
+export async function getAliveAssembly(): Promise<ExecutionSummary[]> {
+  if (!n8nConfigured) return [];
+  const [running, waiting] = await Promise.all([
+    getExecutions("running", 20),
+    getExecutions("waiting", 20),
+  ]);
+  const soon = Date.now() + 2 * 3600 * 1000;
+  return [
+    ...running,
+    ...waiting.filter(
+      (e) => e.waitTill !== null && new Date(e.waitTill).getTime() < soon,
+    ),
+  ].filter((e) => e.workflowId === FINAL_ASSEMBLY_WORKFLOW_ID);
+}
+
+/**
  * Executions that look alive but never ran a node — surfaced so the producer
  * can stop them instead of staring at a batch that will never move.
  */

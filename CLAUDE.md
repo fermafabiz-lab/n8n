@@ -856,6 +856,19 @@ on a visible 8-second grid.
   is generated yet. Note selection had to stop borrowing `.act`, which also
   paints the blinking "generating" dot — the scene under review was the one
   scene whose own light you could never see.
+- **The render lock is not protecting the render.** While a Final Assembly
+  execution is alive, every step but Assembly is frozen in the stepper — but
+  navigating could never have interrupted anything, the render runs in n8n and
+  on Railway and does not care what is on screen. The real hazard is that
+  `confirmFinalSettings` fires the assemble webhook ITSELF (see auto-assembly
+  below), so walking back to Final touches and pressing render again starts a
+  SECOND execution and both write `Link Video Final`. `stopAssembly()` kills
+  the live executions and rewinds the status to `Setari Finale`, which is why
+  stopping and going back are one button. The lock keys off `assembly.running`,
+  never off the status, so the two states that are not a live render unlock by
+  themselves: the gap where production is still upstream, and a render that
+  failed (its panel then offers Restart plus a door back to Final touches,
+  because a failed render is often a failed *setting*).
 - **`?stage=` navigation is a full server round-trip**, and the page is
   `force-dynamic`: every click re-reads Airtable and asks n8n what is running
   before one pixel changes, so the previous step sat on screen for a second

@@ -21,6 +21,7 @@ import {
   updateEditingOptions,
 } from "@/lib/data";
 import {
+  getAliveAssembly,
   getAliveProduction,
   getExecutions,
   getStalledProduction,
@@ -755,6 +756,38 @@ async function fireAssembleWebhook(projectId: string): Promise<ActionResult> {
 }
 
 /** Re-trigger the final render after it died, without redoing production. */
+/**
+ * Call off a render in progress and hand the project back to Final touches.
+ *
+ * The reason this exists is not that navigating away could interrupt the
+ * render — it could not, the render lives in n8n and Railway. It is that
+ * `confirmFinalSettings` fires the assemble webhook itself, so walking back
+ * to Final touches and pressing render again starts a SECOND execution, and
+ * both write `Link Video Final` on the same project. Stopping first is what
+ * makes going back safe, so the two are one button.
+ */
+export async function stopAssembly(projectId: string): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    const alive = await getAliveAssembly().catch(() => []);
+    for (const e of alive) await stopExecution(e.id).catch(() => {});
+    // Back to the gate it came from: Final touches renders again, the render
+    // lock lifts, and pressing render is a clean restart rather than a race.
+    await writeProjectFields(projectId, { "Status General": "Setari Finale" });
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message: alive.length
+        ? `Render stopped — back at Final touches. Nothing else was touched: every clip, take and approval is intact.`
+        : "No render was running in n8n — the project is back at Final touches.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
 export async function retryAssembly(projectId: string): Promise<ActionResult> {
   const fired = await fireAssembleWebhook(projectId);
   if (!fired.ok) return fired;

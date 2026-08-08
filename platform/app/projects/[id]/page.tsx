@@ -198,6 +198,23 @@ export default async function ProductionRoom({
       ? await getAssemblyState().catch(() => null)
       : null;
 
+  /**
+   * A render is genuinely alive in n8n, so the stepper holds still.
+   *
+   * Not because looking at another step could interrupt anything — the render
+   * runs in n8n and on Railway and does not care what is on screen. It is
+   * that `confirmFinalSettings` fires the assemble webhook ITSELF, so walking
+   * back to Final touches and pressing render again starts a second execution
+   * and both write `Link Video Final` on the same project. "Stop the render"
+   * is the way out, and it is the same button that makes going back safe.
+   *
+   * Keyed on `assembly.running` rather than on the status, so the two states
+   * that are NOT a live render unlock by themselves: the gap where production
+   * is still upstream (nothing to protect yet) and a render that failed or
+   * vanished (its panel then offers Restart and the door back).
+   */
+  const renderLocked = !!assembly?.running;
+
   // Which gate (if any) is waiting on the user — drives the notification
   // chime when a generation step finishes and hands control back.
   const stage =
@@ -327,37 +344,66 @@ export default async function ProductionRoom({
 
         {scenes.length > 0 && (
           <div className="pipe">
-            {steps.map((s, i) => (
-              <span key={s.key} style={{ display: "contents" }}>
-                {/* Each step is a link to itself: that is the whole way back
-                    to an earlier stage. The active one links to the bare page
-                    so clicking it again returns to "whatever is live now". */}
-                <StageLink
-                  stage={viewing === s.key ? null : s.key}
-                  href={
-                    viewing === s.key
-                      ? `/projects/${id}`
-                      : `/projects/${id}?stage=${s.key}`
-                  }
-                  className={`ps ${s.state}${viewing === s.key ? " sel" : ""}`}
-                >
-                  <span className="ic">{s.state === "done" ? "✓" : i + 1}</span>
-                  {s.name}
-                </StageLink>
-                {i < steps.length - 1 && <span className="pl" />}
-              </span>
-            ))}
+            {steps.map((s, i) => {
+              // While a render is alive every step but Assembly stops being a
+              // link — see renderLocked. Assembly itself stays reachable so
+              // the producer can always get back to the panel that stops it.
+              const frozen = renderLocked && s.key !== "assembly";
+              const cls = `ps ${s.state}${viewing === s.key ? " sel" : ""}${frozen ? " frozen" : ""}`;
+              return (
+                <span key={s.key} style={{ display: "contents" }}>
+                  {/* Each step is a link to itself: that is the whole way back
+                      to an earlier stage. The active one links to the bare page
+                      so clicking it again returns to "whatever is live now". */}
+                  {frozen ? (
+                    <span
+                      className={cls}
+                      aria-disabled="true"
+                      title="Locked while the final render is running — stop the render to go back"
+                    >
+                      <span className="ic">{s.state === "done" ? "✓" : i + 1}</span>
+                      {s.name}
+                    </span>
+                  ) : (
+                    <StageLink
+                      stage={viewing === s.key ? null : s.key}
+                      href={
+                        viewing === s.key
+                          ? `/projects/${id}`
+                          : `/projects/${id}?stage=${s.key}`
+                      }
+                      className={cls}
+                    >
+                      <span className="ic">{s.state === "done" ? "✓" : i + 1}</span>
+                      {s.name}
+                    </StageLink>
+                  )}
+                  {i < steps.length - 1 && <span className="pl" />}
+                </span>
+              );
+            })}
           </div>
         )}
 
-        {viewing && (
-          // Without this the page just looks stale: the panel on screen is
-          // not the one the pipeline is waiting on, and nothing said so.
+        {renderLocked ? (
           <div className="setupnote" style={{ marginBottom: 20 }}>
-            Looking back at an earlier step. Production carries on in the
-            background — regenerating anything here still works.{" "}
-            <Link href={`/projects/${id}`}>Back to the live step</Link>
+            The final render is running, so the other steps are locked — going
+            back and pressing render again would start a second one. Stop it
+            below to change anything.
           </div>
+        ) : (
+          // Not shown for Assembly while it IS the live step: the pipeline is
+          // there, so calling it "an earlier step" would be a lie.
+          viewing &&
+          !(viewing === "assembly" && assembling) && (
+            // Without this the page just looks stale: the panel on screen is
+            // not the one the pipeline is waiting on, and nothing said so.
+            <div className="setupnote" style={{ marginBottom: 20 }}>
+              Looking back at an earlier step. Production carries on in the
+              background — regenerating anything here still works.{" "}
+              <Link href={`/projects/${id}`}>Back to the live step</Link>
+            </div>
+          )
         )}
 
         {showing("script", !!script) && script && (

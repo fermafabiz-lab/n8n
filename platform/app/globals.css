@@ -496,6 +496,16 @@ a {
   border-color: var(--line2);
   transform: translateY(-1px);
 }
+/* Held still while the final render runs. Not a link, so it must not offer
+   a link's affordances either — no lift, no pointer. */
+.ps.frozen {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+.ps.frozen:hover {
+  border-color: var(--line);
+  transform: none;
+}
 /* Currently being revisited: reads as "you are looking at this one", which
    is deliberately distinct from .act ("the pipeline is here"). */
 .ps.sel {

@@ -51,6 +51,15 @@ export function usePendingStage(): string | null {
   return useContext(PendingStage);
 }
 
+/**
+ * For panels that move the producer themselves rather than by a click —
+ * pressing render sends them to Assembly. Set this before `router.push` so
+ * the stepper highlights the destination straight away.
+ */
+export function useSetPendingStage(): (s: string | null) => void {
+  return useContext(SetPendingStage);
+}
+
 export function StageLink({
   stage,
   href,

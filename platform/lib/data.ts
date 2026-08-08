@@ -769,6 +769,28 @@ export async function requestSceneRewrite(sceneId: string): Promise<void> {
   });
 }
 
+/**
+ * Take a scene back out of "rewrite in flight".
+ *
+ * The flag above is set by the site and cleared by n8n — on success from
+ * `Write Scene Rewrite`, on a refused/failed rewrite from `Mark Scene Regen
+ * Failed`. Both live INSIDE the execution, so an execution that dies before
+ * reaching either (n8n restarted, the webhook POST never landed, or one of
+ * the executions n8n creates and then never runs) leaves the flag set with
+ * nobody left to clear it. The scene then shows "Rewriting…" forever, and
+ * because that state replaces the whole button row, there is no way back to
+ * it from the UI at all.
+ *
+ * "Generare Script" is the same status `Mark Scene Regen Failed` releases to,
+ * so a released scene is indistinguishable from one whose rewrite was
+ * refused: unapproved, editable, awaiting review.
+ */
+export async function releaseSceneRewrite(sceneId: string): Promise<void> {
+  await airtablePatch(SCENES_TABLE, sceneId, {
+    "Status Producție Scenă": "Generare Script",
+  });
+}
+
 async function airtableDelete(table: string, ids: string[]): Promise<void> {
   // Airtable deletes at most 10 records per call.
   for (let i = 0; i < ids.length; i += 10) {

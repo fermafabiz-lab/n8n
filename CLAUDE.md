@@ -78,6 +78,21 @@ cannot recover it; and restart re-runs Claude Scripting from the top, so it
 rewrites the script and its scenes. The site only offers it before any scene
 is approved — past that point Resume is the right door.
 
+**The same trap exists once per "in flight" flag, and there are several.**
+Every regeneration works by the site setting a flag and the n8n run clearing
+it — from `Write Scene Rewrite` on success, `Mark Scene Regen Failed` on a
+refusal. Both live INSIDE the execution, so any death before either one
+(n8n restarted, the POST never landed, or one of the executions n8n creates
+and then never runs) strands the flag with nobody left to clear it. That
+alone would be survivable; what makes it a dead end is that the UI shows the
+in-flight state **instead of** the button row, so the stranded scene cannot
+be approved, edited, or retried. Per-scene rewrite now carries its own way
+out — "⟳ Send the rewrite again" and "Cancel — keep this text"
+(`restartSceneRewrite` / `cancelSceneRewrite`). The image, voice and video
+regen states in `SceneBoard` have the identical shape and no escape yet.
+**When you add a state whose exit is written by someone else, give it a
+local exit too.**
+
 There is also an inactive legacy `2. Scripting Sub-Workflow`
 (`5YWpycnnL6OaDWIx`) — superseded by Claude Scripting, referenced by nothing.
 Leave it alone or archive it; do not repoint anything at it.

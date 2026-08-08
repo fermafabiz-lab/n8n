@@ -11,6 +11,7 @@ import {
   writeSceneScript,
   writeSceneFields,
   requestSceneRewrite,
+  releaseSceneRewrite,
   findRecentProjectByName,
   writeScriptFields,
   requestVoiceRegen,
@@ -218,6 +219,29 @@ export async function saveImagePrompt(
   }
 }
 
+/**
+ * Fire the standalone per-scene rewrite webhook.
+ *
+ * This used to rely on the scene-approval polling loop inside a live
+ * scripting execution: once that execution was stopped or crashed, the flag
+ * sat there forever and the feature was silently dead (Resume only restarts
+ * media generation).
+ */
+async function fireSceneRewriteWebhook(sceneId: string): Promise<void> {
+  const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
+  const webhook =
+    process.env.N8N_SCENE_REGEN_WEBHOOK_URL ??
+    newProject?.replace(/new-project\/?$/, "scene-text-regen");
+  if (!webhook?.includes("scene-text-regen")) return;
+  const res = await fetch(webhook, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scene_id: sceneId }),
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
+}
+
 export async function regenerateSceneText(
   projectId: string,
   sceneId: string,
@@ -228,30 +252,70 @@ export async function regenerateSceneText(
   try {
     // Flag first — it drives the "Rewriting…" badge, and n8n clears it.
     await requestSceneRewrite(sceneId);
-
-    // Then fire the standalone rewrite webhook. This used to rely on the
-    // scene-approval polling loop inside a live scripting execution: once
-    // that execution was stopped or crashed, the flag sat there forever and
-    // the feature was silently dead (Resume only restarts media generation).
-    const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
-    const webhook =
-      process.env.N8N_SCENE_REGEN_WEBHOOK_URL ??
-      newProject?.replace(/new-project\/?$/, "scene-text-regen");
-    if (webhook?.includes("scene-text-regen")) {
-      const res = await fetch(webhook, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scene_id: sceneId }),
-        signal: AbortSignal.timeout(15000),
-      });
-      if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
-    }
+    await fireSceneRewriteWebhook(sceneId);
 
     revalidatePath(`/projects/${projectId}`);
     return {
       ok: true,
       message:
         "Rewrite requested — a fresh take on this scene appears here in ~30s (the page refreshes itself).",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/**
+ * Re-fire a per-scene rewrite that never came back.
+ *
+ * The scene-level twin of restartScripting. Both exist for the same reason:
+ * the flag that means "in flight" is cleared from INSIDE the n8n run, so a
+ * run that dies before clearing it leaves a state the UI can enter and never
+ * leave. Re-posting is safe — the rewrite reads the scene fresh and writes
+ * the whole result at the end, so a duplicate run costs one model call and
+ * the last writer wins.
+ */
+export async function restartSceneRewrite(
+  projectId: string,
+  sceneId: string,
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    // Re-arm rather than assume: the flag is what n8n's own loop matches on,
+    // and a half-finished run may have moved the status elsewhere.
+    await requestSceneRewrite(sceneId);
+    await fireSceneRewriteWebhook(sceneId);
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message: "Rewrite sent again — a fresh take lands here in ~30s.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/**
+ * Give up on a stuck rewrite and hand the scene back to the reviewer with the
+ * text it currently has. The escape hatch for when re-firing keeps failing —
+ * without it, a scene whose rewrite service is down cannot be approved,
+ * edited or even read, because the "Rewriting…" state hides every control.
+ */
+export async function cancelSceneRewrite(
+  projectId: string,
+  sceneId: string,
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    await releaseSceneRewrite(sceneId);
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message: "Rewrite cancelled — the scene is back in review with its current text.",
     };
   } catch (e) {
     return { ok: false, message: friendlyError(e) };

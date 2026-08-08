@@ -3,7 +3,9 @@
 import { useState, useTransition } from "react";
 import {
   approveAllScenes,
+  cancelSceneRewrite,
   regenerateSceneText,
+  restartSceneRewrite,
   saveSceneScript,
   type ActionResult,
 } from "@/app/actions";
@@ -189,7 +191,34 @@ export default function SceneReview({
               />
 
               {!s.sceneApproved && s.rewriteRequested && (
-                <RegenBadge label="Rewriting scene…" note={s.note} />
+                <>
+                  <RegenBadge label="Rewriting scene…" note={s.note} />
+                  {/*
+                    This state is cleared from inside the n8n run, so a run
+                    that dies never clears it — and it replaces the whole
+                    button row, so the scene became unreachable: not
+                    approvable, not editable, not even retryable. These two
+                    are the way out, and they are deliberately quiet: a
+                    rewrite normally lands in ~30s, so anyone still looking
+                    at them has a run that is not coming back.
+                  */}
+                  <div className="abtns" style={{ marginTop: 10 }}>
+                    <button
+                      className="abtn"
+                      disabled={pending}
+                      onClick={() => run(() => restartSceneRewrite(projectId, s.id))}
+                    >
+                      ⟳ Send the rewrite again
+                    </button>
+                    <button
+                      className="abtn"
+                      disabled={pending}
+                      onClick={() => run(() => cancelSceneRewrite(projectId, s.id))}
+                    >
+                      Cancel — keep this text
+                    </button>
+                  </div>
+                </>
               )}
               {!s.sceneApproved && !s.rewriteRequested && (
                 <div className="abtns">

@@ -3,7 +3,9 @@
 import { useState, useTransition } from "react";
 import {
   approveAllOfKind,
+  regenerateSceneText,
   regenerateVoice,
+  reopenStep,
   saveImagePrompt,
   sceneAction,
   type ActionResult,
@@ -13,6 +15,40 @@ import { mediaSrc } from "@/lib/media";
 import { explainRefusal } from "@/lib/refusals";
 import MediaPlayer from "@/components/MediaPlayer";
 import RegenBadge from "@/components/RegenBadge";
+
+const approvedRow: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 8,
+};
+
+/**
+ * The way back into a step that was already signed off.
+ *
+ * Deliberately quiet — it sits next to the "Approved" chip it undoes, and
+ * only appears once there IS an approval to undo. Reopening touches this
+ * scene alone, so the rest of the film keeps its sign-off.
+ */
+function MakeChanges({
+  disabled,
+  onClick,
+}: {
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="abtn"
+      disabled={disabled}
+      onClick={onClick}
+      style={{ padding: "3px 9px", fontSize: 11.5, lineHeight: 1.4 }}
+      title="Reopen this step for this scene only — every other scene keeps its approval"
+    >
+      ✎ Make changes
+    </button>
+  );
+}
 
 function frClass(kind: StatusKind): string {
   switch (kind) {
@@ -217,15 +253,43 @@ export default function SceneBoard({
             <div className="kv">
               <span>Image</span>
               {active.imageApproved ? (
-                <span className="chip ok">Approved</span>
+                <span style={approvedRow}>
+                  <span className="chip ok">Approved</span>
+                  <MakeChanges
+                    disabled={pending}
+                    onClick={() => run(() => reopenStep(projectId, active.id, "images"))}
+                  />
+                </span>
               ) : (
                 <span className="chip wait">Awaiting review</span>
               )}
             </div>
+            {active.voiceUrl && (
+              <div className="kv">
+                <span>Voice</span>
+                {active.voiceApproved ? (
+                  <span style={approvedRow}>
+                    <span className="chip ok">Approved</span>
+                    <MakeChanges
+                      disabled={pending}
+                      onClick={() => run(() => reopenStep(projectId, active.id, "audio"))}
+                    />
+                  </span>
+                ) : (
+                  <span className="chip wait">Awaiting review</span>
+                )}
+              </div>
+            )}
             <div className="kv">
               <span>Video</span>
               {active.videoApproved ? (
-                <span className="chip ok">Approved</span>
+                <span style={approvedRow}>
+                  <span className="chip ok">Approved</span>
+                  <MakeChanges
+                    disabled={pending}
+                    onClick={() => run(() => reopenStep(projectId, active.id, "video"))}
+                  />
+                </span>
               ) : active.videoUrl ? (
                 <span className="chip wait">Awaiting review</span>
               ) : active.statusKind === "run" ? (
@@ -391,6 +455,8 @@ export default function SceneBoard({
                 />
                 {active.regenVoice ? (
                   <RegenBadge label="Regenerating voice…" note={active.note} />
+                ) : active.rewriteRequested ? (
+                  <RegenBadge label="Rewriting the line…" note={active.note} />
                 ) : (
                   <div className="abtns" style={{ marginTop: 8 }}>
                     <button
@@ -408,11 +474,27 @@ export default function SceneBoard({
                     >
                       🎙 Regenerate voice
                     </button>
+                    {/*
+                      Going back a step from here. The writing stage is long
+                      past by the time anyone hears that a line is wrong, and
+                      until now the only way back was to type a replacement by
+                      hand. n8n re-reads the new line automatically, so this
+                      cannot leave text and audio disagreeing.
+                    */}
+                    <button
+                      className="abtn"
+                      disabled={pending}
+                      onClick={() => run(() => regenerateSceneText(projectId, active.id))}
+                    >
+                      ✎ Rewrite the line (AI)
+                    </button>
                   </div>
                 )}
                 <p style={{ margin: "6px 0 0", fontSize: 11.5, color: "var(--dim)" }}>
-                  New voice is synthesized from the text above and re-muxed onto
-                  the existing clip — image and video are NOT regenerated.
+                  Both re-record the voice and re-mux it onto the existing clip
+                  — image and video are NOT regenerated. Editing the text above
+                  and saving it anywhere else also re-records, so the take can
+                  never drift from the line.
                 </p>
               </div>
             )}

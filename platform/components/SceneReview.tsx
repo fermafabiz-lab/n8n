@@ -3,7 +3,10 @@
 import { useState, useTransition } from "react";
 import {
   approveAllScenes,
+  cancelSceneRewrite,
   regenerateSceneText,
+  reopenStep,
+  restartSceneRewrite,
   saveSceneScript,
   type ActionResult,
 } from "@/app/actions";
@@ -152,7 +155,27 @@ export default function SceneReview({
                   S{i + 1} · Scene
                 </h5>
                 {s.sceneApproved ? (
-                  <span className="chip ok">Approved</span>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                    <span className="chip ok">Approved</span>
+                    {/*
+                      Sending one scene back to the writing step. The text
+                      boxes below are disabled while approved, so without this
+                      an approved scene was frozen for good. Only this scene
+                      loses its sign-off — and, because the line drives the
+                      take and the cut, its voice and clip go back for review
+                      with it.
+                    */}
+                    <button
+                      type="button"
+                      className="abtn"
+                      disabled={pending}
+                      onClick={() => run(() => reopenStep(projectId, s.id, "scenes"))}
+                      style={{ padding: "3px 9px", fontSize: 11.5, lineHeight: 1.4 }}
+                      title="Reopen the script for this scene only — every other scene keeps its approval"
+                    >
+                      ✎ Make changes
+                    </button>
+                  </span>
                 ) : s.rewriteRequested ? (
                   <span className="chip run">Rewriting…</span>
                 ) : (
@@ -189,7 +212,34 @@ export default function SceneReview({
               />
 
               {!s.sceneApproved && s.rewriteRequested && (
-                <RegenBadge label="Rewriting scene…" note={s.note} />
+                <>
+                  <RegenBadge label="Rewriting scene…" note={s.note} />
+                  {/*
+                    This state is cleared from inside the n8n run, so a run
+                    that dies never clears it — and it replaces the whole
+                    button row, so the scene became unreachable: not
+                    approvable, not editable, not even retryable. These two
+                    are the way out, and they are deliberately quiet: a
+                    rewrite normally lands in ~30s, so anyone still looking
+                    at them has a run that is not coming back.
+                  */}
+                  <div className="abtns" style={{ marginTop: 10 }}>
+                    <button
+                      className="abtn"
+                      disabled={pending}
+                      onClick={() => run(() => restartSceneRewrite(projectId, s.id))}
+                    >
+                      ⟳ Send the rewrite again
+                    </button>
+                    <button
+                      className="abtn"
+                      disabled={pending}
+                      onClick={() => run(() => cancelSceneRewrite(projectId, s.id))}
+                    >
+                      Cancel — keep this text
+                    </button>
+                  </div>
+                </>
               )}
               {!s.sceneApproved && !s.rewriteRequested && (
                 <div className="abtns">

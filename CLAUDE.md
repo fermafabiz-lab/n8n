@@ -45,29 +45,65 @@ of references** — `Execute Media Generation (Resume)` and `Execute Final
 Assembly (Resume)`, fed by the `resume-project` webhook. Fixing only the three
 on the happy path leaves Pause/Resume broken while new projects look fine.
 
-**`restart-scripting` does not exist yet, and the site already calls it.**
-`resume-project` enters the pipeline at Media Generation, because it was
-built for a project whose scenes exist. A run that dies while the script is
-still being WRITTEN therefore has no way back: Pause stops it, and nothing
-can start it again. The site now shows "⟳ Restart writing" for that phase and
-posts `{project_id}` to `restart-scripting`; until the webhook exists the
-button answers with exactly that, rather than failing silently.
+**`restart-scripting` now exists** (built 2026-08-08, orchestrator
+`8CienBFfG6SgbB1A`). `resume-project` enters the pipeline at Media
+Generation, because it was built for a project whose scenes exist. A run that
+dies while the script is still being WRITTEN therefore had no way back: Pause
+stopped it, and nothing could start it again. The site shows "⟳ Restart
+writing" for that phase and posts `{project_id}` to `restart-scripting`.
 
-To build it in the Master Orchestrator (`8CienBFfG6SgbB1A`), mirroring the
-resume path: a `Webhook` node on path `restart-scripting` → an Airtable
-`get` on Proiecte by `{{ $json.body.project_id }}` → `Execute Workflow`
-pointing at Claude Scripting (`gkEtGMecv4TC3ZHp`) with the same input mapping
-`Execute Scripting Sub-Workflow` uses → then into `Fetch Project Status`, so
-the run continues into media generation exactly as a new project does.
+The chain is **self-contained**, nine nodes on their own canvas row:
+
+```
+Restart Scripting Webhook → Fetch Project For Restart → Prepare Restart Data
+  → Execute Scripting (Restart) → Fetch Project Status (Restart)
+  → Check Script Status (Restart) → Execute Media Generation (Restart)
+  → Execute Final Assembly (Restart) → Mark Finished (Restart)
+```
+
+**It could not simply join the happy path**, which is what the plan here used
+to say ("→ then into `Fetch Project Status`"). Every node in that tail —
+`Fetch Project Status`, `Execute Media Generation (Batch)`, `Execute Final
+Assembly`, `Update Status to Finished` — identifies the project as
+`$("Create Project in Airtable").item.json.id`. On a restart that node never
+executes, so the expression throws and the run dies one step after scripting.
+The resume path had already solved this by duplicating the tail off
+`$('Fetch Project For Resume')`; restart does the same off
+`$('Fetch Project For Restart')`. **Any third entry point needs its own tail
+for the same reason** — the shared tail is only shareable by the form.
+
+Two consequences worth knowing: `Lore` is passed empty, because it arrives
+with the creation form and is never stored on the project, so a restart
+cannot recover it; and restart re-runs Claude Scripting from the top, so it
+rewrites the script and its scenes. The site only offers it before any scene
+is approved — past that point Resume is the right door.
+
+**The same trap exists once per "in flight" flag, and there are several.**
+Every regeneration works by the site setting a flag and the n8n run clearing
+it — from `Write Scene Rewrite` on success, `Mark Scene Regen Failed` on a
+refusal. Both live INSIDE the execution, so any death before either one
+(n8n restarted, the POST never landed, or one of the executions n8n creates
+and then never runs) strands the flag with nobody left to clear it. That
+alone would be survivable; what makes it a dead end is that the UI shows the
+in-flight state **instead of** the button row, so the stranded scene cannot
+be approved, edited, or retried. Per-scene rewrite now carries its own way
+out — "⟳ Send the rewrite again" and "Cancel — keep this text"
+(`restartSceneRewrite` / `cancelSceneRewrite`). The image, voice and video
+regen states in `SceneBoard` have the identical shape and no escape yet.
+**When you add a state whose exit is written by someone else, give it a
+local exit too.**
 
 There is also an inactive legacy `2. Scripting Sub-Workflow`
 (`5YWpycnnL6OaDWIx`) — superseded by Claude Scripting, referenced by nothing.
 Leave it alone or archive it; do not repoint anything at it.
 
-Webhooks the site calls: `new-project`, `resume-project`, `scene-text-regen`,
-`scene-image-regen`, `scene-voice-regen`, `assemble`, and `restart-scripting`
-(**still to be built** — see below). The site derives all of
-them from `N8N_NEW_PROJECT_WEBHOOK_URL`, so they must live on the same host.
+Webhooks the site calls: `new-project`, `resume-project`, `restart-scripting`
+(all three on the Master Orchestrator), `scene-text-regen`,
+`scene-image-regen`, `scene-voice-regen` (all three on Claude Scripting) and
+`assemble`. The site derives all of them from `N8N_NEW_PROJECT_WEBHOOK_URL`
+by string-replacing the last path segment, so they must live on the same host
+— and each new one must be a plain `path` with no path parameters, or the
+derived URL will not resolve.
 
 Run `node scripts/check-n8n.mjs` (needs `N8N_API_URL` + `N8N_API_KEY`) to
 verify all of the above in one shot — ids, active state, webhooks, every
@@ -153,6 +189,47 @@ These each cost hours. Do not rediscover them.
   any rejection.
 - A refusal is deterministic. Resubmitting the same input burns retries and
   then kills the batch. Always rewrite before retrying.
+- **fal refuses too, with HTTP 422 `content_policy_violation`** — and until
+  2026-08-08 `Generate Scene Image` had no `onError`, so one refused prompt
+  killed the whole media batch and every scene after it went untouched. The
+  symptom does not look like a crash: each Resume redoes the finished scenes,
+  makes at most ONE new image, and dies again, so the producer sees image
+  generation that "takes forever" rather than one that is failing. Five runs
+  over thirteen minutes produced four of six images that way (project
+  `recCoZWsZBOrIU69L`). Its error output now enters the SAME chain Google
+  Flow's upload refusals already used:
+  `Prep Flow Reject → Already Rewritten? → Rewrite Prompt AI → Apply
+  Rewritten Prompt`. That reuse is only possible because `Prep Flow Reject`
+  reads every scene field from `$('Loop Images')` and touches `$json` only to
+  sniff the reason — a chain that had read its context from the *upstream
+  node* could not have been shared. It now reports which service refused
+  (`service` in its output), because the two notes used to blame Google Flow
+  for fal's refusals.
+- **Note the two services fail at different moments**, which changes what the
+  scene looks like afterwards: Flow refuses at UPLOAD, so the image exists and
+  the rewrite replaces a picture; fal refuses at GENERATION, so there is no
+  image at all and the scene sits at "Așteaptă Aprobare Imagine" with an empty
+  frame until the regen loop fills it. Both are handled by the same chain
+  because the cure is identical — rewrite, never resubmit — but do not read
+  the empty frame as a second bug.
+- **On a scene flagged for regeneration, `Observații Scenă` is PROMPT, not a
+  comment.** `Evaluate Image Approval` appends it as
+  `ADJUSTMENT REQUEST — the new image MUST follow this: …` so reviewer
+  feedback can steer the re-roll. The trap: the natural thing to write in
+  that box after a refusal is a description of what was refused, which
+  re-injects the banned content and makes the retry fail for a reason the
+  writer added. Caught while unblocking `recCoZWsZBOrIU69L` — a note reading
+  "the depiction of hands seizing the man was replaced with…" would have been
+  sent straight back to fal. Clear the field, or write only what the new
+  image SHOULD contain.
+- **The refusal often is not in the shot, it is in the Story Bible.** The
+  location description is appended to every scene set there, so one flagged
+  phrase refuses every one of them. On `recCoZWsZBOrIU69L` the location
+  carried "dark skeletal hands forcing their way up through the fractured
+  ground", which alone refused scenes 103, 104 and 105. The per-scene rewrite
+  clears the scene it runs on and cannot clear the source, so when several
+  consecutive scenes refuse, edit the LOCATION in the Story Bible — otherwise
+  every new scene on that set is born already refused.
 
 ### Airtable
 
@@ -169,6 +246,17 @@ These each cost hours. Do not rediscover them.
   the render built from zero-length scenes, and scripting computing chapter
   counts from a length of 0. If you add a mapped field, either give it a value
   or take it out of the mapping. Nothing warns you.
+- **A sixteenth one survived that sweep, and it was the worst placed:**
+  `Update Status to Finished` (Master Orchestrator) mapped `Lenght: 0`
+  *explicitly*, not as an empty cell — so every project that reached the end
+  of the happy path had its length wiped at the finish line. Silent while the
+  project stayed finished, and lethal the moment it was restarted: scripting
+  derives chapter count from `ceil(Lenght / 120)` and scene math from the
+  same number, so a restarted film would be written against a length of 0.
+  Removed 2026-08-08 while building `restart-scripting` — which is exactly
+  the feature that would have made the damage visible. `Mark Finished
+  (Resume)` and `Mark Finished (Restart)` map only `id` + `Status General`,
+  and must stay that way.
 
 ### The batch cap
 
@@ -686,6 +774,20 @@ on a visible 8-second grid.
   vocabularies byte-identical — the 2026-08 editorial rebuild moved them into
   hidden inputs bound to React state, nothing more. Every non-submit button
   inside the form must carry `type="button"`.
+- **Approval used to be one-way, and "Make changes" is the door back.** Every
+  control in a step is gated on the scene NOT being approved, so signing off
+  froze it — however wrong it turned out three steps later. `reopenStep()`
+  expresses reopening as **un-approval of one scene**, which is the whole
+  trick: the per-scene controls reappear by themselves and n8n's "is every
+  scene approved" gates reopen with them, so the pipeline needed no change at
+  all. Only the named scene is touched, so the batch gets exactly one piece
+  of outstanding work and the rest of the film keeps its sign-off. What
+  cascades is what was derived from the changed thing — line → voice + video,
+  image → video, voice → video, clip → nothing. It deliberately does NOT
+  start a regeneration: reopening means "this needs another look", and the
+  producer then picks what to change. The initial script has no such button:
+  it is written for the whole project, not per scene, and `restart-scripting`
+  is its door.
 - **Refusal notes get translated to next steps** by `platform/lib/refusals.ts`
   (wired into ProductionActivity and SceneBoard). Match only literal pipeline
   codes, never bare words or bare numbers: `\bminor\b` hit ordinary reviewer
@@ -754,6 +856,21 @@ expected and harmless for an app touching only its own Drive.
 
 ## Open work
 
+- **The OpenAI account is out of credits, and that is what stops the
+  pipeline today** — not any workflow defect. Execution 1783 (2026-08-08,
+  project "Death cominig up to take someone into the underworld",
+  `recCoZWsZBOrIU69L`) died at `Rebuild Story Bible` with *"You have no
+  credits remaining"*, after the script had been written, edited and
+  approved. Every writing path shares that account: the six langchain model
+  nodes (`Story Bible / Outline / Narration / Segment / Hook / Research
+  Model`) and the three raw HTTP calls (`Rewrite Script`, `Rewrite Scene
+  Text`, `Rewrite Scene Standalone`). So whole-script writing AND per-scene
+  rewriting are both dead until the account is topped up, and both fail in a
+  way that reads like a broken button. Per-scene regen at least fails
+  honestly — `Mark Scene Regen Failed` writes the reason into `Observații
+  Scenă` and releases the "Regenerare Text" status, so nothing hangs.
+  That project is mid-flight: Story Bible and approved script exist, no
+  chapters and no scenes. `restart-scripting` is the door back in.
 - **Ask Dan for `hookTitle`.** Scripting should write a 3-6 word line meant
   for the screen and n8n should pass it in `Build Remotion Props`; the prop
   already exists and bypasses the isTitleLike gate. Until then, projects whose
@@ -768,6 +885,18 @@ expected and harmless for an app touching only its own Drive.
   `voice_id`, which beats every mode rule in `VR Pick Voice` for that one
   synthesis. The batch never overwrites an existing voiceover, so the pin
   sticks.
+- **A line and its recording drift apart silently, and that same "never
+  overwrite" rule is why.** The take is synthesized from `Script Scenă`;
+  nothing downstream ever compares the two again. So any path that rewrote
+  the text after the audio existed left the film saying one thing and showing
+  another — visible only by watching the whole cut, which is exactly how it
+  was found. Three writers now all invalidate the voice, and only when a take
+  actually exists (a scene not yet voiced needs no flag; a cinematic project
+  has no speech): `requestVoiceRegen` already did, `saveSceneScript` now
+  reads the old line first and re-records when it changed, and n8n's `Write
+  Scene Rewrite` sets `Regenerează Voce` when `Voiceover URL` is present.
+  **Any fourth writer of `Script Scenă` must do the same** — grep for it
+  before adding one.
 - **Auto-assembly has NEVER fired on wf7** — every Final Assembly execution
   is `mode: webhook`. The batch's settings gate (15s Wait loop) dies rather
   than release, proven again on the first cinematic project. **Bypassed, not
@@ -783,10 +912,9 @@ expected and harmless for an app touching only its own Drive.
 - Test `chapters` multi-voice on a project with 2+ chapters (over 120s), which
   is the branch the per-scene rotation does *not* cover.
 - Codify the "no visible faces" rule into Documentary image prompts.
-- `Generate Scene Image` has no `onError`, so one content refusal from fal
-  kills the whole batch. The auto-rewrite chain already exists for Google Flow
-  rejections (`Prep Flow Reject → Rewrite Prompt AI → Apply Rewritten Prompt`);
-  wire fal's 422 into it.
+- Scene 104/105 of `recCoZWsZBOrIU69L` are the first scenes to go through the
+  new fal auto-rewrite path — worth watching once to confirm the rewritten
+  prompt clears fal and the regen loop picks the scene up.
 - The ambience level in `assemble.mjs` (`nativeVolume`, 0.22) and its
   sidechain settings were never heard on a real montage — tune by ear once.
 - Optional: `channelName: 'Video Factory'` → `'House of Videos'` in

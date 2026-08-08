@@ -129,12 +129,18 @@ export const GENRES: Genre[] = [
  * one: `STARTS` threads, each offset down the axis by a share of the pitch,
  * landing edge to edge.
  */
-const LEAN = 60; // degrees off horizontal
+const LEAN = 45; // degrees off horizontal — 60 reads as aggressive
 const R = 104; // px, the pole's radius
 const RISE = R * Math.tan((LEAN * Math.PI) / 180); // px of descent per radian
 const PITCH_Y = 2 * Math.PI * RISE; // one turn of one thread
-/** Frames around the pole, per turn of one thread. */
-const AROUND = 8;
+/**
+ * Frames around the pole, per turn of one thread — and the pole's roundness
+ * is exactly this number. Each frame is flat, so the silhouette is a polygon
+ * of AROUND sides; at eight it reads as folded rather than rolled. Ten is
+ * enough to look curved without doubling the element count, and the shading
+ * across each frame (see the stylesheet) does the rest.
+ */
+const AROUND = 10;
 const STEP = (2 * Math.PI) / AROUND;
 
 /**
@@ -154,10 +160,16 @@ const THREAD_GAP = PITCH_Y / STARTS;
  * rounding anywhere opens a seam. The overlap factor buys that margin back;
  * overlapping frames simply layer, which costs nothing.
  */
-const TILE_H = Math.ceil(THREAD_GAP * Math.cos((LEAN * Math.PI) / 180) * 1.45);
+const TILE_H = Math.ceil(THREAD_GAP * Math.cos((LEAN * Math.PI) / 180) * 1.25);
 
-/** Frames down each thread — enough to run the length of a long form. */
-const PER_THREAD = 26;
+/**
+ * Frames down each thread — enough to run the length of a long form. Derived
+ * rather than guessed: at 45° the pole descends much more slowly per frame
+ * than at 60°, so a fixed count that covered the form before would now stop
+ * a third of the way down it.
+ */
+const COVER = 3800; // px of form the pole must reach
+const PER_THREAD = Math.ceil(COVER / DROP) + 1;
 
 /**
  * The pole is projected by hand rather than with CSS `perspective`, and that

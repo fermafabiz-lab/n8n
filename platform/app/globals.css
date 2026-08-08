@@ -1757,9 +1757,9 @@ a {
   inset: 0;
   /* A little wider than the pole, pushed toward the page edge so the
      overflow lands in the empty gutter and never over the form. */
-  width: 360px;
+  width: 430px;
   left: 50%;
-  transform: translateX(-34%);
+  transform: translateX(-30%);
   overflow: hidden;
   /* No `perspective`: the projection is done in the component. A CSS
      perspective is measured from this box, and this box is as tall as the
@@ -1795,10 +1795,15 @@ a {
   animation-timing-function: linear;
   animation-iteration-count: infinite;
   will-change: transform, filter;
-  /* The frame has thickness: a bright top lip and a dark under-edge. */
+  /* Thickness, and roll. The top lip and under-edge give the frame an edge;
+     the two side shadows darken it toward its left and right, which is what
+     a flat panel needs to read as part of a curved surface. Ten flat frames
+     around the pole would otherwise show as ten facets. */
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.13),
-    inset 0 -2px 5px rgba(0, 0, 0, 0.55);
+    inset 0 -2px 5px rgba(0, 0, 0, 0.5),
+    inset 14px 0 20px -12px rgba(0, 0, 0, 0.75),
+    inset -14px 0 20px -12px rgba(0, 0, 0, 0.75);
 }
 
 /* The reserved height lives HERE, not on .sprev: a min-height on a

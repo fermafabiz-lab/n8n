@@ -774,6 +774,20 @@ on a visible 8-second grid.
   vocabularies byte-identical — the 2026-08 editorial rebuild moved them into
   hidden inputs bound to React state, nothing more. Every non-submit button
   inside the form must carry `type="button"`.
+- **Approval used to be one-way, and "Make changes" is the door back.** Every
+  control in a step is gated on the scene NOT being approved, so signing off
+  froze it — however wrong it turned out three steps later. `reopenStep()`
+  expresses reopening as **un-approval of one scene**, which is the whole
+  trick: the per-scene controls reappear by themselves and n8n's "is every
+  scene approved" gates reopen with them, so the pipeline needed no change at
+  all. Only the named scene is touched, so the batch gets exactly one piece
+  of outstanding work and the rest of the film keeps its sign-off. What
+  cascades is what was derived from the changed thing — line → voice + video,
+  image → video, voice → video, clip → nothing. It deliberately does NOT
+  start a regeneration: reopening means "this needs another look", and the
+  producer then picks what to change. The initial script has no such button:
+  it is written for the whole project, not per scene, and `restart-scripting`
+  is its door.
 - **Refusal notes get translated to next steps** by `platform/lib/refusals.ts`
   (wired into ProductionActivity and SceneBoard). Match only literal pipeline
   codes, never bare words or bare numbers: `\bminor\b` hit ordinary reviewer

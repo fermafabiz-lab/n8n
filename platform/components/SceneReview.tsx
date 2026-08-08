@@ -5,6 +5,7 @@ import {
   approveAllScenes,
   cancelSceneRewrite,
   regenerateSceneText,
+  reopenStep,
   restartSceneRewrite,
   saveSceneScript,
   type ActionResult,
@@ -154,7 +155,27 @@ export default function SceneReview({
                   S{i + 1} · Scene
                 </h5>
                 {s.sceneApproved ? (
-                  <span className="chip ok">Approved</span>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                    <span className="chip ok">Approved</span>
+                    {/*
+                      Sending one scene back to the writing step. The text
+                      boxes below are disabled while approved, so without this
+                      an approved scene was frozen for good. Only this scene
+                      loses its sign-off — and, because the line drives the
+                      take and the cut, its voice and clip go back for review
+                      with it.
+                    */}
+                    <button
+                      type="button"
+                      className="abtn"
+                      disabled={pending}
+                      onClick={() => run(() => reopenStep(projectId, s.id, "scenes"))}
+                      style={{ padding: "3px 9px", fontSize: 11.5, lineHeight: 1.4 }}
+                      title="Reopen the script for this scene only — every other scene keeps its approval"
+                    >
+                      ✎ Make changes
+                    </button>
+                  </span>
                 ) : s.rewriteRequested ? (
                   <span className="chip run">Rewriting…</span>
                 ) : (

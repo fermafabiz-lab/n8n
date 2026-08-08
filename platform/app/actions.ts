@@ -345,6 +345,66 @@ export async function cancelSceneRewrite(
   }
 }
 
+/** The steps a scene can be sent back to. The initial script is not one of
+ *  them: it is written for the whole project, not per scene. */
+export type ReopenStep = "scenes" | "images" | "audio" | "video";
+
+/**
+ * Reopen one completed step for ONE scene — the "Make changes" door.
+ *
+ * Approving a step used to be final: every control in it is gated on the
+ * scene NOT being approved, so once signed off there was no way to touch it
+ * again, however obviously wrong it turned out to be three steps later.
+ *
+ * Reopening is expressed as un-approval rather than as a separate "editing"
+ * flag, and that is the whole trick: the existing per-scene controls
+ * (rewrite the line, regenerate the image, re-record the voice, redo the
+ * clip) reappear on their own, and n8n's gates — which ask whether EVERY
+ * scene is approved — reopen with them. Nothing new has to be taught the
+ * pipeline.
+ *
+ * Only the scene named here is touched, so the other scenes keep their
+ * approvals and the batch has exactly one piece of outstanding work. What
+ * cascades is what was actually derived from the changed thing:
+ *   - the line drives the take and the cut  → voice + video
+ *   - the image is the clip's start frame   → video
+ *   - the take is muxed into the cut        → video
+ *   - the clip is the last derived asset    → nothing
+ * Regeneration is deliberately NOT started here: reopening says "this needs
+ * another look", and the producer then picks what to change.
+ */
+export async function reopenStep(
+  projectId: string,
+  sceneId: string,
+  step: ReopenStep,
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  const cascade: Record<ReopenStep, Record<string, boolean>> = {
+    scenes: { "Aprobare Scenă": false, "Aprobare Voce": false, "Aprobare Video": false },
+    images: { "Aprobare Imagine": false, "Aprobare Video": false },
+    audio: { "Aprobare Voce": false, "Aprobare Video": false },
+    video: { "Aprobare Video": false },
+  };
+  const label: Record<ReopenStep, string> = {
+    scenes: "the script",
+    images: "the image",
+    audio: "the voice",
+    video: "the clip",
+  };
+  try {
+    await writeSceneFields(sceneId, cascade[step]);
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message: `Reopened ${label[step]} for this scene — change it, then approve it again. Every other scene keeps its approval.`,
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
 /** Voice review gate — approving here lets video generation start. */
 export async function approveVoices(
   projectId: string,

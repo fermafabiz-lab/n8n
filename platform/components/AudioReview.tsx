@@ -5,6 +5,7 @@ import {
   approveVoices,
   changeProjectVoice,
   regenerateVoice,
+  reopenStep,
   saveCastAssignments,
   saveChapterVoices,
   sceneAction,
@@ -756,7 +757,24 @@ export default function AudioReview({
                           {name === "Narrator" ? "Narrator" : `🗣 ${name}`}
                         </span>
                       ))}
-                    {s.voiceApproved && <span className="chip ok">Approved</span>}
+                    {s.voiceApproved && (
+                      <>
+                        <span className="chip ok">Approved</span>
+                        {/* The way back into a signed-off take. Only this
+                            scene loses its approval; the clip goes back with
+                            it, since the take is muxed into the cut. */}
+                        <button
+                          type="button"
+                          className="abtn"
+                          disabled={pending}
+                          onClick={() => run(() => reopenStep(projectId, s.id, "audio"))}
+                          style={{ padding: "3px 9px", fontSize: 11.5, lineHeight: 1.4 }}
+                          title="Reopen the voice for this scene only — every other scene keeps its approval"
+                        >
+                          ✎ Make changes
+                        </button>
+                      </>
+                    )}
                     {flag && <span className="chip wait">{flag}</span>}
                     {fit && <span className="chip wait">{fit}</span>}
                   </div>

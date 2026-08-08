@@ -871,6 +871,26 @@ on a visible 8-second grid.
 
 ## Environment
 
+**There is no `main`. The trunk is `claude/hello-7o90qh`**, and it is what
+deploys — Railway auto-deploys it (documented above), and the site follows the
+same branch. Feature branches are `claude/*` and reach the trunk through a
+merge commit; `9353445 "Merge … into deploy-merge"` is the pattern.
+
+**A branch that is pushed is not a branch that is deployed**, and the gap is
+invisible from here: a session told to develop on its own `claude/*` branch
+will push, report success, and leave the producer reloading a build that never
+contained the change — who then reasonably says the fix did not work. That
+already happened once (the step-scoped scene controls). **Finish the job by
+merging into the trunk**, or say in as many words that the change is not live
+yet and what is needed to make it so. This is the same class of error as the
+stale Remotion Studio above: the artifact on screen outlives the fix.
+
+Verifying a deploy from a Claude Code web session is **not possible** — the
+proxy answers 403 for `house-of-videos.com` (the bare site) as well as for
+`wf7.`, and the Vercel MCP connector authenticates but lists zero projects
+under the `FermaFabiz` team, so it cannot reach the deployment either. The
+only confirmation available is the producer reloading the page.
+
 **Vercel** (the site): `N8N_API_URL`, `N8N_API_KEY`,
 `N8N_NEW_PROJECT_WEBHOOK_URL` — all three must point at the current n8n host.
 See `platform/README.md`.

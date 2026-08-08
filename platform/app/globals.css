@@ -1745,70 +1745,64 @@ a {
   opacity: 1;
 }
 .briefart {
-  position: sticky;
-  top: 104px;
+  /* Only a spacer now: the strip itself is fixed to the viewport so it can
+     run the full height of the screen. This keeps the grid track, and with
+     it the form's centre line. */
   min-height: 1px;
 }
 
-/* --- the genre spiral ---
-   A film strip coiled around an invisible vertical cylinder, descending the
-   right rail: every band is a genre the factory can make, so the page shows
-   its range while you commission from it. Sticky and viewport-tall, so
-   scrolling never reaches an end — the bands simply keep arriving. */
+/* --- the genre strip ---
+   A column of film frames running the FULL height of the screen down the
+   right of the page: every frame is a genre the factory can make, so the
+   page shows its range while you commission from it.
+
+   Fixed, not sticky, and deliberately not inside the grid cell it belongs
+   to: the strip has to reach the top of the viewport, and the column it
+   sits in starts below the hero. `.briefart` still holds the grid track, so
+   the form keeps its centre line. */
 .gspiral {
-  position: relative;
-  height: calc(100vh - 140px);
-  /* Wider than the rail. The strand swings ±80px and its bands are 130 long,
-     so a 224px box clipped the turns to stubs and the chain read as scattered
-     tiles. The overflow goes into the empty gutter either side. */
-  width: 400px;
-  margin-inline: -88px;
-  /* The coil is wider than the rail; clipping is what keeps the form's
-     centre line untouched. */
+  position: fixed;
+  top: 0;
+  height: 100vh;
+  /* Centred on the art track: half the form (300) + the gap (48) + half the
+     track (112), plus clearance so the frames never overlap the form's
+     surface. Below 1240px the track is dropped and so is this. */
+  left: 50%;
+  margin-left: 520px;
+  width: 420px;
+  transform: translateX(-50%);
   overflow: hidden;
-  /* Deep enough that the far side of the cylinder doesn't fish-eye. */
-  perspective: 1400px;
-  perspective-origin: 50% 45%;
-  -webkit-mask-image: linear-gradient(180deg, transparent, #000 13%, #000 87%, transparent);
-  mask-image: linear-gradient(180deg, transparent, #000 13%, #000 87%, transparent);
+  /* Deep enough that the ends of the barrel recede without fish-eyeing. */
+  perspective: 1500px;
+  perspective-origin: 50% 50%;
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 9%, #000 91%, transparent);
+  mask-image: linear-gradient(180deg, transparent, #000 9%, #000 91%, transparent);
   pointer-events: none;
+  z-index: 0;
 }
-/* Seen from slightly above, the way the reference is — dead level would read
-   as a stack of hoops rather than a coil going away from you. */
 .gsstage {
   position: absolute;
   inset: 0;
   transform-style: preserve-3d;
-  transform: rotateX(11deg);
 }
 .gsband {
-  /* Sized by the component: the band is a strip along the path, not a
-     zero-width anchor for a ring. */
+  /* Sized and placed by the component; the anchor is the top centre of the
+     strip and every frame is offset from it. */
   position: absolute;
   left: 50%;
   top: 0;
   display: block;
-  transform-style: preserve-3d;
-  animation-name: gspiral;
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
-  will-change: transform;
   background-repeat: no-repeat;
   background-size: cover;
   background-position: center;
-  /* The far half of the pole is the ribbon's back. It has to draw, or the
-     barber pole becomes a half-pole with holes where it wraps round. */
-  backface-visibility: visible;
-  /* The strip has edges: a bright top lip and a dark under-edge give it
-     thickness without a second element per band. */
+  will-change: transform;
+  /* The frame has edges: a bright top lip and a dark under-edge give it
+     thickness without a second element each. */
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    inset 0 -2px 3px rgba(0, 0, 0, 0.55);
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.6),
+    0 10px 26px rgba(0, 0, 0, 0.5);
 }
-/* Each band is one whole video, and the bands touch: the strand is a
-   CONTINUOUS strip, and only the change of direction along the path draws
-   the helix. Nothing here may add a gap — no per-band scale, no twist away
-   from the viewer, both of which used to leave the chain dotted. */
 
 /* The reserved height lives HERE, not on .sprev: a min-height on a
    -webkit-box (which the line clamp needs) makes Chromium report an 80px

@@ -1,23 +1,26 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+
 /**
- * The genre spiral — a helix of film rings drifting down the right rail.
+ * The genre strip — a column of film frames running the full height of the
+ * screen, down the right of the page.
  *
- * It is a shop window: every ring is a genre the factory can make, so the
+ * It is a shop window: every frame is a genre the factory can make, so the
  * page shows the range of the thing you are about to commission while you
  * commission it.
  *
- * Each ring carries `public/genres/<slug>.webp` when that file exists and
+ * Each frame carries `public/genres/<slug>.webp` when that file exists and
  * falls back to a gradient built from the genre's own palette when it does
- * not — so the spiral is complete from the first render and gets
- * photographic the moment the stills are dropped in, with no code change.
+ * not — so the strip is complete from the first render and gets photographic
+ * the moment the stills are dropped in, with no code change.
  */
 
 /**
  * Flip to true once `public/genres/<slug>.webp` exists for every genre
- * below. Until then the rings use their gradients — asking for 32 images
- * that aren't there would mean 32 failed requests on every page load, and
- * the fallback is what would render anyway.
+ * below. Until then the frames use their gradients — asking for images that
+ * aren't there would mean a failed request each on every page load, and the
+ * fallback is what would render anyway.
  */
 const HAS_STILLS = true;
 
@@ -113,137 +116,111 @@ export const GENRES: Genre[] = [
 ];
 
 /**
- * Every genre twice, so the strand stays full on a tall screen without any
- * one band having to travel a suspiciously long way.
+ * Every genre twice, so the column stays full on a tall screen and the wrap
+ * point is always far off the bottom of the viewport.
  */
-const RINGS = [...GENRES, ...GENRES];
+const FRAMES = [...GENRES, ...GENRES];
+
+const TILE_W = 340; // px — wider than the rail; the overflow is clipped
+const TILE_H = 78; // px
+/** Frame to frame. The difference from TILE_H is the dark gap between them. */
+const PITCH = 96;
+const LOOP = FRAMES.length * PITCH; // the whole column, before it repeats
+/** How far the column travels per pixel of page scroll. */
+const SCROLL_RATE = 0.45;
 
 /**
- * The strand, as a barber's pole.
- *
- * The bands are a single ribbon wound around an invisible vertical cylinder:
- * each one covers the segment of the helix between its own angle and the
- * next, so they meet edge to edge, and the ribbon carries on around the BACK
- * of the cylinder instead of turning around at the sides. That is the whole
- * difference between a barber pole and a flat S drawn on the page — the
- * stripe never reverses, it just goes away from you and comes back.
- *
- * Because the turn per band and the rise per band are both constant, so is
- * the stripe's angle: every band is the same size and the same lean, exactly
- * like a real pole. Nothing per-band may scale — two neighbours at different
- * scales cannot share an edge, which is what used to leave the strand dotted.
+ * The barrel. Frames away from the middle of the screen tilt away and sink
+ * back, so the column reads as wrapped around a very large cylinder lying
+ * across the page rather than as a flat stack of rectangles. `t` is -1 at the
+ * top of the viewport, 0 in the middle, +1 at the bottom.
  */
-const RADIUS = 105; // px — the cylinder's radius
-/** Vertical rise per radian of turn. Sets the stripe's angle. */
-/* One full turn is 2π·RISE ≈ 190px of descent. That number is the whole
-   difference between reading as a pole and reading as a cord: the strand
-   only shows through a ~350px window above the fold, so a turn has to FIT in
-   it. At the previous rise a turn took 750px and all anyone ever saw was one
-   diagonal arc. */
-const RISE = 30;
-/* The stripe's width, and it is set against the PITCH (the ≈190px a full
-   turn descends), not against the drop between neighbouring bands. A barber
-   pole reads as alternating stripes: a thin ribbon on a wide pitch is a wire
-   winding through the air, not a pole. At 92 against 190 the ribbon and the
-   dark gap between its turns are about equal, which is the alternation the
-   eye is looking for. */
-const BAND_H = 92;
-/** Fourteen bands per full turn of the pole. */
-const TURN_PER_BAND = (2 * Math.PI) / 14;
+const TILT = 30; // deg of rotateX at the very top and bottom
+const SINK = 150; // px the ends recede
+/** A slow sway, so the column is never a perfectly straight ruler. */
+const SWAY_X = 10; // px
+const SWAY_DEG = 3.2; // deg of roll
 
-const SPAN = RINGS.length * TURN_PER_BAND * RISE;
-/** Straight-line distance across the face of the cylinder for one band. */
-const CHORD = 2 * RADIUS * Math.sin(TURN_PER_BAND / 2);
-const DROP = TURN_PER_BAND * RISE;
-/** +1: a hairline of overlap beats a hairline of gap. */
-const BAND_W = Math.ceil(Math.hypot(CHORD, DROP)) + 1;
-/** The stripe's angle — constant, the way a barber pole's is. ≈50°. */
-const LEAN = (Math.atan2(DROP, CHORD) * 180) / Math.PI;
-
-/** Where the band starting at fraction p of the descent sits on the pole. */
-function poseAt(p: number) {
-  // Mid-angle of the segment this band covers, so its ends land on the
-  // segment's ends rather than overshooting one side.
-  const a = (p * RINGS.length + 0.5) * TURN_PER_BAND;
-  return {
-    y: -BAND_H + p * SPAN,
-    turn: (a * 180) / Math.PI,
-    depth: Math.cos(a), // +1 at the front of the pole, -1 behind it
-  };
+function transformFor(y: number, viewportH: number) {
+  const t = Math.max(-1.6, Math.min(1.6, (y - viewportH / 2) / (viewportH / 2)));
+  // The sway is a function of the frame's position ON THE STRIP, not of where
+  // it happens to be on screen — otherwise the whole column would ripple as
+  // you scroll instead of the frames riding through a fixed shape.
+  const phase = (y / LOOP) * Math.PI * 2;
+  return (
+    `translate3d(${(Math.sin(phase * 3) * SWAY_X).toFixed(1)}px, ${y.toFixed(1)}px, ` +
+    `${(-Math.abs(t) * SINK).toFixed(1)}px) ` +
+    `rotateX(${(-t * TILT).toFixed(2)}deg) ` +
+    `rotate(${(Math.sin(phase * 3 + 1) * SWAY_DEG).toFixed(2)}deg)`
+  );
 }
 
-const transformFor = (p: number) => {
-  const { y, turn } = poseAt(p);
-  // Order is the whole trick: drop down the axis, turn around the axis, push
-  // out to the surface — and only then lean the band within the tangent plane
-  // it now lies in. Leaning earlier tilts the axis it is turned about and
-  // scatters the bands.
-  return (
-    `translate3d(0px, ${y.toFixed(1)}px, 0) ` +
-    `rotateY(${turn.toFixed(2)}deg) translateZ(${RADIUS}px) ` +
-    `rotate(${LEAN.toFixed(2)}deg)`
-  );
-};
+/** Positive modulo — `%` alone hands back negatives and drops a frame. */
+const wrap = (v: number, m: number) => ((v % m) + m) % m;
 
-/* The far side of the pole must stay VISIBLE, only dimmer. Dropping it to
-   0.4 on a black page hid it completely, and a barber pole with its back
-   half missing reads as a thin cord winding through the air rather than as a
-   cylinder. The range below is the shading that makes it look round. */
-const brightnessAt = (depth: number) => 0.66 + 0.44 * (0.5 + 0.5 * depth);
+export default function GenreSpiral() {
+  const tiles = useRef<(HTMLSpanElement | null)[]>([]);
 
-/**
- * Generated, not hand-written: the keyframes have to trace the same path as
- * the resting pose, or the position a prefers-reduced-motion user sees —
- * animations are stripped globally — would not match the motion.
- *
- * The step count is a multiple of the band count on purpose. Between two
- * stops CSS interpolates linearly, and a rotation interpolated coarsely cuts
- * the corner off the circle, pulling the ribbon inward and apart.
- */
-const KEYFRAMES = (() => {
-  const stops: string[] = [];
-  const STEPS = RINGS.length * 4;
-  for (let i = 0; i <= STEPS; i++) {
-    const p = i / STEPS;
-    const { depth } = poseAt(p);
-    stops.push(
-      `${(p * 100).toFixed(3)}%{transform:${transformFor(p)};` +
-        `filter:brightness(${brightnessAt(depth).toFixed(3)})}`,
-    );
-  }
-  return `@keyframes gspiral{${stops.join("")}}`;
-})();
+  useEffect(() => {
+    let raf = 0;
+    const paint = () => {
+      raf = 0;
+      const vh = window.innerHeight;
+      // Scroll drives the strip: the frames arrive as you read down the form,
+      // which is the point — it is the page's own motion, not a loop playing
+      // beside it. Nothing moves on its own, so there is no reduced-motion
+      // case to answer here.
+      const offset = window.scrollY * SCROLL_RATE;
+      for (let i = 0; i < tiles.current.length; i++) {
+        const el = tiles.current[i];
+        if (!el) continue;
+        // The modulus is the STRIP's own length, and only that: wrapping on
+        // anything else (LOOP + vh was the first attempt) inserts a gap the
+        // size of the difference and sends a hole travelling through the
+        // column. The −vh shift only decides where the seam sits — a screen
+        // above the top, so a frame is never seen appearing.
+        const y = wrap(i * PITCH - offset + vh, LOOP) - vh;
+        el.style.transform = transformFor(y, vh);
+      }
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(paint);
+    };
+    paint();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, []);
 
-export default function GenreSpiral({ speedSeconds = 70 }: { speedSeconds?: number }) {
   return (
     <div className="gspiral" aria-hidden="true">
-      <style>{KEYFRAMES}</style>
       <div className="gsstage">
-        {RINGS.map((g, i) => {
-          const p = i / RINGS.length;
-          const pose = poseAt(p);
-          return (
-            <span
-              key={`${g.slug}-${i}`}
-              className="gsband"
-              style={{
-                width: BAND_W,
-                height: BAND_H,
-                marginLeft: -BAND_W / 2,
-                marginTop: -BAND_H / 2,
-                backgroundImage: HAS_STILLS
-                  ? `url(/genres/${g.slug}.webp), ${g.gradient}`
-                  : g.gradient,
-                // The resting pose lives on the element as well as in the
-                // keyframes — see KEYFRAMES.
-                transform: transformFor(p),
-                filter: `brightness(${brightnessAt(pose.depth).toFixed(3)})`,
-                animationDelay: `${(-p * speedSeconds).toFixed(2)}s`,
-                animationDuration: `${speedSeconds}s`,
-              }}
-            />
-          );
-        })}
+        {FRAMES.map((g, i) => (
+          <span
+            key={`${g.slug}-${i}`}
+            ref={(el) => {
+              tiles.current[i] = el;
+            }}
+            className="gsband"
+            style={{
+              width: TILE_W,
+              height: TILE_H,
+              marginLeft: -TILE_W / 2,
+              marginTop: -TILE_H / 2,
+              backgroundImage: HAS_STILLS
+                ? `url(/genres/${g.slug}.webp), ${g.gradient}`
+                : g.gradient,
+              // A resting pose for the server render and the first paint,
+              // against a nominal viewport. The effect above corrects it to
+              // the real one on the same frame the page becomes interactive.
+              transform: transformFor(i * PITCH, 900),
+            }}
+          />
+        ))}
       </div>
     </div>
   );

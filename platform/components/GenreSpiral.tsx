@@ -123,112 +123,83 @@ export const GENRES: Genre[] = [
  *
  * `LEAN` is the angle the stripe makes with the horizontal, and everything
  * follows from it: the rise per radian of turn is `R · tan(LEAN)`, so one
- * thread descends `2π · rise` in a full turn. At 60° that pitch is six poles
- * wide — far too much for a single thread to cover the surface, which is why
- * a real barber's pole carries several stripes side by side. So does this
- * one: `STARTS` threads, each offset down the axis by a share of the pitch,
- * landing edge to edge.
+ * thread descends `2π · rise` in a full turn. That pitch is wider than the
+ * pole, so a single thread cannot cover it — which is why a real barber's
+ * pole carries several stripes side by side, and why this one does too.
  */
 const LEAN = 30; // degrees off horizontal
 const R = 120; // px, the pole's radius
 const RISE = R * Math.tan((LEAN * Math.PI) / 180); // px of descent per radian
 const PITCH_Y = 2 * Math.PI * RISE; // one turn of one thread
-/**
- * Frames around the pole, per turn of one thread. It is the only lever on how
- * BIG each video is: fewer frames around means each one covers more of the
- * circumference, so it is wider. It is also the pole's roundness, since every
- * frame is flat and the silhouette is a polygon with this many sides — so it
- * trades one against the other, and the shading on the container makes up the
- * difference.
- */
-const AROUND = 6;
-const STEP = (2 * Math.PI) / AROUND;
 
 /**
- * The frame's own size, measured on the UNROLLED surface — arc length, not
- * chord. The projection below does the foreshortening; building it into the
- * size as well would count it twice and leave the frames short of each other.
+ * A frame is NOT one element. It is a run of narrow vertical slabs, each
+ * standing at its own angle on the cylinder — and that is the only way a
+ * picture can actually wrap around the pole instead of being a flat card
+ * turning inside a cylindrical arrangement. Each slab is squeezed by the
+ * cosine of ITS OWN angle, so a frame near the edge of the pole compresses
+ * across its width exactly as a real one would.
+ *
+ * The slab count around the pole is therefore its roundness, and the cost:
+ * sixteen is a step of 22.5°, small enough that the surface reads as curved.
  */
-const ARC_LEN = R * STEP;
-const DROP = STEP * RISE;
-/** The spacing between two frames along their thread. */
-const PATH_STEP = Math.hypot(ARC_LEN, DROP);
+const SLABS_AROUND = 16;
+const dA = (2 * Math.PI) / SLABS_AROUND;
 /**
- * Frames overlap along the thread by this much at each end, and the overlap
- * is what the cross-fade is made of: each frame's mask ramps from clear to
- * solid across exactly the overlap, so where two meet, one ramps down while
- * the other ramps up and the two alphas sum to one. Linear ramps are what
- * make that sum exact — an eased fade would dip and leave a dark seam.
+ * Unrolled width of one slab — the true arc length, kept unrounded. The
+ * element is drawn a little wider so neighbours overlap by a hairline, but
+ * the PICTURE is laid out against the true width: round the two together and
+ * each slab shows the picture about two pixels off from the last, which
+ * accumulates into visible vertical banding across every frame.
  */
-const OVERLAP = Math.round(PATH_STEP * 0.22);
+const SLAB_U = R * dA;
+const SLAB_W = SLAB_U + 1.2;
+/** How far one slab descends along its thread. */
+const SLAB_DROP = dA * RISE;
+
+/** Slabs per picture — four covers 90° of the pole, so the frames stay big. */
+const FRAME_SLABS = 4;
 /**
- * The ramp is a little SHORTER than the overlap it sits in. Running it the
- * full length is what a textbook cross-fade does, and it dissolved the
- * pictures into a wash — with both ramps that long, the part of a frame at
- * full strength was barely a third of it. Stopping short means a frame
- * reaches full opacity while still inside its neighbour, which cannot open a
- * seam (there is picture under it either way) and gives every video a solid
- * middle to be seen in.
+ * The picture is laid across one slab MORE than its frame owns. That spare
+ * column is what the next frame fades in over: without it the bridging slab
+ * would have to repeat the picture's last strip, which shows as a stutter.
  */
-const RAMP = 0.72;
-const TILE_W = Math.ceil(PATH_STEP) + 2 * OVERLAP;
-/** Where the ramp ends, as a share of the frame's width. */
-const FADE_PCT = ((2 * OVERLAP * RAMP) / TILE_W) * 100;
+const IMG_SPAN = FRAME_SLABS + 1;
 
 const STARTS = 3;
 const THREAD_GAP = PITCH_Y / STARTS;
 /**
- * Across the stripe. The bare minimum is the axial gap between threads times
- * cos(lean) — at which two neighbours meet on exactly one line and any
- * rounding anywhere opens a seam. The overlap factor buys that margin back;
- * overlapping frames simply layer, which costs nothing.
+ * The stripe's width across itself, and it is deliberately LESS than the
+ * space between threads: the leftover is a dark gap between the rows, which
+ * is what a barber's pole has. It also removes the need to fade the top and
+ * bottom of every picture — nothing butts against anything there any more,
+ * so there is no seam to hide, and the pictures keep their full height.
  */
-const TILE_H = Math.ceil(THREAD_GAP * Math.cos((LEAN * Math.PI) / 180) * 1.55);
+const BAND_W = (THREAD_GAP * Math.cos((LEAN * Math.PI) / 180)) * 0.82;
+/** Measured up the screen rather than across the stripe. */
+const SLAB_H = Math.ceil(BAND_W / Math.cos((LEAN * Math.PI) / 180));
+
+/** Slabs down each thread — enough to run the length of a long form. */
+const COVER = 3200; // px of form the pole must reach
+const PER_THREAD = Math.ceil(COVER / SLAB_DROP) + 1;
 
 /**
- * The frame dissolves on ALL FOUR sides, not just the two along its thread.
- * A hard edge across the stripe is what showed the pictures' ends and gave
- * the pole its square, cut-out look: the frames butted against their
- * neighbours in the next thread on a straight line, and every corner was a
- * visible corner.
+ * The projection is done here rather than with CSS `perspective`, which is
+ * measured from its own box — and this box is as tall as the form, so a
+ * perspective would project the top of the pole from a vanishing point a
+ * screen and a half below it. Orthographic has no such origin: x is
+ * `R·sin(a)`, the slab is squeezed by `cos(a)`, and the far half is not
+ * drawn.
  *
- * Both ramps span exactly their own overlap, so each one is a true
- * cross-fade: two neighbours' alphas sum to one across the join. Because the
- * two masks multiply, the corners — where four frames meet — fade twice as
- * fast as the edges, which is what rounds them off. The sum still comes to
- * one there: (h1 + h2)(v1 + v2) = 1.
- */
-const CROSS_OVERLAP = TILE_H - THREAD_GAP * Math.cos((LEAN * Math.PI) / 180);
-const FADE_V_PCT = ((CROSS_OVERLAP * RAMP) / TILE_H) * 100;
-const SEAM_MASK =
-  `linear-gradient(90deg, rgba(0,0,0,0) 0%, #000 ${FADE_PCT.toFixed(2)}%, ` +
-  `#000 ${(100 - FADE_PCT).toFixed(2)}%, rgba(0,0,0,0) 100%), ` +
-  `linear-gradient(180deg, rgba(0,0,0,0) 0%, #000 ${FADE_V_PCT.toFixed(2)}%, ` +
-  `#000 ${(100 - FADE_V_PCT).toFixed(2)}%, rgba(0,0,0,0) 100%)`;
-
-/**
- * Frames down each thread — enough to run the length of a long form. Derived
- * rather than guessed: at 45° the pole descends much more slowly per frame
- * than at 60°, so a fixed count that covered the form before would now stop
- * a third of the way down it.
- */
-const COVER = 3800; // px of form the pole must reach
-const PER_THREAD = Math.ceil(COVER / DROP) + 1;
-
-/**
- * The pole is projected by hand rather than with CSS `perspective`, and that
- * is the whole reason this version works where the last one did not: a
- * perspective is measured from ITS OWN box, and this box is as tall as the
- * form — thousands of pixels — so every frame near the top was projected
- * from a vanishing point a screen and a half below it and came out stretched
- * and scattered. Orthographic projection has no such origin: x is
- * `R·sin(a)`, the frame is squeezed by `cos(a)`, and the far half is simply
- * not drawn. The squeeze is applied AFTER the frame's own lean, which is
- * what makes the stripe steepen toward the edges the way a real one does.
+ * `skewY` is what replaced the old whole-frame `rotate`. A slab must keep
+ * VERTICAL sides — the boundary between two angular slices of a cylinder is
+ * a vertical line — while its top and bottom follow the stripe's lean. That
+ * is exactly what a skew does and what a rotation cannot: rotating a slab
+ * tilts its sides too, and the sides then cross their neighbours.
  *
- * All of it lives in one shared keyframe walk, because every frame follows
- * the same path and differs only in where it starts — so the pole spins for
- * the cost of one animation, and `animation-delay` places each frame on it.
+ * It is one shared keyframe walk: every slab follows the same path and
+ * differs only in where it starts, so the pole spins for the cost of a
+ * single animation and `animation-delay` places each slab on it.
  */
 const TURN = (() => {
   const stops: string[] = [];
@@ -237,64 +208,81 @@ const TURN = (() => {
     const p = i / STEPS;
     const a = p * 2 * Math.PI;
     const c = Math.cos(a);
-    const front = c > 0.02;
     stops.push(
       `${(p * 100).toFixed(2)}%{transform:translateX(${(Math.sin(a) * R).toFixed(1)}px) ` +
-        `scaleX(${Math.max(c, 0.02).toFixed(4)}) rotate(${LEAN}deg);` +
-        `filter:brightness(${(0.34 + 0.66 * Math.max(c, 0)).toFixed(3)});` +
-        `opacity:${front ? 1 : 0}}`,
+        `scaleX(${Math.max(c, 0.02).toFixed(4)}) skewY(${LEAN}deg);` +
+        // Shading per slab is a STEP: it is constant across a slab and jumps at
+        // the next one, so a wide range draws a visible line at every slab
+        // boundary — sixteen hairlines down each stripe. Most of the roundness
+        // is the container's fixed gradient instead, which is continuous;
+        // this only has to carry the part that must travel with the surface.
+        `filter:brightness(${(0.66 + 0.34 * Math.max(c, 0)).toFixed(3)});` +
+        `opacity:${c > 0.02 ? 1 : 0}}`,
     );
   }
   return `@keyframes gspole{${stops.join("")}}`;
 })();
 
+/** The bridge slab's ramp: the outgoing picture thins out across it. */
+const BRIDGE_MASK =
+  "linear-gradient(90deg, #000 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0) 100%)";
+
 /** Fold any phase into one turn. `%` alone hands back negatives. */
 const wrap01 = (v: number) => ((v % 1) + 1) % 1;
 
-export default function GenreSpiral({ speedSeconds = 34 }: { speedSeconds?: number }) {
+export default function GenreSpiral({ speedSeconds = 40 }: { speedSeconds?: number }) {
   const rows: React.ReactElement[] = [];
+
+  const imageFor = (i: number) => {
+    const g = GENRES[((i % GENRES.length) + GENRES.length) % GENRES.length];
+    return HAS_STILLS ? `url(/genres/${g.slug}.webp), ${g.gradient}` : g.gradient;
+  };
+
   for (let s = 0; s < STARTS; s++) {
+    // Wound back by whole slabs so every thread starts level with the first.
+    // A thread's height is tied to its angle, so without this each one starts
+    // lower than the last and the top of the pole is missing rows.
+    const lift = Math.round(THREAD_GAP / SLAB_DROP) * s;
     for (let k = 0; k < PER_THREAD; k++) {
-      const g = GENRES[(s * PER_THREAD + k) % GENRES.length];
-      // Mid-angle and mid-height of the segment this frame covers, so its
-      // ends land on the segment's ends instead of overshooting one side.
-      //
-      // The `- lift` is what makes the pole SOLID, and leaving it out is the
-      // bug this cost the longest: a thread's height is tied to its angle, so
-      // starting every thread at the same frame index starts each one lower
-      // than the last, and the top of the pole ends up with only one or two
-      // of the seven threads present — black holes between them. Each thread
-      // is wound back by whole frames until it starts at the top like the
-      // first. Winding back by WHOLE frames matters: the angle moves with it,
-      // so the frame stays a genuine frame of that same thread.
-      const lift = Math.round((s * THREAD_GAP) / DROP);
-      const a = (k - lift + 0.5) * STEP;
+      const j = k - lift;
+      const a = (j + 0.5) * dA;
       const y = a * RISE + s * THREAD_GAP;
+      const frame = Math.floor(j / FRAME_SLABS) + s * 5;
+      const within = ((j % FRAME_SLABS) + FRAME_SLABS) % FRAME_SLABS;
+      const common = {
+        width: SLAB_W,
+        height: SLAB_H,
+        marginLeft: -SLAB_W / 2,
+        marginTop: -SLAB_H / 2,
+        backgroundSize: `${(IMG_SPAN * SLAB_U).toFixed(2)}px 100%`,
+        animationDelay: `${(-wrap01(a / (2 * Math.PI)) * speedSeconds).toFixed(3)}s`,
+        animationDuration: `${speedSeconds}s`,
+      };
       rows.push(
         <span key={`${s}-${k}`} className="gsrow" style={{ top: y }}>
           <i
             className="gsband"
             style={{
-              width: TILE_W,
-              height: TILE_H,
-              marginLeft: -TILE_W / 2,
-              marginTop: -TILE_H / 2,
-              WebkitMaskImage: SEAM_MASK,
-              maskImage: SEAM_MASK,
-              backgroundImage: HAS_STILLS
-                ? `url(/genres/${g.slug}.webp), ${g.gradient}`
-                : g.gradient,
-              // Where on the turn this frame starts. The phase is folded
-              // into one turn FIRST: a wound-back thread has a negative
-              // angle, which would make the delay positive — and a positive
-              // delay means the frame simply sits untransformed, unrotated
-              // and at full brightness, until its turn comes round. That is
-              // what a flat stack of rectangles down one side of the pole
-              // was.
-              animationDelay: `${(-wrap01(a / (2 * Math.PI)) * speedSeconds).toFixed(3)}s`,
-              animationDuration: `${speedSeconds}s`,
+              ...common,
+              backgroundImage: imageFor(frame),
+              backgroundPosition: `${(-within * SLAB_U).toFixed(2)}px center`,
             }}
           />
+          {/* At every picture boundary, the OUTGOING one carries on over the
+              first slab of the next and thins out across it, so one dissolves
+              into the other instead of cutting. */}
+          {within === 0 && (
+            <i
+              className="gsband gsbridge"
+              style={{
+                ...common,
+                backgroundImage: imageFor(frame - 1),
+                backgroundPosition: `${(-FRAME_SLABS * SLAB_U).toFixed(2)}px center`,
+                WebkitMaskImage: BRIDGE_MASK,
+                maskImage: BRIDGE_MASK,
+              }}
+            />
+          )}
         </span>,
       );
     }
@@ -303,7 +291,7 @@ export default function GenreSpiral({ speedSeconds = 34 }: { speedSeconds?: numb
   return (
     <div className="gspiral" aria-hidden="true">
       <style>{TURN}</style>
-      <div className="gsstage" style={{ height: PER_THREAD * DROP }}>
+      <div className="gsstage" style={{ height: PER_THREAD * SLAB_DROP }}>
         {rows}
       </div>
     </div>

@@ -3,15 +3,12 @@
 import { useState, useTransition } from "react";
 import {
   approveAllOfKind,
-  regenerateSceneText,
-  regenerateVoice,
   reopenStep,
   saveImagePrompt,
   sceneAction,
   type ActionResult,
 } from "@/app/actions";
 import type { Scene, StatusKind } from "@/lib/data";
-import { mediaSrc } from "@/lib/media";
 import { explainRefusal } from "@/lib/refusals";
 import MediaPlayer from "@/components/MediaPlayer";
 import RegenBadge from "@/components/RegenBadge";
@@ -81,6 +78,7 @@ export default function SceneBoard({
   scenes,
   portrait = false,
   focus = null,
+  audioPanel = false,
 }: {
   projectId: string;
   scenes: Scene[];
@@ -94,14 +92,20 @@ export default function SceneBoard({
    * the newest asset is right.
    */
   focus?: "images" | "video" | null;
+  /**
+   * Whether the voice panel (AudioReview) is on the page below.
+   *
+   * The board never renders the audio step itself, so it may only hand a
+   * scene to that step when something is actually there to catch it —
+   * otherwise the scene lands on a step that isn't rendered and shows no
+   * controls at all.
+   */
+  audioPanel?: boolean;
 }) {
   const running = scenes.find((s) => s.statusKind === "run");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [msg, setMsg] = useState<ActionResult | null>(null);
   const [feedback, setFeedback] = useState("");
-  // Narration drafts per scene for the voice editor (falls back to the
-  // stored text until edited).
-  const [voiceDrafts, setVoiceDrafts] = useState<Record<string, string>>({});
   // Image-prompt drafts, kept in sessionStorage so the 10s auto-refresh
   // can't quietly reset a rewritten prompt to the stored one.
   const promptKey = `vf-imgprompt-drafts:${projectId}`;
@@ -138,6 +142,33 @@ export default function SceneBoard({
   // the monitor even for a scene whose clip already exists. Everywhere else
   // the clip is the fuller answer and wins when there is one.
   const showClip = focus !== "images" && Boolean(active?.videoUrl);
+
+  /**
+   * Which step's controls this board carries — and only that step's.
+   *
+   * Every step is its own page now (the stepper links back to each one), so a
+   * board that also carried its neighbours' buttons put three unrelated
+   * decisions under one heading: the Video page asked you to approve the clip
+   * while simultaneously offering to re-record the line and re-roll the
+   * picture. Each of those belongs to a page of its own, one click away.
+   *
+   * `focus` is the page being looked at. On the live page there is no
+   * parameter, so the step is the first thing this scene still owes —
+   * image, then voice, then clip, which is the pipeline's own order.
+   */
+  const step: "images" | "audio" | "video" =
+    focus ??
+    (active && !active.imageApproved
+      ? "images"
+      : audioPanel && active && !active.voiceApproved
+        ? "audio"
+        : "video");
+
+  // The two blocks this board owns. Voice lives in AudioReview, and the
+  // narration itself in SceneReview — neither belongs here.
+  const imageControls = step === "images" && !!active && !active.imageApproved;
+  const videoControls =
+    step === "video" && !!active && !!active.videoUrl && !active.videoApproved;
 
   // A 44-scene project turned the filmstrip into a wall of unreadable
   // thumbnails. Page it by 8 with arrows; picking a scene from the list in
@@ -265,15 +296,21 @@ export default function SceneBoard({
         {active && (
           <div className="card">
             <h5>{active.label} · Inspector</h5>
+            {/* All three rows stay — the state of the whole scene is worth
+                seeing from any step. Only the row for the step being viewed
+                offers its way back in; the others are read-only here and
+                reopen from their own page. */}
             <div className="kv">
               <span>Image</span>
               {active.imageApproved ? (
                 <span style={approvedRow}>
                   <span className="chip ok">Approved</span>
-                  <MakeChanges
-                    disabled={pending}
-                    onClick={() => run(() => reopenStep(projectId, active.id, "images"))}
-                  />
+                  {step === "images" && (
+                    <MakeChanges
+                      disabled={pending}
+                      onClick={() => run(() => reopenStep(projectId, active.id, "images"))}
+                    />
+                  )}
                 </span>
               ) : (
                 <span className="chip wait">Awaiting review</span>
@@ -285,10 +322,12 @@ export default function SceneBoard({
                 {active.voiceApproved ? (
                   <span style={approvedRow}>
                     <span className="chip ok">Approved</span>
-                    <MakeChanges
-                      disabled={pending}
-                      onClick={() => run(() => reopenStep(projectId, active.id, "audio"))}
-                    />
+                    {step === "audio" && (
+                      <MakeChanges
+                        disabled={pending}
+                        onClick={() => run(() => reopenStep(projectId, active.id, "audio"))}
+                      />
+                    )}
                   </span>
                 ) : (
                   <span className="chip wait">Awaiting review</span>
@@ -300,10 +339,12 @@ export default function SceneBoard({
               {active.videoApproved ? (
                 <span style={approvedRow}>
                   <span className="chip ok">Approved</span>
-                  <MakeChanges
-                    disabled={pending}
-                    onClick={() => run(() => reopenStep(projectId, active.id, "video"))}
-                  />
+                  {step === "video" && (
+                    <MakeChanges
+                      disabled={pending}
+                      onClick={() => run(() => reopenStep(projectId, active.id, "video"))}
+                    />
+                  )}
                 </span>
               ) : active.videoUrl ? (
                 <span className="chip wait">Awaiting review</span>
@@ -332,7 +373,7 @@ export default function SceneBoard({
               </p>
             )}
 
-            {!active.imageApproved && (
+            {imageControls && (
               <>
                 <label
                   style={{ display: "block", fontSize: 12, color: "var(--dim)", margin: "14px 0 6px" }}
@@ -429,91 +470,15 @@ export default function SceneBoard({
                 )}
               </>
             )}
-            {active.voiceUrl && !active.videoApproved && (
-              <div style={{ marginTop: 16, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
-                <label
-                  style={{ display: "block", fontSize: 12, color: "var(--dim)", marginBottom: 6 }}
-                >
-                  Voiceover — listen, edit the narration, regenerate if needed
-                </label>
-                {/* Native player via /api/media — Drive's embed player overlaps
-                    its own controls at this column width, and the proxy is what
-                    keeps the take seekable. */}
-                <audio
-                  key={`voice-${active.id}-${active.voiceUrl}`}
-                  controls
-                  preload="none"
-                  src={mediaSrc(active.voiceUrl)}
-                  style={{ width: "100%", height: 40, display: "block" }}
-                />
-                <textarea
-                  value={voiceDrafts[active.id] ?? active.narration ?? ""}
-                  onChange={(e) =>
-                    setVoiceDrafts((p) => ({ ...p, [active.id]: e.target.value }))
-                  }
-                  rows={3}
-                  spellCheck={false}
-                  style={{
-                    width: "100%",
-                    marginTop: 10,
-                    background: "var(--bg2)",
-                    border: "1px solid var(--line2)",
-                    borderRadius: 10,
-                    color: "var(--ink)",
-                    font: "inherit",
-                    fontSize: 13,
-                    lineHeight: 1.6,
-                    padding: "10px 12px",
-                    resize: "vertical",
-                    outline: "none",
-                  }}
-                />
-                {active.regenVoice ? (
-                  <RegenBadge label="Regenerating voice…" note={active.note} />
-                ) : active.rewriteRequested ? (
-                  <RegenBadge label="Rewriting the line…" note={active.note} />
-                ) : (
-                  <div className="abtns" style={{ marginTop: 8 }}>
-                    <button
-                      className="abtn"
-                      disabled={pending}
-                      onClick={() =>
-                        run(() =>
-                          regenerateVoice(
-                            projectId,
-                            active.id,
-                            voiceDrafts[active.id] ?? active.narration ?? "",
-                          ),
-                        )
-                      }
-                    >
-                      🎙 Regenerate voice
-                    </button>
-                    {/*
-                      Going back a step from here. The writing stage is long
-                      past by the time anyone hears that a line is wrong, and
-                      until now the only way back was to type a replacement by
-                      hand. n8n re-reads the new line automatically, so this
-                      cannot leave text and audio disagreeing.
-                    */}
-                    <button
-                      className="abtn"
-                      disabled={pending}
-                      onClick={() => run(() => regenerateSceneText(projectId, active.id))}
-                    >
-                      ✎ Rewrite the line (AI)
-                    </button>
-                  </div>
-                )}
-                <p style={{ margin: "6px 0 0", fontSize: 11.5, color: "var(--dim)" }}>
-                  Both re-record the voice and re-mux it onto the existing clip
-                  — image and video are NOT regenerated. Editing the text above
-                  and saving it anywhere else also re-records, so the take can
-                  never drift from the line.
-                </p>
-              </div>
-            )}
-            {active.videoUrl && !active.videoApproved && (
+            {/* The voiceover player, its narration box, "Regenerate voice" and
+                "Rewrite the line (AI)" used to sit here, on whichever step the
+                board happened to be showing. All four have a home of their
+                own: the take belongs to the Audio step (AudioReview, which
+                also flags takes that don't fit their shot and can pin a voice
+                per scene), and the line belongs to the Scenes step
+                (SceneReview's "↻ Regenerate scene"). Nothing was lost by
+                dropping them — one click on the stepper reaches either. */}
+            {videoControls && (
               active.regenVideo ? (
                 <RegenBadge label="Regenerating video…" note={active.note} />
               ) : (
@@ -549,7 +514,7 @@ export default function SceneBoard({
               </div>
               )
             )}
-            {(!active.imageApproved || (active.videoUrl && !active.videoApproved)) && (
+            {(imageControls || videoControls) && (
               <textarea
                 value={feedback}
                 onChange={(e) => setFeedback(e.target.value)}

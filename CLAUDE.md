@@ -802,6 +802,24 @@ on a visible 8-second grid.
   decision. `focus` (from the `?stage=` param) keeps the image in the monitor
   on the Images step; everywhere else the clip still wins, because there it is
   the fuller answer.
+- **…and ONLY its own controls.** The same board carried every control whose
+  asset happened to be unapproved, so the Video step asked you to approve the
+  clip while also offering to re-record the line, rewrite it with AI and
+  re-roll the picture — four buttons for three unrelated decisions under one
+  heading. That was defensible while a step was a one-way door; once the
+  stepper made every step its own page, it was just clutter, and the producer
+  said so. `SceneBoard` now derives a single `step` — `focus` when the
+  producer navigated to one, otherwise the first thing the active scene still
+  owes (image → voice → clip, the pipeline's own order) — and renders that
+  step's block alone. The three status rows stay, because the state of the
+  whole scene is worth seeing from anywhere; only the row for the current step
+  carries its "Make changes". **Removing a control means checking it has a
+  home, not just a replacement**: the take belongs to `AudioReview` (which is
+  strictly richer — duration flags, fit-vs-shot warnings, per-scene voice pin)
+  and the line to `SceneReview`'s "↻ Regenerate scene", so nothing was lost.
+  The one coupling this creates: the board may route a scene to the audio step
+  only when `AudioReview` is actually rendered, hence the `audioPanel` prop —
+  routing to a step that isn't on the page shows no controls at all.
 - **Approval used to be one-way, and "Make changes" is the door back.** Every
   control in a step is gated on the scene NOT being approved, so signing off
   froze it — however wrong it turned out three steps later. `reopenStep()`
@@ -874,6 +892,26 @@ on a visible 8-second grid.
   and inert on purpose — so colleagues can work while the rest is wired up.
 
 ## Environment
+
+**There is no `main`. The trunk is `claude/hello-7o90qh`**, and it is what
+deploys — Railway auto-deploys it (documented above), and the site follows the
+same branch. Feature branches are `claude/*` and reach the trunk through a
+merge commit; `9353445 "Merge … into deploy-merge"` is the pattern.
+
+**A branch that is pushed is not a branch that is deployed**, and the gap is
+invisible from here: a session told to develop on its own `claude/*` branch
+will push, report success, and leave the producer reloading a build that never
+contained the change — who then reasonably says the fix did not work. That
+already happened once (the step-scoped scene controls). **Finish the job by
+merging into the trunk**, or say in as many words that the change is not live
+yet and what is needed to make it so. This is the same class of error as the
+stale Remotion Studio above: the artifact on screen outlives the fix.
+
+Verifying a deploy from a Claude Code web session is **not possible** — the
+proxy answers 403 for `house-of-videos.com` (the bare site) as well as for
+`wf7.`, and the Vercel MCP connector authenticates but lists zero projects
+under the `FermaFabiz` team, so it cannot reach the deployment either. The
+only confirmation available is the producer reloading the page.
 
 **Vercel** (the site): `N8N_API_URL`, `N8N_API_KEY`,
 `N8N_NEW_PROJECT_WEBHOOK_URL` — all three must point at the current n8n host.

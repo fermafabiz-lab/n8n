@@ -1709,10 +1709,27 @@ a {
   right: 0;
   bottom: 100%;
   height: 0;
-  background: inherit;
+  /* The bar's own tint over an OPAQUE base, not `inherit`. The bar is 86%
+     opaque, which is right where it sits — a frosted panel over content —
+     but wrong for the extension: the remaining 14% is a hundred pixels of
+     scrolling form text showing straight through, faint but there. Painting
+     the same tint over the page colour gives the same shade with nothing
+     behind it. */
+  background:
+    linear-gradient(rgba(20, 20, 22, 0.86), rgba(20, 20, 22, 0.86)),
+    var(--bg);
   -webkit-backdrop-filter: blur(18px) saturate(1.4);
   backdrop-filter: blur(18px) saturate(1.4);
   pointer-events: none;
+}
+.fprog.stuck {
+  /* Square while stuck. The bar's rounded top corners leave a notch each
+     side that neither the bar nor its extension covers — the extension is a
+     rectangle butting against a curve — and form text shows through them.
+     That is the leak in the top-left corner. A rounded corner is only there
+     to sit on the form's own top edge anyway; against the screen's edge it
+     has nothing to round. */
+  border-radius: 0;
 }
 .fprog.stuck::before {
   /* The rail's sticky top: exactly the distance from the screen's edge down

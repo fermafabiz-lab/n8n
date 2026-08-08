@@ -1734,68 +1734,62 @@ a {
 }
 
 /* --- the genre spiral ---
-   A helix of film rings descending the right rail: every ring is a genre the
-   factory can make, so the page shows its range while you commission from
-   it. Sticky and viewport-tall, so scrolling never reaches its end — the
-   rings simply keep arriving. */
+   A film strip coiled around an invisible vertical cylinder, descending the
+   right rail: every band is a genre the factory can make, so the page shows
+   its range while you commission from it. Sticky and viewport-tall, so
+   scrolling never reaches an end — the bands simply keep arriving. */
 .gspiral {
   position: relative;
   height: calc(100vh - 140px);
-  /* The rings swing wider than the rail; clipping is what keeps the form's
+  /* The coil is wider than the rail; clipping is what keeps the form's
      centre line untouched. */
   overflow: hidden;
-  perspective: 900px;
-  /* Fades into the page at both ends instead of stopping on a hard edge. */
-  -webkit-mask-image: linear-gradient(180deg, transparent, #000 14%, #000 86%, transparent);
-  mask-image: linear-gradient(180deg, transparent, #000 14%, #000 86%, transparent);
+  /* Deep enough that the far side of the cylinder doesn't fish-eye. */
+  perspective: 1400px;
+  perspective-origin: 50% 45%;
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 13%, #000 87%, transparent);
+  mask-image: linear-gradient(180deg, transparent, #000 13%, #000 87%, transparent);
   pointer-events: none;
+}
+/* Seen from slightly above, the way the reference is — dead level would read
+   as a stack of hoops rather than a coil going away from you. */
+.gsstage {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transform: rotateX(11deg);
 }
 .gsband {
   position: absolute;
-  left: 0;
-  right: 0;
+  left: 50%;
   top: 0;
+  width: 0;
   display: block;
+  transform-style: preserve-3d;
   animation-name: gspiral;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
-  will-change: transform, filter;
+  will-change: transform;
 }
-/* The ring itself: a wide ellipse laid back in space, so a landscape frame
-   wraps onto it the way a strip of film curls. */
-.gsband {
-  /* Wider than the rail: the rings run past both edges and are clipped,
-     which is what stops them reading as a stack of separate lozenges. */
-  margin-inline: -30px;
-}
-.gsdisc {
-  display: block;
-  height: 210px;
-  border-radius: 50%;
-  background-size: cover;
-  background-position: center;
-  transform: rotateX(74deg);
-  box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.6),
-    0 30px 0 -8px rgba(0, 0, 0, 0.5),
-    0 44px 60px rgba(0, 0, 0, 0.55);
-  position: relative;
-}
-/* A raking highlight so each ring reads as a lit surface rather than a flat
-   swatch — the gradient fallback needs it most, but it flatters a photo too. */
-.gsdisc::after {
-  content: "";
+/* One facet of the cylinder. Opaque and single-sided, so the far half of the
+   band is hidden by the near half exactly as a real cylinder hides itself. */
+.gsslice {
   position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: linear-gradient(
-    115deg,
-    rgba(255, 255, 255, 0.22) 0%,
-    rgba(255, 255, 255, 0.04) 34%,
-    rgba(0, 0, 0, 0.28) 72%,
-    rgba(0, 0, 0, 0.5) 100%
-  );
+  top: 0;
+  left: 0;
+  height: 100%;
+  display: block;
+  background-repeat: no-repeat;
+  /* Both faces draw: the far half of an open ribbon is its inside, and
+     hiding it would put a hole in the coil. */
+  backface-visibility: visible;
+  /* The strip has edges: a bright top lip and a dark under-edge give it
+     thickness without a second element per facet. */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.55);
 }
+
 /* The reserved height lives HERE, not on .sprev: a min-height on a
    -webkit-box (which the line clamp needs) makes Chromium report an 80px
    phantom padding-top and drops the title into the middle of a hole. */

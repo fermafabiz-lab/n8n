@@ -114,98 +114,129 @@ export const GENRES: Genre[] = [
 
 /**
  * Every genre twice, so the column stays full on a tall screen without any
- * one ring having to travel a suspiciously long way. The two copies sit at
- * opposite depths, which reads as a denser weave rather than a repeat.
+ * one band having to travel a suspiciously long way.
  */
 const RINGS = [...GENRES, ...GENRES];
 
 /**
- * Vertical distance between consecutive rings, in px. A ring's projected
- * height is ~58px, so this has to be well under that: rings that merely
- * touch read as a stack of lozenges, and it is the overlap that traces the
- * coil.
+ * The coil, as real geometry.
+ *
+ * Each band is a film strip wrapped around an invisible vertical cylinder:
+ * SLICES vertical facets, each rotated around the axis and pushed out to the
+ * radius, with the still's horizontal offset stepped across them. That is
+ * what gives the band actual curvature — the previous version faked depth on
+ * a flat ellipse, and it read as a stack of lozenges rather than a coil.
+ *
+ * Only the near half is ever visible: the facets are opaque and the far ones
+ * are turned away, exactly as a real cylinder behaves.
  */
-const STEP = 33;
-/** Turns the helix makes over the whole loop. */
-const TURNS = 4;
-/** Total travel of one ring before it recycles. */
+const RADIUS = 116; // px — the coil is 232 wide, just past the 224px rail
+const BAND_H = 46; // px, the height of one strip
+const SLICES = 16;
+/**
+ * How much of the circle each strip covers.
+ *
+ * This is the number that decides whether the piece reads as a coil at all.
+ * A CLOSED ring is the same silhouette from every angle, so spinning it
+ * changes nothing on screen and the column reads as a stack of hoops — which
+ * is exactly what the first attempt looked like. An open ribbon has ends, and
+ * watching those ends sweep around is what the eye reads as rotation.
+ */
+const ARC = 155;
+/**
+ * Vertical gap between bands. It has to EXCEED the band height, or the coil
+ * closes into a solid barrel: the dark between the turns is what makes a
+ * helix read as a helix.
+ */
+const STEP = 74;
+/** Turns the coil makes over one full loop. */
+const TURNS = 6;
 const SPAN = RINGS.length * STEP;
 
-/** Where a ring sits at a given point of its journey, 0 → 1. */
-function poseAt(p: number) {
-  const a = p * Math.PI * 2 * TURNS;
-  const depth = Math.cos(a); // +1 nearest the viewer, -1 furthest
-  const near = 0.5 + 0.5 * depth;
-  return {
-    y: -STEP * 2 + p * SPAN,
-    // Wider than the rail on purpose: the rings run past the edges and get
-    // clipped, the way the reference strip does.
-    x: Math.sin(a) * 46,
-    scale: 0.74 + 0.26 * near,
-    brightness: 0.5 + 0.5 * near,
-    front: depth >= 0,
-  };
-}
+/** Arc length of the strip, and of one facet of it. */
+const ARC_LEN = 2 * Math.PI * RADIUS * (ARC / 360);
+const SLICE_W = ARC_LEN / SLICES;
+
+/** Where a band sits at a given point of its descent, 0 → 1. */
+const poseAt = (p: number) => ({
+  y: -BAND_H * 1.5 + p * SPAN,
+  spin: p * 360 * TURNS,
+});
 
 const transformFor = (p: number) => {
-  const { y, x, scale } = poseAt(p);
-  return `translate3d(${x.toFixed(2)}px, ${y.toFixed(1)}px, 0) scale(${scale.toFixed(3)})`;
+  const { y, spin } = poseAt(p);
+  return `translateY(${y.toFixed(1)}px) rotateY(${spin.toFixed(2)}deg)`;
 };
 
 /**
- * The keyframes are generated rather than hand-written: they have to trace
- * the same sine the static pose does, or the resting position (which is all
- * a prefers-reduced-motion user ever sees) would not match the motion.
+ * Both ends of the loop describe the same pose, so two stops are enough and
+ * the interpolation is honest: y and the spin are each linear in p. The
+ * resting transform is also written onto every band inline, because
+ * prefers-reduced-motion strips animations outright and without it the whole
+ * coil would collapse onto one line.
  */
-const KEYFRAMES = (() => {
-  const stops: string[] = [];
-  const STEPS = 36;
-  for (let i = 0; i <= STEPS; i++) {
-    const p = i / STEPS;
-    const { brightness, front } = poseAt(p);
-    stops.push(
-      `${((p * 100)).toFixed(2)}%{transform:${transformFor(p)};` +
-        `filter:brightness(${brightness.toFixed(3)});z-index:${front ? 2 : 1}}`,
-    );
-  }
-  return `@keyframes gspiral{${stops.join("")}}`;
-})();
+const KEYFRAMES =
+  `@keyframes gspiral{` +
+  `from{transform:${transformFor(0)}}` +
+  `to{transform:${transformFor(1)}}}`;
 
-export default function GenreSpiral({ speedSeconds = 44 }: { speedSeconds?: number }) {
+/** One facet of the cylinder: its slab of the still, lit by its own angle. */
+function Slice({ image, index }: { image: string; index: number }) {
+  // Centred on the strip, so the band's own rotation carries its middle.
+  const deg = -ARC / 2 + (index + 0.5) * (ARC / SLICES);
+  const facing = Math.cos((deg * Math.PI) / 180);
+  // Lambert-ish: a facet square to the viewer catches the most light, one
+  // turning away catches least — that gradient across the facets is what
+  // reads as roundness. Facets past 90° are the INSIDE of the strip, seen
+  // through the open side, and are darker still.
+  const light =
+    facing >= 0 ? 0.42 + 0.58 * facing ** 0.75 : 0.2 + 0.14 * (1 + facing);
+  return (
+    <i
+      className="gsslice"
+      style={{
+        width: SLICE_W + 1,
+        marginLeft: -(SLICE_W + 1) / 2,
+        transform: `rotateY(${deg.toFixed(2)}deg) translateZ(${RADIUS}px)`,
+        backgroundImage: image,
+        backgroundSize: `${ARC_LEN.toFixed(1)}px 100%`,
+        backgroundPosition: `${(-index * SLICE_W).toFixed(1)}px center`,
+        filter: `brightness(${light.toFixed(3)})`,
+      }}
+    />
+  );
+}
+
+export default function GenreSpiral({ speedSeconds = 60 }: { speedSeconds?: number }) {
   return (
     <div className="gspiral" aria-hidden="true">
-      {/* Generated here so the animation and the resting pose can never drift
-          apart — see KEYFRAMES. */}
       <style>{KEYFRAMES}</style>
-      {RINGS.map((g, i) => {
-        const p = i / RINGS.length;
-        const pose = poseAt(p);
-        return (
-          <span
-            key={`${g.slug}-${i}`}
-            className="gsband"
-            style={{
-              // The resting pose lives on the element, not only in the
-              // keyframes: prefers-reduced-motion strips animations outright,
-              // and without this every ring would collapse onto the same spot.
-              transform: transformFor(p),
-              filter: `brightness(${pose.brightness.toFixed(3)})`,
-              zIndex: pose.front ? 2 : 1,
-              animationDelay: `${(-p * speedSeconds).toFixed(2)}s`,
-              animationDuration: `${speedSeconds}s`,
-            }}
-          >
-            <i
-              className="gsdisc"
+      {/* Tilted a little, so the coil is seen from slightly above the way the
+          reference is, rather than dead level. */}
+      <div className="gsstage">
+        {RINGS.map((g, i) => {
+          const p = i / RINGS.length;
+          const image = HAS_STILLS
+            ? `url(/genres/${g.slug}.webp), ${g.gradient}`
+            : g.gradient;
+          return (
+            <span
+              key={`${g.slug}-${i}`}
+              className="gsband"
               style={{
-                backgroundImage: HAS_STILLS
-                  ? `url(/genres/${g.slug}.webp), ${g.gradient}`
-                  : g.gradient,
+                height: BAND_H,
+                transform: transformFor(p),
+                animationDelay: `${(-p * speedSeconds).toFixed(2)}s`,
+                animationDuration: `${speedSeconds}s`,
               }}
-            />
-          </span>
-        );
-      })}
+            >
+              {Array.from({ length: SLICES }, (_, k) => (
+                <Slice key={k} image={image} index={k} />
+              ))}
+            </span>
+          );
+        })}
+      </div>
     </div>
   );
 }

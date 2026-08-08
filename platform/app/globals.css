@@ -1757,9 +1757,15 @@ a {
   inset: 0;
   /* A little wider than the pole, pushed toward the page edge so the
      overflow lands in the empty gutter and never over the form. */
-  width: 430px;
-  left: 50%;
-  transform: translateX(-30%);
+  /* Anchored to the RIGHT edge of its track rather than centred on it: the
+     track's right edge is a fixed, known line, whereas a percentage offset
+     plus a percentage translate is measured against two different boxes and
+     lands somewhere that has to be found by trial. The pole is 240 wide and
+     its frames reach about 105 either side of the axis, so this clears the
+     form on the left and the page edge on the right. */
+  left: auto;
+  right: -60px;
+  width: 400px;
   overflow: hidden;
   /* No `perspective`: the projection is done in the component. A CSS
      perspective is measured from this box, and this box is as tall as the
@@ -1768,6 +1774,24 @@ a {
   -webkit-mask-image: linear-gradient(180deg, transparent, #000 8%, #000 92%, transparent);
   mask-image: linear-gradient(180deg, transparent, #000 8%, #000 92%, transparent);
   pointer-events: none;
+}
+/* The shading that makes the pole read as round. It cannot live on the
+   frames: they orbit, so any darkening baked into one would travel with it
+   instead of staying on the shaded side of the pole. */
+.gspiral::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.66) 0%,
+    rgba(0, 0, 0, 0.2) 22%,
+    rgba(255, 255, 255, 0.05) 42%,
+    rgba(0, 0, 0, 0.24) 68%,
+    rgba(0, 0, 0, 0.7) 100%
+  );
+  pointer-events: none;
+  z-index: 2;
 }
 .gsstage {
   position: absolute;
@@ -1795,15 +1819,12 @@ a {
   animation-timing-function: linear;
   animation-iteration-count: infinite;
   will-change: transform, filter;
-  /* Thickness, and roll. The top lip and under-edge give the frame an edge;
-     the two side shadows darken it toward its left and right, which is what
-     a flat panel needs to read as part of a curved surface. Ten flat frames
-     around the pole would otherwise show as ten facets. */
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.13),
-    inset 0 -2px 5px rgba(0, 0, 0, 0.5),
-    inset 14px 0 20px -12px rgba(0, 0, 0, 0.75),
-    inset -14px 0 20px -12px rgba(0, 0, 0, 0.75);
+  /* No edge treatment along the thread any more: the frames cross-fade into
+     each other there, and a shadow or a lip drawn on a fading edge is a dark
+     line straight through the blend. The roundness comes from the shading on
+     the container instead, which is fixed in space and so cannot smear a
+     seam. */
+  box-shadow: inset 0 -1px 6px rgba(0, 0, 0, 0.35);
 }
 
 /* The reserved height lives HERE, not on .sprev: a min-height on a

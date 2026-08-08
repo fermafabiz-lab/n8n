@@ -129,18 +129,19 @@ export const GENRES: Genre[] = [
  * one: `STARTS` threads, each offset down the axis by a share of the pitch,
  * landing edge to edge.
  */
-const LEAN = 45; // degrees off horizontal — 60 reads as aggressive
-const R = 104; // px, the pole's radius
+const LEAN = 30; // degrees off horizontal
+const R = 120; // px, the pole's radius
 const RISE = R * Math.tan((LEAN * Math.PI) / 180); // px of descent per radian
 const PITCH_Y = 2 * Math.PI * RISE; // one turn of one thread
 /**
- * Frames around the pole, per turn of one thread — and the pole's roundness
- * is exactly this number. Each frame is flat, so the silhouette is a polygon
- * of AROUND sides; at eight it reads as folded rather than rolled. Ten is
- * enough to look curved without doubling the element count, and the shading
- * across each frame (see the stylesheet) does the rest.
+ * Frames around the pole, per turn of one thread. It is the only lever on how
+ * BIG each video is: fewer frames around means each one covers more of the
+ * circumference, so it is wider. It is also the pole's roundness, since every
+ * frame is flat and the silhouette is a polygon with this many sides — so it
+ * trades one against the other, and the shading on the container makes up the
+ * difference.
  */
-const AROUND = 10;
+const AROUND = 6;
 const STEP = (2 * Math.PI) / AROUND;
 
 /**
@@ -150,9 +151,24 @@ const STEP = (2 * Math.PI) / AROUND;
  */
 const ARC_LEN = R * STEP;
 const DROP = STEP * RISE;
-const TILE_W = Math.ceil(Math.hypot(ARC_LEN, DROP)) + 1;
+/** The spacing between two frames along their thread. */
+const PATH_STEP = Math.hypot(ARC_LEN, DROP);
+/**
+ * Frames overlap along the thread by this much at each end, and the overlap
+ * is what the cross-fade is made of: each frame's mask ramps from clear to
+ * solid across exactly the overlap, so where two meet, one ramps down while
+ * the other ramps up and the two alphas sum to one. Linear ramps are what
+ * make that sum exact — an eased fade would dip and leave a dark seam.
+ */
+const OVERLAP = Math.round(PATH_STEP * 0.22);
+const TILE_W = Math.ceil(PATH_STEP) + 2 * OVERLAP;
+/** Where the ramp ends, as a share of the frame's width. */
+const FADE_PCT = ((2 * OVERLAP) / TILE_W) * 100;
+const SEAM_MASK =
+  `linear-gradient(90deg, rgba(0,0,0,0) 0%, #000 ${FADE_PCT.toFixed(2)}%, ` +
+  `#000 ${(100 - FADE_PCT).toFixed(2)}%, rgba(0,0,0,0) 100%)`;
 
-const STARTS = 7;
+const STARTS = 3;
 const THREAD_GAP = PITCH_Y / STARTS;
 /**
  * Across the stripe. The bare minimum is the axial gap between threads times
@@ -160,7 +176,7 @@ const THREAD_GAP = PITCH_Y / STARTS;
  * rounding anywhere opens a seam. The overlap factor buys that margin back;
  * overlapping frames simply layer, which costs nothing.
  */
-const TILE_H = Math.ceil(THREAD_GAP * Math.cos((LEAN * Math.PI) / 180) * 1.25);
+const TILE_H = Math.ceil(THREAD_GAP * Math.cos((LEAN * Math.PI) / 180) * 1.2);
 
 /**
  * Frames down each thread — enough to run the length of a long form. Derived
@@ -235,6 +251,8 @@ export default function GenreSpiral({ speedSeconds = 34 }: { speedSeconds?: numb
               height: TILE_H,
               marginLeft: -TILE_W / 2,
               marginTop: -TILE_H / 2,
+              WebkitMaskImage: SEAM_MASK,
+              maskImage: SEAM_MASK,
               backgroundImage: HAS_STILLS
                 ? `url(/genres/${g.slug}.webp), ${g.gradient}`
                 : g.gradient,

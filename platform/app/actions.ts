@@ -13,6 +13,7 @@ import {
   requestSceneRewrite,
   releaseSceneRewrite,
   readSceneNarration,
+  readSceneVideoInputs,
   findRecentProjectByName,
   writeScriptFields,
   requestVoiceRegen,
@@ -40,6 +41,87 @@ function friendlyError(e: unknown): string {
     return "The Airtable token can read but not write. Regenerate it with the data.records:write scope.";
   }
   return msg;
+}
+
+/**
+ * Nudge a media-generation batch into existence, best effort.
+ *
+ * Video regeneration is the one regeneration with no webhook of its own: the
+ * flag is only ever noticed by `Evaluate Video Approval`, which polls every
+ * 15s from INSIDE a live media-generation execution. With no batch alive the
+ * flag simply sits there, and the scene shows "Regenerating video…" forever.
+ *
+ * Best effort, and deliberately quiet about it: `getAliveProduction()` is
+ * instance-wide, so another project's batch reads as "alive" here, and an
+ * execution parked past the video gate (final settings, assembly) is alive
+ * without polling for regenerations. Both cases return "alive" and start
+ * nothing — which is why the flag also has a local exit in the UI.
+ */
+async function nudgeProduction(projectId: string): Promise<"alive" | "started" | "no"> {
+  const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
+  const webhook =
+    process.env.N8N_RESUME_WEBHOOK_URL ??
+    newProject?.replace(/new-project\/?$/, "resume-project");
+  if (!webhook?.includes("resume-project")) return "no";
+  try {
+    const alive = await getAliveProduction();
+    if (alive.length > 0) return "alive";
+    // Same housekeeping the Resume button does: executions n8n created but
+    // never ran report as running forever and wedge their parent.
+    for (const dead of await getStalledProduction().catch(() => [])) {
+      await stopExecution(dead.id).catch(() => {});
+    }
+    const res = await fetch(webhook, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project_id: projectId }),
+      signal: AbortSignal.timeout(15000),
+    });
+    return res.ok ? "started" : "no";
+  } catch {
+    // n8n unreachable — the flag is written either way, and the producer
+    // still has Resume.
+    return "no";
+  }
+}
+
+/**
+ * Ask for a new clip on a scene whose picture just changed.
+ *
+ * Guarded, because `Prep Video Regen` in Media Generation is `onError: null`:
+ * it throws when the scene has no `Image Media ID` or no motion prompt, and a
+ * throw there does not skip the scene — it kills the whole batch, including
+ * the scenes it was busy generating. So the inputs are read before the flag
+ * is written, never after.
+ *
+ * "none" = nothing to do: no clip yet, so the batch's own video loop
+ * (`Needs Clip?`) will generate the first one from the approved image anyway.
+ */
+async function flagStaleClip(
+  sceneId: string,
+): Promise<"none" | "flagged" | "blocked"> {
+  const inputs = await readSceneVideoInputs(sceneId).catch(() => null);
+  if (!inputs?.hasClip) return "none";
+  if (!inputs.hasImageMediaId || !inputs.hasMotionPrompt) return "blocked";
+  await writeSceneApproval(sceneId, "video", "regenerate");
+  return "flagged";
+}
+
+const BLOCKED_NOTE =
+  " The clip still shows the old picture, but this scene has no Flow asset id or no motion prompt, so asking for a new one would stop the whole batch — redo the clip by hand from the Video step.";
+
+/** Single-scene version: flag, then make sure something will pick it up. */
+async function chainVideoRegen(
+  projectId: string,
+  sceneId: string,
+): Promise<string | null> {
+  const outcome = await flagStaleClip(sceneId);
+  if (outcome === "none") return null;
+  if (outcome === "blocked") return BLOCKED_NOTE;
+  const where = await nudgeProduction(projectId);
+  return where === "started"
+    ? " The clip was built from the old picture, so a new one was queued and production restarted to pick it up."
+    : " The clip was built from the old picture, so a new one was queued — a running batch picks it up within ~15s.";
 }
 
 export async function sceneAction(
@@ -77,13 +159,22 @@ export async function sceneAction(
         if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
       }
     }
+    // Approving a picture that already has a clip means the clip is now made
+    // from an image nobody approved. Nothing downstream ever compares the two
+    // — the same silent drift the narration/take pair had — so the new clip is
+    // asked for here rather than left to the producer to remember.
+    const chained =
+      kind === "image" && action === "approve"
+        ? await chainVideoRegen(projectId, sceneId)
+        : null;
+
     revalidatePath(`/projects/${projectId}`);
     return {
       ok: true,
       message:
-        action === "approve"
+        (action === "approve"
           ? `${kind === "image" ? "Image" : "Video"} approved.`
-          : `Regeneration queued — n8n picks it up within ~15s.`,
+          : `Regeneration queued — n8n picks it up within ~15s.`) + (chained ?? ""),
     };
   } catch (e) {
     return { ok: false, message: friendlyError(e) };
@@ -156,15 +247,36 @@ export async function approveAllOfKind(
     return { ok: true, message: "Demo mode — nothing was written." };
   }
   try {
+    let restaled = 0;
+    let blocked = 0;
     for (const id of sceneIds) {
       await writeSceneApproval(id, kind, "approve");
+      // Same rule as the single approve — a picture signed off under a clip
+      // that was made from the previous one leaves the two disagreeing.
+      // On the first pass through the pipeline no clip exists yet, so this
+      // is a no-op for every scene and costs one read each.
+      if (kind === "image") {
+        const outcome = await flagStaleClip(id);
+        if (outcome === "flagged") restaled++;
+        if (outcome === "blocked") blocked++;
+      }
       // Airtable rate limit is 5 req/s per base; n8n polls concurrently.
       await new Promise((r) => setTimeout(r, 250));
     }
+    // Nudged once for the whole batch, not per scene: the poller regenerates
+    // one scene per 15s cycle regardless, and each nudge costs n8n API calls.
+    if (restaled > 0) await nudgeProduction(projectId);
     revalidatePath(`/projects/${projectId}`);
     return {
       ok: true,
-      message: `Approved ${sceneIds.length} ${kind === "image" ? "images" : "videos"}.`,
+      message:
+        `Approved ${sceneIds.length} ${kind === "image" ? "images" : "videos"}.` +
+        (restaled > 0
+          ? ` ${restaled} clip${restaled === 1 ? " was" : "s were"} built from the old picture, so ${restaled === 1 ? "it is" : "they are"} being redone — one per ~15s.`
+          : "") +
+        (blocked > 0
+          ? ` ${blocked} could not be queued (missing Flow asset id or motion prompt) — redo ${blocked === 1 ? "it" : "them"} from the Video step.`
+          : ""),
     };
   } catch (e) {
     return { ok: false, message: friendlyError(e) };
@@ -359,6 +471,72 @@ export async function cancelSceneRewrite(
     return {
       ok: true,
       message: "Rewrite cancelled — the scene is back in review with its current text.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/**
+ * Re-fire a video regeneration that nothing ever picked up.
+ *
+ * Video regen is the only regeneration with no webhook of its own — the flag
+ * is noticed solely by `Evaluate Video Approval`, polling from inside a live
+ * media-generation execution. So it strands in more ways than its siblings:
+ * no batch alive, a batch already past the video gate, another project's run
+ * making `getAliveProduction()` answer "alive", or the scene falling outside
+ * `Sort & Cap Scenes`. Re-arming the flag and nudging production is the
+ * cheapest thing that fixes all four.
+ */
+export async function restartVideoRegen(
+  projectId: string,
+  sceneId: string,
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    await writeSceneApproval(sceneId, "video", "regenerate");
+    const where = await nudgeProduction(projectId);
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message:
+        where === "started"
+          ? "Sent again — production was restarted and picks this clip up shortly."
+          : where === "alive"
+            ? "Sent again. Something is already running in n8n, so if this stays stuck it is that run rather than the flag — Pause, then Resume."
+            : "Flag re-armed, but n8n could not be reached to start a batch. Use Resume once it answers.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/**
+ * Give up on a stuck video regeneration and keep the clip that exists.
+ *
+ * The escape hatch the image/voice/video regen states were missing: the badge
+ * replaces the whole button row, so a stranded flag leaves the scene
+ * unapprovable and unretryable. Approval is deliberately NOT restored — the
+ * producer decides whether the old clip is good enough.
+ */
+export async function cancelVideoRegen(
+  projectId: string,
+  sceneId: string,
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    await writeSceneFields(sceneId, {
+      "Regenerează Video": false,
+      "Status Producție Scenă": "Așteaptă Aprobare Video",
+    });
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message: "Cancelled — the scene keeps its current clip and is back in review.",
     };
   } catch (e) {
     return { ok: false, message: friendlyError(e) };

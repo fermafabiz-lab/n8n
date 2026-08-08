@@ -628,7 +628,16 @@ export async function writeSceneApproval(
         : { "Regenerează Imagine": true, "Aprobare Imagine": false }
       : action === "approve"
         ? { "Aprobare Video": true, "Regenerează Video": false }
-        : { "Regenerează Video": true, "Aprobare Video": false };
+        : {
+            "Regenerează Video": true,
+            "Aprobare Video": false,
+            // Sort & Cap Scenes treats "Așteaptă Aprobare Video"/"Finalizat"
+            // as DONE and sorts them behind the pending ones, where the cap
+            // of 8 can drop them. A scene waiting on a regeneration IS
+            // outstanding work, so it has to read as such or a fresh batch
+            // on a long project would never reach it.
+            "Status Producție Scenă": "Generare Video",
+          };
   await airtablePatch(SCENES_TABLE, sceneId, fields);
 }
 
@@ -773,6 +782,40 @@ export async function readSceneNarration(
     hasVoice: Boolean(f["Voiceover URL"]),
     imagePrompt: String(f["Imagine First Frame"] ?? ""),
     imageApproved: Boolean(f["Aprobare Imagine"]),
+  };
+}
+
+/**
+ * Everything `Prep Video Regen` (Media Generation) needs before a video
+ * regeneration can be asked for — read BEFORE setting the flag.
+ *
+ * That node is `onError: null`, so it does not fail the scene, it **kills the
+ * whole batch**: it throws when the scene has no `Image Media ID` (the Flow
+ * asset the clip starts from) or no motion prompt. Flagging a regeneration
+ * blind would therefore take down a run that is busy generating other scenes.
+ *
+ * `hasClip` is the other half: a scene with no clip yet needs no regeneration
+ * at all — the batch's own video loop (`Needs Clip?`) will generate one.
+ */
+export async function readSceneVideoInputs(sceneId: string): Promise<{
+  hasClip: boolean;
+  hasImageMediaId: boolean;
+  hasMotionPrompt: boolean;
+}> {
+  if (!isConfigured)
+    return { hasClip: false, hasImageMediaId: false, hasMotionPrompt: false };
+  const res = await fetch(
+    `https://api.airtable.com/v0/${BASE_ID}/${encodeURIComponent(SCENES_TABLE)}/${sceneId}`,
+    { headers: { Authorization: `Bearer ${API_KEY}` }, cache: "no-store" },
+  );
+  if (!res.ok) throw new Error(`Airtable ${res.status}: ${await res.text()}`);
+  const rec = (await res.json()) as { fields?: Record<string, unknown> };
+  const f = rec.fields ?? {};
+  return {
+    hasClip: String(f["Scene Final URL"] ?? "").startsWith("http"),
+    hasImageMediaId: String(f["Image Media ID"] ?? "").trim() !== "",
+    // Legacy field reuse: "Video Scenă URL" holds the motion PROMPT.
+    hasMotionPrompt: String(f["Video Scenă URL"] ?? "").trim() !== "",
   };
 }
 

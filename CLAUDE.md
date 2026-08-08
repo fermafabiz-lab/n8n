@@ -88,8 +88,10 @@ alone would be survivable; what makes it a dead end is that the UI shows the
 in-flight state **instead of** the button row, so the stranded scene cannot
 be approved, edited, or retried. Per-scene rewrite now carries its own way
 out — "⟳ Send the rewrite again" and "Cancel — keep this text"
-(`restartSceneRewrite` / `cancelSceneRewrite`). The image, voice and video
-regen states in `SceneBoard` have the identical shape and no escape yet.
+(`restartSceneRewrite` / `cancelSceneRewrite`). Video regen now has the same
+pair (`restartVideoRegen` / `cancelVideoRegen`) because approving an image
+queues one automatically — see below. The image and voice regen states in
+`SceneBoard` still have the identical shape and no escape yet.
 **When you add a state whose exit is written by someone else, give it a
 local exit too.**
 
@@ -257,6 +259,45 @@ These each cost hours. Do not rediscover them.
   the feature that would have made the damage visible. `Mark Finished
   (Resume)` and `Mark Finished (Restart)` map only `id` + `Status General`,
   and must stay that way.
+
+### Approving an image queues a new clip (and why that is delicate)
+
+A picture approved under a clip that was made from the PREVIOUS picture leaves
+the two disagreeing, with nothing downstream ever comparing them — the same
+silent drift the narration/take pair had. `sceneAction('image','approve')`
+now asks for a new clip itself. Four things make this safe, and all four are
+load-bearing:
+
+- **It only fires when a clip already exists.** On the first pass through the
+  pipeline `Scene Final URL` is empty, so every approval is a no-op and the
+  normal flow is untouched. `Needs Clip?` generates that first clip anyway.
+- **The inputs are READ BEFORE the flag is written.** `Prep Video Regen` is
+  `onError: null` and throws when the scene has no `Image Media ID` or no
+  motion prompt (`Video Scenă URL`) — and a throw there does not skip the
+  scene, it **kills the whole batch** mid-generation. `readSceneVideoInputs`
+  is what stops an approval from doing that.
+- **The site's image regen keeps `Image Media ID` fresh.** The clip's start
+  frame is that Flow asset id, not the image URL, so a chained regeneration
+  would silently rebuild from the OLD picture if it were stale. It is not:
+  `IR Write Image` (Claude Scripting) writes the new id, exactly like
+  `Write Regen Image` does inside the batch.
+- **The flag also writes `Status Producție Scenă: 'Generare Video'`.**
+  `Sort & Cap Scenes` treats `Așteaptă Aprobare Video`/`Finalizat` as DONE and
+  sorts them behind pending scenes, where CAP=8 can drop them. A scene owed a
+  regeneration is outstanding work and has to read as such. That field is the
+  ONLY thing in the workflow that reads the status text — every gate keys off
+  checkboxes plus asset existence — so writing it changes ordering and nothing
+  else.
+
+**Video regen is the only regeneration with no webhook of its own.** Image,
+voice and scene-text each have one; video is seen solely by
+`Evaluate Video Approval`, polling every 15s from inside a live
+media-generation execution. So it strands in four ways: no batch alive, a
+batch already past the video gate (final settings, assembly), another
+project's run making the instance-wide `getAliveProduction()` answer "alive",
+or the scene falling outside the cap. `nudgeProduction()` fires
+`resume-project` when nothing is alive, which covers the first case only —
+hence the local exit on the badge. Do not promise this always starts.
 
 ### The batch cap
 

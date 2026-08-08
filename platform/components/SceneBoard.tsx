@@ -3,7 +3,9 @@
 import { useState, useTransition } from "react";
 import {
   approveAllOfKind,
+  cancelVideoRegen,
   reopenStep,
+  restartVideoRegen,
   saveImagePrompt,
   sceneAction,
   type ActionResult,
@@ -480,7 +482,36 @@ export default function SceneBoard({
                 dropping them — one click on the stepper reaches either. */}
             {videoControls && (
               active.regenVideo ? (
-                <RegenBadge label="Regenerating video…" note={active.note} />
+                <>
+                  <RegenBadge label="Regenerating video…" note={active.note} />
+                  {/*
+                    This state is cleared from inside a media-generation run,
+                    and video regen is the one regeneration with no webhook of
+                    its own — the flag is only ever seen by a batch that is
+                    alive AND still polling the video gate. It strands more
+                    easily than its siblings, and the badge replaces the whole
+                    button row, so without these two the scene cannot be
+                    approved, redone, or let go. Approving an image now queues
+                    a clip automatically, which makes the state common enough
+                    that it had to stop being a dead end.
+                  */}
+                  <div className="abtns" style={{ marginTop: 10 }}>
+                    <button
+                      className="abtn"
+                      disabled={pending}
+                      onClick={() => run(() => restartVideoRegen(projectId, active.id))}
+                    >
+                      ⟳ Send it again
+                    </button>
+                    <button
+                      className="abtn"
+                      disabled={pending}
+                      onClick={() => run(() => cancelVideoRegen(projectId, active.id))}
+                    >
+                      Cancel — keep this clip
+                    </button>
+                  </div>
+                </>
               ) : (
               <div className="abtns">
                 <button

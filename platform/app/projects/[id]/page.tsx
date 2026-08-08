@@ -133,6 +133,18 @@ export default async function ProductionRoom({
     assembling,
   );
 
+  // Whether the voice gate is on the page. Computed once because SceneBoard
+  // needs the same answer: it owns the image and video steps only, and may
+  // hand a scene to the audio step just when this panel is there to catch it.
+  const audioPanel =
+    scenes.length > 0 &&
+    showing(
+      "audio",
+      scenes.every((s) => s.sceneApproved) &&
+        scenes.every((s) => s.imageApproved) &&
+        scenes.some((s) => !s.voiceApproved),
+    );
+
   // Script review phase: the Scripturi record is still awaiting approval.
   // Fetched for finished projects too, so the Script step stays readable
   // after the fact instead of the panel vanishing with the record.
@@ -395,23 +407,17 @@ export default async function ProductionRoom({
             step — the panel appears as soon as the pipeline reaches it, even
             before the first take exists, otherwise the stepper points at an
             "Audio" stage with nothing under it. */}
-        {scenes.length > 0 &&
-          showing(
-            "audio",
-            scenes.every((s) => s.sceneApproved) &&
-              scenes.every((s) => s.imageApproved) &&
-              scenes.some((s) => !s.voiceApproved),
-          ) && (
-            <AudioReview
-              projectId={id}
-              scenes={scenes}
-              mode={project.multiVoiceMode}
-              narratorVoice={project.narratorVoice}
-              cast={project.cast}
-              castAssign={project.castAssign}
-              chapterVoices={project.chapterVoices}
-            />
-          )}
+        {audioPanel && (
+          <AudioReview
+            projectId={id}
+            scenes={scenes}
+            mode={project.multiVoiceMode}
+            narratorVoice={project.narratorVoice}
+            cast={project.cast}
+            castAssign={project.castAssign}
+            chapterVoices={project.chapterVoices}
+          />
+        )}
 
         {scenes.length > 0 &&
         showing("scenes", scenes.some((s) => !s.sceneApproved)) ? (
@@ -429,6 +435,9 @@ export default async function ProductionRoom({
             // back to Images showed a video player instead of the image being
             // reviewed.
             focus={viewing === "images" ? "images" : viewing === "video" ? "video" : null}
+            // On the live page the board picks the step itself, and it may
+            // only pick "audio" when the panel that serves it is rendered.
+            audioPanel={audioPanel}
           />
         ) : null}
 

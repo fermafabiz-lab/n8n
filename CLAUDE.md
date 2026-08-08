@@ -780,6 +780,24 @@ on a visible 8-second grid.
   decision. `focus` (from the `?stage=` param) keeps the image in the monitor
   on the Images step; everywhere else the clip still wins, because there it is
   the fuller answer.
+- **…and ONLY its own controls.** The same board carried every control whose
+  asset happened to be unapproved, so the Video step asked you to approve the
+  clip while also offering to re-record the line, rewrite it with AI and
+  re-roll the picture — four buttons for three unrelated decisions under one
+  heading. That was defensible while a step was a one-way door; once the
+  stepper made every step its own page, it was just clutter, and the producer
+  said so. `SceneBoard` now derives a single `step` — `focus` when the
+  producer navigated to one, otherwise the first thing the active scene still
+  owes (image → voice → clip, the pipeline's own order) — and renders that
+  step's block alone. The three status rows stay, because the state of the
+  whole scene is worth seeing from anywhere; only the row for the current step
+  carries its "Make changes". **Removing a control means checking it has a
+  home, not just a replacement**: the take belongs to `AudioReview` (which is
+  strictly richer — duration flags, fit-vs-shot warnings, per-scene voice pin)
+  and the line to `SceneReview`'s "↻ Regenerate scene", so nothing was lost.
+  The one coupling this creates: the board may route a scene to the audio step
+  only when `AudioReview` is actually rendered, hence the `audioPanel` prop —
+  routing to a step that isn't on the page shows no controls at all.
 - **Approval used to be one-way, and "Make changes" is the door back.** Every
   control in a step is gated on the scene NOT being approved, so signing off
   froze it — however wrong it turned out three steps later. `reopenStep()`

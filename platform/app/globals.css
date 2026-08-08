@@ -1097,21 +1097,36 @@ a {
 }
 
 /* Content used to scroll raw past the floating pill; this dims it out
-   underneath so the nav has air. Sits under the nav (z 90 < 100). */
+   underneath so the nav has air. Sits under the nav (z 90 < 100).
+
+   It has to be OPAQUE for as far down as the form's own sticky rail begins
+   (84px), not merely tinted: the old gradient was already 86% clear by 40%
+   of its height, so headings surfaced in the band between the pill and the
+   rail and the form appeared to run off the top of the screen. The form
+   dissolves into the bottom bar the same way, and this is the other half of
+   that. The blur is what keeps the handover soft — anything still visible at
+   the bottom edge is defocused rather than cut, and the mask fades the blur
+   itself out so it has no edge of its own. */
 .navfade {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  height: 104px;
+  height: 118px;
   z-index: 90;
   pointer-events: none;
   background: linear-gradient(
     180deg,
     var(--bg) 0%,
-    rgba(10, 10, 11, 0.86) 40%,
+    var(--bg) 58%,
+    rgba(10, 10, 11, 0.9) 74%,
     rgba(10, 10, 11, 0) 100%
   );
+  -webkit-backdrop-filter: blur(9px) saturate(1.1);
+  backdrop-filter: blur(9px) saturate(1.1);
+  /* Solid as far as 85px, which is where the form's sticky rail starts. */
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 72%, rgba(0, 0, 0, 0) 100%);
+  mask-image: linear-gradient(180deg, #000 0%, #000 72%, rgba(0, 0, 0, 0) 100%);
 }
 
 /* --- eyebrow filter tabs (dashboard) --- */

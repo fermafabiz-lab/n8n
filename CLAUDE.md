@@ -379,6 +379,28 @@ claims so fiction projects flow through unharmed.
   Evidence rows, and the scene-text regen path rewrites narration without
   revalidating its `evidence_ref`.
 
+**The bible the film is made from was not the bible stored on the project.**
+`Generate Story Bible → Save Story Bible` writes to Airtable. When the
+producer then rewrites the script, `If Script Changed → Rebuild Story Bible`
+builds a new one — and until 2026-08-08 that rebuilt bible existed only in
+memory: `Choose Bible` handed it to the segmenter and nothing ever saved it.
+So the scenes and their images came out right, while the project record kept
+the bible the producer had just REJECTED.
+
+It stays invisible until someone regenerates one scene, because that is the
+only path that reads the stored copy (`Load Project Bible` for text,
+`IR Load Project` for images). On `recCoZWsZBOrIU69L` a scene rewrite
+returned a prompt describing a dying woman in an apartment stairwell for a
+film about a man on a night road — a perfectly coherent prompt for the wrong
+story, which reads as the model malfunctioning and is not.
+
+`Save Rebuilt Bible` now persists it in-line between `Rebuild Story Bible`
+and `Choose Bible`. Inserting a node there is safe **only** because
+`Choose Bible` reads `$('Rebuild Story Bible')` by name rather than `$json` —
+check that before putting anything else in that chain. It is
+`onError: continueRegularOutput`: a failed bible write must never kill a
+scripting run.
+
 ### Sound effects (the `sfx` toggle)
 
 `Scene Final URL` is the RAW Veo clip re-hosted on Drive — there is no

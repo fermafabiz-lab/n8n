@@ -232,7 +232,10 @@ a {
    an index line and gets out of the way of the work below it. */
 .stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* Not a fixed four: the row grows a tile when there are failed or
+     unrecognised projects to account for, and it has to keep adding up. */
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   gap: 0;
   margin: 40px 0 52px;
   border-top: 1px solid var(--line);

@@ -1,4 +1,4 @@
-import { getProjects, isConfigured } from "@/lib/data";
+import { getProjects, isConfigured, type StatusKind } from "@/lib/data";
 import AutoRefresh from "@/components/AutoRefresh";
 import OpsPanel from "@/components/OpsPanel";
 import StageChime from "@/components/StageChime";
@@ -9,8 +9,30 @@ export const dynamic = "force-dynamic";
 export default async function Dashboard() {
   const projects = await getProjects();
   const waiting = projects.filter((p) => p.statusKind === "wait");
-  const running = projects.filter((p) => p.statusKind === "run").length;
-  const finished = projects.filter((p) => p.statusKind === "done").length;
+
+  /**
+   * Every project lands in exactly one bucket, and the buckets are counted
+   * from the same list the grid shows — so the tiles always add up to the
+   * total. They did not before: only running, waiting and finished had a
+   * tile, so anything whose status the map does not recognise (a half-created
+   * row, a status written by hand, a project abandoned before it started)
+   * was counted in the total and shown nowhere. On the real base that was 47
+   * of 98 projects, which read as the numbers being wrong.
+   */
+  const byKind: Record<StatusKind, number> = { run: 0, wait: 0, done: 0, err: 0, idle: 0 };
+  for (const p of projects) byKind[p.statusKind] += 1;
+
+  /** Shown only when they have something in them — an empty tile is noise. */
+  const extraTiles: Array<{ label: string; n: number }> = [
+    { label: "Needs a fix", n: byKind.err },
+    // Deliberately vague, because it is: the grid's "Other" tab lists them
+    // and every card there carries its own status text, which is the only
+    // way to find out what these actually are.
+    { label: "Other", n: byKind.idle },
+  ].filter((t) => t.n > 0);
+
+  const running = byKind.run;
+  const finished = byKind.done;
 
   // Titles come from a free-text field and people paste whole prompts into it
   // (a ~3000-char master prompt has been seen in production). The hero sets
@@ -77,6 +99,12 @@ export default async function Dashboard() {
           <small>Finished</small>
           <b>{finished}</b>
         </div>
+        {extraTiles.map((t) => (
+          <div className="stat" key={t.label}>
+            <small>{t.label}</small>
+            <b>{t.n}</b>
+          </div>
+        ))}
         <div className="stat">
           <small>Total projects</small>
           <b>{projects.length}</b>

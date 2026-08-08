@@ -28,6 +28,12 @@ const FILTERS: Array<{ key: "all" | StatusKind; label: string }> = [
   { key: "run", label: "Rendering" },
   { key: "done", label: "Finished" },
   { key: "err", label: "Failed" },
+  // Anything whose status the map does not recognise. Without this tab those
+  // projects were counted in "All" and reachable from no tab at all, so the
+  // numbers across the top could not be made to add up — and a project you
+  // cannot open is a project you cannot delete either. The label stays vague
+  // because the bucket is: every card in it shows its own status text.
+  { key: "idle", label: "Other" },
 ];
 
 const short = (s: string, n: number) =>

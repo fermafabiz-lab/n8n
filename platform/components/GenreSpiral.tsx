@@ -161,12 +161,19 @@ const PATH_STEP = Math.hypot(ARC_LEN, DROP);
  * make that sum exact — an eased fade would dip and leave a dark seam.
  */
 const OVERLAP = Math.round(PATH_STEP * 0.22);
+/**
+ * The ramp is a little SHORTER than the overlap it sits in. Running it the
+ * full length is what a textbook cross-fade does, and it dissolved the
+ * pictures into a wash — with both ramps that long, the part of a frame at
+ * full strength was barely a third of it. Stopping short means a frame
+ * reaches full opacity while still inside its neighbour, which cannot open a
+ * seam (there is picture under it either way) and gives every video a solid
+ * middle to be seen in.
+ */
+const RAMP = 0.72;
 const TILE_W = Math.ceil(PATH_STEP) + 2 * OVERLAP;
 /** Where the ramp ends, as a share of the frame's width. */
-const FADE_PCT = ((2 * OVERLAP) / TILE_W) * 100;
-const SEAM_MASK =
-  `linear-gradient(90deg, rgba(0,0,0,0) 0%, #000 ${FADE_PCT.toFixed(2)}%, ` +
-  `#000 ${(100 - FADE_PCT).toFixed(2)}%, rgba(0,0,0,0) 100%)`;
+const FADE_PCT = ((2 * OVERLAP * RAMP) / TILE_W) * 100;
 
 const STARTS = 3;
 const THREAD_GAP = PITCH_Y / STARTS;
@@ -176,7 +183,28 @@ const THREAD_GAP = PITCH_Y / STARTS;
  * rounding anywhere opens a seam. The overlap factor buys that margin back;
  * overlapping frames simply layer, which costs nothing.
  */
-const TILE_H = Math.ceil(THREAD_GAP * Math.cos((LEAN * Math.PI) / 180) * 1.2);
+const TILE_H = Math.ceil(THREAD_GAP * Math.cos((LEAN * Math.PI) / 180) * 1.55);
+
+/**
+ * The frame dissolves on ALL FOUR sides, not just the two along its thread.
+ * A hard edge across the stripe is what showed the pictures' ends and gave
+ * the pole its square, cut-out look: the frames butted against their
+ * neighbours in the next thread on a straight line, and every corner was a
+ * visible corner.
+ *
+ * Both ramps span exactly their own overlap, so each one is a true
+ * cross-fade: two neighbours' alphas sum to one across the join. Because the
+ * two masks multiply, the corners — where four frames meet — fade twice as
+ * fast as the edges, which is what rounds them off. The sum still comes to
+ * one there: (h1 + h2)(v1 + v2) = 1.
+ */
+const CROSS_OVERLAP = TILE_H - THREAD_GAP * Math.cos((LEAN * Math.PI) / 180);
+const FADE_V_PCT = ((CROSS_OVERLAP * RAMP) / TILE_H) * 100;
+const SEAM_MASK =
+  `linear-gradient(90deg, rgba(0,0,0,0) 0%, #000 ${FADE_PCT.toFixed(2)}%, ` +
+  `#000 ${(100 - FADE_PCT).toFixed(2)}%, rgba(0,0,0,0) 100%), ` +
+  `linear-gradient(180deg, rgba(0,0,0,0) 0%, #000 ${FADE_V_PCT.toFixed(2)}%, ` +
+  `#000 ${(100 - FADE_V_PCT).toFixed(2)}%, rgba(0,0,0,0) 100%)`;
 
 /**
  * Frames down each thread — enough to run the length of a long form. Derived

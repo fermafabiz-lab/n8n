@@ -1819,12 +1819,16 @@ a {
   animation-timing-function: linear;
   animation-iteration-count: infinite;
   will-change: transform, filter;
-  /* No edge treatment along the thread any more: the frames cross-fade into
-     each other there, and a shadow or a lip drawn on a fading edge is a dark
-     line straight through the blend. The roundness comes from the shading on
-     the container instead, which is fixed in space and so cannot smear a
-     seam. */
-  box-shadow: inset 0 -1px 6px rgba(0, 0, 0, 0.35);
+  /* The frame's two mask ramps MULTIPLY rather than replace one another:
+     that is what makes a corner fade twice as fast as an edge, and a corner
+     that fades is a corner you cannot see. Without this the second mask
+     simply wins and the frame keeps hard sides. */
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+  /* No inset edge, no lip, no shadow. Every side of the frame is a blend
+     now, and anything drawn on a blend is a line straight through it. The
+     roundness comes from the shading on the container instead, which is
+     fixed in space and so cannot smear a seam. */
 }
 
 /* The reserved height lives HERE, not on .sprev: a min-height on a

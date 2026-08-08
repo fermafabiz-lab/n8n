@@ -194,17 +194,37 @@ export async function saveSceneScript(
       narration.trim() !== "" &&
       narration.trim() !== before.narration.trim();
 
+    // Same reasoning one step later: the picture was approved against the OLD
+    // prompt, so a changed prompt means the sign-off was given for something
+    // that is no longer what this scene asks for.
+    const staleImage =
+      before !== null &&
+      before.imageApproved &&
+      imagePrompt.trim() !== "" &&
+      imagePrompt.trim() !== before.imagePrompt.trim();
+
     await writeSceneScript(sceneId, { narration, imagePrompt, approve });
 
+    if (staleImage) {
+      // The clip is built from the image, so it goes back for review too.
+      await writeSceneFields(sceneId, {
+        "Aprobare Imagine": false,
+        "Aprobare Video": false,
+      });
+    }
     if (staleVoice) {
       // Same door the audio panel uses — saves the line and re-reads it.
       await regenerateVoice(projectId, sceneId, narration);
     }
 
     revalidatePath(`/projects/${projectId}`);
-    const suffix = staleVoice
-      ? " The line changed after it had been recorded, so the voice is being read again."
-      : "";
+    const suffix =
+      (staleImage
+        ? " The image prompt changed, so the picture needs approving again."
+        : "") +
+      (staleVoice
+        ? " The line changed after it had been recorded, so the voice is being read again."
+        : "");
     return {
       ok: true,
       message:
@@ -366,7 +386,8 @@ export type ReopenStep = "scenes" | "images" | "audio" | "video";
  * Only the scene named here is touched, so the other scenes keep their
  * approvals and the batch has exactly one piece of outstanding work. What
  * cascades is what was actually derived from the changed thing:
- *   - the line drives the take and the cut  → voice + video
+ *   - the scene step owns BOTH the narration and the image prompt, so it
+ *     invalidates everything after it → image + voice + video
  *   - the image is the clip's start frame   → video
  *   - the take is muxed into the cut        → video
  *   - the clip is the last derived asset    → nothing
@@ -382,7 +403,12 @@ export async function reopenStep(
     return { ok: true, message: "Demo mode — nothing was written." };
   }
   const cascade: Record<ReopenStep, Record<string, boolean>> = {
-    scenes: { "Aprobare Scenă": false, "Aprobare Voce": false, "Aprobare Video": false },
+    scenes: {
+      "Aprobare Scenă": false,
+      "Aprobare Imagine": false,
+      "Aprobare Voce": false,
+      "Aprobare Video": false,
+    },
     images: { "Aprobare Imagine": false, "Aprobare Video": false },
     audio: { "Aprobare Voce": false, "Aprobare Video": false },
     video: { "Aprobare Video": false },

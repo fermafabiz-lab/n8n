@@ -80,10 +80,20 @@ export default function SceneBoard({
   projectId,
   scenes,
   portrait = false,
+  focus = null,
 }: {
   projectId: string;
   scenes: Scene[];
   portrait?: boolean;
+  /**
+   * The step being looked at, when the producer stepped back to one.
+   *
+   * The monitor used to play the clip whenever a clip existed, so revisiting
+   * Images showed a video player over the image under review — the wrong
+   * asset for the decision being made. null = the live step, where showing
+   * the newest asset is right.
+   */
+  focus?: "images" | "video" | null;
 }) {
   const running = scenes.find((s) => s.statusKind === "run");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -124,6 +134,11 @@ export default function SceneBoard({
   const active =
     scenes.find((s) => s.id === selectedId) ?? running ?? scenes[0] ?? null;
 
+  // On the Images step the image IS the thing being judged, so it stays in
+  // the monitor even for a scene whose clip already exists. Everywhere else
+  // the clip is the fuller answer and wins when there is one.
+  const showClip = focus !== "images" && Boolean(active?.videoUrl);
+
   // A 44-scene project turned the filmstrip into a wall of unreadable
   // thumbnails. Page it by 8 with arrows; picking a scene from the list in
   // the inspector jumps the strip to that scene's page.
@@ -163,8 +178,8 @@ export default function SceneBoard({
     <div className="stage">
       <div>
         <div className={`monitor${portrait ? " portrait" : ""}`}>
-          <div className={`scr${active?.videoUrl ? " video" : ""}`}>
-            {active?.videoUrl ? (
+          <div className={`scr${showClip ? " video" : ""}`}>
+            {showClip && active?.videoUrl ? (
               // The clip plays in the big monitor so the whole frame is
               // visible; the inspector keeps only the approve/regen controls.
               <MediaPlayer

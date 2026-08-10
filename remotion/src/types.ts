@@ -13,6 +13,53 @@ export type SceneCaption = {
 	 * scene duration.
 	 */
 	speechSeconds?: number;
+	/**
+	 * Evidence ref (E1..E20) this scene's narration leans on, as validated by
+	 * `Validate Evidence Refs` in Claude Scripting. Present only on researched
+	 * projects; a ref that survived validation is guaranteed to exist in the
+	 * pack, so a card built from it can never cite something invented.
+	 */
+	evidenceRef?: string;
+};
+
+/**
+ * One row of the Evidence pack (Airtable table `Evidence`, tblU26cUiQQV2eNdg),
+ * as Claude Scripting wrote it. The source and date are the reason a claim card
+ * is worth showing — the narration never says them aloud.
+ */
+export type EvidenceClaim = {
+	/** E1..E20, matching a scene's `evidenceRef`. */
+	ref: string;
+	claim: string;
+	source: string;
+	date?: string;
+	url?: string;
+};
+
+/**
+ * A full-frame text card the montage can cut to. Normally derived in code from
+ * the evidence pack or from a figure the narration speaks (see
+ * `src/textCards.ts`); supplied explicitly only when something upstream
+ * authored it on purpose, which bypasses every derivation gate.
+ */
+export type TextCardSpec = {
+	/** The scene whose narration this card belongs with. */
+	sceneIndex: number;
+	variant: 'claim' | 'figure';
+	/** The line the card is built around: the claim, or the figure itself. */
+	headline: string;
+	/** What a figure quantifies. Meaningless on a claim card. */
+	kicker?: string;
+	/** "SOURCE · 1923". The whole point of a claim card. */
+	attribution?: string;
+	/** How long it needs to be read. */
+	seconds: number;
+	/**
+	 * Shortest it may be squeezed to and still be readable. A claim card is long
+	 * by nature and rarely fits a 4-5s scene at full length; without a floor to
+	 * shrink to, every one of them was silently dropped.
+	 */
+	minSeconds: number;
 };
 
 export type Palette = {
@@ -69,6 +116,19 @@ export type FinalVideoProps = {
 	showEndScreen?: boolean;
 	/** Chapter number -> real chapter title (from the script's [CHAPTER n: title] markers). */
 	chapterTitles?: Record<string, string>;
+	/**
+	 * The project's Evidence rows. Cards are built from these, so a researched
+	 * project shows its sources on screen instead of only in Airtable. Absent
+	 * on fiction projects, which then fall back to figure cards or none.
+	 */
+	evidence?: EvidenceClaim[];
+	/**
+	 * Cards authored upstream. Supplying these replaces derivation entirely —
+	 * a deliberate card always beats a guessed one.
+	 */
+	textCards?: TextCardSpec[];
+	/** Master switch for text cards. Omitted/true keeps them. */
+	showTextCards?: boolean;
 };
 
 export const defaultFinalVideoProps: FinalVideoProps = {

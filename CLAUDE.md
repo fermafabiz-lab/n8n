@@ -772,55 +772,83 @@ them on every publish. Ignore those four; do not wire them back.
 
 ### The montage (`remotion/src/montage.ts`)
 
-The films used to read as ONE shot. Measured against five reference
-documentaries (`remotion/reference/editing-benchmarks.json`), at the same
-detector threshold every reference registers 43-126 cuts per 4 minutes and
-ours registered **one** — consecutive scenes shared subject, location and
-framing, so the only "cut" was a luminance dip, and the scene boundaries
-only appeared at all when the detector was made twice as sensitive, landing
-on a visible 8-second grid.
+Read the "a cut is a change of picture" entry above first — it is the rule this
+file exists to obey, and the whole account of how it was got wrong. What
+follows is only what remains true after that correction.
 
-- **No pipeline change was needed, and none should be made.** The planner
-  never touches the media, never reorders and never drops time: shots tile
-  the timeline contiguously and only ever **re-frame the same continuous
-  footage**. A discontinuous jump in scale/position is what reads as a cut,
-  exactly the way an editor punches into a single take. The audio timeline
-  is fixed (narration is muxed per scene), so this is the only kind of
-  cutting available to us — and it is enough.
-- **Rhythm is planned across the whole timeline, not per scene.** A scene is
-  one narration beat (~7-9s), far too short to hold both a burst and a hold.
-  The planner walks the scene list in modes: HOLD swallows several scenes
-  whole (the only way to reach the 10s+ shots every reference has), BURST
-  chops one scene into 4-8 rapid inserts, NORMAL cuts lightly.
-- **A cut the detector cannot see is not a cut**, and rhythm statistics
-  cannot tell you the difference — a shot list with perfect variability still
-  reads as one take if consecutive framings happen to match. Two ways that
-  happened, both fixed, both invisible in the stats:
-  - `pickKind` enforced the 0.14 minimum scale step against the previous
-    shot's **base** framing, but `shotTransform` pushes in during the shot.
-    A shot that drifted 0.03 upward left a smaller gap than its base
-    suggested, so planned 14% cuts landed at 3%. `pushFor()`/`endScaleOf()`
-    now own that number and both the planner and the renderer read it.
-  - Every insert in a BURST was forced to `detail`, so all eight shared
-    scale 1.5 — the fastest passage in the film was the one a detector read
-    as a single shot. Modes now state a framing *preference list* and
-    `clearing()` picks the first entry that actually clears the threshold.
-- **`npm run check:montage`** reports rhythm AND `auditCuts()` — the real
-  jump at every planned cut, measured from where the outgoing shot ended.
-  It exits non-zero on any weak cut or missed acceptance target. Run it
-  after touching the planner; the numbers above are exactly what it caught.
-- `intensity` used to have `BURST_EVERY` as its only lever, and a burst fires
-  at most once on a 40s film — so intensity 2 planned a shot-for-shot
-  identical edit to intensity 1 on the length we make most often. It now also
-  drives the NORMAL piece count.
-- The remaining acceptance target, `cutsWithAudioAccentPct >= 40`, cannot be
-  checked here: it needs a rendered file, and it is **Dan's side** — SFX
-  accents have to land on these cut times. `auditCuts()` is where to get
-  them from.
+- **`npm run check:montage` asserts PLACEMENT, not count.** Every planned cut
+  must sit on a real change of picture (`pictureChanges()`); the rhythm figures
+  are printed but informational, because they describe the script's pacing,
+  which the planner does not control and must not fake. It also derives the
+  text cards exactly as `FinalVideo` does, so the report measures the edit that
+  will actually render.
+- **The pipeline already generates material we never put on screen.** Every
+  scene has an approved `Imagine Scenă` (used only as Veo's first frame) and
+  researched projects have a whole `Evidence` table. Before paying to generate
+  anything new for variety, spend what is already bought. Text cards are the
+  first of that (below); scene stills are the obvious next one, though the
+  still IS the clip's first frame, so it can only be used decalat or it reads
+  as a freeze.
+- **A text card is the one mid-scene cut the planner may invent**, and it
+  passes the rule rather than dodging it: the frame is replaced outright, so
+  nothing about the two pictures either side matches. The framing DOES change
+  across a card, and that is not a punch-in through the back door — the two
+  footage shots never touch on screen, so there is no zoom jump to see.
+  Returning on the SAME framing is what would look wrong: it makes the card
+  read as a splice into one static shot rather than as a cutaway.
+- **Cards are placed by the planner, not at fixed points.** Dropped at "always
+  the chapter start" they land next to the rhythm instead of in it. It respects
+  `CARD_MIN_GAP` (9s), `CARD_MAX_SHARE` (16% of runtime) and a `CARD_LEAD` of
+  footage before the card, and it places TIME only — it never sees a card's
+  content. `toMontageCards()` is the whole interface.
+- The `cutsWithAudioAccentPct >= 40` acceptance target cannot be checked here:
+  it needs a rendered file, and it is **Dan's side** — SFX accents have to land
+  on the cut times. `auditCuts()` is where to get them from.
 - Pixel-diffing a cut against the Studio fixture proves nothing:
   `PreviewBackdrop` is a near-featureless gradient, so adjacent frames differ
   by 0.07 vs 0.11 of 255 either way. That is a defect of the test, not the
   montage — verify numerically, or over real footage.
+
+### Text cards (`remotion/src/textCards.ts`)
+
+The second source the montage cuts to, and the only honest way we have to cut
+more often than the footage changes. Cost zero: both kinds are built from data
+the pipeline already produces.
+
+- **A card must show what the narration is NOT saying.** Reprinting the spoken
+  sentence is worse than no card, because the captions already print it —
+  three copies of one line. That single test is what rules out the obvious
+  "key phrase from the script" card, and it is why captions are suppressed for
+  the frames a card is up.
+- Two kinds, both derived in CODE so a card can never be invented:
+  - `claim` — a row from the `Evidence` table, with **its source and date**.
+    The attribution is the entire point; a claim with no `source` produces no
+    card. Needs `evidence[]` + per-scene `evidenceRef` in the props (Dan's
+    side); until then researched projects fall back to figures.
+  - `figure` — a number the narration speaks, set large. Gated narrowly:
+    percentages, plausible years, scaled quantities (million/miliarde/…), and
+    bare numbers only from three digits up. "three days" and "7 birds" produce
+    nothing, deliberately.
+- **Which side the figure's context is on is decided by punctuation, not by
+  preference.** A quantity usually governs the noun after it ("16 billion
+  hours every day"), but when the figure closes its clause the noun is behind
+  it — "raise global output by 26%, according to the same modelling" first
+  produced the card "26% — according to the same modelling", which says
+  nothing. Backward windows are also tighter than forward ones (4 words / 28
+  chars), or they pick up the start of a different phrase.
+- The kicker is bounded by **width, not word count**: a fixed six-word cap cut
+  one phrase mid-clause while truncating a good six-word label on another.
+- The card is ink with the accent, revealed by a fast settle — **not** the
+  light leak, which belongs to the chapter boundary. Two full-frame light cards
+  would be confusable, and reusing the leak blurs which element owns a frame.
+- The planner may **squeeze** a card to fit its scene, so `TextCard` takes its
+  duration from the SHOT, not from the spec. Without a `minSeconds` floor to
+  shrink to, every claim card — long by nature — was silently dropped on 4-5s
+  scenes. The bug first appeared in `check-montage.mjs`, which hand-rolled the
+  spec→planner projection and forgot the field; that is why `toMontageCards()`
+  exists as the single owner.
+- An explicit `textCards` prop bypasses every gate above, same pattern as
+  `hookTitle`. That is where Scripting-authored cards will land.
 
 ### The site
 

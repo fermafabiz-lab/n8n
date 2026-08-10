@@ -8,6 +8,8 @@ import {Captions} from './components/Captions';
 import {FilmLayer, gradeForTone} from './components/FilmLayer';
 import {Transitions, kenBurnsTransform} from './components/Transitions';
 import {planMontage, shotAt, shotTransform} from './montage';
+import {TextCard} from './components/TextCard';
+import {buildTextCards, toMontageCards} from './textCards';
 import {SourceVideo} from './components/SourceVideo';
 import {presetForTone} from './style';
 import type {FinalVideoProps} from './types';
@@ -30,6 +32,9 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 	showChapterCards = true,
 	showEndScreen = true,
 	chapterTitles = {},
+	evidence,
+	textCards,
+	showTextCards = true,
 }) => {
 	const {fps} = useVideoConfig();
 	const frame = useCurrentFrame();
@@ -101,6 +106,25 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 			: preset.energy === 2
 				? 2
 				: 1;
+	// The second source the montage can cut to. Re-framing alone gives rhythm
+	// without variety — every "cut" is the same tape, differently cropped — so
+	// the planner needs material that genuinely differs. Cards are the cheapest
+	// such material we have: the Evidence pack and the figures the narration
+	// already speaks are both sitting unused.
+	const cards = useMemo(
+		() =>
+			showTextCards
+				? buildTextCards({
+						scenes,
+						evidence,
+						explicit: textCards,
+						chapterCardsOn: showChapterCards,
+						hookSeconds,
+					})
+				: [],
+		[scenes, evidence, textCards, showTextCards, showChapterCards, hookSeconds],
+	);
+
 	const shots = useMemo(
 		() =>
 			planMontage(scenes, {
@@ -111,10 +135,22 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 				// A chapter card already owns its boundary with a light leak;
 				// a black frame there too would be two effects on one cut.
 				blackPunctuation: !showChapterCards,
+				// The planner places TIME; it never sees what a card holds.
+				cards: toMontageCards(cards),
 			}),
-		[scenes, intensity, projectTitle, showChapterCards],
+		[scenes, intensity, projectTitle, showChapterCards, cards],
 	);
-	const shot = intensity === 0 ? null : shotAt(shots, seconds);
+	// Cards are material, not rhythm, so they land even at intensity 0 — turning
+	// the montage off must not throw away a sourced claim.
+	const shot = shotAt(shots, seconds);
+	const activeCard =
+		shot?.kind === 'card' && shot.cardIndex !== undefined ? cards[shot.cardIndex] : null;
+	// Rendered as Sequences rather than from `shot`, so each card's own clock
+	// starts at zero; `activeCard` is only used to know a card is up.
+	const cardShots = useMemo(
+		() => shots.filter((s) => s.kind === 'card' && s.cardIndex !== undefined),
+		[shots],
+	);
 
 	// First scene of every chapter >= 1 gets an impact card.
 	const chapterStarts = scenes.filter(
@@ -153,7 +189,11 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 						chapterCards={showChapterCards}
 						sceneDips={intensity === 0}
 					/>
-					{showCaptions && (
+					{/* Captions go dark under a card. The card is already text, and
+					    the whole reason a card earns its place is that it shows what
+					    the narration is NOT saying — printing the spoken line over it
+					    would put three copies of one sentence on screen. */}
+					{showCaptions && !activeCard && (
 						<Captions
 							scenes={scenes}
 							palette={palette}
@@ -162,6 +202,26 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 							portrait={aspectRatio === '9:16'}
 						/>
 					)}
+					{/* Text cards. Each gets its own Sequence so the component's clock
+					    starts at zero and its reveal is frame-exact, exactly as the
+					    chapter card does. Placement came from the planner, so a card
+					    never lands two in a row or over the hook. */}
+					{cardShots.map((cs) => (
+						<Sequence
+							key={`tc-${cs.startSeconds}`}
+							from={Math.round(cs.startSeconds * fps)}
+							durationInFrames={Math.max(1, Math.round(cs.durationSeconds * fps))}
+						>
+							<TextCard
+								card={cards[cs.cardIndex as number]}
+								// The planner may have squeezed the card to fit its scene, so
+								// the SHOT owns the duration, not the spec — otherwise the exit
+								// fade gets cut off mid-burn.
+								seconds={cs.durationSeconds}
+								preset={preset}
+							/>
+						</Sequence>
+					))}
 					{showChapterCards &&
 						chapterStarts.map((s) => (
 							<Sequence

@@ -25,6 +25,9 @@ import {fileURLToPath} from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const {planMontage, montageStats, auditCuts, pictureChanges, framingOverscan, MIN_SCALE_STEP} =
 	await import(join(root, 'src', 'montage.ts'));
+// Cards are derived exactly as FinalVideo derives them, so the report measures
+// the edit that will actually render rather than a framing-only skeleton.
+const {buildTextCards, toMontageCards} = await import(join(root, 'src', 'textCards.ts'));
 
 const args = process.argv.slice(2);
 const iFlag = args.indexOf('--intensity');
@@ -38,27 +41,44 @@ if (!scenes.length) {
 	process.exit(1);
 }
 const total = scenes.at(-1).startSeconds + scenes.at(-1).durationSeconds;
-// Seconds at which the footage genuinely changes. A cut anywhere else is a
-// jump on the same shot, whatever a detector would call it.
-const changes = pictureChanges(scenes);
-const isPictureChange = (t) => changes.some((c) => Math.abs(c - t) < 0.75);
 const check = (ok) => (ok ? 'OK  ' : 'FAIL');
 let failed = false;
 
 console.log(`\nprops: ${propsPath.replace(root + '/', '')}`);
-console.log(`${scenes.length} scenes over ${total.toFixed(1)}s\n`);
+console.log(`${scenes.length} scenes over ${total.toFixed(1)}s`);
+
+const cards = buildTextCards({
+	scenes,
+	evidence: props.evidence,
+	explicit: props.textCards,
+	chapterCardsOn: props.showChapterCards !== false,
+	hookSeconds: props.showHookTitle === false ? 0 : (props.hookTitleDurationInSeconds ?? 3.5),
+});
+console.log(
+	cards.length
+		? `${cards.length} text card(s): ` +
+				cards.map((c) => `${c.variant}@scene${c.sceneIndex} "${c.headline}"`).join(', ')
+		: 'no text cards derived (no evidence rows, no figures in the narration)',
+);
+console.log();
 
 for (const intensity of intensities) {
 	const shots = planMontage(scenes, {
 		intensity,
 		seed: props.projectTitle || 'house-of-videos',
 		blackPunctuation: !props.showChapterCards,
+		cards: toMontageCards(cards),
 	});
 	const st = montageStats(shots);
 	const cuts = auditCuts(shots);
 	const weak = cuts.filter((c) => c.belowThreshold);
 
-	// THE assertion: no cut may sit anywhere but a change of footage.
+	// THE assertion: no cut may sit anywhere but a change of PICTURE — a scene
+	// boundary, or a card's in/out, where the frame is replaced outright. Derived
+	// per plan rather than once up front, because where the cards landed is a
+	// property of the plan.
+	const changes = pictureChanges(scenes, shots);
+	const isPictureChange = (t) => changes.some((c) => Math.abs(c - t) < 0.75);
 	const invented = cuts.filter((c) => !isPictureChange(c.atSeconds));
 
 	console.log(`--- intensity ${intensity} -> ${st.count} shots, ${cuts.length} cuts ---`);
@@ -76,10 +96,16 @@ for (const intensity of intensities) {
 	}
 
 	// The shot list itself, so a suspicious rhythm can be read at a glance.
+	// Upper case marks a shot that is NOT footage — a card or a black — so it
+	// cannot be mistaken for a framing ('c' would mean both close and card).
 	console.log(
 		'  shots: ' +
 			shots
-				.map((s) => `${s.kind[0]}${s.durationSeconds.toFixed(1)}`)
+				.map((s) => {
+					const notFootage = s.kind === 'card' || s.kind === 'black';
+					const tag = notFootage ? s.kind[0].toUpperCase() : s.kind[0];
+					return `${tag}${s.durationSeconds.toFixed(1)}`;
+				})
 				.join(' '),
 	);
 	console.log();
@@ -97,7 +123,7 @@ if (torn.length) failed = true;
 console.log();
 
 console.log(
-	`${changes.length} real picture changes available in this footage — one per scene.\n` +
+	`${pictureChanges(scenes).length} real picture changes available in this footage — one per scene.\n` +
 		`Cutting more often than that needs more footage, not a bolder planner:\n` +
 		`the Faza 2 plan in README.md, where Remotion receives the scene clips\n` +
 		`separately and can cut between them.\n`,

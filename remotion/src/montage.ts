@@ -42,12 +42,18 @@ import type {SceneCaption} from './types';
  * far. Dropping it also lets the three that remain be spaced far enough apart
  * that any two of them cut; see FRAMINGS.
  */
-export type ShotKind = 'wide' | 'medium' | 'close' | 'black';
+export type ShotKind = 'wide' | 'medium' | 'close' | 'black' | 'card';
 
 export type Shot = {
 	startSeconds: number;
 	durationSeconds: number;
 	kind: ShotKind;
+	/**
+	 * Index into `MontageOptions.cards`, set only when kind is 'card'. The
+	 * planner never sees what a card holds — it places TIME and the caller
+	 * renders. Rhythm has no business knowing about Airtable.
+	 */
+	cardIndex?: number;
 	/** Zoom applied to the footage; 1 = untouched. */
 	scale: number;
 	/** Framing offset in percent of frame size, applied before scale. */
@@ -95,7 +101,7 @@ function hashString(s: string): number {
 // 1.5) / 100, asserted by scripts/check-montage.mjs.
 //
 // The tightest rung stays under 1.5 so a punch-in never turns soft.
-const FRAMINGS: Record<Exclude<ShotKind, 'black'>, {scale: number; spread: number}> = {
+const FRAMINGS: Record<Framing, {scale: number; spread: number}> = {
 	wide: {scale: 1.08, spread: 2},
 	medium: {scale: 1.26, spread: 5},
 	close: {scale: 1.44, spread: 7},
@@ -121,11 +127,22 @@ const INSERT_PUSH = 0.004;
 
 const pushFor = (durationSeconds: number) => (durationSeconds > 2 ? HELD_PUSH : INSERT_PUSH);
 
-/** The scale the footage has actually reached by the time a shot ends. */
+/**
+ * The scale the footage has actually reached by the time a shot ends, or null
+ * for a shot that is not footage at all.
+ */
 const endScaleOf = (shot: {scale: number; durationSeconds: number; kind: ShotKind}): number | null =>
-	shot.kind === 'black' ? null : shot.scale + pushFor(shot.durationSeconds);
+	shot.kind === 'black' || shot.kind === 'card'
+		? null
+		: shot.scale + pushFor(shot.durationSeconds);
 
-type Framing = Exclude<ShotKind, 'black'>;
+/**
+ * `black` and `card` are not framings — they are what the frame HOLDS, a
+ * different axis from how tightly the footage is cropped. The union carries
+ * both because a shot is only ever one of them, but every framing lookup has
+ * to exclude them.
+ */
+type Framing = Exclude<ShotKind, 'black' | 'card'>;
 
 function furthest(prevEndScale: number, candidates: Framing[]): Framing {
 	return candidates.reduce((best, k) =>
@@ -202,22 +219,124 @@ export type MontageOptions = {
 	seed?: string;
 	/** Insert short black frames before chapter changes. */
 	blackPunctuation?: boolean;
+	/**
+	 * Text cards available to cut to, in the caller's own order.
+	 *
+	 * These are the one legitimate way to add a cut that the footage does not
+	 * give us, and they pass the rule above rather than dodging it: a card
+	 * replaces the picture entirely. Nothing about the two frames either side
+	 * matches — it is a change of material, not a change of zoom, which is
+	 * exactly what a scene boundary is and exactly what a punch-in is not.
+	 *
+	 * They are also why more cutting no longer has to wait for Faza 2. The
+	 * material is already bought: the Evidence pack and the figures the
+	 * narration speaks (see src/textCards.ts).
+	 */
+	cards?: MontageCard[];
 };
 
+export type MontageCard = {
+	/** The scene whose narration this card belongs with. */
+	sceneIndex: number;
+	/** How long it wants on screen; the caller knows how much text it holds. */
+	seconds: number;
+	/**
+	 * Shortest it may be squeezed to and still be readable. Without a floor to
+	 * shrink to, a claim card — long by nature, since it carries a whole sourced
+	 * sentence — never fitted a 4-5s scene and every one was silently dropped.
+	 */
+	minSeconds?: number;
+};
+
+/**
+ * A card is content, so its placement obeys the edit rather than a fixed slot
+ * like "always at the chapter start" — dropped at fixed points cards land NEXT
+ * TO the rhythm instead of in it.
+ */
+/** Minimum quiet time between two cards. */
+const CARD_MIN_GAP = 9;
+/** No more than this share of the runtime may be card. */
+const CARD_MAX_SHARE = 0.16;
+/**
+ * Footage that runs before the card inside the same scene. A claim card supers
+ * a sentence that has already begun; cutting to it on the scene's first frame
+ * would land before the narration gives it a reason to exist.
+ */
+const CARD_LEAD = 1.1;
+
 export function planMontage(scenes: SceneCaption[], opts: MontageOptions = {}): Shot[] {
-	const {intensity = 1, seed = 'video-factory', blackPunctuation = true} = opts;
+	const {intensity = 1, seed = 'video-factory', blackPunctuation = true, cards = []} = opts;
 	if (!scenes.length) return [];
+
+	const totalRuntime =
+		scenes[scenes.length - 1].startSeconds + scenes[scenes.length - 1].durationSeconds;
+	const cardBudget = totalRuntime * CARD_MAX_SHARE;
+	// One card per scene at most; the caller's order decides which wins.
+	const cardForScene = new Map<number, number>();
+	cards.forEach((c, i) => {
+		if (!cardForScene.has(c.sceneIndex)) cardForScene.set(c.sceneIndex, i);
+	});
+	let cardSecondsUsed = 0;
+	let lastCardEnd = -Infinity;
+
+	/**
+	 * Room for this scene's card? Checked identically at every intensity,
+	 * because a card is material rather than framing: turning the montage off
+	 * must not throw away a sourced claim.
+	 */
+	const cardRoom = (sceneIndex: number, cursor: number, remaining: number) => {
+		const ci = cardForScene.get(sceneIndex);
+		if (ci === undefined) return null;
+		const card = cards[ci];
+		const floor = Math.min(card.seconds, card.minSeconds ?? card.seconds);
+		// A card may run to the end of its scene — the next scene is a real cut
+		// regardless — but it may never start before the lead.
+		const available = remaining - CARD_LEAD;
+		if (available < floor) return null;
+		if (cursor - lastCardEnd < CARD_MIN_GAP) return null;
+		const secs = Math.min(card.seconds, available);
+		if (cardSecondsUsed + secs > cardBudget) return null;
+		return {ci, secs};
+	};
+
+	const cardShot = (start: number, cardIndex: number, seconds: number): Shot => ({
+		startSeconds: start,
+		durationSeconds: seconds,
+		kind: 'card',
+		cardIndex,
+		scale: 1,
+		offsetXPct: 0,
+		offsetYPct: 0,
+		driftX: 0,
+		driftY: 0,
+	});
+
 	if (intensity === 0) {
-		return scenes.map((s) => ({
-			startSeconds: s.startSeconds,
-			durationSeconds: s.durationSeconds,
-			kind: 'medium' as ShotKind,
+		const out: Shot[] = [];
+		const plain = (startSeconds: number, durationSeconds: number): Shot => ({
+			startSeconds,
+			durationSeconds,
+			kind: 'medium',
 			scale: FRAMINGS.medium.scale,
 			offsetXPct: 0,
 			offsetYPct: 0,
 			driftX: 1,
 			driftY: 0.5,
-		}));
+		});
+		scenes.forEach((s, i) => {
+			const room = cardRoom(i, s.startSeconds, s.durationSeconds);
+			if (!room) {
+				out.push(plain(s.startSeconds, s.durationSeconds));
+				return;
+			}
+			out.push(plain(s.startSeconds, CARD_LEAD));
+			out.push(cardShot(s.startSeconds + CARD_LEAD, room.ci, room.secs));
+			const tail = s.durationSeconds - CARD_LEAD - room.secs;
+			if (tail > 0.35) out.push(plain(s.startSeconds + CARD_LEAD + room.secs, tail));
+			cardSecondsUsed += room.secs;
+			lastCardEnd = s.startSeconds + CARD_LEAD + room.secs;
+		});
+		return out;
 	}
 
 	const rand = mulberry32(hashString(seed) ^ scenes.length);
@@ -257,44 +376,90 @@ export function planMontage(scenes: SceneCaption[], opts: MontageOptions = {}): 
 			prevEndScale = null;
 		}
 
-		// Intensity 2 picks from the whole repertoire rather than the framings
-		// that suit the length: a stronger contrast at the cost of sitting
-		// closer than a long shot really wants.
-		const pool = intensity === 2 ? (Object.keys(FRAMINGS) as Framing[]) : poolFor(remaining);
-		const kind =
-			prevEndScale === null
-				? pool[0]
-				: (crossing(rand, prevEndScale, pool) ?? furthest(prevEndScale, pool));
-		const {scale, spread} = FRAMINGS[kind];
-		// Offsets alternate sides, so successive scenes are not all framed off
-		// the same edge — another way the change reads as deliberate.
-		const prevX = shots.length ? shots[shots.length - 1].offsetXPct : 0;
-		const dirX = prevX > 0 ? -1 : prevX < 0 ? 1 : rand() < 0.5 ? -1 : 1;
-		const shot: Shot = {
-			startSeconds: cursor,
-			durationSeconds: remaining,
-			kind,
-			scale,
-			offsetXPct: dirX * spread * (0.55 + rand() * 0.45),
-			offsetYPct: (rand() < 0.5 ? -1 : 1) * spread * 0.45 * (0.4 + rand() * 0.6),
-			driftX: (rand() < 0.5 ? -1 : 1) * (0.6 + rand() * 0.9),
-			driftY: (rand() < 0.5 ? -1 : 1) * (0.4 + rand() * 0.7),
+		/**
+		 * One footage shot, from `cursor` for `length`. Framing crosses whatever
+		 * the previous footage shot ended on, so a real change of picture is
+		 * reinforced by a real change of frame.
+		 */
+		const footage = (length: number) => {
+			// Intensity 2 picks from the whole repertoire rather than the framings
+			// that suit the length: a stronger contrast at the cost of sitting
+			// closer than a long shot really wants.
+			const pool = intensity === 2 ? (Object.keys(FRAMINGS) as Framing[]) : poolFor(length);
+			const kind =
+				prevEndScale === null
+					? pool[0]
+					: (crossing(rand, prevEndScale, pool) ?? furthest(prevEndScale, pool));
+			const {scale, spread} = FRAMINGS[kind];
+			// Offsets alternate sides, so successive scenes are not all framed off
+			// the same edge — another way the change reads as deliberate.
+			const prevX = shots.length ? shots[shots.length - 1].offsetXPct : 0;
+			const dirX = prevX > 0 ? -1 : prevX < 0 ? 1 : rand() < 0.5 ? -1 : 1;
+			const shot: Shot = {
+				startSeconds: cursor,
+				durationSeconds: length,
+				kind,
+				scale,
+				offsetXPct: dirX * spread * (0.55 + rand() * 0.45),
+				offsetYPct: (rand() < 0.5 ? -1 : 1) * spread * 0.45 * (0.4 + rand() * 0.6),
+				driftX: (rand() < 0.5 ? -1 : 1) * (0.6 + rand() * 0.9),
+				driftY: (rand() < 0.5 ? -1 : 1) * (0.4 + rand() * 0.7),
+			};
+			shots.push(shot);
+			cursor += length;
+			remaining -= length;
+			prevEndScale = endScaleOf(shot);
 		};
-		shots.push(shot);
-		prevEndScale = endScaleOf(shot);
+
+		// A card splits the scene into footage / card / footage. This is the one
+		// mid-scene cut the planner is allowed to invent, and it does not break
+		// the rule above: the picture is genuinely replaced, so nothing about the
+		// frames either side matches.
+		//
+		// Note the framing DOES change across it, and that is not a punch-in
+		// through the back door: the two footage shots never touch on screen, so
+		// there is no zoom jump to see. Coming back on the same framing is what
+		// would look wrong — it would make the card read as a splice dropped into
+		// one static shot instead of a cutaway.
+		const room = cardRoom(i, cursor, remaining);
+		if (room) {
+			footage(CARD_LEAD);
+			shots.push(cardShot(cursor, room.ci, room.secs));
+			cursor += room.secs;
+			remaining -= room.secs;
+			cardSecondsUsed += room.secs;
+			lastCardEnd = cursor;
+			// A card that runs to the scene boundary leaves no tail, and a
+			// sub-frame orphan shot would be worse than none.
+			if (remaining > 0.35) footage(remaining);
+			continue;
+		}
+
+		footage(remaining);
 	}
 
 	return shots;
 }
 
 /**
- * Seconds at which the FOOTAGE changes — scene starts, which is the only place
- * a cut is honest. Exported so the checker can assert that every planned cut
- * lands on one instead of measuring cut COUNT, the metric that produced the
- * zoom-jump edit in the first place.
+ * Seconds at which the PICTURE genuinely changes, which is the only place a cut
+ * is honest. Exported so the checker can assert that every planned cut lands on
+ * one, instead of measuring cut COUNT — the metric that produced the zoom-jump
+ * edit in the first place.
+ *
+ * Scene starts, because one clip per scene is what the footage gives us, plus
+ * each placed card's in and out. A card qualifies on the same terms as a scene
+ * boundary rather than by exemption: the frame is replaced outright, so nothing
+ * about the two pictures either side matches. Pass the plan to include them; a
+ * bare call still answers for the footage alone.
  */
-export function pictureChanges(scenes: SceneCaption[]): number[] {
-	return scenes.map((s) => s.startSeconds);
+export function pictureChanges(scenes: SceneCaption[], shots: Shot[] = []): number[] {
+	const out = scenes.map((s) => s.startSeconds);
+	for (const shot of shots) {
+		if (shot.kind !== 'card') continue;
+		out.push(shot.startSeconds, shot.startSeconds + shot.durationSeconds);
+	}
+	return out.sort((a, b) => a - b);
 }
 
 /**
@@ -353,7 +518,10 @@ export type CutAudit = {
 	 * which is what a detector sees.
 	 */
 	scaleJump: number;
-	/** Black on either side: the cut is total and framing does not matter. */
+	/**
+	 * Black or a card on either side: the picture is replaced outright, so
+	 * framing does not matter — nothing about the two frames matches.
+	 */
 	hardCut: boolean;
 	belowThreshold: boolean;
 };
@@ -370,7 +538,8 @@ export function auditCuts(shots: Shot[]): CutAudit[] {
 	for (let i = 1; i < shots.length; i++) {
 		const a = shots[i - 1];
 		const b = shots[i];
-		const hardCut = a.kind === 'black' || b.kind === 'black';
+		const notFootage = (k: ShotKind) => k === 'black' || k === 'card';
+		const hardCut = notFootage(a.kind) || notFootage(b.kind);
 		const from = endScaleOf(a);
 		const scaleJump = hardCut || from === null ? Infinity : Math.abs(b.scale - from);
 		out.push({

@@ -1036,6 +1036,36 @@ origins empty. The app is **Published**, not in Testing — Testing mode expires
 refresh tokens after 7 days. The "Google hasn't verified this app" warning is
 expected and harmless for an app touching only its own Drive.
 
+### Reference image for the first scene
+
+The creation form takes an optional photo; the first scene's image is then
+generated FROM it. The chain, and where each piece lives:
+
+- **Site**: `new/page.tsx` file input (JPG/PNG/WebP, ≤6 MB, validated in
+  `createProject`) → base64 in the webhook payload as `reference_image`.
+  `next.config.mjs` raises the server-action `bodySizeLimit` to 10 MB —
+  the default 1 MB would reject the photo before the action even ran.
+- **Orchestrator**: IN-LINE after `Respond With Project` (parallel branches
+  flush too late — same lesson as Save Evidence): `Has Ref Image?` →
+  decode base64 (`this.helpers.prepareBinaryData` works in Code nodes) →
+  Drive upload + share → merge `refImage: <drive url>` into Editing
+  Options via HTTP PATCH (no read needed — the record was created seconds
+  earlier by this same execution).
+- **Media Generation**: new `IMG Load Project` (one GET at batch start,
+  in-line before `Find Audio Folder`) exposes Editing Options to the image
+  loop. `Build Image Request`: scene with `Ordine Scenă === 1` + refImage
+  → `nano-banana/edit` with the photo as GROUND TRUTH ("recreate the
+  subject faithfully"), which is a deliberately different instruction from
+  the n-1 chain's "identity only, different composition". User ref wins
+  over chaining and skips the similarity guard.
+- **Regen path** (`IR Build Request`/`IR Generate Image` in Scripting):
+  same rule, keyed by `refIsUser`. Unlike the n-1 chain, the user ref
+  survives a prior rejection — it is producer-approved content; the
+  refusal came from the generated output.
+- The RESTART-scripting path reuses the same project record, so refImage
+  survives a script redo. The rest of the film chains off scene 1's
+  generated image (n-1), so the reference propagates one hop at a time.
+
 ## Open work
 
 - **The OpenAI account is out of credits, and that is what stops the

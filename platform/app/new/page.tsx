@@ -414,6 +414,24 @@ export default function NewVideo() {
                   knowledge is enough for history, science, brands etc.
                 </p>
               </div>
+              <div className="field" style={{ marginTop: 16 }}>
+                <label htmlFor="reference_image">
+                  Reference image for the first scene
+                </label>
+                <input
+                  type="file"
+                  id="reference_image"
+                  name="reference_image"
+                  accept="image/jpeg,image/png,image/webp"
+                />
+                <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--dim)" }}>
+                  Optional — upload a photo and the first scene&apos;s image is
+                  generated FROM it: the exact subject, design and look are
+                  treated as ground truth (ex. your car, your product, a real
+                  place). The rest of the film chains off that first frame.
+                  JPG/PNG/WebP, max 6&nbsp;MB.
+                </p>
+              </div>
             </section>
 
             {state && (

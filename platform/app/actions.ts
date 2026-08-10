@@ -1034,6 +1034,31 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     .split(",")
     .map((v) => v.trim())
     .filter(Boolean);
+  // Optional reference photo for the first scene. Base64 rides the webhook
+  // JSON; the orchestrator uploads it to Drive and stores the URL in
+  // Editing Options as refImage, which Media Generation uses as the fal
+  // edit reference for the scene with Ordine 1.
+  let reference_image: { name: string; type: string; data: string } | null = null;
+  const refFile = formData.get("reference_image");
+  if (refFile instanceof File && refFile.size > 0) {
+    if (refFile.size > 6 * 1024 * 1024) {
+      return {
+        ok: false,
+        message: "The reference image is too large — keep it under 6 MB.",
+      };
+    }
+    if (!/^image\/(jpeg|png|webp)$/.test(refFile.type)) {
+      return {
+        ok: false,
+        message: "The reference image must be a JPG, PNG or WebP.",
+      };
+    }
+    reference_image = {
+      name: refFile.name,
+      type: refFile.type,
+      data: Buffer.from(await refFile.arrayBuffer()).toString("base64"),
+    };
+  }
   const payload = {
     "Nume Proiect": String(formData.get("name") ?? ""),
     category: String(formData.get("category") ?? "story"),
@@ -1056,6 +1081,7 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     end_screen: String(formData.get("end_screen") ?? "yes"),
     sfx: String(formData.get("sfx") ?? "yes"),
     music: String(formData.get("music") ?? "no"),
+    ...(reference_image ? { reference_image } : {}),
   };
   // A no-narration category has nothing to speak and nothing to caption —
   // enforce that server-side no matter what the form controls held.

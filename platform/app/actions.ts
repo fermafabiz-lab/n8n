@@ -799,6 +799,34 @@ export async function retryAssembly(projectId: string): Promise<ActionResult> {
 }
 
 /**
+ * Change the film's sound after the fact: save the two audio switches into
+ * Editing Options (merged), then re-render from the approved clips. This is
+ * the only path to different sound on a FINISHED project — Final touches is
+ * gone by then and plain Restart reuses whatever was stored.
+ */
+export async function rerenderWithSound(
+  projectId: string,
+  sfx: boolean,
+  music: boolean,
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    await updateEditingOptions(projectId, { sfx, music });
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+  const fired = await fireAssembleWebhook(projectId);
+  if (!fired.ok) return fired;
+  revalidatePath(`/projects/${projectId}`);
+  return {
+    ok: true,
+    message: `Saved (effects ${sfx ? "on" : "off"}, music ${music ? "on" : "off"}) — re-rendering now. The new video replaces this one in a few minutes.`,
+  };
+}
+
+/**
  * Characters mode: save which voice plays each character. n8n reads this
  * (castAssign in Editing Options) on every synthesis, so it applies to the
  * next regeneration of any line.

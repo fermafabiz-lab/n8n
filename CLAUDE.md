@@ -488,7 +488,28 @@ is built only inside that guard (a `-1` input index would break the graph).
   the branch is pushed and the build goes green, and the way to check which
   code is running is the deployment's commit hash, not a guess.
 - If SFX are enabled and the final video still has none, check whether the
-  veo-3.1-lite clips actually carry an audio stream (`/inspect`).
+  veo-3.1-lite clips actually carry an audio stream (`/inspect`). Verified
+  once (2026-08-10): a real veo-3.1-lite clip probed `aac, 2ch, 48kHz` —
+  the ambience track exists.
+- **A Railway deploy mid-render used to kill the render**: render/graphics
+  jobs live in the server's memory, the deploy swaps the container, the
+  next status poll answers 404 "job not found" and the execution died —
+  proven by 1877 (the first-ever successful music mix, lost this way) and
+  1883, both 404ing minutes after a git push. `Check Render`/`Check
+  Graphics` now `continueRegularOutput`, both Guards classify that 404 as
+  `lost`, and `Render Lost?`/`Graphics Lost?` loop back to `Build
+  Timeline`/`Build Remotion Props` to rebuild and resubmit. The poll caps
+  still bound the loop. Corollary: pushing to the branch DURING a render
+  is safe now, but still costs a full resubmit of that stage.
+- **Sound is changeable after the render**: `SoundSettings` (under the
+  final video player) writes the two switches via `updateEditingOptions`
+  and re-fires the assemble webhook — the only path to different sound on
+  a finished project, since Final touches is gone by then.
+- To probe a media URL through the pipeline's own plumbing: temporarily
+  disable `Assemble Webhook` in the FA **draft** (do not publish), run
+  `execute_workflow` manual with `{media_url}` — it lands on `Probe
+  Webhook` → fal metadata — then re-enable. `execute_workflow` always
+  targets the first enabled webhook.
 - The ffmpeg bundled with Remotion in `node_modules` is a **stripped build**
   — no `sidechaincompress`, `alimiter`, `asplit`, `afade`, `anullsink`,
   `aloop`. The mix graph cannot be rehearsed locally with it; validate the

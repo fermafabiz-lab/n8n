@@ -17,6 +17,7 @@ import ExpandableTitle from "@/components/ExpandableTitle";
 import FinishedFlash from "@/components/FinishedFlash";
 import OpsPanel from "@/components/OpsPanel";
 import AssemblyStatus from "@/components/AssemblyStatus";
+import SoundSettings from "@/components/SoundSettings";
 import ProductionActivity from "@/components/ProductionActivity";
 import { StageLink, StageNavProvider } from "@/components/StageNav";
 import {
@@ -339,6 +340,11 @@ export default async function ProductionRoom({
                 Open / download
               </a>
             </div>
+            <SoundSettings
+              projectId={id}
+              initialSfx={project.editing.sfx}
+              initialMusic={project.editing.music}
+            />
           </div>
         )}
 

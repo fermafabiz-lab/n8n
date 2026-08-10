@@ -135,16 +135,28 @@ These each cost hours. Do not rediscover them.
   in `platform/lib/n8n.ts` threads this needle: `running` always counts;
   `waiting` counts only for worker workflows with a genuinely near wake-up.
 - **`execute_workflow` targets the first enabled webhook** in a workflow.
-- **Some executions never start at all.** n8n creates the execution, stores its
-  input, and then runs nothing: `runData` stays `{}` while the status says
-  `running`, forever. Seen twice (5639, and 1175 on the Vikings project). The
-  parent sits in `waitForSubWorkflow`, the batch never moves, and the site used
-  to hide Resume because it trusted `running` — leaving no way out of the UI.
-  `isStalled()` in `platform/lib/n8n.ts` detects it by the empty `runData`
-  after a 3-minute grace, never by age: a real media batch legitimately runs
-  for the best part of an hour. Stalled executions are excluded from
-  `getAliveProduction()`, listed in the ops panel with a Stop button, and
-  stopped automatically before a Resume so they can't accumulate.
+- **`runData` is EMPTY for the whole life of a healthy running execution**,
+  and mistaking that for "it never started" cost a full day of the producer
+  fighting the site. n8n does not persist node progress mid-run
+  (`saveExecutionProgress` is off), so `data.resultData.runData` is `{}` from
+  the first second until the execution FINISHES or suspends into a Wait node
+  — at which point the whole thing lands at once. Proven by execution 2485:
+  `running` with empty `runData` after 75s, then a clean render at 4 min.
+  Corollary for debugging: **you cannot watch an execution's progress through
+  the API.** Fetching a live execution tells you nothing; wait for it to end.
+- **Some executions really never start at all** (5639; 1175 on the Vikings
+  project): `runData` stays `{}` and the execution never terminates either.
+  From the API a live render and a dead one are **indistinguishable** while
+  running — the old `isStalled()` claimed otherwise ("a healthy execution
+  runs its first node within seconds") and therefore declared every render
+  older than 3 minutes STUCK, dropped it from `getAliveProduction()`, and let
+  the next Resume STOP it. That is what "it keeps stopping and the render
+  starts over from the beginning" was: the site killing its own healthy work,
+  every few minutes, on a false premise. Every one of those failures reads
+  "The execution was cancelled manually" in the ops panel.
+  `isStalled()` is now age-only (45 min), advisory, and NEVER removes
+  anything from `getAliveProduction()` — a running execution counts as alive,
+  full stop. Do not reintroduce a progress-based test; there is no signal.
 - **`WEBHOOK_URL=https://wf7.house-of-videos.com`** must be set as an env var
   on the instance. Without it n8n hands out `localhost` webhook URLs and
   Vercel can't start anything — which presents as "the site is broken".

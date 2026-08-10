@@ -86,17 +86,17 @@ export default async function OpsPanel({
 
   return (
     <div style={{ marginBottom: 36, display: "flex", flexDirection: "column", gap: 14 }}>
-      {/* An execution n8n reports as running that never executed a node. It
-          will never move on its own, and while it exists the Resume button
-          stays hidden — so this panel has to be the way out. */}
+      {/* An execution running far past any plausible duration. Advisory only:
+          nothing the API exposes proves it is dead, so this offers a Stop and
+          says as much rather than acting on the producer's behalf. */}
       {stalled.length > 0 && (
         <div className="card errcard">
-          <h5>Stuck — never started</h5>
+          <h5>Running unusually long</h5>
           {stalled.map((r) => (
             <div className="kv" key={r.id}>
               <span>
                 <b style={{ color: "var(--ink)" }}>{r.workflowName}</b> · started{" "}
-                {ago(r.startedAt)}, still hasn&apos;t run a single step
+                {ago(r.startedAt)}, longer than a normal run
               </span>
               <span style={{ display: "flex", gap: 10, alignItems: "center" }}>
                 <form action={stopExecutionAction}>
@@ -109,9 +109,11 @@ export default async function OpsPanel({
             </div>
           ))}
           <p style={{ margin: "10px 0 0", fontSize: 12, color: "var(--dim)" }}>
-            n8n sometimes creates an execution and never runs it. Stop it, then
-            press Resume — the batch skips whatever already has a clip, so
-            nothing finished gets regenerated.
+            Usually still working — a big batch can take an hour. n8n does
+            occasionally create an execution and never run it, and that looks
+            identical from here, so this is only a hint. If nothing has landed
+            in a long while, stop it and press Resume: the batch skips whatever
+            already has a clip, so nothing finished gets regenerated.
           </p>
         </div>
       )}

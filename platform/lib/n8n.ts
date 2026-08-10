@@ -140,27 +140,35 @@ const WORKER_WORKFLOWS = new Set([
  * n8n occasionally creates an execution, hands it its input, and then never
  * executes a single node. It reports as `running` forever: the parent sits in
  * `waitForSubWorkflow`, the batch never moves, and the site — which trusts
- * `running` — refuses to Resume because it believes work is in progress. That
- * combination is unrecoverable from the UI, and it has now cost two separate
- * production stalls.
+ * `running` — refuses to Resume because it believes work is in progress.
  *
- * The tell is exact, not a guess: a healthy execution runs its first node
- * within seconds, so an empty `runData` after the grace period means no node
- * ever ran. Age alone would be wrong — a real media batch legitimately runs
- * for the best part of an hour.
+ * THE OLD TEST WAS WRONG AND IT COST US A DAY. It called an execution dead
+ * when `runData` was still empty after three minutes, on the premise that "a
+ * healthy execution runs its first node within seconds". That premise is
+ * false here: n8n does not persist node progress mid-run (`saveExecutionProgress`
+ * is off), so `runData` stays `{}` for the WHOLE life of a perfectly healthy
+ * execution and only lands when it finishes or suspends into a Wait node.
+ * Proven by execution 2485 — `running` with empty `runData` for over a
+ * minute, then a clean render four minutes later.
+ *
+ * So every render longer than three minutes was declared "STUCK — NEVER
+ * STARTED", dropped from `getAliveProduction()`, and then STOPPED by the
+ * next Resume, which restarted it from the beginning — the producer's
+ * "it keeps stopping and the render starts over".
+ *
+ * What survives: only a `running` execution can be judged at all (a
+ * `waiting` one has its state persisted by definition, so it is alive), and
+ * only by AGE, well past anything legitimate. A real media batch runs for
+ * the best part of an hour, but it spends that time in Wait nodes reporting
+ * `waiting`; a continuously-`running` execution this old has stopped being
+ * plausible. Deliberately conservative: a false negative costs a Stop
+ * button nobody presses, a false positive kills a real render.
  */
-const STALL_GRACE_MS = 3 * 60 * 1000;
+const STALL_AGE_MS = 45 * 60 * 1000;
 
-export async function isStalled(e: ExecutionSummary): Promise<boolean> {
+export function isStalled(e: ExecutionSummary): boolean {
   if (!e.startedAt) return false;
-  if (Date.now() - new Date(e.startedAt).getTime() < STALL_GRACE_MS) return false;
-  const res = await api(`/executions/${e.id}?includeData=true`);
-  if (!res.ok) return false; // Can't tell — treat as alive, never kill on doubt.
-  const data = (await res.json()) as {
-    data?: { resultData?: { runData?: Record<string, unknown> } };
-  };
-  const runData = data.data?.resultData?.runData;
-  return Boolean(runData) && Object.keys(runData as object).length === 0;
+  return Date.now() - new Date(e.startedAt).getTime() > STALL_AGE_MS;
 }
 
 export async function getAliveProduction(): Promise<ExecutionSummary[]> {
@@ -179,9 +187,10 @@ export async function getAliveProduction(): Promise<ExecutionSummary[]> {
         new Date(e.waitTill).getTime() < soon,
     ),
   ];
-  // Drop the ones that never executed a node, so Pause/Resume works again.
-  const stalled = await Promise.all(candidates.map((e) => isStalled(e).catch(() => false)));
-  return candidates.filter((_, i) => !stalled[i]);
+  // A running execution counts as alive, full stop. Nothing readable from
+  // the API distinguishes "working" from "never started" while it runs, and
+  // guessing here is what let Resume kill live renders.
+  return candidates;
 }
 
 /**
@@ -207,16 +216,15 @@ export async function getAliveAssembly(): Promise<ExecutionSummary[]> {
 }
 
 /**
- * Executions that look alive but never ran a node — surfaced so the producer
- * can stop them instead of staring at a batch that will never move.
+ * Executions running far longer than any real one — surfaced so the producer
+ * can stop them instead of staring at a batch that will never move. Advisory
+ * only: see isStalled for why this can no longer be trusted to auto-kill.
  */
 export async function getStalledProduction(): Promise<ExecutionSummary[]> {
   if (!n8nConfigured) return [];
-  const running = (await getExecutions("running", 20)).filter((e) =>
-    WORKER_WORKFLOWS.has(e.workflowId),
+  return (await getExecutions("running", 20)).filter(
+    (e) => WORKER_WORKFLOWS.has(e.workflowId) && isStalled(e),
   );
-  const stalled = await Promise.all(running.map((e) => isStalled(e).catch(() => false)));
-  return running.filter((_, i) => stalled[i]);
 }
 
 export interface AssemblyState {

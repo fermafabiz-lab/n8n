@@ -321,9 +321,25 @@ stayed invisible rather than pending. Regenerating did nothing, because the
 scene was never in the batch to begin with.
 
 Pending scenes now sort ahead of finished ones, so the cap always covers
-outstanding work and repeated runs converge. The cap itself still stands: a
-20-scene project needs several passes. The drop is logged — do not make it
-silent again.
+outstanding work and repeated runs converge. The drop is logged — do not
+make it silent again.
+
+**The passes are automatic now; the cap is an internal chunk size, not a
+stopping point.** It used to be one: the batch walked from the last approved
+clip straight to the final-settings gate, so a 15-scene project produced 8
+scenes and stopped dead — *with the execution still alive*, which also hid
+the site's own "Start the next batch" button, whose whole condition is that
+nothing is running. Pause + Resume was the only way through, once per 8
+scenes. After marking its scenes Finalizat the batch now re-counts the
+project's approved scenes (`Fetch Scenes After Batch` → `More Batches?` →
+`Another Pass?`) and loops back to `Fetch Approved Scenes` while any still
+lack a clip. Capped at 12 passes so a permanently-refused scene cannot spin
+it forever — it falls through to the gate and shows as unfinished.
+
+Note the loop re-enters at `Fetch Approved Scenes`, which is BEFORE
+`Warm-up Cooldown` and `Sort & Cap Scenes` — that is deliberate: Sort & Cap
+resets the per-batch static data (`prevImageUrl`, poll counters), so each
+pass starts clean and the n-1 image chain does not leak across passes.
 
 This interacted viciously with the zeroing bug above: processed scenes lost
 their order to `0`, so the one *un*processed scene held the only non-zero
@@ -1289,6 +1305,15 @@ generated FROM it. The chain, and where each piece lives:
 - The RESTART-scripting path reuses the same project record, so refImage
   survives a script redo. The rest of the film chains off scene 1's
   generated image (n-1), so the reference propagates one hop at a time.
+- `Has Ref Image?` must guard `$('Normalize Webhook Input').isExecuted`.
+  The orchestrator has a LEGACY `Video Project Form` trigger that is still
+  enabled and still first, and on that path Normalize never runs — an
+  unguarded `$('Normalize Webhook Input')` killed the run one step after the
+  record was created (execution 2701). Same class as the restart-tail
+  lesson: any node referenced by name must be reachable on every path that
+  reaches the reference. That form trigger is also what `execute_workflow`
+  hits when you mean to fire a webhook, which silently creates empty
+  projects — target webhooks by POSTing the URL, not via execute_workflow.
 
 ## Open work
 

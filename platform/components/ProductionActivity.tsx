@@ -184,22 +184,21 @@ export default function ProductionActivity({
         <p style={{ margin: "10px 0 0", fontSize: 13, color: "var(--soft)" }}>
           {aliveAny ? (
             <>
-              This run covers{" "}
+              This pass covers{" "}
               <b style={{ color: "var(--ink)" }}>
                 {Math.min(cap, unfinished.length)} of {unfinished.length}
               </b>{" "}
-              unfinished scenes (a batch takes at most {cap})
+              unfinished scenes — a pass takes at most {cap} at a time
               {runsAfterThis > 0
-                ? ` — ${runsAfterThis} more run${runsAfterThis > 1 ? "s" : ""} needed after it.`
+                ? `, so it runs ${runsAfterThis} more pass${runsAfterThis > 1 ? "es" : ""} after this one. That happens on its own; nothing to press.`
                 : "."}
             </>
           ) : (
             <>
               <b style={{ color: "var(--ink)" }}>{unfinished.length}</b> scene
-              {unfinished.length > 1 ? "s" : ""} still unfinished; a batch
-              takes at most {cap}, so{" "}
-              {Math.ceil(unfinished.length / cap)} more run
-              {Math.ceil(unfinished.length / cap) > 1 ? "s are" : " is"} needed.
+              {unfinished.length > 1 ? "s" : ""} still unfinished, and nothing
+              is running — start the next pass below. It works {cap} scenes at
+              a time and continues by itself from there.
             </>
           )}
         </p>
@@ -208,11 +207,11 @@ export default function ProductionActivity({
       {showNextBatch && (
         <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 12 }}>
           <button className="btn gold" disabled={pending} onClick={startNext}>
-            {pending ? "Starting…" : "▶ Start the next batch"}
+            {pending ? "Starting…" : "▶ Generate the remaining scenes"}
           </button>
           <span style={{ fontSize: 12, color: "var(--dim)" }}>
             Picks up only the unfinished scenes — nothing already made is
-            regenerated.
+            regenerated — and keeps going until every scene has a clip.
           </span>
         </div>
       )}

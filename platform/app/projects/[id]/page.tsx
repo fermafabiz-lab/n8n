@@ -51,6 +51,17 @@ function pipeline(
   const imagesDone = imagesApproved === total && total > 0;
   const audioDone = voicesApproved === total && total > 0;
   const videoDone = videosApproved === total && total > 0;
+  // Which step is actually waiting on the producer, as opposed to how much
+  // of the film is finished. Media generation runs a batch at a time (n8n
+  // CAP=8) and its gates count only the batch's own scenes, so on a project
+  // bigger than one batch the whole-project counts NEVER complete a step —
+  // "Images · 8/15" stayed the active step forever while the thing actually
+  // blocking production was an unapproved take. The fractions stay
+  // project-wide (the film really does need all of them); only the "you are
+  // here" marker follows the staged scenes.
+  const staged = scenes.filter((s) => s.imageUrl);
+  const stagedImages = staged.length > 0 && staged.every((s) => s.imageApproved);
+  const stagedVoices = stagedImages && staged.every((s) => s.voiceApproved);
   return [
     { key: "script", name: "Script", state: "done" },
     {
@@ -61,17 +72,18 @@ function pipeline(
     {
       key: "images",
       name: imagesDone ? "Images" : `Images · ${imagesApproved}/${total}`,
-      state: imagesDone ? "done" : scenesDone ? "act" : "next",
+      state: imagesDone ? "done" : scenesDone && !stagedImages ? "act" : "next",
     },
     {
       key: "audio",
       name: audioDone ? "Audio" : `Audio · ${voicesApproved}/${total}`,
-      state: audioDone ? "done" : imagesDone ? "act" : "next",
+      state:
+        audioDone ? "done" : stagedImages && !stagedVoices ? "act" : "next",
     },
     {
       key: "video",
       name: videoDone ? "Video" : `Video · ${videosApproved}/${total}`,
-      state: videoDone ? "done" : audioDone ? "act" : "next",
+      state: videoDone ? "done" : stagedVoices ? "act" : "next",
     },
     {
       // Its own step, because it is the one place the pipeline stops and
@@ -138,13 +150,26 @@ export default async function ProductionRoom({
   // Whether the voice gate is on the page. Computed once because SceneBoard
   // needs the same answer: it owns the image and video steps only, and may
   // hand a scene to the audio step just when this panel is there to catch it.
+  //
+  // Scoped to the scenes that HAVE a picture, never to the whole project.
+  // n8n runs media generation in batches (Sort & Cap, CAP=8) and every gate
+  // in it — `Evaluate Image Approval`, `Evaluate Voice Approval` — counts
+  // only the scenes of the current batch. A project bigger than one batch
+  // therefore always has scenes with nothing generated yet, and requiring
+  // `scenes.every(imageApproved)` made this panel unreachable for them: the
+  // producer could never approve the takes, so the batch sat at its voice
+  // gate forever and production looked frozen with no error anywhere.
+  // "Every image that exists is signed off" is the same question the batch
+  // asks, expressed in what the site can see.
+  const withImage = scenes.filter((s) => s.imageUrl);
   const audioPanel =
     scenes.length > 0 &&
     showing(
       "audio",
       scenes.every((s) => s.sceneApproved) &&
-        scenes.every((s) => s.imageApproved) &&
-        scenes.some((s) => !s.voiceApproved),
+        withImage.length > 0 &&
+        withImage.every((s) => s.imageApproved) &&
+        withImage.some((s) => !s.voiceApproved),
     );
 
   // Script review phase: the Scripturi record is still awaiting approval.

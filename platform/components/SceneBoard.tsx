@@ -273,16 +273,26 @@ export default function SceneBoard({
     .map((s, i) => ({ s, i }))
     .slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
 
-  // Bulk approval only unlocks once EVERY scene has the asset generated —
-  // approving placeholders early used to open the n8n gate prematurely and
-  // start the next phase with missing images.
-  const imagesMissing = scenes.filter((s) => !s.imageUrl).length;
-  const clipsMissing = scenes.filter((s) => !s.videoUrl).length;
-  const unapprovedImages = scenes
-    .filter((s) => s.imageUrl && !s.imageApproved)
+  // Bulk approval is about the assets that EXIST.
+  //
+  // It used to unlock only once EVERY scene in the project had one, as a
+  // guard against approving placeholders. That guard is unreachable on any
+  // project past the batch cap: n8n stages CAP=8 scenes at a time, so a
+  // 15-scene film permanently has scenes with no picture and no clip, and
+  // the button was replaced forever by a "still generating" notice that
+  // could never clear. The guard was also redundant — `Evaluate Image
+  // Approval` and `Evaluate Voice Approval` in n8n count a scene as approved
+  // only when its asset actually exists, so an early sign-off cannot open a
+  // gate on something that was never made.
+  const withImage = scenes.filter((s) => s.imageUrl);
+  const withClip = scenes.filter((s) => s.videoUrl);
+  const imagesLater = scenes.length - withImage.length;
+  const clipsLater = scenes.length - withClip.length;
+  const unapprovedImages = withImage
+    .filter((s) => !s.imageApproved)
     .map((s) => s.id);
-  const unapprovedVideos = scenes
-    .filter((s) => s.videoUrl && !s.videoApproved)
+  const unapprovedVideos = withClip
+    .filter((s) => !s.videoApproved)
     .map((s) => s.id);
 
   const run = (fn: () => Promise<ActionResult>) =>
@@ -399,8 +409,15 @@ export default function SceneBoard({
                     />
                   )}
                 </span>
-              ) : (
+              ) : active.imageUrl ? (
                 <span className="chip wait">Awaiting review</span>
+              ) : active.regenImage ? (
+                <span className="chip run">Regenerating</span>
+              ) : (
+                // "Awaiting review" on a scene with no picture at all was a
+                // straight lie, and on a project past the batch cap it was
+                // the state most scenes sat in.
+                <span className="chip wait">Not made yet</span>
               )}
             </div>
             {active.voiceUrl && (
@@ -435,7 +452,12 @@ export default function SceneBoard({
                 </span>
               ) : active.videoUrl ? (
                 <span className="chip wait">Awaiting review</span>
-              ) : active.statusKind === "run" ? (
+              ) : active.regenVideo ||
+                (active.imageApproved && active.voiceApproved) ? (
+                // Derived from the checkboxes, never from the status TEXT,
+                // which is display-only and lags: a scene with nothing
+                // generated reads "Generare Script" there and was being
+                // reported as "Rendering".
                 <span className="chip run">Rendering</span>
               ) : (
                 <span className="chip wait">Queued</span>
@@ -670,64 +692,60 @@ export default function SceneBoard({
             images branch to take — landed on "Approve all 6 videos": a
             one-click sign-off of the entire next stage, offered from the
             page before it. */}
-        {step === "images" && (imagesMissing > 0 || unapprovedImages.length > 1) && (
+        {step === "images" && unapprovedImages.length > 1 && (
           <div className="card">
             <h5>Bulk review</h5>
-            {imagesMissing > 0 ? (
-              <p style={{ margin: 0, fontSize: 13, color: "var(--soft)" }}>
-                {imagesMissing} image{imagesMissing === 1 ? " is" : "s are"} still
-                generating — bulk approval unlocks when every scene has its
-                image, so nothing starts half-done. You can still approve
-                finished scenes one by one.
-              </p>
-            ) : (
-              <>
-                <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--soft)" }}>
-                  All {scenes.length} images are generated, {unapprovedImages.length} still
-                  need review. Regenerate individual scenes first if needed.
-                </p>
-                <button
-                  className="abtn ok"
-                  style={{ width: "100%" }}
-                  disabled={pending}
-                  onClick={() =>
-                    run(() => approveAllOfKind(projectId, unapprovedImages, "image"))
-                  }
-                >
-                  Approve all {unapprovedImages.length} images
-                </button>
-              </>
-            )}
+            <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--soft)" }}>
+              {unapprovedImages.length} of the {withImage.length} pictures made
+              so far still need review. Regenerate individual scenes first if
+              needed.
+              {imagesLater > 0 && (
+                <>
+                  {" "}
+                  The other {imagesLater} scene{imagesLater === 1 ? "" : "s"}{" "}
+                  {imagesLater === 1 ? "is" : "are"} drawn in a later pass —
+                  production works through the film a batch at a time.
+                </>
+              )}
+            </p>
+            <button
+              className="abtn ok"
+              style={{ width: "100%" }}
+              disabled={pending}
+              onClick={() =>
+                run(() => approveAllOfKind(projectId, unapprovedImages, "image"))
+              }
+            >
+              Approve all {unapprovedImages.length} images
+            </button>
           </div>
         )}
 
-        {step === "video" && (clipsMissing > 0 || unapprovedVideos.length > 1) && (
+        {step === "video" && unapprovedVideos.length > 1 && (
           <div className="card">
             <h5>Bulk review</h5>
-            {clipsMissing > 0 ? (
-              <p style={{ margin: 0, fontSize: 13, color: "var(--soft)" }}>
-                {clipsMissing} video clip{clipsMissing === 1 ? " is" : "s are"} still
-                generating — bulk approval unlocks when every scene has its
-                clip.
-              </p>
-            ) : (
-              <>
-                <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--soft)" }}>
-                  All {scenes.length} clips are generated, {unapprovedVideos.length} still
-                  need review.
-                </p>
-                <button
-                  className="abtn ok"
-                  style={{ width: "100%" }}
-                  disabled={pending}
-                  onClick={() =>
-                    run(() => approveAllOfKind(projectId, unapprovedVideos, "video"))
-                  }
-                >
-                  Approve all {unapprovedVideos.length} videos
-                </button>
-              </>
-            )}
+            <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--soft)" }}>
+              {unapprovedVideos.length} of the {withClip.length} clips rendered
+              so far still need review.
+              {clipsLater > 0 && (
+                <>
+                  {" "}
+                  The other {clipsLater} scene{clipsLater === 1 ? "" : "s"}{" "}
+                  {clipsLater === 1 ? "is" : "are"} filmed in a later pass, which
+                  starts once these are signed off.
+                </>
+              )}
+            </p>
+            <button
+              className="abtn ok"
+              style={{ width: "100%" }}
+              disabled={pending}
+              onClick={() =>
+                run(() => approveAllOfKind(projectId, unapprovedVideos, "video"))
+              }
+            >
+              Approve all {unapprovedVideos.length} videos
+            </button>
           </div>
         )}
 

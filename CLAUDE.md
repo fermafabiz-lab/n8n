@@ -345,6 +345,36 @@ This interacted viciously with the zeroing bug above: processed scenes lost
 their order to `0`, so the one *un*processed scene held the only non-zero
 order, sorted last, and fell off the end forever.
 
+**Every gate in the batch counts the BATCH's scenes; every gate on the site
+counted the PROJECT's — and that mismatch deadlocked any film bigger than 8
+scenes.** `Evaluate Image Approval` and `Evaluate Voice Approval` both scope
+themselves to `$('Sort & Cap Scenes').all()`, so n8n only ever asks "are the
+scenes of this pass signed off". The site asked "are ALL the scenes signed
+off", which on a 15-scene project is unreachable by construction: seven
+scenes have no picture and no take until a later pass, and a later pass only
+starts after this one is approved. Four places had the same shape, and all
+four had to move to "of the scenes that have the asset":
+
+- `audioPanel` (`projects/[id]/page.tsx`) required `scenes.every(imageApproved)`
+  — so the Voice review panel **never rendered**, and the producer could not
+  approve the takes the batch was polling for.
+- `AudioReview`'s `missing` counted every voice-less scene in the project, so
+  "Approve all" stayed disabled with "still being synthesized" forever.
+- `SceneBoard`'s bulk-review cards required `imagesMissing === 0` /
+  `clipsMissing === 0`, replacing both buttons with a notice that could never
+  clear.
+- the stepper's `act` marker sat on `Images · 8/15` while the thing actually
+  blocking production was an unapproved take.
+
+The "nothing starts half-done" guard those checks existed for is redundant:
+both n8n gates count a scene as approved **only when its asset exists**, so
+an early sign-off cannot open a gate on something that was never made. The
+fractions in the stepper stay project-wide (the film really does need all 15);
+only the "you are here" marker and the approval controls follow the staged
+scenes. Symptom to recognise: production frozen with a healthy `running`
+execution in n8n, no error anywhere, and a Wait loop polling for an approval
+the UI offers no way to give.
+
 ### Multi-voice
 
 `chapters` mode needs **no tags in the script** — `AB Pick Voice` derives the
@@ -1233,6 +1263,17 @@ the pipeline already produces.
   of play.
 - Count **approvals**, not asset existence, for pipeline progress. Counting
   clips that merely exist made "Video" tick green before review.
+- **…but scope that count to the scenes the pass staged, not to the film.**
+  See "The batch cap" — asking the project-wide question is what froze every
+  film longer than 8 scenes.
+- **The Inspector's chips are derived from checkboxes and assets, never from
+  the status TEXT** — the same rule the gates follow, for the same reason.
+  `Video` read `statusKind === 'run'` and therefore announced "Rendering" on
+  scenes that had nothing at all (their status text still says "Generare
+  Script"), while `Image` said "Awaiting review" for a picture that did not
+  exist. On a project past the batch cap that was the state most scenes sat
+  in, which is precisely what made the producer suspect the statuses were
+  what had jammed production.
 - Transient states need a grace period. The render-error panel fires on healthy
   gaps between executions; `AssemblyStatus` uses a 75s sessionStorage-backed
   grace before crying failure.

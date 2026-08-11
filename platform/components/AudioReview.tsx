@@ -253,10 +253,33 @@ export default function AudioReview({
       ? scenes
       : scenes.filter((s) => !s.voiceUrl || effectiveVoiceOf(s) !== voice);
 
-  const withAudio = useMemo(() => scenes.filter((s) => s.voiceUrl), [scenes]);
-  const unapproved = scenes.filter((s) => !s.voiceApproved && s.voiceUrl);
-  const missing = scenes.filter((s) => !s.voiceUrl).length;
-  const approved = scenes.filter((s) => s.voiceApproved).length;
+  /**
+   * The scenes this pass is actually about.
+   *
+   * Media generation runs in batches (n8n `Sort & Cap Scenes`, CAP=8) and
+   * every gate inside it counts only the batch's own scenes. So a project
+   * larger than one batch permanently contains scenes with nothing generated
+   * — and treating those as "still being synthesized" was a hard deadlock:
+   * `missing` never reached 0, "Approve all" stayed disabled, the batch sat
+   * at its voice gate forever, and the producer saw a frozen production with
+   * no error anywhere. A picture is what marks a scene as staged: the batch
+   * generates the images first, so the scenes with an image are exactly the
+   * ones that will be given a take this pass.
+   *
+   * Falls back to the whole project when nothing has a picture yet, so the
+   * "being synthesized" message still reads correctly at the very start.
+   */
+  const inPlay = useMemo(() => {
+    const staged = scenes.filter((s) => s.imageUrl);
+    return staged.length > 0 ? staged : scenes;
+  }, [scenes]);
+
+  const withAudio = useMemo(() => inPlay.filter((s) => s.voiceUrl), [inPlay]);
+  const unapproved = inPlay.filter((s) => !s.voiceApproved && s.voiceUrl);
+  const missing = inPlay.filter((s) => !s.voiceUrl).length;
+  const approved = inPlay.filter((s) => s.voiceApproved).length;
+  /** Scenes beyond this batch — named so the panel can say so out loud. */
+  const later = scenes.length - inPlay.length;
 
   // Read every line's real duration once, off-screen, so the table can flag
   // outliers without the reviewer opening a single player.
@@ -343,7 +366,7 @@ export default function AudioReview({
         <h2>Voice review</h2>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <span style={{ fontSize: 13, color: "var(--soft)" }}>
-            {approved}/{scenes.length} approved
+            {approved}/{inPlay.length} approved
           </span>
           <button
             className="btn"
@@ -385,9 +408,9 @@ export default function AudioReview({
 
       {withAudio.length === 0 ? (
         <p className="formmsg" style={{ marginBottom: 12 }}>
-          Narration is being synthesized for all {scenes.length} scenes — the
-          takes appear here one by one, usually within a couple of minutes. The
-          page refreshes itself.
+          Narration is being synthesized for {inPlay.length} scene
+          {inPlay.length === 1 ? "" : "s"} — the takes appear here one by one,
+          usually within a couple of minutes. The page refreshes itself.
         </p>
       ) : missing > 0 ? (
         <p className="formmsg" style={{ marginBottom: 12 }}>
@@ -396,6 +419,17 @@ export default function AudioReview({
           line exists.
         </p>
       ) : null}
+      {later > 0 && (
+        // Said out loud, because the panel now deliberately shows fewer
+        // scenes than the film has: production works in batches, and the
+        // tail has no picture and no take yet. Silence here read as scenes
+        // gone missing.
+        <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--dim)" }}>
+          {later} later scene{later === 1 ? "" : "s"} {later === 1 ? "is" : "are"}{" "}
+          not part of this pass — production takes them a batch at a time, and
+          their takes appear here once their pictures are made.
+        </p>
+      )}
       {msg && <p className={`formmsg ${msg.ok ? "ok" : "err"}`}>{msg.message}</p>}
 
       {mode === "chapters" && chapterKeys.length > 0 && (
@@ -706,7 +740,7 @@ export default function AudioReview({
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {scenes.map((s, i) => {
+        {inPlay.map((s, i) => {
           const flag = flagFor(s, durations[s.id]);
           const fit = fitProblem(durations[s.id], clipDurations[s.id]);
           const isPlaying = playingId === s.id;

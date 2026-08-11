@@ -990,6 +990,20 @@ the pipeline already produces.
   exactly that and was deleted for it). Titles in the LISTS are Poppins
   (`--f-title`) instead — at 17px a high-contrast serif costs legibility on a
   line that is scanned, not read.
+- **A metadata-only filter is not the search a human does.** The first
+  language filter scanned pages with an empty query and kept only voices whose
+  `language`/`accent` named the language — it surfaced TWO Romanian voices on
+  a library that visibly holds many, while typing "romanian" into the box
+  found them all. Lesson: **ai33's own `q` search reaches deeper than any
+  bounded scan and reads fields we cannot see**, so the route now runs BOTH
+  (`q=<language name>` plus the scan), merges, and ranks metadata-confirmed
+  voices above ones that only matched by name or description — without
+  discarding the latter, which is precisely what threw away the ones the
+  producer could see. The language is chosen by ISO code from a searchable
+  list of the 32 ElevenLabs multilingual languages (`LANGUAGES` in
+  `lib/languages.ts`); the code is what ElevenLabs itself thinks in, so "ro"
+  plus Enter is the whole interaction. Note that list is the MODEL's coverage,
+  not a promise the library holds a natively-labelled voice for each.
 - **Voice pickers narrow to the film's language, and two vocabularies had to
   be reconciled to do it.** The form's Language field is a free-text input
   whose datalist offers ENDONYMS ("Română", "Deutsch"), while ai33 relays each

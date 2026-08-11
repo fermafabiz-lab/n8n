@@ -36,6 +36,25 @@ export const flashEnvelope = (p: number, attack: number = FLASH_PEAK): number =>
 		: 1 - curveAt((p - attack) / (1 - attack), CURVES.inOutCubic);
 };
 
+/**
+ * Where the flare sits at progress `p`, as the 0..1 the `sweep` prop wants.
+ *
+ * Intensity is only half of how bright the frame looks — the other half is
+ * whether the bright part of the flare is ON it. Swept by a plain eased ramp,
+ * the flare was still at -3% of frame width when the envelope peaked, so the
+ * brightest thing on screen arrived two to three frames after the moment the
+ * swap was timed to, and the cut it was hiding showed at its edge. Measured, on
+ * a real render: peak intensity at frame 230, peak luminance at 232-233.
+ *
+ * So the sweep is bent to reach frame CENTRE exactly at `attack`, and to finish
+ * its exit during the long decay. Same physical story — a flare crossing the
+ * lens — with its brightest instant on the frame that matters.
+ */
+export const flashSweep = (p: number, attack: number = FLASH_PEAK): number =>
+	p < attack
+		? 0.5 * curveAt(p / attack, CURVES.inOutCubic)
+		: 0.5 + 0.5 * curveAt((p - attack) / (1 - attack), CURVES.inOutCubic);
+
 export const LightLeak: React.FC<{
 	/** Envelope value, 0..1 — see flashEnvelope. */
 	amount: number;

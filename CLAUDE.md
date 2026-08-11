@@ -581,6 +581,36 @@ them on every publish. Ignore those four; do not wire them back.
 
 ### Remotion / the edit
 
+- **A blind planner will fight the footage, and the framing ladder was sized
+  for a goal that no longer exists.** Rungs ran 1.08 / 1.26 / 1.44 spaced 0.18,
+  with `MIN_SCALE_STEP` at 0.14, because the framing step was expected to MAKE
+  the cut — big enough for a scene detector to register. That premise died when
+  the planner went to one shot per scene: the footage now cuts at every scene
+  boundary on its own. What the wide spacing did instead was **invert the
+  footage's own framing**, which it cannot help, because `planMontage` never
+  sees a frame. Measured on a real film: Veo generated scene 1 as a wide shot of
+  the whole room and scene 2 as a close-up of one face — the planner punched the
+  wide one to 1.44 and left the close-up at 1.08, so at that cut the picture went
+  wide→close while the framing went close→wide. Two changes pulling against each
+  other on one frame is what the producer reported, twice, as random zooms that
+  "look like bugs". Rungs are now 1.05 / 1.11 / 1.17 (85% of the picture at the
+  tightest, not 69% — which also stops the resample softening 720-wide AI
+  footage), `MIN_SCALE_STEP` 0.04, `HELD_PUSH` halved to 0.015 because a
+  ten-second scene visibly crept inward for its whole length. Framing is
+  composition and breathing now; the picture change is the cut.
+- **Scene times are floats; frames are a grid. One frame of lag between them is
+  visible and reads as a bug.** `Sort`-style rounding is not enough: a boundary
+  at 17.141s whose picture actually cuts at 17.133s (frame 514) falls BETWEEN
+  frames, so `shotAt` kept the old shot for frame 514 and switched at 515 — one
+  lone frame showing the NEW scene at the PREVIOUS scene's framing, then a jump.
+  Reported exactly as "one frame is zoomed compared to the rest of the scene".
+  `FinalVideo` now calls `shotAt(shots, seconds + 0.5 / fps)`, which lands a
+  boundary on the NEAREST frame rather than the next one. **The detector is how
+  you find this**: `ffmpeg scdet` reported two changes 0.04s apart at 17.13/17.17
+  where the film has one, and narrowing the ladder alone did NOT remove the pair
+  — only the half-frame lead did. Two adjacent detections where the edit has one
+  cut is the signature of a one-frame pop; look for it after any change to shot
+  boundaries.
 - **A cut is a change of picture. Zooming the same clip is not a cut, and
   optimising a detector taught us it was.** The montage planner was built to
   close a measured gap: five reference documentaries register 43-126 cuts per
@@ -705,6 +735,75 @@ them on every publish. Ignore those four; do not wire them back.
   `ceil(width / wrapWidth)` lines, not one: both surfaces set `overflow-wrap:
   anywhere`, so the browser splits it mid-word and a naive count approves a
   size that then overflows.
+- **An opaque overlay hides bugs underneath it, and they surface the day it
+  stops being opaque.** `FinalVideo`'s caption suppression reads `!activeCard`,
+  and `activeCard` only ever covered the planner's TEXT cards — the caption was
+  always drawn under the CHAPTER card too. Invisible for as long as `ImpactCard`
+  painted a solid cream panel over it; plainly readable the moment its ground
+  became a translucent backdrop, with the spoken line showing through the card
+  that exists precisely so the screen is not saying the same thing twice. Fixed
+  with `chapterCardUp` beside `activeCard`. Worth generalising: when you make a
+  covering layer transparent, everything it was hiding becomes yours to check.
+- **Measure a face's metrics with that face loaded; never inherit another's.**
+  The chapter card moved to Poppins Bold, centred, no rule, over a dimmed blur
+  of the footage itself (producer's call — note Poppins is the face `style.ts`
+  argues against for the display role, and that objection still stands for the
+  hook title). It initially kept the preset's `titleAdvance` and the shared 0.58
+  word-space, both of which belong to high-contrast serifs. Canvas `measureText`
+  on loaded Poppins 700 gives an advance of 0.59 and a space of **0.36** — a
+  geometric sans sets spaces far tighter than a serif — so the fitter was
+  overestimating every gap and dropping a size for nothing.
+  `CARD_TITLE_ADVANCE` / `CARD_SPACE_RATIO` in `style.ts` hold the measured
+  pair, and `fitTitleSize` takes an optional `spaceRatio` whose default stays
+  0.58 because that is what the hook was tuned on. The card's ground is a
+  `CardBackdrop` constant — `blur` (chosen), `ink`, `duotone` — flip it and
+  render a still to compare. Its eyebrow is a single `EYEBROW_INK` (vermilion
+  `#E2533B`), no longer the per-tone accent: at eyebrow size and tracking a
+  label separates from the white title by VALUE before hue, which is why the
+  brighter yellow and gold candidates lost despite more chroma.
+- **A flash hides a change only if its brightest instant sits ON the change,
+  and "brightest" is not where the envelope peaks.** Two separate errors, both
+  live, found by rendering the card window and reading per-frame luminance
+  (`ffmpeg signalstats`) rather than by eye:
+  (a) `ImpactCard`'s Sequence began AT the chapter start, so the flash could
+  only start there — the picture cut played completely naked and the light
+  arrived a fifth of a second later, over footage that had already changed.
+  `CARD_FLASH_LEAD` (= `IN * FLASH_PEAK`) now leads the whole window, and
+  `cardWindowStart()` in FinalVideo is the single owner of that offset, shared
+  by the Sequence and the caption suppression.
+  (b) Even then the measured peak was 3 frames late, because `LightLeak`'s
+  flare is SWEPT: at the envelope's peak it was still at -3% of frame width,
+  entirely off-picture. Intensity peaked on time; brightness did not.
+  `flashSweep()` bends the sweep to reach frame centre exactly at the attack.
+  Measured result: luminance peak moved 233 → 229 against a cut at 230, and the
+  cut frame itself went from 118 to 147 — a quarter more light on the one frame
+  that matters. `Transitions` carried the same pair on the cards-off chapter
+  path (its window was CENTRED on the boundary, so it flashed brightest before
+  the cut) and was corrected with the same two tools.
+  **Neither end of the card crossfades any more**, and the entrance is the one
+  that mattered most. Both ends used to ease over 0.07s as "insurance against a
+  pop on a bright shot". On the way out it ghosted the title over the returning
+  footage. On the way IN it was worse *because* the alignment above succeeded:
+  the card now arrives exactly on a picture cut, so a half-opacity card sat over
+  a SHARP new scene for two frames and read unmistakably as a graphic that had
+  fired by mistake — reported as a bug, and it was one. A hard swap under a
+  flash peak is the whole premise of the effect; a crossfade is a dissolve
+  competing with the light that is supposed to hide the change. The card renders
+  only for `appearAt <= t < vanishAt`, at full opacity, and nothing fades.
+  **Any "insurance" easing added around a flash swap re-creates this.**
+- **An entrance curve can make a position animation invisible.** The card's
+  typewriter reveal was replaced with a per-WORD stagger of rise + opacity —
+  a typewriter is a literal depiction of typing, which a chapter card is not
+  doing, and it is one of the loudest template tells available. Written first
+  with `outExpo`, the hook's entrance curve, which spends nearly all its travel
+  in the first few frames: the fade staggered beautifully and the RISE could not
+  be seen at all, so what shipped would have been an opacity animation wearing a
+  transform. `outQuart` decelerates over a distance the eye can follow. Verify
+  this numerically, not by eye — computing the per-frame offset gave 49.5px of
+  travel on a 90px title, which a still cannot show you. The "reveal must FINISH
+  inside the hold" rule carries over unchanged: the stagger compresses so the
+  last word lands 0.35s before the exit flash (measured: lands at 0.99s, card
+  gone at 2.40s).
 - **A card that holds a variable-length line cannot have a fixed type size.**
   `ImpactCard`'s title was a flat `px(52)`, picked for the long case — the
   eight-word narration excerpt it falls back to on projects rendered before

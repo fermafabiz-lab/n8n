@@ -100,19 +100,40 @@ function hashString(s: string): number {
 // repertoire was the one that could tear. Required: scale >= 1 + 2 * (spread +
 // 1.5) / 100, asserted by scripts/check-montage.mjs.
 //
-// The tightest rung stays under 1.5 so a punch-in never turns soft.
+// The tightest rung stays modest so a punch-in never turns soft.
+//
+// The ladder used to run 1.08 / 1.26 / 1.44, spaced 0.18, because the framing
+// step was expected to MAKE the cut — big enough to register on a scene
+// detector. That premise died when the planner went to one shot per scene: the
+// footage already cuts at every scene boundary, so there is no cut left to
+// manufacture. What the wide spacing did instead was fight the picture, and it
+// could only ever fight it, because the planner never sees a frame of footage.
+// Measured on a real film: Veo had generated scene 1 as a wide two-shot of the
+// whole room and scene 2 as a close-up of one face; the planner punched the
+// wide one to 1.44 and left the close-up at 1.08 — the opposite of the footage's
+// own intent, so at the cut the picture went wide→close while the framing went
+// close→wide. Two changes pulling against each other on one frame is exactly
+// what the producer reported as "looks like a zoom error", twice.
+//
+// Narrow rungs cannot invert anything meaningfully: at 1.17 the frame still
+// shows 85% of the picture rather than 69%, which also stops the resampling
+// from softening 720-wide AI footage. Framing is now composition and breathing,
+// not a cut. Spacing is 0.06, comfortably above MIN_SCALE_STEP plus HELD_PUSH,
+// so no rung is a dead end.
 const FRAMINGS: Record<Framing, {scale: number; spread: number}> = {
-	wide: {scale: 1.08, spread: 2},
-	medium: {scale: 1.26, spread: 5},
-	close: {scale: 1.44, spread: 7},
+	wide: {scale: 1.05, spread: 0.5},
+	medium: {scale: 1.11, spread: 2},
+	close: {scale: 1.17, spread: 3},
 };
 
 /**
- * Two consecutive shots must not look like the same frame. A scale step of
- * 0.14 moves roughly a seventh of the frame, which reads as a cut both to
- * the eye and to a scene detector.
+ * Two consecutive shots must not be an EXACT match — that is all this asserts
+ * now. It used to demand 0.14, a seventh of the frame, so that a scene detector
+ * would register the change as a cut; see the note on FRAMINGS for why that
+ * requirement is gone. The picture change is the cut; the framing only has to
+ * avoid looking like a continuation of the same shot.
  */
-export const MIN_SCALE_STEP = 0.14;
+export const MIN_SCALE_STEP = 0.04;
 
 /**
  * Slow push applied *within* a shot by `shotTransform`. It matters to the
@@ -122,7 +143,10 @@ export const MIN_SCALE_STEP = 0.14;
  * planned 14% cuts land at 3% in practice — a cut the detector cannot see is
  * not a cut. One function owns the number so the two can never disagree.
  */
-const HELD_PUSH = 0.03;
+// Halved along with the ladder. At 0.03 a ten-second scene visibly crept
+// inward for its whole length — the second half of the "some kind of zoom"
+// complaint, and the half that is present even when no cut is near.
+const HELD_PUSH = 0.015;
 const INSERT_PUSH = 0.004;
 
 const pushFor = (durationSeconds: number) => (durationSeconds > 2 ? HELD_PUSH : INSERT_PUSH);

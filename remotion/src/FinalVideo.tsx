@@ -1,7 +1,12 @@
 import React, {useMemo} from 'react';
 import {AbsoluteFill, Sequence, useCurrentFrame, useVideoConfig} from 'remotion';
 import {HookTitle} from './components/HookTitle';
-import {IMPACT_CARD_SECONDS, ImpactCard, keyLineFor} from './components/ImpactCard';
+import {
+	CARD_FLASH_LEAD,
+	IMPACT_CARD_SECONDS,
+	ImpactCard,
+	keyLineFor,
+} from './components/ImpactCard';
 import {isTitleLike} from './components/HookTitle';
 import {OutroCard} from './components/OutroCard';
 import {Captions} from './components/Captions';
@@ -142,7 +147,16 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 	);
 	// Cards are material, not rhythm, so they land even at intensity 0 — turning
 	// the montage off must not throw away a sourced claim.
-	const shot = shotAt(shots, seconds);
+	// Half a frame of lead, which makes a shot boundary land on the NEAREST
+	// frame instead of the next one. Scene times arrive as floats from the
+	// assembly and almost never sit on a frame line: scene 3 of a real film
+	// started at 17.141s while its picture actually cut at 17.133s (frame 514),
+	// so the framing changed one frame later than the footage did — a single
+	// frame showing the NEW scene at the PREVIOUS scene's framing, then a jump.
+	// That lone mismatched frame is what reads as "one frame is zoomed compared
+	// to the rest of the scene", and a scene detector sees it as two changes a
+	// frame apart where the film has one.
+	const shot = shotAt(shots, seconds + 0.5 / fps);
 	const activeCard =
 		shot?.kind === 'card' && shot.cardIndex !== undefined ? cards[shot.cardIndex] : null;
 	// Rendered as Sequences rather than from `shot`, so each card's own clock
@@ -156,11 +170,27 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 	const chapterStarts = scenes.filter(
 		(s, i) => (s.chapter ?? 0) >= 1 && (i === 0 || (scenes[i - 1].chapter ?? 0) !== s.chapter),
 	);
+	// `activeCard` above covers only the planner's TEXT cards, so the caption was
+	// always drawn under a chapter card too — invisible for as long as the chapter
+	// card was an opaque panel, and plainly visible the moment its ground became
+	// translucent. Same rule, same reason: a card is already text, and printing
+	// the spoken line over it puts two of them on screen.
+	// The window a card occupies, led so its entrance flash PEAKS on the chapter
+	// cut rather than starting there. One helper because three things have to
+	// agree on it: the Sequence, the caption suppression below, and anything
+	// later that asks "is a card up".
+	const cardWindowStart = (startSeconds: number) => Math.max(0, startSeconds - CARD_FLASH_LEAD);
+	const chapterCardUp =
+		showChapterCards &&
+		chapterStarts.some((s) => {
+			const from = cardWindowStart(s.startSeconds);
+			return seconds >= from && seconds < from + IMPACT_CARD_SECONDS;
+		});
 
 	return (
-		<AbsoluteFill style={{backgroundColor: palette.background}}>
-			{/* Footage starts on frame 1 — the title plays OVER the hook scene. */}
-			<Sequence from={0} durationInFrames={videoFrames}>
+        <AbsoluteFill style={{backgroundColor: palette.background}}>
+            {/* Footage starts on frame 1 — the title plays OVER the hook scene. */}
+            <Sequence from={0} durationInFrames={videoFrames}>
 				<AbsoluteFill style={{overflow: 'hidden'}}>
 					<AbsoluteFill
 						style={{
@@ -193,7 +223,7 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 					    the whole reason a card earns its place is that it shows what
 					    the narration is NOT saying — printing the spoken line over it
 					    would put three copies of one sentence on screen. */}
-					{showCaptions && !activeCard && (
+					{showCaptions && !activeCard && !chapterCardUp && (
 						<Captions
 							scenes={scenes}
 							palette={palette}
@@ -225,14 +255,14 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 					{showChapterCards &&
 						chapterStarts.map((s) => (
 							<Sequence
-								key={`ch-${s.chapter}`}
-								from={Math.round(s.startSeconds * fps)}
-								// The card owns its own in/out light leak now, so the
-								// Sequence has to cover the whole window — a shorter one cuts
-								// the exit flash off mid-burn and the card vanishes on a hard
-								// frame.
-								durationInFrames={Math.round(IMPACT_CARD_SECONDS * fps)}
-							>
+                                key={`ch-${s.chapter}`}
+                                // Led by CARD_FLASH_LEAD — see cardWindowStart above.
+                                from={Math.round(cardWindowStart(s.startSeconds) * fps)}
+                                // The card owns its own in/out light leak now, so the
+                                // Sequence has to cover the whole window — a shorter one cuts
+                                // the exit flash off mid-burn and the card vanishes on a hard
+                                // frame.
+                                durationInFrames={Math.round(IMPACT_CARD_SECONDS * fps)}>
 								<ImpactCard
 									chapter={s.chapter ?? 1}
 									// Real chapter title from the script's [CHAPTER n: title]
@@ -257,8 +287,7 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 					)}
 				</AbsoluteFill>
 			</Sequence>
-
-			{outroFrames > 0 && (
+            {outroFrames > 0 && (
 				<Sequence from={videoFrames} durationInFrames={outroFrames}>
 					<OutroCard
 						channelName={channelName}
@@ -268,6 +297,6 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 					/>
 				</Sequence>
 			)}
-		</AbsoluteFill>
-	);
+        </AbsoluteFill>
+    );
 };

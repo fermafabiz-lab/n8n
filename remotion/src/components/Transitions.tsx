@@ -3,7 +3,7 @@ import {AbsoluteFill, useCurrentFrame, useVideoConfig} from 'remotion';
 import type {SceneCaption} from '../types';
 import {toneKey} from '../types';
 import {CURVES, curveAt} from '../easing';
-import {LightLeak, flashEnvelope} from './LightLeak';
+import {FLASH_PEAK, LightLeak, flashEnvelope, flashSweep} from './LightLeak';
 
 /**
  * Scene/chapter transitions over the single continuous video layer (a true
@@ -55,7 +55,13 @@ export const Transitions: React.FC<{
 		const d = Math.abs(t - boundary);
 		if (d >= half) continue;
 		if (isChapterChange) {
-			const p = (t - (boundary - half)) / (2 * half);
+			// The window is placed so the envelope's PEAK lands on the boundary,
+			// not so the window is centred on it. Those are different: the attack
+			// is only 28% of the envelope, so a centred window flashed brightest
+			// well before the cut it exists to hide. Same correction the chapter
+			// card needed — see CARD_FLASH_LEAD.
+			const span = 2 * half;
+			const p = (t - (boundary - FLASH_PEAK * span)) / span;
 			const amount = flashEnvelope(p);
 			if (!leak || amount > leak.amount) leak = {amount, sweep: p};
 		} else {
@@ -73,7 +79,7 @@ export const Transitions: React.FC<{
 			{leak && (
 				<LightLeak
 					amount={leak.amount}
-					sweep={curveAt(leak.sweep, CURVES.inOutCubic)}
+					sweep={flashSweep(leak.sweep)}
 					hue={dark ? 'cool' : 'warm'}
 				/>
 			)}

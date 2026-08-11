@@ -13,17 +13,24 @@
  * descending sizes until the block fits its line budget and its height.
  */
 
+/**
+ * A word space as a fraction of an average glyph, for the high-contrast serifs
+ * the hook is set in. Measured, not assumed: that is 0.42em in Fraunces caps,
+ * far more than the 0.25em a body face uses, and guessing the body-face number
+ * put a five-word title on four lines. A geometric sans sits nowhere near it —
+ * Poppins measures 0.36 — so any surface setting one has to say so.
+ */
+export const DEFAULT_SPACE_RATIO = 0.58;
+
 /** Words per line at a given size, by the greedy pass the browser makes. */
 export const linesAtSize = (
 	words: string[],
 	advance: number,
 	wrapWidth: number,
 	size: number,
+	spaceRatio: number = DEFAULT_SPACE_RATIO,
 ): number => {
-	// A word space costs ~0.58 of an average glyph. Measured, not assumed: that
-	// is 0.42em in Fraunces caps, far more than the 0.25em a body face uses, and
-	// guessing the body-face number put a five-word title on four lines.
-	const space = advance * size * 0.58;
+	const space = advance * size * spaceRatio;
 	let lines = 1;
 	let cur = -1;
 	for (const w of words) {
@@ -58,6 +65,12 @@ export type TitleFit = {
 	 * roughly half a serif's width and a shared guess is wrong for both.
 	 */
 	advance: number;
+	/**
+	 * Word space as a fraction of an average glyph, for THIS face. Defaults to
+	 * the serif figure the hook was tuned on; a geometric sans must pass its own
+	 * or the fitter overestimates every gap and sets the title too small.
+	 */
+	spaceRatio?: number;
 	/** Width a line may occupy, in px. Keep the safety margin inside it. */
 	wrapWidth: number;
 	maxSize: number;
@@ -73,7 +86,7 @@ export type TitleFit = {
 export const fitTitleSize = (o: TitleFit): number => {
 	let fontSize = o.minSize;
 	for (let s = o.maxSize; s >= o.minSize; s -= o.maxSize / 60) {
-		const lines = linesAtSize(o.words, o.advance, o.wrapWidth, s);
+		const lines = linesAtSize(o.words, o.advance, o.wrapWidth, s, o.spaceRatio);
 		if (lines <= o.maxLines && lines * s * o.lineHeight <= o.maxHeight) {
 			fontSize = s;
 			break;

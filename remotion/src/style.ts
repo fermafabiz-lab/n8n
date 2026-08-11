@@ -5,6 +5,7 @@ import {loadFont as loadSpaceGrotesk} from '@remotion/google-fonts/SpaceGrotesk'
 import {loadFont as loadAnton} from '@remotion/google-fonts/Anton';
 import {loadFont as loadInterTight} from '@remotion/google-fonts/InterTight';
 import {loadFont as loadPlexMono} from '@remotion/google-fonts/IBMPlexMono';
+import {loadFont as loadPoppins} from '@remotion/google-fonts/Poppins';
 import {toneKey} from './types';
 
 // Fonts are fetched once at bundle/render time on the render server, so the
@@ -48,6 +49,28 @@ const plexMono = loadPlexMono('normal', {
 	weights: ['500'],
 	subsets: ['latin', 'latin-ext'],
 });
+// The chapter card is the one surface that deliberately breaks the per-tone
+// director above: the producer asked for Poppins Bold on it regardless of tone.
+// Note this is the face the comment at the top of this file argues against for
+// the DISPLAY role — the objection stands for a hook title set in it, and the
+// card gets away with it because the rest of the card changed with it (centred,
+// no rule, dark ground). Kept here rather than imported in the component so
+// every font load in the render still has exactly one owner.
+const poppins = loadPoppins('normal', {weights: ['700'], subsets: ['latin', 'latin-ext']});
+
+/** Display face for the chapter impact card. Tone-independent, on purpose. */
+export const cardTitleFont = poppins.fontFamily;
+/**
+ * Poppins 700 metrics for `fitTitleSize`, which simulates the browser's line
+ * breaks and is only as good as these two numbers. MEASURED, with the face
+ * actually loaded, via canvas `measureText` — a title-case sample gives an
+ * advance of 0.588 and the real chapter title 0.593, against the 0.62 a guess
+ * had put here. The space is the bigger correction: a geometric sans sets it at
+ * 0.36 of an average glyph where the serif default assumes 0.58, and
+ * overestimating every gap makes the fitter drop a size for no reason.
+ */
+export const CARD_TITLE_ADVANCE = 0.59;
+export const CARD_SPACE_RATIO = 0.36;
 
 export type StylePreset = {
 	/** Display face for the hook title and impact cards. */

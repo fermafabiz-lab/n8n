@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   languageByCode,
+  narrowsUsefully,
   normLang,
   voiceMatchesLanguage,
   voiceMentionsLanguage,
@@ -92,7 +93,10 @@ export async function GET(req: NextRequest) {
     return out;
   };
 
-  const lang: Language | null = languageByCode(sp.get("lang") || "");
+  // The picker already omits the filter for a baseline language; this guards
+  // the same rule for anything calling the route directly. See narrowsUsefully.
+  const asked: Language | null = languageByCode(sp.get("lang") || "");
+  const lang: Language | null = asked && narrowsUsefully(asked.code) ? asked : null;
 
   if (lang) {
     try {

@@ -808,6 +808,18 @@ on a visible 8-second grid.
   exactly that and was deleted for it). Titles in the LISTS are Poppins
   (`--f-title`) instead — at 17px a high-contrast serif costs legibility on a
   line that is scanned, not read.
+- **The language belongs to the FORM, not to the voice picker.** Putting the
+  selector inside `VoicePicker` looked right and was wrong twice over: a
+  silent (`cinematic`) film renders no voice picker at all and still needs a
+  language for its script, and a multi-voice project renders TWO voice pickers
+  — narrator plus cast — so the control appeared twice. `LanguagePicker` now
+  sits once in section 01 and drives a hidden `language` input; the voice
+  pickers only read it, and their sole control is "show every language" (a
+  local widening, not a change to the film). The posted value is the ENGLISH
+  name, which is safe because n8n only ever interpolates `Language` into
+  prompts and never compares it — checked across all twelve nodes that touch
+  it in Claude Scripting. The free-text field it replaced was also `required`
+  with no default, so clearing it blocked submission with a browser tooltip.
 - **A metadata-only filter is not the search a human does.** The first
   language filter scanned pages with an empty query and kept only voices whose
   `language`/`accent` named the language — it surfaced TWO Romanian voices on

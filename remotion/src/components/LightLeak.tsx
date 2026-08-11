@@ -22,6 +22,24 @@ import {CURVES, curveAt} from '../easing';
  */
 export const FLASH_PEAK = 0.28;
 
+/** How long a full-frame card's entrance or exit flare burns. */
+export const FLASH_IN = 0.55;
+
+/**
+ * Time from the start of a flash to its peak, and the amount by which a card's
+ * whole window must be placed EARLIER than the moment it replaces.
+ *
+ * A flash exists to hide a change, so its brightest instant has to sit ON the
+ * change, not after it. A Sequence that begins at the change can only begin
+ * flashing there — so the cut plays completely naked and the light arrives a
+ * fifth of a second late, over a picture that has already changed. Leading by
+ * exactly this much puts the peak and the swap on the same frame.
+ *
+ * Lives here rather than on either card because both use it and they must not
+ * drift apart.
+ */
+export const FLASH_LEAD = FLASH_IN * FLASH_PEAK;
+
 /**
  * Asymmetric envelope: fast attack, slow decay.
  *

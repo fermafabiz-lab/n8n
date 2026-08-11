@@ -4,7 +4,7 @@ import type {StylePreset} from '../style';
 import {CARD_SPACE_RATIO, CARD_TITLE_ADVANCE, cardTitleFont} from '../style';
 import {CURVES, curveAt} from '../easing';
 import {fitTitleSize} from '../fitType';
-import {FLASH_PEAK, LightLeak, flashEnvelope, flashSweep} from './LightLeak';
+import {FLASH_IN, FLASH_LEAD, FLASH_PEAK, LightLeak, flashEnvelope, flashSweep} from './LightLeak';
 
 const ROMAN = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
 
@@ -71,22 +71,13 @@ const EYEBROW_INK = '#E2533B';
 const GRAIN =
 	"url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E\")";
 
-/** Entrance and exit flash durations. */
-const IN = 0.55;
-const OUT = 0.55;
-
 /**
- * Time from the start of a flash to its peak, and the amount by which the whole
- * card window must be placed EARLIER than the chapter start.
- *
- * A flash exists to hide a change, so its brightest moment has to sit ON the
- * change, not after it. A Sequence that begins at the chapter start can only
- * begin flashing there — so the picture cut played completely naked, and the
- * light arrived a fifth of a second late, over footage that had already
- * changed. Leading by exactly this much puts the peak, the picture cut and the
- * card's appearance all on the same frame.
+ * Entrance and exit flash durations, and the lead that puts the peak on the
+ * frame being hidden. Both now live in LightLeak, because the outro card runs
+ * the identical entrance and the two must never drift apart.
  */
-export const CARD_FLASH_LEAD = IN * FLASH_PEAK;
+const IN = FLASH_IN;
+const OUT = FLASH_IN;
 /** Set here rather than inline: the size fitter has to know it to budget height. */
 const LINE_HEIGHT = 1.25;
 
@@ -134,7 +125,7 @@ export const ImpactCard: React.FC<{
 	// SHARP new scene, so you read the incoming shot and a translucent card at
 	// once — which looks exactly like a graphic that fired by mistake. A card
 	// that is either fully there or not there at all cannot produce that frame.
-	const appearAt = CARD_FLASH_LEAD;
+	const appearAt = FLASH_LEAD;
 	const vanishAt = outStart + OUT * FLASH_PEAK;
 
 	// Words are unbreakable inline-blocks; the spaces BETWEEN them are plain

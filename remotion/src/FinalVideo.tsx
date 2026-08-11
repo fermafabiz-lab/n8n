@@ -1,13 +1,9 @@
 import React, {useMemo} from 'react';
 import {AbsoluteFill, Sequence, useCurrentFrame, useVideoConfig} from 'remotion';
 import {HookTitle} from './components/HookTitle';
-import {
-	CARD_FLASH_LEAD,
-	IMPACT_CARD_SECONDS,
-	ImpactCard,
-	keyLineFor,
-} from './components/ImpactCard';
+import {IMPACT_CARD_SECONDS, ImpactCard, keyLineFor} from './components/ImpactCard';
 import {isTitleLike} from './components/HookTitle';
+import {FLASH_LEAD} from './components/LightLeak';
 import {OutroCard} from './components/OutroCard';
 import {Captions} from './components/Captions';
 import {FilmLayer, gradeForTone} from './components/FilmLayer';
@@ -179,7 +175,7 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 	// cut rather than starting there. One helper because three things have to
 	// agree on it: the Sequence, the caption suppression below, and anything
 	// later that asks "is a card up".
-	const cardWindowStart = (startSeconds: number) => Math.max(0, startSeconds - CARD_FLASH_LEAD);
+	const cardWindowStart = (startSeconds: number) => Math.max(0, startSeconds - FLASH_LEAD);
 	const chapterCardUp =
 		showChapterCards &&
 		chapterStarts.some((s) => {
@@ -256,7 +252,7 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 						chapterStarts.map((s) => (
 							<Sequence
                                 key={`ch-${s.chapter}`}
-                                // Led by CARD_FLASH_LEAD — see cardWindowStart above.
+                                // Led by FLASH_LEAD — see cardWindowStart above.
                                 from={Math.round(cardWindowStart(s.startSeconds) * fps)}
                                 // The card owns its own in/out light leak now, so the
                                 // Sequence has to cover the whole window — a shorter one cuts
@@ -288,7 +284,15 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 				</AbsoluteFill>
 			</Sequence>
             {outroFrames > 0 && (
-				<Sequence from={videoFrames} durationInFrames={outroFrames}>
+				// Led by FLASH_LEAD, exactly as the chapter card is, so the end
+				// screen's flare peaks ON the frame the footage gives way rather
+				// than starting there. The duration grows by the same amount, so
+				// the film still ends when it always did — the lead is borrowed
+				// from the tail of the footage, which the flash is covering.
+				<Sequence
+					from={Math.max(0, videoFrames - Math.round(FLASH_LEAD * fps))}
+					durationInFrames={outroFrames + Math.round(FLASH_LEAD * fps)}
+				>
 					<OutroCard
 						channelName={channelName}
 						subscribeText={subscribeText}

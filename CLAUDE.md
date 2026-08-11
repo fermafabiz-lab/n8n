@@ -780,6 +780,15 @@ them on every publish. Ignore those four; do not wire them back.
   that matters. `Transitions` carried the same pair on the cards-off chapter
   path (its window was CENTRED on the boundary, so it flashed brightest before
   the cut) and was corrected with the same two tools.
+  **The outro runs the identical entrance**, and `FLASH_IN` / `FLASH_LEAD` live
+  in `LightLeak` rather than on either card so the two cannot drift. The end
+  screen used to fade its opacity up over 0.4s while sliding 24px linearly —
+  the same dissolve, on the most total cut in the film. Its Sequence is led by
+  `FLASH_LEAD` and its duration grown by the same amount, so the film still ends
+  on the frame it always did (1375 for the 42s fixture, unchanged); the lead is
+  borrowed from the tail of the footage, which the flash covers anyway. The
+  subscribe pill's spring now starts a beat AFTER the card lands — an accent on
+  something already on screen, not part of the arrival.
   **Neither end of the card crossfades any more**, and the entrance is the one
   that mattered most. Both ends used to ease over 0.07s as "insurance against a
   pop on a bright shot". On the way out it ghosted the title over the returning

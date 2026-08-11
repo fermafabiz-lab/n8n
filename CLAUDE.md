@@ -1012,6 +1012,19 @@ the pipeline already produces.
   house-of-videos host, so the metadata's real coverage per provider could not
   be checked here — the "no voice is labelled X" branch exists precisely
   because it may be common.
+- **Enter must not start a film.** An HTML form with a submit button submits
+  on Enter from any text field, and here submitting writes a project to
+  Airtable, starts scripting and spends model credits. Typing a title and
+  pressing Enter — or pressing it to accept a voice search — started a real
+  production run. The form's `onKeyDown` now blocks Enter, but **only when the
+  target is an `INPUT`**: a textarea's Enter is a newline and never submitted
+  anyway, and a button's Enter is that button's own activation, so blocking it
+  wholesale would break "Start production" from the keyboard along with every
+  `type="button"` chip and toggle. `isComposing` is checked too, or IME entry
+  loses its commit key. Verified in a real Chromium (playwright-core against
+  `/opt/pw-browsers`, installed with `--no-save`): Enter in the title, the
+  language field and the voice search do nothing, while both clicking the
+  button and pressing Enter on it still start the project.
 - **The /new form's field names are a frozen contract.** `createProject()`
   posts `name, category, cat_*, cast_voices, language, length, tone, pace,
   style, voice_id, aspect, captions/hook_title/chapter_cards/end_screen/sfx

@@ -150,7 +150,30 @@ export default function NewVideo() {
         <span className="scrollcue">The brief</span>
       </div>
 
-      <form action={formAction}>
+      <form
+        action={formAction}
+        onKeyDown={(e) => {
+          // Enter in a text field implicitly submits an HTML form, and here
+          // submitting means starting a real production run: a project is
+          // written to Airtable, scripting starts, model credits are spent.
+          // Pressing Enter after typing the title, or to accept a voice
+          // search, did exactly that. Starting a film should take a click.
+          //
+          // Only INPUT is blocked, deliberately. A textarea's Enter is a
+          // newline and never submits, and a button's Enter is that button's
+          // own activation — so "Start production" still works from the
+          // keyboard, and so do the tone chips and the finish toggles (all
+          // type="button"). isComposing guards IME entry, where Enter commits
+          // a candidate rather than reaching the form at all.
+          if (
+            e.key === "Enter" &&
+            !e.nativeEvent.isComposing &&
+            (e.target as HTMLElement).tagName === "INPUT"
+          ) {
+            e.preventDefault();
+          }
+        }}
+      >
         <div className="brief">
           {/* ---- the live project preview ---- */}
           <aside className="callsheet">
@@ -444,7 +467,16 @@ export default function NewVideo() {
             )}
 
             <div className="fsubmit">
-              <button className="btn gold" disabled={pending} style={{ padding: "12px 26px" }}>
+              {/* The only way to start a film. Explicitly type="submit" —
+                  it is the default, but the form deliberately blocks Enter
+                  above, so the one control that IS meant to submit should
+                  say so where a reader will see it. */}
+              <button
+                type="submit"
+                className="btn gold"
+                disabled={pending}
+                style={{ padding: "12px 26px" }}
+              >
                 {pending ? "Starting…" : "Start production"}
               </button>
             </div>

@@ -6,6 +6,8 @@ import CategoryPicker, { type CategoryMeta } from "@/components/CategoryPicker";
 import Toggle from "@/components/Toggle";
 import FormProgress from "@/components/FormProgress";
 import GenreSpiral from "@/components/GenreSpiral";
+import LanguagePicker from "@/components/LanguagePicker";
+import { languageByCode } from "@/lib/languages";
 import { toneType } from "@/lib/tone-type";
 
 async function submit(_prev: ActionResult | null, formData: FormData) {
@@ -117,7 +119,9 @@ export default function NewVideo() {
   const [length, setLength] = useState(64);
   const [aspect, setAspect] = useState<"16:9" | "9:16">("16:9");
   const [pace, setPace] = useState("Normal");
-  const [language, setLanguage] = useState("English");
+  // The language as an ISO code — the picker's own currency. What n8n gets
+  // is the English name, below.
+  const [language, setLanguage] = useState("en");
   const [finishes, setFinishes] = useState<Record<string, boolean>>(
     Object.fromEntries(FINISHES.map((f) => [f.name, f.default])),
   );
@@ -128,6 +132,8 @@ export default function NewVideo() {
     ready: true,
   });
 
+  const lang = languageByCode(language);
+  const languageName = lang?.name ?? "English";
   const scenes = Math.max(1, Math.round(length / 8));
   const tt = toneType(tone);
   const silent = catMeta.voiceMode === "silent";
@@ -224,7 +230,7 @@ export default function NewVideo() {
               </div>
               <div>
                 <dt>Language</dt>
-                <dd>{language || "—"}</dd>
+                <dd>{lang ? `${lang.name} · ${lang.endonym}` : "—"}</dd>
               </div>
               <div>
                 <dt>Pace</dt>
@@ -263,22 +269,17 @@ export default function NewVideo() {
                 </p>
               </div>
               <div className="field" style={{ marginTop: 18 }}>
-                <label htmlFor="language">Language</label>
-                <input
-                  id="language"
-                  name="language"
-                  list="langs"
-                  value={language}
-                  onChange={(e) => setLanguage(e.target.value)}
-                  required
-                />
-                <datalist id="langs">
-                  <option value="English" />
-                  <option value="Română" />
-                  <option value="Deutsch" />
-                  <option value="Español" />
-                  <option value="Français" />
-                </datalist>
+                <label>Language</label>
+                {/* The film's ONE language control. n8n only ever interpolates
+                    this value into prompts (never compares it), so the English
+                    name is what gets posted — unambiguous to the writer model
+                    — while the list shows the endonym and the ISO code. */}
+                <input type="hidden" name="language" value={languageName} />
+                <LanguagePicker value={language} onChange={setLanguage} />
+                <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--dim)" }}>
+                  The script is written and narrated in this language, and it is
+                  what the voice pickers below are narrowed to.
+                </p>
               </div>
             </section>
 

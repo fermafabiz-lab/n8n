@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { LANGUAGES, normLang, resolveLanguage } from "@/lib/languages";
+import { useEffect, useRef, useState } from "react";
+import { resolveLanguage } from "@/lib/languages";
 
 interface Voice {
   voice_id: string;
@@ -48,10 +48,11 @@ export default function VoicePicker({
   /** Chip prefix in multi mode: "cast" (default) or "narrator". */
   chipLabel?: string;
   /**
-   * The film's language, as the producer typed it. The list is narrowed to
-   * voices that speak it — picking Română and being offered Roger is the
-   * whole problem this solves. Empty = no narrowing, which is what every
-   * caller that has no language to offer gets.
+   * The film's language — an ISO code ("ro") from the form, or a name as
+   * Airtable stored it ("Romanian"); both resolve. The list is narrowed to
+   * voices that speak it: picking Română and being offered Roger is the whole
+   * problem this solves. Empty = no narrowing, which is what a caller with no
+   * language to offer gets.
    */
   language?: string;
 }) {
@@ -70,14 +71,17 @@ export default function VoicePicker({
   const [playing, setPlaying] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // The language the list is narrowed to, as an ISO code ("ro", "it", "en").
-  // Seeded from the film's language, then owned by the picker — a producer
-  // may deliberately want an English narrator over a Romanian script, and the
-  // metadata is the provider's, so it can be wrong on a perfectly good voice.
-  // "" means every language.
-  const [lang, setLang] = useState(() => resolveLanguage(language)?.code ?? "");
-  const [langOpen, setLangOpen] = useState(false);
-  const [langQuery, setLangQuery] = useState("");
+  // The film's language decides what this list shows; the ONLY control here
+  // is whether to widen past it. A selector of its own would be a second
+  // language control on the page — and a third, on a multi-voice project
+  // that renders two of these.
+  //
+  // Widening still matters: a producer may deliberately want an English
+  // narrator over a Romanian script, and the metadata is the provider's, so
+  // it can be wrong on a perfectly good voice.
+  const filmLang = resolveLanguage(language);
+  const [wide, setWide] = useState(false);
+  const lang = wide ? "" : (filmLang?.code ?? "");
   const [langState, setLangState] = useState<{
     applied: boolean;
     label: string;
@@ -85,27 +89,6 @@ export default function VoicePicker({
     total: number;
   } | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  // Follow the form's Language field while the producer is still editing it,
-  // but never fight a choice made here.
-  const [touched, setTouched] = useState(false);
-  useEffect(() => {
-    if (touched) return;
-    setLang(resolveLanguage(language)?.code ?? "");
-  }, [language, touched]);
-
-  const current = LANGUAGES.find((l) => l.code === lang) ?? null;
-  const langMatches = useMemo(() => {
-    const n = normLang(langQuery);
-    if (!n) return LANGUAGES;
-    return LANGUAGES.filter(
-      (l) =>
-        l.code.startsWith(n) ||
-        normLang(l.name).includes(n) ||
-        normLang(l.endonym).includes(n) ||
-        (l.extra ?? []).some((e) => normLang(e).includes(n)),
-    );
-  }, [langQuery]);
 
   useEffect(() => {
     const t = setTimeout(async () => {
@@ -170,97 +153,17 @@ export default function VoicePicker({
         />
       </div>
 
-      {/* Language, as a searchable list rather than a select: 32 entries is
-          past the point where scrolling one beats typing two letters, and
-          the codes are what ElevenLabs itself thinks in, so "ro" should get
-          you there. */}
-      <div style={{ position: "relative", marginBottom: 10 }}>
-        <button
-          type="button"
-          className="langbtn"
-          onClick={() => {
-            setLangOpen((o) => !o);
-            setLangQuery("");
-          }}
-          aria-expanded={langOpen}
-        >
-          <span>
-            {current ? (
-              <>
-                <b>{current.name}</b>
-                <span style={{ color: "var(--dim)" }}> · {current.endonym}</span>
-                <code className="langcode">{current.code}</code>
-              </>
-            ) : (
-              "All languages"
-            )}
-          </span>
-          <span style={{ color: "var(--dim)" }}>{langOpen ? "▲" : "▼"}</span>
-        </button>
-
-        {langOpen && (
-          <div className="langpop">
-            <input
-              autoFocus
-              placeholder="Type a language or its code — ro, it, en…"
-              value={langQuery}
-              onChange={(e) => setLangQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") setLangOpen(false);
-                // Enter picks the only remaining match, so two letters and
-                // Enter is the whole interaction.
-                if (e.key === "Enter" && langMatches.length > 0) {
-                  e.preventDefault();
-                  setTouched(true);
-                  setLang(langMatches[0].code);
-                  setLangOpen(false);
-                }
-              }}
-              style={{ marginBottom: 8 }}
-            />
-            <div className="langlist">
-              <button
-                type="button"
-                className={`langrow ${lang === "" ? "on" : ""}`}
-                onClick={() => {
-                  setTouched(true);
-                  setLang("");
-                  setLangOpen(false);
-                }}
-              >
-                All languages
-              </button>
-              {langMatches.map((l) => (
-                <button
-                  type="button"
-                  key={l.code}
-                  className={`langrow ${lang === l.code ? "on" : ""}`}
-                  onClick={() => {
-                    setTouched(true);
-                    setLang(l.code);
-                    setLangOpen(false);
-                  }}
-                >
-                  <span>
-                    {l.name}
-                    <span style={{ color: "var(--dim)" }}> · {l.endonym}</span>
-                  </span>
-                  <code className="langcode">{l.code}</code>
-                </button>
-              ))}
-              {langMatches.length === 0 && (
-                <p style={{ fontSize: 12.5, color: "var(--soft)", margin: "6px 8px" }}>
-                  No language matches “{langQuery}”.
-                </p>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
       {/* What the list is currently showing. Never a silent filter: an
           unexplained short list reads as a broken library, which is exactly
           how the first version of this looked. */}
+      {wide && filmLang && !loading && (
+        <p style={{ margin: "0 0 10px", fontSize: 12, color: "var(--soft)" }}>
+          Every language.{" "}
+          <button type="button" className="linkish" onClick={() => setWide(false)}>
+            Back to {filmLang.name} only
+          </button>
+        </p>
+      )}
       {lang && langState && !loading && (
         <p style={{ margin: "0 0 10px", fontSize: 12, color: "var(--soft)" }}>
           {langState.applied ? (
@@ -275,15 +178,8 @@ export default function VoicePicker({
                 </>
               )}
               .{" "}
-              <button
-                type="button"
-                className="linkish"
-                onClick={() => {
-                  setTouched(true);
-                  setLang("");
-                }}
-              >
-                Show all languages
+              <button type="button" className="linkish" onClick={() => setWide(true)}>
+                Show every language
               </button>
             </>
           ) : (

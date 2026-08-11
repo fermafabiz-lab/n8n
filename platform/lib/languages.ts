@@ -78,6 +78,22 @@ export const LANGUAGES: Language[] = [
   { code: "fil", name: "Filipino", endonym: "Filipino", extra: ["tagalog", "fil-ph", "tl"] },
 ];
 
+/**
+ * Is narrowing to this language worth doing at all?
+ *
+ * English is the library's baseline: most voices are English and simply do
+ * not bother saying so in their metadata, so filtering on the label DROPS far
+ * more than it finds and hands back an odd subset instead of the well-known
+ * default list. For English, "no filter" is the more accurate answer rather
+ * than a shortcut — the plain listing already IS the English one.
+ *
+ * One owner for the rule, read by both the picker (which then sends no
+ * filter) and the route (which guards anyway, for direct callers).
+ */
+export function narrowsUsefully(code: string): boolean {
+  return normLang(code) !== "en";
+}
+
 /** Every normalised spelling that counts as this language. */
 function aliasesOf(l: Language): string[] {
   return [l.code, normLang(l.name), normLang(l.endonym), ...(l.extra ?? []).map(normLang)];

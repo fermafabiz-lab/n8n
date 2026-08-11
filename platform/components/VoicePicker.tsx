@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { resolveLanguage } from "@/lib/languages";
+import { narrowsUsefully, resolveLanguage } from "@/lib/languages";
 
 interface Voice {
   voice_id: string;
@@ -81,7 +81,9 @@ export default function VoicePicker({
   // it can be wrong on a perfectly good voice.
   const filmLang = resolveLanguage(language);
   const [wide, setWide] = useState(false);
-  const lang = wide ? "" : (filmLang?.code ?? "");
+  // No filter for a baseline language — the plain listing already is it.
+  const lang =
+    wide || !filmLang || !narrowsUsefully(filmLang.code) ? "" : filmLang.code;
   const [langState, setLangState] = useState<{
     applied: boolean;
     label: string;
@@ -113,6 +115,26 @@ export default function VoicePicker({
     }, 300);
     return () => clearTimeout(t);
   }, [provider, q, lang]);
+
+  /**
+   * Keep the selection inside the language on screen.
+   *
+   * Switching to Romanian used to leave the English default selected and
+   * invisible — nothing in the list was highlighted, and the form quietly
+   * posted an English narrator for a Romanian film.
+   *
+   * Deliberately narrow: only the form's own single picker (a controlled one
+   * belongs to a project that already has a voice, and choosing for it would
+   * silently change a setting), and only on a genuinely language-filtered
+   * list — the unfiltered English list keeps its historical default voice
+   * rather than being reassigned to whatever happens to sort first.
+   */
+  useEffect(() => {
+    if (controlled || multi || loading) return;
+    if (!langState?.applied || voices.length === 0) return;
+    if (voices.some((v) => v.voice_id === selected)) return;
+    setInternal(voices[0].voice_id);
+  }, [voices, loading, langState, controlled, multi, selected]);
 
   const togglePreview = (v: Voice) => {
     if (!v.preview_url) return;
@@ -194,9 +216,19 @@ export default function VoicePicker({
       )}
 
       {error && <p className="formmsg err">{error}</p>}
-      {loading && <p style={{ fontSize: 13, color: "var(--soft)" }}>Loading voices…</p>}
+      {loading && (
+        <p style={{ fontSize: 13, color: "var(--soft)" }}>
+          Loading voices{filmLang && !wide ? ` for ${filmLang.name}` : ""}…
+        </p>
+      )}
 
+      {/* Frozen while a new list is on its way. What is on screen during
+          that moment belongs to the PREVIOUS language, and clicking it would
+          pick a voice that does not speak the film's language — silently,
+          because the row looks exactly like a valid choice. Dimmed rather
+          than emptied so the box does not jump. */}
       <div
+        aria-busy={loading}
         style={{
           maxHeight: 320,
           overflowY: "auto",
@@ -207,6 +239,9 @@ export default function VoicePicker({
           borderRadius: 12,
           padding: 10,
           background: "var(--card)",
+          opacity: loading ? 0.4 : 1,
+          pointerEvents: loading ? "none" : undefined,
+          transition: "opacity 0.15s ease",
         }}
       >
         {voices.map((v) => {
@@ -214,7 +249,7 @@ export default function VoicePicker({
           return (
             <div
               key={v.voice_id}
-              onClick={() => setSelected(v.voice_id)}
+              onClick={() => !loading && setSelected(v.voice_id)}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -232,7 +267,7 @@ export default function VoicePicker({
                   e.stopPropagation();
                   togglePreview(v);
                 }}
-                disabled={!v.preview_url}
+                disabled={!v.preview_url || loading}
                 style={{
                   width: 38,
                   height: 38,

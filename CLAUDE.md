@@ -820,6 +820,21 @@ on a visible 8-second grid.
   prompts and never compares it — checked across all twelve nodes that touch
   it in Claude Scripting. The free-text field it replaced was also `required`
   with no default, so clearing it blocked submission with a browser tooltip.
+- **English is not filtered, on purpose.** Most of the library is English and
+  most of it never says so in its metadata, so narrowing on the label drops
+  far more than it finds and hands back an odd subset instead of the familiar
+  default list. `narrowsUsefully()` in `lib/languages.ts` owns that rule — the
+  picker sends no `lang` at all for a baseline language, and the route guards
+  the same thing for direct callers. One owner, two readers.
+- **A list that is still loading must not be clickable.** During the fetch the
+  rows on screen belong to the PREVIOUS language, and they look exactly like
+  valid choices — so a click picked a voice that does not speak the film's
+  language, silently. The box is dimmed and `pointer-events: none` while busy,
+  the row handler checks `loading` as well, and once a language-filtered list
+  lands, a selection that is not in it moves to the first voice that is. That
+  last part is deliberately narrow: never in controlled mode (it would change
+  a project's saved voice behind the producer's back) and never on the
+  unfiltered English list, which keeps its historical default voice.
 - **A metadata-only filter is not the search a human does.** The first
   language filter scanned pages with an empty query and kept only voices whose
   `language`/`accent` named the language — it surfaced TWO Romanian voices on

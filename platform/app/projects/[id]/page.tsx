@@ -498,6 +498,7 @@ export default async function ProductionRoom({
           (!viewing || viewing === "images" || viewing === "video") ? (
           <SceneBoard
             projectId={id}
+            projectName={project.name}
             scenes={scenes}
             portrait={project.aspect === "9:16"}
             // Which step the producer is actually looking at. Without it the

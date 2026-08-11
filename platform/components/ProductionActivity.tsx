@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { resumeProject, type ActionResult } from "@/app/actions";
+import { restartProduction, resumeProject, type ActionResult } from "@/app/actions";
 import type { Scene } from "@/lib/data";
 import type { ExecutionSummary } from "@/lib/n8n";
 import { explainRefusal } from "@/lib/refusals";
@@ -104,6 +104,30 @@ export default function ProductionActivity({
 
   const aliveKnown = alive !== null;
   const aliveAny = (alive?.length ?? 0) > 0;
+
+  /**
+   * How long the oldest live execution has been claiming to work.
+   *
+   * n8n sometimes creates an execution and never runs a node of it: it reads
+   * `running` forever with an empty node stack, and its parent orchestrator
+   * stays wedged waiting for a child that will never report. From the API
+   * that is INDISTINGUISHABLE from a healthy batch — n8n persists no progress
+   * mid-run — so the site must not decide it on its own; deciding it on its
+   * own is what once had the page killing its own healthy renders. What it
+   * can do is stop hiding the door: past a threshold no honest batch needs,
+   * offer the restart and let the producer judge.
+   */
+  const oldestAliveMin = aliveAny
+    ? Math.max(
+        ...alive!.map((r) =>
+          r.startedAt
+            ? Math.floor((Date.now() - new Date(r.startedAt).getTime()) / 60000)
+            : 0,
+        ),
+      )
+    : 0;
+  const FROZEN_MIN = 12;
+  const looksFrozen = aliveAny && oldestAliveMin >= FROZEN_MIN;
   const runsAfterThis = Math.max(0, Math.ceil(unfinished.length / cap) - 1);
   const showCapNote = scenes.length > cap && unfinished.length > 0;
   const showNextBatch = aliveKnown && !aliveAny && unfinished.length > 0;
@@ -114,6 +138,8 @@ export default function ProductionActivity({
 
   const startNext = () =>
     startTransition(async () => setMsg(await resumeProject(projectId)));
+  const restart = () =>
+    startTransition(async () => setMsg(await restartProduction(projectId)));
 
   return (
     <div className="card" style={{ marginBottom: 20 }}>
@@ -213,6 +239,33 @@ export default function ProductionActivity({
             Picks up only the unfinished scenes — nothing already made is
             regenerated — and keeps going until every scene has a clip.
           </span>
+        </div>
+      )}
+
+      {looksFrozen && (
+        // The one exit from "n8n says it is working and nothing is moving".
+        // Deliberately manual and deliberately explicit about the cost: the
+        // site cannot tell a wedged execution from a slow one, but the
+        // producer can — they are looking at whether anything appeared.
+        <div style={{ marginTop: 12 }}>
+          <p style={{ margin: "0 0 8px", fontSize: 13, color: "var(--soft)" }}>
+            This pass has been running for {oldestAliveMin} minutes.{" "}
+            <b style={{ color: "var(--ink)" }}>
+              If nothing new has appeared in that time, it is wedged
+            </b>{" "}
+            — n8n does sometimes open an execution and never actually run it,
+            and from the outside that looks exactly like work in progress.
+          </p>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <button className="btn" disabled={pending} onClick={restart}>
+              {pending ? "Restarting…" : "⟳ Restart this pass"}
+            </button>
+            <span style={{ fontSize: 12, color: "var(--dim)" }}>
+              Stops what n8n thinks is running and starts the pass again.
+              Every image, take and clip already made is kept — only the
+              missing pieces are generated.
+            </span>
+          </div>
         </div>
       )}
 

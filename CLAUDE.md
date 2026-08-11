@@ -157,6 +157,28 @@ These each cost hours. Do not rediscover them.
   `isStalled()` is now age-only (45 min), advisory, and NEVER removes
   anything from `getAliveProduction()` — a running execution counts as alive,
   full stop. Do not reintroduce a progress-based test; there is no signal.
+- **The never-started execution is not rare, and it wedges the whole project
+  because Resume refuses to run beside it.** Specimen: 2704, a Media
+  Generation child created by a resume webhook at 12:43:56, still `running`
+  twenty minutes later with `runData: {}` **and its `nodeExecutionStack` still
+  holding the trigger node** — not one node executed. Its parent (2703,
+  webhook mode) was in the same state, so the webhook never even answered.
+  The instance was fine throughout: a 5-minute cron on `wmGLHkNssLAyZHKX`
+  succeeded every five minutes right through it, so this is not a wedged
+  runner and not a concurrency cap — it is that one execution never being
+  picked up. Note the node stack is **not** a usable discriminator: n8n saves
+  execution data at creation and not again until the run ends, so a healthy
+  running execution shows exactly the same empty stack. There is still no
+  signal.
+  What that costs: `resumeProject` refuses while anything is alive (correctly
+  — it would start a duplicate batch), and `getStalledProduction()` only
+  reaches 45 minutes, so between minute 0 and minute 45 the project has no
+  door at all. The producer's only way through was Pause then Resume, by hand,
+  guessing. `restartProduction()` is now that door in one press — pause, wait
+  for the alive list to clear, resume — offered by `ProductionActivity` once
+  the oldest live execution passes 12 minutes, with the cost stated. It is
+  **manual on purpose**: the site must never decide this by itself, which is
+  the lesson directly above.
 - **`WEBHOOK_URL=https://wf7.house-of-videos.com`** must be set as an env var
   on the instance. Without it n8n hands out `localhost` webhook URLs and
   Vercel can't start anything — which presents as "the site is broken".
@@ -249,7 +271,24 @@ These each cost hours. Do not rediscover them.
 
 - **The status TEXT field is display-only and lags.** The site must trust the
   **checkboxes** (`Aprobare Imagine`, `Aprobare Voce`, `Aprobare Video`),
-  never the status string. Stale-status overrides live in `platform/lib/data.ts`.
+  never the status string. `toScene()` in `platform/lib/data.ts` now DERIVES
+  the whole scene status from checkboxes + asset existence and keeps the
+  stored text only for what cannot be derived: an error, `Regenerare Text`,
+  and the phase before the scene text is approved.
+- **`Status Producție Scenă` is not a progress field — it is a set of result
+  stamps, and it lies loudest on the scenes nobody has reached.** Grep every
+  node that writes it and you find only *outcomes*: `Așteaptă Aprobare
+  Imagine/Voce/Video` and `Finalizat`. Nothing anywhere writes "Generare
+  Imagine" or "Generare Voce" onto a scene. So a scene the batch has not
+  touched still carries what Scripting set at creation — **"Generare Script",
+  which the site rendered as *Writing script***, the one stage that is
+  provably finished for it (its text is written AND `Aprobare Scenă` is
+  checked). Invisible while a film fitted in one batch of 8; past the cap it
+  is what the producer mostly sees — on a 15-scene film seven scenes sit at
+  "Writing script" indefinitely, which reads as scripting being stuck and
+  sends the search into the wrong workflow entirely. It cost exactly that
+  here. Derived, those scenes read **Queued**, and which one is being worked
+  on right now stays where it belongs: the estimate in `ProductionActivity`.
 - Use `typecast: true` on writes. Airtable re-hosts uploaded attachment URLs,
   which is what keeps assets alive after Flow's signed CDN URLs expire (~hours).
 - **A numeric field left in an Airtable node's column mapping with no value

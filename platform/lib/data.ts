@@ -102,6 +102,8 @@ const STATUS_MAP: Array<{ match: RegExp; kind: StatusKind; progress: number }> =
   { match: /asamblare/, kind: "run", progress: 0.95 },
   { match: /aprobare video/, kind: "wait", progress: 0.85 },
   { match: /generare video/, kind: "run", progress: 0.7 },
+  { match: /aprobare voce/, kind: "wait", progress: 0.65 },
+  { match: /generare voce/, kind: "run", progress: 0.6 },
   { match: /aprobare imagine/, kind: "wait", progress: 0.55 },
   { match: /generare imagine/, kind: "run", progress: 0.4 },
   { match: /awaiting_approval|aprobare script/, kind: "wait", progress: 0.2 },
@@ -117,7 +119,9 @@ const STATUS_LABELS: Array<{ match: RegExp; label: string }> = [
   { match: /setari finale/, label: "Awaiting Final Settings" },
   { match: /asamblare/, label: "Assembling" },
   { match: /asteapta aprobare video/, label: "Awaiting Video Approval" },
+  { match: /asteapta aprobare voce/, label: "Awaiting Voice Approval" },
   { match: /asteapta aprobare imagine/, label: "Awaiting Image Approval" },
+  { match: /generare voce/, label: "Generating Voice" },
   { match: /asteapta aprobare script|aprobare script/, label: "Awaiting Script Approval" },
   { match: /generare video/, label: "Generating Video" },
   { match: /generare imagine/, label: "Generating Image" },
@@ -310,39 +314,90 @@ function toScene(r: AirtableRecord, index: number): Scene {
   const rawStatus = String(pick(r.fields, F.sceneStatus) ?? "—");
   const imageApproved = Boolean(pick(r.fields, F.sceneImageApproved));
   const videoApproved = Boolean(pick(r.fields, F.sceneVideoApproved));
-  // n8n only rewrites the status text when its loop reaches a scene, so an
-  // already-approved image can sit under "Awaiting Image Approval" for
-  // minutes — and a scene whose clip was approved after the batch ended
-  // stays on "Awaiting Video Approval" forever. The checkboxes are the
-  // truth; show them instead of stale text.
-  const status =
-    videoApproved && /(aprobare|generare) video/.test(normalizeStatus(rawStatus))
-      ? "Finalizat"
-      : imageApproved && /(aprobare|generare) imagine/.test(normalizeStatus(rawStatus))
-        ? "In Asteptare"
-        : rawStatus;
-  const { kind } = classifyStatus(status);
+  const voiceApproved = Boolean(pick(r.fields, F.sceneVoiceApproved));
+  const sceneApproved = Boolean(pick(r.fields, F.sceneApproved));
+  const regenImage = Boolean(pick(r.fields, F.sceneRegenImage));
+  const regenVoice = Boolean(pick(r.fields, F.sceneRegenVoice));
+  const regenVideo = Boolean(pick(r.fields, F.sceneRegenVideo));
+  const imageUrl = firstAttachmentUrl(pick(r.fields, F.sceneImage));
+  const voiceUrl = (pick(r.fields, F.sceneVoice) as string) ?? null;
   const order = Number(pick(r.fields, F.sceneOrder)) || index + 1;
   const videoUrl =
     ((pick(r.fields, F.sceneVideo) as string) || null) ??
     firstAttachmentUrl(pick(r.fields, F.sceneVideoAttachment));
+
+  /*
+   * The scene's state, DERIVED — the stored text is a poor witness.
+   *
+   * n8n only writes that field when a loop physically reaches the scene, and
+   * it only ever writes result states: grep the workflow and you find
+   * "Așteaptă Aprobare Imagine/Voce/Video" and "Finalizat", never "Generare
+   * Imagine" or "Generare Voce". So the value on a scene the batch has not
+   * touched yet is still whatever Scripting set at creation — "Generare
+   * Script", *Writing script* — which is the one stage that is definitely
+   * over: its text is written AND approved.
+   *
+   * Harmless while every scene fitted in one batch. Past the cap it becomes
+   * the main thing the producer sees: on a 15-scene film seven scenes sit at
+   * "Writing script" indefinitely, which reads as scripting being stuck and
+   * sends everyone hunting for a bug in the wrong workflow.
+   *
+   * Every gate in the pipeline keys off checkboxes plus "does the asset
+   * exist" — exactly what we have here — so the state can be reconstructed
+   * instead of trusted. The stored text is kept only where it says something
+   * that cannot be derived: an error, an explicit rewrite, and the scripting
+   * phase before the scene text is approved.
+   */
+  const norm = normalizeStatus(rawStatus);
+  const status =
+    /eroare|failed|error/.test(norm) || /regenerare text/.test(norm)
+      ? rawStatus
+      : regenImage
+        ? "Generare Imagine"
+        : regenVoice
+          ? "Generare Voce"
+          : regenVideo
+            ? "Generare Video"
+            : videoApproved
+              ? "Finalizat"
+              : videoUrl
+                ? "Așteaptă Aprobare Video"
+                : !sceneApproved
+                  ? rawStatus
+                  : // Script approved, nothing generated: the batch simply
+                    // has not got to it. "Queued" is the honest word — which
+                    // scene is being worked on right now is an estimate, and
+                    // ProductionActivity is where that estimate belongs.
+                    !imageUrl
+                    ? "In Asteptare"
+                    : !imageApproved
+                      ? "Așteaptă Aprobare Imagine"
+                      : // voiceApproved with no take = a cinematic (silent)
+                        // project, where Scripting pre-checks the box and
+                        // nothing is ever synthesized.
+                        !voiceApproved
+                        ? voiceUrl
+                          ? "Așteaptă Aprobare Voce"
+                          : "Generare Voce"
+                        : "Generare Video";
+  const { kind } = classifyStatus(status);
   return {
     id: r.id,
     order,
     label: `S${index + 1}`,
     narration: (pick(r.fields, F.sceneNarration) as string) ?? null,
     imagePrompt: (pick(r.fields, F.sceneImagePrompt) as string) ?? null,
-    imageUrl: firstAttachmentUrl(pick(r.fields, F.sceneImage)),
+    imageUrl,
     videoUrl,
-    voiceUrl: (pick(r.fields, F.sceneVoice) as string) ?? null,
-    sceneApproved: Boolean(pick(r.fields, F.sceneApproved)),
-    rewriteRequested: status === "Regenerare Text",
-    voiceApproved: Boolean(pick(r.fields, F.sceneVoiceApproved)),
+    voiceUrl,
+    sceneApproved,
+    rewriteRequested: /regenerare text/.test(norm),
+    voiceApproved,
     imageApproved,
     videoApproved,
-    regenImage: Boolean(pick(r.fields, F.sceneRegenImage)),
-    regenVideo: Boolean(pick(r.fields, F.sceneRegenVideo)),
-    regenVoice: Boolean(pick(r.fields, F.sceneRegenVoice)),
+    regenImage,
+    regenVideo,
+    regenVoice,
     note: (pick(r.fields, F.sceneNote) as string) ?? null,
     evidenceRef: (pick(r.fields, F.sceneEvidenceRef) as string) || null,
     needsFactCheck: Boolean(pick(r.fields, F.sceneNeedsFactCheck)),

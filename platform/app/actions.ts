@@ -1324,6 +1324,51 @@ export async function pauseProduction(projectId: string): Promise<ActionResult> 
   }
 }
 
+/**
+ * Pause + Resume in one press, for production that claims to be running and
+ * plainly is not.
+ *
+ * n8n sometimes creates an execution and never runs a single node of it —
+ * `runData` stays `{}`, the node stack never leaves the trigger, and the row
+ * reports `running` forever. Execution 2704 is the specimen: created at
+ * 12:43:56 as a child of a resume webhook, still "running" twenty minutes
+ * later with nothing executed, while the instance itself was perfectly
+ * healthy (a 5-minute cron kept succeeding right through it).
+ *
+ * There is no API signal that separates that from a healthy batch — n8n does
+ * not persist progress mid-run, so a live render and a dead one read
+ * identically, and inventing a progress test is exactly the mistake that once
+ * had the site killing its own healthy renders. What is safe is a MANUAL door:
+ * `resumeProject` refuses while anything is alive (rightly — it would start a
+ * duplicate batch), so the escape has to stop the wedged execution first, and
+ * the producer is the one who decides that it is wedged.
+ *
+ * Nothing is lost by pressing it: every finished image, take and clip is
+ * already in Airtable, and the batch skips whatever exists.
+ */
+export async function restartProduction(projectId: string): Promise<ActionResult> {
+  const paused = await pauseProduction(projectId);
+  // n8n marks a stopped execution canceled asynchronously, and resumeProject
+  // refuses while anything still reads alive — so wait for the list to clear
+  // rather than handing back a "already running" that the producer would have
+  // to press through a second time.
+  for (let i = 0; i < 6; i++) {
+    const still = await getAliveProduction().catch(() => []);
+    if (still.length === 0) break;
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  // "Nothing is running" is not a failure here — it means the execution died
+  // between the render and the click, and resuming is still the right move.
+  const resumed = await resumeProject(projectId);
+  if (!resumed.ok) return resumed;
+  return {
+    ok: true,
+    message: paused.ok
+      ? `${paused.message} ${resumed.message}`
+      : resumed.message,
+  };
+}
+
 export async function stopExecutionAction(formData: FormData): Promise<void> {
   const id = String(formData.get("executionId") ?? "");
   if (id) await stopExecution(id);

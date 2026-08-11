@@ -264,7 +264,10 @@ export default function NewVideo() {
                 <span className="no">02</span>
                 <h2>Format &amp; voices</h2>
               </header>
-              <CategoryPicker onMeta={setCatMeta} />
+              {/* The Language field lives one section up, so the value is
+                  threaded down rather than read from the DOM — both voice
+                  pickers narrow to voices that speak it. */}
+              <CategoryPicker onMeta={setCatMeta} language={language} />
               <div className="cols2" style={{ marginTop: 18 }}>
                 <div className="field">
                   <label htmlFor="length">

@@ -30,6 +30,8 @@ export interface Project {
   awaitingFinalSettings: boolean;
   /** Video category id (lib/categories.ts); older projects have none. */
   category: string | null;
+  /** Spoken language ("Română", "English", …) — narrows every voice picker. */
+  language: string;
   /** The project's main narrator voice id (empty when none was picked). */
   narratorVoice: string;
   /** "off" | "characters" | "chapters" — how narration voices work. */
@@ -278,6 +280,11 @@ function toProject(r: AirtableRecord): Project {
     category: typeof (opts as { category?: unknown }).category === "string"
       ? String((opts as { category?: string }).category)
       : null,
+    // The film's spoken language, as the creation form recorded it. Read so
+    // every later voice picker can narrow to voices that speak it, exactly
+    // like the creation form does — otherwise swapping a narrator on a
+    // Romanian project offers the English library again.
+    language: String(r.fields["Language"] ?? ""),
     narratorVoice: String(r.fields["Voice ID"] ?? ""),
     multiVoiceMode: String((opts as { multiVoiceMode?: string }).multiVoiceMode ?? "off"),
     cast: Array.isArray((opts as { cast?: unknown }).cast)
@@ -479,6 +486,7 @@ const DEMO_PROJECTS: Project[] = [
     editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: true, music: false },
     awaitingFinalSettings: false,
     category: "story",
+    language: "English",
     narratorVoice: "",
     multiVoiceMode: "off",
     cast: [],
@@ -499,6 +507,7 @@ const DEMO_PROJECTS: Project[] = [
     editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: true, music: false },
     awaitingFinalSettings: false,
     category: "story",
+    language: "English",
     narratorVoice: "",
     multiVoiceMode: "off",
     cast: [],
@@ -519,6 +528,7 @@ const DEMO_PROJECTS: Project[] = [
     editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: true, music: false },
     awaitingFinalSettings: false,
     category: "story",
+    language: "English",
     narratorVoice: "",
     multiVoiceMode: "off",
     cast: [],
@@ -539,6 +549,7 @@ const DEMO_PROJECTS: Project[] = [
     editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: true, music: false },
     awaitingFinalSettings: false,
     category: "story",
+    language: "English",
     narratorVoice: "",
     multiVoiceMode: "off",
     cast: [],

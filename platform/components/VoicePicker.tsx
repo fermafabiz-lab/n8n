@@ -35,6 +35,7 @@ export default function VoicePicker({
   selectedIds,
   onToggle,
   chipLabel = "cast",
+  language = "",
 }: {
   name?: string;
   label?: string;
@@ -45,6 +46,13 @@ export default function VoicePicker({
   onToggle?: (voiceId: string) => void;
   /** Chip prefix in multi mode: "cast" (default) or "narrator". */
   chipLabel?: string;
+  /**
+   * The film's language, as the producer typed it. The list is narrowed to
+   * voices that speak it — picking Română and being offered Roger is the
+   * whole problem this solves. Empty = no narrowing, which is what every
+   * caller that has no language to offer gets.
+   */
+  language?: string;
 }) {
   const [provider, setProvider] = useState("elevenlabs");
   const [q, setQ] = useState("");
@@ -61,7 +69,18 @@ export default function VoicePicker({
   const [playing, setPlaying] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Escape hatch from the language narrowing: a producer may deliberately
+  // want an English narrator over a Romanian script, and the metadata is the
+  // provider's, so it can be wrong or missing on a voice that is perfectly
+  // fine. Narrowed by default, never a cage.
+  const [showAll, setShowAll] = useState(false);
+  const [langState, setLangState] = useState<{
+    applied: boolean;
+    label: string;
+    matched: number;
+  } | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const filtering = Boolean(language.trim()) && !showAll;
 
   useEffect(() => {
     const t = setTimeout(async () => {
@@ -69,20 +88,23 @@ export default function VoicePicker({
       setError(null);
       try {
         const res = await fetch(
-          `/api/voices?provider=${provider}&q=${encodeURIComponent(q)}`,
+          `/api/voices?provider=${provider}&q=${encodeURIComponent(q)}` +
+            (filtering ? `&language=${encodeURIComponent(language.trim())}` : ""),
         );
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
         setVoices(data.voices ?? []);
+        setLangState(data.language ?? null);
       } catch (e) {
         setError(String((e as Error).message ?? e));
         setVoices([]);
+        setLangState(null);
       } finally {
         setLoading(false);
       }
     }, 300);
     return () => clearTimeout(t);
-  }, [provider, q]);
+  }, [provider, q, language, filtering]);
 
   const togglePreview = (v: Voice) => {
     if (!v.preview_url) return;
@@ -122,6 +144,36 @@ export default function VoicePicker({
           onChange={(e) => setQ(e.target.value)}
         />
       </div>
+
+      {/* What the list is currently showing, and how to change it. Never a
+          silent filter: an unexplained short list reads as a broken library. */}
+      {language.trim() && !loading && (
+        <p style={{ margin: "0 0 10px", fontSize: 12, color: "var(--soft)" }}>
+          {!filtering ? (
+            <>
+              Showing every voice.{" "}
+              <button type="button" className="linkish" onClick={() => setShowAll(false)}>
+                Only {language.trim()}
+              </button>
+            </>
+          ) : langState?.applied ? (
+            <>
+              {langState.matched} voice{langState.matched === 1 ? "" : "s"} that speak{" "}
+              <b>{langState.label}</b>.{" "}
+              <button type="button" className="linkish" onClick={() => setShowAll(true)}>
+                Show all voices
+              </button>
+            </>
+          ) : langState ? (
+            <>
+              No voice in this library is labelled <b>{langState.label}</b>, so all of
+              them are shown. ElevenLabs&apos; multilingual voices read it anyway — what
+              you lose is the native accent, not the language. Try another provider
+              above for a native one.
+            </>
+          ) : null}
+        </p>
+      )}
 
       {error && <p className="formmsg err">{error}</p>}
       {loading && <p style={{ fontSize: 13, color: "var(--soft)" }}>Loading voices…</p>}
@@ -208,6 +260,7 @@ export default function VoicePicker({
         {!loading && voices.length === 0 && !error && (
           <p style={{ fontSize: 13, color: "var(--soft)", margin: 8 }}>
             No voices found for this search.
+            {filtering && " Clear the search box, or show all voices above."}
           </p>
         )}
       </div>

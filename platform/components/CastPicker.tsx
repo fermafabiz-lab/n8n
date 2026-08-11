@@ -18,9 +18,12 @@ export default function CastPicker({
   mode = "characters",
   /** characters mode: whether a separate narrator voice exists above. */
   hasNarrator = true,
+  /** The film's language — narrows the pool to voices that speak it. */
+  language = "",
 }: {
   mode?: string;
   hasNarrator?: boolean;
+  language?: string;
 }) {
   const [cast, setCast] = useState<string[]>([]);
   const toggle = (id: string) =>
@@ -35,6 +38,7 @@ export default function CastPicker({
         multi
         selectedIds={cast}
         onToggle={toggle}
+        language={language}
         chipLabel={mode === "chapters" ? "narrator" : "cast"}
         label={
           mode === "chapters"

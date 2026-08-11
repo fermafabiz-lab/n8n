@@ -26,9 +26,16 @@ export interface CategoryMeta {
  */
 export default function CategoryPicker({
   onMeta,
+  language = "",
 }: {
   /** Reports selection changes upward so the call sheet can mirror them. */
   onMeta?: (meta: CategoryMeta) => void;
+  /**
+   * The film's language, forwarded to both voice pickers so the narrator and
+   * the cast are drawn from voices that actually speak it. Lives on the page
+   * rather than here because the Language field is in an earlier section.
+   */
+  language?: string;
 }) {
   const [selected, setSelected] = useState(DEFAULT_CATEGORY);
   const [values, setValues] = useState<Record<string, string | boolean>>({});
@@ -175,6 +182,7 @@ export default function CategoryPicker({
           )}
           {(mode === "off" || withNarrator) && (
             <VoicePicker
+              language={language}
               label={
                 mode === "off"
                   ? "Narrator voice — press ▶ to listen"
@@ -182,7 +190,9 @@ export default function CategoryPicker({
               }
             />
           )}
-          {mode !== "off" && <CastPicker mode={mode} hasNarrator={withNarrator} />}
+          {mode !== "off" && (
+            <CastPicker mode={mode} hasNarrator={withNarrator} language={language} />
+          )}
         </div>
       )}
     </div>

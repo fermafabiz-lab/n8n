@@ -119,6 +119,7 @@ export default function AudioReview({
   cast = [],
   castAssign = {},
   chapterVoices = {},
+  language = "",
 }: {
   projectId: string;
   scenes: Scene[];
@@ -130,6 +131,12 @@ export default function AudioReview({
   castAssign?: Record<string, string>;
   /** Chapter number (and "hook") -> voice id, overriding the cast order. */
   chapterVoices?: Record<string, string>;
+  /**
+   * The film's spoken language. Every picker here narrows to voices that
+   * speak it, the same way the creation form does — otherwise a Romanian
+   * project offers the English library again the moment a voice is swapped.
+   */
+  language?: string;
 }) {
   // How many real chapters the script produced — the hook (order < 100) is not
   // one. n8n reads this from the project's linked chapters because its own
@@ -440,6 +447,7 @@ export default function AudioReview({
                       {changed && <span className="chip wait">will re-synthesize</span>}
                     </div>
                     <VoicePicker
+                            language={language}
                       label={
                         key === "hook" && !chapterPick(key)
                           ? "Currently the main narrator — pick a voice to override it"
@@ -501,6 +509,7 @@ export default function AudioReview({
             {showSingle ? (
               <>
                 <VoicePicker
+                            language={language}
                   label="One narrator for the whole video — press ▶ to listen"
                   value={newVoice}
                   onChange={setNewVoice}
@@ -655,6 +664,7 @@ export default function AudioReview({
         {showVoice ? (
           <div className="card" style={{ padding: "14px 16px" }}>
             <VoicePicker
+                            language={language}
               label="New narrator for the whole project — press ▶ to listen"
               value={newVoice}
               onChange={setNewVoice}
@@ -865,6 +875,7 @@ export default function AudioReview({
                       {voiceSearchFor === s.id && (
                         <div style={{ flexBasis: "100%", marginTop: 8 }}>
                           <VoicePicker
+                            language={language}
                             label="Voice for this scene — press ▶ to listen, then Regenerate"
                             value={voiceSel[s.id] ?? ""}
                             onChange={(id) => {

@@ -808,6 +808,28 @@ on a visible 8-second grid.
   exactly that and was deleted for it). Titles in the LISTS are Poppins
   (`--f-title`) instead — at 17px a high-contrast serif costs legibility on a
   line that is scanned, not read.
+- **Voice pickers narrow to the film's language, and two vocabularies had to
+  be reconciled to do it.** The form's Language field is a free-text input
+  whose datalist offers ENDONYMS ("Română", "Deutsch"), while ai33 relays each
+  provider's own labels — "Romanian", "ro", "ro-RO", "Romanian (Romania)", or
+  nothing at all in `language` with the useful word in `accent` instead.
+  `platform/lib/languages.ts` is the single place that maps both sides, and it
+  matches on whole words: a naive substring test made "ro" match *Roger* and
+  "Rock ballad voice", which is exactly the bug the feature exists to fix.
+  Unknown languages still filter — the input becomes its own alias — because
+  the datalist is a suggestion, not a closed list. Three rules hold it up:
+  **filtering must scan pages**, since one page of 24 in a mostly-English
+  library can hold zero Romanian voices while the library holds a dozen (the
+  route walks 6×100, cached an hour, exactly like `resolveNames`); **a filter
+  must never empty the picker**, so no match falls back to the full list with
+  a line saying so; and the narrowing is threaded to EVERY picker — the
+  creation form via `CategoryPicker`/`CastPicker`, and `AudioReview` via the
+  new `Project.language`, or swapping a narrator later would offer the English
+  library again. **Whether native voices actually appear is unverified**: a
+  Claude Code web session gets a 403 for `api.ai33.pro` like every other
+  house-of-videos host, so the metadata's real coverage per provider could not
+  be checked here — the "no voice is labelled X" branch exists precisely
+  because it may be common.
 - **The /new form's field names are a frozen contract.** `createProject()`
   posts `name, category, cat_*, cast_voices, language, length, tone, pace,
   style, voice_id, aspect, captions/hook_title/chapter_cards/end_screen/sfx

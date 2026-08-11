@@ -15,8 +15,28 @@ export const dynamic = "force-dynamic";
 const driveUrl = (id: string) =>
 	`https://drive.google.com/uc?export=download&id=${id}`;
 
+/**
+ * A filename safe to put in a Content-Disposition header.
+ *
+ * Quotes and control characters would let the caller inject header syntax,
+ * and a browser given a name with a newline in it does unpredictable things.
+ * Empty after cleaning => no attachment header at all, rather than a
+ * download called "".
+ */
+const safeFilename = (raw: string): string =>
+	raw
+		.replace(/[^\w .\-()]+/g, "-")
+		.replace(/-+/g, "-")
+		.slice(0, 80)
+		.replace(/^[-. ]+|[-. ]+$/g, "");
+
 export async function GET(req: Request) {
-	const id = new URL(req.url).searchParams.get("id") ?? "";
+	const params = new URL(req.url).searchParams;
+	const id = params.get("id") ?? "";
+	// `dl` turns the same proxied bytes into a download. Opt-in by query, not
+	// by default: the players use this route too, and an attachment header
+	// would make every scene clip download instead of play.
+	const download = safeFilename(params.get("dl") ?? "");
 	if (!/^[\w-]{10,}$/.test(id)) {
 		return new Response(JSON.stringify({error: "invalid id"}), {
 			status: 400,
@@ -74,6 +94,9 @@ export async function GET(req: Request) {
 	for (const h of ["content-length", "content-range", "etag", "last-modified"]) {
 		const v = upstream.headers.get(h);
 		if (v) headers.set(h, v);
+	}
+	if (download) {
+		headers.set("Content-Disposition", `attachment; filename="${download}"`);
 	}
 
 	// Streamed, not buffered: the old proxy read the entire file into memory

@@ -1014,6 +1014,16 @@ on a visible 8-second grid.
   cost Vercel bandwidth for nothing. A 206 is returned `private, no-store`: a
   cache keyed on URL alone would serve one partial response for a different
   range, which looks like a corrupt file rather than a caching bug.
+  **Scene clips are Drive URLs too** — `Set Scene Result` writes
+  `uc?export=download&id=…`, so an older note here claiming they sit on
+  fal.media is wrong for `Scene Final URL`. That is what makes the per-scene
+  download work: `mediaSrc` routes them through `/api/media`, which is
+  SAME-ORIGIN, and a browser only honours `<a download="name">` on a
+  same-origin link. `?dl=<filename>` additionally asks the proxy for a
+  `Content-Disposition`, so the file arrives named even when the link is
+  opened rather than clicked — opt-in by query, because the same route feeds
+  the players and an attachment header would make every clip download instead
+  of play.
 - Count **approvals**, not asset existence, for pipeline progress. Counting
   clips that merely exist made "Video" tick green before review.
 - Transient states need a grace period. The render-error panel fires on healthy

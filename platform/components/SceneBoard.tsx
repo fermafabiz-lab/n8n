@@ -11,6 +11,7 @@ import {
   type ActionResult,
 } from "@/app/actions";
 import type { Scene, StatusKind } from "@/lib/data";
+import { mediaSrc } from "@/lib/media";
 import { explainRefusal } from "@/lib/refusals";
 import MediaPlayer from "@/components/MediaPlayer";
 import RegenBadge from "@/components/RegenBadge";
@@ -33,6 +34,44 @@ function assetFor(s: Scene, step: Step): boolean {
   return Boolean(
     step === "images" ? s.imageUrl : step === "audio" ? s.voiceUrl : s.videoUrl,
   );
+}
+
+/** Filename-safe stub of a project name, so downloads don't all collide. */
+function slug(s: string): string {
+  return (
+    s
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 40) || "project"
+  );
+}
+
+/**
+ * Where "download this clip" points.
+ *
+ * Scene clips are Drive URLs (`Set Scene Result` writes
+ * `uc?export=download&id=…`), so `mediaSrc` already routes them through our
+ * own `/api/media` — which makes the link SAME-ORIGIN, and that is what lets
+ * the browser honour a filename at all. `dl` additionally asks the proxy for
+ * a Content-Disposition, so the file arrives named even when the link is
+ * opened rather than clicked.
+ *
+ * A clip that is not on Drive (older projects, CDN-hosted) is passed through
+ * untouched: cross-origin, so the name is ignored and the browser opens it.
+ * Still useful, just not a one-click save.
+ */
+function clipDownload(scene: Scene, projectName: string) {
+  const file = `${slug(projectName)}-${slug(scene.label)}.mp4`;
+  const src = mediaSrc(scene.videoUrl ?? "");
+  return {
+    file,
+    href: src.startsWith("/api/media")
+      ? `${src}&dl=${encodeURIComponent(file)}`
+      : src,
+  };
 }
 
 const approvedRow: React.CSSProperties = {
@@ -105,12 +144,16 @@ function chipClass(kind: StatusKind): string {
 
 export default function SceneBoard({
   projectId,
+  projectName = "project",
   scenes,
   portrait = false,
   focus = null,
   audioPanel = false,
 }: {
   projectId: string;
+  /** Only used to name downloaded clips, so files from different films
+   *  don't all land in the folder as "scene-S1.mp4". */
+  projectName?: string;
   scenes: Scene[];
   portrait?: boolean;
   /**
@@ -584,6 +627,16 @@ export default function SceneBoard({
                 >
                   Regenerate video
                 </button>
+                {/* Same-origin through /api/media, which is what makes the
+                    filename stick — see clipDownload. */}
+                <a
+                  className="abtn"
+                  href={clipDownload(active, projectName).href}
+                  download={clipDownload(active, projectName).file}
+                  title="Save this scene's clip"
+                >
+                  ⤓ Download
+                </a>
               </div>
               )
             )}
@@ -690,7 +743,25 @@ export default function SceneBoard({
               <span>
                 {s.label} · {s.narration?.slice(0, 26) ?? "—"}
               </span>
-              <span className={`chip ${chipClass(s.statusKind)}`}>{s.status}</span>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                {/* One per scene, on the Video step only — that is the step
+                    this list is being read on when clips are what you want,
+                    and every other step has nothing to save yet. The click
+                    must not also select the row it sits in. */}
+                {step === "video" && s.videoUrl && (
+                  <a
+                    className="dlmini"
+                    href={clipDownload(s, projectName).href}
+                    download={clipDownload(s, projectName).file}
+                    onClick={(e) => e.stopPropagation()}
+                    title={`Save ${s.label} as ${clipDownload(s, projectName).file}`}
+                    aria-label={`Download ${s.label}`}
+                  >
+                    ⤓
+                  </a>
+                )}
+                <span className={`chip ${chipClass(s.statusKind)}`}>{s.status}</span>
+              </span>
             </div>
           ))}
         </div>

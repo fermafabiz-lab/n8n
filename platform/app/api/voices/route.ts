@@ -179,9 +179,11 @@ export async function GET(req: NextRequest) {
  * so the audio panel printed "elevenlabs · …oKomo" at the producer — from
  * which no one can tell ZaTurk from Roxana, let alone a man from a woman.
  * That is the state in which a Romanian male character was given Bella and
- * nobody could see it. ai33 answers a direct GET per id, so anything the
- * scan misses is fetched individually; the scan stays because one page
- * covers a whole cast in one request when the voices are common ones.
+ * nobody could see it. There is no lookup-by-id endpoint — /v3/voices/<id>
+ * answers 404 — but ai33's own `q` search matches the id and returns the one
+ * row, which is the same trick the language filter uses. The scan stays
+ * ahead of it: one page covers a whole cast of common voices in one
+ * request, and only what it misses costs an extra call.
  *
  * Gender rides along for the same reason: it is the one field that makes a
  * wrong pairing obvious at a glance, and the API already returns it.
@@ -231,18 +233,26 @@ async function resolveNames(
   // the batch, because a truncated code is still better than no panel.
   for (const id of wanted) {
     if (names[id]) continue;
-    const bare = id.split("_").slice(1).join("_");
-    if (!bare) continue;
+    const [provider, ...rest] = id.split("_");
+    const bare = rest.join("_");
+    if (!provider || !bare) continue;
     try {
-      const res = await fetch(`https://api.ai33.pro/v3/voices/${encodeURIComponent(bare)}`, {
+      const url = new URL("https://api.ai33.pro/v3/voices");
+      url.searchParams.set("provider", provider);
+      url.searchParams.set("q", bare);
+      const res = await fetch(url, {
         headers: { "xi-api-key": key },
         next: { revalidate: 3600 },
       });
       if (!res.ok) continue;
-      const j = (await res.json()) as Record<string, unknown>;
-      const v = (j.data && typeof j.data === "object" ? j.data : j) as Record<string, unknown>;
-      if (typeof v.name === "string" && v.name) {
-        names[id] = { name: v.name, gender: (v.gender as string) ?? null };
+      const j = (await res.json()) as { data?: Array<Record<string, unknown>> };
+      // The row carries the PREFIXED id, so match on it rather than assuming
+      // the single result is the one asked for.
+      for (const v of j.data ?? []) {
+        const got = String(v.voice_id ?? "");
+        if (got === id && typeof v.name === "string" && v.name) {
+          names[id] = { name: v.name, gender: (v.gender as string) ?? null };
+        }
       }
     } catch {
       // Leave it unresolved; shortVoiceId still renders something.

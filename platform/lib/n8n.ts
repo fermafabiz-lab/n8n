@@ -86,7 +86,18 @@ export interface ExecutionError {
 
 export async function getExecutionError(id: string): Promise<ExecutionError | null> {
   if (!n8nConfigured) return null;
-  const res = await api(`/executions/${id}?includeData=true`);
+  // Every other failure here answers null; a NETWORK failure used to throw,
+  // because `api()` is a bare fetch and `!res.ok` never sees a request that
+  // did not complete. Callers reasonably read the signature as "the error
+  // text, or null" and did not guard it — so one unreachable moment on the
+  // n8n host took a whole page down with a digest instead of degrading.
+  // A blip is a null like any other missing answer.
+  let res: Response;
+  try {
+    res = await api(`/executions/${id}?includeData=true`);
+  } catch {
+    return null;
+  }
   if (!res.ok) return null;
   const data = (await res.json()) as {
     data?: {

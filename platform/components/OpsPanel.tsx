@@ -66,10 +66,15 @@ export default async function OpsPanel({
   const recentFailed = failed.filter(
     (f) => f.startedAt && Date.now() - new Date(f.startedAt).getTime() < 24 * 3600 * 1000,
   );
+  // Deliberately outside the try above, and therefore its own hazard: the
+  // list call can succeed and this one still fail if n8n goes away in
+  // between. Losing one error MESSAGE is worth a missing line; it is not
+  // worth the page. `getExecutionError` no longer throws, and this catch is
+  // the second lock on the same door.
   const withErrors = await Promise.all(
     recentFailed.map(async (f) => ({
       ...f,
-      error: await getExecutionError(f.id),
+      error: await getExecutionError(f.id).catch(() => null),
     })),
   );
 

@@ -13,7 +13,7 @@ conversation. Keep it updated when a hard-won lesson is learned.
 
 | Piece | Where | Role |
 |---|---|---|
-| **Website** | `platform/` — Next.js on Vercel | The producer's whole interface: create projects, approve each stage, watch progress |
+| **Website** | `platform/` — Next.js on the Hetzner box, `house-of-videos.com` | The producer's whole interface: create projects, approve each stage, watch progress |
 | **n8n** | self-hosted at `wf7.house-of-videos.com` | All orchestration. 4 workflows, see below |
 | **Airtable** | base "Database Video" | The single source of truth for project + scene state |
 | **Render server** | `remotion/server/` on Railway | ffmpeg + Remotion: `/assemble`, `/tts-multi`, `/media`, `/transcript`, `/inspect` |
@@ -1350,15 +1350,32 @@ merging into the trunk**, or say in as many words that the change is not live
 yet and what is needed to make it so. This is the same class of error as the
 stale Remotion Studio above: the artifact on screen outlives the fix.
 
-Verifying a deploy from a Claude Code web session is **not possible** — the
-proxy answers 403 for `house-of-videos.com` (the bare site) as well as for
-`wf7.`, and the Vercel MCP connector authenticates but lists zero projects
-under the `FermaFabiz` team, so it cannot reach the deployment either. The
-only confirmation available is the producer reloading the page.
+Verifying a deploy no longer depends on the producer reloading the page. A
+session with the SSH key can check the real thing directly:
+`docker ps` for health, `docker logs n8n-web-1`, and a `wget` inside the
+container using `SITE_PASSWORD` from `platform.env` as the `vf_auth` cookie.
+The Vercel MCP connector still lists zero projects, and the web-session proxy
+still answers 403 — neither matters now.
 
-**Vercel** (the site): `N8N_API_URL`, `N8N_API_KEY`,
-`N8N_NEW_PROJECT_WEBHOOK_URL` — all three must point at the current n8n host.
-See `platform/README.md`.
+**Caddy does not reload itself.** The deploy workflow restarts only `web`. Env
+vars are fixed when a container is created, so a change to the Caddyfile or to
+`SITE_HOST`/`PANEL_HOST` in `/opt/n8n/.env` needs
+`docker compose up -d caddy` — a reload is not enough. Skipping this is what
+took the site down for a few minutes during the Vercel cutover: DNS pointed at
+the box while Caddy was still running an 11-day-old config that had no site
+block for the bare domain.
+
+**The site's env** lives in **GitHub repo Secrets and Variables**, not on
+the server: `.github/workflows/deploy-platform.yml` writes `/opt/n8n/platform.env`
+from them on every deploy. Editing that file over SSH does nothing lasting —
+the next deploy overwrites it. This is deliberate: four people share the work
+and only one has a key on the box, but everyone reaches GitHub.
+
+`N8N_API_URL`, `N8N_API_KEY`, `N8N_NEW_PROJECT_WEBHOOK_URL` must point at the
+current n8n host. The other six webhooks are DERIVED from the new-project URL
+by swapping the trailing path, so getting that one wrong breaks every approval
+button at once. The registered paths are in Postgres:
+`select method, "webhookPath" from webhook_entity;`
 
 **Google OAuth** (Drive credential): redirect URI is
 `https://wf7.house-of-videos.com/rest/oauth2-credential/callback`, JavaScript

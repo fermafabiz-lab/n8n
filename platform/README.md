@@ -6,25 +6,50 @@ as the invisible backend; this app is where daily work happens.
 Phase A (current): read-only dashboard + production room, reading straight
 from the Airtable base that n8n already writes to. No auth yet.
 
-## Deploy on Vercel
+## Deploy
 
-1. Import the GitHub repo on vercel.com → **Add New Project**.
-2. Set **Root Directory** to `platform` (Framework preset: Next.js — detected
-   automatically).
-3. Add environment variables:
+The site runs on the Hetzner box that already hosts n8n, in the `n8n` compose
+project at `/opt/n8n`, behind the Caddy that fronts `wf7.`. It was on Vercel
+until 2026-08-13; nothing in the app was Vercel-specific, so the move was
+packaging only.
 
-   | Variable | Value |
-   |---|---|
-   | `AIRTABLE_API_KEY` | Airtable personal access token (scopes: `data.records:read` **and** `data.records:write`, access to the production base) |
-   | `AIRTABLE_BASE_ID` | the `app...` id of the base (visible in the base URL) |
-   | `AIRTABLE_PROJECTS_TABLE` | table name/id for projects (default `Proiecte`) |
-   | `AIRTABLE_SCENES_TABLE` | table name/id for scenes (default `Scene`) |
-   | `SITE_PASSWORD` | optional — locks the whole site behind a shared password |
-   | `N8N_NEW_PROJECT_WEBHOOK_URL` | optional — n8n webhook that starts a new project; enables the “New video” form |
-   | `AIRTABLE_SCRIPT_APPROVED_STATUS` | optional — Status value the scripting workflow waits for (default `approved`) |
+Push to the trunk (`claude/hello-7o90qh`) and
+`.github/workflows/deploy-platform.yml` does the rest: build the image, push
+it to GHCR, pull it on the server, write `platform.env`, restart `web`, and
+wait for the container to report healthy before calling the deploy green.
 
-4. Deploy. Without the env vars the app serves demo data, so the UI is
-   reviewable before wiring anything.
+The image is built in CI, never on the server — that box has ~2 GB free with
+n8n and Postgres running, and `next build` would fight them for it.
+
+### Environment
+
+Set in **GitHub → Settings → Secrets and variables → Actions**, not on the
+server. The workflow writes `/opt/n8n/platform.env` from them on every deploy,
+so editing that file over SSH does nothing lasting.
+
+Secrets (all required — the deploy fails fast if any is blank):
+
+| Secret | Value |
+|---|---|
+| `AIRTABLE_API_KEY` | Airtable PAT, scopes `data.records:read` **and** `:write` |
+| `AIRTABLE_BASE_ID` | the `app...` id of the base |
+| `N8N_API_KEY` | from the n8n instance, Settings → n8n API |
+| `AI33_API_KEY` | ai33, used by `/api/voices` |
+| `SITE_PASSWORD` | shared password gate. **Blank disables the gate entirely** and publishes the site, which is why it is required |
+| `SSH_HOST` / `SSH_USER` / `SSH_KEY` | the deploy key, `/root/.ssh/gh_deploy` on the box |
+
+Variables (optional — the workflow has these as defaults):
+
+| Variable | Default |
+|---|---|
+| `N8N_API_URL` | `https://wf7.house-of-videos.com/api/v1` |
+| `N8N_NEW_PROJECT_WEBHOOK_URL` | `https://wf7.house-of-videos.com/webhook/new-project` |
+| `AIRTABLE_PROJECTS_TABLE` | `Proiecte` |
+| `AIRTABLE_SCENES_TABLE` | `Scene` |
+| `AIRTABLE_SCRIPTS_TABLE` | `Scripturi` |
+
+Without the Airtable vars the app serves demo data, so the UI stays reviewable
+before anything is wired up.
 
 ## Local dev
 

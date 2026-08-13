@@ -1320,6 +1320,20 @@ the pipeline already produces.
   exist. On a project past the batch cap that was the state most scenes sat
   in, which is precisely what made the producer suspect the statuses were
   what had jammed production.
+- **A getter that answers `null` for every failure must answer `null` for a
+  NETWORK failure too, or its callers are guarding a lie.** `getExecutionError`
+  returned null when n8n was unconfigured, when the response was not OK, and
+  when the payload held no error — but `api()` is a bare `fetch`, and a
+  request that never completes throws instead of returning a response for
+  `!res.ok` to catch. `OpsPanel` compounded it by putting the list calls
+  inside `try/catch` and the per-execution lookup AFTER it, so a three-second
+  DNS blip on wf7 between the two calls killed the server component and
+  answered the whole site with a black "Application error" page (digest
+  2857745208, 2026-08-13). The same outage an hour earlier, hitting the list
+  call, had produced the "Can't reach the n8n API" card and a perfectly usable
+  page — the strategy was right, one call was outside it. The path is not
+  rare: it runs on every render whenever any execution failed in the last 24h,
+  and four had. **When a display-path fetch can throw, the page must not.**
 - Transient states need a grace period. The render-error panel fires on healthy
   gaps between executions; `AssemblyStatus` uses a 75s sessionStorage-backed
   grace before crying failure.

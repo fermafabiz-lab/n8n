@@ -41,6 +41,20 @@ export function explainRefusal(note: string): RefusalAdvice | null {
       advice: "Nothing wrong with the scene — it usually clears on the next batch run.",
     };
   }
+  // AUTO-REWRITE-* is the pipeline REPORTING a refusal it already handled:
+  // Prep Flow Reject → Rewrite Prompt AI → Apply Rewritten Prompt has run and
+  // the next cycle regenerates from the new wording. It has to be matched
+  // before the generic branch below, which would otherwise answer "change the
+  // image or the wording before retrying" — work the pipeline had already
+  // done, and the exact opposite of what the note's own last sentence says.
+  // A producer who follows that advice edits a scene that was already fixed.
+  if (/AUTO-REWRITE/i.test(note)) {
+    return {
+      cause: "Refused once, then rewritten by the pipeline itself",
+      advice:
+        "Nothing to do — the prompt was rewritten automatically and the asset regenerates on the next pass. Step in only if the same scene refuses again after that.",
+    };
+  }
   // The deterministic-refusal branch comes BEFORE the transient branch, and
   // the status-code patterns are anchored to an HTTP context: scene orders
   // here are chapter*100+scene, so "scene 503" is a real scene number in any

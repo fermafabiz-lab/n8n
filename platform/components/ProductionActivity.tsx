@@ -73,19 +73,24 @@ export default function ProductionActivity({
   const unappVoice = batch.filter((s) => !s.voiceApproved);
   const noClip = batch.filter((s) => !s.videoUrl);
   const unappClip = batch.filter((s) => !s.videoApproved);
+  // `text` describes a batch that is RUNNING; `idle` the same stage when
+  // nothing is. Without the pair the panel said "No batch is running in n8n
+  // right now." and "Generating images · 1/8" one line apart — two
+  // statements that cannot both be true, on the screen a producer checks
+  // precisely to find out whether anything is happening.
   const phase =
     noImage.length > 0
-      ? { text: "Generating images", done: batch.length - noImage.length, current: noImage[0].label, review: false }
+      ? { text: "Generating images", idle: "Next pass starts with images", done: batch.length - noImage.length, current: noImage[0].label, review: false }
       : unappImage.length > 0
-        ? { text: "Images ready — reviewing", done: batch.length - unappImage.length, current: null, review: true }
+        ? { text: "Images ready — reviewing", idle: "Images ready — reviewing", done: batch.length - unappImage.length, current: null, review: true }
         : noVoice.length > 0
-          ? { text: "Synthesizing voiceovers", done: batch.length - noVoice.length, current: noVoice[0].label, review: false }
+          ? { text: "Synthesizing voiceovers", idle: "Next pass starts with the voiceovers", done: batch.length - noVoice.length, current: noVoice[0].label, review: false }
           : unappVoice.length > 0
-            ? { text: "Voices ready — reviewing", done: batch.length - unappVoice.length, current: null, review: true }
+            ? { text: "Voices ready — reviewing", idle: "Voices ready — reviewing", done: batch.length - unappVoice.length, current: null, review: true }
             : noClip.length > 0
-              ? { text: "Generating video clips", done: batch.length - noClip.length, current: noClip[0].label, review: false }
+              ? { text: "Generating video clips", idle: "Next pass starts with the clips", done: batch.length - noClip.length, current: noClip[0].label, review: false }
               : unappClip.length > 0
-                ? { text: "Clips ready — reviewing", done: batch.length - unappClip.length, current: null, review: true }
+                ? { text: "Clips ready — reviewing", idle: "Clips ready — reviewing", done: batch.length - unappClip.length, current: null, review: true }
                 : null;
 
   // Regenerations in flight, across the whole project (regens ride their own
@@ -98,8 +103,22 @@ export default function ProductionActivity({
 
   // Content refusals the pipeline wrote back — surfaced here in aggregate so
   // a refused scene is visible without clicking through every card.
+  // An AUTO-REWRITE note is a RECORD of something the pipeline already fixed,
+  // not a live failure: it rewrote the prompt and regenerated. Once the asset
+  // it names has landed, the note is history — and leaving it here put a red
+  // panel reading "the video filter refused this scene" above a scene that
+  // has its clip, which reads as production being broken when it is not.
+  // Scoped to auto-rewrites on purpose: a refusal the pipeline did NOT handle
+  // must keep shouting even if some other asset on the scene exists.
+  const settled = (s: Scene) =>
+    /AUTO-REWRITE-VIDEO/i.test(s.note ?? "")
+      ? Boolean(s.videoUrl)
+      : /AUTO-REWRITE/i.test(s.note ?? "")
+        ? Boolean(s.imageUrl)
+        : false;
+
   const refusals = scenes.filter(
-    (s) => !s.videoApproved && s.note && REFUSAL.test(s.note),
+    (s) => !s.videoApproved && s.note && REFUSAL.test(s.note) && !settled(s),
   );
 
   const aliveKnown = alive !== null;
@@ -167,7 +186,8 @@ export default function ProductionActivity({
 
       {phase && (
         <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--soft)" }}>
-          {phase.text} · {phase.done}/{batch.length}
+          {(aliveAny ? phase.text : (phase.idle ?? phase.text))} ·{" "}
+          {phase.done}/{batch.length}
           {phase.current && aliveAny && (
             <>
               {" "}— likely on <b style={{ color: "var(--ink)" }}>{phase.current}</b>

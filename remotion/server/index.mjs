@@ -83,12 +83,23 @@ app.post('/render', async (req, res) => {
 				codec: 'h264',
 				outputLocation,
 				inputProps,
-				// Railway's plan caps this container at 1GB RAM. Parallel Chrome
-				// tabs (Remotion's default concurrency) blow past that and hang
-				// mid-frame. Serialize rendering and give each frame more time
-				// to land on a slow/shared vCPU instead of timing out.
+				// The container has 8GB. Parallel Chrome tabs (Remotion's default
+				// concurrency) blow past it and hang mid-frame, so rendering is
+				// serialized and each frame gets longer to land on a shared vCPU.
 				concurrency: 1,
 				timeoutInMilliseconds: 120000,
+				// THE cause of two dead renders on the 15-scene Tahiti film
+				// (2026-08-13). Remotion's OffthreadVideo frame cache defaults to
+				// null, which means HALF THE SYSTEM MEMORY at render start — 4GB
+				// here — on top of Chrome under swangle and the ffmpeg encode.
+				// Peak hit 7.91GB against an 8GB limit and the kernel killed the
+				// compositor. n8n reports that as "Compositor exited with signal
+				// SIGKILL / Remotion render failed", which names neither memory
+				// nor the cache, and it only bites once a film is long enough:
+				// every earlier render here finished in 2-4 minutes and fitted.
+				// A cap costs cache hits, not correctness — at concurrency 1 the
+				// frames are read in order and barely reused.
+				offthreadVideoCacheSizeInBytes: 1024 * 1024 * 1024,
 				chromiumOptions: {
 					// No GPU in this container; disabling it avoids Chrome trying
 					// (and failing) to init hardware acceleration, which otherwise

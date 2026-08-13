@@ -615,6 +615,21 @@ is built only inside that guard (a `-1` input index would break the graph).
   veo-3.1-lite clips actually carry an audio stream (`/inspect`). Verified
   once (2026-08-10): a real veo-3.1-lite clip probed `aac, 2ch, 48kHz` —
   the ambience track exists.
+- **`SIGKILL` from the compositor is the container running out of memory, and
+  the default OffthreadVideo cache is what fills it.** Two renders of the
+  15-scene Tahiti film died at `Graphics Guard` with "Compositor exited with
+  signal SIGKILL / Remotion render failed" — a message that names neither
+  memory nor a cache. Railway metrics settle it in one look:
+  `MEMORY_USAGE_GB` peaked at **7.91 against a limit of 8**, CPU at 7.4 of 8.
+  `offthreadVideoCacheSizeInBytes` defaults to `null`, which Remotion
+  documents as HALF the system memory at render start — 4GB on this box —
+  and that sits on top of Chrome under swangle plus the ffmpeg encode.
+  `server/index.mjs` now caps it at 1GB. It stayed invisible for months
+  because every earlier film fitted: the successful renders all finished in
+  2-4 minutes, and the failures ran 8-10 before dying, so LENGTH is the
+  trigger. **Check the metrics before reading the error text** — and note the
+  first suspicion here was a mid-render deploy, which was wrong: the second
+  render died with no deployment in flight at all.
 - **A Railway deploy mid-render used to kill the render**: render/graphics
   jobs live in the server's memory, the deploy swaps the container, the
   next status poll answers 404 "job not found" and the execution died —

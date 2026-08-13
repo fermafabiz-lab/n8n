@@ -14,7 +14,7 @@ import {
   type ActionResult,
 } from "@/app/actions";
 import type { Scene } from "@/lib/data";
-import { useVoiceNames } from "@/lib/voice-names";
+import { useVoiceLabels, useVoiceNames } from "@/lib/voice-names";
 import { mediaSrc } from "@/lib/media";
 import RegenBadge from "@/components/RegenBadge";
 import VoicePicker from "@/components/VoicePicker";
@@ -184,6 +184,8 @@ export default function AudioReview({
     ...Object.values(voiceSel),
   ]);
   const shortVoice = (id: string) => voiceName(id);
+  // Cast options name the gender too — see useVoiceLabels.
+  const voiceLabel = useVoiceLabels([narratorVoice, ...cast]);
   // The pickable set: the narrator first, then the cast (deduplicated).
   // Narrator alone still yields a useful menu on single-voice projects —
   // offering ONLY the cast made the selector a list of one on exactly the
@@ -670,10 +672,18 @@ export default function AudioReview({
                   >
                     {cast.map((v) => (
                       <option key={v} value={v}>
-                        {shortVoice(v)}
+                        {voiceLabel(v)}
                       </option>
                     ))}
                   </select>
+                  {!castAssign[name] && (
+                    // Until someone picks, this is n8n's first-appearance
+                    // fallback, not a decision. Rendered as a plain <select>
+                    // value it looked like a choice already made — which is
+                    // how a male character kept a female voice through eight
+                    // synthesized takes before anyone listened.
+                    <span className="chip wait">auto — picked by speaking order, not chosen</span>
+                  )}
                   {i < cast.length ? null : (
                     <span className="chip wait">shares a voice — cast is smaller than the cast list</span>
                   )}

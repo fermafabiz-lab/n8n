@@ -62,7 +62,13 @@ export async function GET(req: NextRequest) {
 
   // Name lookup: ?ids=elevenlabs_abc,elevenlabs_def -> {id: "Charlie"}.
   const ids = sp.get("ids");
-  if (ids) return NextResponse.json({ names: await resolveNames(ids, key) });
+  if (ids) {
+    const resolved = await resolveNames(ids, key);
+    return NextResponse.json({
+      names: Object.fromEntries(Object.entries(resolved).map(([k, v]) => [k, v.name])),
+      genders: Object.fromEntries(Object.entries(resolved).map(([k, v]) => [k, v.gender])),
+    });
+  }
 
   const fetchPage = async (p: number, size: number, query: string) => {
     const url = new URL("https://api.ai33.pro/v3/voices");
@@ -165,22 +171,29 @@ export async function GET(req: NextRequest) {
 }
 
 /**
- * Resolve prefixed voice ids to display names.
+ * Ids -> name + gender.
  *
- * ai33's library endpoint has no lookup-by-id, so this walks the pages of
- * each provider the ids mention until every one is found. Pages are bounded
- * and individually cached for an hour, so the walk happens once per provider
- * and then costs nothing. An id that never turns up is simply omitted — the
- * caller falls back to showing the short code rather than an empty label.
+ * The paged scan alone was not enough, and the gap was invisible: it walks
+ * the first 800 voices, and a cast picked from a large library routinely
+ * sits past that. Three of one project's four voices came back unresolved,
+ * so the audio panel printed "elevenlabs · …oKomo" at the producer — from
+ * which no one can tell ZaTurk from Roxana, let alone a man from a woman.
+ * That is the state in which a Romanian male character was given Bella and
+ * nobody could see it. ai33 answers a direct GET per id, so anything the
+ * scan misses is fetched individually; the scan stays because one page
+ * covers a whole cast in one request when the voices are common ones.
+ *
+ * Gender rides along for the same reason: it is the one field that makes a
+ * wrong pairing obvious at a glance, and the API already returns it.
  */
 async function resolveNames(
   idList: string,
   key: string,
-): Promise<Record<string, string>> {
+): Promise<Record<string, { name: string; gender: string | null }>> {
   const wanted = new Set(
     idList.split(",").map((s) => s.trim()).filter(Boolean).slice(0, 40),
   );
-  const names: Record<string, string> = {};
+  const names: Record<string, { name: string; gender: string | null }> = {};
   const providers = new Set(
     [...wanted].map((id) => id.split("_")[0]).filter(Boolean),
   );
@@ -205,10 +218,36 @@ async function resolveNames(
       }
       for (const v of data.data ?? []) {
         const id = String(v.voice_id ?? "");
-        if (wanted.has(id) && typeof v.name === "string") names[id] = v.name;
+        if (wanted.has(id) && typeof v.name === "string") {
+          names[id] = { name: v.name, gender: (v.gender as string) ?? null };
+        }
       }
       if (!data.pagination?.has_more) break;
     }
   }
+
+  // Whatever the scan did not reach, asked for by name. Sequential and
+  // bounded by the 40-id cap above; a miss stays a miss rather than failing
+  // the batch, because a truncated code is still better than no panel.
+  for (const id of wanted) {
+    if (names[id]) continue;
+    const bare = id.split("_").slice(1).join("_");
+    if (!bare) continue;
+    try {
+      const res = await fetch(`https://api.ai33.pro/v3/voices/${encodeURIComponent(bare)}`, {
+        headers: { "xi-api-key": key },
+        next: { revalidate: 3600 },
+      });
+      if (!res.ok) continue;
+      const j = (await res.json()) as Record<string, unknown>;
+      const v = (j.data && typeof j.data === "object" ? j.data : j) as Record<string, unknown>;
+      if (typeof v.name === "string" && v.name) {
+        names[id] = { name: v.name, gender: (v.gender as string) ?? null };
+      }
+    } catch {
+      // Leave it unresolved; shortVoiceId still renders something.
+    }
+  }
+
   return names;
 }

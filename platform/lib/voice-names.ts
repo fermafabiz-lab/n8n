@@ -17,6 +17,9 @@ import { useEffect, useState } from "react";
  * all of them.
  */
 const cache = new Map<string, string>();
+/** Gender per id, when ai33 reports one. Kept beside the name because it
+ *  is what makes a wrong cast pairing visible without listening. */
+const genders = new Map<string, string>();
 /** Ids already asked about, so a miss isn't re-requested on every render. */
 const asked = new Set<string>();
 const listeners = new Set<() => void>();
@@ -28,13 +31,19 @@ async function fetchNames(ids: string[]): Promise<void> {
   try {
     const res = await fetch(`/api/voices?ids=${encodeURIComponent(missing.join(","))}`);
     if (!res.ok) return;
-    const data = (await res.json()) as { names?: Record<string, string> };
+    const data = (await res.json()) as {
+      names?: Record<string, string>;
+      genders?: Record<string, string | null>;
+    };
     let changed = false;
     for (const [id, name] of Object.entries(data.names ?? {})) {
       if (name) {
         cache.set(id, name);
         changed = true;
       }
+    }
+    for (const [id, g] of Object.entries(data.genders ?? {})) {
+      if (g) genders.set(id, g);
     }
     if (changed) for (const l of listeners) l();
   } catch {
@@ -63,6 +72,21 @@ export function useVoiceNames(ids: Array<string | null | undefined>) {
   return (id: string | null | undefined): string => {
     if (!id) return "";
     return cache.get(id) ?? shortVoiceId(id);
+  };
+}
+
+/**
+ * The same labeller, with the voice's gender appended when ai33 knows it:
+ * "ZaTurk — male". Use it wherever a voice is CHOSEN rather than merely
+ * named — a cast list reads as correct until you notice the man is female,
+ * and the name alone does not say.
+ */
+export function useVoiceLabels(ids: Array<string | null | undefined>) {
+  const name = useVoiceNames(ids);
+  return (id: string | null | undefined): string => {
+    if (!id) return "";
+    const g = genders.get(id);
+    return g ? `${name(id)} — ${g}` : name(id);
   };
 }
 

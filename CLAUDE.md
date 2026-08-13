@@ -182,6 +182,13 @@ These each cost hours. Do not rediscover them.
 - **`WEBHOOK_URL=https://wf7.house-of-videos.com`** must be set as an env var
   on the instance. Without it n8n hands out `localhost` webhook URLs and
   Vercel can't start anything — which presents as "the site is broken".
+- **A missing `wf7` DNS record reads as a broken site, not a DNS problem.**
+  The page loads and lists every project — Airtable is a different host and
+  keeps working — while "Can't reach the n8n API: fetch failed" sits at the
+  top and every approval button is dead. Resolve the name before debugging
+  the app: `dig +short A wf7.house-of-videos.com`, and NXDOMAIN is the answer.
+  This happened on 2026-08-13, when the two Vercel A records were deleted
+  during the cutover and `wf7` went with them.
 - **The n8n host is `wf7.house-of-videos.com`, not the bare domain.** The bare
   domain is the website. Everything that must reach n8n — Vercel's three env
   vars, the Google OAuth redirect URI, the MCP connector — needs the `wf7.`

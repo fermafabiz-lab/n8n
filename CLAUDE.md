@@ -440,6 +440,26 @@ chapter could change narrator halfway. `AB Pick Voice` and `VR Pick Voice`
 hold the same rule and must be edited together, or a regenerated scene gets a
 different voice from the one the batch gave it.
 
+**The cast is picked before the characters exist, so the name→voice binding
+is a GUESS until someone makes it.** The form asks for cast voices while the
+script is still unwritten; `castAssign` is empty; `AB Pick Voice` and
+`VR Pick Voice` therefore fall back to first-appearance order, which has no
+relationship to which voice the producer meant for whom. On a two-hander it
+is a coin flip, and it lands after the takes are synthesized — the first
+signal is someone listening. Seen 2026-08-13 on `rec1GITgUCq4mEsUd`: Victor
+Marin (first to speak) got Bella, Elena Ionescu got a male Romanian VO.
+
+The audio panel could not have caught it either, and that is the part worth
+remembering: `resolveNames` scanned the first 800 voices and gave up, so three
+of the four ids printed as `elevenlabs · …oKomo`. There is **no lookup-by-id
+endpoint** — `/v3/voices/<id>` answers 404 — but `q=<bare id>` matches and
+returns the one row, so misses are now resolved that way, with `gender`
+alongside the name. Cast options read "ZaTurk — male", and a character with
+no explicit assignment is labelled `auto — picked by speaking order`.
+Fixing an existing project means writing `castAssign` **and** re-recording
+the affected lines: a changed voice only applies to takes regenerated after
+it.
+
 `characters` mode splits on `[NARRATOR]` and `[CHARACTER: Name]` markers in
 `Script Scenă`, and Scripting **does** ask for them — the chain is
 `Receive Project Data → Fetch Project Record → Voice Mode`, where `Voice Mode`

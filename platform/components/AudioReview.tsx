@@ -15,7 +15,7 @@ import {
 } from "@/app/actions";
 import type { Scene } from "@/lib/data";
 import { useVoiceLabels, useVoiceNames } from "@/lib/voice-names";
-import { mediaSrc } from "@/lib/media";
+import { downloadSrc, mediaSrc } from "@/lib/media";
 import RegenBadge from "@/components/RegenBadge";
 import VoicePicker from "@/components/VoicePicker";
 
@@ -120,9 +120,13 @@ export default function AudioReview({
   castAssign = {},
   chapterVoices = {},
   language = "",
+  projectName = "",
 }: {
   projectId: string;
   scenes: Scene[];
+  /** Only used to name downloaded files — a take called "S3 narration.mp3"
+   *  is indistinguishable from every other project's third take. */
+  projectName?: string;
   /** Project multi-voice mode: "off" | "characters" | "chapters". */
   mode?: string;
   /** The project narrator's voice id — offered in the per-scene picker. */
@@ -221,6 +225,9 @@ export default function AudioReview({
     if (key === "hook" || cast.length === 0) return "";
     return cast[(Number(key) - 1) % cast.length] ?? "";
   };
+  /** Where a bundled narration download comes from. See /api/audio-bundle. */
+  const bundleHref = (chapter: string) =>
+    `/api/audio-bundle?project=${encodeURIComponent(projectId)}&chapter=${encodeURIComponent(chapter)}`;
   const [showChapters, setShowChapters] = useState(false);
   const [chapDraft, setChapDraft] = useState<Record<string, string>>({});
   const chapterPick = (key: string): string => chapDraft[key] ?? chapterVoiceOf(key);
@@ -407,6 +414,41 @@ export default function AudioReview({
           </>
         )}
       </p>
+
+      {/*
+        The narration on its own. It exists nowhere else: the pipeline stores
+        one take per scene and only ever joins them inside the final video,
+        under the picture. Prominent because these are the two a producer
+        actually reaches for — the per-scene ⤓ below is for the odd line.
+        Chapter buttons appear only when the film HAS more than one; on a
+        single-chapter project they would just repeat the full download.
+      */}
+      {withAudio.length > 0 && (
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+            flexWrap: "wrap",
+            marginBottom: 14,
+          }}
+        >
+          <span style={{ fontSize: 12, color: "var(--dim)" }}>Download</span>
+          <a className="btn" href={bundleHref("all")} download>
+            ⤓ Full narration
+          </a>
+          {chapterKeys.length > 1 &&
+            chapterKeys.map((k) => (
+              <a key={k} className="btn" href={bundleHref(k)} download>
+                ⤓ {k === "hook" ? "Hook" : `Chapter ${k}`}
+              </a>
+            ))}
+          <span style={{ fontSize: 11.5, color: "var(--dim)" }}>
+            One mp3, takes joined in scene order — no gaps, exactly as the cut
+            plays them.
+          </span>
+        </div>
+      )}
 
       {withAudio.length === 0 ? (
         <p className="formmsg" style={{ marginBottom: 12 }}>
@@ -831,6 +873,27 @@ export default function AudioReview({
                     )}
                     {flag && <span className="chip wait">{flag}</span>}
                     {fit && <span className="chip wait">{fit}</span>}
+                    {/* One take on its own. Deliberately the smallest control
+                        in the row: it is for the odd line worth pulling out,
+                        while the whole-narration and per-chapter downloads at
+                        the top are the ones reached for. Works because
+                        /api/media is SAME-ORIGIN — a browser ignores the
+                        download attribute on a cross-origin link, so a raw
+                        Drive href would open a tab instead of saving. */}
+                    {s.voiceUrl && (
+                      <a
+                        className="abtn"
+                        href={downloadSrc(
+                          s.voiceUrl,
+                          `${projectName ? `${projectName} - ` : ""}S${i + 1} narration.mp3`,
+                        )}
+                        download
+                        title="Download this take"
+                        style={{ padding: "3px 8px", fontSize: 11.5, lineHeight: 1.4 }}
+                      >
+                        ⤓
+                      </a>
+                    )}
                   </div>
                   <textarea
                     value={draft ?? s.narration ?? ""}

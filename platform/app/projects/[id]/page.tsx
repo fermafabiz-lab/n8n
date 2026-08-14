@@ -387,6 +387,16 @@ export default async function ProductionRoom({
               >
                 Open / download
               </a>
+              {/* The narration on its own, from the same route the Voice
+                  review panel links to. Repeated here because that panel is
+                  several clicks away once a film is finished, and this is
+                  where a producer stands when they want the audio. Silent
+                  films have no takes to bundle. */}
+              {!silent && scenes.some((s) => s.voiceUrl) && (
+                <a className="btn" href={`/api/audio-bundle?project=${id}&chapter=all`} download>
+                  ⤓ Narration
+                </a>
+              )}
             </div>
             <SoundSettings
               projectId={id}
@@ -528,6 +538,7 @@ export default async function ProductionRoom({
         {audioPanel && (
           <AudioReview
             projectId={id}
+            projectName={project.name}
             scenes={scenes}
             mode={project.multiVoiceMode}
             language={project.language}

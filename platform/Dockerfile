@@ -21,6 +21,13 @@ ENV NODE_ENV=production \
     PORT=3000 \
     HOSTNAME=0.0.0.0
 
+# /api/audio-bundle joins a project's per-scene takes into one narration
+# file. The takes are separate mp3s on Drive and nothing in the pipeline ever
+# keeps a combined track, so the joining has to happen somewhere — here rather
+# than on the Railway render server, which would have meant giving the site
+# that server's URL and key as two more secrets.
+RUN apk add --no-cache ffmpeg
+
 RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
 
 # `output: "standalone"` emits server.js plus its traced deps, but leaves

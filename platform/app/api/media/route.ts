@@ -9,26 +9,13 @@
 // Drive-only by construction: the id is interpolated into a Drive URL, so this
 // cannot be pointed at an arbitrary host.
 
+import { safeFilename } from "@/lib/media";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const driveUrl = (id: string) =>
 	`https://drive.google.com/uc?export=download&id=${id}`;
-
-/**
- * A filename safe to put in a Content-Disposition header.
- *
- * Quotes and control characters would let the caller inject header syntax,
- * and a browser given a name with a newline in it does unpredictable things.
- * Empty after cleaning => no attachment header at all, rather than a
- * download called "".
- */
-const safeFilename = (raw: string): string =>
-	raw
-		.replace(/[^\w .\-()]+/g, "-")
-		.replace(/-+/g, "-")
-		.slice(0, 80)
-		.replace(/^[-. ]+|[-. ]+$/g, "");
 
 export async function GET(req: Request) {
 	const params = new URL(req.url).searchParams;

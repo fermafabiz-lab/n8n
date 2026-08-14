@@ -1515,6 +1515,32 @@ the pipeline already produces.
   opened rather than clicked — opt-in by query, because the same route feeds
   the players and an attachment header would make every clip download instead
   of play.
+- **The narration exists only as one take per scene, so downloading it whole
+  had to be built, not linked.** `Voiceover URL` is per scene and the takes are
+  joined in exactly one place — inside the final video, muxed under the
+  picture — so there was no way to get the narration on its own.
+  `/api/audio-bundle?project=…&chapter=all|hook|N` concatenates them with
+  ffmpeg and answers as an attachment. Four things are load-bearing:
+  it is a **GET**, because `<a download>` cannot POST; the site's password
+  middleware covers `/api`, so it is no more open than the page linking to it;
+  every input is passed through `aformat` before `concat`, because a
+  re-synthesized line can come back at a different sample rate and concat
+  refuses inputs that disagree; and there is **no gap between takes** — the
+  bundle is the narration as the cut plays it, and one that drifts from the
+  video is worse than none. Chapter is `floor(Ordine Scenă / 100)`, the same
+  rule as `AB Pick Voice` and `AudioReview`'s `chapterOf` — all three must
+  agree or "Chapter 2" downloads different lines from the ones labelled Ch. 2.
+- **That put ffmpeg in the site's own image** (`apk add ffmpeg` in the
+  Dockerfile runner stage). The alternative was the Railway render server,
+  which already has ffmpeg — but the site holds neither its URL nor its key,
+  so that route meant two new GitHub Secrets and a `remotion/**` push (which
+  rebuilds Railway and can kill a live render). A 3-second mp3 join is not
+  worth either.
+- **A per-scene download works only because `/api/media` is same-origin.** A
+  browser ignores `download` on a cross-origin link, so a raw Drive href opens
+  a tab instead of saving. `downloadSrc()` in `lib/media.ts` adds `?dl=<name>`
+  for proxied assets and returns CDN URLs untouched, since the attribute is
+  ignored there either way.
 - Count **approvals**, not asset existence, for pipeline progress. Counting
   clips that merely exist made "Video" tick green before review.
 - **…but scope that count to the scenes the pass staged, not to the film.**

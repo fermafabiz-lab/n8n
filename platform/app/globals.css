@@ -66,6 +66,23 @@ body {
   border-bottom: 1px solid var(--line);
   margin-bottom: 22px;
 }
+/* The projects bar is set in the page's own typeface — the one the hero
+   headline uses — rather than the mono every other eyebrow wears. It is the
+   only eyebrow you operate rather than read: it holds the filters, the view
+   toggle and Select, so it belongs to the interface, not to the labelling.
+   Sans needs a shade less tracking than mono at the same size to look evenly
+   spaced, and a little more weight to hold up at 11px. */
+.eyebrow.prow {
+  font-family: var(--f-ui), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+}
+/* Counts change on every refresh; tabular figures stop the tabs shifting. */
+.eyebrow.prow .c,
+.eyebrow.prow .n {
+  font-variant-numeric: tabular-nums;
+}
 .eyebrow .n {
   color: var(--dim);
   font-variant-numeric: tabular-nums;

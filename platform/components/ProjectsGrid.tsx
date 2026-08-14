@@ -134,7 +134,11 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
 
   return (
     <>
-      <div className="eyebrow">
+      {/* `prow` is a modifier, not a look of its own: the projects bar
+          wears the page's own typeface instead of the mono used by every
+          other eyebrow. `.eyebrow` is app-wide, so this has to be scoped or
+          every label on every page changes with it. */}
+      <div className="eyebrow prow">
         <span>Projects</span>
         <span className="ftabs" style={{ marginLeft: 24 }}>
           {/* A tab also stays visible while it IS the active filter — the

@@ -676,9 +676,21 @@ each piece handles it:
   length (no elastic retime). `Build Remotion Props` forces
   `showCaptions: false` for cinematic — `Script Scenă` holds the beat
   sheet, and captioning it would print stage directions on screen.
-- Untested end to end as of writing. Watch for: the site's Audio stage
-  shows green immediately (correct); hook title still works (on-screen
-  text only).
+- **The site had known this only on the /new form.** `noNarration` was read
+  by `CategoryPicker` and nowhere else, so the project page still built an
+  Audio step, still rendered the voice panel, and `ProductionActivity` still
+  announced "next pass starts with the voiceovers" for a film that has none.
+  The page now derives `silent` from the category and drops the Audio step
+  from the stepper entirely — not greyed, absent, because a chip you can
+  click into and find nothing is worse than no chip.
+- **A silent film cannot survive a voice un-approval, and `reopenStep` was
+  doing one.** The cascade cleared `Aprobare Voce` on any scene sent back to
+  the script step. On cinematic that builds a gate nothing can satisfy: n8n
+  waits for every voice to be approved, no TTS will ever run, and the site
+  offers no take to listen to — the project stops for good. Caught on
+  "Working engine" (`recrlkONIpkgkYxzw`), whose single scene was reopened and
+  never moved again. `reopenStep` now reads the project's category and leaves
+  the voice alone on a silent film. **Any new cascade must do the same.**
 
 ### The stage chain in Media Generation
 

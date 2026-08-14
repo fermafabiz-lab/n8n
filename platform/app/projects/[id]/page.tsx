@@ -38,6 +38,8 @@ function pipeline(
   projectDone: boolean,
   awaitingSettings: boolean,
   assembling: boolean,
+  /** Silent film: nobody speaks, so there is no voice step to review. */
+  silent: boolean,
 ) {
   const scenesApproved = scenes.filter((s) => s.sceneApproved).length;
   const imagesApproved = scenes.filter((s) => s.imageApproved).length;
@@ -49,7 +51,11 @@ function pipeline(
   const total = scenes.length || 1;
   const scenesDone = scenesApproved === total && total > 0;
   const imagesDone = imagesApproved === total && total > 0;
-  const audioDone = voicesApproved === total && total > 0;
+  // A silent film never records anything, so the voice gate is not a step
+  // it passes through — it is a step it does not have. Treating it as
+  // "done" keeps every downstream state (Video, Final touches) correct
+  // without special-casing each one.
+  const audioDone = silent || (voicesApproved === total && total > 0);
   const videoDone = videosApproved === total && total > 0;
   // Which step is actually waiting on the producer, as opposed to how much
   // of the film is finished. Media generation runs a batch at a time (n8n
@@ -74,12 +80,19 @@ function pipeline(
       name: imagesDone ? "Images" : `Images · ${imagesApproved}/${total}`,
       state: imagesDone ? "done" : scenesDone && !stagedImages ? "act" : "next",
     },
-    {
-      key: "audio",
-      name: audioDone ? "Audio" : `Audio · ${voicesApproved}/${total}`,
-      state:
-        audioDone ? "done" : stagedImages && !stagedVoices ? "act" : "next",
-    },
+    // Dropped entirely for a silent film rather than shown green: an "Audio"
+    // chip on a film with no narration is a step the producer keeps clicking
+    // into to find nothing.
+    ...(silent
+      ? []
+      : [
+          {
+            key: "audio",
+            name: audioDone ? "Audio" : `Audio · ${voicesApproved}/${total}`,
+            state:
+              audioDone ? "done" : stagedImages && !stagedVoices ? "act" : "next",
+          },
+        ]),
     {
       key: "video",
       name: videoDone ? "Video" : `Video · ${videosApproved}/${total}`,
@@ -140,11 +153,15 @@ export default async function ProductionRoom({
 
   const scenes = await getScenes(id);
   const assembling = /assembling/i.test(project.status);
+  // Cinematic and anything else marked noNarration: no TTS ever runs, so
+  // every voice gate on this page has to be treated as already passed.
+  const silent = getCategory(project.category).noNarration === true;
   const steps = pipeline(
     scenes,
     project.statusKind === "done",
     project.awaitingFinalSettings,
     assembling,
+    silent,
   );
 
   // Whether the voice gate is on the page. Computed once because SceneBoard
@@ -164,6 +181,10 @@ export default async function ProductionRoom({
   const withImage = scenes.filter((s) => s.imageUrl);
   const audioPanel =
     scenes.length > 0 &&
+    // A silent film has no takes to review, and its scenes are created with
+    // the voice already approved — the panel would be an empty gate the
+    // producer cannot pass.
+    !silent &&
     showing(
       "audio",
       scenes.every((s) => s.sceneApproved) &&
@@ -256,7 +277,9 @@ export default async function ProductionRoom({
             ? "scene-review"
             : scenes.some((s) => s.imageUrl && !s.imageApproved)
               ? "image-review"
-              : scenes.some((s) => s.voiceUrl) && scenes.some((s) => !s.voiceApproved)
+              : !silent &&
+                  scenes.some((s) => s.voiceUrl) &&
+                  scenes.some((s) => !s.voiceApproved)
                 ? "voice-review"
               : scenes.some((s) => s.videoUrl && !s.videoApproved)
                 ? "video-review"
@@ -494,6 +517,7 @@ export default async function ProductionRoom({
               alive={aliveNow}
               scenes={scenes}
               cap={MEDIA_BATCH_CAP}
+              silent={silent}
             />
           )}
 

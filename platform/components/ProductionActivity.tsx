@@ -46,11 +46,14 @@ export default function ProductionActivity({
   alive,
   scenes,
   cap,
+  silent = false,
 }: {
   projectId: string;
   alive: ExecutionSummary[] | null;
   scenes: Scene[];
   cap: number;
+  /** Silent film: no TTS runs, so the voice phases never happen. */
+  silent?: boolean;
 }) {
   const [msg, setMsg] = useState<ActionResult | null>(null);
   const [pending, startTransition] = useTransition();
@@ -69,8 +72,11 @@ export default function ProductionActivity({
   // asset is the one being worked on — presented as such, not as a fact.
   const noImage = batch.filter((s) => !s.imageUrl);
   const unappImage = batch.filter((s) => !s.imageApproved);
-  const noVoice = batch.filter((s) => !s.voiceUrl);
-  const unappVoice = batch.filter((s) => !s.voiceApproved);
+  // On a silent film nothing is ever synthesized, so both voice phases are
+  // empty rather than pending — otherwise the panel announces "next pass
+  // starts with the voiceovers" for a film that has none, forever.
+  const noVoice = silent ? [] : batch.filter((s) => !s.voiceUrl);
+  const unappVoice = silent ? [] : batch.filter((s) => !s.voiceApproved);
   const noClip = batch.filter((s) => !s.videoUrl);
   const unappClip = batch.filter((s) => !s.videoApproved);
   // `text` describes a batch that is RUNNING; `idle` the same stage when

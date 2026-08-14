@@ -6,7 +6,9 @@ import {
   cancelVideoRegen,
   reopenStep,
   restartVideoRegen,
+  restoreSceneVersion,
   saveImagePrompt,
+  saveSceneVersion,
   saveVideoPrompt,
   sceneAction,
   type ActionResult,
@@ -550,6 +552,18 @@ export default function SceneBoard({
                   >
                     Approve image
                   </button>
+                  {/* Generation overwrites in place, so this is the only way
+                      a picture survives being replaced. */}
+                  <button
+                    className="abtn"
+                    disabled={pending || !active.imageUrl}
+                    title="Keep this image, so you can come back to it if the next one is worse"
+                    onClick={() =>
+                      run(() => saveSceneVersion(projectId, active.id, "image"))
+                    }
+                  >
+                    ⤓ Save draft
+                  </button>
                   <button
                     className="abtn"
                     disabled={pending}
@@ -590,6 +604,77 @@ export default function SceneBoard({
                 per scene), and the line belongs to the Scenes step
                 (SceneReview's "↻ Regenerate scene"). Nothing was lost by
                 dropping them — one click on the stepper reaches either. */}
+            {/*
+              The way back from a bad re-roll. Only what the producer chose
+              to keep is here — the pipeline itself never keeps anything it
+              replaces, so this list is empty until "Save draft" is used.
+            */}
+            {active.versions.length > 0 && (
+              <div style={{ marginTop: 16, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
+                <label
+                  style={{ display: "block", fontSize: 12, color: "var(--dim)", marginBottom: 8 }}
+                >
+                  Saved drafts ({active.versions.length})
+                </label>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                  {[...active.versions].reverse().map((v) => (
+                    <div
+                      key={v.id}
+                      style={{
+                        width: 104,
+                        border: "1px solid var(--line2)",
+                        borderRadius: 8,
+                        overflow: "hidden",
+                        background: "var(--bg2)",
+                      }}
+                    >
+                      {v.kind === "image" && v.url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={v.url}
+                          alt=""
+                          style={{ width: "100%", height: 58, objectFit: "cover", display: "block" }}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            height: 58,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 20,
+                            color: "var(--dim)",
+                          }}
+                        >
+                          ▶
+                        </div>
+                      )}
+                      <div style={{ padding: "6px 7px 7px" }}>
+                        <div style={{ fontSize: 10.5, color: "var(--dim)", marginBottom: 5 }}>
+                          {v.kind === "image" ? "Image" : "Clip"}
+                          {v.at ? ` · ${new Date(v.at).toLocaleDateString()}` : ""}
+                        </div>
+                        <button
+                          className="abtn"
+                          disabled={pending}
+                          style={{ padding: "3px 8px", fontSize: 11, width: "100%" }}
+                          title={v.prompt ?? undefined}
+                          onClick={() =>
+                            run(() => restoreSceneVersion(projectId, active.id, v.id))
+                          }
+                        >
+                          Restore
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p style={{ margin: "8px 0 0", fontSize: 11.5, color: "var(--dim)" }}>
+                  Restoring brings back the prompt it was made with too, and
+                  sends it for approval again.
+                </p>
+              </div>
+            )}
             {/*
               What the clip is told to DO. Scripting writes it once and
               nothing else ever touches it — not the narration, not the image
@@ -702,6 +787,16 @@ export default function SceneBoard({
                   }
                 >
                   Approve video
+                </button>
+                <button
+                  className="abtn"
+                  disabled={pending || !active.videoUrl}
+                  title="Keep this clip, so you can come back to it if the next one is worse"
+                  onClick={() =>
+                    run(() => saveSceneVersion(projectId, active.id, "video"))
+                  }
+                >
+                  ⤓ Save draft
                 </button>
                 <button
                   className="abtn"

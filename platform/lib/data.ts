@@ -61,6 +61,29 @@ export interface EditingOptions {
   music: boolean;
 }
 
+/**
+ * A generated asset the producer chose to keep before replacing it.
+ *
+ * Regeneration overwrites in place — there is exactly one image and one clip
+ * per scene, and the pipeline never keeps what it replaces. So a re-roll that
+ * comes back worse used to be unrecoverable; this is the way back.
+ */
+export interface SceneVersion {
+  id: string;
+  kind: "image" | "video";
+  /** Playable/renderable URL, resolved at read time for image versions. */
+  url: string | null;
+  /** The prompt that produced it — how you tell two versions apart. */
+  prompt: string | null;
+  /**
+   * Flow media id of an image version. Restoring an image without it leaves
+   * the scene unable to generate video at all ("Prep Video Regen" refuses a
+   * scene with no Image Media ID), so it travels with the version.
+   */
+  mediaId: string | null;
+  at: string | null;
+}
+
 export interface Scene {
   id: string;
   order: number;
@@ -90,6 +113,8 @@ export interface Scene {
   evidenceRef: string | null;
   /** Scripting couldn't back this scene's factual claim with a real source. */
   needsFactCheck: boolean;
+  /** Drafts kept before a regeneration replaced them, newest last. */
+  versions: SceneVersion[];
   status: string;
   statusKind: StatusKind;
 }
@@ -201,6 +226,12 @@ const F = {
   sceneRegenVideo: ["Regenerează Video", "Regenereaza Video"],
   sceneRegenVoice: ["Regenerează Voce", "Regenereaza Voce"],
   sceneNote: ["Observații Scenă", "Observatii Scena"],
+  // Saved drafts. The bytes of an image version live in the attachment field
+  // (Airtable re-hosts them, so they outlive fal's expiring link); a video
+  // version needs no attachment because its Drive link does not expire.
+  sceneVersionFiles: ["Versiuni Imagine"],
+  sceneVersions: ["Versiuni Media"],
+  sceneMediaId: ["Image Media ID"],
   sceneEvidenceRef: ["Evidence Ref"],
   sceneNeedsFactCheck: ["Needs Fact Check"],
   sceneStatus: ["Status Producție Scenă", "Status"],
@@ -209,6 +240,55 @@ const F = {
 function pick(fields: Record<string, unknown>, names: string[]): unknown {
   for (const n of names) if (fields[n] !== undefined) return fields[n];
   return undefined;
+}
+
+/**
+ * Saved drafts, joined to their files.
+ *
+ * The metadata lives in a JSON field and the image bytes in an attachment
+ * field, because neither alone is enough: an attachment carries no prompt or
+ * Flow id, and a bare URL to fal or Airtable expires. Image entries name a
+ * file and get a freshly signed URL on every read; video entries carry their
+ * own Drive link, which does not expire.
+ */
+function readVersions(fields: Record<string, unknown>): SceneVersion[] {
+  const raw = pick(fields, F.sceneVersions);
+  if (typeof raw !== "string" || !raw.trim()) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return []; // Hand-edited into nonsense: show none rather than crash.
+  }
+  if (!Array.isArray(parsed)) return [];
+  const files = pick(fields, F.sceneVersionFiles);
+  const byName = new Map<string, string>();
+  if (Array.isArray(files)) {
+    for (const f of files as Array<{ filename?: string; url?: string }>) {
+      if (f?.filename && f?.url) byName.set(f.filename, f.url);
+    }
+  }
+  return parsed.flatMap((e): SceneVersion[] => {
+    const v = e as Record<string, unknown>;
+    const kind = v.kind === "video" ? "video" : "image";
+    const url =
+      kind === "video"
+        ? typeof v.url === "string"
+          ? v.url
+          : null
+        : (byName.get(String(v.file ?? "")) ?? null);
+    if (!url) return []; // File deleted from Airtable — drop the orphan.
+    return [
+      {
+        id: String(v.id ?? v.file ?? url),
+        kind,
+        url,
+        prompt: typeof v.prompt === "string" ? v.prompt : null,
+        mediaId: typeof v.mediaId === "string" ? v.mediaId : null,
+        at: typeof v.at === "string" ? v.at : null,
+      },
+    ];
+  });
 }
 
 function firstAttachmentUrl(v: unknown): string | null {
@@ -414,6 +494,7 @@ function toScene(r: AirtableRecord, index: number): Scene {
     note: (pick(r.fields, F.sceneNote) as string) ?? null,
     evidenceRef: (pick(r.fields, F.sceneEvidenceRef) as string) || null,
     needsFactCheck: Boolean(pick(r.fields, F.sceneNeedsFactCheck)),
+    versions: readVersions(r.fields),
     status: displayStatus(status),
     statusKind: kind,
   };
@@ -656,6 +737,7 @@ const DEMO_SCENES: Scene[] = Array.from({ length: 8 }, (_, i) => {
     note: null,
     evidenceRef: i === 1 ? "E1, E2" : null,
     needsFactCheck: false,
+    versions: [],
     voiceApproved: i < 3,
     imageApproved: i < 4,
     videoApproved: i < 2,
@@ -921,6 +1003,125 @@ export async function writeSceneScript(
  * watches for "Regenerare Text", rewrites narration + prompts, then sets
  * the status back and leaves the scene unapproved for review.
  */
+async function fetchSceneRecord(
+  sceneId: string,
+): Promise<Record<string, unknown>> {
+  const res = await fetch(
+    `https://api.airtable.com/v0/${BASE_ID}/${encodeURIComponent(SCENES_TABLE)}/${sceneId}`,
+    { headers: { Authorization: `Bearer ${API_KEY}` }, cache: "no-store" },
+  );
+  if (!res.ok) throw new Error(`Airtable ${res.status}: ${await res.text()}`);
+  const rec = (await res.json()) as { fields?: Record<string, unknown> };
+  return rec.fields ?? {};
+}
+
+/** Copy the live asset aside so a regeneration can be undone. */
+export async function saveVersionOfScene(
+  sceneId: string,
+  kind: "image" | "video",
+): Promise<{ saved: true } | { saved: false; reason: string }> {
+  const f = await fetchSceneRecord(sceneId);
+  const url =
+    kind === "image"
+      ? firstAttachmentUrl(pick(f, F.sceneImage))
+      : ((pick(f, F.sceneVideo) as string) || null) ??
+        firstAttachmentUrl(pick(f, F.sceneVideoAttachment));
+  if (!url) {
+    return {
+      saved: false,
+      reason: `There is no ${kind === "image" ? "image" : "clip"} on this scene yet — nothing to save.`,
+    };
+  }
+
+  const existing = readVersions(f);
+  const id = `v${Date.now().toString(36)}`;
+  const entry: Record<string, unknown> = {
+    id,
+    kind,
+    prompt:
+      (pick(f, kind === "image" ? F.sceneImagePrompt : F.sceneVideoPrompt) as string) ??
+      null,
+    at: new Date().toISOString(),
+  };
+  const patch: Record<string, unknown> = {};
+
+  if (kind === "image") {
+    // Hand Airtable the URL and it re-hosts the bytes; fal's own link is gone
+    // within hours, so a version that merely pointed at it would rot.
+    const file = `${id}.png`;
+    entry.file = file;
+    entry.mediaId = (pick(f, F.sceneMediaId) as string) ?? null;
+    const prior = pick(f, F.sceneVersionFiles);
+    const keep = Array.isArray(prior)
+      ? (prior as Array<{ id?: string }>).flatMap((a) => (a?.id ? [{ id: a.id }] : []))
+      : [];
+    patch["Versiuni Imagine"] = [...keep, { url, filename: file }];
+  } else {
+    // Drive links do not expire, so the clip needs no second copy.
+    entry.url = url;
+  }
+
+  // Metadata is stored raw rather than through readVersions() — that view
+  // drops entries whose file is missing, and round-tripping through it would
+  // quietly delete history the moment Airtable was slow to attach a file.
+  const rawPrior = pick(f, F.sceneVersions);
+  let list: unknown[] = [];
+  if (typeof rawPrior === "string" && rawPrior.trim()) {
+    try {
+      const p = JSON.parse(rawPrior);
+      if (Array.isArray(p)) list = p;
+    } catch {
+      /* unreadable history: start a fresh list rather than lose the save */
+    }
+  }
+  void existing;
+  patch["Versiuni Media"] = JSON.stringify([...list, entry]);
+  await airtablePatch(SCENES_TABLE, sceneId, patch);
+  return { saved: true };
+}
+
+/** Make a saved draft the live asset again. */
+export async function restoreVersionOfScene(
+  sceneId: string,
+  versionId: string,
+): Promise<
+  { restored: true; kind: "image" | "video" } | { restored: false; reason: string }
+> {
+  const f = await fetchSceneRecord(sceneId);
+  const version = readVersions(f).find((v) => v.id === versionId);
+  if (!version || !version.url) {
+    return {
+      restored: false,
+      reason: "That saved draft is no longer available — its file was removed from Airtable.",
+    };
+  }
+
+  if (version.kind === "image") {
+    const patch: Record<string, unknown> = {
+      "Imagine Scenă": [{ url: version.url }],
+      // What is on screen changed, so both the picture and the clip built
+      // from the previous one go back for review.
+      "Aprobare Imagine": false,
+      "Aprobare Video": false,
+    };
+    // Restoring without these leaves a scene that looks right and cannot be
+    // filmed: video generation refuses a scene with no Flow media id, and a
+    // later re-roll would work from a prompt that made a different picture.
+    if (version.mediaId) patch["Image Media ID"] = version.mediaId;
+    if (version.prompt) patch["Imagine First Frame"] = version.prompt;
+    await airtablePatch(SCENES_TABLE, sceneId, patch);
+    return { restored: true, kind: "image" };
+  }
+
+  const patch: Record<string, unknown> = {
+    "Scene Final URL": version.url,
+    "Aprobare Video": false,
+  };
+  if (version.prompt) patch["Video Scenă URL"] = version.prompt;
+  await airtablePatch(SCENES_TABLE, sceneId, patch);
+  return { restored: true, kind: "video" };
+}
+
 export async function requestSceneRewrite(sceneId: string): Promise<void> {
   await airtablePatch(SCENES_TABLE, sceneId, {
     "Status Producție Scenă": "Regenerare Text",

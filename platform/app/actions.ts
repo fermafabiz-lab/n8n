@@ -14,6 +14,8 @@ import {
   releaseSceneRewrite,
   readSceneNarration,
   readSceneVideoInputs,
+  saveVersionOfScene,
+  restoreVersionOfScene,
   getProject,
   findRecentProjectByName,
   writeScriptFields,
@@ -577,6 +579,75 @@ export async function cancelVideoRegen(
     return {
       ok: true,
       message: "Cancelled — the scene keeps its current clip and is back in review.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/**
+ * Keep the asset that is on screen right now, before something replaces it.
+ *
+ * Every generation overwrites in place: one image and one clip per scene, and
+ * the pipeline never keeps what it replaces. So a re-roll that came back
+ * worse than the original was simply lost. This is the only place in the
+ * system that copies an asset aside instead of over.
+ *
+ * An image is copied INTO Airtable (attachment), because fal's link expires
+ * within hours and a saved draft that rots is worse than none. A clip already
+ * lives on Drive behind a permanent link, so its URL is enough.
+ */
+export async function saveSceneVersion(
+  projectId: string,
+  sceneId: string,
+  kind: "image" | "video",
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    const r = await saveVersionOfScene(sceneId, kind);
+    if (!r.saved) return { ok: false, message: r.reason };
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message: `Draft saved — you can bring this ${kind === "image" ? "image" : "clip"} back after a regeneration.`,
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/**
+ * Put a saved draft back as the live asset.
+ *
+ * Restoring an image also restores its Flow media id and the prompt that made
+ * it — without the id the scene cannot generate video at all, and without the
+ * prompt a later regeneration would re-roll from a description that no longer
+ * matches the picture on screen.
+ *
+ * Approval is dropped rather than carried over: what is on screen changed, so
+ * it deserves another look, and for an image the clip built from the previous
+ * one is now stale too.
+ */
+export async function restoreSceneVersion(
+  projectId: string,
+  sceneId: string,
+  versionId: string,
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    const r = await restoreVersionOfScene(sceneId, versionId);
+    if (!r.restored) return { ok: false, message: r.reason };
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message:
+        r.kind === "image"
+          ? "Image restored, with the prompt and the Flow id it was made with. Approve it again when you're happy."
+          : "Clip restored, with the shot direction it was made with. Approve it again when you're happy.",
     };
   } catch (e) {
     return { ok: false, message: friendlyError(e) };

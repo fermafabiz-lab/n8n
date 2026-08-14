@@ -1547,6 +1547,20 @@ the pipeline already produces.
   in-flight flags from the other, and `getAliveProduction()` answering for
   both. Turning the Vercel project off is the actual fix; the fallback only
   means the producer is not stranded when they land there.
+- **The stale copy now says so itself** (`StaleCopyBanner`, any `*.vercel.app`
+  host). Two things about how, both deliberate. It is a CLIENT check on
+  `location.host`, not the Host header: `headers()` in the root layout is
+  correct on the first paint and opts the **entire app** out of static
+  rendering — `/login` and `/new` both stopped being prerendered, which the
+  build output shows and nothing else warns about. A temporary banner must not
+  change how every page is served. And it keys off the vercel.app suffix
+  rather than a canonical-host env var, so it needs no configuration and
+  cannot misfire on the real site.
+- **The Vercel MCP connector cannot delete that project**, so this is still a
+  manual step: the connector's grant covers the `FermaFabiz` team, which has
+  ZERO projects, and the personal scope answers 403. The deployment lives in
+  the personal account. Dashboard → the `n8n` project → Settings → Delete, or
+  at minimum disconnect its Git integration so it stops rebuilding this trunk.
 - **The pure-Node join is a fallback and not a replacement, and the reason is
   measured.** Every mp3 carries encoder delay/padding frames, trimmed by a
   decoder using the gapless info in the Xing header — the very header a frame

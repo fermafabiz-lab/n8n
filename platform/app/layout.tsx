@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Fraunces, IBM_Plex_Mono, Inter_Tight, Poppins } from "next/font/google";
 import ProductionTicker from "@/components/ProductionTicker";
+import StaleCopyBanner from "@/components/StaleCopyBanner";
 import "./globals.css";
 
 /**
@@ -59,6 +60,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className={`${display.variable} ${ui.variable} ${mono.variable} ${title.variable}`}>
+        <StaleCopyBanner />
         <div className="glow g1" />
         <div className="glow g2" />
         <div className="vignette" />

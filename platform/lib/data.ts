@@ -83,6 +83,15 @@ export interface SceneVersion {
    */
   mediaId: string | null;
   at: string | null;
+  /** Filed by a replacing path rather than by the "Save draft" button. */
+  auto: boolean;
+  /**
+   * The asset that was live immediately before the current one — what a
+   * producer means by "the previous generation". At most one per kind, and
+   * only an automatic keep can claim it: a manual save files the asset that
+   * is still on the scene, which is not a previous anything.
+   */
+  last: boolean;
 }
 
 export interface Scene {
@@ -269,7 +278,7 @@ function readVersions(fields: Record<string, unknown>): SceneVersion[] {
       if (f?.filename && f?.url) byName.set(f.filename, f.url);
     }
   }
-  return parsed.flatMap((e): SceneVersion[] => {
+  const out = parsed.flatMap((e): SceneVersion[] => {
     const v = e as Record<string, unknown>;
     const kind = v.kind === "video" ? "video" : "image";
     const url =
@@ -287,9 +296,28 @@ function readVersions(fields: Record<string, unknown>): SceneVersion[] {
         prompt: typeof v.prompt === "string" ? v.prompt : null,
         mediaId: typeof v.mediaId === "string" ? v.mediaId : null,
         at: typeof v.at === "string" ? v.at : null,
+        auto: v.auto === true,
+        last: v.last === true,
       },
     ];
   });
+
+  // Drafts saved before the marker existed carry no `last`, and waiting for
+  // the next regeneration to label one would leave old scenes reading as if
+  // nothing had ever been kept automatically. The newest automatic keep is
+  // the best available answer for those, and the guess is dropped the moment
+  // a real marker is written.
+  for (const kind of ["image", "video"] as const) {
+    const ofKind = out.filter((v) => v.kind === kind);
+    if (ofKind.some((v) => v.last)) continue;
+    for (let i = ofKind.length - 1; i >= 0; i--) {
+      if (ofKind[i].auto) {
+        ofKind[i].last = true;
+        break;
+      }
+    }
+  }
+  return out;
 }
 
 function firstAttachmentUrl(v: unknown): string | null {
@@ -1089,13 +1117,24 @@ export async function saveVersionOfScene(
   // Already kept. Checked against EVERY draft of this kind, not just the
   // newest: restoring A then B then A again would otherwise file a second
   // copy of A each time round.
-  if (list.some((e) => e?.kind === kind && e?.key === key)) {
-    return opts.auto
-      ? { saved: true, dropped: 0 }
-      : {
-          saved: false,
-          reason: `This ${kind === "image" ? "image" : "clip"} is already saved as a draft.`,
-        };
+  const existing = list.find((e) => e?.kind === kind && e?.key === key);
+  if (existing) {
+    if (!opts.auto) {
+      return {
+        saved: false,
+        reason: `This ${kind === "image" ? "image" : "clip"} is already saved as a draft.`,
+      };
+    }
+    // Nothing new to file — but this IS the asset being replaced right now,
+    // so it takes the "Last generation" marker over from whoever held it.
+    // Without this the label would go stale exactly when de-duplication bites:
+    // restore an older draft, then regenerate, and the asset just replaced is
+    // one that was already on file.
+    const moved = list.map((e) => (e?.kind === kind ? { ...e, last: e === existing } : e));
+    await airtablePatch(SCENES_TABLE, sceneId, {
+      "Versiuni Media": JSON.stringify(moved),
+    });
+    return { saved: true, dropped: 0 };
   }
 
   const id = `v${Date.now().toString(36)}`;
@@ -1104,6 +1143,10 @@ export async function saveVersionOfScene(
     kind,
     key,
     auto: opts.auto === true,
+    // Only an automatic keep is a "previous generation": it files the asset
+    // a replacement is about to overwrite. A manual "Save draft" files the
+    // asset that is still live, so it claims nothing.
+    ...(opts.auto ? { last: true } : {}),
     prompt:
       (pick(f, kind === "image" ? F.sceneImagePrompt : F.sceneVideoPrompt) as string) ??
       null,
@@ -1122,7 +1165,10 @@ export async function saveVersionOfScene(
   }
 
   // Oldest-first within the kind, so the cap drops the least useful draft.
-  const next = [...list, entry];
+  const next = [
+    ...(opts.auto ? list.map((e) => (e?.kind === kind ? { ...e, last: false } : e)) : list),
+    entry,
+  ];
   const ofKind = next.filter((e) => e?.kind === kind);
   const drop = new Set(
     ofKind.slice(0, Math.max(0, ofKind.length - MAX_VERSIONS_PER_KIND)).map((e) => e.id),

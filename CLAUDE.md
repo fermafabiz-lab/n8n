@@ -1345,9 +1345,6 @@ the pipeline already produces.
   producer then picks what to change. The initial script has no such button:
   it is written for the whole project, not per scene, and `restart-scripting`
   is its door.
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 - **…and the script is the one step where approval is FINAL.** Every per-scene
   step can be reopened; the script cannot, because the entire film is derived
   from it — chapters, scenes, narration, image prompts — so editing it
@@ -1361,9 +1358,6 @@ the pipeline already produces.
   pipeline with no door at all — and the sessionStorage draft is DROPPED when
   locked instead of restored, or an unsaved pre-approval edit reappears on top
   of the approved text and reads as what production is running on.
-=======
-=======
-=======
 - **Drafts are filed automatically, and the de-duplication is what makes that
   bearable.** Every path that replaces an asset — image regen, video regen,
   `restartVideoRegen`, and restoring an older draft — calls `autoKeep` first,
@@ -1374,7 +1368,21 @@ the pipeline already produces.
   Airtable attachment** — those are re-signed on every read, so comparing
   them would file a duplicate on every single regeneration. `MAX_VERSIONS_PER_KIND`
   (12) bounds the growth and the drop is reported, not silent.
->>>>>>> claude/verify-conversation-connectors-qmhekv
+- **One draft per kind is a place, not a date, and it needs a marker of its
+  own.** Since every regeneration files one, the newest automatic keep is
+  always "the thing that was on this scene before the current one" — which is
+  the card reached for most, and a timestamp is a poor name for it. It is
+  labelled **Last generation** instead. The obvious implementation ("newest
+  entry with `auto: true`") is wrong the moment de-duplication bites: restore
+  an older draft, then regenerate, and the asset just replaced is one that was
+  already on file, so no new entry is written and the label stays on the wrong
+  card. So the marker is an explicit `last` flag on exactly one entry per kind,
+  moved by EVERY automatic keep including the de-duplicated one — which is why
+  that branch now writes to Airtable where it used to return early. A manual
+  "Save draft" never claims it: it files the asset that is still live, which is
+  not a previous anything. `readVersions` falls back to the newest `auto` entry
+  for drafts saved before the flag existed, and drops the guess as soon as a
+  real marker is written.
 - **Nothing in the pipeline keeps what it replaces.** There is one image and
   one clip per scene, and every regeneration overwrites in place — so a
   re-roll that came back worse was unrecoverable. "⤓ Save draft" copies the
@@ -1388,7 +1396,6 @@ the pipeline already produces.
   `Image Media ID` and prompt as well — without the Flow id the scene can no
   longer generate video at all (`Prep Video Regen` refuses it), which would
   look like the restore having silently broken the scene.
->>>>>>> claude/verify-conversation-connectors-qmhekv
 - **A scene has THREE inputs, and the site used to show two.** `Script Scenă`
   is the line, `Imagine First Frame` is the picture, and `Video Scenă URL` —
   despite the name — is the MOTION prompt handed to Veo. The finished clip
@@ -1404,7 +1411,6 @@ the pipeline already produces.
   it as "Shot direction" (`saveVideoPrompt`), and saving it un-approves the
   clip. `Evaluate Video Approval` re-reads the field every polling cycle, so
   an edit lands on the next regeneration.
->>>>>>> claude/verify-conversation-connectors-qmhekv
 - **Refusal notes get translated to next steps** by `platform/lib/refusals.ts`
   (wired into ProductionActivity and SceneBoard). Match only literal pipeline
   codes, never bare words or bare numbers: `\bminor\b` hit ordinary reviewer

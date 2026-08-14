@@ -641,9 +641,11 @@ export default function SceneBoard({
                 (SceneReview's "↻ Regenerate scene"). Nothing was lost by
                 dropping them — one click on the stepper reaches either. */}
             {/*
-              The way back from a bad re-roll. Only what the producer chose
-              to keep is here — the pipeline itself never keeps anything it
-              replaces, so this list is empty until "Save draft" is used.
+              The way back from a bad re-roll. Every replacing path files the
+              outgoing asset here itself, so the list fills without anyone
+              pressing anything; "Save draft" is only for keeping one on
+              purpose. Exactly one card per kind carries the "Last generation"
+              marker — the asset that was live immediately before this one.
             */}
             {stepVersions.length > 0 && (
               <div style={{ marginTop: 16, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
@@ -706,17 +708,26 @@ export default function SceneBoard({
                       <div style={{ padding: "6px 7px 7px" }}>
                         <div style={{ fontSize: 10.5, color: "var(--dim)", marginBottom: 5 }}>
                           {v.kind === "image" ? "Image" : "Clip"}
-                          {/* The hour matters more than the date: several
-                              drafts of one scene are usually saved minutes
-                              apart, and a bare date made them identical. */}
-                          {v.at
-                            ? ` · ${new Date(v.at).toLocaleString(undefined, {
-                                day: "2-digit",
-                                month: "2-digit",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}`
-                            : ""}
+                          {/* One draft per kind is not a date to the producer,
+                              it is a place: the thing that was on the scene
+                              before this one. Naming it beats timestamping it,
+                              and it is the card reached for most. */}
+                          {v.last ? (
+                            <span style={{ color: "var(--acc)" }}> · Last generation</span>
+                          ) : v.at ? (
+                            /* For the rest the hour matters more than the
+                               date: several drafts of one scene are usually
+                               saved minutes apart, and a bare date made them
+                               identical. */
+                            ` · ${new Date(v.at).toLocaleString(undefined, {
+                              day: "2-digit",
+                              month: "2-digit",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}`
+                          ) : (
+                            ""
+                          )}
                         </div>
                         <div style={{ display: "flex", gap: 4 }}>
                           <button
@@ -744,7 +755,9 @@ export default function SceneBoard({
                 </div>
                 <p style={{ margin: "8px 0 0", fontSize: 11.5, color: "var(--dim)" }}>
                   Every regeneration files the asset it replaces here on its
-                  own — the button is for keeping one you like on purpose.
+                  own — <span style={{ color: "var(--acc)" }}>Last generation</span>{" "}
+                  is the one that was on this scene just before the current
+                  one. The button is for keeping any other on purpose.
                   Restoring brings back the prompt it was made with too, and
                   sends it for approval again.
                 </p>

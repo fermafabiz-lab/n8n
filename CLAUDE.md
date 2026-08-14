@@ -1536,6 +1536,27 @@ the pipeline already produces.
   so that route meant two new GitHub Secrets and a `remotion/**` push (which
   rebuilds Railway and can kill a live render). A 3-second mp3 join is not
   worth either.
+- **…and a binary in the image is a dependency on WHICH COPY of the site you
+  opened.** The first report of the feature was a 500 — from
+  `n8n-chi-azure.vercel.app`, the pre-Hetzner deployment, which is still live
+  and still auto-building this trunk. Everything else on it works, because
+  everything else is Airtable and n8n over HTTP; only the one route that
+  shells out to a binary cannot. `lib/mp3.ts` is the answer: no ffmpeg → join
+  the frames in pure Node. **Two live copies of the site writing to one
+  Airtable and one n8n is the real hazard here** — approvals from one,
+  in-flight flags from the other, and `getAliveProduction()` answering for
+  both. Turning the Vercel project off is the actual fix; the fallback only
+  means the producer is not stranded when they land there.
+- **The pure-Node join is a fallback and not a replacement, and the reason is
+  measured.** Every mp3 carries encoder delay/padding frames, trimmed by a
+  decoder using the gapless info in the Xing header — the very header a frame
+  concat has to strip. So each join gains ~36ms of silence: three takes came
+  out 4.2006s through ffmpeg and 4.3106s through the Node path (parts decode
+  to 4.2018s of real audio). Inaudible per join, but on a fifteen-scene film
+  it is about half a second of drift against the cut. Verify this by decoding
+  to WAV and counting samples — the container's own duration field will not
+  show it, and the remotion-bundled ffmpeg has no `s16le` muxer, so decode to
+  `-c:a pcm_s16le` in a `.wav` rather than to a pipe.
 - **A per-scene download works only because `/api/media` is same-origin.** A
   browser ignores `download` on a cross-origin link, so a raw Drive href opens
   a tab instead of saving. `downloadSrc()` in `lib/media.ts` adds `?dl=<name>`

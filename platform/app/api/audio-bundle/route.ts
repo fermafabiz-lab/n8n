@@ -19,6 +19,7 @@ import os from "os";
 import path from "path";
 import { getProject, getScenes } from "@/lib/data";
 import { driveId, safeFilename } from "@/lib/media";
+import { concatMp3 } from "@/lib/mp3";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,6 +42,26 @@ const run = (cmd: string, args: string[], timeoutMs = 120_000) =>
 			else resolve();
 		});
 	});
+
+/**
+ * Is there an ffmpeg on this host?
+ *
+ * The site's own image installs one, but the same code also runs where none
+ * exists — an old Vercel copy of this app, or a bare `next dev` — and there
+ * the download answered 500 with nothing a producer could act on. Probed once
+ * per process rather than per request, and never assumed: a missing binary is
+ * a fallback, not an error.
+ */
+let ffmpegProbe: Promise<boolean> | null = null;
+const hasFfmpeg = (): Promise<boolean> => {
+	if (!ffmpegProbe) {
+		ffmpegProbe = run("ffmpeg", ["-version"], 5_000).then(
+			() => true,
+			() => false,
+		);
+	}
+	return ffmpegProbe;
+};
 
 /**
  * Scene order encodes the chapter — 101/102 are chapter 1, 201 chapter 2,
@@ -86,7 +107,7 @@ export async function GET(req: Request) {
 
 	const work = await fs.mkdtemp(path.join(os.tmpdir(), "narration-"));
 	try {
-		const files: string[] = [];
+		const parts: Buffer[] = [];
 		let total = 0;
 		for (const [i, s] of takes.entries()) {
 			const id = driveId(s.voiceUrl as string) as string;
@@ -104,31 +125,43 @@ export async function GET(req: Request) {
 			const buf = Buffer.from(await res.arrayBuffer());
 			total += buf.length;
 			if (total > MAX_TOTAL_BYTES) return bad(413, "narration too large to bundle");
-			const f = path.join(work, `t${String(i).padStart(3, "0")}.mp3`);
-			await fs.writeFile(f, buf);
-			files.push(f);
+			parts.push(buf);
 		}
 
-		// Same graph as /tts-multi on the render server: normalise every take
-		// to one sample rate and channel count first, because concat refuses
-		// inputs that disagree, and a re-synthesized line can come back with a
-		// different one from its neighbours.
-		//
-		// No gap between takes: this is the narration as the film cuts it, and
-		// a bundle that drifts from the video is worse than no bundle.
-		const out = path.join(work, "out.mp3");
-		const args = ["-y"];
-		for (const f of files) args.push("-i", f);
-		const parts = files.map(
-			(_, i) => `[${i}:a]aformat=sample_rates=44100:channel_layouts=mono[s${i}]`,
-		);
-		parts.push(
-			`${files.map((_, i) => `[s${i}]`).join("")}concat=n=${files.length}:v=0:a=1[out]`,
-		);
-		args.push("-filter_complex", parts.join(";"), "-map", "[out]", "-b:a", "128k", out);
-		await run("ffmpeg", args);
-
-		const bytes = await fs.readFile(out);
+		// No gap between takes, either way: this is the narration as the film
+		// cuts it, and a bundle that drifts from the video is worse than none.
+		let bytes: Buffer;
+		if (await hasFfmpeg()) {
+			// Preferred. Same graph as /tts-multi on the render server:
+			// normalise every take to one sample rate and channel count before
+			// concat, because concat refuses inputs that disagree and a
+			// re-synthesized line can come back unlike its neighbours.
+			const files: string[] = [];
+			for (const [i, buf] of parts.entries()) {
+				const f = path.join(work, `t${String(i).padStart(3, "0")}.mp3`);
+				await fs.writeFile(f, buf);
+				files.push(f);
+			}
+			const out = path.join(work, "out.mp3");
+			const args = ["-y"];
+			for (const f of files) args.push("-i", f);
+			const graph = files.map(
+				(_, i) => `[${i}:a]aformat=sample_rates=44100:channel_layouts=mono[s${i}]`,
+			);
+			graph.push(
+				`${files.map((_, i) => `[s${i}]`).join("")}concat=n=${files.length}:v=0:a=1[out]`,
+			);
+			args.push("-filter_complex", graph.join(";"), "-map", "[out]", "-b:a", "128k", out);
+			await run("ffmpeg", args);
+			bytes = await fs.readFile(out);
+		} else {
+			// No ffmpeg on this host. Frame-level concatenation instead — see
+			// lib/mp3.ts for why the tags and the Xing header have to go, and
+			// for the one thing this path cannot do: it keeps each take's
+			// encoder padding, so every join gains ~36ms of silence. Inaudible,
+			// but not sample-exact, which is why it is the fallback.
+			bytes = concatMp3(parts);
+		}
 		const label =
 			chapter === "all"
 				? "narration"

@@ -444,8 +444,8 @@ export default function AudioReview({
               </a>
             ))}
           <span style={{ fontSize: 11.5, color: "var(--dim)" }}>
-            One mp3, takes joined in scene order — no gaps, exactly as the cut
-            plays them.
+            One mp3, takes joined back to back in scene order — the narration
+            as the cut plays it.
           </span>
         </div>
       )}

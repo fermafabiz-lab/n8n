@@ -184,6 +184,10 @@ export default function SceneBoard({
   const [feedback, setFeedback] = useState("");
   // Shot-direction drafts: the stored text until edited.
   const [videoDrafts, setVideoDrafts] = useState<Record<string, string>>({});
+  // Draft being previewed in the big monitor. Comparing a saved take against
+  // the live one is the whole point of keeping drafts, and that cannot be
+  // done in a 128px card — so the preview borrows the player above.
+  const [previewId, setPreviewId] = useState<string | null>(null);
   // Image-prompt drafts, kept in sessionStorage so the 10s auto-refresh
   // can't quietly reset a rewritten prompt to the stored one.
   const promptKey = `vf-imgprompt-drafts:${projectId}`;
@@ -251,6 +255,9 @@ export default function SceneBoard({
   // what a scene still owes — so clicking "Images" changes nothing, instead
   // of flashing the clip first.
   const showClip = step !== "images" && Boolean(active?.videoUrl);
+  // Selecting another scene must drop a preview belonging to the old one,
+  // otherwise the monitor keeps showing a draft the inspector no longer lists.
+  const preview = active?.versions.find((v) => v.id === previewId) ?? null;
 
   // The two blocks this board owns. Voice lives in AudioReview, and the
   // narration itself in SceneReview — neither belongs here.
@@ -307,8 +314,22 @@ export default function SceneBoard({
     <div className="stage">
       <div>
         <div className={`monitor${portrait ? " portrait" : ""}`}>
-          <div className={`scr${showClip ? " video" : ""}`}>
-            {showClip && active?.videoUrl ? (
+          <div className={`scr${(preview ? preview.kind === "video" : showClip) ? " video" : ""}`}>
+            {preview?.url ? (
+              // A draft under review takes the monitor, so it can be judged at
+              // the same size as the asset it would replace.
+              preview.kind === "video" ? (
+                <MediaPlayer key={preview.id} url={preview.url} portrait={portrait} fill />
+              ) : (
+                <>
+                  <div
+                    className="art"
+                    style={{ backgroundImage: `url(${preview.url})` }}
+                  />
+                  <span className="tc">{active?.label ?? "—"}</span>
+                </>
+              )
+            ) : showClip && active?.videoUrl ? (
               // The clip plays in the big monitor so the whole frame is
               // visible; the inspector keeps only the approve/regen controls.
               <MediaPlayer
@@ -621,50 +642,87 @@ export default function SceneBoard({
                     <div
                       key={v.id}
                       style={{
-                        width: 104,
-                        border: "1px solid var(--line2)",
+                        width: 128,
+                        border: `1px solid ${previewId === v.id ? "var(--acc)" : "var(--line2)"}`,
                         borderRadius: 8,
                         overflow: "hidden",
                         background: "var(--bg2)",
                       }}
                     >
-                      {v.kind === "image" && v.url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={v.url}
-                          alt=""
-                          style={{ width: "100%", height: 58, objectFit: "cover", display: "block" }}
-                        />
-                      ) : (
-                        <div
-                          style={{
-                            height: 58,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontSize: 20,
-                            color: "var(--dim)",
-                          }}
-                        >
-                          ▶
-                        </div>
-                      )}
+                      {/*
+                        A clip draft used to be an anonymous ▶ on a grey card,
+                        so two saves of the same scene were indistinguishable.
+                        A muted <video> seeked just past the start renders its
+                        own first frame, which is the only thumbnail we have —
+                        nothing in the pipeline produces a poster image.
+                      */}
+                      <button
+                        type="button"
+                        onClick={() => setPreviewId(previewId === v.id ? null : v.id)}
+                        title="Show this draft in the player above"
+                        style={{
+                          display: "block",
+                          width: "100%",
+                          padding: 0,
+                          border: "none",
+                          background: "none",
+                          cursor: "pointer",
+                        }}
+                      >
+                        {v.kind === "image" && v.url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={v.url}
+                            alt=""
+                            style={{ width: "100%", height: 72, objectFit: "cover", display: "block" }}
+                          />
+                        ) : v.url ? (
+                          <video
+                            src={`${mediaSrc(v.url)}#t=0.5`}
+                            muted
+                            playsInline
+                            preload="metadata"
+                            style={{ width: "100%", height: 72, objectFit: "cover", display: "block" }}
+                          />
+                        ) : (
+                          <div style={{ height: 72 }} />
+                        )}
+                      </button>
                       <div style={{ padding: "6px 7px 7px" }}>
                         <div style={{ fontSize: 10.5, color: "var(--dim)", marginBottom: 5 }}>
                           {v.kind === "image" ? "Image" : "Clip"}
-                          {v.at ? ` · ${new Date(v.at).toLocaleDateString()}` : ""}
+                          {/* The hour matters more than the date: several
+                              drafts of one scene are usually saved minutes
+                              apart, and a bare date made them identical. */}
+                          {v.at
+                            ? ` · ${new Date(v.at).toLocaleString(undefined, {
+                                day: "2-digit",
+                                month: "2-digit",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}`
+                            : ""}
                         </div>
-                        <button
-                          className="abtn"
-                          disabled={pending}
-                          style={{ padding: "3px 8px", fontSize: 11, width: "100%" }}
-                          title={v.prompt ?? undefined}
-                          onClick={() =>
-                            run(() => restoreSceneVersion(projectId, active.id, v.id))
-                          }
-                        >
-                          Restore
-                        </button>
+                        <div style={{ display: "flex", gap: 4 }}>
+                          <button
+                            className="abtn"
+                            style={{ padding: "3px 6px", fontSize: 11, flex: 1 }}
+                            onClick={() => setPreviewId(previewId === v.id ? null : v.id)}
+                          >
+                            {previewId === v.id ? "Close" : "Preview"}
+                          </button>
+                          <button
+                            className="abtn"
+                            disabled={pending}
+                            style={{ padding: "3px 6px", fontSize: 11, flex: 1 }}
+                            title={v.prompt ?? undefined}
+                            onClick={() =>
+                              run(() => restoreSceneVersion(projectId, active.id, v.id))
+                            }
+                          >
+                            Restore
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}

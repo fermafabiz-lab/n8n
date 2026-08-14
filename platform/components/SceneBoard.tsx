@@ -596,6 +596,8 @@ export default function SceneBoard({
                   ))}
                 </div>
                 <p style={{ margin: "8px 0 0", fontSize: 11.5, color: "var(--dim)" }}>
+                  Every regeneration files the asset it replaces here on its
+                  own — the button is for keeping one you like on purpose.
                   Restoring brings back the prompt it was made with too, and
                   sends it for approval again.
                 </p>

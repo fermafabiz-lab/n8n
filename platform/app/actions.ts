@@ -46,6 +46,21 @@ function friendlyError(e: unknown): string {
   return msg;
 }
 
+/**
+ * Keep the outgoing asset before anything replaces it.
+ *
+ * The manual button only helps the producer who remembers to press it, and
+ * the moment you need a draft is exactly the moment you did not expect to —
+ * so every path that replaces an image or a clip files one first. Already
+ * saved assets are de-duplicated, so this stays quiet.
+ *
+ * Deliberately swallows its errors: this is a safety net, and a safety net
+ * that can block the regeneration it protects is worse than none.
+ */
+async function autoKeep(sceneId: string, kind: "image" | "video"): Promise<void> {
+  await saveVersionOfScene(sceneId, kind, { auto: true }).catch(() => {});
+}
+
 export async function sceneAction(
   projectId: string,
   sceneId: string,
@@ -61,6 +76,9 @@ export async function sceneAction(
       // n8n appends this to the generation prompt, then clears it.
       await writeSceneFeedback(sceneId, feedback.trim());
     }
+    // Before the replacement is set in motion, not after: once n8n overwrites
+    // the field the old asset is unreachable.
+    if (action === "regenerate") await autoKeep(sceneId, kind);
     await writeSceneApproval(sceneId, kind, action);
 
     // Image regeneration runs on its own webhook, so it no longer depends on

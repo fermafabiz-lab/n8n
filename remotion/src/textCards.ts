@@ -181,6 +181,15 @@ export type BuildCardsOptions = {
 	chapterCardsOn: boolean;
 	/** Seconds the hook title occupies, so a card never lands under it. */
 	hookSeconds: number;
+	/**
+	 * False on a silent film, where `narratorText` is an unspoken shot note.
+	 * A figure card's whole premise is "a number the narration SPEAKS, set
+	 * large because a listener cannot hold it" — with nothing spoken the
+	 * premise is gone, and what the pattern would actually catch is a year or
+	 * a duration out of a stage direction. Claim cards are unaffected: their
+	 * text comes from the Evidence rows, not from the scene.
+	 */
+	narrationIsSpoken?: boolean;
 };
 
 /**
@@ -188,7 +197,14 @@ export type BuildCardsOptions = {
  * planner's job — this decides only what exists and how long it needs.
  */
 export const buildTextCards = (o: BuildCardsOptions): TextCardSpec[] => {
-	const {scenes, evidence = [], explicit, chapterCardsOn, hookSeconds} = o;
+	const {
+		scenes,
+		evidence = [],
+		explicit,
+		chapterCardsOn,
+		hookSeconds,
+		narrationIsSpoken = true,
+	} = o;
 	if (explicit?.length) return [...explicit].sort((a, b) => a.sceneIndex - b.sceneIndex);
 
 	const byRef = new Map<string, EvidenceClaim>();
@@ -203,7 +219,9 @@ export const buildTextCards = (o: BuildCardsOptions): TextCardSpec[] => {
 		if (isChapterStart && chapterCardsOn) return;
 		// A sourced claim outranks a figure: it carries an attribution, which is
 		// information the audience has no other way to get.
-		const card = claimCardFor(scene, i, byRef) ?? figureCardFor(scene, i);
+		const card =
+			claimCardFor(scene, i, byRef) ??
+			(narrationIsSpoken ? figureCardFor(scene, i) : null);
 		if (card) out.push(card);
 	});
 	return out;

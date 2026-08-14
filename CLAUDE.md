@@ -721,6 +721,36 @@ each piece handles it:
   length (no elastic retime). `Build Remotion Props` forces
   `showCaptions: false` for cinematic — `Script Scenă` holds the beat
   sheet, and captioning it would print stage directions on screen.
+- **Captions were only the visible third of that.** `narratorText` reaches
+  THREE surfaces in the render, and all three treated it as spoken: captions
+  print it, `ImpactCard` borrows its first eight words as a chapter title
+  whenever the chapter has no `[CHAPTER n: title]` marker, and
+  `figureCardFor` lifts figures out of it — a year or a duration inside a
+  stage direction matches those patterns exactly like a fact the narration
+  speaks. Only captions were fixed, because only captions were something the
+  producer could see. `narrationIsSpoken` (props, default true) now carries
+  the fact once and all three read it: the card falls back to nothing rather
+  than to the beat sheet, and figure cards are not derived at all. Claim
+  cards are untouched — their text comes from the Evidence rows, not from
+  the scene. **Any fourth reader of `narratorText` must ask the same
+  question.**
+- **A title-less chapter card still renders, on purpose.** Dropping it would
+  be the obvious fix and it is wrong: with cards on, `ImpactCard`'s own light
+  leak IS that boundary's transition and `Transitions` skips every boundary
+  it holds, so a skipped card leaves the cut with no owner at all. The
+  eyebrow becomes the whole statement instead — a full-frame "CHAPTER II",
+  which is what an intertitle is. `titled` in `ImpactCard` gates the fitter,
+  the eyebrow size (`px(52)`, not the title-proportional one) and the gap
+  between them. Verified as stills at 1280x720 and 720x1280 through
+  `src/probe.tsx`'s existing `CardLandscape` / `CardPortrait`, which take
+  `keyLine` as a prop — `--props='{"keyLine":""}'` is the whole test.
+- **The Final touches panel dropped its Captions row for cinematic.** The
+  toggle was inert — the render forces captions off whatever it says — and an
+  inert control reads as a decision. `FinalSettings` marks that row
+  `spokenOnly` and filters it out, the same call the stepper makes about the
+  Audio step. The Opening title is NOT dropped: `displayTitle` comes from the
+  project name, never from narration, so it is purely visual and is the most
+  silent-film-native element on the list.
 - **The site had known this only on the /new form.** `noNarration` was read
   by `CategoryPicker` and nowhere else, so the project page still built an
   Audio step, still rendered the voice panel, and `ProductionActivity` still

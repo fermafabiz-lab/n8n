@@ -36,6 +36,7 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 	evidence,
 	textCards,
 	showTextCards = true,
+	narrationIsSpoken = true,
 }) => {
 	const {fps} = useVideoConfig();
 	const frame = useCurrentFrame();
@@ -121,9 +122,18 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 						explicit: textCards,
 						chapterCardsOn: showChapterCards,
 						hookSeconds,
+						narrationIsSpoken,
 					})
 				: [],
-		[scenes, evidence, textCards, showTextCards, showChapterCards, hookSeconds],
+		[
+			scenes,
+			evidence,
+			textCards,
+			showTextCards,
+			showChapterCards,
+			hookSeconds,
+			narrationIsSpoken,
+		],
 	);
 
 	const shots = useMemo(
@@ -263,9 +273,16 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 									chapter={s.chapter ?? 1}
 									// Real chapter title from the script's [CHAPTER n: title]
 									// markers; the narration excerpt is only a fallback for
-									// old projects rendered before titles were passed in.
+									// old projects rendered before titles were passed in — and
+									// it is available only when that text is actually spoken.
+									// On a silent film it is a shot note, so borrowing its
+									// first eight words would print stage directions as the
+									// chapter's title. The card still renders: it owns this
+									// boundary's transition, and dropping it would leave the
+									// cut with no owner at all.
 									keyLine={
-										chapterTitles[String(s.chapter ?? 1)] || keyLineFor(s.narratorText)
+										chapterTitles[String(s.chapter ?? 1)] ||
+										(narrationIsSpoken ? keyLineFor(s.narratorText) : '')
 									}
 									preset={preset}
 								/>

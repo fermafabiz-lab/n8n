@@ -23,6 +23,8 @@ const OPTIONS: Array<{
   on: string;
   off: string;
   icon: string;
+  /** Offered on a silent film? Default yes — set false for spoken-word only. */
+  spokenOnly?: boolean;
 }> = [
   {
     key: "captions",
@@ -30,6 +32,11 @@ const OPTIONS: Array<{
     on: "Subtitles appear on screen, paced to the narration",
     off: "No subtitles — visuals and voice only",
     icon: "💬",
+    // A cinematic project's `Script Scenă` is an unspoken shot note, so there
+    // is nothing to subtitle — `Build Remotion Props` forces showCaptions off
+    // for it whatever this says. A toggle that cannot change the film is worse
+    // than no toggle: it reads as a decision and silently isn't one.
+    spokenOnly: true,
   },
   {
     key: "hookTitle",
@@ -71,14 +78,21 @@ const OPTIONS: Array<{
 export default function FinalSettings({
   projectId,
   initial,
+  silent = false,
 }: {
   projectId: string;
   initial: EditingOptions;
+  /** Cinematic: no narration is ever spoken, so some rows have no meaning. */
+  silent?: boolean;
 }) {
   const [opts, setOpts] = useState<EditingOptions>(initial);
   const [msg, setMsg] = useState<ActionResult | null>(null);
   const [pending, startTransition] = useTransition();
-  const changedKeys = OPTIONS.filter((o) => opts[o.key] !== initial[o.key]);
+  // Dropped rather than disabled, the same call the stepper makes about the
+  // Audio step: a control you can reach and find inert is worse than one that
+  // is simply not there.
+  const rows = OPTIONS.filter((o) => !(silent && o.spokenOnly));
+  const changedKeys = rows.filter((o) => opts[o.key] !== initial[o.key]);
   const changed = changedKeys.length > 0;
   const done = msg?.ok === true;
   const router = useRouter();
@@ -135,7 +149,7 @@ export default function FinalSettings({
           pointerEvents: done ? "none" : undefined,
         }}
       >
-        {OPTIONS.map((o, i) => {
+        {rows.map((o, i) => {
           const on = opts[o.key];
           const moved = on !== initial[o.key];
           return (

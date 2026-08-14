@@ -129,6 +129,20 @@ export type FinalVideoProps = {
 	textCards?: TextCardSpec[];
 	/** Master switch for text cards. Omitted/true keeps them. */
 	showTextCards?: boolean;
+	/**
+	 * Whether `scenes[].narratorText` is ever HEARD.
+	 *
+	 * False on a cinematic (silent) project, where that field holds an unspoken
+	 * visual beat sheet — stage directions — rather than narration. Three
+	 * surfaces read it as if it were spoken and each puts the beat sheet on
+	 * screen when it is not: captions print it, the chapter card borrows its
+	 * first eight words as a title, and a text card lifts figures out of it.
+	 * Captions were the only one the producer could see, which is why the other
+	 * two survived so long.
+	 *
+	 * Omitted/true keeps every existing project rendering exactly as before.
+	 */
+	narrationIsSpoken?: boolean;
 };
 
 export const defaultFinalVideoProps: FinalVideoProps = {
@@ -149,6 +163,7 @@ export const defaultFinalVideoProps: FinalVideoProps = {
 	showChapterCards: true,
 	showEndScreen: true,
 	chapterTitles: {},
+	narrationIsSpoken: true,
 };
 
 /** Tone → visual language. Lowercased, diacritics-insensitive lookup. */

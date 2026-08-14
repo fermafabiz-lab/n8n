@@ -131,7 +131,14 @@ export const ImpactCard: React.FC<{
 	// Words are unbreakable inline-blocks; the spaces BETWEEN them are plain
 	// breakable text nodes. Per-character spans with white-space:pre killed
 	// every soft-wrap point and the line ran straight off the screen.
-	const words = keyLine.split(' ');
+	const words = keyLine.trim() ? keyLine.trim().split(' ') : [];
+	// A card with no title at all. Reached on a silent film whose chapter has
+	// no [CHAPTER n: title] marker: there the usual fallback — the first eight
+	// words of the narration — would print an unspoken stage direction as the
+	// chapter's name. The card still has to render, because it owns this
+	// boundary's transition and Transitions skips every boundary it holds; so
+	// the eyebrow becomes the whole statement, which is what an intertitle is.
+	const titled = words.length > 0;
 
 	// The title used to light character by character. A typewriter is a literal
 	// depiction of typing, which is not what a chapter card is doing, and it is
@@ -171,31 +178,36 @@ export const ImpactCard: React.FC<{
 	// The card is a stop-frame with nothing else on it; the title is meant to
 	// be the whole image.
 	const blockWidth = width * 0.74;
-	const fontSize = fitTitleSize({
-		words,
-		// The card's own face, not the preset's — the two surfaces no longer share
-		// a typeface, so they must not share an advance either. Feeding Cormorant's
-		// 0.44 to a Poppins card would let the fitter approve a size that then
-		// wraps onto an extra line.
-		advance: CARD_TITLE_ADVANCE,
-		spaceRatio: CARD_SPACE_RATIO,
-		wrapWidth: blockWidth * 0.94,
-		// Deliberately above what any title actually reaches: the wrap and height
-		// tests below decide the real size, and a low ceiling would cap a short
-		// title before either of them had an opinion.
-		maxSize: width * 0.125,
-		minSize: width * 0.026,
-		maxLines: 3,
-		lineHeight: LINE_HEIGHT,
-		// Not the full frame: the eyebrow shares the block, and the card needs air
-		// at top and bottom to read as a card rather than as text that overflowed
-		// onto one.
-		maxHeight: height * 0.46,
-	});
+	const fontSize = titled
+		? fitTitleSize({
+				words,
+				// The card's own face, not the preset's — the two surfaces no longer
+				// share a typeface, so they must not share an advance either. Feeding
+				// Cormorant's 0.44 to a Poppins card would let the fitter approve a
+				// size that then wraps onto an extra line.
+				advance: CARD_TITLE_ADVANCE,
+				spaceRatio: CARD_SPACE_RATIO,
+				wrapWidth: blockWidth * 0.94,
+				// Deliberately above what any title actually reaches: the wrap and
+				// height tests below decide the real size, and a low ceiling would cap
+				// a short title before either of them had an opinion.
+				maxSize: width * 0.125,
+				minSize: width * 0.026,
+				maxLines: 3,
+				lineHeight: LINE_HEIGHT,
+				// Not the full frame: the eyebrow shares the block, and the card needs
+				// air at top and bottom to read as a card rather than as text that
+				// overflowed onto one.
+				maxHeight: height * 0.46,
+			})
+		: 0;
 
 	// The eyebrow is proportional to the title, so the layout holds its shape at
-	// any fitted size.
-	const eyebrowSize = Math.max(px(15), fontSize * 0.2);
+	// any fitted size. With no title it IS the card, so it takes a size of its
+	// own — deliberately well under the title ceiling, because "Chapter VIII"
+	// tracked at 0.35em is a wide line and the vertical canvas is half as wide
+	// as the one these numbers were tuned on.
+	const eyebrowSize = titled ? Math.max(px(15), fontSize * 0.2) : px(52);
 
 	// The three grounds differ only here. 'ink' paints its own panel; the other
 	// two read the footage that is already behind this layer, so the card is
@@ -265,11 +277,14 @@ export const ImpactCard: React.FC<{
 								textIndent: eyebrowSize * 0.35,
 								textTransform: 'uppercase',
 								color: EYEBROW_INK,
-								marginBottom: fontSize * 0.35,
+								// No title below it means no gap below it either — the
+								// eyebrow is the whole block and has to centre as one.
+								marginBottom: titled ? fontSize * 0.35 : 0,
 							}}
 						>
 							Chapter {ROMAN[chapter] ?? chapter}
 						</div>
+						{titled && (
 						<div
 							style={{
 								fontFamily: cardTitleFont,
@@ -303,6 +318,7 @@ export const ImpactCard: React.FC<{
 								);
 							})}
 						</div>
+						)}
 					</div>
 				</AbsoluteFill>
 			)}

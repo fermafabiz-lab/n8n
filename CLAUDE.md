@@ -357,6 +357,44 @@ or the scene falling outside the cap. `nudgeProduction()` fires
 `resume-project` when nothing is alive, which covers the first case only —
 hence the local exit on the badge. Do not promise this always starts.
 
+**The second of those four — a batch already past the video gate — is now
+covered inside n8n.** The final-settings gate is where a batch spends the
+longest stretch of its life (a 15s Wait loop that holds for up to two hours
+waiting for the producer to press render), and until 2026-08-14 a flag raised
+during that window had nobody left to read it: `Evaluate Video Approval` is
+several nodes upstream and the run never goes back. The gate now looks for it
+on every cycle — `Fetch Final Settings → Fetch Regen Flags → Settings Gate
+Guard → If Settings Confirmed → If Video Regen Pending` — and routes a
+flagged project back to `Fetch Approved Scenes`, i.e. one more pass, which is
+exactly the path `Another Pass?` and the site's `nudgeProduction()` already
+use. The flagged scene carries `Status Producție Scenă: 'Generare Video'`, so
+`Sort & Cap Scenes` sorts it as outstanding work and it lands inside the cap;
+`Needs Clip?` skips it (it has a clip), the video gate polls, and
+`Evaluate Video Approval` picks the flag up.
+
+Three details are load-bearing:
+
+- **The regen check runs on the "keep waiting" branch only.** `If Settings
+  Confirmed` still decides first, so a confirmed render is never sent back
+  for a regeneration — the change adds an exit from the waiting loop and
+  alters nothing else.
+- **One automatic bounce per scene per execution**, remembered in workflow
+  static data under `sgBounced_<executionId>`. Without that bound the two
+  gates ping-pong forever whenever a pass cannot clear the flag; with it, a
+  scene that fails to regenerate falls back to today's behaviour and the
+  site's own local exit (`restartVideoRegen` / `cancelVideoRegen`).
+- **`Fetch Regen Flags` is `alwaysOutputData` + `continueRegularOutput`.** An
+  Airtable search that returns nothing stops the chain dead, and this one
+  sits *inside* the gate loop — an empty answer would strand every project at
+  final settings. On error it passes the project record through, which has no
+  `Regenerează Video` field, so it fails closed rather than into a false
+  positive.
+
+`Settings Gate Guard` now reads the project record from
+`$('Fetch Final Settings')` **by name**, because its `$input` is the scene
+list. Anything inserted between those two nodes must keep that reference
+valid.
+
 ### The batch cap
 
 `Sort & Cap Scenes` in Media Generation ends with `items.slice(0, CAP)`,

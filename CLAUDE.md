@@ -831,6 +831,19 @@ on a visible 8-second grid.
   producer then picks what to change. The initial script has no such button:
   it is written for the whole project, not per scene, and `restart-scripting`
   is its door.
+- **Nothing in the pipeline keeps what it replaces.** There is one image and
+  one clip per scene, and every regeneration overwrites in place — so a
+  re-roll that came back worse was unrecoverable. "⤓ Save draft" copies the
+  live asset aside first; the drafts appear in the inspector with Restore.
+  Two Airtable fields hold them, both created 2026-08-14 and **written only
+  by the site — n8n must never touch either**: `Versiuni Imagine`
+  (attachment) and `Versiuni Media` (JSON metadata). The split is forced by
+  how the two assets expire: **an image is copied INTO Airtable** because
+  fal's link dies within hours, while **a clip only needs its URL** because
+  Drive links are permanent. And restoring an image writes back its
+  `Image Media ID` and prompt as well — without the Flow id the scene can no
+  longer generate video at all (`Prep Video Regen` refuses it), which would
+  look like the restore having silently broken the scene.
 - **A scene has THREE inputs, and the site used to show two.** `Script Scenă`
   is the line, `Imagine First Frame` is the picture, and `Video Scenă URL` —
   despite the name — is the MOTION prompt handed to Veo. The finished clip

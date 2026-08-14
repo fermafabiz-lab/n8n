@@ -65,6 +65,8 @@ export interface Scene {
   label: string;
   narration: string | null;
   imagePrompt: string | null;
+  /** What the clip DOES — the direction handed to Veo. */
+  videoPrompt: string | null;
   imageUrl: string | null;
   videoUrl: string | null;
   voiceUrl: string | null;
@@ -179,6 +181,12 @@ const F = {
   sceneVideoAttachment: ["Video Scenă"],
   sceneVoice: ["Voiceover URL"],
   sceneImagePrompt: ["Imagine First Frame"],
+  // Despite the name, this holds the MOTION prompt — what Veo is told the
+  // shot does. The finished clip lands in "Scene Final URL". It is the field
+  // that actually decides what the video shows, and it was invisible to the
+  // producer: editing the narration or the image prompt left it untouched,
+  // so a clip kept performing the old direction.
+  sceneVideoPrompt: ["Video Scenă URL"],
   sceneApproved: ["Aprobare Scenă", "Aprobare Scena"],
   sceneVoiceApproved: ["Aprobare Voce"],
   sceneImageApproved: ["Aprobare Imagine"],
@@ -325,6 +333,11 @@ function toScene(r: AirtableRecord, index: number): Scene {
     label: `S${index + 1}`,
     narration: (pick(r.fields, F.sceneNarration) as string) ?? null,
     imagePrompt: (pick(r.fields, F.sceneImagePrompt) as string) ?? null,
+    // Older rows can hold a URL here instead of a direction; showing that as
+    // an editable prompt would invite someone to overwrite a link.
+    videoPrompt: ((v) => (v && !/^https?:\/\//i.test(v.trim()) ? v : null))(
+      (pick(r.fields, F.sceneVideoPrompt) as string) ?? null,
+    ),
     imageUrl: firstAttachmentUrl(pick(r.fields, F.sceneImage)),
     videoUrl,
     voiceUrl: (pick(r.fields, F.sceneVoice) as string) ?? null,
@@ -565,6 +578,7 @@ const DEMO_SCENES: Scene[] = Array.from({ length: 8 }, (_, i) => {
     label: `S${i + 1}`,
     narration: names[i],
     imagePrompt: null,
+    videoPrompt: null,
     imageUrl: null,
     videoUrl: null,
     voiceUrl: null,

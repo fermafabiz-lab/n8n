@@ -831,6 +831,21 @@ on a visible 8-second grid.
   producer then picks what to change. The initial script has no such button:
   it is written for the whole project, not per scene, and `restart-scripting`
   is its door.
+- **A scene has THREE inputs, and the site used to show two.** `Script Scenă`
+  is the line, `Imagine First Frame` is the picture, and `Video Scenă URL` —
+  despite the name — is the MOTION prompt handed to Veo. The finished clip
+  lands in `Scene Final URL`, so the "URL" field stays prose for the life of
+  the project. Scripting writes all three once; nothing downstream ever
+  rewrites the motion prompt except the AI scene rewrite. So a producer who
+  edited the narration and the image prompt still got a clip performing the
+  ORIGINAL direction, with no field on screen explaining why — seen on
+  "Working engine", where a mechanic the producer had written out kept
+  appearing. **On a cinematic project this makes the script edit entirely
+  inert**, because the narration is neither spoken nor captioned: the whole
+  film is the image prompt plus the motion prompt. The video step now shows
+  it as "Shot direction" (`saveVideoPrompt`), and saving it un-approves the
+  clip. `Evaluate Video Approval` re-reads the field every polling cycle, so
+  an edit lands on the next regeneration.
 - **Refusal notes get translated to next steps** by `platform/lib/refusals.ts`
   (wired into ProductionActivity and SceneBoard). Match only literal pipeline
   codes, never bare words or bare numbers: `\bminor\b` hit ordinary reviewer

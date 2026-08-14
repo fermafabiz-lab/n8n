@@ -7,6 +7,7 @@ import {
   regenerateVoice,
   reopenStep,
   saveImagePrompt,
+  saveVideoPrompt,
   sceneAction,
   type ActionResult,
 } from "@/app/actions";
@@ -102,6 +103,8 @@ export default function SceneBoard({
   // Narration drafts per scene for the voice editor (falls back to the
   // stored text until edited).
   const [voiceDrafts, setVoiceDrafts] = useState<Record<string, string>>({});
+  // Shot-direction drafts, same shape as the voice ones.
+  const [videoDrafts, setVideoDrafts] = useState<Record<string, string>>({});
   // Image-prompt drafts, kept in sessionStorage so the 10s auto-refresh
   // can't quietly reset a rewritten prompt to the stored one.
   const promptKey = `vf-imgprompt-drafts:${projectId}`;
@@ -510,6 +513,75 @@ export default function SceneBoard({
                   — image and video are NOT regenerated. Editing the text above
                   and saving it anywhere else also re-records, so the take can
                   never drift from the line.
+                </p>
+              </div>
+            )}
+            {/*
+              What the clip is told to DO. Scripting writes it once and
+              nothing else ever touches it — not the narration, not the image
+              prompt — so a rewritten scene used to be shot to the original
+              direction, with no way to see why. On a silent film it is the
+              whole story, since the narration is neither spoken nor shown.
+            */}
+            {!active.videoApproved && active.videoPrompt !== null && (
+              <div style={{ marginTop: 16, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
+                <label
+                  style={{ display: "block", fontSize: 12, color: "var(--dim)", marginBottom: 6 }}
+                >
+                  Shot direction (what happens in the clip)
+                </label>
+                <textarea
+                  value={videoDrafts[active.id] ?? active.videoPrompt ?? ""}
+                  onChange={(e) =>
+                    setVideoDrafts((p) => ({ ...p, [active.id]: e.target.value }))
+                  }
+                  rows={4}
+                  spellCheck={false}
+                  style={{
+                    width: "100%",
+                    background: "var(--bg2)",
+                    border: "1px solid var(--line2)",
+                    borderRadius: 10,
+                    color: "var(--ink)",
+                    font: "inherit",
+                    fontSize: 13,
+                    lineHeight: 1.6,
+                    padding: "10px 12px",
+                    resize: "vertical",
+                    outline: "none",
+                  }}
+                />
+                <div className="abtns" style={{ marginTop: 8 }}>
+                  <button
+                    className="abtn"
+                    disabled={
+                      pending ||
+                      (videoDrafts[active.id] ?? active.videoPrompt ?? "") ===
+                        (active.videoPrompt ?? "")
+                    }
+                    onClick={() =>
+                      run(async () => {
+                        const r = await saveVideoPrompt(
+                          projectId,
+                          active.id,
+                          videoDrafts[active.id] ?? "",
+                        );
+                        if (r.ok)
+                          setVideoDrafts((p) => {
+                            const n = { ...p };
+                            delete n[active.id];
+                            return n;
+                          });
+                        return r;
+                      })
+                    }
+                  >
+                    Save shot direction
+                  </button>
+                </div>
+                <p style={{ margin: "6px 0 0", fontSize: 11.5, color: "var(--dim)" }}>
+                  This is what the clip is generated from — editing the
+                  narration or the image prompt does not change it.
                 </p>
               </div>
             )}

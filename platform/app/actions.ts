@@ -287,6 +287,43 @@ async function fireSceneRewriteWebhook(sceneId: string): Promise<void> {
   if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
 }
 
+/**
+ * Replace what the clip DOES — the direction Veo is given.
+ *
+ * This is the field that decides the video, and until now it was invisible:
+ * scripting wrote it once, the site showed the narration and the image
+ * prompt, and neither of those reaches it. So a producer who rewrote a scene
+ * got a clip still performing the original direction — on a cinematic
+ * project, where the narration is never spoken or captioned, editing the
+ * script changed nothing about the output at all.
+ *
+ * Saving it un-approves the clip, because the clip on screen was made from
+ * the direction being replaced.
+ */
+export async function saveVideoPrompt(
+  projectId: string,
+  sceneId: string,
+  videoPrompt: string,
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    await writeSceneFields(sceneId, {
+      "Video Scenă URL": videoPrompt,
+      "Aprobare Video": false,
+    });
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message:
+        "Shot direction saved — the clip is back for review. Press Regenerate video to shoot it again.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
 export async function regenerateSceneText(
   projectId: string,
   sceneId: string,

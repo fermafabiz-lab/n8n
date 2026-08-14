@@ -36,6 +36,8 @@ function pipeline(
   projectDone: boolean,
   awaitingSettings: boolean,
   assembling: boolean,
+  /** Silent film: nobody speaks, so there is no voice step to review. */
+  silent: boolean,
 ) {
   const scenesApproved = scenes.filter((s) => s.sceneApproved).length;
   const imagesApproved = scenes.filter((s) => s.imageApproved).length;
@@ -47,7 +49,11 @@ function pipeline(
   const total = scenes.length || 1;
   const scenesDone = scenesApproved === total && total > 0;
   const imagesDone = imagesApproved === total && total > 0;
-  const audioDone = voicesApproved === total && total > 0;
+  // A silent film never records anything, so the voice gate is not a step
+  // it passes through — it is a step it does not have. Treating it as
+  // "done" keeps every downstream state (Video, Final touches) correct
+  // without special-casing each one.
+  const audioDone = silent || (voicesApproved === total && total > 0);
   const videoDone = videosApproved === total && total > 0;
   return [
     { key: "script", name: "Script", state: "done" },
@@ -61,11 +67,18 @@ function pipeline(
       name: imagesDone ? "Images" : `Images · ${imagesApproved}/${total}`,
       state: imagesDone ? "done" : scenesDone ? "act" : "next",
     },
-    {
-      key: "audio",
-      name: audioDone ? "Audio" : `Audio · ${voicesApproved}/${total}`,
-      state: audioDone ? "done" : imagesDone ? "act" : "next",
-    },
+    // Dropped entirely for a silent film rather than shown green: an "Audio"
+    // chip on a film with no narration is a step the producer keeps clicking
+    // into to find nothing.
+    ...(silent
+      ? []
+      : [
+          {
+            key: "audio",
+            name: audioDone ? "Audio" : `Audio · ${voicesApproved}/${total}`,
+            state: audioDone ? "done" : imagesDone ? "act" : "next",
+          },
+        ]),
     {
       key: "video",
       name: videoDone ? "Video" : `Video · ${videosApproved}/${total}`,
@@ -126,11 +139,15 @@ export default async function ProductionRoom({
 
   const scenes = await getScenes(id);
   const assembling = /assembling/i.test(project.status);
+  // Cinematic and anything else marked noNarration: no TTS ever runs, so
+  // every voice gate on this page has to be treated as already passed.
+  const silent = getCategory(project.category).noNarration === true;
   const steps = pipeline(
     scenes,
     project.statusKind === "done",
     project.awaitingFinalSettings,
     assembling,
+    silent,
   );
 
   // Script review phase: the Scripturi record is still awaiting approval.
@@ -189,7 +206,9 @@ export default async function ProductionRoom({
             ? "scene-review"
             : scenes.some((s) => s.imageUrl && !s.imageApproved)
               ? "image-review"
-              : scenes.some((s) => s.voiceUrl) && scenes.some((s) => !s.voiceApproved)
+              : !silent &&
+                  scenes.some((s) => s.voiceUrl) &&
+                  scenes.some((s) => !s.voiceApproved)
                 ? "voice-review"
               : scenes.some((s) => s.videoUrl && !s.videoApproved)
                 ? "video-review"
@@ -388,6 +407,7 @@ export default async function ProductionRoom({
               alive={aliveNow}
               scenes={scenes}
               cap={MEDIA_BATCH_CAP}
+              silent={silent}
             />
           )}
 
@@ -396,6 +416,7 @@ export default async function ProductionRoom({
             before the first take exists, otherwise the stepper points at an
             "Audio" stage with nothing under it. */}
         {scenes.length > 0 &&
+          !silent &&
           showing(
             "audio",
             scenes.every((s) => s.sceneApproved) &&

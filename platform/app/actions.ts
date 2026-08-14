@@ -13,6 +13,7 @@ import {
   requestSceneRewrite,
   releaseSceneRewrite,
   readSceneNarration,
+  getProject,
   findRecentProjectByName,
   writeScriptFields,
   requestVoiceRegen,
@@ -25,6 +26,7 @@ import {
   getStalledProduction,
   stopExecution,
 } from "@/lib/n8n";
+import { getCategory } from "@/lib/categories";
 
 export interface ActionResult {
   ok: boolean;
@@ -402,17 +404,26 @@ export async function reopenStep(
   if (!isConfigured) {
     return { ok: true, message: "Demo mode — nothing was written." };
   }
+  // A silent film has no voice to redo, and no TTS runs that could ever
+  // re-approve one. Un-approving it there builds a gate nothing can satisfy:
+  // n8n waits for every voice to be approved, the site offers no take to
+  // listen to, and the project stops for good. Seen on a cinematic project
+  // whose only scene was sent back a step.
+  const silent = getCategory((await getProject(projectId))?.category).noNarration === true;
   const cascade: Record<ReopenStep, Record<string, boolean>> = {
     scenes: {
       "Aprobare Scenă": false,
       "Aprobare Imagine": false,
-      "Aprobare Voce": false,
+      ...(silent ? {} : { "Aprobare Voce": false }),
       "Aprobare Video": false,
     },
     images: { "Aprobare Imagine": false, "Aprobare Video": false },
     audio: { "Aprobare Voce": false, "Aprobare Video": false },
     video: { "Aprobare Video": false },
   };
+  if (silent && step === "audio") {
+    return { ok: false, message: "This film has no narration — there is no voice step to reopen." };
+  }
   const label: Record<ReopenStep, string> = {
     scenes: "the script",
     images: "the image",

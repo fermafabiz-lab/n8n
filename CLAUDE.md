@@ -685,6 +685,39 @@ is built only inside that guard (a `-1` input index would break the graph).
   Timeline`/`Build Remotion Props` to rebuild and resubmit. The poll caps
   still bound the loop. Corollary: pushing to the branch DURING a render
   is safe now, but still costs a full resubmit of that stage.
+- **Where a final assembly's minutes actually go — measured, not guessed.**
+  Execution 3599 (a ONE-scene, ~8s cinematic film) took 2m35s end to end.
+  The n8n API cannot show this (`runData` lands only at the end), but
+  Railway's **http** log stream can: every `POST /assemble`, `POST /render`
+  and status poll is timestamped, so the stage boundaries fall straight out
+  of it (`mcp__Railway__get-logs` with `types: ["http"]`). The split was
+  3.6s Airtable + the Drive music walk + Build Timeline · 20.3s assemble
+  (ffmpeg was already finished at the FIRST poll) · 9.5s Remotion bundle +
+  `selectComposition` + Chrome start · **~2m00s the graphics render itself**
+  · 8.1s download + Drive upload + share + Airtable. So ~78% is the Remotion
+  pass, and it is real work rather than waiting.
+  It is NOT flat in length: that is ~240 frames at roughly 2 fps, because the
+  render is headless Chrome on software GL (`gl: 'swangle'`, no GPU on
+  Railway) at `concurrency: 1`. A 60s film is ~1800 frames, which is why the
+  15-scene Tahiti film took ~11m50s. What makes a short film FEEL flat is a
+  fixed floor of about 45s that it pays in full.
+  **Do not reach for `concurrency` as the speed-up.** Memory is no longer the
+  constraint — since the OffthreadVideo cap, peak is 2.48GB against 8 — but
+  CPU peaked at 6.85 of 8 cores, so the headroom is about one core. More
+  vCPU is the lever, not more tabs. (Caveat: that 4-hour metrics window also
+  contained a Docker build, and Railway's sampling cannot be narrowed to the
+  render alone, so treat the CPU figure as an upper bound and measure before
+  changing it.)
+- **The two poll loops slept 20s BEFORE their first check**, so a one-scene
+  film waited a full 20s on an ffmpeg job that was already done, and every
+  stage was rounded up to a 20s step. Now 5s. **The interval and the guard's
+  cap are one setting in two places**: `Render Guard` and `Graphics Guard`
+  bound the loop by poll COUNT, so dropping the interval without raising the
+  cap would have cut the assemble ceiling from 15 min to 3m45s and the render
+  ceiling from 30 min to 7m30s — killing exactly the long films that need
+  them. Caps went 45 → 180 and 90 → 360, both ceilings unchanged, and each
+  guard now names the arithmetic in a comment. Note each guard tests
+  `$runIndex` TWICE (lost-job recovery and timeout); both had to move.
 - **Sound is changeable after the render**: `SoundSettings` (under the
   final video player) writes the two switches via `updateEditingOptions`
   and re-fires the assemble webhook — the only path to different sound on

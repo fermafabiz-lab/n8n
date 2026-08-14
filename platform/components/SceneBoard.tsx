@@ -255,9 +255,24 @@ export default function SceneBoard({
   // what a scene still owes — so clicking "Images" changes nothing, instead
   // of flashing the clip first.
   const showClip = step !== "images" && Boolean(active?.videoUrl);
-  // Selecting another scene must drop a preview belonging to the old one,
-  // otherwise the monitor keeps showing a draft the inspector no longer lists.
-  const preview = active?.versions.find((v) => v.id === previewId) ?? null;
+  /**
+   * Drafts belonging to the step being reviewed, and only those.
+   *
+   * The panel listed every saved version of the scene, so standing on Images
+   * offered clip drafts to restore — assets that step cannot judge and whose
+   * Restore would quietly send the video back for approval from a page about
+   * pictures. Each step now sees its own kind; the audio step has none,
+   * because takes are not versioned.
+   */
+  const stepKind: "image" | "video" | null =
+    step === "images" ? "image" : step === "video" ? "video" : null;
+  const stepVersions =
+    stepKind === null
+      ? []
+      : (active?.versions ?? []).filter((v) => v.kind === stepKind);
+  // Resolved against the step's own list, so a preview does not survive
+  // switching scene OR step — in both cases the inspector stops listing it.
+  const preview = stepVersions.find((v) => v.id === previewId) ?? null;
 
   // The two blocks this board owns. Voice lives in AudioReview, and the
   // narration itself in SceneReview — neither belongs here.
@@ -630,15 +645,15 @@ export default function SceneBoard({
               to keep is here — the pipeline itself never keeps anything it
               replaces, so this list is empty until "Save draft" is used.
             */}
-            {active.versions.length > 0 && (
+            {stepVersions.length > 0 && (
               <div style={{ marginTop: 16, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
                 <label
                   style={{ display: "block", fontSize: 12, color: "var(--dim)", marginBottom: 8 }}
                 >
-                  Saved drafts ({active.versions.length})
+                  Saved drafts ({stepVersions.length})
                 </label>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-                  {[...active.versions].reverse().map((v) => (
+                  {[...stepVersions].reverse().map((v) => (
                     <div
                       key={v.id}
                       style={{

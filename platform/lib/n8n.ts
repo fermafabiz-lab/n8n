@@ -1,7 +1,8 @@
 // n8n public API client — powers the "Production health" panel: shows
 // running/failed executions and lets the team stop a runaway workflow.
 //
-// Env (Vercel → Settings → Environment Variables):
+// Env (GitHub Secrets — the deploy workflow writes them onto the Hetzner
+// box; the site left Vercel on 2026-08-13):
 //   N8N_API_URL  e.g. https://your-n8n-host/api/v1  (cloud or self-hosted)
 //   N8N_API_KEY  n8n → Settings → n8n API → Create API key
 

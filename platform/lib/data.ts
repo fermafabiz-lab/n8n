@@ -2,7 +2,8 @@
 // Today: AirtableAdapter reading the same base n8n already writes to.
 // Later: swap in a PostgresAdapter without touching any page or component.
 //
-// Required env vars (set on Vercel → Project → Settings → Environment Variables):
+// Required env vars (GitHub Secrets — the deploy workflow writes them onto
+// the Hetzner box on every deploy; the site left Vercel on 2026-08-13):
 //   AIRTABLE_API_KEY        personal access token with data.records:read
 //   AIRTABLE_BASE_ID        the app... id of the production base
 //   AIRTABLE_PROJECTS_TABLE table name or tbl... id for projects (default: "Proiecte")

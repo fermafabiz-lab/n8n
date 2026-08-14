@@ -611,6 +611,13 @@ is built only inside that guard (a `-1` input index would break the graph).
   were manual; they are not. So a change to `remotion/server/` is live once
   the branch is pushed and the build goes green, and the way to check which
   code is running is the deployment's commit hash, not a guess.
+- **Never push while a final render is running.** A Railway deploy replaces
+  the container, which kills a render in flight — and the producer sees a
+  film that simply never arrives, with nothing in the site to explain it.
+  Since 2026-08-14 Railway watches `["/remotion/**"]`, so commits touching
+  only `platform/` or documentation no longer rebuild it; anything under
+  `remotion/` still does. Check for a live Final Assembly execution before
+  pushing there, and hold the push if one is running.
 - If SFX are enabled and the final video still has none, check whether the
   veo-3.1-lite clips actually carry an audio stream (`/inspect`). Verified
   once (2026-08-10): a real veo-3.1-lite clip probed `aac, 2ch, 48kHz` —
@@ -1452,9 +1459,21 @@ the pipeline already produces.
 ## Environment
 
 **There is no `main`. The trunk is `claude/hello-7o90qh`**, and it is what
-deploys — Railway auto-deploys it (documented above), and the site follows the
-same branch. Feature branches are `claude/*` and reach the trunk through a
-merge commit; `9353445 "Merge … into deploy-merge"` is the pattern.
+deploys. Feature branches are `claude/*` and reach the trunk through a merge
+commit; `9353445 "Merge … into deploy-merge"` is the pattern.
+
+**The Hetzner box does not track a branch — do not go looking for a git
+checkout on it.** GitHub Actions builds a Docker image from the trunk on
+every push touching `platform/**`, pushes it to GHCR, and the server pulls
+that image. So the question is never "which branch does the server track" but
+"which branch triggers the workflow", and that is the trunk. The site's env
+vars live in **GitHub Secrets**, and the workflow writes them to the server on
+each deploy — nothing about shipping needs shell access. Only hot diagnosis
+does: logs, a restart, checking what the container is actually running.
+
+To confirm a change is live, read the deploy's commit and the container's
+restart time (`c3e72b8` at 11:16:18 → container back at 11:17:35 is the shape
+of a healthy one), rather than assuming a green push means a served build.
 
 **A branch that is pushed is not a branch that is deployed**, and the gap is
 invisible from here: a session told to develop on its own `claude/*` branch

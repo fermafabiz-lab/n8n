@@ -1302,6 +1302,7 @@ the pipeline already produces.
   is its door.
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 - **…and the script is the one step where approval is FINAL.** Every per-scene
   step can be reopened; the script cannot, because the entire film is derived
   from it — chapters, scenes, narration, image prompts — so editing it
@@ -1317,6 +1318,18 @@ the pipeline already produces.
   of the approved text and reads as what production is running on.
 =======
 =======
+=======
+- **Drafts are filed automatically, and the de-duplication is what makes that
+  bearable.** Every path that replaces an asset — image regen, video regen,
+  `restartVideoRegen`, and restoring an older draft — calls `autoKeep` first,
+  because the moment you need a draft is the moment you did not think to
+  press the button. It swallows its errors on purpose: a safety net that can
+  block the regeneration it protects is worse than none. Identity is the Flow
+  media id for images and the Drive URL for clips, **never the URL of an
+  Airtable attachment** — those are re-signed on every read, so comparing
+  them would file a duplicate on every single regeneration. `MAX_VERSIONS_PER_KIND`
+  (12) bounds the growth and the drop is reported, not silent.
+>>>>>>> claude/verify-conversation-connectors-qmhekv
 - **Nothing in the pipeline keeps what it replaces.** There is one image and
   one clip per scene, and every regeneration overwrites in place — so a
   re-roll that came back worse was unrecoverable. "⤓ Save draft" copies the

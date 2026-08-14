@@ -1016,10 +1016,46 @@ async function fetchSceneRecord(
 }
 
 /** Copy the live asset aside so a regeneration can be undone. */
+/**
+ * How many drafts of each kind a scene keeps.
+ *
+ * Auto-saving on every regeneration means this grows without anyone deciding
+ * to grow it, and each image draft is a real file in the base. The oldest of
+ * a kind is dropped past this — and the drop is reported, never silent.
+ */
+export const MAX_VERSIONS_PER_KIND = 12;
+
+/**
+ * Identity of the asset currently on the scene, for de-duplication.
+ *
+ * URLs cannot be compared: an Airtable attachment link is re-signed on every
+ * read, so the same picture reads as a different URL each time and every
+ * regeneration would stack a duplicate. The Flow media id is stable per
+ * generated image, and a Drive link is stable per clip.
+ */
+function assetKey(
+  f: Record<string, unknown>,
+  kind: "image" | "video",
+  url: string,
+): string {
+  if (kind === "video") return url;
+  const mediaId = pick(f, F.sceneMediaId);
+  if (typeof mediaId === "string" && mediaId) return mediaId;
+  const att = pick(f, F.sceneImage);
+  const name =
+    Array.isArray(att) && att[0] && typeof att[0] === "object"
+      ? (att[0] as { filename?: string }).filename
+      : null;
+  return name ?? url;
+}
+
 export async function saveVersionOfScene(
   sceneId: string,
   kind: "image" | "video",
-): Promise<{ saved: true } | { saved: false; reason: string }> {
+  opts: { auto?: boolean } = {},
+): Promise<
+  { saved: true; dropped: number } | { saved: false; reason: string }
+> {
   const f = await fetchSceneRecord(sceneId);
   const url =
     kind === "image"
@@ -1033,11 +1069,40 @@ export async function saveVersionOfScene(
     };
   }
 
-  const existing = readVersions(f);
+  const key = assetKey(f, kind, url);
+
+  // Metadata is round-tripped raw rather than through readVersions() — that
+  // view drops entries whose file is missing, and going back through it would
+  // delete history the moment Airtable was slow to attach a file.
+  const rawPrior = pick(f, F.sceneVersions);
+  let list: Array<Record<string, unknown>> = [];
+  if (typeof rawPrior === "string" && rawPrior.trim()) {
+    try {
+      const p = JSON.parse(rawPrior);
+      if (Array.isArray(p)) list = p as Array<Record<string, unknown>>;
+    } catch {
+      /* unreadable history: start a fresh list rather than lose the save */
+    }
+  }
+
+  // Already kept. Checked against EVERY draft of this kind, not just the
+  // newest: restoring A then B then A again would otherwise file a second
+  // copy of A each time round.
+  if (list.some((e) => e?.kind === kind && e?.key === key)) {
+    return opts.auto
+      ? { saved: true, dropped: 0 }
+      : {
+          saved: false,
+          reason: `This ${kind === "image" ? "image" : "clip"} is already saved as a draft.`,
+        };
+  }
+
   const id = `v${Date.now().toString(36)}`;
   const entry: Record<string, unknown> = {
     id,
     kind,
+    key,
+    auto: opts.auto === true,
     prompt:
       (pick(f, kind === "image" ? F.sceneImagePrompt : F.sceneVideoPrompt) as string) ??
       null,
@@ -1048,36 +1113,42 @@ export async function saveVersionOfScene(
   if (kind === "image") {
     // Hand Airtable the URL and it re-hosts the bytes; fal's own link is gone
     // within hours, so a version that merely pointed at it would rot.
-    const file = `${id}.png`;
-    entry.file = file;
+    entry.file = `${id}.png`;
     entry.mediaId = (pick(f, F.sceneMediaId) as string) ?? null;
-    const prior = pick(f, F.sceneVersionFiles);
-    const keep = Array.isArray(prior)
-      ? (prior as Array<{ id?: string }>).flatMap((a) => (a?.id ? [{ id: a.id }] : []))
-      : [];
-    patch["Versiuni Imagine"] = [...keep, { url, filename: file }];
   } else {
     // Drive links do not expire, so the clip needs no second copy.
     entry.url = url;
   }
 
-  // Metadata is stored raw rather than through readVersions() — that view
-  // drops entries whose file is missing, and round-tripping through it would
-  // quietly delete history the moment Airtable was slow to attach a file.
-  const rawPrior = pick(f, F.sceneVersions);
-  let list: unknown[] = [];
-  if (typeof rawPrior === "string" && rawPrior.trim()) {
-    try {
-      const p = JSON.parse(rawPrior);
-      if (Array.isArray(p)) list = p;
-    } catch {
-      /* unreadable history: start a fresh list rather than lose the save */
-    }
+  // Oldest-first within the kind, so the cap drops the least useful draft.
+  const next = [...list, entry];
+  const ofKind = next.filter((e) => e?.kind === kind);
+  const drop = new Set(
+    ofKind.slice(0, Math.max(0, ofKind.length - MAX_VERSIONS_PER_KIND)).map((e) => e.id),
+  );
+  const kept = next.filter((e) => !drop.has(e.id));
+
+  if (kind === "image") {
+    const prior = pick(f, F.sceneVersionFiles);
+    const files = Array.isArray(prior)
+      ? (prior as Array<{ id?: string; filename?: string }>)
+      : [];
+    const keptNames = new Set(
+      kept.flatMap((e) => (typeof e.file === "string" ? [e.file] : [])),
+    );
+    patch["Versiuni Imagine"] = [
+      // Existing attachments are re-sent by id; re-sending their URL would
+      // make Airtable download and store every one of them again.
+      ...files.flatMap((a) =>
+        a?.id && a?.filename && keptNames.has(a.filename) ? [{ id: a.id }] : [],
+      ),
+      { url, filename: entry.file as string },
+    ];
   }
-  void existing;
-  patch["Versiuni Media"] = JSON.stringify([...list, entry]);
+
+  patch["Versiuni Media"] = JSON.stringify(kept);
   await airtablePatch(SCENES_TABLE, sceneId, patch);
-  return { saved: true };
+  return { saved: true, dropped: drop.size };
 }
 
 /** Make a saved draft the live asset again. */
@@ -1095,6 +1166,13 @@ export async function restoreVersionOfScene(
       reason: "That saved draft is no longer available — its file was removed from Airtable.",
     };
   }
+
+  // Restoring replaces the live asset, so file that one first — otherwise
+  // stepping back to an older draft throws away the newer one, which is the
+  // exact loss this whole feature exists to prevent. De-duplication makes it
+  // a no-op when the live asset is already kept, and a failure here must not
+  // block the restore.
+  await saveVersionOfScene(sceneId, version.kind, { auto: true }).catch(() => {});
 
   if (version.kind === "image") {
     const patch: Record<string, unknown> = {

@@ -108,6 +108,10 @@ async function flagStaleClip(
   const inputs = await readSceneVideoInputs(sceneId).catch(() => null);
   if (!inputs?.hasClip) return "none";
   if (!inputs.hasImageMediaId || !inputs.hasMotionPrompt) return "blocked";
+  // This path replaces a clip the producer never asked to lose — it fires
+  // when an approved image made the existing clip stale — so it is the one
+  // that most needs the outgoing clip kept.
+  await autoKeep(sceneId, "video");
   await writeSceneApproval(sceneId, "video", "regenerate");
   return "flagged";
 }
@@ -129,6 +133,21 @@ async function chainVideoRegen(
     : " The clip was built from the old picture, so a new one was queued — a running batch picks it up within ~15s.";
 }
 
+/**
+ * Keep the outgoing asset before anything replaces it.
+ *
+ * The manual button only helps the producer who remembers to press it, and
+ * the moment you need a draft is exactly the moment you did not expect to —
+ * so every path that replaces an image or a clip files one first. Already
+ * saved assets are de-duplicated, so this stays quiet.
+ *
+ * Deliberately swallows its errors: this is a safety net, and a safety net
+ * that can block the regeneration it protects is worse than none.
+ */
+async function autoKeep(sceneId: string, kind: "image" | "video"): Promise<void> {
+  await saveVersionOfScene(sceneId, kind, { auto: true }).catch(() => {});
+}
+
 export async function sceneAction(
   projectId: string,
   sceneId: string,
@@ -144,6 +163,9 @@ export async function sceneAction(
       // n8n appends this to the generation prompt, then clears it.
       await writeSceneFeedback(sceneId, feedback.trim());
     }
+    // Before the replacement is set in motion, not after: once n8n overwrites
+    // the field the old asset is unreachable.
+    if (action === "regenerate") await autoKeep(sceneId, kind);
     await writeSceneApproval(sceneId, kind, action);
 
     // Image regeneration runs on its own webhook, so it no longer depends on
@@ -538,6 +560,9 @@ export async function restartVideoRegen(
     return { ok: true, message: "Demo mode — nothing was written." };
   }
   try {
+    // Same safety net as every other replacing path: keep the clip that is
+    // about to be replaced, before anything can overwrite it.
+    await autoKeep(sceneId, "video");
     await writeSceneApproval(sceneId, "video", "regenerate");
     const where = await nudgeProduction(projectId);
     revalidatePath(`/projects/${projectId}`);

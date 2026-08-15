@@ -27,7 +27,11 @@ function updateTabBadge(pulse: Pulse) {
     c.height = 64;
     const g = c.getContext("2d");
     if (!g) return;
-    // Dark rounded tile — the app's ground.
+    // Dark rounded tile. This used to match the app's ground and no longer
+    // does — the app is light now — but the tile stays dark on purpose: a
+    // favicon sits on browser chrome, not on the page, and a near-white tile
+    // disappears into a light tab strip exactly when the badge is trying to
+    // say "the factory needs you". The status marks below carry the colour.
     g.beginPath();
     g.roundRect(0, 0, 64, 64, 16);
     g.fillStyle = "#141416";

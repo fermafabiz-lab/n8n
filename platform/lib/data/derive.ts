@@ -171,7 +171,10 @@ export interface RawScene {
   narration: string | null;
   imagePrompt: string | null;
   imageUrl: string | null;
+  /** Where the clip was published — Drive, fal, Flow. May be gone. */
   videoUrl: string | null;
+  /** Our own copy in the media store, if there is one. */
+  storedVideoUrl: string | null;
   voiceUrl: string | null;
   sceneApproved: boolean;
   imageApproved: boolean;
@@ -326,6 +329,26 @@ export function buildScene(r: RawScene, index: number): Scene {
   const order = r.order ?? index + 1;
 
   /*
+   * Our copy wins over the published link.
+   *
+   * Airtable read "Scene Final URL" first and fell back to the attachment, on
+   * the assumption that the attachment was the raw clip and the URL the muxed
+   * one. Measured, that is not true: twelve of twelve stored clips carry an
+   * aac track, so the stored file IS the muxed clip.
+   *
+   * Meanwhile the published link is somebody else's uptime. Of the thirteen
+   * scenes not on Drive, eleven fal links still answer months later — but both
+   * `flow-content.google` links answer 403, and both of those scenes have a
+   * perfectly good copy on our own disk that the old precedence refused to
+   * show.
+   *
+   * The two move together from now on — the ingest endpoint writes the file
+   * and Scene Final URL in one transaction — so preferring ours costs nothing
+   * and drops a dependency on a host we do not run.
+   */
+  const videoUrl = r.storedVideoUrl ?? r.videoUrl;
+
+  /*
    * The scene's state, DERIVED — the stored text is a poor witness.
    *
    * n8n only writes that field when a loop physically reaches the scene, and
@@ -358,7 +381,7 @@ export function buildScene(r: RawScene, index: number): Scene {
             ? "Generare Video"
             : r.videoApproved
               ? "Finalizat"
-              : r.videoUrl
+              : videoUrl
                 ? "Așteaptă Aprobare Video"
                 : !r.sceneApproved
                   ? rawStatus
@@ -388,7 +411,7 @@ export function buildScene(r: RawScene, index: number): Scene {
     narration: r.narration,
     imagePrompt: r.imagePrompt,
     imageUrl: r.imageUrl,
-    videoUrl: r.videoUrl,
+    videoUrl,
     voiceUrl: r.voiceUrl,
     sceneApproved: r.sceneApproved,
     rewriteRequested: /regenerare text/.test(norm),

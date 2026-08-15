@@ -164,10 +164,8 @@ function toRawScene(r: SceneRow): RawScene & { createdAt: string | null } {
     narration: r.narration,
     imagePrompt: r.image_prompt,
     imageUrl: mediaUrl(r.image_path),
-    // The clip the site plays is the muxed per-scene file; the stored
-    // attachment is the fallback, exactly as the Airtable adapter reads
-    // "Scene Final URL" first and the "Video Scenă" attachment second.
-    videoUrl: r.scene_final_url || mediaUrl(r.video_path),
+    videoUrl: r.scene_final_url,
+    storedVideoUrl: mediaUrl(r.video_path),
     voiceUrl: r.voiceover_url,
     sceneApproved: r.scene_approved,
     imageApproved: r.image_approved,

@@ -290,9 +290,8 @@ function toRawScene(r: AirtableRecord): RawScene & { createdAt: string | null } 
       (pick(r.fields, F.sceneVideoPrompt) as string) ?? null,
     ),
     imageUrl: firstAttachmentUrl(pick(r.fields, F.sceneImage)),
-    videoUrl:
-      ((pick(r.fields, F.sceneVideo) as string) || null) ??
-      firstAttachmentUrl(pick(r.fields, F.sceneVideoAttachment)),
+    videoUrl: (pick(r.fields, F.sceneVideo) as string) || null,
+    storedVideoUrl: firstAttachmentUrl(pick(r.fields, F.sceneVideoAttachment)),
     voiceUrl: (pick(r.fields, F.sceneVoice) as string) ?? null,
     sceneApproved: Boolean(pick(r.fields, F.sceneApproved)),
     imageApproved: Boolean(pick(r.fields, F.sceneImageApproved)),

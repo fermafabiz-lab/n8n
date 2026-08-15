@@ -1890,6 +1890,55 @@ HTTP Request (download the url, response format: file)
 `/opt/n8n/media` is already mounted read-write into the n8n container at
 `/media`, and n8n is in the `hovmedia` group, so the write works today.
 
+### Editing a live workflow is safe; publishing is not
+
+n8n 2.32.7 keeps a draft and a published version side by side — `versionId` is
+the draft, **`activeVersionId` is what production actually runs**. Updating a
+workflow through the API or the UI bumps the draft and nothing else; the live
+version keeps serving until `publish_workflow`.
+
+    select name, active, "versionId" = "activeVersionId" as draft_equals_live
+    from workflow_entity where active;
+
+All six read `true` when there is no work in progress, so that query also tells
+you whether someone left an unpublished edit lying around.
+
+**So the port does not need a quiet window — only the publish does.** The 48
+nodes can be converted, reviewed and left as drafts while films are being made,
+and the window shrinks to the ~20 minutes in the next section. Do not hold
+production idle waiting for porting work; it buys nothing.
+
+### The write mechanism: dollar-quoting, not parameters
+
+Feeding n8n expressions into SQL looked like the awkward part and turned out
+not to be. Postgres dollar-quoting sidesteps escaping entirely:
+
+```sql
+select * from hov.at_write($hov$scene$hov$, $hov${{ $json.sceneId }}$hov$,
+  $hov${{ JSON.stringify({ "Observații Scenă": $json.note,
+                           "Aprobare Imagine": false }) }}$hov$::jsonb)
+```
+
+The column mapping of an Airtable node becomes the object literal in the middle
+— a mechanical rewrite. Verified through a real Postgres node with deliberately
+hostile input (`it's "tricky" — 100% $5 cost`, a newline, and `ăîșțâ`), which
+round-tripped byte for byte, booleans included, with the regen timestamp set.
+
+Only a literal `$hov$` in the data could break it, which no prompt will contain.
+`queryReplacement` was the obvious alternative and is worse: it splits on
+commas, and these payloads are full of them.
+
+### The four search shapes
+
+Thirteen `search` nodes, four distinct filters between them:
+
+| Airtable formula | SQL |
+|---|---|
+| `AND({Project_ID}='X', {Aprobare Scenă}=1)` | `fields->>'Project_ID' = 'X' and (fields->>'Aprobare Scenă')::boolean` |
+| `OR(RECORD_ID()='a', RECORD_ID()='b', …)` | `id = any(...)` built from the same `.map()` |
+| `{Status General}='Finalizat'` | `fields->>'Status General' = 'Finalizat'` |
+| `OR({Status Producție Scenă}='A', …='B')` | `fields->>'Status Producție Scenă' in ('A','B')` |
+
 ### The cutover is atomic — this is the part to plan around
 
 **The workflows cannot be ported one at a time over a week.** The moment one

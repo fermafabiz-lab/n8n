@@ -1985,53 +1985,60 @@ Thirteen `search` nodes, four distinct filters between them:
 | `{Status General}='Finalizat'` | `fields->>'Status General' = 'Finalizat'` |
 | `OR({Status Producție Scenă}='A', …='B')` | `fields->>'Status Producție Scenă' in ('A','B')` |
 
-### The cutover is atomic — this is the part to plan around
+### The cutover happened — 2026-08-15, 22:46 UTC
 
-**The workflows cannot be ported one at a time over a week.** The moment one
-workflow writes Postgres while another still writes Airtable, a project in
-flight has half its state in each system, and nothing reconciles them. There is
-no "migrate Final Assembly first and see how it goes".
+Airtable is no longer read or written by anything. What ran, in order:
 
-So the sequence is: prepare every ported workflow, then in **one window with
-nothing running** —
+1. `search_executions` returned zero running/waiting.
+2. `pg_dump` of `hov` to `/opt/n8n/backups_hov_pre_cutover.sql.gz`.
+3. Final `import-from-airtable.mjs` — 56 projects, 382 scenes, 334 files.
+4. Five `PUT`s from `db/port/workflows/*.ported.json`. **22:46:38.**
+5. `DATA_BACKEND=postgres` + `docker compose up -d web`.
 
-1. `search_executions` returns zero `running`/`waiting`.
-2. Final `import-from-airtable.mjs` run (it is idempotent; this is the sync).
-3. Publish all five ported workflows.
-4. `DATA_BACKEND=postgres` in `/opt/n8n/.env`, `docker compose up -d web`.
-5. `node scripts/check-n8n.mjs`, then one full film end to end.
+First production execution on the new backend was `4019`, 22:50:47: same scene,
+same Romanian field names, same values — with
+`https://house-of-videos.com/media/…` where Airtable had signed links, and
+**65 ms where Airtable took 787 ms**.
 
-Roll back by reverting step 3 and 4 — Airtable is untouched by any of this and
-stays a complete, current copy until the plan is actually cancelled. **Do not
-cancel the Airtable subscription on cutover day.** Give it a full film and a
-week first; it is the only rollback that exists.
+**A caution about verifying this.** Execution `4018` ran at 22:45:47, 51
+seconds before the PUT landed, and reading it as proof of success was wrong —
+its attachment URLs were still `airtableusercontent.com`, with `thumbnails`,
+which `at_attachments()` never emits. Compare an execution's `startedAt`
+against the workflow's `updatedAt` before believing it tested anything.
 
-### Settings — the screens that replace Airtable's grid
+### Rolling back
 
-`/admin` edits the three tables nobody had a screen for, because Airtable's
-grid WAS the screen: `Genre Profiles`, `Script Library`, `Librărie Scripturi`.
+Airtable is untouched and complete. To go back:
 
-**They are wired to both backends, and that is not tidiness.** A Postgres-only
-version would look like it worked before the cutover — someone edits a genre,
-sees "Saved", and the next film ignores it because Claude Scripting is still
-reading Airtable. The page prints which store answered for the same reason:
-while two exist, an edit landing in the one nothing reads is indistinguishable
-from an edit that worked.
+    # workflows
+    for f in db/port/workflows/*.original.json; do … PUT … ; done
+    # site
+    sed -i 's/^DATA_BACKEND=.*/DATA_BACKEND=airtable/' /opt/n8n/.env
+    cd /opt/n8n && docker compose up -d web
 
-Two rules the forms enforce rather than trust:
+**The asymmetry that matters:** rolling back loses everything written since the
+cutover, because those writes went to Postgres and the import only ever runs
+one way. The longer it runs, the more expensive the rollback — so give it a
+full film early rather than waiting.
 
-- **A genre's tone cannot be blanked.** That string is how scripting finds the
-  row (`lower(tone)`), so an unnamed profile is an unreachable one.
-- **A new genre is created inactive.** A half-filled profile that scripting
-  starts using immediately is worse than none, because the built-in fallback is
-  complete and a fresh row is not.
+**Do not cancel the Airtable plan yet.** It is the only rollback that exists.
+A full film and a week first.
 
-`Raw Transcript` is deliberately not editable — far too long for a form, and
-nothing reads it by hand. The row shows its size instead.
+### Known gaps, live right now
 
-Records are closed lines with their state on the right. Eleven genres at twelve
-fields each is four hundred inputs, and the question people arrive with is
-"which of these is on?".
+- **Saved drafts throw on Postgres.** `saveVersionOfScene` /
+  `restoreVersionOfScene` are not implemented — the manual "Save draft" and
+  "Restore" buttons show an error. `autoKeep` swallows it (`.catch(() => {})`),
+  so the automatic safety net before a regeneration silently does nothing
+  rather than blocking anything. Reading versions works. The fix needs
+  `attachment.path`'s global unique dropped for `(scene_id, field, path)` —
+  a draft points at the SAME file the scene still holds, which the current
+  index forbids.
+- **`Scene Final URL` still wins over the stored clip.** `toRawScene` reads
+  `scene_final_url || mediaUrl(video_path)`, matching Airtable's old
+  precedence — so a scene whose fal link has expired shows a dead video even
+  though a permanent copy now sits in the media store. Pre-existing, not a
+  regression, and now trivially fixable: prefer the attachment.
 
 ### Still owed before Airtable can be cancelled
 
@@ -2044,10 +2051,9 @@ fields each is four hundred inputs, and the question people arrive with is
    live immediately, so they go in during the window.
 3. ~~Admin screens for the three hand-edited tables.~~ Done — `/admin`, on
    both backends.
-4. Saved drafts on Postgres: `saveVersionOfScene` / `restoreVersionOfScene`
-   throw rather than pretend. Reading versions works. The open question is
-   whether a draft copies the bytes or `attachment.path` stops being unique.
-5. Cutover, then a full film and a week before cancelling the plan.
+4. Saved drafts on Postgres — see "Known gaps, live right now".
+5. ~~Cutover.~~ Done 2026-08-15. A full film and a week before cancelling the
+   Airtable plan; it is the only rollback there is.
 
 
 ## Environment

@@ -1823,6 +1823,94 @@ per-character voice assignments intact, covers and scene images resolving to
 the media store, `scene_final_url` correctly winning over the stored
 attachment, and scene orders 1/101/102/103 in the right sequence.
 
+## Porting the workflows off Airtable
+
+48 Airtable nodes across the five active workflows: 22 `update`, 13 `search`,
+8 `get`, 5 `create`.
+
+| Workflow | Airtable nodes | of total |
+|---|---|---|
+| 3. Media Generation (Batch) | 23 | 165 |
+| Claude Scripting | 10 | 100 |
+| 1. Master Orchestrator | 8 | 32 |
+| 4. Final Assembly | 4 | 37 |
+| Video Factory Notifications | 3 | 7 |
+
+### Postgres speaks Airtable, so the expressions never find out
+
+**Do not swap an Airtable node for a Postgres node that returns columns.**
+`db/002_airtable_compat.sql` exists because of one number: **52 nodes read
+`$json.fields['Nume Câmp']`** — Romanian, with diacritics. A Postgres node
+returning flat snake_case breaks every one of them, and they are scattered
+through 344 nodes. That is not a port, it is a rewrite of the pipeline's gates.
+
+So the database emits Airtable's exact shape instead:
+
+```sql
+select id, "createdTime", fields from hov.at_scene where id = $1
+select * from hov.at_write('scene', $1, '{"Aprobare Imagine": true}'::jsonb)
+select * from hov.at_create('project', $1::jsonb)
+```
+
+`{ id, createdTime, fields: {…} }`, with linked records as id arrays and
+attachments as `[{id,url,filename,size,type,width,height}]`. Views `at_project`
+/ `at_scene` / `at_chapter` / `at_script`; writes through `at_write` /
+`at_create`, which read the field map out of `hov.airtable_field` and cast
+using each column's real type from `information_schema` — there is no second
+copy of the schema to drift.
+
+**Verified inside n8n**, not just in psql: a real Postgres node feeding a Set
+node resolved `$json.fields["Ordine Scenă"]` → `102`,
+`$json.fields["Imagine Scenă"][0].url` → the media store URL, `$json.id` →
+the record id, and `typeof $json.fields` → `object`. That last one is the
+assumption the whole design rests on and it holds: node-postgres parses jsonb
+into a real object, so expressions index it exactly as they indexed Airtable's.
+
+Credential: **`HOV Postgres`** (`eRjiNDQFuDSTJpGK`), type `postgres`, pointing
+at `postgres:5432/hov` on the compose network.
+
+`at_write` **refuses** rather than drops: an unmapped field name raises, and so
+does any attempt to write an attachment. A silently ignored write is precisely
+the divergence that would make a parallel run look successful while it was not.
+
+### The four nodes that need more than a query
+
+`Write Scene Image`, `Write Regen Image`, `Write Regen Video` and
+`Update Scene Record` write `"Imagine Scenă": [{url}]` / `"Video Scenă":
+[{url}]`. **Airtable then went and fetched those bytes itself** — that download
+is what kept assets alive after fal and Flow's signed links expired, and it is
+the one thing Postgres cannot do. Each of the four needs a chain instead:
+
+```
+HTTP Request (download the url, response format: file)
+  → Read/Write Files from Disk (write /media/<sceneId>/<field>/<sha>.<ext>)
+  → Postgres (insert into hov.attachment, then at_write for the other fields)
+```
+
+`/opt/n8n/media` is already mounted read-write into the n8n container at
+`/media`, and n8n is in the `hovmedia` group, so the write works today.
+
+### The cutover is atomic — this is the part to plan around
+
+**The workflows cannot be ported one at a time over a week.** The moment one
+workflow writes Postgres while another still writes Airtable, a project in
+flight has half its state in each system, and nothing reconciles them. There is
+no "migrate Final Assembly first and see how it goes".
+
+So the sequence is: prepare every ported workflow, then in **one window with
+nothing running** —
+
+1. `search_executions` returns zero `running`/`waiting`.
+2. Final `import-from-airtable.mjs` run (it is idempotent; this is the sync).
+3. Publish all five ported workflows.
+4. `DATA_BACKEND=postgres` in `/opt/n8n/.env`, `docker compose up -d web`.
+5. `node scripts/check-n8n.mjs`, then one full film end to end.
+
+Roll back by reverting step 3 and 4 — Airtable is untouched by any of this and
+stays a complete, current copy until the plan is actually cancelled. **Do not
+cancel the Airtable subscription on cutover day.** Give it a full film and a
+week first; it is the only rollback that exists.
+
 ### Still owed before Airtable can be cancelled
 
 1. ~~A `PostgresAdapter` behind the existing signatures in
@@ -1830,12 +1918,12 @@ attachment, and scene orders 1/101/102/103 in the right sequence.
    here said 11 direct `fetch` calls to `api.airtable.com` had to be pulled in
    first; on inspection all 11 were already *inside* `lib/data.ts`. Nothing
    outside it ever talked to Airtable directly.)
-2. Every Airtable node in the 4 live workflows, one at a time, with
-   `node scripts/check-n8n.mjs` after each. **This is the step that decides the
-   cutover** — the site can be flipped in a second, the workflows cannot.
+2. The 48 Airtable nodes. The compatibility layer that makes 44 of them a
+   one-line query change is **done and verified** (see above); the 4 that write
+   attachments need a download chain built. All of it lands in one window —
+   see "The cutover is atomic".
 3. Admin screens for the three hand-edited tables.
-4. A final `import-from-airtable.mjs` run at cutover, flip `DATA_BACKEND`,
-   then cancel the plan.
+4. Cutover, then let it run a full film and a week before cancelling the plan.
 
 
 ## Environment

@@ -2043,7 +2043,21 @@ write access, which is not the same door as the approval buttons.
 
 It reads `hov` directly, so **it shows real column names**, not the Airtable
 ones. `hov.at_scene` and the other `at_*` views are there for anyone who wants
-the old shape back.
+the old shape back. The tables live under the **`hov` schema**, not `public`.
+
+**The `hov` role can only reach its own database, and that had to be arranged.**
+Postgres grants CONNECT on every database to PUBLIC by default, so on the first
+visit pgweb's own Connect button led straight into the `n8n` database — its
+`project` table, its `oauth_access_tokens`, its migrations. Table reads were
+denied, but the schema was fully visible, and the `/db` password is not the
+password that should open n8n's internals. Closed with:
+
+    revoke connect on database n8n      from public;
+    revoke connect on database postgres from public;
+
+Owners keep their access, so n8n was unaffected — verified immediately after
+(9 workflows, healthz 200). Worth re-checking after any `createdb`: a new
+database starts open to everyone again.
 
 ### Known gaps, live right now
 

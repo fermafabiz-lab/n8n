@@ -36,9 +36,9 @@ function updateTabBadge(pulse: Pulse) {
       // Amber disc with the waiting count: the "needs you" state.
       g.beginPath();
       g.arc(32, 32, 23, 0, Math.PI * 2);
-      g.fillStyle = "#f5b841";
+      g.fillStyle = "#7a4fd6";
       g.fill();
-      g.fillStyle = "#171004";
+      g.fillStyle = "#f7f7f8";
       g.font = "700 32px -apple-system, 'Segoe UI', sans-serif";
       g.textAlign = "center";
       g.textBaseline = "middle";
@@ -51,7 +51,7 @@ function updateTabBadge(pulse: Pulse) {
       g.lineTo(48, 32);
       g.lineTo(24, 46);
       g.closePath();
-      g.fillStyle = pulse.err > 0 ? "#f0655b" : "#f5b841";
+      g.fillStyle = pulse.err > 0 ? "#d8483d" : "#7a4fd6";
       g.fill();
     }
     let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');

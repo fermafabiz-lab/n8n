@@ -69,7 +69,7 @@ export default function AutoResume({
   return (
     <div
       className="setupnote"
-      style={{ borderColor: "rgba(240,101,91,0.4)", marginBottom: 16 }}
+      style={{ borderColor: "rgba(216, 72, 61,0.4)", marginBottom: 16 }}
     >
       {msg ? (
         <span>{msg.message}</span>

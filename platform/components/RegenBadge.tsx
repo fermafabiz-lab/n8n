@@ -37,7 +37,7 @@ export default function RegenBadge({
             margin: "8px 0 0",
             fontSize: 12,
             lineHeight: 1.5,
-            color: "#f5a8a2",
+            color: "var(--red)",
           }}
         >
           Last attempt failed: {rejection.slice(0, 260)}

@@ -125,7 +125,7 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
     manage
       ? {
           outline: selected.has(id)
-            ? "2px solid var(--red, #f0655b)"
+            ? "2px solid var(--red, #d8483d)"
             : "2px solid transparent",
           opacity: selected.has(id) ? 1 : 0.75,
           transition: "outline-color 0.15s, opacity 0.15s",
@@ -195,9 +195,9 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
                 className="abtn"
                 disabled={pending || selected.size === 0}
                 style={{
-                  borderColor: "rgba(240,101,91,0.45)",
-                  color: armed ? "#fff" : "#f5a8a2",
-                  background: armed ? "rgba(240,101,91,0.85)" : undefined,
+                  borderColor: "rgba(216, 72, 61,0.45)",
+                  color: armed ? "#fff" : "var(--red)",
+                  background: armed ? "rgba(216, 72, 61,0.85)" : undefined,
                   fontSize: 12,
                   padding: "7px 14px",
                 }}
@@ -295,7 +295,7 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
                       justifyContent: "center",
                       fontSize: 15,
                       fontWeight: 700,
-                      background: selected.has(p.id) ? "#f0655b" : "rgba(0,0,0,0.55)",
+                      background: selected.has(p.id) ? "#d8483d" : "rgba(0,0,0,0.55)",
                       color: "#fff",
                       border: "1px solid rgba(255,255,255,0.35)",
                     }}
@@ -348,7 +348,7 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      background: "rgba(240,101,91,0.4)",
+                      background: "rgba(216, 72, 61,0.4)",
                       color: "#fff",
                       fontWeight: 700,
                     }}

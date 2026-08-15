@@ -257,8 +257,8 @@ export default function VoicePicker({
                 padding: "10px 12px",
                 borderRadius: 10,
                 cursor: "pointer",
-                background: isSel ? "rgba(245,184,65,0.08)" : "var(--card2)",
-                border: `1px solid ${isSel ? "rgba(245,184,65,0.45)" : "var(--line)"}`,
+                background: isSel ? "var(--accent-a08)" : "var(--card2)",
+                border: `1px solid ${isSel ? "rgba(122, 79, 214,0.45)" : "var(--line)"}`,
               }}
             >
               <button
@@ -274,8 +274,8 @@ export default function VoicePicker({
                   borderRadius: "50%",
                   flex: "none",
                   border: "1px solid var(--line2)",
-                  background: playing === v.voice_id ? "var(--amber)" : "var(--bg2)",
-                  color: playing === v.voice_id ? "#171004" : "var(--ink)",
+                  background: playing === v.voice_id ? "var(--accent)" : "var(--bg2)",
+                  color: playing === v.voice_id ? "#f7f7f8" : "var(--ink)",
                   fontSize: 14,
                   cursor: v.preview_url ? "pointer" : "default",
                   opacity: v.preview_url ? 1 : 0.35,

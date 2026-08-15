@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=Inter:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #ececed; color: #1b1b1e; font-family: "Inter", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  a { text-decoration: none; }
+  ::selection { background: rgba(122,79,214,0.18); }
+  button:focus-visible { outline: 2px solid #7a4fd6; outline-offset: 3px; }
+  @keyframes drift { 0%,100% { transform: translate(0,0) scale(1) } 50% { transform: translate(calc(-24px * var(--m,1)), calc(16px * var(--m,1))) scale(1.06) } }
+  @keyframes pulse { 0%,100% { opacity: .35 } 50% { opacity: 1 } }
+</style>
+</helmet>
+
+<div style="width: 1280px; margin: 0 auto; padding: 14px 0 0;">
+
+  <div style="display: flex; justify-content: center;">
+    <div style="{{ navBar }}">
+      <a href="House of Videos Landing.dc.html" style="display: flex; align-items: center; gap: 9px; font-family: 'Outfit', sans-serif; font-size: 18px; font-weight: 500; letter-spacing: -.02em; color: #1b1b1e;">
+        <span style="{{ mark }}"></span>House of Videos
+      </a>
+      <span style="display: flex; gap: 4px;">
+        <sc-for list="{{ nav }}" as="n" hint-placeholder-count="4">
+          <a href="#" style="{{ n.style }}" style-hover="opacity:1;color:#1b1b1e">{{ n.label }}</a>
+        </sc-for>
+      </span>
+      <a href="House of Videos Start.dc.html" style="{{ navBtn }}" style-hover="transform:translateY(-2px)">Start a video</a>
+    </div>
+  </div>
+
+  <div style="{{ shell }}">
+    <div style="{{ blob }}"></div>
+
+    <div style="position: relative; padding: 38px 40px 0;">
+      <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 40px;">
+        <div>
+          <span style="{{ pill }}"><span style="{{ dotLive }}"></span>{{ projectState }}</span>
+          <h1 style="margin: 18px 0 0; font-family: 'Outfit', sans-serif; font-size: 54px; line-height: 1.0; font-weight: 500; letter-spacing: -.045em; color: #2a2a30;">The Last Lighthouse Keepers</h1>
+          <span style="display: flex; gap: 16px; margin-top: 14px; font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; color: #63636e;">
+            <span>08:00</span><span>·</span><span>60 scenes</span><span>·</span><span>documentary, cinematic</span><span>·</span><span>Rachel / English</span>
+          </span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 10px; align-items: flex-end;">
+          <span style="font-size: 13px; color: #63636e;">{{ overallLabel }}</span>
+          <span style="{{ overallTrack }}"><i style="{{ overallFill }}"></i></span>
+        </div>
+      </div>
+
+      <div style="{{ stepper }}">
+        <sc-for list="{{ stages }}" as="s" hint-placeholder-count="5">
+          <button style="{{ s.style }}" onClick="{{ s.pick }}" style-hover="transform:translateY(-2px)">
+            <span style="{{ s.badge }}">{{ s.mark }}</span>
+            <span style="display: flex; flex-direction: column; gap: 2px; text-align: left;">
+              <span style="{{ s.name }}">{{ s.label }}</span>
+              <span style="{{ s.meta }}">{{ s.state }}</span>
+            </span>
+          </button>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="position: relative; display: grid; grid-template-columns: 1fr 340px; gap: 20px; padding: 24px 40px 40px;">
+
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+
+        <sc-if value="{{ isScript }}" hint-placeholder-val="{{ false }}">
+          <div style="{{ card }}">
+            <div style="display: flex; align-items: baseline; justify-content: space-between;">
+              <h2 style="{{ cardTitle }}">Script</h2>
+              <span style="{{ num }}">5 chapters · 1,320 words</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <sc-for list="{{ chapters }}" as="c" hint-placeholder-count="5">
+                <div style="{{ c.row }}" onClick="{{ c.open }}">
+                  <span style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+                    <span style="display: flex; align-items: center; gap: 12px;">
+                      <span style="{{ c.numStyle }}">{{ c.no }}</span>
+                      <span style="{{ c.title }}">{{ c.name }}</span>
+                    </span>
+                    <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: #6f6f7c;">{{ c.meta }}</span>
+                  </span>
+                  <sc-if value="{{ c.isOpen }}" hint-placeholder-val="{{ false }}">
+                    <p style="{{ c.bodyStyle }}">{{ c.body }}</p>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isScenes }}" hint-placeholder-val="{{ true }}">
+          <div style="{{ card }}">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 20px;">
+              <h2 style="{{ cardTitle }}">Scenes</h2>
+              <span style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 13px; color: #63636e;">{{ approvedCount }} of {{ sceneTotal }} approved</span>
+                <button style="{{ approveAllBtn }}" onClick="{{ approveAll }}" style-hover="transform:translateY(-2px)">Approve all</button>
+              </span>
+            </div>
+
+            <div style="{{ hero }}">
+              <span style="{{ heroBadge }}">scene {{ sceneNo }} · first frame → last frame</span>
+              <span style="position: absolute; left: 16px; bottom: 16px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: rgba(255,255,255,0.55);">flux → kling i2v</span>
+              <span style="position: absolute; right: 16px; bottom: 16px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: rgba(255,255,255,0.55);">8.0s</span>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <button style="{{ playBtn }}" onClick="{{ togglePlay }}" style-hover="transform:translateY(-2px)">{{ playLabel }}</button>
+              <span style="{{ scrubTrack }}"><i style="{{ scrubFill }}"></i><i style="{{ scrubKnob }}"></i></span>
+              <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #63636e;">{{ timecode }}</span>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 300px; gap: 14px;">
+              <div style="{{ innerCard }}">
+                <span style="{{ label }}">Narration</span>
+                <p style="margin: 8px 0 0; font-size: 15.5px; line-height: 1.55; color: #2a2a30; text-wrap: pretty;">{{ narration }}</p>
+                <span style="display: block; margin-top: 10px; font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: #6f6f7c;">{{ wordCount }} words · Rachel</span>
+              </div>
+              <div style="{{ innerCard }}">
+                <span style="{{ label }}">Motion prompt</span>
+                <p style="margin: 8px 0 0; font-size: 13.5px; line-height: 1.5; color: #55555e;">{{ motionPrompt }}</p>
+                <span style="display: flex; gap: 8px; margin-top: 14px;">
+                  <button style="{{ ghostSm }}" style-hover="transform:translateY(-2px)">Edit</button>
+                  <button style="{{ ghostSm }}" style-hover="transform:translateY(-2px)">Regenerate</button>
+                </span>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px;">
+              <sc-for list="{{ scenes }}" as="s" hint-placeholder-count="10">
+                <div style="{{ s.tile }}" onClick="{{ s.select }}" style-hover="transform:translateY(-3px)">
+                  <span style="{{ s.thumb }}">
+                    <button style="{{ s.check }}" onClick="{{ s.approve }}">✓</button>
+                  </span>
+                  <span style="{{ s.no }}">{{ s.label }}</span>
+                  <span style="{{ s.text }}">{{ s.line }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isImages }}" hint-placeholder-val="{{ false }}">
+          <div style="{{ card }}">
+            <div style="display: flex; align-items: baseline; justify-content: space-between;">
+              <h2 style="{{ cardTitle }}">Keyframes</h2>
+              <span style="{{ num }}">120 frames · each scene opens where the last one closed</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <sc-for list="{{ pairs }}" as="p" hint-placeholder-count="4">
+                <div style="{{ innerCard }}">
+                  <span style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                    <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: #63636e;">{{ p.label }}</span>
+                    <span style="{{ p.chip }}">{{ p.state }}</span>
+                  </span>
+                  <span style="display: flex; align-items: center; gap: 12px;">
+                    <span style="{{ p.a }}"></span>
+                    <span style="font-size: 15px; color: #6f6f7c;">→</span>
+                    <span style="{{ p.b }}"></span>
+                    <span style="flex: 1; font-size: 13px; color: #55555e; line-height: 1.5;">{{ p.note }}</span>
+                  </span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isVideo }}" hint-placeholder-val="{{ false }}">
+          <div style="{{ card }}">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <h2 style="{{ cardTitle }}">Clips</h2>
+              <span style="{{ num }}">34 of 60 rendered · 12 in the queue</span>
+            </div>
+            <div style="{{ hero }}">
+              <span style="{{ heroBadge }}">rendered clip · scene {{ sceneNo }}</span>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(10, 1fr); gap: 6px;">
+              <sc-for list="{{ clipStrip }}" as="c" hint-placeholder-count="20">
+                <span style="{{ c.style }}"></span>
+              </sc-for>
+            </div>
+            <div style="{{ innerCard }}">
+              <span style="display: flex; align-items: center; justify-content: space-between;">
+                <span style="font-size: 13.5px; color: #55555e;">Rendering scene 35 — kling 2.1, two keyframes pinned</span>
+                <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #63636e;">≈ 46 min left</span>
+              </span>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isAssembly }}" hint-placeholder-val="{{ false }}">
+          <div style="{{ card }}">
+            <div style="display: flex; align-items: baseline; justify-content: space-between;">
+              <h2 style="{{ cardTitle }}">Assembly</h2>
+              <span style="{{ num }}">waiting on the last 26 clips</span>
+            </div>
+            <div style="{{ hero }}">
+              <span style="{{ heroBadge }}">final cut · 08:00</span>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+              <sc-for list="{{ assembly }}" as="a" hint-placeholder-count="3">
+                <div style="{{ innerCard }}">
+                  <span style="{{ label }}">{{ a.k }}</span>
+                  <b style="display: block; margin-top: 8px; font-family: 'Outfit', sans-serif; font-size: 26px; font-weight: 500; letter-spacing: -.03em; color: #2a2a30;">{{ a.v }}</b>
+                </div>
+              </sc-for>
+            </div>
+            <button style="{{ bigBtn }}" style-hover="transform:translateY(-3px)">Render the final cut</button>
+          </div>
+        </sc-if>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 14px; position: sticky; top: 20px; align-self: start;">
+        <div style="{{ statusCard }}">
+          <span style="{{ darkPill }}"><span style="{{ dotLight }}"></span>{{ gateTitle }}</span>
+          <h3 style="margin: 16px 0 0; font-family: 'Outfit', sans-serif; font-size: 25px; font-weight: 500; letter-spacing: -.03em; color: #f7f7f8; line-height: 1.15;">{{ gateHeadline }}</h3>
+          <p style="margin: 10px 0 0; font-size: 13.5px; line-height: 1.55; color: #b7b7c2; text-wrap: pretty;">{{ gateBody }}</p>
+          <button style="{{ gateBtn }}" onClick="{{ gateAction }}" style-hover="transform:translateY(-3px)" style-active="transform:translateY(-1px)">{{ gateLabel }}</button>
+          <button style="{{ gateGhost }}" style-hover="transform:translateY(-2px)">Request changes</button>
+        </div>
+
+        <div style="{{ noteCard }}">
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase; color: #63636e;">Activity</span>
+          <sc-for list="{{ activity }}" as="a" hint-placeholder-count="5">
+            <div style="display: flex; gap: 11px; align-items: flex-start;">
+              <span style="{{ a.dot }}"></span>
+              <span style="display: flex; flex-direction: column; gap: 2px;">
+                <span style="font-size: 13.5px; color: #2a2a30;">{{ a.title }}</span>
+                <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: #6f6f7c;">{{ a.when }}</span>
+              </span>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="{{ noteCard }}">
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase; color: #63636e;">Spend on this film</span>
+          <span style="display: flex; align-items: flex-end; justify-content: space-between;">
+            <b style="font-family: 'Outfit', sans-serif; font-size: 34px; font-weight: 500; letter-spacing: -.04em; color: #2a2a30; line-height: 1;">$18.60</b>
+            <span style="font-size: 12.5px; color: #63636e;">of $22.40 estimated</span>
+          </span>
+          <span style="{{ spendTrack }}"><i style="{{ spendFill }}"></i></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 30px 12px 46px; font-size: 13.5px; color: #63636e;">
+    <span style="display: flex; align-items: center; gap: 9px;"><span style="{{ markSm }}"></span>House of Videos</span>
+    <span>Brief → script → scenes → film</span>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:940},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#7a4fd6&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;#7a4fd6&quot;,&quot;#c9482f&quot;,&quot;#2f6bd6&quot;,&quot;#17171a&quot;],&quot;section&quot;:&quot;Feel&quot;},&quot;surface&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;Cushioned&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;Cushioned&quot;,&quot;Crisp&quot;,&quot;Flat&quot;],&quot;section&quot;:&quot;Feel&quot;},&quot;motion&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;Floaty&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;Floaty&quot;,&quot;Calm&quot;,&quot;Still&quot;],&quot;section&quot;:&quot;Feel&quot;}}">
+const hex2rgb = h => { const s = h.replace("#", ""); const n = parseInt(s.length === 3 ? s.split("").map(c => c + c).join("") : s, 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+const rgba = (h, a) => { const [r, g, b] = hex2rgb(h); return `rgba(${r},${g},${b},${a})`; };
+const mix = (h, t, amt) => { const A = hex2rgb(h), B = hex2rgb(t); return "#" + A.map((v, i) => Math.round(v + (B[i] - v) * amt).toString(16).padStart(2, "0")).join(""); };
+
+const STAGES = [
+  { label: "Script", state: "approved" },
+  { label: "Scenes", state: "needs you" },
+  { label: "Keyframes", state: "88 of 120" },
+  { label: "Clips", state: "34 of 60" },
+  { label: "Assembly", state: "queued" },
+];
+
+const CHAPTERS = [
+  { name: "The light that never slept", meta: "268 words · 12 scenes", body: "For ninety years the lamp turned every eight seconds, and the men who kept it turning wrote almost nothing about themselves. The logbooks record weather, passing ships, and the hour the wick was trimmed." },
+  { name: "Three men and a boat", meta: "301 words · 14 scenes", body: "Keepers arrived three at a time and stayed for months. The rota was arithmetic before it was a life: one on watch, one asleep, one repairing whatever the sea had taken that week." },
+  { name: "Winter", meta: "254 words · 11 scenes", body: "In winter the tower moved. Not much — enough to feel it in your teeth, and enough that the mercury bath under the lens had to be watched as closely as the horizon." },
+  { name: "The engineers arrive", meta: "289 words · 13 scenes", body: "Automation came quietly in the seventies, one lighthouse at a time, arriving as a crate of relays and leaving as a job that no longer existed." },
+  { name: "What the sea kept", meta: "208 words · 10 scenes", body: "The last keeper left in 1998 and took the cat with him. The lamp still turns. From the mainland it looks exactly as it did in the logbook sketches." },
+];
+
+const SCENES = [
+  "The lamp turned every eight seconds, and had done so for ninety years.",
+  "Keepers arrived by boat, three at a time, and stayed for months.",
+  "Their logbooks record weather, ships, and almost nothing about themselves.",
+  "In winter the tower moved. Not much. Enough to feel it in your teeth.",
+  "Automation came in the seventies, quietly, one lighthouse at a time.",
+  "The last keeper left in 1998 and took the cat with him.",
+  "The lamp still turns. Nobody is upstairs to watch it.",
+  "Salt has taken the railings. The paint is on its fourth decade.",
+  "Every few years someone proposes a museum. Nothing comes of it.",
+  "From the mainland it looks as it did in the logbook sketches.",
+];
+
+class Component extends DCLogic {
+  state = {
+    stage: 1, chapter: 0, scene: 3, playing: false, t: 3.1,
+    approved: { 0: true, 1: true, 2: true, 3: false, 4: false, 5: true, 6: false, 7: false, 8: false, 9: false },
+    gateDone: false,
+  };
+
+  componentDidMount() {
+    this.tick = setInterval(() => { if (this.state.playing) this.setState(s => ({ t: s.t >= 8 ? 0 : +(s.t + 0.1).toFixed(1) })); }, 100);
+  }
+  componentWillUnmount() { clearInterval(this.tick); }
+
+  renderVals() {
+    const st = this.state;
+    const accent = this.props.accent ?? "#7a4fd6";
+    const surface = this.props.surface ?? "Cushioned";
+    const motion = this.props.motion ?? "Floaty";
+    const deep = mix(accent, "#0f0f12", 0.42);
+    const lift = mix(accent, "#ffffff", 0.42);
+
+    const S = {
+      Cushioned: { r: 24, shellR: 30, shadow: d => `0 ${12 * d}px ${28 * d}px rgba(24,20,40,0.13)`, light: "linear-gradient(160deg, #fbfbfc, #eeeef2)", border: "none" },
+      Crisp: { r: 14, shellR: 18, shadow: d => `0 ${4 * d}px ${10 * d}px rgba(24,20,40,0.09)`, light: "#fbfbfc", border: "1px solid rgba(24,20,40,0.10)" },
+      Flat: { r: 8, shellR: 10, shadow: () => "none", light: "#f6f6f8", border: "1px solid rgba(24,20,40,0.13)" },
+    }[surface];
+    const M = { Floaty: { m: 1, ease: ".38s cubic-bezier(.2,.8,.2,1)" }, Calm: { m: 0.45, ease: ".6s cubic-bezier(.3,.7,.2,1)" }, Still: { m: 0, ease: ".18s ease" } }[motion];
+    const tr = `transform ${M.ease}, box-shadow ${M.ease}, background ${M.ease}, color ${M.ease}, border-color ${M.ease}`;
+    const R = surface === "Flat" ? 6 : 999;
+    const soft = surface === "Flat" ? 8 : 18;
+
+    const approvedCount = Object.values(st.approved).filter(Boolean).length;
+    const stripes = (deg, a, b) => `repeating-linear-gradient(${deg}deg, ${a} 0 6px, ${b} 6px 12px)`;
+    const filmA = mix(deep, "#ffffff", 0.06), filmB = mix(deep, "#000000", 0.35);
+
+    const gate = [
+      { title: "Script gate", head: "The script is approved", body: "Five chapters, 1,320 words. Scenes were cut from it automatically.", label: "Reopen the script", act: () => this.setState({ stage: 0 }) },
+      { title: "Scene gate", head: st.gateDone || approvedCount === SCENES.length ? "Scenes approved — production continues" : `${SCENES.length - approvedCount} scenes still hold the gate`, body: "Nothing renders until every scene is checked. Approve them here or one by one below.", label: st.gateDone || approvedCount === SCENES.length ? "Gate open" : "Approve remaining", act: () => this.setState({ approved: Object.fromEntries(SCENES.map((_, i) => [i, true])), gateDone: true }) },
+      { title: "Keyframes", head: "88 of 120 frames made", body: "Each scene starts on the previous scene's last frame — that chain is what keeps the film coherent.", label: "Pause generation", act: () => {} },
+      { title: "Clips", head: "34 clips rendered, 12 queued", body: "Motion runs two keyframes at a time. Finished clips are never regenerated on resume.", label: "Pause rendering", act: () => {} },
+      { title: "Assembly", head: "Waiting on the last 26 clips", body: "Stitching starts on its own once every scene has a clip and a voiceover.", label: "Render anyway", act: () => {} },
+    ][st.stage];
+
+    const cardBase = { borderRadius: S.r, background: S.light, border: S.border, boxShadow: S.shadow(1.1), padding: "26px 28px 28px", display: "flex", flexDirection: "column", gap: 18, transition: tr };
+
+    return {
+      nav: ["Production", "Films", "Voices", "Settings"].map(label => ({ label, style: { fontSize: 14.5, color: "#55555e", opacity: 0.85, padding: "8px 13px", borderRadius: R, transition: tr } })),
+      navBar: { display: "flex", alignItems: "center", gap: 26, background: "rgba(252,252,253,0.9)", backdropFilter: "blur(18px)", border: S.border === "none" ? "1px solid rgba(255,255,255,0.7)" : S.border, borderRadius: R, padding: "9px 9px 9px 24px", boxShadow: S.shadow(1) },
+      navBtn: { whiteSpace: "nowrap", fontFamily: "inherit", fontSize: 14.5, color: "#f7f7f8", background: "#17171a", borderRadius: R, padding: "12px 24px", boxShadow: S.shadow(1.2), transition: tr },
+      mark: { width: 17, height: 17, borderRadius: surface === "Flat" ? 4 : "50%", background: `linear-gradient(135deg, ${accent} 0 50%, #1b1b1e 50% 100%)`, display: "block" },
+      markSm: { width: 15, height: 15, borderRadius: surface === "Flat" ? 4 : "50%", background: `linear-gradient(135deg, ${accent} 0 50%, #1b1b1e 50% 100%)`, display: "block" },
+
+      shell: { position: "relative", marginTop: 10, borderRadius: S.shellR, overflow: "hidden", background: "radial-gradient(90% 70% at 16% 10%, #fdfdfe 0%, rgba(253,253,254,0) 62%), linear-gradient(154deg, #f2f2f5 0%, #e4e4ea 50%, #eeeef1 100%)" },
+      blob: { position: "absolute", right: -470, top: -360, width: 880, height: 920, borderRadius: "50%", background: `radial-gradient(closest-side, rgba(20,18,28,0) 0 54%, ${rgba(deep, 0.85)} 64%, ${accent} 77%, ${lift} 87%, rgba(20,18,28,0.26) 94%, rgba(20,18,28,0) 100%)`, filter: "blur(20px)", opacity: 0.85, animation: M.m ? "drift 24s ease-in-out infinite" : "none", ["--m"]: M.m },
+
+      pill: { display: "inline-flex", alignItems: "center", gap: 8, background: "#fdfdfe", color: accent, borderRadius: R, padding: "7px 16px", fontSize: 13.5, boxShadow: S.shadow(0.7), border: S.border },
+      dotLive: { width: 6, height: 6, borderRadius: "50%", background: accent, display: "block", animation: M.m ? "pulse 2.4s ease-in-out infinite" : "none" },
+      dotLight: { width: 6, height: 6, borderRadius: "50%", background: lift, display: "block" },
+      projectState: "In production · scenes awaiting approval",
+      overallLabel: "48% of the way to a finished film",
+      overallTrack: { display: "block", width: 220, height: 6, borderRadius: 6, background: "rgba(24,20,40,0.09)", overflow: "hidden" },
+      overallFill: { display: "block", height: "100%", width: "48%", borderRadius: 6, background: `linear-gradient(90deg, ${mix(accent, "#ffffff", 0.3)}, ${accent})` },
+
+      stepper: { display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10, marginTop: 30 },
+      stages: STAGES.map((s, i) => {
+        const on = i === st.stage, done = i < st.stage;
+        return {
+          label: s.label, state: s.state, mark: done ? "✓" : String(i + 1),
+          pick: () => this.setState({ stage: i }),
+          style: { display: "flex", alignItems: "center", gap: 11, cursor: "pointer", padding: "13px 16px", borderRadius: soft, transition: tr, textAlign: "left", background: on ? `linear-gradient(160deg, ${deep}, #14141a)` : "#fdfdfe", border: on ? "none" : (S.border === "none" ? "1px solid rgba(24,20,40,0.06)" : S.border), boxShadow: on ? S.shadow(1.7) : S.shadow(0.5) },
+          badge: { width: 26, height: 26, flex: "none", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontFamily: "'IBM Plex Mono', monospace", background: on ? rgba(lift, 0.22) : done ? rgba(accent, 0.14) : "rgba(24,20,40,0.06)", color: on ? lift : done ? accent : "#6f6f7c" },
+          name: { fontFamily: "'Outfit', sans-serif", fontSize: 16, fontWeight: 500, letterSpacing: "-.02em", color: on ? "#f7f7f8" : "#2a2a30" },
+          meta: { fontSize: 11.5, color: on ? "#b7b7c2" : "#6f6f7c" },
+        };
+      }),
+
+      isScript: st.stage === 0, isScenes: st.stage === 1, isImages: st.stage === 2, isVideo: st.stage === 3, isAssembly: st.stage === 4,
+
+      card: cardBase,
+      innerCard: { borderRadius: soft, background: "#fdfdfe", border: S.border === "none" ? "1px solid rgba(24,20,40,0.06)" : S.border, boxShadow: S.shadow(0.4), padding: "16px 18px", transition: tr },
+      cardTitle: { margin: 0, fontFamily: "'Outfit', sans-serif", fontSize: 26, fontWeight: 500, letterSpacing: "-.03em", color: "#2a2a30" },
+      num: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 11.5, color: "#6f6f7c" },
+      label: { fontSize: 12, fontFamily: "'IBM Plex Mono', monospace", letterSpacing: ".08em", textTransform: "uppercase", color: "#6f6f7c" },
+
+      chapters: CHAPTERS.map((c, i) => {
+        const on = i === st.chapter;
+        return {
+          no: `0${i + 1}`, name: c.name, meta: c.meta, body: c.body, isOpen: on,
+          open: () => this.setState({ chapter: i }),
+          row: { display: "flex", flexDirection: "column", gap: 10, cursor: "pointer", padding: "16px 18px", borderRadius: soft, transition: tr, background: on ? `linear-gradient(160deg, ${deep}, #14141a)` : "#fdfdfe", border: on ? "none" : (S.border === "none" ? "1px solid rgba(24,20,40,0.06)" : S.border), boxShadow: on ? S.shadow(1.4) : S.shadow(0.4) },
+          numStyle: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 11.5, color: on ? lift : "#6f6f7c" },
+          title: { fontFamily: "'Outfit', sans-serif", fontSize: 19, fontWeight: 500, letterSpacing: "-.02em", color: on ? "#f7f7f8" : "#2a2a30" },
+          bodyStyle: { margin: 0, fontSize: 14.5, lineHeight: 1.6, color: on ? "#b7b7c2" : "#55555e", maxWidth: 640, textWrap: "pretty" },
+        };
+      }),
+
+      hero: { position: "relative", height: 260, borderRadius: soft, overflow: "hidden", background: `${stripes(112 + st.scene * 9, filmA, filmB)}`, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08)" },
+      heroBadge: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 11.5, color: "#e4e4ea", background: "rgba(15,15,18,0.6)", borderRadius: R, padding: "7px 14px" },
+      sceneNo: String(st.scene + 1).padStart(2, "0"),
+      narration: SCENES[st.scene],
+      wordCount: SCENES[st.scene].split(" ").length,
+      motionPrompt: "slow push in, lamp sweep crossing frame left to right, handheld drift",
+
+      playBtn: { whiteSpace: "nowrap", fontFamily: "inherit", fontSize: 13.5, width: 86, cursor: "pointer", color: "#f7f7f8", background: accent, border: "none", borderRadius: R, padding: "10px 0", boxShadow: `0 8px 20px ${rgba(accent, 0.36)}`, transition: tr },
+      playLabel: st.playing ? "Pause" : "Play",
+      scrubTrack: { position: "relative", flex: 1, height: 6, borderRadius: 6, background: "rgba(24,20,40,0.09)", display: "block" },
+      scrubFill: { position: "absolute", left: 0, top: 0, height: "100%", width: `${(st.t / 8) * 100}%`, borderRadius: 6, background: accent, display: "block" },
+      scrubKnob: { position: "absolute", top: "50%", left: `${(st.t / 8) * 100}%`, transform: "translate(-50%,-50%)", width: 16, height: 16, borderRadius: "50%", background: "#fdfdfe", boxShadow: `0 4px 12px ${rgba(accent, 0.4)}`, display: "block" },
+      timecode: `0:0${st.t.toFixed(1)} / 0:08.0`,
+      togglePlay: () => this.setState(s => ({ playing: !s.playing })),
+      ghostSm: { whiteSpace: "nowrap", fontFamily: "inherit", fontSize: 12.5, cursor: "pointer", color: "#55555e", background: "transparent", border: "1px solid rgba(24,20,40,0.14)", borderRadius: R, padding: "8px 14px", transition: tr },
+
+      approvedCount, sceneTotal: SCENES.length,
+      approveAllBtn: { whiteSpace: "nowrap", fontFamily: "inherit", fontSize: 13, cursor: "pointer", color: "#f7f7f8", background: "#17171a", border: "none", borderRadius: R, padding: "10px 18px", boxShadow: S.shadow(1), transition: tr },
+      approveAll: () => this.setState({ approved: Object.fromEntries(SCENES.map((_, i) => [i, true])), gateDone: true }),
+      scenes: SCENES.map((line, i) => {
+        const on = i === st.scene, ok = st.approved[i];
+        return {
+          label: `Scene ${String(i + 1).padStart(2, "0")}`, line,
+          select: () => this.setState({ scene: i, t: 0, playing: false }),
+          approve: e => { e.stopPropagation(); this.setState(s => ({ approved: { ...s.approved, [i]: !s.approved[i] } })); },
+          tile: { display: "flex", flexDirection: "column", gap: 7, cursor: "pointer", padding: 9, borderRadius: soft, transition: tr, background: on ? `linear-gradient(160deg, ${deep}, #14141a)` : "#fdfdfe", border: on ? "none" : (S.border === "none" ? "1px solid rgba(24,20,40,0.06)" : S.border), boxShadow: on ? S.shadow(1.4) : S.shadow(0.4) },
+          thumb: { position: "relative", display: "block", height: 62, borderRadius: surface === "Flat" ? 4 : 12, background: stripes(112 + i * 11, filmA, filmB), opacity: i <= 6 ? 1 : 0.45 },
+          check: { position: "absolute", right: 6, top: 6, width: 22, height: 22, borderRadius: "50%", cursor: "pointer", fontSize: 11, lineHeight: 1, fontFamily: "inherit", transition: tr, border: ok ? "none" : "1px solid rgba(255,255,255,0.4)", background: ok ? accent : "rgba(15,15,18,0.45)", color: ok ? "#f7f7f8" : "rgba(255,255,255,0.35)" },
+          no: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, color: on ? lift : "#6f6f7c" },
+          text: { fontSize: 12, lineHeight: 1.35, color: on ? "#b7b7c2" : "#55555e", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" },
+        };
+      }),
+
+      pairs: [0, 1, 2, 3].map(i => ({
+        label: `Scene ${String(i + 1).padStart(2, "0")} · first → last`,
+        state: i < 3 ? "ready" : "generating",
+        note: i === 0 ? "Opens the film — no inherited frame." : "Starts on the previous scene's last frame.",
+        chip: { fontSize: 11.5, color: i < 3 ? accent : "#63636e", background: i < 3 ? rgba(accent, 0.12) : "rgba(24,20,40,0.06)", borderRadius: R, padding: "5px 11px" },
+        a: { display: "block", width: 118, height: 66, borderRadius: surface === "Flat" ? 4 : 10, background: stripes(110 + i * 12, filmA, filmB) },
+        b: { display: "block", width: 118, height: 66, borderRadius: surface === "Flat" ? 4 : 10, background: stripes(124 + i * 12, filmA, filmB), opacity: i < 3 ? 1 : 0.4 },
+      })),
+
+      clipStrip: Array.from({ length: 20 }, (_, i) => ({
+        style: { display: "block", height: 44, borderRadius: surface === "Flat" ? 3 : 7, background: i < 12 ? stripes(112 + i * 9, filmA, filmB) : "rgba(24,20,40,0.07)", boxShadow: i === 12 ? `0 0 0 2px ${accent}` : "none", animation: i === 12 && M.m ? "pulse 1.8s ease-in-out infinite" : "none" },
+      })),
+
+      assembly: [{ k: "Clips ready", v: "34 / 60" }, { k: "Voiceover", v: "60 / 60" }, { k: "Runtime", v: "08:00" }],
+      bigBtn: { whiteSpace: "nowrap", fontFamily: "inherit", fontSize: 15, cursor: "pointer", color: "#f7f7f8", background: "#17171a", border: "none", borderRadius: R, padding: "16px 0", boxShadow: S.shadow(1.4), transition: tr },
+
+      statusCard: { borderRadius: S.r, background: `radial-gradient(120% 100% at 100% 0%, ${deep} 0%, #1a1a1f 55%, #0f0f12 100%)`, boxShadow: S.shadow(2), padding: "24px 24px 26px", transition: tr },
+      darkPill: { display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", color: "#e4e4ea", borderRadius: R, padding: "6px 14px", fontSize: 12.5 },
+      gateTitle: gate.title, gateHeadline: gate.head, gateBody: gate.body, gateLabel: gate.label, gateAction: gate.act,
+      gateBtn: { whiteSpace: "nowrap", width: "100%", marginTop: 20, fontFamily: "inherit", fontSize: 14.5, cursor: "pointer", border: "none", borderRadius: R, padding: "15px 0", transition: tr, color: "#17171a", background: "#fdfdfe", boxShadow: "0 12px 26px rgba(0,0,0,0.32)" },
+      gateGhost: { whiteSpace: "nowrap", width: "100%", marginTop: 9, fontFamily: "inherit", fontSize: 14, cursor: "pointer", borderRadius: R, padding: "13px 0", transition: tr, color: "#e4e4ea", background: rgba(accent, 0.18), border: `1px solid ${rgba(lift, 0.3)}` },
+
+      noteCard: { borderRadius: S.r, background: S.light, border: S.border, boxShadow: S.shadow(0.9), padding: "20px 22px 22px", display: "flex", flexDirection: "column", gap: 13, transition: tr },
+      activity: [
+        { title: "Scene 34 clip rendered", when: "2 min ago" },
+        { title: "Keyframe pair 44 generated", when: "6 min ago" },
+        { title: "You approved 6 scenes", when: "24 min ago" },
+        { title: "Script approved", when: "1h ago" },
+        { title: "Brief submitted", when: "2h ago" },
+      ].map((a, i) => ({ ...a, dot: { width: 7, height: 7, borderRadius: "50%", marginTop: 6, flex: "none", display: "block", background: i === 0 ? accent : "rgba(24,20,40,0.18)" } })),
+
+      spendTrack: { display: "block", height: 6, borderRadius: 6, background: "rgba(24,20,40,0.09)", overflow: "hidden" },
+      spendFill: { display: "block", height: "100%", width: "83%", borderRadius: 6, background: `linear-gradient(90deg, ${mix(accent, "#ffffff", 0.3)}, ${accent})` },
+    };
+  }
+}
+</script>
+</body>
+</html>

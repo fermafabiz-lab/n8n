@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=Inter:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #ececed; color: #1b1b1e; font-family: "Inter", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  a { text-decoration: none; }
+  ::selection { background: rgba(122,79,214,0.18); }
+  @keyframes bob { 0%,100% { transform: translateY(0) rotate(-7deg) } 50% { transform: translateY(calc(-9px * var(--m, 1))) rotate(-4deg) } }
+  @keyframes bob2 { 0%,100% { transform: translateY(0) rotate(9deg) } 50% { transform: translateY(calc(-12px * var(--m, 1))) rotate(5deg) } }
+  @keyframes drift { 0%,100% { transform: translate(0,0) scale(1) } 50% { transform: translate(calc(-30px * var(--m, 1)), calc(20px * var(--m, 1))) scale(1.08) } }
+</style>
+</helmet>
+
+<div style="width: 1280px; margin: 0 auto; padding: 14px 0 0;">
+
+  <div style="{{ heroShell }}">
+    <div style="{{ heroBlob }}"></div>
+    <div style="position: absolute; right: 60px; top: 120px; width: 300px; height: 520px; border-radius: 50%; background: radial-gradient(closest-side, rgba(255,255,255,0.55), rgba(255,255,255,0)); filter: blur(20px);"></div>
+    <div style="{{ heroWash }}"></div>
+
+    <div style="position: relative; display: flex; justify-content: center; padding-top: 22px;">
+      <div style="{{ navBar }}">
+        <span style="display: flex; align-items: center; gap: 9px; font-family: 'Outfit', sans-serif; font-size: 18px; font-weight: 500; letter-spacing: -.02em;">
+          <span style="{{ mark }}"></span>
+          House of Videos
+        </span>
+        <span style="display: flex; gap: 4px;">
+          <sc-for list="{{ nav }}" as="n" hint-placeholder-count="5">
+            <a href="#" style="{{ n.style }}" style-hover="opacity:1;color:#1b1b1e">{{ n.label }}</a>
+          </sc-for>
+        </span>
+        <button style="{{ navBtn }}" style-hover="transform:translateY(-2px)" style-active="transform:translateY(0)">Start a video</button>
+      </div>
+    </div>
+
+    <div style="position: relative; text-align: center; padding: 84px 0 0;">
+      <span style="{{ eyebrow }}">
+        <span style="{{ dot }}"></span>
+        Automated video production
+      </span>
+
+      <h1 style="margin: 26px 0 0; font-family: 'Outfit', sans-serif; font-size: 92px; line-height: 0.98; font-weight: 500; letter-spacing: -.045em; color: #2a2a30;">
+        House of Videos
+        <span style="display: block; position: relative;">
+          <span style="position: relative; z-index: 2;">makes films while</span>
+          <span style="display: block;">you sleep
+            <span style="position: relative; display: inline-block; vertical-align: -8px; margin-left: 10px;">
+              <span style="{{ capsule }}"></span>
+              <span style="{{ tileA }}">▶</span>
+              <span style="{{ tileB }}">● REC</span>
+              <span style="{{ tileC }}">✦</span>
+            </span>
+          </span>
+        </span>
+      </h1>
+
+      <p style="margin: 30px auto 0; max-width: 560px; font-size: 16px; line-height: 1.6; color: #55555e; text-wrap: pretty;">One brief in. A finished, narrated documentary out — script, voice, frames and cut, produced by a pipeline that only stops to ask for your approval.</p>
+
+      <div style="display: flex; gap: 12px; justify-content: center; margin-top: 34px;">
+        <button style="{{ ctaDark }}" style-hover="transform:translateY(-3px)" style-active="transform:translateY(-1px)">Make your first film</button>
+        <button style="{{ ctaLight }}" style-hover="transform:translateY(-3px)" style-active="transform:translateY(-1px)">Watch a render</button>
+      </div>
+    </div>
+
+    <div style="position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); background: #ececed; border-radius: 22px 22px 0 0; padding: 14px 30px 16px; display: flex; align-items: center; gap: 10px; font-size: 14px; color: #55555e;">
+      Scroll for more
+      <span style="{{ scrollDot }}">↓</span>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 400px 1fr; gap: 60px; padding: 96px 8px 0;">
+    <div>
+      <span style="{{ pill }}"><span style="{{ dot }}"></span>The pipeline</span>
+      <h2 style="margin: 22px 0 0; font-family: 'Outfit', sans-serif; font-size: 54px; line-height: 1.04; font-weight: 500; letter-spacing: -.04em; color: #2a2a30;">Four steps,<br>no crew</h2>
+      <p style="margin: 20px 0 0; font-size: 15px; line-height: 1.65; color: #55555e; max-width: 340px; text-wrap: pretty;">Every stage runs on its own and hands the next one what it needs. You appear twice: once to approve the script, once to approve the scenes.</p>
+
+      <div style="{{ floorCard }}">
+        <span style="font-family: 'Outfit', sans-serif; font-size: 15px; color: #55555e;">Today's floor</span>
+        <sc-for list="{{ floor }}" as="f" hint-placeholder-count="3">
+          <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px;">
+            <span style="font-size: 14px; color: #55555e;">{{ f.label }}</span>
+            <b style="font-family: 'Outfit', sans-serif; font-size: 26px; font-weight: 500; letter-spacing: -.03em; color: #2a2a30;">{{ f.n }}</b>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 14px;">
+      <sc-for list="{{ steps }}" as="s" hint-placeholder-count="4">
+        <div style="{{ s.card }}" onClick="{{ s.open }}">
+          <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 24px;">
+            <h3 style="{{ s.title }}">{{ s.name }}</h3>
+            <span style="{{ s.num }}">{{ s.no }}</span>
+          </div>
+          <sc-if value="{{ s.isOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="padding-top: 14px;">
+              <p style="margin: 0; font-size: 14.5px; line-height: 1.6; color: #b7b7c2; max-width: 520px; text-wrap: pretty;">{{ s.body }}</p>
+              <div style="display: flex; flex-wrap: wrap; gap: 9px; padding-top: 26px;">
+                <sc-for list="{{ s.chips }}" as="c" hint-placeholder-count="3">
+                  <span style="{{ c.style }}" style-hover="transform:translateY(-2px)">{{ c.label }}</span>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 96px 8px 0;">
+    <div style="{{ darkPanel }}">
+      <span style="{{ darkPill }}"><span style="{{ dotLight }}"></span>Rendering right now</span>
+      <h3 style="margin: 22px 0 0; font-family: 'Outfit', sans-serif; font-size: 34px; font-weight: 500; letter-spacing: -.03em; color: #f7f7f8;">34 clips in flight<br><span style="{{ accentText }}">across 3 films</span></h3>
+      <button style="{{ ghostBtn }}" style-hover="transform:translateY(-2px)">Open the floor</button>
+      <div style="margin-top: 34px; width: 460px; height: 240px; border-radius: 240px 240px 0 0; background: repeating-linear-gradient(112deg, rgba(255,255,255,0.06) 0 5px, rgba(255,255,255,0) 5px 11px), radial-gradient(closest-side, #2b2b33, #121216); box-shadow: inset 0 1px 0 rgba(255,255,255,0.09);"></div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 20px;">
+      <div style="{{ lightCard }}">
+        <p style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 21px; line-height: 1.4; font-weight: 400; letter-spacing: -.02em; color: #2a2a30; max-width: 400px; text-wrap: pretty;">A ten-minute documentary, scripted, voiced and cut — in about four hours, for the price of a lunch.</p>
+        <div style="display: flex; align-items: flex-end; justify-content: space-between; margin-top: 40px;">
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <span style="font-size: 13px; color: #63636e;">Average cost per finished minute</span>
+            <span style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: #2a2a30;"><span style="{{ dot }}"></span>Down 61% since March</span>
+          </div>
+          <span style="font-family: 'Outfit', sans-serif; font-size: 74px; font-weight: 500; letter-spacing: -.05em; color: rgba(42,42,48,0.13); line-height: 0.8;">$2.32</span>
+        </div>
+      </div>
+
+      <div style="{{ quoteCard }}">
+        <div style="{{ portrait }}">
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: rgba(255,255,255,0.72);">portrait</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <span style="font-family: 'Outfit', sans-serif; font-size: 30px; color: rgba(42,42,48,0.2); line-height: 0.6;">"</span>
+          <p style="margin: 0; font-size: 15.5px; line-height: 1.55; color: #2a2a30; text-wrap: pretty;">I stopped hiring editors for the back catalogue. The queue just empties itself overnight.</p>
+          <span style="font-size: 13px; color: #63636e;">Placeholder quote &nbsp;·&nbsp; swap for a real one</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="{{ ctaPanel }}">
+    <div>
+      <h2 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 52px; line-height: 1.04; font-weight: 500; letter-spacing: -.04em; color: #f7f7f8;">Give it a theme.<br>Come back to a film.</h2>
+      <p style="margin: 18px 0 0; font-size: 15.5px; color: #b7b7c2; max-width: 420px; text-wrap: pretty;">Six fields, one submission. The first cut lands in your inbox before the day is out.</p>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 12px; align-items: stretch;">
+      <button style="{{ ctaWhite }}" style-hover="transform:translateY(-3px)" style-active="transform:translateY(-1px)">Start a video</button>
+      <button style="{{ ghostBtnWide }}" style-hover="transform:translateY(-3px)">Talk to us</button>
+    </div>
+  </div>
+
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 34px 12px 48px; font-size: 13.5px; color: #63636e;">
+    <span style="display: flex; align-items: center; gap: 9px;">
+      <span style="{{ markSm }}"></span>
+      House of Videos
+    </span>
+    <span style="display: flex; gap: 22px;">
+      <sc-for list="{{ footLinks }}" as="l" hint-placeholder-count="3">
+        <a href="#" style="{{ l.style }}" style-hover="opacity:1">{{ l.label }}</a>
+      </sc-for>
+    </span>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:900},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#7a4fd6&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;#7a4fd6&quot;,&quot;#c9482f&quot;,&quot;#2f6bd6&quot;,&quot;#17171a&quot;],&quot;section&quot;:&quot;Feel&quot;},&quot;surface&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;Cushioned&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;Cushioned&quot;,&quot;Crisp&quot;,&quot;Flat&quot;],&quot;section&quot;:&quot;Feel&quot;},&quot;motion&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;Floaty&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;Floaty&quot;,&quot;Calm&quot;,&quot;Still&quot;],&quot;section&quot;:&quot;Feel&quot;}}">
+const STEPS = [
+  { name: "Script & story", body: "One brief becomes an outline of four or five chapters, then full narration, then a scene plan cut at roughly twenty-two words — eight seconds of finished film each.", chips: ["Chapter outline", "Narration pass", "Scene segmentation"] },
+  { name: "Voice & sound", body: "Every scene's narration is spoken, timed and filed back against the scene it belongs to, so the cut never drifts from the script.", chips: ["Voice casting", "Per-scene timing", "Loudness match"] },
+  { name: "Frames & motion", body: "Two keyframes per scene, then motion between them. Each scene opens on the frame the last one closed with, which is what keeps ten minutes of film looking like one film.", chips: ["Keyframe pair", "Image-to-video", "Frame chaining"] },
+  { name: "Assembly & delivery", body: "Clips, voiceover and music are stitched into the final cut, graded and handed over with the project's full scene history intact.", chips: ["Stitch & grade", "Final render", "Delivery link"] },
+];
+
+const hex2rgb = h => { const s = h.replace("#", ""); const n = parseInt(s.length === 3 ? s.split("").map(c => c + c).join("") : s, 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+const rgba = (h, a) => { const [r, g, b] = hex2rgb(h); return `rgba(${r},${g},${b},${a})`; };
+const mix = (h, t, amt) => { const A = hex2rgb(h), B = hex2rgb(t); return "#" + A.map((v, i) => Math.round(v + (B[i] - v) * amt).toString(16).padStart(2, "0")).join(""); };
+
+class Component extends DCLogic {
+  state = { open: 0 };
+
+  renderVals() {
+    const accent = this.props.accent ?? "#7a4fd6";
+    const surface = this.props.surface ?? "Cushioned";
+    const motion = this.props.motion ?? "Floaty";
+
+    const deep = mix(accent, "#0f0f12", 0.42);
+    const lift = mix(accent, "#ffffff", 0.42);
+
+    // Surface reshapes every card: how round, how lit, how much air under it.
+    const S = {
+      Cushioned: { r: 28, heroR: 30, shadow: d => `0 ${12 * d}px ${28 * d}px ${rgba("#181428", 0.13)}`, light: "linear-gradient(160deg, #fbfbfc, #e6e6ea)", border: "none", pad: 1 },
+      Crisp: { r: 16, heroR: 18, shadow: d => `0 ${4 * d}px ${10 * d}px rgba(24,20,40,0.09)`, light: "#fbfbfc", border: "1px solid rgba(24,20,40,0.10)", pad: 1 },
+      Flat: { r: 8, heroR: 10, shadow: () => "none", light: "#f4f4f6", border: "1px solid rgba(24,20,40,0.13)", pad: 1 },
+    }[surface];
+
+    // Motion reshapes the ambient float and how eagerly things respond.
+    const M = { Floaty: { m: 1, speed: 1, ease: ".38s cubic-bezier(.2,.8,.2,1)" }, Calm: { m: 0.45, speed: 1.9, ease: ".6s cubic-bezier(.3,.7,.2,1)" }, Still: { m: 0, speed: 1, ease: ".18s ease" } }[motion];
+    const anim = (name, sec) => M.m === 0 ? "none" : `${name} ${(sec * M.speed).toFixed(1)}s ease-in-out infinite`;
+    const tr = "transform " + M.ease + ", box-shadow " + M.ease + ", background " + M.ease + ", color " + M.ease;
+
+    const card = (extra = {}) => ({ borderRadius: S.r, background: S.light, border: S.border, boxShadow: S.shadow(1.3), transition: tr, ...extra });
+    const darkBg = `radial-gradient(120% 90% at 50% 120%, ${deep} 0%, #1a1a1f 55%, #0f0f12 100%)`;
+    const pillBase = { display: "inline-flex", alignItems: "center", gap: 8, borderRadius: 999, padding: "8px 18px", fontSize: 13.5, transition: tr };
+    const btn = (bg, color, extra = {}) => ({ fontFamily: "inherit", fontSize: 15, whiteSpace: "nowrap", color, background: bg, border: "none", borderRadius: surface === "Flat" ? 8 : 999, padding: "16px 32px", cursor: "pointer", boxShadow: S.shadow(1.6), transition: tr, ...extra });
+    const dot = (c, size = 6) => ({ width: size, height: size, borderRadius: "50%", background: c, display: "block", flex: "none" });
+    const link = { fontSize: 14.5, color: "#55555e", opacity: 0.85, padding: "8px 13px", borderRadius: 999, transition: tr };
+
+    return {
+      nav: ["Pipeline", "Films", "Pricing", "About", "Contact"].map(label => ({ label, style: link })),
+      footLinks: ["Pipeline", "Pricing", "Contact"].map(label => ({ label, style: { color: "#63636e", opacity: 0.85, transition: tr } })),
+      floor: [{ label: "Films in production", n: "4" }, { label: "Waiting on you", n: "3" }, { label: "Delivered this month", n: "27" }],
+
+      heroShell: { position: "relative", borderRadius: S.heroR, overflow: "hidden", height: 760, background: "radial-gradient(90% 70% at 18% 12%, #fdfdfe 0%, rgba(253,253,254,0) 60%), linear-gradient(154deg, #f2f2f5 0%, #e2e2e8 46%, #d3d3db 72%, #eeeef1 100%)" },
+      heroBlob: { position: "absolute", right: -560, top: -300, width: 900, height: 1020, borderRadius: "50%", background: `radial-gradient(closest-side, rgba(20,18,28,0) 0 52%, ${rgba(deep, 0.9)} 63%, ${accent} 76%, ${lift} 86%, rgba(20,18,28,0.32) 94%, rgba(20,18,28,0) 100%)`, filter: surface === "Flat" ? "blur(6px)" : "blur(18px)", opacity: 0.92, animation: anim("drift", 22), ["--m"]: M.m },
+      heroWash: { position: "absolute", left: -280, bottom: -320, width: 780, height: 800, borderRadius: "50%", background: `radial-gradient(closest-side, rgba(20,18,28,0) 0 54%, ${rgba(deep, 0.35)} 65%, ${rgba(accent, 0.5)} 78%, ${rgba(lift, 0.42)} 87%, rgba(20,18,28,0.12) 94%, rgba(20,18,28,0) 100%)`, filter: "blur(22px)", opacity: 0.8, animation: anim("drift", 30), ["--m"]: M.m * -0.7 },
+
+      navBar: { display: "flex", alignItems: "center", gap: 26, background: "rgba(252,252,253,0.86)", backdropFilter: "blur(18px)", border: S.border === "none" ? "1px solid rgba(255,255,255,0.7)" : S.border, borderRadius: surface === "Flat" ? 10 : 999, padding: "9px 9px 9px 24px", boxShadow: S.shadow(1) },
+      navBtn: { whiteSpace: "nowrap", fontFamily: "inherit", fontSize: 14.5, color: "#f7f7f8", background: "#17171a", border: "none", borderRadius: surface === "Flat" ? 8 : 999, padding: "12px 24px", cursor: "pointer", boxShadow: S.shadow(1.2), transition: tr },
+      mark: { width: 17, height: 17, borderRadius: surface === "Flat" ? 4 : "50%", background: `linear-gradient(135deg, ${accent} 0 50%, #1b1b1e 50% 100%)`, display: "block" },
+      markSm: { width: 15, height: 15, borderRadius: surface === "Flat" ? 4 : "50%", background: `linear-gradient(135deg, ${accent} 0 50%, #1b1b1e 50% 100%)`, display: "block" },
+
+      eyebrow: { ...pillBase, background: "rgba(252,252,253,0.88)", border: S.border === "none" ? "1px solid rgba(255,255,255,0.8)" : S.border, color: accent, boxShadow: S.shadow(0.8), borderRadius: surface === "Flat" ? 8 : 999 },
+      pill: { ...pillBase, background: "#fdfdfe", color: accent, boxShadow: S.shadow(0.7), padding: "7px 16px", border: S.border, borderRadius: surface === "Flat" ? 8 : 999 },
+      dot: dot(accent),
+      dotLight: dot(lift),
+      accentText: { color: lift },
+
+      capsule: { display: "inline-block", width: 214, height: 66, borderRadius: surface === "Flat" ? 12 : 999, background: `linear-gradient(120deg, ${mix(accent, "#ffffff", 0.18)}, ${deep})`, boxShadow: S.shadow(2.4) },
+      tileA: { position: "absolute", left: 14, top: -14, width: 60, height: 60, borderRadius: surface === "Flat" ? 8 : 15, background: "#fdfdfe", boxShadow: S.shadow(1.5), animation: anim("bob", 6), ["--m"]: M.m, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Outfit', sans-serif", fontSize: 22, color: accent },
+      tileB: { position: "absolute", left: 78, top: 12, width: 56, height: 56, borderRadius: surface === "Flat" ? 8 : 15, background: "#17171a", boxShadow: S.shadow(1.5), animation: anim("bob2", 7.4), ["--m"]: M.m, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, letterSpacing: ".04em", whiteSpace: "nowrap", color: lift },
+      tileC: { position: "absolute", left: 142, top: -8, width: 54, height: 54, borderRadius: surface === "Flat" ? 8 : 15, background: "#fdfdfe", boxShadow: S.shadow(1.4), animation: anim("bob", 8.2), ["--m"]: M.m, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, color: "#1b1b1e" },
+
+      ctaDark: btn("#17171a", "#f7f7f8"),
+      ctaLight: btn("#fdfdfe", "#1b1b1e", { border: S.border === "none" ? "1px solid rgba(255,255,255,0.9)" : S.border }),
+      ctaWhite: btn("#fdfdfe", "#17171a", { padding: "17px 38px" }),
+      ghostBtn: { whiteSpace: "nowrap", fontFamily: "inherit", fontSize: 14.5, color: "#f7f7f8", background: rgba(accent, 0.16), border: `1px solid ${rgba(lift, 0.35)}`, borderRadius: surface === "Flat" ? 8 : 999, padding: "13px 26px", marginTop: 22, cursor: "pointer", transition: tr },
+      ghostBtnWide: { whiteSpace: "nowrap", fontFamily: "inherit", fontSize: 15, color: "#e4e4ea", background: rgba(accent, 0.18), border: `1px solid ${rgba(lift, 0.35)}`, borderRadius: surface === "Flat" ? 8 : 999, padding: "17px 38px", cursor: "pointer", transition: tr },
+      scrollDot: { width: 26, height: 26, borderRadius: "50%", background: "#fdfdfe", boxShadow: S.shadow(0.6), display: "flex", alignItems: "center", justifyContent: "center", color: accent, fontSize: 13 },
+
+      floorCard: card({ marginTop: 40, padding: 26, display: "flex", flexDirection: "column", gap: 14 }),
+      lightCard: card({ padding: 32, position: "relative", overflow: "hidden" }),
+      quoteCard: card({ padding: 28, display: "grid", gridTemplateColumns: "132px 1fr", gap: 22, alignItems: "center" }),
+      portrait: { width: 132, height: 168, borderRadius: surface === "Flat" ? 8 : 18, background: `repeating-linear-gradient(118deg, ${mix(accent, "#ffffff", 0.1)} 0 7px, ${deep} 7px 14px)`, boxShadow: S.shadow(1.6), display: "flex", alignItems: "flex-end", justifyContent: "center", paddingBottom: 12 },
+      darkPanel: { position: "relative", borderRadius: S.r, overflow: "hidden", background: darkBg, boxShadow: S.shadow(2), padding: "34px 34px 0", minHeight: 470, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" },
+      darkPill: { ...pillBase, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", color: "#e4e4ea", fontSize: 13, padding: "7px 16px", borderRadius: surface === "Flat" ? 8 : 999 },
+      ctaPanel: { margin: "96px 8px 0", borderRadius: S.heroR, background: `radial-gradient(110% 140% at 20% 0%, ${deep} 0%, #1a1a1f 55%, #0f0f12 100%)`, boxShadow: S.shadow(2.2), padding: "76px 60px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 40 },
+
+      steps: STEPS.map((s, i) => {
+        const on = i === this.state.open;
+        return {
+          name: s.name, body: s.body, no: `(0${i + 1})`, isOpen: on,
+          open: () => this.setState({ open: i }),
+          chips: s.chips.map(label => ({ label, style: { fontSize: 13, color: "#e4e4ea", background: rgba(accent, 0.22), border: `1px solid ${rgba(lift, 0.3)}`, borderRadius: surface === "Flat" ? 6 : 999, padding: "9px 16px", transition: tr } })),
+          card: { borderRadius: S.r, padding: on ? "34px 36px 36px" : "30px 36px", cursor: "pointer", background: on ? `radial-gradient(120% 160% at 100% 0%, ${deep} 0%, #1a1a1f 52%, #0f0f12 100%)` : S.light, border: on ? "none" : S.border, boxShadow: S.shadow(on ? 2 : 1.1), transition: tr },
+          title: { margin: 0, fontFamily: "'Outfit', sans-serif", fontSize: on ? 38 : 30, fontWeight: 500, letterSpacing: "-.035em", lineHeight: 1.1, color: on ? "#f7f7f8" : "#6c6c78", transition: tr },
+          num: { fontFamily: "'Outfit', sans-serif", fontSize: 15, color: on ? lift : "#6f6f7c", flex: "none" },
+        };
+      }),
+    };
+  }
+}
+</script>
+</body>
+</html>

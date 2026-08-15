@@ -44,7 +44,7 @@ export default function ExpandableTitle({
             font: "inherit",
             fontSize: "0.72em",
             fontWeight: 600,
-            color: "var(--amber)",
+            color: "var(--accent)",
             cursor: "pointer",
           }}
         >

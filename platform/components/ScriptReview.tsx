@@ -156,7 +156,7 @@ export default function ScriptReview({
       </div>
       <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--soft)" }}>
         You can edit the text right here — keep the{" "}
-        <code style={{ color: "var(--amber)" }}>[CHAPTER n: title]</code>{" "}
+        <code style={{ color: "var(--accent)" }}>[CHAPTER n: title]</code>{" "}
         markers, they separate the chapters. Approve sends exactly what you see
         below into production.
       </p>

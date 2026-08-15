@@ -122,7 +122,7 @@ export default function CategoryPicker({
                     checked={on}
                     disabled={o.comingSoon}
                     onChange={(e) => setVal(o.name, e.target.checked)}
-                    style={{ width: 17, height: 17, accentColor: "var(--amber)", flex: "none" }}
+                    style={{ width: 17, height: 17, accentColor: "var(--accent)", flex: "none" }}
                   />
                 ) : (
                   <select

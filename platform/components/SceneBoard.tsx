@@ -551,7 +551,7 @@ export default function SceneBoard({
                 />
                 {promptDrafts[active.id] !== undefined &&
                   promptDrafts[active.id] !== (active.imagePrompt ?? "") && (
-                    <div style={{ fontSize: 11.5, color: "var(--amber)", marginTop: 5 }}>
+                    <div style={{ fontSize: 11.5, color: "var(--accent)", marginTop: 5 }}>
                       Edited — Regenerate saves this prompt and renders it.
                     </div>
                   )}

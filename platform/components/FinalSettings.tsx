@@ -119,8 +119,8 @@ export default function FinalSettings({
       className="script"
       style={{
         marginTop: 24,
-        border: "1px solid rgba(245,184,65,0.35)",
-        boxShadow: "0 0 0 1px rgba(245,184,65,0.06), 0 18px 50px rgba(0,0,0,0.35)",
+        border: "1px solid rgba(122, 79, 214,0.35)",
+        boxShadow: "0 0 0 1px rgba(122, 79, 214,0.06), 0 18px 50px rgba(0,0,0,0.35)",
       }}
     >
       <div className="sechead">

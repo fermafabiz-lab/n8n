@@ -143,7 +143,7 @@ export default function AssemblyStatus({
       className="script"
       style={{
         marginTop: 24,
-        border: `1px solid ${broken ? "rgba(255,107,107,0.4)" : "rgba(245,184,65,0.3)"}`,
+        border: `1px solid ${broken ? "rgba(255,107,107,0.4)" : "var(--accent-a28)"}`,
       }}
     >
       <div className="sechead">
@@ -257,7 +257,7 @@ export default function AssemblyStatus({
                   Failed at: <b style={{ color: "var(--soft)" }}>{failure.node}</b>
                 </div>
               )}
-              <code style={{ color: "var(--amber)", whiteSpace: "pre-wrap" }}>
+              <code style={{ color: "var(--accent)", whiteSpace: "pre-wrap" }}>
                 {failure.message.slice(0, 500)}
               </code>
             </div>

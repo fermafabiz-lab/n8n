@@ -805,8 +805,8 @@ export default function AudioReview({
               key={s.id}
               style={{
                 padding: "12px 14px",
-                outline: isPlaying ? "2px solid var(--amber)" : undefined,
-                borderLeft: flag ? "3px solid var(--amber)" : undefined,
+                outline: isPlaying ? "2px solid var(--accent)" : undefined,
+                borderLeft: flag ? "3px solid var(--accent)" : undefined,
               }}
             >
               <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>

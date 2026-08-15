@@ -142,8 +142,8 @@ export default async function OpsPanel({
                     style={{
                       padding: "6px 14px",
                       fontSize: 12,
-                      borderColor: "rgba(240,101,91,0.4)",
-                      color: "#f5a8a2",
+                      borderColor: "rgba(216, 72, 61,0.4)",
+                      color: "var(--red)",
                     }}
                   >
                     ■ Stop
@@ -181,9 +181,9 @@ export default async function OpsPanel({
                       style={{
                         fontFamily: "ui-monospace, Menlo, monospace",
                         fontSize: 11.5,
-                        color: "var(--amber)",
-                        background: "rgba(245,184,65,0.08)",
-                        border: "1px solid rgba(245,184,65,0.25)",
+                        color: "var(--accent)",
+                        background: "var(--accent-a08)",
+                        border: "1px solid var(--accent-a28)",
                         borderRadius: 6,
                         padding: "1px 7px",
                       }}

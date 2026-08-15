@@ -36,9 +36,12 @@ export default function StaleCopyBanner() {
         position: "relative",
         zIndex: 100,
         padding: "9px 16px",
-        background: "#3a1d16",
-        borderBottom: "1px solid #7a3a26",
-        color: "#ffd9cc",
+        // A warning tint, not the accent: this banner must not read as part of
+        // the brand. On the dark ground it was a deep brown carrying pale text;
+        // inverted, the tint stays warm and the text becomes the saturated ink.
+        background: "#fdece7",
+        borderBottom: "1px solid rgba(216, 72, 61, 0.28)",
+        color: "#8c3323",
         fontSize: 13,
         textAlign: "center",
       }}
@@ -48,7 +51,7 @@ export default function StaleCopyBanner() {
       some features need the live server. Use{" "}
       <a
         href="https://house-of-videos.com"
-        style={{ color: "#fff", textDecoration: "underline" }}
+        style={{ color: "#5e1f13", fontWeight: 600, textDecoration: "underline" }}
       >
         house-of-videos.com
       </a>

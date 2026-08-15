@@ -2059,6 +2059,61 @@ Owners keep their access, so n8n was unaffected — verified immediately after
 (9 workflows, healthz 200). Worth re-checking after any `createdb`: a new
 database starts open to everyone again.
 
+### Ticking things by hand, now that the grid is gone
+
+Unblocking a stuck film by ticking a box in Airtable was a real part of how
+this got operated, and it still works — through `/db`'s **Query** tab, as SQL.
+The gates n8n polls are the same columns they always were; only the names
+changed.
+
+| What you used to tick | Now |
+|---|---|
+| `Aprobare Scenă` | `scene_approved` |
+| `Aprobare Imagine` | `image_approved` |
+| `Aprobare Voce` | `voice_approved` |
+| `Aprobare Video` | `video_approved` |
+| `Regenerează Imagine/Video/Voce` | `regen_image` / `regen_video` / `regen_voice` |
+| `Status Producție Scenă` | `production_status` |
+| `Status General` (project) | `status` |
+
+Scenes of one film, in the order the site shows them:
+
+```sql
+select id, scene_order, left(narration,60) as text,
+       scene_approved, image_approved, voice_approved, video_approved,
+       production_status
+from hov.scene
+where project_id = (select id from hov.project where name ilike '%part of the title%')
+order by scene_order;
+```
+
+Push one scene past a gate:
+
+```sql
+update hov.scene set image_approved = true where id = 'recXXXXXXXXXXXXXX';
+```
+
+Release a regeneration that got stranded — the flag is set, the execution that
+was meant to clear it is gone, and the UI shows the in-flight state instead of
+the buttons:
+
+```sql
+update hov.scene
+set regen_image = false, regen_image_at = null
+where regen_image and regen_image_at < now() - interval '10 minutes';
+```
+
+**Two things behave differently from Airtable, both on purpose.** The database
+refuses values Airtable accepted — `scene_order = 0` raises rather than
+silently destroying the ordering — and a regen flag carries a `*_at` timestamp,
+so clear both together or the staleness sweep stops seeing it.
+
+**SQL is worse than a checkbox, and that is a real cost.** NocoDB gives an
+Airtable-shaped grid with actual checkboxes over this same database for ~500 MB
+of RAM; pgweb costs 5.8 MB. Worth revisiting if hand-editing turns out to be
+frequent rather than occasional — but most of what used to need a manual tick
+now has a button on the site.
+
 ### Known gaps, live right now
 
 - **Saved drafts throw on Postgres.** `saveVersionOfScene` /

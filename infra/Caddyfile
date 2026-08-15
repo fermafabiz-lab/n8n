@@ -43,6 +43,16 @@
 		file_server
 	}
 
+	# Grila bazei de date. Parola proprie, separata de a site-ului: da acces
+	# la TOATE tabelele, inclusiv scriere, deci nu merge in spatele aceleiasi
+	# usi ca butoanele de aprobare.
+	handle /db* {
+		basic_auth {
+			echipa {$DB_UI_HASH}
+		}
+		reverse_proxy pgweb:8081
+	}
+
 	handle {
 		reverse_proxy web:3000 {
 			header_up X-Forwarded-Proto {scheme}

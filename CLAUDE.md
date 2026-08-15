@@ -2024,6 +2024,27 @@ full film early rather than waiting.
 **Do not cancel the Airtable plan yet.** It is the only rollback that exists.
 A full film and a week first.
 
+### Looking at the data — /db
+
+Airtable's grid was also how the team *looked* at things, and losing it left the
+data reachable only over SSH, which two people have. `https://house-of-videos.com/db`
+gives it back: browse every table, filter, sort, edit a cell, export CSV, run
+SQL.
+
+**pgweb, not NocoDB.** NocoDB is the closer match to Airtable's feel and costs
+~500 MB; pgweb costs **5.8 MB measured**, on a box with 3.8 GB total that could
+not host Supabase for the same reason. If the grid ever genuinely matters more
+than the memory, NocoDB points at the same database and nothing else changes.
+
+**Its own password**, separate from the site's, in `/opt/n8n/secrets/db_ui_password`
+with the bcrypt hash in `.env` as `DB_UI_HASH`. Caddy checks it — the container
+publishes no port. This is deliberate: the door opens onto every table with
+write access, which is not the same door as the approval buttons.
+
+It reads `hov` directly, so **it shows real column names**, not the Airtable
+ones. `hov.at_scene` and the other `at_*` views are there for anyone who wants
+the old shape back.
+
 ### Known gaps, live right now
 
 - **Saved drafts throw on Postgres.** `saveVersionOfScene` /

@@ -318,6 +318,14 @@ begin
         then format('%I = $1 -> %L', col, k)
       when coltype = 'jsonb'
         then format('%I = ($1 ->> %L)::jsonb', col, k)
+      -- A linked-record field arrives as an ARRAY of ids, because that is
+      -- what Airtable always sent and the workflows still build it that way
+      -- ("Capitol": [ $('Create Chapter Records').item.json.id ]). The column
+      -- holds one id, so take the first element. Without this the whole JSON
+      -- array lands in the column as text and the foreign key breaks — quietly,
+      -- because a text column will accept '["recXXX"]' without complaint.
+      when jsonb_typeof(p_fields -> k) = 'array' then format(
+        '%I = nullif(($1 -> %L ->> 0), '''')::%s', col, k, coltype)
       -- Everything else: extract as text, cast to the column's own type.
       -- The nullif is load-bearing: n8n writes '' for an expression that
       -- resolved to nothing, and ''::integer raises rather than giving null.

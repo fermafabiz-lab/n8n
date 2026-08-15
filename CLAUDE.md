@@ -1890,23 +1890,36 @@ HTTP Request (download the url, response format: file)
 `/opt/n8n/media` is already mounted read-write into the n8n container at
 `/media`, and n8n is in the `hovmedia` group, so the write works today.
 
-### Editing a live workflow is safe; publishing is not
+### The public API has no draft — a PUT goes straight to production
 
-n8n 2.32.7 keeps a draft and a published version side by side — `versionId` is
-the draft, **`activeVersionId` is what production actually runs**. Updating a
-workflow through the API or the UI bumps the draft and nothing else; the live
-version keeps serving until `publish_workflow`.
+n8n 2.32.7 stores `versionId` and `activeVersionId`, and the UI's publish flow
+uses them, so it is natural to assume the REST API stages edits as drafts.
 
-    select name, active, "versionId" = "activeVersionId" as draft_equals_live
+**It does not.** `PUT /workflows/{id}` on an active workflow bumps
+`versionCounter`, sets `versionId` **and** `activeVersionId` to the new
+version, and that version is live from that moment. Verified the hard way on
+2026-08-15: a converted `Video Factory Notifications` was pushed expecting a
+draft, went live immediately (3 Postgres nodes, 0 Airtable), and was reverted
+from the saved original about two minutes later. Its schedule fires every five
+minutes and the last run had been at 22:10:47 against a PUT at 22:11:06, so
+nothing executed on the wrong version — luck, not design.
+
+This query is the check, and `draft_eq_live` staying `t` after an edit is the
+tell that the edit is already serving traffic:
+
+    select "versionId" = "activeVersionId" as draft_eq_live, "versionCounter"
     from workflow_entity where active;
 
-All six read `true` when there is no work in progress, so that query also tells
-you whether someone left an unpublished edit lying around.
+**So the port cannot be staged.** Converting all five workflows ahead of time
+and leaving them parked is not available through the API. The consequences:
 
-**So the port does not need a quiet window — only the publish does.** The 48
-nodes can be converted, reviewed and left as drafts while films are being made,
-and the window shrinks to the ~20 minutes in the next section. Do not hold
-production idle waiting for porting work; it buys nothing.
+- **Always save the original first.** `GET /workflows/{id}` to a file before
+  any PUT. That file is the only rollback, and it took ninety seconds to use.
+- The conversion is a *file* deliverable (`db/port/*.ported.json`), applied
+  inside the cutover window, not a set of live drafts.
+- `settings` is stricter on PUT than on GET: it rejects `binaryMode` and
+  `availableInMCP`, which GET happily returns. Send `{"executionOrder": "v1"}`
+  alone — the server merges rather than replaces, and the other two survive.
 
 ### The write mechanism: dollar-quoting, not parameters
 

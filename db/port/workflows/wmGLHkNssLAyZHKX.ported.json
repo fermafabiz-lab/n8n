@@ -1,0 +1,532 @@
+{
+  "updatedAt": "2026-08-02T21:58:05.687Z",
+  "createdAt": "2026-08-02T21:55:39.258Z",
+  "id": "wmGLHkNssLAyZHKX",
+  "name": "Video Factory Notifications",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "id": "26bba56e-1809-4177-83c7-581ffa68a3e4",
+      "name": "Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -224,
+        192
+      ]
+    },
+    {
+      "id": "e39218c6-07d8-4416-bc32-c3deeefbbfcb",
+      "name": "Fetch Scripts Awaiting",
+      "position": [
+        0,
+        0
+      ],
+      "alwaysOutputData": true,
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select id, \"createdTime\", fields from hov.at_script\nwhere fields->>'Status' = 'awaiting_approval'",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "eRjiNDQFuDSTJpGK",
+          "name": "HOV Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "id": "d99bdaf6-a533-4677-99ba-8f47e698b711",
+      "name": "Collect",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        224,
+        176
+      ]
+    },
+    {
+      "id": "553cbfdc-43f1-4411-8926-54f3c733905a",
+      "name": "Fetch Scenes Awaiting",
+      "position": [
+        0,
+        192
+      ],
+      "alwaysOutputData": true,
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select id, \"createdTime\", fields from hov.at_scene\nwhere fields->>'Status Producție Scenă' in ('Așteaptă Aprobare Imagine', 'Așteaptă Aprobare Video')",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "eRjiNDQFuDSTJpGK",
+          "name": "HOV Postgres"
+        }
+      }
+    },
+    {
+      "id": "76b76f9f-1981-4d4c-b3af-ca7ce1671e82",
+      "name": "Fetch Finished Projects",
+      "position": [
+        0,
+        384
+      ],
+      "alwaysOutputData": true,
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select id, \"createdTime\", fields from hov.at_project\nwhere fields->>'Status General' = 'Finalizat'",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "eRjiNDQFuDSTJpGK",
+          "name": "HOV Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Paste your Discord webhook URL below (Server Settings -> Integrations ->\n// Webhooks -> New Webhook -> Copy URL). Empty = notifications disabled.\nconst WEBHOOK = '';\nif (!WEBHOOK) return [];\nconst SITE = 'https://n8n-chi-azure.vercel.app';\nconst sd = $getWorkflowStaticData('global');\nsd.sent = sd.sent || {};\nconst now = Date.now();\nfor (const k of Object.keys(sd.sent)) {\n  if (now - sd.sent[k] > 14 * 24 * 3600 * 1000) delete sd.sent[k];\n}\nconst items = $input.all().map(i => i.json).filter(j => j && j.id && j.fields);\nconst msgs = [];\nconst mark = (key) => { if (sd.sent[key]) return false; sd.sent[key] = now; return true; };\n\n// Scripts awaiting review\nfor (const j of items) {\n  const f = j.fields;\n  if (f['Script Content'] !== undefined && f['Status'] === 'awaiting_approval') {\n    if (mark('script:' + j.id)) {\n      msgs.push('📜 **Script gata de review:** ' + (f['Script Title'] || j.id) + '\\n' + SITE);\n    }\n  }\n}\n\n// Scenes awaiting image/video approval, grouped per project + phase\nconst groups = {};\nfor (const j of items) {\n  const f = j.fields;\n  const st = f['Status Producție Scenă'];\n  if (st === 'Așteaptă Aprobare Imagine' || st === 'Așteaptă Aprobare Video') {\n    const pid = f['Project_ID'] || 'unknown';\n    const phase = st.includes('Imagine') ? 'img' : 'vid';\n    const key = pid + ':' + phase;\n    groups[key] = groups[key] || { pid, phase, n: 0 };\n    groups[key].n++;\n  }\n}\nfor (const g of Object.values(groups)) {\n  if (mark('scene:' + g.pid + ':' + g.phase)) {\n    const what = g.phase === 'img' ? 'imagini' : 'clipuri video';\n    msgs.push('🖼️ **' + g.n + ' ' + what + ' așteaptă aprobarea ta**\\n' + SITE + '/projects/' + g.pid);\n  }\n}\n\n// Finished projects\nfor (const j of items) {\n  const f = j.fields;\n  if (f['Status General'] === 'Finalizat' && f['Nume Proiect']) {\n    if (mark('done:' + j.id)) {\n      msgs.push('✅ **Video finalizat:** ' + f['Nume Proiect'] + '\\n' + (f['Link Video Final'] || SITE + '/projects/' + j.id));\n    }\n  }\n}\nreturn msgs.map(content => ({ json: { content, webhook: WEBHOOK } }));"
+      },
+      "id": "bdf06620-e8c3-4bc2-b7a1-339213b56dcc",
+      "name": "Build Notifications",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        192
+      ],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.webhook }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { content: $json.content } }}",
+        "options": {}
+      },
+      "id": "b7524b44-5c3e-4090-8742-a81ed53f23e2",
+      "name": "Send Discord",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        672,
+        192
+      ]
+    }
+  ],
+  "connections": {
+    "Every 5 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Fetch Scripts Awaiting",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Scenes Awaiting",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Finished Projects",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Scripts Awaiting": {
+      "main": [
+        [
+          {
+            "node": "Collect",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect": {
+      "main": [
+        [
+          {
+            "node": "Build Notifications",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Scenes Awaiting": {
+      "main": [
+        [
+          {
+            "node": "Collect",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Fetch Finished Projects": {
+      "main": [
+        [
+          {
+            "node": "Collect",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Build Notifications": {
+      "main": [
+        [
+          {
+            "node": "Send Discord",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "staticData": {
+    "node:Every 5 Minutes": {
+      "recurrenceRules": [
+        null
+      ],
+      "recurrenceRuleSignatures": [
+        null
+      ]
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "5a5b6658-d8a2-4952-a94c-13617ec7d03c",
+  "activeVersionId": "5a5b6658-d8a2-4952-a94c-13617ec7d03c",
+  "versionCounter": 5,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "shared": [
+    {
+      "updatedAt": "2026-08-02T21:55:39.258Z",
+      "createdAt": "2026-08-02T21:55:39.258Z",
+      "role": "workflow:owner",
+      "workflowId": "wmGLHkNssLAyZHKX",
+      "projectId": "8rPamXN1Yu28xfiI",
+      "project": {
+        "updatedAt": "2026-08-02T16:31:01.133Z",
+        "createdAt": "2026-08-02T16:28:59.063Z",
+        "id": "8rPamXN1Yu28xfiI",
+        "name": "Ferma Fabiz <fermafabiz@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "26b2c253-a454-4ae8-a922-db4410bda0d9"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-08-02T22:02:23.496Z",
+    "createdAt": "2026-08-02T21:55:45.589Z",
+    "versionId": "5a5b6658-d8a2-4952-a94c-13617ec7d03c",
+    "workflowId": "wmGLHkNssLAyZHKX",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "minutes"
+              }
+            ]
+          }
+        },
+        "id": "26bba56e-1809-4177-83c7-581ffa68a3e4",
+        "name": "Every 5 Minutes",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.3,
+        "position": [
+          -224,
+          192
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "search",
+          "base": {
+            "__rl": true,
+            "value": "applPyJjvNzyxJkbv",
+            "mode": "list",
+            "cachedResultName": "Database Video"
+          },
+          "table": {
+            "__rl": true,
+            "value": "tblUueZa5ADA3A2rA",
+            "mode": "list",
+            "cachedResultName": "Scripturi"
+          },
+          "filterByFormula": "{Status}='awaiting_approval'",
+          "options": {}
+        },
+        "id": "e39218c6-07d8-4416-bc32-c3deeefbbfcb",
+        "name": "Fetch Scripts Awaiting",
+        "type": "n8n-nodes-base.airtable",
+        "typeVersion": 2.2,
+        "position": [
+          0,
+          0
+        ],
+        "alwaysOutputData": true,
+        "credentials": {
+          "airtableTokenApi": {
+            "id": "TPSvrVbCvTyOfNpL",
+            "name": "Airtable Personal Access Token account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "numberInputs": 3
+        },
+        "id": "d99bdaf6-a533-4677-99ba-8f47e698b711",
+        "name": "Collect",
+        "type": "n8n-nodes-base.merge",
+        "typeVersion": 3.2,
+        "position": [
+          224,
+          176
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "search",
+          "base": {
+            "__rl": true,
+            "value": "applPyJjvNzyxJkbv",
+            "mode": "list",
+            "cachedResultName": "Database Video"
+          },
+          "table": {
+            "__rl": true,
+            "value": "tblkNIyOUeLnKqako",
+            "mode": "list",
+            "cachedResultName": "Scene"
+          },
+          "filterByFormula": "OR({Status Producție Scenă}='Așteaptă Aprobare Imagine',{Status Producție Scenă}='Așteaptă Aprobare Video')",
+          "options": {}
+        },
+        "id": "553cbfdc-43f1-4411-8926-54f3c733905a",
+        "name": "Fetch Scenes Awaiting",
+        "type": "n8n-nodes-base.airtable",
+        "typeVersion": 2.2,
+        "position": [
+          0,
+          192
+        ],
+        "alwaysOutputData": true,
+        "credentials": {
+          "airtableTokenApi": {
+            "id": "TPSvrVbCvTyOfNpL",
+            "name": "Airtable Personal Access Token account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "search",
+          "base": {
+            "__rl": true,
+            "value": "applPyJjvNzyxJkbv",
+            "mode": "list",
+            "cachedResultName": "Database Video"
+          },
+          "table": {
+            "__rl": true,
+            "value": "tbl0zT7ilefOqE3xk",
+            "mode": "list",
+            "cachedResultName": "Proiecte"
+          },
+          "filterByFormula": "{Status General}='Finalizat'",
+          "options": {}
+        },
+        "id": "76b76f9f-1981-4d4c-b3af-ca7ce1671e82",
+        "name": "Fetch Finished Projects",
+        "type": "n8n-nodes-base.airtable",
+        "typeVersion": 2.2,
+        "position": [
+          0,
+          384
+        ],
+        "alwaysOutputData": true,
+        "credentials": {
+          "airtableTokenApi": {
+            "id": "TPSvrVbCvTyOfNpL",
+            "name": "Airtable Personal Access Token account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "// Paste your Discord webhook URL below (Server Settings -> Integrations ->\n// Webhooks -> New Webhook -> Copy URL). Empty = notifications disabled.\nconst WEBHOOK = '';\nif (!WEBHOOK) return [];\nconst SITE = 'https://n8n-chi-azure.vercel.app';\nconst sd = $getWorkflowStaticData('global');\nsd.sent = sd.sent || {};\nconst now = Date.now();\nfor (const k of Object.keys(sd.sent)) {\n  if (now - sd.sent[k] > 14 * 24 * 3600 * 1000) delete sd.sent[k];\n}\nconst items = $input.all().map(i => i.json).filter(j => j && j.id && j.fields);\nconst msgs = [];\nconst mark = (key) => { if (sd.sent[key]) return false; sd.sent[key] = now; return true; };\n\n// Scripts awaiting review\nfor (const j of items) {\n  const f = j.fields;\n  if (f['Script Content'] !== undefined && f['Status'] === 'awaiting_approval') {\n    if (mark('script:' + j.id)) {\n      msgs.push('📜 **Script gata de review:** ' + (f['Script Title'] || j.id) + '\\n' + SITE);\n    }\n  }\n}\n\n// Scenes awaiting image/video approval, grouped per project + phase\nconst groups = {};\nfor (const j of items) {\n  const f = j.fields;\n  const st = f['Status Producție Scenă'];\n  if (st === 'Așteaptă Aprobare Imagine' || st === 'Așteaptă Aprobare Video') {\n    const pid = f['Project_ID'] || 'unknown';\n    const phase = st.includes('Imagine') ? 'img' : 'vid';\n    const key = pid + ':' + phase;\n    groups[key] = groups[key] || { pid, phase, n: 0 };\n    groups[key].n++;\n  }\n}\nfor (const g of Object.values(groups)) {\n  if (mark('scene:' + g.pid + ':' + g.phase)) {\n    const what = g.phase === 'img' ? 'imagini' : 'clipuri video';\n    msgs.push('🖼️ **' + g.n + ' ' + what + ' așteaptă aprobarea ta**\\n' + SITE + '/projects/' + g.pid);\n  }\n}\n\n// Finished projects\nfor (const j of items) {\n  const f = j.fields;\n  if (f['Status General'] === 'Finalizat' && f['Nume Proiect']) {\n    if (mark('done:' + j.id)) {\n      msgs.push('✅ **Video finalizat:** ' + f['Nume Proiect'] + '\\n' + (f['Link Video Final'] || SITE + '/projects/' + j.id));\n    }\n  }\n}\nreturn msgs.map(content => ({ json: { content, webhook: WEBHOOK } }));"
+        },
+        "id": "bdf06620-e8c3-4bc2-b7a1-339213b56dcc",
+        "name": "Build Notifications",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          448,
+          192
+        ],
+        "executeOnce": true
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "={{ $json.webhook }}",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ { content: $json.content } }}",
+          "options": {}
+        },
+        "id": "b7524b44-5c3e-4090-8742-a81ed53f23e2",
+        "name": "Send Discord",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          672,
+          192
+        ]
+      }
+    ],
+    "connections": {
+      "Every 5 Minutes": {
+        "main": [
+          [
+            {
+              "node": "Fetch Scripts Awaiting",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Fetch Scenes Awaiting",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Fetch Finished Projects",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Fetch Scripts Awaiting": {
+        "main": [
+          [
+            {
+              "node": "Collect",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Collect": {
+        "main": [
+          [
+            {
+              "node": "Build Notifications",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Fetch Scenes Awaiting": {
+        "main": [
+          [
+            {
+              "node": "Collect",
+              "type": "main",
+              "index": 1
+            }
+          ]
+        ]
+      },
+      "Fetch Finished Projects": {
+        "main": [
+          [
+            {
+              "node": "Collect",
+              "type": "main",
+              "index": 2
+            }
+          ]
+        ]
+      },
+      "Build Notifications": {
+        "main": [
+          [
+            {
+              "node": "Send Discord",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "nodeGroups": [],
+    "authors": "Ferma Fabiz",
+    "name": "Version 5a5b6658",
+    "description": "",
+    "autosaved": true,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-08-02T22:02:23.493Z",
+        "id": 5,
+        "workflowId": "wmGLHkNssLAyZHKX",
+        "versionId": "5a5b6658-d8a2-4952-a94c-13617ec7d03c",
+        "event": "activated",
+        "userId": "26b2c253-a454-4ae8-a922-db4410bda0d9"
+      }
+    ]
+  }
+}

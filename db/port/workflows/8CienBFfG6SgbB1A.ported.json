@@ -1,0 +1,4435 @@
+{
+  "updatedAt": "2026-08-11T12:42:14.895Z",
+  "createdAt": "2026-08-02T17:21:13.139Z",
+  "id": "8CienBFfG6SgbB1A",
+  "name": "1. Master Orchestrator",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "AI Video Automation - Proiect Nou",
+        "formDescription": "Completează formularul pentru a crea un nou proiect video",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Tema",
+              "fieldName": "tema",
+              "placeholder": "Introdu tema video-ului",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Tonalitate",
+              "fieldType": "dropdown",
+              "fieldName": "tonalitate",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Epic"
+                  },
+                  {
+                    "option": "Educativ"
+                  },
+                  {
+                    "option": "Cinematic"
+                  },
+                  {
+                    "option": "Corporate"
+                  },
+                  {
+                    "option": "Emotional"
+                  },
+                  {
+                    "option": "Dark"
+                  },
+                  {
+                    "option": "Conspiracy"
+                  },
+                  {
+                    "option": "Horror"
+                  },
+                  {
+                    "option": "Dramatic"
+                  },
+                  {
+                    "option": "Documentary"
+                  },
+                  {
+                    "option": "Motivational"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Pace",
+              "fieldType": "dropdown",
+              "fieldName": "pace",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Slow"
+                  },
+                  {
+                    "option": "Normal"
+                  },
+                  {
+                    "option": "Fast"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Length",
+              "fieldType": "number",
+              "fieldName": "length",
+              "placeholder": "Video length in seconds"
+            },
+            {
+              "fieldLabel": "Style",
+              "fieldName": "style",
+              "placeholder": "Visual style preferences"
+            },
+            {
+              "fieldLabel": "Language",
+              "fieldName": "language",
+              "placeholder": "Content language"
+            }
+          ]
+        },
+        "options": {
+          "buttonLabel": "Creează Proiect",
+          "respondWithOptions": {
+            "values": {
+              "formSubmittedText": "Proiectul tău a fost creat cu succes! Procesarea va începe în curând."
+            }
+          }
+        }
+      },
+      "id": "1a20563d-431b-4d0c-87e5-2009d26dc502",
+      "name": "Video Project Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        -2208,
+        144
+      ],
+      "webhookId": "1dcf53cb-8454-4bb8-846e-1e0d1bfd9726"
+    },
+    {
+      "id": "ee22733c-37cc-4c6e-a975-148335a2cf14",
+      "name": "Create Project in Airtable",
+      "position": [
+        -1856,
+        144
+      ],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select * from hov.at_create($hov$project$hov$,\n  $hov${{ JSON.stringify({ \"Nume Proiect\": $json.tema, \"Pace\": $json.pace, \"Language\": $json.language, \"Style\": $json.style, \"Lenght\": $json.length, \"Tonalitate\": $json.tonalitate, \"Status General\": \"În Lucru\", \"Format\": $('New Project Webhook').isExecuted ? ($('Normalize Webhook Input').first().json.aspect || '16:9') : '16:9', \"Fără Subtitrări\": $('New Project Webhook').isExecuted ? ($('Normalize Webhook Input').first().json.noCaptions === true) : false, \"Voice ID\": $('New Project Webhook').isExecuted ? ($('Normalize Webhook Input').first().json.voice || '') : '', \"Editing Options\": $('New Project Webhook').isExecuted ? ($('Normalize Webhook Input').first().json.editingOptions || '') : '' }) }}$hov$::jsonb)",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "eRjiNDQFuDSTJpGK",
+          "name": "HOV Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gkEtGMecv4TC3ZHp",
+          "cachedResultName": "Claude Scripting",
+          "cachedResultUrl": "/workflow/gkEtGMecv4TC3ZHp"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Project_ID": "={{ $json.project_record_id }}",
+            "Tema": "={{ $json.fields['Nume Proiect'] }}",
+            "Tonalitate": "={{ $json.Tonalitate }}",
+            "Pace": "={{ $json.Pace }}",
+            "Lenght": "={{ $json.Lenght }}",
+            "Language": "={{ $json.Language }}",
+            "Style": "={{ $json.Style }}",
+            "Lore": "={{ $('New Project Webhook').isExecuted ? ($('Normalize Webhook Input').first().json.lore || '') : '' }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Project_ID",
+              "displayName": "Project_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "Tema",
+              "displayName": "Tema",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "Tonalitate",
+              "displayName": "Tonalitate",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "Pace",
+              "displayName": "Pace",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "Lenght",
+              "displayName": "Lenght",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "Language",
+              "displayName": "Language",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "Style",
+              "displayName": "Style",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "Lore",
+              "displayName": "Lore",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": true,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "d41b8e0e-6424-4e20-8842-27fecfea1724",
+      "name": "Execute Scripting Sub-Workflow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -1344,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "BY22Vlhh20Xdkr5Z",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/BY22Vlhh20Xdkr5Z",
+          "cachedResultName": "4. Final Assembly"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Project_ID": "={{ $(\"Create Project in Airtable\").item.json.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Project_ID",
+              "displayName": "Project_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "Aspect",
+              "displayName": "Aspect",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "No_Captions",
+              "displayName": "No_Captions",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "dcfba863-1e96-4fff-bb40-133d6a60d00b",
+      "name": "Execute Final Assembly",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": "e6a37db1-6db7-4a9f-a8e9-75911ed8eddd",
+      "name": "Update Status to Finished",
+      "position": [
+        304,
+        0
+      ],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select * from hov.at_write($hov$project$hov$, $hov${{ $(\"Create Project in Airtable\").item.json.id }}$hov$,\n  $hov${{ JSON.stringify({ \"Status General\": \"Finalizat\" }) }}$hov$::jsonb)",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "eRjiNDQFuDSTJpGK",
+          "name": "HOV Postgres"
+        }
+      }
+    },
+    {
+      "id": "f73392bc-6663-4240-b772-fe3c30877906",
+      "name": "Fetch Project Status",
+      "position": [
+        -896,
+        32
+      ],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select id, \"createdTime\", fields from hov.at_project\nwhere id = $hov${{ $(\"Create Project in Airtable\").item.json.id }}$hov$",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "eRjiNDQFuDSTJpGK",
+          "name": "HOV Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.fields[\"Script Status\"] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "id": "script-approved"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8d9a1bff-9205-4e04-bd35-c158faa5d664",
+      "name": "Check Script Status",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -672,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0c62a384-1e41-4827-b371-477635896f2e",
+              "name": "project_record_id",
+              "value": "={{ $(\"Create Project in Airtable\").item.json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "688a6250-c626-4269-9848-e8de1a94da69",
+              "name": "project_title",
+              "value": "= ={{ $(\"Create Project in Airtable\").item.json.fields[\"Nume Proiect\"] }}",
+              "type": "string"
+            },
+            {
+              "id": "27252d90-b6f0-4c95-80c3-da3654f0f58f",
+              "name": "Tonalitate",
+              "value": "={{ $json.fields.Tonalitate }}",
+              "type": "string"
+            },
+            {
+              "id": "39850fb7-548b-4562-8046-4d09c437595c",
+              "name": "Pace",
+              "value": "={{ $json.fields.Pace }}",
+              "type": "string"
+            },
+            {
+              "id": "ff50d370-0a89-4718-aadc-c6425ef07437",
+              "name": "Style",
+              "value": "={{ $json.fields.Style }}",
+              "type": "string"
+            },
+            {
+              "id": "e4b51c07-7a1b-4b37-b890-224e84dc9751",
+              "name": "Lenght",
+              "value": "={{ $json.fields.Lenght }}",
+              "type": "number"
+            },
+            {
+              "id": "b2a9e739-0d8e-43d0-a81b-6ea5f064092d",
+              "name": "Language",
+              "value": "={{ $json.fields.Language }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1536,
+        144
+      ],
+      "id": "7a2e0c3e-5b6b-4819-b4c8-6c6a31522a95",
+      "name": "Prepare project data"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "yHG4DBCDjR3RJzav",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/yHG4DBCDjR3RJzav",
+          "cachedResultName": "3. Media Generation (Batch)"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Project_ID": "={{ $(\"Create Project in Airtable\").item.json.id }}",
+            "Voice_ID": "={{ $('New Project Webhook').isExecuted ? ($('Normalize Webhook Input').first().json.voice || 'elevenlabs_hpp4J3VqNfWAUOO0d1Us') : 'elevenlabs_hpp4J3VqNfWAUOO0d1Us' }}",
+            "Aspect_Ratio": "={{ $('New Project Webhook').isExecuted ? ($('Normalize Webhook Input').first().json.aspect || '16:9') : '16:9' }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Project_ID",
+              "displayName": "Project_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "Voice_ID",
+              "displayName": "Voice_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "Aspect_Ratio",
+              "displayName": "Aspect_Ratio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "e93fb3a2-12e9-4ea7-b296-cf63e210c065",
+      "name": "Execute Media Generation (Batch)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -448,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "new-project",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "28aedc2b-c762-478f-aa14-0864652ec0cb",
+      "name": "New Project Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -2432,
+        352
+      ],
+      "webhookId": "7975f80f-90b8-4b95-b746-9c695be228d7"
+    },
+    {
+      "parameters": {
+        "jsCode": "// The website POSTs JSON; the form trigger outputs flat fields. Map the\n// webhook body to the exact shape 'Create Project in Airtable' expects.\nconst b = $json.body || {};\nconst catOpts = (b.category_options && typeof b.category_options === 'object') ? b.category_options : {};\n// Cast of extra voices for multi-voice videos. Empty (the default and every\n// older project) means narrator-only, i.e. today's behaviour.\nconst cast = Array.isArray(b.cast_voices) ? b.cast_voices.filter(v => typeof v === 'string' && v) : [];\n// Two modes: 'characters' (the cast speaks its own lines) and 'chapters'\n// (each chapter is read by a different narrator from the cast).\nconst mvRaw = String(catOpts.multi_voice || 'off');\nconst multiVoiceMode = (cast.length > 0 && (mvRaw === 'characters' || mvRaw === 'chapters')) ? mvRaw : 'off';\nreturn [{ json: {\n  tema: b.tema || b.name || b['Nume Proiect'] || 'Untitled',\n  tonalitate: b.tonalitate || b.tone || b.Tonalitate || 'Dark',\n  pace: b.pace || b.Pace || 'Normal',\n  length: Number(b.length || b.Lenght) || 64,\n  style: b.style || b.Style || '',\n  language: b.language || b.Language || 'English',\n  voice: b.voice_id || b.voice || '',\n  aspect: b.aspect === '9:16' ? '9:16' : '16:9',\n  noCaptions: b.captions === 'no' || b.captions === false,\n  // Optional canon/lore text for niche topics (Backrooms levels, SCP...) —\n  // injected into the Story Bible as ground truth.\n  lore: String(b.lore || '').slice(0, 8000),\n  // Producer-uploaded reference photo for the film's FIRST scene: base64\n  // rides the webhook, gets uploaded to Drive right after the record is\n  // created, and its URL lands in Editing Options as refImage.\n  refImage: (b.reference_image && typeof b.reference_image === 'object' && typeof b.reference_image.data === 'string' && b.reference_image.data.length > 100) ? { type: String(b.reference_image.type || 'image/jpeg'), data: String(b.reference_image.data) } : null,\n  // Per-overlay editing toggles + the video category, its options and the\n  // voice cast — all stored as one JSON on the project ('Editing Options'),\n  // read back by whichever workflow implements each feature. Unknown keys\n  // are inert, so 'story' without multi-voice behaves exactly as before.\n  editingOptions: JSON.stringify({\n    hookTitle: b.hook_title !== 'no',\n    chapterCards: b.chapter_cards !== 'no',\n    endScreen: b.end_screen !== 'no',\n    // The clips' own ambience is the footage's natural sound, so it is ON\n    // unless explicitly refused. Music is the opposite — a background track\n    // and the synthesized whoosh/boom accents are composed here and have no\n    // relationship to what is on screen, so nothing plays unless asked.\n    sfx: !(b.sfx === 'no' || b.sfx === false),\n    music: b.music === 'yes' || b.music === true,\n    category: String(b.category || 'story'),\n    categoryOptions: catOpts,\n    multiVoiceMode,\n    cast,\n  }),\n} }];"
+      },
+      "id": "60682037-757b-4ffe-bad3-163b1f7c5e62",
+      "name": "Normalize Webhook Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2208,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "resume-project",
+        "options": {}
+      },
+      "id": "dbece006-2bf4-4a02-a943-fe62ddf09a33",
+      "name": "Resume Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -2432,
+        704
+      ],
+      "webhookId": "8081e762-4621-4730-b542-5c5157adbd7e",
+      "notes": "POST {project_id} — restarts production for an existing project. Media Generation skips scenes that already have images/clips, so only missing work is regenerated."
+    },
+    {
+      "id": "5e9ff202-4d98-443d-8cf9-cb56a773ea48",
+      "name": "Fetch Project For Resume",
+      "position": [
+        -2176,
+        704
+      ],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select id, \"createdTime\", fields from hov.at_project\nwhere id = $hov${{ $json.body.project_id }}$hov$",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "eRjiNDQFuDSTJpGK",
+          "name": "HOV Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "yHG4DBCDjR3RJzav",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/yHG4DBCDjR3RJzav",
+          "cachedResultName": "3. Media Generation (Batch)"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Project_ID": "={{ $('Fetch Project For Resume').first().json.id }}",
+            "Voice_ID": "={{ $('Fetch Project For Resume').first().json.fields['Voice ID'] || 'elevenlabs_hpp4J3VqNfWAUOO0d1Us' }}",
+            "Aspect_Ratio": "={{ $('Fetch Project For Resume').first().json.fields['Format'] || '16:9' }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Project_ID",
+              "displayName": "Project_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "Voice_ID",
+              "displayName": "Voice_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "Aspect_Ratio",
+              "displayName": "Aspect_Ratio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "ada77d77-35ee-439d-820a-9dec6571c5b9",
+      "name": "Execute Media Generation (Resume)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -1920,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "BY22Vlhh20Xdkr5Z",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/BY22Vlhh20Xdkr5Z",
+          "cachedResultName": "4. Final Assembly"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Project_ID": "={{ $('Fetch Project For Resume').first().json.id }}",
+            "Aspect": "",
+            "No_Captions": ""
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Project_ID",
+              "displayName": "Project_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "1a5aa012-5fd5-476a-ad90-456c2f95852f",
+      "name": "Execute Final Assembly (Resume)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -1664,
+        704
+      ]
+    },
+    {
+      "id": "dbcbcaa7-a51a-4fff-9def-70510cf046dc",
+      "name": "Mark Finished (Resume)",
+      "position": [
+        -1408,
+        704
+      ],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select * from hov.at_write($hov$project$hov$, $hov${{ $('Fetch Project For Resume').first().json.id }}$hov$,\n  $hov${{ JSON.stringify({ \"Status General\": \"Finalizat\" }) }}$hov$::jsonb)",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "eRjiNDQFuDSTJpGK",
+          "name": "HOV Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { project_id: $json.id } }}",
+        "options": {}
+      },
+      "id": "8e9e748b-09e2-4d7f-8d1d-39ed2ced0dd6",
+      "name": "Respond With Project",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -1616,
+        352
+      ],
+      "onError": "continueRegularOutput",
+      "notes": "Returns the freshly created Airtable project id so the site can redirect straight to the project page. Fails silently on form-trigger runs (no webhook to answer)."
+    },
+    {
+      "id": "da8dc42a-da75-4634-a5db-753d77f5ccc3",
+      "name": "Restart Scripting Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -2432,
+        1024
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "restart-scripting",
+        "options": {}
+      },
+      "notes": "The site posts {project_id} here when the writing phase died and there is nothing left to resume.",
+      "webhookId": "2a1994dd-9034-45e6-b96f-7fde0ebedab3"
+    },
+    {
+      "id": "6e503c34-2836-4837-8fc5-4dfd40783a71",
+      "name": "Fetch Project For Restart",
+      "position": [
+        -2176,
+        1024
+      ],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select id, \"createdTime\", fields from hov.at_project\nwhere id = $hov${{ $json.body.project_id }}$hov$",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "eRjiNDQFuDSTJpGK",
+          "name": "HOV Postgres"
+        }
+      }
+    },
+    {
+      "id": "395c4ba6-aac4-478d-90f0-71602ce9f6df",
+      "name": "Prepare Restart Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1920,
+        1024
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r1",
+              "name": "project_record_id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "r2",
+              "name": "project_title",
+              "value": "={{ $json.fields[\"Nume Proiect\"] }}",
+              "type": "string"
+            },
+            {
+              "id": "r3",
+              "name": "Tonalitate",
+              "value": "={{ $json.fields.Tonalitate }}",
+              "type": "string"
+            },
+            {
+              "id": "r4",
+              "name": "Pace",
+              "value": "={{ $json.fields.Pace }}",
+              "type": "string"
+            },
+            {
+              "id": "r5",
+              "name": "Style",
+              "value": "={{ $json.fields.Style }}",
+              "type": "string"
+            },
+            {
+              "id": "r6",
+              "name": "Lenght",
+              "value": "={{ $json.fields.Lenght }}",
+              "type": "number"
+            },
+            {
+              "id": "r7",
+              "name": "Language",
+              "value": "={{ $json.fields.Language }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "notes": "Mirrors 'Prepare project data', but sourced from the existing record instead of the one the form just created."
+    },
+    {
+      "id": "59ffda6f-2b9a-49de-9a60-bee3d7cc1033",
+      "name": "Execute Scripting (Restart)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -1664,
+        1024
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gkEtGMecv4TC3ZHp",
+          "cachedResultName": "Claude Scripting",
+          "cachedResultUrl": "/workflow/gkEtGMecv4TC3ZHp"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Project_ID": "={{ $json.project_record_id }}",
+            "Tema": "={{ $json.fields['Nume Proiect'] }}",
+            "Tonalitate": "={{ $json.Tonalitate }}",
+            "Pace": "={{ $json.Pace }}",
+            "Lenght": "={{ $json.Lenght }}",
+            "Language": "={{ $json.Language }}",
+            "Style": "={{ $json.Style }}",
+            "Lore": ""
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Project_ID",
+              "displayName": "Project_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "Tema",
+              "displayName": "Tema",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "Tonalitate",
+              "displayName": "Tonalitate",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "Pace",
+              "displayName": "Pace",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "Lenght",
+              "displayName": "Lenght",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "Language",
+              "displayName": "Language",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "Style",
+              "displayName": "Style",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "Lore",
+              "displayName": "Lore",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": true,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "notes": "Lore is empty on purpose: it arrives with the creation form and is never stored on the project, so a restart cannot recover it."
+    },
+    {
+      "id": "724fe7d0-ba9c-40c8-8886-6d9083861481",
+      "name": "Fetch Project Status (Restart)",
+      "position": [
+        -1408,
+        1024
+      ],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select id, \"createdTime\", fields from hov.at_project\nwhere id = $hov${{ $('Fetch Project For Restart').first().json.id }}$hov$",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "eRjiNDQFuDSTJpGK",
+          "name": "HOV Postgres"
+        }
+      }
+    },
+    {
+      "id": "7508fe3b-8e5d-4371-a099-3bcf43136145",
+      "name": "Check Script Status (Restart)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1152,
+        1024
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "restart-script-approved",
+              "leftValue": "={{ $json.fields[\"Script Status\"] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "0cecc517-ddbd-4776-8a46-7ab46095f5cc",
+      "name": "Execute Media Generation (Restart)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -896,
+        1024
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "yHG4DBCDjR3RJzav",
+          "mode": "list",
+          "cachedResultName": "3. Media Generation (Batch)",
+          "cachedResultUrl": "/workflow/yHG4DBCDjR3RJzav"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Project_ID": "={{ $('Fetch Project For Restart').first().json.id }}",
+            "Voice_ID": "={{ $('Fetch Project For Restart').first().json.fields['Voice ID'] || 'elevenlabs_hpp4J3VqNfWAUOO0d1Us' }}",
+            "Aspect_Ratio": "={{ $('Fetch Project For Restart').first().json.fields['Format'] || '16:9' }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Project_ID",
+              "displayName": "Project_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "Voice_ID",
+              "displayName": "Voice_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "Aspect_Ratio",
+              "displayName": "Aspect_Ratio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "a5a61c5b-4229-4d41-a9a4-82b09256f962",
+      "name": "Execute Final Assembly (Restart)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -640,
+        1024
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "BY22Vlhh20Xdkr5Z",
+          "mode": "list",
+          "cachedResultName": "4. Final Assembly",
+          "cachedResultUrl": "/workflow/BY22Vlhh20Xdkr5Z"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Project_ID": "={{ $('Fetch Project For Restart').first().json.id }}",
+            "Aspect": "",
+            "No_Captions": ""
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Project_ID",
+              "displayName": "Project_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "7c64b3c2-c4a6-4306-af35-af17109e3041",
+      "name": "Mark Finished (Restart)",
+      "position": [
+        -384,
+        1024
+      ],
+      "notes": "No Lenght in the mapping - a mapped numeric field with no value writes a literal 0 and destroys the project length.",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select * from hov.at_write($hov$project$hov$, $hov${{ $('Fetch Project For Restart').first().json.id }}$hov$,\n  $hov${{ JSON.stringify({ \"Status General\": \"Finalizat\" }) }}$hov$::jsonb)",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "eRjiNDQFuDSTJpGK",
+          "name": "HOV Postgres"
+        }
+      }
+    },
+    {
+      "id": "c06ca1f5-4d83-415a-9971-63668ba0dd21",
+      "name": "Has Ref Image?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -200,
+        420
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "has-ref",
+              "leftValue": "={{ (() => { try { if (!$('Normalize Webhook Input').isExecuted) return false; const r = $('Normalize Webhook Input').first().json.refImage; return !!(r && r.data); } catch (e) { return false; } })() }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "70f6ea1c-079e-46d1-b107-90b1712a4b31",
+      "name": "Ref To Binary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -40,
+        340
+      ],
+      "parameters": {
+        "jsCode": "// Decode the uploaded reference photo back into a real file for Drive.\nconst ref = $('Normalize Webhook Input').first().json.refImage;\nif (!ref || !ref.data) throw new Error('no reference image on this run');\nconst mime = String(ref.type || 'image/jpeg');\nconst ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg';\nconst buf = Buffer.from(String(ref.data), 'base64');\nif (!buf.length) throw new Error('reference image decoded to zero bytes');\nconst projectId = $('Create Project in Airtable').first().json.id;\nconst name = 'ref-' + projectId + '.' + ext;\nconst bin = await this.helpers.prepareBinaryData(buf, name, mime);\nreturn [{ json: { projectId, name }, binary: { data: bin } }];"
+      }
+    },
+    {
+      "id": "c92e94ca-00e2-4a82-89ec-49cf6b3b2546",
+      "name": "Upload Ref Image",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        120,
+        340
+      ],
+      "parameters": {
+        "resource": "file",
+        "operation": "upload",
+        "name": "={{ $json.name }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive",
+          "cachedResultName": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "root",
+          "cachedResultName": "/ (Root folder)"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "dv4yT9vojdPQoO17",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "id": "265f3381-ae2d-4978-9765-1b0893e72324",
+      "name": "Share Ref Image",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        280,
+        340
+      ],
+      "parameters": {
+        "resource": "file",
+        "operation": "share",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Upload Ref Image').first().json.id }}"
+        },
+        "permissionsUi": {
+          "permissionsValues": {
+            "role": "reader",
+            "type": "anyone"
+          }
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "dv4yT9vojdPQoO17",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "id": "5ea1085b-918b-4ed8-8116-486e34be80d1",
+      "name": "Merge Ref Into Options",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        340
+      ],
+      "parameters": {
+        "jsCode": "// The record was created seconds ago by THIS execution, so the freshly\n// built Editing Options is the whole truth — merge refImage in and write\n// it back without a read.\nconst url = 'https://drive.google.com/uc?export=download&id=' + $('Upload Ref Image').first().json.id;\nlet opts = {};\ntry { opts = JSON.parse($('Normalize Webhook Input').first().json.editingOptions || '{}') || {}; } catch (e) {}\nopts.refImage = url;\nreturn [{ json: { projectId: $('Create Project in Airtable').first().json.id, editingOptions: JSON.stringify(opts) } }];"
+      }
+    },
+    {
+      "id": "7d633b66-a5f7-4a52-8a23-c3c10f5ab689",
+      "name": "Write Ref Options",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        600,
+        340
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://api.airtable.com/v0/applPyJjvNzyxJkbv/tbl0zT7ilefOqE3xk/' + $json.projectId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ fields: { 'Editing Options': $json.editingOptions }, typecast: true }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "TPSvrVbCvTyOfNpL",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Video Project Form": {
+      "main": [
+        [
+          {
+            "node": "Create Project in Airtable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Scripting Sub-Workflow": {
+      "main": [
+        [
+          {
+            "node": "Fetch Project Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Final Assembly": {
+      "main": [
+        [
+          {
+            "node": "Update Status to Finished",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Project Status": {
+      "main": [
+        [
+          {
+            "node": "Check Script Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare project data": {
+      "main": [
+        [
+          {
+            "node": "Execute Scripting Sub-Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Script Status": {
+      "main": [
+        [
+          {
+            "node": "Execute Media Generation (Batch)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Media Generation (Batch)": {
+      "main": [
+        [
+          {
+            "node": "Execute Final Assembly",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "New Project Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Webhook Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Webhook Input": {
+      "main": [
+        [
+          {
+            "node": "Create Project in Airtable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resume Webhook": {
+      "main": [
+        [
+          {
+            "node": "Fetch Project For Resume",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Project For Resume": {
+      "main": [
+        [
+          {
+            "node": "Execute Media Generation (Resume)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Media Generation (Resume)": {
+      "main": [
+        [
+          {
+            "node": "Execute Final Assembly (Resume)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Final Assembly (Resume)": {
+      "main": [
+        [
+          {
+            "node": "Mark Finished (Resume)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Project in Airtable": {
+      "main": [
+        [
+          {
+            "node": "Respond With Project",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restart Scripting Webhook": {
+      "main": [
+        [
+          {
+            "node": "Fetch Project For Restart",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Project For Restart": {
+      "main": [
+        [
+          {
+            "node": "Prepare Restart Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Restart Data": {
+      "main": [
+        [
+          {
+            "node": "Execute Scripting (Restart)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Scripting (Restart)": {
+      "main": [
+        [
+          {
+            "node": "Fetch Project Status (Restart)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Project Status (Restart)": {
+      "main": [
+        [
+          {
+            "node": "Check Script Status (Restart)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Script Status (Restart)": {
+      "main": [
+        [
+          {
+            "node": "Execute Media Generation (Restart)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Media Generation (Restart)": {
+      "main": [
+        [
+          {
+            "node": "Execute Final Assembly (Restart)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Final Assembly (Restart)": {
+      "main": [
+        [
+          {
+            "node": "Mark Finished (Restart)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond With Project": {
+      "main": [
+        [
+          {
+            "node": "Has Ref Image?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Ref Image?": {
+      "main": [
+        [
+          {
+            "node": "Ref To Binary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare project data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ref To Binary": {
+      "main": [
+        [
+          {
+            "node": "Upload Ref Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Ref Image": {
+      "main": [
+        [
+          {
+            "node": "Share Ref Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Share Ref Image": {
+      "main": [
+        [
+          {
+            "node": "Merge Ref Into Options",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Ref Into Options": {
+      "main": [
+        [
+          {
+            "node": "Write Ref Options",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Ref Options": {
+      "main": [
+        [
+          {
+            "node": "Prepare project data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
+  },
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "76a4bf78-e6f0-4788-b63b-d05f7c0833c2",
+  "activeVersionId": "76a4bf78-e6f0-4788-b63b-d05f7c0833c2",
+  "versionCounter": 19,
+  "triggerCount": 4,
+  "sourceWorkflowId": null,
+  "shared": [
+    {
+      "updatedAt": "2026-08-02T17:21:13.139Z",
+      "createdAt": "2026-08-02T17:21:13.139Z",
+      "role": "workflow:owner",
+      "workflowId": "8CienBFfG6SgbB1A",
+      "projectId": "8rPamXN1Yu28xfiI",
+      "project": {
+        "updatedAt": "2026-08-02T16:31:01.133Z",
+        "createdAt": "2026-08-02T16:28:59.063Z",
+        "id": "8rPamXN1Yu28xfiI",
+        "name": "Ferma Fabiz <fermafabiz@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "26b2c253-a454-4ae8-a922-db4410bda0d9"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-08-11T12:42:14.897Z",
+    "createdAt": "2026-08-11T12:42:14.897Z",
+    "versionId": "76a4bf78-e6f0-4788-b63b-d05f7c0833c2",
+    "workflowId": "8CienBFfG6SgbB1A",
+    "nodes": [
+      {
+        "parameters": {
+          "formTitle": "AI Video Automation - Proiect Nou",
+          "formDescription": "Completează formularul pentru a crea un nou proiect video",
+          "formFields": {
+            "values": [
+              {
+                "fieldLabel": "Tema",
+                "fieldName": "tema",
+                "placeholder": "Introdu tema video-ului",
+                "requiredField": true
+              },
+              {
+                "fieldLabel": "Tonalitate",
+                "fieldType": "dropdown",
+                "fieldName": "tonalitate",
+                "fieldOptions": {
+                  "values": [
+                    {
+                      "option": "Epic"
+                    },
+                    {
+                      "option": "Educativ"
+                    },
+                    {
+                      "option": "Cinematic"
+                    },
+                    {
+                      "option": "Corporate"
+                    },
+                    {
+                      "option": "Emotional"
+                    },
+                    {
+                      "option": "Dark"
+                    },
+                    {
+                      "option": "Conspiracy"
+                    },
+                    {
+                      "option": "Horror"
+                    },
+                    {
+                      "option": "Dramatic"
+                    },
+                    {
+                      "option": "Documentary"
+                    },
+                    {
+                      "option": "Motivational"
+                    }
+                  ]
+                },
+                "requiredField": true
+              },
+              {
+                "fieldLabel": "Pace",
+                "fieldType": "dropdown",
+                "fieldName": "pace",
+                "fieldOptions": {
+                  "values": [
+                    {
+                      "option": "Slow"
+                    },
+                    {
+                      "option": "Normal"
+                    },
+                    {
+                      "option": "Fast"
+                    }
+                  ]
+                },
+                "requiredField": true
+              },
+              {
+                "fieldLabel": "Length",
+                "fieldType": "number",
+                "fieldName": "length",
+                "placeholder": "Video length in seconds"
+              },
+              {
+                "fieldLabel": "Style",
+                "fieldName": "style",
+                "placeholder": "Visual style preferences"
+              },
+              {
+                "fieldLabel": "Language",
+                "fieldName": "language",
+                "placeholder": "Content language"
+              }
+            ]
+          },
+          "options": {
+            "buttonLabel": "Creează Proiect",
+            "respondWithOptions": {
+              "values": {
+                "formSubmittedText": "Proiectul tău a fost creat cu succes! Procesarea va începe în curând."
+              }
+            }
+          }
+        },
+        "id": "1a20563d-431b-4d0c-87e5-2009d26dc502",
+        "name": "Video Project Form",
+        "type": "n8n-nodes-base.formTrigger",
+        "typeVersion": 2.5,
+        "position": [
+          -2208,
+          144
+        ],
+        "webhookId": "1dcf53cb-8454-4bb8-846e-1e0d1bfd9726"
+      },
+      {
+        "parameters": {
+          "operation": "create",
+          "base": {
+            "__rl": true,
+            "value": "applPyJjvNzyxJkbv",
+            "mode": "list",
+            "cachedResultName": "Database Video",
+            "cachedResultUrl": "https://airtable.com/applPyJjvNzyxJkbv"
+          },
+          "table": {
+            "__rl": true,
+            "value": "tbl0zT7ilefOqE3xk",
+            "mode": "list",
+            "cachedResultName": "Proiecte",
+            "cachedResultUrl": "https://airtable.com/applPyJjvNzyxJkbv/tbl0zT7ilefOqE3xk"
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "Nume Proiect": "={{ $json.tema }}",
+              "Pace": "={{ $json.pace }}",
+              "Language": "={{ $json.language }}",
+              "Style": "={{ $json.style }}",
+              "Lenght": "={{ $json.length }}",
+              "Tonalitate": "={{ $json.tonalitate }}",
+              "Status General": "În Lucru",
+              "Format": "={{ $('New Project Webhook').isExecuted ? ($('Normalize Webhook Input').first().json.aspect || '16:9') : '16:9' }}",
+              "Fără Subtitrări": "={{ $('New Project Webhook').isExecuted ? ($('Normalize Webhook Input').first().json.noCaptions === true) : false }}",
+              "Voice ID": "={{ $('New Project Webhook').isExecuted ? ($('Normalize Webhook Input').first().json.voice || '') : '' }}",
+              "Editing Options": "={{ $('New Project Webhook').isExecuted ? ($('Normalize Webhook Input').first().json.editingOptions || '') : '' }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "Nume Proiect",
+                "displayName": "Nume Proiect",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Tonalitate",
+                "displayName": "Tonalitate",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Pace",
+                "displayName": "Pace",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Project ID",
+                "displayName": "Project ID",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Lenght",
+                "displayName": "Lenght",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "number",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Status General",
+                "displayName": "Status General",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "options",
+                "options": [
+                  {
+                    "name": "Planificare",
+                    "value": "Planificare"
+                  },
+                  {
+                    "name": "În Lucru",
+                    "value": "În Lucru"
+                  },
+                  {
+                    "name": "Finalizat",
+                    "value": "Finalizat"
+                  },
+                  {
+                    "name": "În desfășurare",
+                    "value": "În desfășurare"
+                  },
+                  {
+                    "name": "Planificat",
+                    "value": "Planificat"
+                  }
+                ],
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Link Video Final",
+                "displayName": "Link Video Final",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Data Start",
+                "displayName": "Data Start",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Data Finalizare Estimată",
+                "displayName": "Data Finalizare Estimată",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Descriere Proiect",
+                "displayName": "Descriere Proiect",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Tag-uri Proiect",
+                "displayName": "Tag-uri Proiect",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "array",
+                "options": [
+                  {
+                    "name": "Branding",
+                    "value": "Branding"
+                  },
+                  {
+                    "name": "Educațional",
+                    "value": "Educațional"
+                  },
+                  {
+                    "name": "Promoțional",
+                    "value": "Promoțional"
+                  },
+                  {
+                    "name": "Tehnologic",
+                    "value": "Tehnologic"
+                  },
+                  {
+                    "name": "Entertainment",
+                    "value": "Entertainment"
+                  },
+                  {
+                    "name": "Alt tip",
+                    "value": "Alt tip"
+                  },
+                  {
+                    "name": "Lansare",
+                    "value": "Lansare"
+                  },
+                  {
+                    "name": "Promo",
+                    "value": "Promo"
+                  },
+                  {
+                    "name": "Tehnologie",
+                    "value": "Tehnologie"
+                  },
+                  {
+                    "name": "CSR",
+                    "value": "CSR"
+                  },
+                  {
+                    "name": "Educație",
+                    "value": "Educație"
+                  },
+                  {
+                    "name": "Comunitate",
+                    "value": "Comunitate"
+                  },
+                  {
+                    "name": "Testimonial",
+                    "value": "Testimonial"
+                  },
+                  {
+                    "name": "Clienți",
+                    "value": "Clienți"
+                  },
+                  {
+                    "name": "Feedback",
+                    "value": "Feedback"
+                  },
+                  {
+                    "name": "Tutorial",
+                    "value": "Tutorial"
+                  },
+                  {
+                    "name": "Aplicație",
+                    "value": "Aplicație"
+                  },
+                  {
+                    "name": "Utilizatori",
+                    "value": "Utilizatori"
+                  },
+                  {
+                    "name": "Publicitate",
+                    "value": "Publicitate"
+                  },
+                  {
+                    "name": "Vară",
+                    "value": "Vară"
+                  },
+                  {
+                    "name": "Documentar",
+                    "value": "Documentar"
+                  },
+                  {
+                    "name": "Istorie",
+                    "value": "Istorie"
+                  },
+                  {
+                    "name": "Local",
+                    "value": "Local"
+                  },
+                  {
+                    "name": "Prezentare",
+                    "value": "Prezentare"
+                  },
+                  {
+                    "name": "Companie",
+                    "value": "Companie"
+                  },
+                  {
+                    "name": "B2B",
+                    "value": "B2B"
+                  },
+                  {
+                    "name": "Aftermovie",
+                    "value": "Aftermovie"
+                  },
+                  {
+                    "name": "Conferință",
+                    "value": "Conferință"
+                  },
+                  {
+                    "name": "Tech",
+                    "value": "Tech"
+                  },
+                  {
+                    "name": "Recrutare",
+                    "value": "Recrutare"
+                  },
+                  {
+                    "name": "HR",
+                    "value": "HR"
+                  },
+                  {
+                    "name": "Aniversare",
+                    "value": "Aniversare"
+                  },
+                  {
+                    "name": "Emoție",
+                    "value": "Emoție"
+                  },
+                  {
+                    "name": "Training",
+                    "value": "Training"
+                  },
+                  {
+                    "name": "Intern",
+                    "value": "Intern"
+                  },
+                  {
+                    "name": "Black Friday",
+                    "value": "Black Friday"
+                  },
+                  {
+                    "name": "Vânzări",
+                    "value": "Vânzări"
+                  },
+                  {
+                    "name": "Interviu",
+                    "value": "Interviu"
+                  },
+                  {
+                    "name": "CEO",
+                    "value": "CEO"
+                  },
+                  {
+                    "name": "Viziune",
+                    "value": "Viziune"
+                  },
+                  {
+                    "name": "Recenzie",
+                    "value": "Recenzie"
+                  },
+                  {
+                    "name": "Produs",
+                    "value": "Produs"
+                  },
+                  {
+                    "name": "Social Media",
+                    "value": "Social Media"
+                  },
+                  {
+                    "name": "Online",
+                    "value": "Online"
+                  }
+                ],
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Capitole",
+                "displayName": "Capitole",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "array",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Language",
+                "displayName": "Language",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Style",
+                "displayName": "Style",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Scene",
+                "displayName": "Scene",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "scripts",
+                "displayName": "scripts",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "array",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Full Narrator Script",
+                "displayName": "Full Narrator Script",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Script Chapters JSON",
+                "displayName": "Script Chapters JSON",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Script Status",
+                "displayName": "Script Status",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "options",
+                "options": [
+                  {
+                    "name": "Draft",
+                    "value": "Draft"
+                  },
+                  {
+                    "name": "In Review",
+                    "value": "In Review"
+                  },
+                  {
+                    "name": "Approved",
+                    "value": "Approved"
+                  },
+                  {
+                    "name": "Final",
+                    "value": "Final"
+                  },
+                  {
+                    "name": "Rejected",
+                    "value": "Rejected"
+                  }
+                ],
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Edited Narrator Script",
+                "displayName": "Edited Narrator Script",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          },
+          "options": {
+            "typecast": true
+          }
+        },
+        "id": "ee22733c-37cc-4c6e-a975-148335a2cf14",
+        "name": "Create Project in Airtable",
+        "type": "n8n-nodes-base.airtable",
+        "typeVersion": 2.2,
+        "position": [
+          -1856,
+          144
+        ],
+        "credentials": {
+          "airtableTokenApi": {
+            "id": "TPSvrVbCvTyOfNpL",
+            "name": "Airtable Personal Access Token account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "workflowId": {
+            "__rl": true,
+            "mode": "list",
+            "value": "gkEtGMecv4TC3ZHp",
+            "cachedResultName": "Claude Scripting",
+            "cachedResultUrl": "/workflow/gkEtGMecv4TC3ZHp"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "Project_ID": "={{ $json.project_record_id }}",
+              "Tema": "={{ $json.fields['Nume Proiect'] }}",
+              "Tonalitate": "={{ $json.Tonalitate }}",
+              "Pace": "={{ $json.Pace }}",
+              "Lenght": "={{ $json.Lenght }}",
+              "Language": "={{ $json.Language }}",
+              "Style": "={{ $json.Style }}",
+              "Lore": "={{ $('New Project Webhook').isExecuted ? ($('Normalize Webhook Input').first().json.lore || '') : '' }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "Project_ID",
+                "displayName": "Project_ID",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "string",
+                "removed": false
+              },
+              {
+                "id": "Tema",
+                "displayName": "Tema",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "string",
+                "removed": false
+              },
+              {
+                "id": "Tonalitate",
+                "displayName": "Tonalitate",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "string",
+                "removed": false
+              },
+              {
+                "id": "Pace",
+                "displayName": "Pace",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "string",
+                "removed": false
+              },
+              {
+                "id": "Lenght",
+                "displayName": "Lenght",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "string",
+                "removed": false
+              },
+              {
+                "id": "Language",
+                "displayName": "Language",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "string",
+                "removed": false
+              },
+              {
+                "id": "Style",
+                "displayName": "Style",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "string",
+                "removed": false
+              },
+              {
+                "id": "Lore",
+                "displayName": "Lore",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "string"
+              }
+            ],
+            "attemptToConvertTypes": true,
+            "convertFieldsToString": true
+          },
+          "options": {
+            "waitForSubWorkflow": true
+          }
+        },
+        "id": "d41b8e0e-6424-4e20-8842-27fecfea1724",
+        "name": "Execute Scripting Sub-Workflow",
+        "type": "n8n-nodes-base.executeWorkflow",
+        "typeVersion": 1.3,
+        "position": [
+          -1344,
+          144
+        ]
+      },
+      {
+        "parameters": {
+          "workflowId": {
+            "__rl": true,
+            "value": "BY22Vlhh20Xdkr5Z",
+            "mode": "list",
+            "cachedResultUrl": "/workflow/BY22Vlhh20Xdkr5Z",
+            "cachedResultName": "4. Final Assembly"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "Project_ID": "={{ $(\"Create Project in Airtable\").item.json.id }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "Project_ID",
+                "displayName": "Project_ID",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "string",
+                "removed": false
+              },
+              {
+                "id": "Aspect",
+                "displayName": "Aspect",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "string"
+              },
+              {
+                "id": "No_Captions",
+                "displayName": "No_Captions",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "string"
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": true
+          },
+          "options": {
+            "waitForSubWorkflow": true
+          }
+        },
+        "id": "dcfba863-1e96-4fff-bb40-133d6a60d00b",
+        "name": "Execute Final Assembly",
+        "type": "n8n-nodes-base.executeWorkflow",
+        "typeVersion": 1.3,
+        "position": [
+          0,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "update",
+          "base": {
+            "__rl": true,
+            "value": "applPyJjvNzyxJkbv",
+            "mode": "list",
+            "cachedResultName": "Database Video",
+            "cachedResultUrl": "https://airtable.com/applPyJjvNzyxJkbv"
+          },
+          "table": {
+            "__rl": true,
+            "value": "tbl0zT7ilefOqE3xk",
+            "mode": "list",
+            "cachedResultName": "Proiecte",
+            "cachedResultUrl": "https://airtable.com/applPyJjvNzyxJkbv/tbl0zT7ilefOqE3xk"
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "id": "={{ $(\"Create Project in Airtable\").item.json.id }}",
+              "Status General": "Finalizat"
+            },
+            "matchingColumns": [
+              "id"
+            ],
+            "schema": [
+              {
+                "id": "id",
+                "displayName": "id",
+                "required": false,
+                "defaultMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": true
+              },
+              {
+                "id": "Nume Proiect",
+                "displayName": "Nume Proiect",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Tonalitate",
+                "displayName": "Tonalitate",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Pace",
+                "displayName": "Pace",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Project ID",
+                "displayName": "Project ID",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": true,
+                "removed": false
+              },
+              {
+                "id": "Lenght",
+                "displayName": "Lenght",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "number",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Status General",
+                "displayName": "Status General",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "options",
+                "options": [
+                  {
+                    "name": "Planificare",
+                    "value": "Planificare"
+                  },
+                  {
+                    "name": "În Lucru",
+                    "value": "În Lucru"
+                  },
+                  {
+                    "name": "Finalizat",
+                    "value": "Finalizat"
+                  },
+                  {
+                    "name": "În desfășurare",
+                    "value": "În desfășurare"
+                  },
+                  {
+                    "name": "Planificat",
+                    "value": "Planificat"
+                  }
+                ],
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Link Video Final",
+                "displayName": "Link Video Final",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Data Start",
+                "displayName": "Data Start",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": true,
+                "removed": false
+              },
+              {
+                "id": "Data Finalizare Estimată",
+                "displayName": "Data Finalizare Estimată",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Tag-uri Proiect",
+                "displayName": "Tag-uri Proiect",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "array",
+                "options": [
+                  {
+                    "name": "Branding",
+                    "value": "Branding"
+                  },
+                  {
+                    "name": "Educațional",
+                    "value": "Educațional"
+                  },
+                  {
+                    "name": "Promoțional",
+                    "value": "Promoțional"
+                  },
+                  {
+                    "name": "Tehnologic",
+                    "value": "Tehnologic"
+                  },
+                  {
+                    "name": "Entertainment",
+                    "value": "Entertainment"
+                  },
+                  {
+                    "name": "Alt tip",
+                    "value": "Alt tip"
+                  },
+                  {
+                    "name": "Lansare",
+                    "value": "Lansare"
+                  },
+                  {
+                    "name": "Promo",
+                    "value": "Promo"
+                  },
+                  {
+                    "name": "Tehnologie",
+                    "value": "Tehnologie"
+                  },
+                  {
+                    "name": "CSR",
+                    "value": "CSR"
+                  },
+                  {
+                    "name": "Educație",
+                    "value": "Educație"
+                  },
+                  {
+                    "name": "Comunitate",
+                    "value": "Comunitate"
+                  },
+                  {
+                    "name": "Testimonial",
+                    "value": "Testimonial"
+                  },
+                  {
+                    "name": "Clienți",
+                    "value": "Clienți"
+                  },
+                  {
+                    "name": "Feedback",
+                    "value": "Feedback"
+                  },
+                  {
+                    "name": "Tutorial",
+                    "value": "Tutorial"
+                  },
+                  {
+                    "name": "Aplicație",
+                    "value": "Aplicație"
+                  },
+                  {
+                    "name": "Utilizatori",
+                    "value": "Utilizatori"
+                  },
+                  {
+                    "name": "Publicitate",
+                    "value": "Publicitate"
+                  },
+                  {
+                    "name": "Vară",
+                    "value": "Vară"
+                  },
+                  {
+                    "name": "Documentar",
+                    "value": "Documentar"
+                  },
+                  {
+                    "name": "Istorie",
+                    "value": "Istorie"
+                  },
+                  {
+                    "name": "Local",
+                    "value": "Local"
+                  },
+                  {
+                    "name": "Prezentare",
+                    "value": "Prezentare"
+                  },
+                  {
+                    "name": "Companie",
+                    "value": "Companie"
+                  },
+                  {
+                    "name": "B2B",
+                    "value": "B2B"
+                  },
+                  {
+                    "name": "Aftermovie",
+                    "value": "Aftermovie"
+                  },
+                  {
+                    "name": "Conferință",
+                    "value": "Conferință"
+                  },
+                  {
+                    "name": "Tech",
+                    "value": "Tech"
+                  },
+                  {
+                    "name": "Recrutare",
+                    "value": "Recrutare"
+                  },
+                  {
+                    "name": "HR",
+                    "value": "HR"
+                  },
+                  {
+                    "name": "Aniversare",
+                    "value": "Aniversare"
+                  },
+                  {
+                    "name": "Emoție",
+                    "value": "Emoție"
+                  },
+                  {
+                    "name": "Training",
+                    "value": "Training"
+                  },
+                  {
+                    "name": "Intern",
+                    "value": "Intern"
+                  },
+                  {
+                    "name": "Black Friday",
+                    "value": "Black Friday"
+                  },
+                  {
+                    "name": "Vânzări",
+                    "value": "Vânzări"
+                  },
+                  {
+                    "name": "Interviu",
+                    "value": "Interviu"
+                  },
+                  {
+                    "name": "CEO",
+                    "value": "CEO"
+                  },
+                  {
+                    "name": "Viziune",
+                    "value": "Viziune"
+                  },
+                  {
+                    "name": "Recenzie",
+                    "value": "Recenzie"
+                  },
+                  {
+                    "name": "Produs",
+                    "value": "Produs"
+                  },
+                  {
+                    "name": "Social Media",
+                    "value": "Social Media"
+                  },
+                  {
+                    "name": "Online",
+                    "value": "Online"
+                  }
+                ],
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Capitole",
+                "displayName": "Capitole",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "array",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Language",
+                "displayName": "Language",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Style",
+                "displayName": "Style",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Story Bible",
+                "displayName": "Story Bible",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Scene",
+                "displayName": "Scene",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "scripts",
+                "displayName": "scripts",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "array",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Full Narrator Script",
+                "displayName": "Full Narrator Script",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Script Chapters JSON",
+                "displayName": "Script Chapters JSON",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Script Status",
+                "displayName": "Script Status",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "boolean",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Edited Narrator Script",
+                "displayName": "Edited Narrator Script",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          },
+          "options": {
+            "typecast": true
+          }
+        },
+        "id": "e6a37db1-6db7-4a9f-a8e9-75911ed8eddd",
+        "name": "Update Status to Finished",
+        "type": "n8n-nodes-base.airtable",
+        "typeVersion": 2.2,
+        "position": [
+          304,
+          0
+        ],
+        "credentials": {
+          "airtableTokenApi": {
+            "id": "TPSvrVbCvTyOfNpL",
+            "name": "Airtable Personal Access Token account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "base": {
+            "__rl": true,
+            "value": "applPyJjvNzyxJkbv",
+            "mode": "list",
+            "cachedResultName": "Database Video",
+            "cachedResultUrl": "https://airtable.com/applPyJjvNzyxJkbv"
+          },
+          "table": {
+            "__rl": true,
+            "value": "tbl0zT7ilefOqE3xk",
+            "mode": "list",
+            "cachedResultName": "Proiecte",
+            "cachedResultUrl": "https://airtable.com/applPyJjvNzyxJkbv/tbl0zT7ilefOqE3xk"
+          },
+          "id": "={{ $(\"Create Project in Airtable\").item.json.id }}",
+          "options": {}
+        },
+        "id": "f73392bc-6663-4240-b772-fe3c30877906",
+        "name": "Fetch Project Status",
+        "type": "n8n-nodes-base.airtable",
+        "typeVersion": 2.2,
+        "position": [
+          -896,
+          32
+        ],
+        "credentials": {
+          "airtableTokenApi": {
+            "id": "TPSvrVbCvTyOfNpL",
+            "name": "Airtable Personal Access Token account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "loose",
+              "version": 3
+            },
+            "conditions": [
+              {
+                "leftValue": "={{ $json.fields[\"Script Status\"] }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                },
+                "id": "script-approved"
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "8d9a1bff-9205-4e04-bd35-c158faa5d664",
+        "name": "Check Script Status",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          -672,
+          144
+        ]
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "0c62a384-1e41-4827-b371-477635896f2e",
+                "name": "project_record_id",
+                "value": "={{ $(\"Create Project in Airtable\").item.json.id }}",
+                "type": "string"
+              },
+              {
+                "id": "688a6250-c626-4269-9848-e8de1a94da69",
+                "name": "project_title",
+                "value": "= ={{ $(\"Create Project in Airtable\").item.json.fields[\"Nume Proiect\"] }}",
+                "type": "string"
+              },
+              {
+                "id": "27252d90-b6f0-4c95-80c3-da3654f0f58f",
+                "name": "Tonalitate",
+                "value": "={{ $json.fields.Tonalitate }}",
+                "type": "string"
+              },
+              {
+                "id": "39850fb7-548b-4562-8046-4d09c437595c",
+                "name": "Pace",
+                "value": "={{ $json.fields.Pace }}",
+                "type": "string"
+              },
+              {
+                "id": "ff50d370-0a89-4718-aadc-c6425ef07437",
+                "name": "Style",
+                "value": "={{ $json.fields.Style }}",
+                "type": "string"
+              },
+              {
+                "id": "e4b51c07-7a1b-4b37-b890-224e84dc9751",
+                "name": "Lenght",
+                "value": "={{ $json.fields.Lenght }}",
+                "type": "number"
+              },
+              {
+                "id": "b2a9e739-0d8e-43d0-a81b-6ea5f064092d",
+                "name": "Language",
+                "value": "={{ $json.fields.Language }}",
+                "type": "string"
+              }
+            ]
+          },
+          "includeOtherFields": true,
+          "options": {}
+        },
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          -1536,
+          144
+        ],
+        "id": "7a2e0c3e-5b6b-4819-b4c8-6c6a31522a95",
+        "name": "Prepare project data"
+      },
+      {
+        "parameters": {
+          "workflowId": {
+            "__rl": true,
+            "value": "yHG4DBCDjR3RJzav",
+            "mode": "list",
+            "cachedResultUrl": "/workflow/yHG4DBCDjR3RJzav",
+            "cachedResultName": "3. Media Generation (Batch)"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "Project_ID": "={{ $(\"Create Project in Airtable\").item.json.id }}",
+              "Voice_ID": "={{ $('New Project Webhook').isExecuted ? ($('Normalize Webhook Input').first().json.voice || 'elevenlabs_hpp4J3VqNfWAUOO0d1Us') : 'elevenlabs_hpp4J3VqNfWAUOO0d1Us' }}",
+              "Aspect_Ratio": "={{ $('New Project Webhook').isExecuted ? ($('Normalize Webhook Input').first().json.aspect || '16:9') : '16:9' }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "Project_ID",
+                "displayName": "Project_ID",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "string",
+                "removed": false
+              },
+              {
+                "id": "Voice_ID",
+                "displayName": "Voice_ID",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "string",
+                "removed": false
+              },
+              {
+                "id": "Aspect_Ratio",
+                "displayName": "Aspect_Ratio",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "string"
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": true
+          },
+          "options": {
+            "waitForSubWorkflow": true
+          }
+        },
+        "id": "e93fb3a2-12e9-4ea7-b296-cf63e210c065",
+        "name": "Execute Media Generation (Batch)",
+        "type": "n8n-nodes-base.executeWorkflow",
+        "typeVersion": 1.3,
+        "position": [
+          -448,
+          144
+        ]
+      },
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "new-project",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "id": "28aedc2b-c762-478f-aa14-0864652ec0cb",
+        "name": "New Project Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          -2432,
+          352
+        ],
+        "webhookId": "7975f80f-90b8-4b95-b746-9c695be228d7"
+      },
+      {
+        "parameters": {
+          "jsCode": "// The website POSTs JSON; the form trigger outputs flat fields. Map the\n// webhook body to the exact shape 'Create Project in Airtable' expects.\nconst b = $json.body || {};\nconst catOpts = (b.category_options && typeof b.category_options === 'object') ? b.category_options : {};\n// Cast of extra voices for multi-voice videos. Empty (the default and every\n// older project) means narrator-only, i.e. today's behaviour.\nconst cast = Array.isArray(b.cast_voices) ? b.cast_voices.filter(v => typeof v === 'string' && v) : [];\n// Two modes: 'characters' (the cast speaks its own lines) and 'chapters'\n// (each chapter is read by a different narrator from the cast).\nconst mvRaw = String(catOpts.multi_voice || 'off');\nconst multiVoiceMode = (cast.length > 0 && (mvRaw === 'characters' || mvRaw === 'chapters')) ? mvRaw : 'off';\nreturn [{ json: {\n  tema: b.tema || b.name || b['Nume Proiect'] || 'Untitled',\n  tonalitate: b.tonalitate || b.tone || b.Tonalitate || 'Dark',\n  pace: b.pace || b.Pace || 'Normal',\n  length: Number(b.length || b.Lenght) || 64,\n  style: b.style || b.Style || '',\n  language: b.language || b.Language || 'English',\n  voice: b.voice_id || b.voice || '',\n  aspect: b.aspect === '9:16' ? '9:16' : '16:9',\n  noCaptions: b.captions === 'no' || b.captions === false,\n  // Optional canon/lore text for niche topics (Backrooms levels, SCP...) —\n  // injected into the Story Bible as ground truth.\n  lore: String(b.lore || '').slice(0, 8000),\n  // Producer-uploaded reference photo for the film's FIRST scene: base64\n  // rides the webhook, gets uploaded to Drive right after the record is\n  // created, and its URL lands in Editing Options as refImage.\n  refImage: (b.reference_image && typeof b.reference_image === 'object' && typeof b.reference_image.data === 'string' && b.reference_image.data.length > 100) ? { type: String(b.reference_image.type || 'image/jpeg'), data: String(b.reference_image.data) } : null,\n  // Per-overlay editing toggles + the video category, its options and the\n  // voice cast — all stored as one JSON on the project ('Editing Options'),\n  // read back by whichever workflow implements each feature. Unknown keys\n  // are inert, so 'story' without multi-voice behaves exactly as before.\n  editingOptions: JSON.stringify({\n    hookTitle: b.hook_title !== 'no',\n    chapterCards: b.chapter_cards !== 'no',\n    endScreen: b.end_screen !== 'no',\n    // The clips' own ambience is the footage's natural sound, so it is ON\n    // unless explicitly refused. Music is the opposite — a background track\n    // and the synthesized whoosh/boom accents are composed here and have no\n    // relationship to what is on screen, so nothing plays unless asked.\n    sfx: !(b.sfx === 'no' || b.sfx === false),\n    music: b.music === 'yes' || b.music === true,\n    category: String(b.category || 'story'),\n    categoryOptions: catOpts,\n    multiVoiceMode,\n    cast,\n  }),\n} }];"
+        },
+        "id": "60682037-757b-4ffe-bad3-163b1f7c5e62",
+        "name": "Normalize Webhook Input",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -2208,
+          352
+        ]
+      },
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "resume-project",
+          "options": {}
+        },
+        "id": "dbece006-2bf4-4a02-a943-fe62ddf09a33",
+        "name": "Resume Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          -2432,
+          704
+        ],
+        "webhookId": "8081e762-4621-4730-b542-5c5157adbd7e",
+        "notes": "POST {project_id} — restarts production for an existing project. Media Generation skips scenes that already have images/clips, so only missing work is regenerated."
+      },
+      {
+        "parameters": {
+          "base": {
+            "__rl": true,
+            "value": "applPyJjvNzyxJkbv",
+            "mode": "list",
+            "cachedResultName": "Database Video",
+            "cachedResultUrl": "https://airtable.com/applPyJjvNzyxJkbv"
+          },
+          "table": {
+            "__rl": true,
+            "value": "tbl0zT7ilefOqE3xk",
+            "mode": "list",
+            "cachedResultName": "Proiecte",
+            "cachedResultUrl": "https://airtable.com/applPyJjvNzyxJkbv/tbl0zT7ilefOqE3xk"
+          },
+          "id": "={{ $json.body.project_id }}",
+          "options": {}
+        },
+        "id": "5e9ff202-4d98-443d-8cf9-cb56a773ea48",
+        "name": "Fetch Project For Resume",
+        "type": "n8n-nodes-base.airtable",
+        "typeVersion": 2.2,
+        "position": [
+          -2176,
+          704
+        ],
+        "credentials": {
+          "airtableTokenApi": {
+            "id": "TPSvrVbCvTyOfNpL",
+            "name": "Airtable Personal Access Token account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "workflowId": {
+            "__rl": true,
+            "value": "yHG4DBCDjR3RJzav",
+            "mode": "list",
+            "cachedResultUrl": "/workflow/yHG4DBCDjR3RJzav",
+            "cachedResultName": "3. Media Generation (Batch)"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "Project_ID": "={{ $('Fetch Project For Resume').first().json.id }}",
+              "Voice_ID": "={{ $('Fetch Project For Resume').first().json.fields['Voice ID'] || 'elevenlabs_hpp4J3VqNfWAUOO0d1Us' }}",
+              "Aspect_Ratio": "={{ $('Fetch Project For Resume').first().json.fields['Format'] || '16:9' }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "Project_ID",
+                "displayName": "Project_ID",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "string",
+                "removed": false
+              },
+              {
+                "id": "Voice_ID",
+                "displayName": "Voice_ID",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "string",
+                "removed": false
+              },
+              {
+                "id": "Aspect_Ratio",
+                "displayName": "Aspect_Ratio",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "string",
+                "removed": false
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": true
+          },
+          "options": {
+            "waitForSubWorkflow": true
+          }
+        },
+        "id": "ada77d77-35ee-439d-820a-9dec6571c5b9",
+        "name": "Execute Media Generation (Resume)",
+        "type": "n8n-nodes-base.executeWorkflow",
+        "typeVersion": 1.3,
+        "position": [
+          -1920,
+          704
+        ]
+      },
+      {
+        "parameters": {
+          "workflowId": {
+            "__rl": true,
+            "value": "BY22Vlhh20Xdkr5Z",
+            "mode": "list",
+            "cachedResultUrl": "/workflow/BY22Vlhh20Xdkr5Z",
+            "cachedResultName": "4. Final Assembly"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "Project_ID": "={{ $('Fetch Project For Resume').first().json.id }}",
+              "Aspect": "",
+              "No_Captions": ""
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "Project_ID",
+                "displayName": "Project_ID",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "string",
+                "removed": false
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": true
+          },
+          "options": {
+            "waitForSubWorkflow": true
+          }
+        },
+        "id": "1a5aa012-5fd5-476a-ad90-456c2f95852f",
+        "name": "Execute Final Assembly (Resume)",
+        "type": "n8n-nodes-base.executeWorkflow",
+        "typeVersion": 1.3,
+        "position": [
+          -1664,
+          704
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "update",
+          "base": {
+            "__rl": true,
+            "value": "applPyJjvNzyxJkbv",
+            "mode": "list",
+            "cachedResultName": "Database Video",
+            "cachedResultUrl": "https://airtable.com/applPyJjvNzyxJkbv"
+          },
+          "table": {
+            "__rl": true,
+            "value": "tbl0zT7ilefOqE3xk",
+            "mode": "list",
+            "cachedResultName": "Proiecte",
+            "cachedResultUrl": "https://airtable.com/applPyJjvNzyxJkbv/tbl0zT7ilefOqE3xk"
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "id": "={{ $('Fetch Project For Resume').first().json.id }}",
+              "Status General": "Finalizat"
+            },
+            "matchingColumns": [
+              "id"
+            ],
+            "schema": [
+              {
+                "id": "id",
+                "displayName": "id",
+                "required": false,
+                "defaultMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": true
+              },
+              {
+                "id": "Status General",
+                "displayName": "Status General",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "options",
+                "options": [
+                  {
+                    "name": "Planificare",
+                    "value": "Planificare"
+                  },
+                  {
+                    "name": "În Lucru",
+                    "value": "În Lucru"
+                  },
+                  {
+                    "name": "Finalizat",
+                    "value": "Finalizat"
+                  },
+                  {
+                    "name": "În desfășurare",
+                    "value": "În desfășurare"
+                  },
+                  {
+                    "name": "Planificat",
+                    "value": "Planificat"
+                  }
+                ],
+                "readOnly": false,
+                "removed": false
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          },
+          "options": {
+            "typecast": true
+          }
+        },
+        "id": "dbcbcaa7-a51a-4fff-9def-70510cf046dc",
+        "name": "Mark Finished (Resume)",
+        "type": "n8n-nodes-base.airtable",
+        "typeVersion": 2.2,
+        "position": [
+          -1408,
+          704
+        ],
+        "credentials": {
+          "airtableTokenApi": {
+            "id": "TPSvrVbCvTyOfNpL",
+            "name": "Airtable Personal Access Token account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ { project_id: $json.id } }}",
+          "options": {}
+        },
+        "id": "8e9e748b-09e2-4d7f-8d1d-39ed2ced0dd6",
+        "name": "Respond With Project",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.1,
+        "position": [
+          -1616,
+          352
+        ],
+        "onError": "continueRegularOutput",
+        "notes": "Returns the freshly created Airtable project id so the site can redirect straight to the project page. Fails silently on form-trigger runs (no webhook to answer)."
+      },
+      {
+        "id": "da8dc42a-da75-4634-a5db-753d77f5ccc3",
+        "name": "Restart Scripting Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          -2432,
+          1024
+        ],
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "restart-scripting",
+          "options": {}
+        },
+        "notes": "The site posts {project_id} here when the writing phase died and there is nothing left to resume.",
+        "webhookId": "2a1994dd-9034-45e6-b96f-7fde0ebedab3"
+      },
+      {
+        "id": "6e503c34-2836-4837-8fc5-4dfd40783a71",
+        "name": "Fetch Project For Restart",
+        "type": "n8n-nodes-base.airtable",
+        "typeVersion": 2.2,
+        "position": [
+          -2176,
+          1024
+        ],
+        "parameters": {
+          "base": {
+            "__rl": true,
+            "value": "applPyJjvNzyxJkbv",
+            "mode": "list",
+            "cachedResultName": "Database Video",
+            "cachedResultUrl": "https://airtable.com/applPyJjvNzyxJkbv"
+          },
+          "table": {
+            "__rl": true,
+            "value": "tbl0zT7ilefOqE3xk",
+            "mode": "list",
+            "cachedResultName": "Proiecte",
+            "cachedResultUrl": "https://airtable.com/applPyJjvNzyxJkbv/tbl0zT7ilefOqE3xk"
+          },
+          "id": "={{ $json.body.project_id }}",
+          "options": {}
+        },
+        "credentials": {
+          "airtableTokenApi": {
+            "id": "TPSvrVbCvTyOfNpL",
+            "name": "Airtable Personal Access Token account"
+          }
+        }
+      },
+      {
+        "id": "395c4ba6-aac4-478d-90f0-71602ce9f6df",
+        "name": "Prepare Restart Data",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          -1920,
+          1024
+        ],
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "r1",
+                "name": "project_record_id",
+                "value": "={{ $json.id }}",
+                "type": "string"
+              },
+              {
+                "id": "r2",
+                "name": "project_title",
+                "value": "={{ $json.fields[\"Nume Proiect\"] }}",
+                "type": "string"
+              },
+              {
+                "id": "r3",
+                "name": "Tonalitate",
+                "value": "={{ $json.fields.Tonalitate }}",
+                "type": "string"
+              },
+              {
+                "id": "r4",
+                "name": "Pace",
+                "value": "={{ $json.fields.Pace }}",
+                "type": "string"
+              },
+              {
+                "id": "r5",
+                "name": "Style",
+                "value": "={{ $json.fields.Style }}",
+                "type": "string"
+              },
+              {
+                "id": "r6",
+                "name": "Lenght",
+                "value": "={{ $json.fields.Lenght }}",
+                "type": "number"
+              },
+              {
+                "id": "r7",
+                "name": "Language",
+                "value": "={{ $json.fields.Language }}",
+                "type": "string"
+              }
+            ]
+          },
+          "includeOtherFields": true,
+          "options": {}
+        },
+        "notes": "Mirrors 'Prepare project data', but sourced from the existing record instead of the one the form just created."
+      },
+      {
+        "id": "59ffda6f-2b9a-49de-9a60-bee3d7cc1033",
+        "name": "Execute Scripting (Restart)",
+        "type": "n8n-nodes-base.executeWorkflow",
+        "typeVersion": 1.3,
+        "position": [
+          -1664,
+          1024
+        ],
+        "parameters": {
+          "workflowId": {
+            "__rl": true,
+            "mode": "list",
+            "value": "gkEtGMecv4TC3ZHp",
+            "cachedResultName": "Claude Scripting",
+            "cachedResultUrl": "/workflow/gkEtGMecv4TC3ZHp"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "Project_ID": "={{ $json.project_record_id }}",
+              "Tema": "={{ $json.fields['Nume Proiect'] }}",
+              "Tonalitate": "={{ $json.Tonalitate }}",
+              "Pace": "={{ $json.Pace }}",
+              "Lenght": "={{ $json.Lenght }}",
+              "Language": "={{ $json.Language }}",
+              "Style": "={{ $json.Style }}",
+              "Lore": ""
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "Project_ID",
+                "displayName": "Project_ID",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "string",
+                "removed": false
+              },
+              {
+                "id": "Tema",
+                "displayName": "Tema",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "string",
+                "removed": false
+              },
+              {
+                "id": "Tonalitate",
+                "displayName": "Tonalitate",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "string",
+                "removed": false
+              },
+              {
+                "id": "Pace",
+                "displayName": "Pace",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "string",
+                "removed": false
+              },
+              {
+                "id": "Lenght",
+                "displayName": "Lenght",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "string",
+                "removed": false
+              },
+              {
+                "id": "Language",
+                "displayName": "Language",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "string",
+                "removed": false
+              },
+              {
+                "id": "Style",
+                "displayName": "Style",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "string",
+                "removed": false
+              },
+              {
+                "id": "Lore",
+                "displayName": "Lore",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "string"
+              }
+            ],
+            "attemptToConvertTypes": true,
+            "convertFieldsToString": true
+          },
+          "options": {
+            "waitForSubWorkflow": true
+          }
+        },
+        "notes": "Lore is empty on purpose: it arrives with the creation form and is never stored on the project, so a restart cannot recover it."
+      },
+      {
+        "id": "724fe7d0-ba9c-40c8-8886-6d9083861481",
+        "name": "Fetch Project Status (Restart)",
+        "type": "n8n-nodes-base.airtable",
+        "typeVersion": 2.2,
+        "position": [
+          -1408,
+          1024
+        ],
+        "parameters": {
+          "base": {
+            "__rl": true,
+            "value": "applPyJjvNzyxJkbv",
+            "mode": "list",
+            "cachedResultName": "Database Video",
+            "cachedResultUrl": "https://airtable.com/applPyJjvNzyxJkbv"
+          },
+          "table": {
+            "__rl": true,
+            "value": "tbl0zT7ilefOqE3xk",
+            "mode": "list",
+            "cachedResultName": "Proiecte",
+            "cachedResultUrl": "https://airtable.com/applPyJjvNzyxJkbv/tbl0zT7ilefOqE3xk"
+          },
+          "id": "={{ $('Fetch Project For Restart').first().json.id }}",
+          "options": {}
+        },
+        "credentials": {
+          "airtableTokenApi": {
+            "id": "TPSvrVbCvTyOfNpL",
+            "name": "Airtable Personal Access Token account"
+          }
+        }
+      },
+      {
+        "id": "7508fe3b-8e5d-4371-a099-3bcf43136145",
+        "name": "Check Script Status (Restart)",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          -1152,
+          1024
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "loose",
+              "version": 3
+            },
+            "conditions": [
+              {
+                "id": "restart-script-approved",
+                "leftValue": "={{ $json.fields[\"Script Status\"] }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        }
+      },
+      {
+        "id": "0cecc517-ddbd-4776-8a46-7ab46095f5cc",
+        "name": "Execute Media Generation (Restart)",
+        "type": "n8n-nodes-base.executeWorkflow",
+        "typeVersion": 1.3,
+        "position": [
+          -896,
+          1024
+        ],
+        "parameters": {
+          "workflowId": {
+            "__rl": true,
+            "value": "yHG4DBCDjR3RJzav",
+            "mode": "list",
+            "cachedResultName": "3. Media Generation (Batch)",
+            "cachedResultUrl": "/workflow/yHG4DBCDjR3RJzav"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "Project_ID": "={{ $('Fetch Project For Restart').first().json.id }}",
+              "Voice_ID": "={{ $('Fetch Project For Restart').first().json.fields['Voice ID'] || 'elevenlabs_hpp4J3VqNfWAUOO0d1Us' }}",
+              "Aspect_Ratio": "={{ $('Fetch Project For Restart').first().json.fields['Format'] || '16:9' }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "Project_ID",
+                "displayName": "Project_ID",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "string",
+                "removed": false
+              },
+              {
+                "id": "Voice_ID",
+                "displayName": "Voice_ID",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "string",
+                "removed": false
+              },
+              {
+                "id": "Aspect_Ratio",
+                "displayName": "Aspect_Ratio",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "string",
+                "removed": false
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": true
+          },
+          "options": {
+            "waitForSubWorkflow": true
+          }
+        }
+      },
+      {
+        "id": "a5a61c5b-4229-4d41-a9a4-82b09256f962",
+        "name": "Execute Final Assembly (Restart)",
+        "type": "n8n-nodes-base.executeWorkflow",
+        "typeVersion": 1.3,
+        "position": [
+          -640,
+          1024
+        ],
+        "parameters": {
+          "workflowId": {
+            "__rl": true,
+            "value": "BY22Vlhh20Xdkr5Z",
+            "mode": "list",
+            "cachedResultName": "4. Final Assembly",
+            "cachedResultUrl": "/workflow/BY22Vlhh20Xdkr5Z"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "Project_ID": "={{ $('Fetch Project For Restart').first().json.id }}",
+              "Aspect": "",
+              "No_Captions": ""
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "Project_ID",
+                "displayName": "Project_ID",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "string",
+                "removed": false
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": true
+          },
+          "options": {
+            "waitForSubWorkflow": true
+          }
+        }
+      },
+      {
+        "id": "7c64b3c2-c4a6-4306-af35-af17109e3041",
+        "name": "Mark Finished (Restart)",
+        "type": "n8n-nodes-base.airtable",
+        "typeVersion": 2.2,
+        "position": [
+          -384,
+          1024
+        ],
+        "parameters": {
+          "operation": "update",
+          "base": {
+            "__rl": true,
+            "value": "applPyJjvNzyxJkbv",
+            "mode": "list",
+            "cachedResultName": "Database Video",
+            "cachedResultUrl": "https://airtable.com/applPyJjvNzyxJkbv"
+          },
+          "table": {
+            "__rl": true,
+            "value": "tbl0zT7ilefOqE3xk",
+            "mode": "list",
+            "cachedResultName": "Proiecte",
+            "cachedResultUrl": "https://airtable.com/applPyJjvNzyxJkbv/tbl0zT7ilefOqE3xk"
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "id": "={{ $('Fetch Project For Restart').first().json.id }}",
+              "Status General": "Finalizat"
+            },
+            "matchingColumns": [
+              "id"
+            ],
+            "schema": [
+              {
+                "id": "id",
+                "displayName": "id",
+                "required": false,
+                "defaultMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": true
+              },
+              {
+                "id": "Status General",
+                "displayName": "Status General",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "options",
+                "options": [
+                  {
+                    "name": "Planificare",
+                    "value": "Planificare"
+                  },
+                  {
+                    "name": "În Lucru",
+                    "value": "În Lucru"
+                  },
+                  {
+                    "name": "Finalizat",
+                    "value": "Finalizat"
+                  },
+                  {
+                    "name": "În desfășurare",
+                    "value": "În desfășurare"
+                  },
+                  {
+                    "name": "Planificat",
+                    "value": "Planificat"
+                  }
+                ],
+                "readOnly": false,
+                "removed": false
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          },
+          "options": {
+            "typecast": true
+          }
+        },
+        "credentials": {
+          "airtableTokenApi": {
+            "id": "TPSvrVbCvTyOfNpL",
+            "name": "Airtable Personal Access Token account"
+          }
+        },
+        "notes": "No Lenght in the mapping - a mapped numeric field with no value writes a literal 0 and destroys the project length."
+      },
+      {
+        "id": "c06ca1f5-4d83-415a-9971-63668ba0dd21",
+        "name": "Has Ref Image?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          -200,
+          420
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "typeValidation": "loose",
+              "version": 3
+            },
+            "conditions": [
+              {
+                "id": "has-ref",
+                "leftValue": "={{ (() => { try { if (!$('Normalize Webhook Input').isExecuted) return false; const r = $('Normalize Webhook Input').first().json.refImage; return !!(r && r.data); } catch (e) { return false; } })() }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "looseTypeValidation": true,
+          "options": {}
+        }
+      },
+      {
+        "id": "70f6ea1c-079e-46d1-b107-90b1712a4b31",
+        "name": "Ref To Binary",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -40,
+          340
+        ],
+        "parameters": {
+          "jsCode": "// Decode the uploaded reference photo back into a real file for Drive.\nconst ref = $('Normalize Webhook Input').first().json.refImage;\nif (!ref || !ref.data) throw new Error('no reference image on this run');\nconst mime = String(ref.type || 'image/jpeg');\nconst ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg';\nconst buf = Buffer.from(String(ref.data), 'base64');\nif (!buf.length) throw new Error('reference image decoded to zero bytes');\nconst projectId = $('Create Project in Airtable').first().json.id;\nconst name = 'ref-' + projectId + '.' + ext;\nconst bin = await this.helpers.prepareBinaryData(buf, name, mime);\nreturn [{ json: { projectId, name }, binary: { data: bin } }];"
+        }
+      },
+      {
+        "id": "c92e94ca-00e2-4a82-89ec-49cf6b3b2546",
+        "name": "Upload Ref Image",
+        "type": "n8n-nodes-base.googleDrive",
+        "typeVersion": 3,
+        "position": [
+          120,
+          340
+        ],
+        "parameters": {
+          "resource": "file",
+          "operation": "upload",
+          "name": "={{ $json.name }}",
+          "driveId": {
+            "__rl": true,
+            "mode": "list",
+            "value": "My Drive",
+            "cachedResultName": "My Drive"
+          },
+          "folderId": {
+            "__rl": true,
+            "mode": "list",
+            "value": "root",
+            "cachedResultName": "/ (Root folder)"
+          },
+          "options": {}
+        },
+        "credentials": {
+          "googleDriveOAuth2Api": {
+            "id": "dv4yT9vojdPQoO17",
+            "name": "Google Drive account"
+          }
+        }
+      },
+      {
+        "id": "265f3381-ae2d-4978-9765-1b0893e72324",
+        "name": "Share Ref Image",
+        "type": "n8n-nodes-base.googleDrive",
+        "typeVersion": 3,
+        "position": [
+          280,
+          340
+        ],
+        "parameters": {
+          "resource": "file",
+          "operation": "share",
+          "fileId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "={{ $('Upload Ref Image').first().json.id }}"
+          },
+          "permissionsUi": {
+            "permissionsValues": {
+              "role": "reader",
+              "type": "anyone"
+            }
+          },
+          "options": {}
+        },
+        "credentials": {
+          "googleDriveOAuth2Api": {
+            "id": "dv4yT9vojdPQoO17",
+            "name": "Google Drive account"
+          }
+        }
+      },
+      {
+        "id": "5ea1085b-918b-4ed8-8116-486e34be80d1",
+        "name": "Merge Ref Into Options",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          440,
+          340
+        ],
+        "parameters": {
+          "jsCode": "// The record was created seconds ago by THIS execution, so the freshly\n// built Editing Options is the whole truth — merge refImage in and write\n// it back without a read.\nconst url = 'https://drive.google.com/uc?export=download&id=' + $('Upload Ref Image').first().json.id;\nlet opts = {};\ntry { opts = JSON.parse($('Normalize Webhook Input').first().json.editingOptions || '{}') || {}; } catch (e) {}\nopts.refImage = url;\nreturn [{ json: { projectId: $('Create Project in Airtable').first().json.id, editingOptions: JSON.stringify(opts) } }];"
+        }
+      },
+      {
+        "id": "7d633b66-a5f7-4a52-8a23-c3c10f5ab689",
+        "name": "Write Ref Options",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          600,
+          340
+        ],
+        "parameters": {
+          "method": "PATCH",
+          "url": "={{ 'https://api.airtable.com/v0/applPyJjvNzyxJkbv/tbl0zT7ilefOqE3xk/' + $json.projectId }}",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "airtableTokenApi",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ fields: { 'Editing Options': $json.editingOptions }, typecast: true }) }}",
+          "options": {
+            "timeout": 15000
+          }
+        },
+        "credentials": {
+          "airtableTokenApi": {
+            "id": "TPSvrVbCvTyOfNpL",
+            "name": "Airtable Personal Access Token account"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Video Project Form": {
+        "main": [
+          [
+            {
+              "node": "Create Project in Airtable",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Execute Scripting Sub-Workflow": {
+        "main": [
+          [
+            {
+              "node": "Fetch Project Status",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Execute Final Assembly": {
+        "main": [
+          [
+            {
+              "node": "Update Status to Finished",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Fetch Project Status": {
+        "main": [
+          [
+            {
+              "node": "Check Script Status",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Prepare project data": {
+        "main": [
+          [
+            {
+              "node": "Execute Scripting Sub-Workflow",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Check Script Status": {
+        "main": [
+          [
+            {
+              "node": "Execute Media Generation (Batch)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Execute Media Generation (Batch)": {
+        "main": [
+          [
+            {
+              "node": "Execute Final Assembly",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "New Project Webhook": {
+        "main": [
+          [
+            {
+              "node": "Normalize Webhook Input",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Normalize Webhook Input": {
+        "main": [
+          [
+            {
+              "node": "Create Project in Airtable",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Resume Webhook": {
+        "main": [
+          [
+            {
+              "node": "Fetch Project For Resume",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Fetch Project For Resume": {
+        "main": [
+          [
+            {
+              "node": "Execute Media Generation (Resume)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Execute Media Generation (Resume)": {
+        "main": [
+          [
+            {
+              "node": "Execute Final Assembly (Resume)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Execute Final Assembly (Resume)": {
+        "main": [
+          [
+            {
+              "node": "Mark Finished (Resume)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create Project in Airtable": {
+        "main": [
+          [
+            {
+              "node": "Respond With Project",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Restart Scripting Webhook": {
+        "main": [
+          [
+            {
+              "node": "Fetch Project For Restart",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Fetch Project For Restart": {
+        "main": [
+          [
+            {
+              "node": "Prepare Restart Data",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Prepare Restart Data": {
+        "main": [
+          [
+            {
+              "node": "Execute Scripting (Restart)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Execute Scripting (Restart)": {
+        "main": [
+          [
+            {
+              "node": "Fetch Project Status (Restart)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Fetch Project Status (Restart)": {
+        "main": [
+          [
+            {
+              "node": "Check Script Status (Restart)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Check Script Status (Restart)": {
+        "main": [
+          [
+            {
+              "node": "Execute Media Generation (Restart)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Execute Media Generation (Restart)": {
+        "main": [
+          [
+            {
+              "node": "Execute Final Assembly (Restart)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Execute Final Assembly (Restart)": {
+        "main": [
+          [
+            {
+              "node": "Mark Finished (Restart)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Respond With Project": {
+        "main": [
+          [
+            {
+              "node": "Has Ref Image?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Has Ref Image?": {
+        "main": [
+          [
+            {
+              "node": "Ref To Binary",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Prepare project data",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Ref To Binary": {
+        "main": [
+          [
+            {
+              "node": "Upload Ref Image",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Upload Ref Image": {
+        "main": [
+          [
+            {
+              "node": "Share Ref Image",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Share Ref Image": {
+        "main": [
+          [
+            {
+              "node": "Merge Ref Into Options",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Merge Ref Into Options": {
+        "main": [
+          [
+            {
+              "node": "Write Ref Options",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Write Ref Options": {
+        "main": [
+          [
+            {
+              "node": "Prepare project data",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "nodeGroups": [],
+    "authors": "Ferma Fabiz (via MCP)",
+    "name": "Guard the ref-image check against the form path",
+    "description": "Has Ref Image? read $('Normalize Webhook Input') unconditionally, so a project started from the legacy n8n form trigger (where that node never runs) died one step after the record was created — execution 2701. Guarded with isExecuted; no reference image can exist on that path anyway.",
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-08-11T12:42:18.453Z",
+        "id": 94,
+        "workflowId": "8CienBFfG6SgbB1A",
+        "versionId": "76a4bf78-e6f0-4788-b63b-d05f7c0833c2",
+        "event": "activated",
+        "userId": "26b2c253-a454-4ae8-a922-db4410bda0d9"
+      }
+    ]
+  }
+}

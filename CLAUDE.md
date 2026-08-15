@@ -2124,11 +2124,17 @@ now has a button on the site.
   `attachment.path`'s global unique dropped for `(scene_id, field, path)` —
   a draft points at the SAME file the scene still holds, which the current
   index forbids.
-- **`Scene Final URL` still wins over the stored clip.** `toRawScene` reads
-  `scene_final_url || mediaUrl(video_path)`, matching Airtable's old
-  precedence — so a scene whose fal link has expired shows a dead video even
-  though a permanent copy now sits in the media store. Pre-existing, not a
-  regression, and now trivially fixable: prefer the attachment.
+- ~~`Scene Final URL` wins over the stored clip.~~ Inverted 2026-08-15: the
+  stored copy is preferred when there is one, in `buildScene` where both
+  backends share it.
+
+  Checking it first corrected two assumptions. The old precedence existed
+  because the attachment was assumed to be the raw clip and the URL the muxed
+  one — but twelve of twelve stored clips carry an aac track, so the stored
+  file IS the muxed clip. And the expiring links were never fal: all eleven fal
+  URLs still answer months later, while both `flow-content.google` ones answer
+  403. Those two scenes had a good copy on disk the whole time and the old rule
+  refused to show it. Both play again.
 
 ### Still owed before Airtable can be cancelled
 

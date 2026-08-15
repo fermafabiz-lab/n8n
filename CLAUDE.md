@@ -2006,6 +2006,33 @@ stays a complete, current copy until the plan is actually cancelled. **Do not
 cancel the Airtable subscription on cutover day.** Give it a full film and a
 week first; it is the only rollback that exists.
 
+### Settings — the screens that replace Airtable's grid
+
+`/admin` edits the three tables nobody had a screen for, because Airtable's
+grid WAS the screen: `Genre Profiles`, `Script Library`, `Librărie Scripturi`.
+
+**They are wired to both backends, and that is not tidiness.** A Postgres-only
+version would look like it worked before the cutover — someone edits a genre,
+sees "Saved", and the next film ignores it because Claude Scripting is still
+reading Airtable. The page prints which store answered for the same reason:
+while two exist, an edit landing in the one nothing reads is indistinguishable
+from an edit that worked.
+
+Two rules the forms enforce rather than trust:
+
+- **A genre's tone cannot be blanked.** That string is how scripting finds the
+  row (`lower(tone)`), so an unnamed profile is an unreachable one.
+- **A new genre is created inactive.** A half-filled profile that scripting
+  starts using immediately is worse than none, because the built-in fallback is
+  complete and a fresh row is not.
+
+`Raw Transcript` is deliberately not editable — far too long for a form, and
+nothing reads it by hand. The row shows its size instead.
+
+Records are closed lines with their state on the right. Eleven genres at twelve
+fields each is four hundred inputs, and the question people arrive with is
+"which of these is on?".
+
 ### Still owed before Airtable can be cancelled
 
 1. ~~A `PostgresAdapter` behind the existing signatures in
@@ -2015,9 +2042,8 @@ week first; it is the only rollback that exists.
 2. ~~The 48 Airtable nodes.~~ All 48 convert — `db/port/workflows/*.ported.json`,
    regenerate with `db/port/port-airtable-nodes.mjs`. **Not applied**: a PUT is
    live immediately, so they go in during the window.
-3. Admin screens for the three hand-edited tables — `Genre Profiles`,
-   `Script Library`, `Librărie Scripturi`. Still the only thing genuinely
-   unbuilt, and Airtable cannot be cancelled while people edit those by hand.
+3. ~~Admin screens for the three hand-edited tables.~~ Done — `/admin`, on
+   both backends.
 4. Saved drafts on Postgres: `saveVersionOfScene` / `restoreVersionOfScene`
    throw rather than pretend. Reading versions works. The open question is
    whether a draft copies the bytes or `attachment.path` stops being unique.

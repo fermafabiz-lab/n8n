@@ -22,6 +22,9 @@ import {
   type RawScene,
   type Scene,
   type ScriptInfo,
+  type GenreProfile,
+  type LibraryScript,
+  type ScriptExample,
 } from "./derive";
 
 // ---------------------------------------------------------------------------
@@ -691,3 +694,135 @@ export async function attachMedia(opts: {
     client.release();
   }
 }
+
+// ---------------------------------------------------------------------------
+// The three hand-edited tables
+// ---------------------------------------------------------------------------
+
+const num = (v: unknown): number | null =>
+  v === null || v === undefined ? null : Number(v);
+
+export async function getGenreProfiles(): Promise<GenreProfile[]> {
+  const rows = await query<Record<string, unknown>>(
+    `select id, tone, format, research, research_brief, fact_sheet_framing, invention,
+            structure, voice, wpm, hook_rule, visual, montage_intensity, active
+       from hov.genre_profile order by lower(tone)`,
+  );
+  return rows.map((r) => ({
+    id: String(r.id),
+    tone: String(r.tone ?? ""),
+    format: (r.format as string) ?? null,
+    research: r.research === true,
+    researchBrief: (r.research_brief as string) ?? null,
+    factSheetFraming: (r.fact_sheet_framing as string) ?? null,
+    invention: (r.invention as string) ?? null,
+    structure: (r.structure as string) ?? null,
+    voice: (r.voice as string) ?? null,
+    wpm: num(r.wpm),
+    hookRule: (r.hook_rule as string) ?? null,
+    visual: (r.visual as string) ?? null,
+    montageIntensity: Number(r.montage_intensity ?? 1),
+    active: r.active === true,
+  }));
+}
+
+const GENRE_COLS: Record<string, string> = {
+  tone: "tone", format: "format", research: "research",
+  researchBrief: "research_brief", factSheetFraming: "fact_sheet_framing",
+  invention: "invention", structure: "structure", voice: "voice", wpm: "wpm",
+  hookRule: "hook_rule", visual: "visual", montageIntensity: "montage_intensity",
+  active: "active",
+};
+
+const LIBRARY_COLS: Record<string, string> = {
+  title: "title", sourceUrl: "source_url", category: "category", tone: "tone",
+  styleCard: "style_card", pacingWpm: "pacing_wpm", hookWpm: "hook_wpm",
+  durationSeconds: "duration_seconds", active: "active", notes: "notes",
+};
+
+const EXAMPLE_COLS: Record<string, string> = {
+  name: "name", content: "content", style: "style", tags: "tags",
+  usageUrl: "usage_url", notes: "notes",
+};
+
+/**
+ * One update builder for all three tables.
+ *
+ * An unmapped key throws rather than being skipped — a form field that
+ * silently does nothing is exactly the failure these screens exist to end.
+ */
+async function patchRow(
+  table: string,
+  cols: Record<string, string>,
+  id: string,
+  patch: Record<string, unknown>,
+): Promise<void> {
+  const sets: string[] = [];
+  const params: unknown[] = [];
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === undefined) continue;
+    const col = cols[k];
+    if (!col) throw new Error(`${table}: no column for "${k}"`);
+    params.push(v === "" && typeof v === "string" ? null : v);
+    sets.push(`${col} = $${params.length}`);
+  }
+  if (!sets.length) return;
+  params.push(id);
+  await query(`update hov.${table} set ${sets.join(", ")} where id = $${params.length}`, params);
+}
+
+export const saveGenreProfile = (id: string, patch: Record<string, unknown>) =>
+  patchRow("genre_profile", GENRE_COLS, id, patch);
+
+export async function createGenreProfile(tone: string): Promise<string> {
+  const rows = await query<{ id: string }>(
+    `insert into hov.genre_profile (tone, active) values ($1, false) returning id`,
+    [tone],
+  );
+  return rows[0].id;
+}
+
+export async function getLibraryScripts(): Promise<LibraryScript[]> {
+  const rows = await query<Record<string, unknown>>(
+    `select id, title, source_url, category, tone, style_card, pacing_wpm, hook_wpm,
+            duration_seconds, active, notes,
+            coalesce(length(raw_transcript), 0) as transcript_chars
+       from hov.script_library order by active desc, lower(title)`,
+  );
+  return rows.map((r) => ({
+    id: String(r.id),
+    title: String(r.title ?? ""),
+    sourceUrl: (r.source_url as string) ?? null,
+    category: (r.category as string) ?? null,
+    tone: (r.tone as string) ?? null,
+    styleCard: (r.style_card as string) ?? null,
+    pacingWpm: num(r.pacing_wpm),
+    hookWpm: num(r.hook_wpm),
+    durationSeconds: num(r.duration_seconds),
+    active: r.active === true,
+    notes: (r.notes as string) ?? null,
+    transcriptChars: Number(r.transcript_chars ?? 0),
+  }));
+}
+
+export const saveLibraryScript = (id: string, patch: Record<string, unknown>) =>
+  patchRow("script_library", LIBRARY_COLS, id, patch);
+
+export async function getScriptExamples(): Promise<ScriptExample[]> {
+  const rows = await query<Record<string, unknown>>(
+    `select id, name, content, style, tags, usage_url, notes
+       from hov.script_example order by lower(name)`,
+  );
+  return rows.map((r) => ({
+    id: String(r.id),
+    name: String(r.name ?? ""),
+    content: (r.content as string) ?? null,
+    style: (r.style as string[]) ?? [],
+    tags: (r.tags as string[]) ?? [],
+    usageUrl: (r.usage_url as string) ?? null,
+    notes: (r.notes as string) ?? null,
+  }));
+}
+
+export const saveScriptExample = (id: string, patch: Record<string, unknown>) =>
+  patchRow("script_example", EXAMPLE_COLS, id, patch);

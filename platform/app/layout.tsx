@@ -76,6 +76,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/" className="navlink on">
               Projects
             </Link>
+            <Link href="/admin" className="navlink">
+              Settings
+            </Link>
             <span className="sp" />
             <ProductionTicker />
             <span className="sp" />

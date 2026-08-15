@@ -51,10 +51,21 @@ export type {
   Scene,
   SceneVersion,
   ScriptInfo,
+  GenreProfile,
+  LibraryScript,
+  ScriptExample,
 } from "./data/derive";
-export { MAX_VERSIONS_PER_KIND } from "./data/derive";
+export {
+  MAX_VERSIONS_PER_KIND,
+  GENRE_EDITABLE,
+  LIBRARY_EDITABLE,
+  EXAMPLE_EDITABLE,
+} from "./data/derive";
 
-import type { Project, Scene, ScriptInfo, SceneVersion, StatusKind } from "./data/derive";
+import type {
+  Project, Scene, ScriptInfo, SceneVersion, StatusKind,
+  GenreProfile, LibraryScript, ScriptExample,
+} from "./data/derive";
 
 /**
  * Which backend answers. Airtable unless explicitly switched, because
@@ -1130,4 +1141,162 @@ export async function requestVoiceRegen(
     patch["Script Scenă"] = narration.trim();
   }
   await airtablePatch(SCENES_TABLE, sceneId, patch);
+}
+
+// ---------------------------------------------------------------------------
+// The three hand-edited tables
+//
+// These screens exist to replace Airtable's grid, and they are wired to BOTH
+// backends on purpose. A Postgres-only version would look like it worked
+// before the cutover — someone edits a genre, sees it saved, and the next film
+// quietly ignores it, because Claude Scripting is still reading Airtable. That
+// is precisely the class of silent failure this project keeps paying for.
+// ---------------------------------------------------------------------------
+
+const GENRES_TABLE = "tblfhYXhxMkCTfuRT";
+const LIBRARY_TABLE = "tblRy8Qg0Vl9JXgAw";
+const EXAMPLES_TABLE = "tblnGOKRIkYKU7khh";
+
+/** Airtable field name ← domain key, per table. Mirrors hov.airtable_field. */
+const GENRE_AT: Record<string, string> = {
+  tone: "Tone", format: "Format", research: "Research",
+  researchBrief: "Research Brief", factSheetFraming: "Fact Sheet Framing",
+  invention: "Invention", structure: "Structure", voice: "Voice", wpm: "WPM",
+  hookRule: "Hook Rule", visual: "Visual", montageIntensity: "Montage Intensity",
+  active: "Active",
+};
+const LIBRARY_AT: Record<string, string> = {
+  title: "Title", sourceUrl: "Source URL", category: "Category", tone: "Tone",
+  styleCard: "Style Card", pacingWpm: "Pacing WPM", hookWpm: "Hook WPM",
+  durationSeconds: "Duration Seconds", active: "Active", notes: "Notes",
+};
+const EXAMPLE_AT: Record<string, string> = {
+  name: "Nume Exemplu", content: "Conținut Script", style: "Stil",
+  tags: "Tag-uri Script", usageUrl: "Link Utilizare Exemplu",
+  notes: "Observații Script",
+};
+
+const asNum = (v: unknown): number | null => {
+  const n = Number(v);
+  return Number.isFinite(n) && String(v ?? "") !== "" ? n : null;
+};
+const asStr = (v: unknown): string | null =>
+  typeof v === "string" && v.trim() ? v : null;
+const asArr = (v: unknown): string[] =>
+  Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+
+/** Translate a domain patch into Airtable's field names. */
+function toAirtablePatch(map: Record<string, string>, patch: Record<string, unknown>) {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === undefined) continue;
+    const name = map[k];
+    if (!name) throw new Error(`no Airtable field mapped for "${k}"`);
+    out[name] = v;
+  }
+  return out;
+}
+
+export async function getGenreProfiles(): Promise<GenreProfile[]> {
+  if (USE_PG) return pgBackend.getGenreProfiles();
+  if (!isConfigured) return [];
+  const recs = await airtableList(GENRES_TABLE, "pageSize=100");
+  return recs
+    .map((r) => ({
+      id: r.id,
+      tone: String(r.fields["Tone"] ?? ""),
+      format: asStr(r.fields["Format"]),
+      research: r.fields["Research"] === true,
+      researchBrief: asStr(r.fields["Research Brief"]),
+      factSheetFraming: asStr(r.fields["Fact Sheet Framing"]),
+      invention: asStr(r.fields["Invention"]),
+      structure: asStr(r.fields["Structure"]),
+      voice: asStr(r.fields["Voice"]),
+      wpm: asNum(r.fields["WPM"]),
+      hookRule: asStr(r.fields["Hook Rule"]),
+      visual: asStr(r.fields["Visual"]),
+      montageIntensity: asNum(r.fields["Montage Intensity"]) ?? 1,
+      active: r.fields["Active"] === true,
+    }))
+    .sort((a, b) => a.tone.toLowerCase().localeCompare(b.tone.toLowerCase()));
+}
+
+export async function saveGenreProfile(
+  id: string,
+  patch: Record<string, unknown>,
+): Promise<void> {
+  if (USE_PG) return pgBackend.saveGenreProfile(id, patch);
+  await airtablePatch(GENRES_TABLE, id, toAirtablePatch(GENRE_AT, patch));
+}
+
+export async function createGenreProfile(tone: string): Promise<string> {
+  if (USE_PG) return pgBackend.createGenreProfile(tone);
+  const res = await fetch(`https://api.airtable.com/v0/${BASE_ID}/${GENRES_TABLE}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${API_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ fields: { Tone: tone, Active: false }, typecast: true }),
+  });
+  if (!res.ok) throw new Error(`Airtable create genre: HTTP ${res.status}`);
+  return ((await res.json()) as { id: string }).id;
+}
+
+export async function getLibraryScripts(): Promise<LibraryScript[]> {
+  if (USE_PG) return pgBackend.getLibraryScripts();
+  if (!isConfigured) return [];
+  const recs = await airtableList(LIBRARY_TABLE, "pageSize=100");
+  return recs
+    .map((r) => ({
+      id: r.id,
+      title: String(r.fields["Title"] ?? ""),
+      sourceUrl: asStr(r.fields["Source URL"]),
+      category: asStr(r.fields["Category"]),
+      tone: asStr(r.fields["Tone"]),
+      styleCard: asStr(r.fields["Style Card"]),
+      pacingWpm: asNum(r.fields["Pacing WPM"]),
+      hookWpm: asNum(r.fields["Hook WPM"]),
+      durationSeconds: asNum(r.fields["Duration Seconds"]),
+      active: r.fields["Active"] === true,
+      notes: asStr(r.fields["Notes"]),
+      transcriptChars: String(r.fields["Raw Transcript"] ?? "").length,
+    }))
+    .sort((a, b) =>
+      a.active === b.active
+        ? a.title.toLowerCase().localeCompare(b.title.toLowerCase())
+        : a.active
+          ? -1
+          : 1,
+    );
+}
+
+export async function saveLibraryScript(
+  id: string,
+  patch: Record<string, unknown>,
+): Promise<void> {
+  if (USE_PG) return pgBackend.saveLibraryScript(id, patch);
+  await airtablePatch(LIBRARY_TABLE, id, toAirtablePatch(LIBRARY_AT, patch));
+}
+
+export async function getScriptExamples(): Promise<ScriptExample[]> {
+  if (USE_PG) return pgBackend.getScriptExamples();
+  if (!isConfigured) return [];
+  const recs = await airtableList(EXAMPLES_TABLE, "pageSize=100");
+  return recs
+    .map((r) => ({
+      id: r.id,
+      name: String(r.fields["Nume Exemplu"] ?? ""),
+      content: asStr(r.fields["Conținut Script"]),
+      style: asArr(r.fields["Stil"]),
+      tags: asArr(r.fields["Tag-uri Script"]),
+      usageUrl: asStr(r.fields["Link Utilizare Exemplu"]),
+      notes: asStr(r.fields["Observații Script"]),
+    }))
+    .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+}
+
+export async function saveScriptExample(
+  id: string,
+  patch: Record<string, unknown>,
+): Promise<void> {
+  if (USE_PG) return pgBackend.saveScriptExample(id, patch);
+  await airtablePatch(EXAMPLES_TABLE, id, toAirtablePatch(EXAMPLE_AT, patch));
 }

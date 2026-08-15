@@ -493,3 +493,88 @@ export function buildVersions(
   }
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// The three tables humans edit by hand
+//
+// These are the only tables nobody built a screen for, because Airtable's grid
+// WAS the screen. `Genre Profiles` says so in its own description: "edit a cell
+// here and the next project picks it up, no workflow change needed". That
+// property is the reason Airtable cannot simply be switched off — and the
+// reason these types exist.
+// ---------------------------------------------------------------------------
+
+/**
+ * One row per Tonalitate option on the creation form. Claude Scripting fetches
+ * the row matching the chosen tone at the start of every run and injects each
+ * column into its prompts, falling back to its built-in copy if the row is
+ * missing or inactive.
+ */
+export interface GenreProfile {
+  id: string;
+  /** Matched case-insensitively against the form's Tone option. */
+  tone: string;
+  /** What the film calls itself in every prompt: "documentary", "horror story". */
+  format: string | null;
+  /** On = the web-research step runs before writing. */
+  research: boolean;
+  researchBrief: string | null;
+  /** Ground truth (factual genres) vs setting texture only (fiction). */
+  factSheetFraming: string | null;
+  /** Forbidden, required, or attributed-claims-only. */
+  invention: string | null;
+  structure: string | null;
+  voice: string | null;
+  wpm: number | null;
+  hookRule: string | null;
+  visual: string | null;
+  /** 0 calm, 1 default, 2 aggressive. Read by the Remotion montage planner. */
+  montageIntensity: number;
+  /** Off = the workflow ignores this row and uses its built-in fallback. */
+  active: boolean;
+}
+
+export interface LibraryScript {
+  id: string;
+  title: string;
+  sourceUrl: string | null;
+  category: string | null;
+  tone: string | null;
+  styleCard: string | null;
+  pacingWpm: number | null;
+  hookWpm: number | null;
+  durationSeconds: number | null;
+  active: boolean;
+  notes: string | null;
+  /** Length only — the full transcript is far too big to ship to a form. */
+  transcriptChars: number;
+}
+
+export interface ScriptExample {
+  id: string;
+  name: string;
+  content: string | null;
+  style: string[];
+  tags: string[];
+  usageUrl: string | null;
+  notes: string | null;
+}
+
+/** What an admin form may change, per table. Anything else is refused. */
+export const GENRE_EDITABLE = [
+  "tone", "format", "research", "researchBrief", "factSheetFraming", "invention",
+  "structure", "voice", "wpm", "hookRule", "visual", "montageIntensity", "active",
+] as const;
+
+export const LIBRARY_EDITABLE = [
+  "title", "sourceUrl", "category", "tone", "styleCard",
+  "pacingWpm", "hookWpm", "durationSeconds", "active", "notes",
+] as const;
+
+export const EXAMPLE_EDITABLE = [
+  "name", "content", "style", "tags", "usageUrl", "notes",
+] as const;
+
+export type GenrePatch = Partial<Pick<GenreProfile, (typeof GENRE_EDITABLE)[number]>>;
+export type LibraryPatch = Partial<Pick<LibraryScript, (typeof LIBRARY_EDITABLE)[number]>>;
+export type ExamplePatch = Partial<Pick<ScriptExample, (typeof EXAMPLE_EDITABLE)[number]>>;

@@ -204,20 +204,27 @@ select:focus-visible {
    Keep the lit band clear of any text column. g2 is a dimmer echo drifting in
    counter-phase on the opposite corner; it must stay faint enough to read as
    the same light source bouncing, not as a second one. */
+/* The blur is far heavier than the handoff's 18-22px, and deliberately. There
+   the arc sits INSIDE a hero shell with overflow:hidden, so only a slice of the
+   band is ever on screen and a light blur keeps that slice crisp. Here it is
+   fixed to the page with nothing clipping it, so the whole ring shows — and at
+   that size a lightly-blurred ring reads as a drawn purple object sitting on
+   top of the page rather than as light falling across it. Verified on a
+   screenshot: at blur(20px)/0.9 it dominated the right third of /new. */
 .glow {
   position: fixed;
   pointer-events: none;
   z-index: 0;
-  filter: blur(20px);
+  filter: blur(64px);
   will-change: transform;
 }
 .glow.g1 {
-  top: -300px;
-  right: -560px;
+  top: -380px;
+  right: -660px;
   width: 900px;
   height: 1020px;
   border-radius: 50%;
-  opacity: 0.9;
+  opacity: 0.5;
   background: radial-gradient(
     closest-side,
     rgba(20, 18, 28, 0) 0 52%,
@@ -231,13 +238,13 @@ select:focus-visible {
 }
 .glow.g2 {
   top: auto;
-  bottom: -320px;
-  left: -280px;
+  bottom: -380px;
+  left: -340px;
   width: 780px;
   height: 800px;
   border-radius: 50%;
-  opacity: 0.62;
-  filter: blur(22px);
+  opacity: 0.34;
+  filter: blur(70px);
   background: radial-gradient(
     closest-side,
     rgba(20, 18, 28, 0) 0 54%,
@@ -354,15 +361,22 @@ select:focus-visible {
   margin: 0 0 20px;
   text-wrap: balance;
 }
-/* The serif answers the statement, it does not compete with it. agenciy can
-   set both lines huge because theirs is a two-word brand line; ours carries a
-   project name of unknown length, and at full size a long one took over the
-   whole page. Roughly half the grotesque keeps the hierarchy at any length. */
+/* The second line answers the statement, it does not compete with it. Ours
+   carries a project name of unknown length, and at full size a long one took
+   over the whole page; roughly half the first line keeps the hierarchy at any
+   length.
+
+   It used to be the display serif's ITALIC, which is unavailable now: Outfit
+   ships no italic, so `font-style: italic` makes the browser shear the roman
+   into a fake oblique — the same synthesis trap as asking Anton for a bold.
+   The contrast is carried by weight, size and colour instead, which is what
+   the handoff's own two-line hero does. */
 .hero h1 em {
   display: block;
-  font-family: var(--f-display), Georgia, serif;
-  font-style: italic;
-  font-weight: 500;
+  font-family: var(--f-display), var(--f-ui), sans-serif;
+  font-style: normal;
+  font-weight: 300;
+  color: var(--soft);
   font-size: 0.52em;
   line-height: 1.12;
   letter-spacing: -0.015em;
@@ -2231,10 +2245,12 @@ select:focus-visible {
   overflow-wrap: anywhere;
 }
 /* NOT .empty — that is the app-wide empty-state block (padding: 80px 0),
-   and sharing the name dropped the title into the middle of a hole. */
+   and sharing the name dropped the title into the middle of a hole.
+   No italic: the tone faces (Bodoni, Anton, Cormorant, Space Grotesk) are each
+   loaded at a single weight with no italic file, so this synthesised one. */
 .sprev.blank {
-  color: var(--dim);
-  font-style: italic;
+  color: var(--disabled);
+  letter-spacing: 0.02em;
 }
 .srule {
   width: 64px;
@@ -2296,9 +2312,8 @@ select:focus-visible {
   border-bottom-color: var(--accent);
 }
 .field input.bigin::placeholder {
-  color: var(--dim);
-  font-style: italic;
-  font-weight: 500;
+  color: var(--disabled);
+  font-weight: 400;
 }
 
 /* Drop the (empty) art rail first — losing it costs nothing, and the form

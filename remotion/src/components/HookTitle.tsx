@@ -35,6 +35,34 @@ export const isTitleLike = (s: string): boolean => {
 	return words.length > 0 && words.length <= 7 && t.length <= 46;
 };
 
+/**
+ * Baseline-to-baseline, in em. It has to clear the deepest thing a line can
+ * hang below its baseline, and for this title that is not a descender — it is
+ * the comma below Ș and Ț, which the producer writes constantly.
+ *
+ * The arithmetic: uppercase caps top out around 0.71em, so the NEXT line's
+ * glyphs begin (lineHeight - 0.71)em under the current baseline. A mark
+ * reaching -Dem collides whenever lineHeight < D + 0.71. Measured off the
+ * fonts themselves: Fraunces Ș/Ț reach -0.288em and so needed 1.00 — which is
+ * exactly why the old 1.04 looked fine and nobody found this. Outfit reaches
+ * -0.397em and needs 1.107, so at 1.04 the commas of one line landed on top of
+ * the next, reading as stray marks rather than as diacritics. Caught on a
+ * still of "Ședința și Întâlnirea Târzie".
+ *
+ * 1.12 clears Outfit with a little margin, and is where this stops: the same
+ * arithmetic against Î/Â — whose circumflex reaches 0.968em, not 0.71 — asks
+ * for 1.365, which would blow the statement card open to buy a case that only
+ * bites when a comma-below sits directly above a circumflex, and even then
+ * merely crowds rather than overlaps. Verified on a still of "Ședința și
+ * Întâlnirea Târzie", which is that worst case: the marks are tight but each
+ * is legibly its own.
+ *
+ * ANY future display face has to be re-checked against this rule, and checked
+ * in Romanian rather than in English — in English every one of these titles
+ * looks perfect at 1.04.
+ */
+const TITLE_LINE_HEIGHT = 1.12;
+
 export const HookTitle: React.FC<{
 	title: string;
 	palette: Palette;
@@ -56,11 +84,15 @@ export const HookTitle: React.FC<{
 	const fontSize = fitTitleSize({
 		words,
 		advance: preset.titleAdvance,
+		// Undefined for every preset that has not measured its own, which falls
+		// back to fitType's default — so this is a no-op for all tones but the
+		// one whose face changed. See the note on titleSpaceRatio in style.ts.
+		spaceRatio: preset.titleSpaceRatio,
 		wrapWidth: avail * 0.94,
 		maxSize: width * 0.094,
 		minSize: width * 0.03,
 		maxLines: 3,
-		lineHeight: 1.04,
+		lineHeight: TITLE_LINE_HEIGHT,
 		maxHeight: height * 0.6,
 	});
 
@@ -109,7 +141,7 @@ export const HookTitle: React.FC<{
 						fontWeight: preset.displayWeight,
 						fontSize,
 						color: '#FFFFFF',
-						lineHeight: 1.04,
+						lineHeight: TITLE_LINE_HEIGHT,
 						margin: 0,
 						// Uppercase needs air between the caps; mixed case at this size
 						// wants the opposite, or the words drift apart.

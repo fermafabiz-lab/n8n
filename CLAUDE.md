@@ -902,6 +902,45 @@ them on every publish. Ignore those four; do not wire them back.
   Burns push in `kenBurnsTransform`: a constant-velocity zoom is what a real
   rostrum move looks like, and easing it makes it visibly decelerate for no
   reason. Punch-ins are discrete events and do get shaped.
+- **A display face is chosen in English and breaks in Romanian, and line-height
+  is where it breaks.** The site and the render moved from Fraunces to Outfit
+  together (2026-08-15). `HookTitle` set `lineHeight: 1.04`, which had always
+  been fine — and was fine by accident. What hangs below a line here is not a
+  descender, uppercase has none; it is the comma under **Ș** and **Ț**.
+  Measured off the fonts: Fraunces' reaches -0.288em, Outfit's -0.397em, while
+  caps top out at ~0.71em. A mark collides when `lineHeight < depth + 0.71`, so
+  Fraunces needed 1.00 and cleared 1.04 by 0.037em; Outfit needs 1.107 and did
+  not. The result was one line's commas sitting ON the next line's letters,
+  reading as stray marks rather than diacritics — invisible in English, obvious
+  the first time a Romanian title is rendered. Now `TITLE_LINE_HEIGHT = 1.12`.
+  **Re-check this rule for any future display face, in Romanian**, and note the
+  rule is stated against cap-height: Î/Â carry a circumflex to 0.968em, which by
+  the same arithmetic would want 1.365 — deliberately not paid, because it only
+  crowds and never overlaps.
+- **The type fitter's metrics are measured from the font binary, not guessed —
+  and there is a way to do it without a browser.** `fontTools` reads `hmtx`
+  advances straight out of the TTF (instantiate the variable font at the weight
+  first), which gives the exact fraction of em that `titleAdvance` wants. The
+  method reproduces the codebase's own hand-measured Poppins numbers to three
+  decimals (0.5873 vs the documented 0.59; space ratio 0.3610 vs 0.36), which is
+  how you know it is right before trusting it on a new face. Outfit 700
+  uppercase measures **0.66**, against Fraunces' 0.7333 — so inheriting 0.72
+  would have made the fitter overestimate every line and drop a size for
+  nothing. Note the proxy blocks `fonts.gstatic.com` for a Chrome we launch, but
+  plain `curl` to it works, so the TTF is one request away.
+- **`DEFAULT_SPACE_RATIO = 0.58` in `fitType.ts` is a tuning constant, not a
+  measurement, and CLAUDE.md used to describe it as one** ("a word space at 0.58
+  of that advance, which is 0.42em in Fraunces"). Fraunces actually sets its
+  space at **0.2105em** — a ratio of 0.287 against its uppercase advance, 0.367
+  against title-case. Nothing about it is 0.58. So the hook has always assumed a
+  word gap about twice as wide as the face sets, which makes it wrap early and
+  pick a size SMALLER than needed — conservative, never overflowing, which is
+  exactly why it survived. It is deliberately NOT corrected globally: every
+  preset's `titleAdvance` was tuned with 0.58 in place, so changing the default
+  would resize the titles of all five tones at once. `StylePreset` gained an
+  optional `titleSpaceRatio` instead (Outfit sets 0.29), which is the same
+  pattern the Poppins chapter card already used, and presets that omit it are
+  byte-identical to before.
 - **`latin-ext` is mandatory on every font load.** ș (U+0219) and ț (U+021B) are
   not in `latin`, so a Romanian chapter title renders as missing-glyph boxes
   without it. Naming subsets also cut one family from 21 network requests per

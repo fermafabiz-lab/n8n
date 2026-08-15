@@ -2155,14 +2155,23 @@ now has a button on the site.
 
 ### Known gaps, live right now
 
-- **Saved drafts throw on Postgres.** `saveVersionOfScene` /
-  `restoreVersionOfScene` are not implemented — the manual "Save draft" and
-  "Restore" buttons show an error. `autoKeep` swallows it (`.catch(() => {})`),
-  so the automatic safety net before a regeneration silently does nothing
-  rather than blocking anything. Reading versions works. The fix needs
-  `attachment.path`'s global unique dropped for `(scene_id, field, path)` —
-  a draft points at the SAME file the scene still holds, which the current
-  index forbids.
+- ~~Saved drafts throw on Postgres.~~ Implemented 2026-08-15. A draft is now a
+  second `attachment` row over the **same file** the scene already holds —
+  Airtable re-uploaded and kept two copies; here the bytes are already ours and
+  copying them would buy nothing but disk. That needed `attachment.path`'s
+  global unique replaced by `(scene_id, field, path)` (db/003), and restoring
+  moves the row, not the bytes.
+
+  The bookkeeping — de-duplicating against every prior draft, moving the
+  "previous generation" marker, pruning past the cap — moved into
+  `planVersionSave()` in `derive.ts` as a pure function. `lib/data.ts` still
+  carries the Airtable original inline; the two must agree, and the shared one
+  is what runs.
+
+  Verified end to end: manual save files a draft over the live image, the same
+  asset is refused as a duplicate, a new image auto-keeps the outgoing one with
+  the `last` marker, and restoring puts back the file, the Flow media id and
+  the prompt while resetting the approval.
 - ~~`Scene Final URL` wins over the stored clip.~~ Inverted 2026-08-15: the
   stored copy is preferred when there is one, in `buildScene` where both
   backends share it.

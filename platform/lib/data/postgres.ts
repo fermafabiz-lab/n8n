@@ -17,6 +17,7 @@ import {
   buildVersions,
   classifyStatus,
   orderScenes,
+  planVersionSave,
   type Project,
   type RawProject,
   type RawScene,
@@ -564,48 +565,251 @@ export async function deleteProjectDeep(projectId: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Saved drafts — read here, not yet written here
+// Saved drafts
+//
+// Airtable filed a draft by re-uploading the asset, which made it re-host a
+// second copy. Here the bytes are already ours — the scene's live image IS a
+// row in hov.attachment — so a draft is a second row over the SAME file, which
+// is why `attachment.path` stopped being globally unique (db/003).
+//
+// The bookkeeping lives in planVersionSave(); this only does the I/O.
 // ---------------------------------------------------------------------------
 
-/**
- * Not ported yet, and deliberately loud about it.
- *
- * Reading versions works (see version_files above); writing one does not, and
- * the gap is real rather than an oversight. On Airtable a save re-uploaded the
- * asset and Airtable re-hosted it. Here the bytes are already in the media
- * store, so a save ought to be little more than a second `attachment` row —
- * except `attachment.path` is globally unique, so two rows cannot point at one
- * file, and the choice between relaxing that constraint and copying the bytes
- * changes what "12 drafts per kind" costs on disk.
- *
- * That decision belongs with the feature, which is days old and still moving
- * upstream. Guessing at it now and being wrong would corrupt the media store
- * quietly, which is worse than a button that says it does not work yet — and
- * this is a convenience path, not the production one. Throwing keeps the two
- * backends honestly different instead of pretending they are the same.
- */
+interface LiveAsset {
+  url: string | null;
+  path: string | null;
+  filename: string | null;
+  /** Stable identity for de-duplication — never a URL. */
+  key: string | null;
+  prompt: string | null;
+  mediaId: string | null;
+}
+
+/** What the scene currently holds of one kind, and how to recognise it again. */
+async function liveAsset(sceneId: string, kind: "image" | "video"): Promise<LiveAsset> {
+  const rows = await query<{
+    image_media_id: string | null;
+    image_prompt: string | null;
+    motion_prompt: string | null;
+    scene_final_url: string | null;
+    path: string | null;
+    filename: string | null;
+  }>(
+    `select s.image_media_id, s.image_prompt, s.motion_prompt, s.scene_final_url,
+            a.path, a.filename
+       from hov.scene s
+       left join hov.attachment a on a.scene_id = s.id and a.field = $2
+      where s.id = $1`,
+    [sceneId, kind],
+  );
+  const r = rows[0];
+  if (!r) throw new Error(`scene ${sceneId} not found`);
+
+  const stored = mediaUrl(r.path);
+  if (kind === "image") {
+    return {
+      url: stored,
+      path: r.path,
+      filename: r.filename,
+      // The Flow media id is stable per generated image; the filename is the
+      // fallback. The key is written into metadata that has to keep matching
+      // later, so it stays independent of any URL.
+      key: r.image_media_id || r.filename || r.path,
+      prompt: r.image_prompt,
+      mediaId: r.image_media_id,
+    };
+  }
+  const url = stored ?? r.scene_final_url;
+  return {
+    url,
+    path: r.path,
+    filename: r.filename,
+    key: url,
+    prompt: r.motion_prompt,
+    mediaId: null,
+  };
+}
+
 export async function saveVersionOfScene(
-  _sceneId: string,
-  _kind: "image" | "video",
-  _opts: { auto?: boolean } = {},
+  sceneId: string,
+  kind: "image" | "video",
+  opts: { auto?: boolean } = {},
 ): Promise<{ saved: true; dropped: number } | { saved: false; reason: string }> {
-  throw new Error(
-    "saveVersionOfScene is not implemented on the Postgres backend yet — " +
-      "saved drafts still need their storage decision (see lib/data/postgres.ts).",
+  const live = await liveAsset(sceneId, kind);
+  if (!live.url || !live.key) {
+    return {
+      saved: false,
+      reason: `There is no ${kind === "image" ? "image" : "clip"} on this scene yet — nothing to save.`,
+    };
+  }
+
+  const rows = await query<{ media_versions: unknown }>(
+    `select media_versions from hov.scene where id = $1`,
+    [sceneId],
   );
+  const raw = rows[0]?.media_versions;
+  const list = Array.isArray(raw) ? (raw as Array<Record<string, unknown>>) : [];
+
+  const plan = planVersionSave({
+    list,
+    kind,
+    key: live.key,
+    auto: opts.auto === true,
+    prompt: live.prompt,
+    mediaId: live.mediaId,
+    url: live.url,
+    nowIso: new Date().toISOString(),
+    stamp: Date.now(),
+  });
+
+  if (plan.action === "duplicate") {
+    return {
+      saved: false,
+      reason: `This ${kind === "image" ? "image" : "clip"} is already saved as a draft.`,
+    };
+  }
+
+  if (plan.action === "marker") {
+    await query(`update hov.scene set media_versions = $2::jsonb where id = $1`, [
+      sceneId,
+      JSON.stringify(plan.list),
+    ]);
+    return { saved: true, dropped: 0 };
+  }
+
+  const client = await pool().connect();
+  try {
+    await client.query("begin");
+
+    if (kind === "image" && live.path) {
+      // A second row over the same file. buildVersions() joins metadata to
+      // rows BY FILENAME, so the synthetic name in the entry is the join key
+      // and has to be what lands here.
+      await client.query(
+        `insert into hov.attachment
+           (scene_id, field, path, filename, content_type, size_bytes, source_url)
+         select $1, 'image_version', a.path, $3, a.content_type, a.size_bytes, a.source_url
+           from hov.attachment a where a.scene_id = $1 and a.field = 'image' and a.path = $2
+         on conflict (scene_id, field, path) do update set filename = excluded.filename`,
+        [sceneId, live.path, plan.entry.file],
+      );
+    }
+
+    // Rows for pruned drafts go; the FILES stay. Another draft — or the live
+    // asset — may point at the same path, and a scene's own image very often
+    // is exactly that.
+    const keptNames = plan.list.flatMap((e) => (typeof e.file === "string" ? [e.file] : []));
+    await client.query(
+      `delete from hov.attachment
+        where scene_id = $1 and field = 'image_version'
+          and not (filename = any($2::text[]))`,
+      [sceneId, keptNames],
+    );
+
+    await client.query(`update hov.scene set media_versions = $2::jsonb where id = $1`, [
+      sceneId,
+      JSON.stringify(plan.list),
+    ]);
+    await client.query("commit");
+  } catch (e) {
+    await client.query("rollback").catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+
+  return { saved: true, dropped: plan.dropped };
 }
 
-/** Same story as saveVersionOfScene — the read path works, the write does not. */
 export async function restoreVersionOfScene(
-  _sceneId: string,
-  _versionId: string,
+  sceneId: string,
+  versionId: string,
 ): Promise<{ restored: true; kind: "image" | "video" } | { restored: false; reason: string }> {
-  throw new Error(
-    "restoreVersionOfScene is not implemented on the Postgres backend yet — " +
-      "saved drafts still need their storage decision (see lib/data/postgres.ts).",
+  const rows = await query<{
+    media_versions: unknown;
+    version_files: Array<{ filename: string | null; path: string }> | null;
+  }>(
+    `select s.media_versions,
+            (select jsonb_agg(jsonb_build_object('filename', a.filename, 'path', a.path))
+               from hov.attachment a
+              where a.scene_id = s.id and a.field = 'image_version') as version_files
+       from hov.scene s where s.id = $1`,
+    [sceneId],
   );
-}
+  const row = rows[0];
+  if (!row) return { restored: false, reason: "That scene no longer exists." };
 
+  const files = row.version_files ?? [];
+  const version = buildVersions(
+    row.media_versions,
+    files.map((f) => ({ filename: f.filename, url: mediaUrl(f.path) })),
+  ).find((v) => v.id === versionId);
+
+  if (!version || !version.url) {
+    return {
+      restored: false,
+      reason: "That saved draft is no longer available — its file is missing.",
+    };
+  }
+
+  // Restoring replaces the live asset, so file that one first — otherwise
+  // stepping back to an older draft throws away the newer one, which is the
+  // exact loss this feature exists to prevent. De-duplication makes it a no-op
+  // when the live asset is already kept, and a failure here must not block the
+  // restore.
+  await saveVersionOfScene(sceneId, version.kind, { auto: true }).catch(() => {});
+
+  if (version.kind === "image") {
+    const path = files.find((f) => mediaUrl(f.path) === version.url)?.path;
+    if (!path) return { restored: false, reason: "That draft's file could not be located." };
+
+    const client = await pool().connect();
+    try {
+      await client.query("begin");
+      // Point the live image at the draft's file. The row moves; no bytes do.
+      await client.query(
+        `insert into hov.attachment
+           (scene_id, field, path, filename, content_type, size_bytes, source_url)
+         select $1, 'image', a.path, a.filename, a.content_type, a.size_bytes, a.source_url
+           from hov.attachment a
+          where a.scene_id = $1 and a.field = 'image_version' and a.path = $2
+         on conflict (scene_id, field) where field in ('image','video')
+         do update set path = excluded.path, filename = excluded.filename,
+                       content_type = excluded.content_type, size_bytes = excluded.size_bytes`,
+        [sceneId, path],
+      );
+      // What is on screen changed, so the picture and the clip built from the
+      // previous one both go back for review. And without the media id and the
+      // prompt the scene looks right and cannot be filmed: video generation
+      // refuses a scene with no Flow media id, and a later re-roll would work
+      // from a prompt that made a different picture.
+      await client.query(
+        `update hov.scene
+            set image_approved = false, video_approved = false,
+                image_media_id = coalesce($2, image_media_id),
+                image_prompt   = coalesce($3, image_prompt)
+          where id = $1`,
+        [sceneId, version.mediaId, version.prompt],
+      );
+      await client.query("commit");
+    } catch (e) {
+      await client.query("rollback").catch(() => {});
+      throw e;
+    } finally {
+      client.release();
+    }
+    return { restored: true, kind: "image" };
+  }
+
+  await query(
+    `update hov.scene
+        set scene_final_url = $2, video_approved = false,
+            motion_prompt = coalesce($3, motion_prompt)
+      where id = $1`,
+    [sceneId, version.url, version.prompt],
+  );
+  return { restored: true, kind: "video" };
+}
 // ---------------------------------------------------------------------------
 // Media ingest
 // ---------------------------------------------------------------------------
@@ -650,10 +854,12 @@ export async function attachMedia(opts: {
       `insert into hov.attachment
          (scene_id, field, path, filename, content_type, size_bytes, source_url)
        values ($1, $2, $3, $4, $5, $6, $7)
-       on conflict (path) do update set
-         scene_id = excluded.scene_id,
-         field    = excluded.field,
-         filename = excluded.filename,
+       -- (scene_id, field, path), not (path): a file may be both a scene's
+       -- live image and a saved draft of it, so path alone stopped being
+       -- unique when drafts landed (db/003).
+       on conflict (scene_id, field, path) do update set
+         filename   = excluded.filename,
+         size_bytes = excluded.size_bytes,
          source_url = excluded.source_url`,
       [
         opts.sceneId,

@@ -1873,22 +1873,55 @@ at `postgres:5432/hov` on the compose network.
 does any attempt to write an attachment. A silently ignored write is precisely
 the divergence that would make a parallel run look successful while it was not.
 
-### The four nodes that need more than a query
+### The four nodes that need more than a query — solved
 
 `Write Scene Image`, `Write Regen Image`, `Write Regen Video` and
-`Update Scene Record` write `"Imagine Scenă": [{url}]` / `"Video Scenă":
-[{url}]`. **Airtable then went and fetched those bytes itself** — that download
-is what kept assets alive after fal and Flow's signed links expired, and it is
-the one thing Postgres cannot do. Each of the four needs a chain instead:
+`Update Scene Record` wrote `"Imagine Scenă": [{url}]` / `"Video Scenă":
+[{url}]`, and **Airtable went and fetched those bytes itself**. That download
+is the only reason images survive fal and Flow's signed links expiring within
+hours, and it is the one thing a database cannot do.
 
-```
-HTTP Request (download the url, response format: file)
-  → Read/Write Files from Disk (write /media/<sceneId>/<field>/<sha>.<ext>)
-  → Postgres (insert into hov.attachment, then at_write for the other fields)
+They are now a single POST each to **`/api/media/ingest`** on the site:
+
+```json
+{ "sceneId": "rec…", "field": "image", "url": "https://fal…/x.png",
+  "fields": { "Aprobare Imagine": false, "Status Producție Scenă": "Așteaptă Aprobare Imagine" } }
 ```
 
-`/opt/n8n/media` is already mounted read-write into the n8n container at
-`/media`, and n8n is in the `hovmedia` group, so the write works today.
+The endpoint downloads, content-addresses the bytes exactly as the import does,
+writes the file under `/media/<scene>/<field>/<sha>.<ext>`, and records the
+attachment **and the node's other fields in one transaction**. That transaction
+is the point: split apart, a failure between them leaves a scene holding a new
+image while still claiming to await the old one — and the batch's gates read
+exactly those columns.
+
+It answers with the scene in **Airtable's own shape**, spread at the top level,
+so it is a drop-in: `Wait Image Approval`, `Wait Between Images` and `Loop
+Scenes` read `$json.id` and `$json.fields['…']` and never learn anything moved.
+
+Doing it inside n8n instead would have been three nodes per site — HTTP
+Request, write to disk, insert — twelve nodes expressing directory creation and
+content hashing as node parameters, none of it testable.
+
+Two things about the wiring:
+
+- **It is exempt from the site password** (`middleware.ts`). n8n has no browser
+  session, so the gate would have bounced it to `/login` and the image would
+  vanish behind a 200 nobody reads. Auth is the `x-hov-key` header against
+  `MEDIA_INGEST_KEY` (in `/opt/n8n/.env` and `/opt/n8n/secrets/media_ingest_key`).
+- **n8n holds that key as a credential**, `HOV Media Ingest`
+  (`8kpY42LmZaBYBzfY`, type `httpHeaderAuth`), not as `{{ $env.… }}` — env
+  access inside nodes can be switched off, and the port should not depend on
+  whether it currently is. Same pattern as the FAL header.
+
+Writing an `image` or `video` replaces that scene's attachment ROW. The old
+FILE stays on disk on purpose: saved drafts point at it by path, and deleting
+it would empty the one feature that exists to recover a bad re-roll.
+
+Verified end to end on 2026-08-15: a real image posted from inside the network
+downloaded, stored, served over HTTPS at 200, returned the scene with
+`Imagine Scenă` as `[{id,url,size,type,filename}]`, and a second write with
+different bytes left exactly one row.
 
 ### The public API has no draft — a PUT goes straight to production
 
@@ -1976,16 +2009,19 @@ week first; it is the only rollback that exists.
 ### Still owed before Airtable can be cancelled
 
 1. ~~A `PostgresAdapter` behind the existing signatures in
-   `platform/lib/data.ts`.~~ Done — see above. (The note that used to live
-   here said 11 direct `fetch` calls to `api.airtable.com` had to be pulled in
-   first; on inspection all 11 were already *inside* `lib/data.ts`. Nothing
-   outside it ever talked to Airtable directly.)
-2. The 48 Airtable nodes. The compatibility layer that makes 44 of them a
-   one-line query change is **done and verified** (see above); the 4 that write
-   attachments need a download chain built. All of it lands in one window —
-   see "The cutover is atomic".
-3. Admin screens for the three hand-edited tables.
-4. Cutover, then let it run a full film and a week before cancelling the plan.
+   `platform/lib/data.ts`.~~ Done. (The note that used to live here said 11
+   direct `fetch` calls to `api.airtable.com` had to be pulled in first; on
+   inspection all 11 were already *inside* `lib/data.ts`.)
+2. ~~The 48 Airtable nodes.~~ All 48 convert — `db/port/workflows/*.ported.json`,
+   regenerate with `db/port/port-airtable-nodes.mjs`. **Not applied**: a PUT is
+   live immediately, so they go in during the window.
+3. Admin screens for the three hand-edited tables — `Genre Profiles`,
+   `Script Library`, `Librărie Scripturi`. Still the only thing genuinely
+   unbuilt, and Airtable cannot be cancelled while people edit those by hand.
+4. Saved drafts on Postgres: `saveVersionOfScene` / `restoreVersionOfScene`
+   throw rather than pretend. Reading versions works. The open question is
+   whether a draft copies the bytes or `attachment.path` stops being unique.
+5. Cutover, then a full film and a week before cancelling the plan.
 
 
 ## Environment

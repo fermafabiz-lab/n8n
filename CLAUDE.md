@@ -1624,6 +1624,163 @@ the pipeline already produces.
   never by changing it. Categories marked `ready: false` are selectable, saved,
   and inert on purpose — so colleagues can work while the rest is wired up.
 
+## The database that replaces Airtable
+
+Airtable costs 125 lei/month and is being retired. **It is still the source of
+truth today** — the site and every n8n workflow still read and write it. What
+exists so far is the substrate underneath: a populated Postgres database and a
+media store, running in parallel and used by nothing yet. Do not point anything
+at it without reading this section.
+
+| Piece | Where |
+|---|---|
+| Database | `hov` database, role `hov`, in the postgres:16 container already on the box. n8n's own database is untouched. |
+| Password | `/opt/n8n/secrets/hov_db_password` (root-only) |
+| Connection from a container | `postgresql://hov:<pw>@postgres:5432/hov` on `n8n_n8n_net` |
+| Schema | `db/001_schema.sql` in this repo, applied 2026-08-15 |
+| Media store | `/opt/n8n/media` on the host, served by Caddy at `https://house-of-videos.com/media/*` |
+| Import | `db/import-from-airtable.mjs`, idempotent, re-runnable |
+
+### Why Postgres and not Supabase
+
+Self-hosted Supabase is ~10 containers and wants 4 GB+ RAM. The box has 3.8 GB
+total. It does not fit, and paying for a bigger box would move the cost rather
+than remove it. Postgres was already running for n8n, so a second database
+there costs nothing and no extra memory.
+
+### Airtable is only a rendezvous, which is why this substitutes 1:1
+
+Nothing in the approval loop is an Airtable *feature*. The whole handshake is:
+
+```
+site:  PATCH { "Aprobare Imagine": true }        → writeSceneApproval(), lib/data.ts
+n8n:   GET every 15s → is it true? → proceed     → Evaluate Image/Voice/Video Approval
+```
+
+No automations, no triggers, no formulas on that path. `UPDATE` + `SELECT` do
+the same thing, without the 5 req/s per-base ceiling, and locally instead of
+through a third host in the cloud.
+
+### What Airtable was silently doing that Postgres does not
+
+**Hosting files.** fal and Flow return signed CDN links that die in hours;
+re-uploading them into an Airtable attachment field made Airtable re-host the
+bytes permanently. That is what has been keeping every image and clip alive.
+Postgres stores no files, so `/opt/n8n/media` now does that job:
+
+- Mounted `rw` into `n8n` and `web` at `/media`, `ro` into `caddy` at `/srv/media`.
+- `web` gets `MEDIA_ROOT=/media` and `MEDIA_BASE_URL=https://house-of-videos.com/media`.
+- **The two containers run as different non-root users** (n8n `1000:1000`, web
+  `1001:65533`), so both are in a shared host group `hovmedia` (gid 2000) via
+  `group_add:`, and the directory is `2775` so new files inherit the group. A
+  plain `chown` of one uid locks the other out; that is the failure you get
+  first if you rebuild this.
+- Paths are content-addressed (`<scene>/<field>/<sha256-32>.<ext>`), so Caddy
+  serves them `immutable` and a re-import overwrites nothing.
+- **Deliberately not behind the site password**, exactly like the Airtable
+  attachment URLs it replaces — n8n, Remotion and the browser all fetch these
+  with no session. Unguessable paths are the protection.
+
+**A grid for humans.** `Genre Profiles`, `Script Library` and `Librărie
+Scripturi` are edited by hand in Airtable — Genre Profiles explicitly so
+("edit a cell here and the next project picks it up"). Nothing replaces that
+yet. Screens in the site are still owed before Airtable can be switched off.
+
+### Record ids keep Airtable's shape
+
+`gen_rec_id()` mints `rec` + 14 chars, indistinguishable from an Airtable id,
+and the import copies existing ids verbatim. The site puts scene ids in webhook
+payloads and n8n passes them between workflows as opaque strings — UUIDs would
+have forced a rewrite of every stored reference and broken every project in
+flight on cutover day.
+
+### Three legacy field names survive, and they lie
+
+Columns are named for what they HOLD, not what Airtable called them, and every
+column carries its Airtable original in a `COMMENT`. Three are worth knowing by
+heart before porting any node:
+
+| Airtable field | Column | What it actually holds |
+|---|---|---|
+| `Imagine First Frame` | `scene.image_prompt` | prompt TEXT, not a frame |
+| `Video Scenă URL` | `scene.motion_prompt` | the motion prompt, never a URL |
+| `Scene Final URL` | `scene.scene_final_url` | the clip the site actually plays |
+
+`Status Producție Scenă` → `scene.production_status` is still result-stamps
+only. The displayed status stays DERIVED from checkboxes plus asset existence,
+exactly as `toScene()` does today. Do not start trusting the stored text.
+
+### The constraints are the point, not decoration
+
+The zeroing bug — a numeric field left mapped with no value writing a literal
+`0` — cannot be committed any more:
+
+```sql
+scene.scene_order      integer not null check (scene_order > 0)
+project.length_seconds integer      check (length_seconds is null or > 0)
+```
+
+The import found **206 zeros already fossilised in the data**, including the
+eight projects whose `Lenght` was wiped by `Update Status to Finished`. They
+import as NULL and are listed in the run's report rather than laundered.
+
+`evidence` gained a unique `(project_id, ref)` — a scene citing E3 now gets one
+claim instead of a coin flip. `genre_profile` gained a unique `lower(tone)`,
+because the lookup is case-insensitive and two rows differing only in case made
+the winner depend on row order.
+
+### Stranded regen flags are now a query
+
+The site sets a regen flag, n8n clears it from inside the execution, and any
+death in between strands it — with the UI showing the in-flight state *instead
+of* the button row. Each flag needed a hand-built escape hatch and two still
+have none. Every flag now has a `*_at` timestamp, so staleness is one rule for
+all of them, including ones added later:
+
+```sql
+where regen_image and regen_image_at < now() - interval '10 minutes'
+```
+
+### What the import did, and what it left behind
+
+Run it with `--dry-run` first; it reads Airtable and writes nothing.
+
+```
+docker run --rm --network n8n_n8n_net \
+  -v /opt/n8n/media:/media -v /opt/n8n/import:/app -w /app \
+  --env-file /opt/n8n/import/import.env \
+  node:20-alpine sh -c 'npm i --no-save --silent pg && node import-from-airtable.mjs'
+```
+
+Landed 2026-08-15: 56 projects, 107 chapters, 382 scenes, 334 files (735 MB),
+59 scripts, 134 evidence, 11 genre profiles, 71 script library, 48 examples.
+
+**287 records were skipped and that is correct.** 131 scenes and 156 chapters
+from May–June predate the `Project_ID` convention: they have no project, no
+order, and the site cannot render them either (`getScenes` filters on
+`Project_ID`). They are residue from an earlier pipeline, not data loss. The
+report groups every skip by reason with a count — it never truncates to
+"…and 279 more", because that reads as a harmless tail and is how a real
+problem hides.
+
+**Attachment URLs expire.** Airtable hands back signed
+`v5.airtableusercontent.com` links good for a few hours. The script downloads
+each one inside the per-record loop for that reason — collect every URL first
+and fetch them later and you get a few hundred dead links with no way to tell
+which. Do not "optimise" that into two passes.
+
+### Still owed before Airtable can be cancelled
+
+1. A `PostgresAdapter` behind the existing signatures in `platform/lib/data.ts`
+   — the file already says it was built for this ("Later: swap in a
+   PostgresAdapter without touching any page or component"). The 11 direct
+   `fetch` calls to `api.airtable.com` outside it have to come in first.
+2. Every Airtable node in the 4 live workflows, one at a time, with
+   `node scripts/check-n8n.mjs` after each.
+3. Admin screens for the three hand-edited tables.
+4. A final `import-from-airtable.mjs` run at cutover, then cancel the plan.
+
+
 ## Environment
 
 **There is no `main`. The trunk is `claude/hello-7o90qh`**, and it is what

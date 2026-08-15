@@ -1,0 +1,121 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - n8n_net
+
+  n8n:
+    image: n8nio/n8n:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # --- Baza de date ---
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: ${POSTGRES_DB}
+      DB_POSTGRESDB_USER: ${POSTGRES_USER}
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
+
+      # --- Host / HTTPS (n8n stă în spatele lui Caddy) ---
+      N8N_HOST: ${N8N_HOST}
+      N8N_PORT: 5678
+      N8N_PROTOCOL: https
+      N8N_EDITOR_BASE_URL: https://${N8N_HOST}
+      WEBHOOK_URL: https://${N8N_HOST}/
+      N8N_PROXY_HOPS: 1
+      N8N_SECURE_COOKIE: "true"
+
+      # --- Securitate ---
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+
+      # --- Timezone ---
+      GENERIC_TIMEZONE: Europe/Bucharest
+      TZ: Europe/Bucharest
+
+      # --- Diverse ---
+      N8N_RUNNERS_ENABLED: "true"
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      EXECUTIONS_DATA_PRUNE: "true"
+      EXECUTIONS_DATA_MAX_AGE: 336
+    group_add:
+      - "2000"   # hovmedia — shared write access to ./media
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./files:/files
+      # Generated images/clips land here instead of being re-uploaded into an
+      # Airtable attachment field. fal and Flow hand back signed URLs that die
+      # in hours; this is what outlives them.
+      - ./media:/media
+    networks:
+      - n8n_net
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - n8n
+      - web
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      N8N_HOST: ${N8N_HOST}
+      SITE_HOST: ${SITE_HOST}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+      - ./media:/srv/media:ro
+    networks:
+      - n8n_net
+
+  # Site-ul producatorului (fost Vercel). Imaginea e construita in GitHub
+  # Actions si doar trasa aici — serverul nu are RAM de `next build`.
+  web:
+    image: ghcr.io/fermafabiz-lab/n8n/platform:latest
+    restart: unless-stopped
+    env_file:
+      - ./platform.env
+    environment:
+      NODE_ENV: production
+      TZ: Europe/Bucharest
+      MEDIA_ROOT: /media
+      MEDIA_BASE_URL: https://${SITE_HOST}/media
+    group_add:
+      - "2000"   # hovmedia — shared write access to ./media
+    volumes:
+      # Read-write: the site writes saved drafts here ("Versiuni Imagine").
+      - ./media:/media
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/login"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - n8n_net
+
+volumes:
+  postgres_data:
+  n8n_data:
+  caddy_data:
+  caddy_config:
+
+networks:
+  n8n_net:

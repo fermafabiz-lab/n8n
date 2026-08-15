@@ -1,0 +1,64 @@
+{$N8N_HOST} {
+	encode zstd gzip
+
+	reverse_proxy n8n:5678 {
+		flush_interval -1
+		header_up Host {upstream_hostport}
+		header_up X-Forwarded-Host {host}
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Real-IP {remote_host}
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
+
+# Site-ul producatorului. Spre deosebire de blocul n8n de mai sus, Host NU se
+# rescrie: Next.js compara Origin cu Host la fiecare server action, iar un Host
+# rescris face ca fiecare buton de aprobare sa dea eroare de CSRF.
+{$SITE_HOST} {
+	encode zstd gzip
+
+	# Media store — what replaces Airtable attachment hosting. Files are
+	# content-hashed under /opt/n8n/media, so a path never changes meaning
+	# and can be cached forever. Served straight off disk: routing these
+	# through Next.js would pin a node process to every image load.
+	#
+	# Deliberately NOT behind the site password, exactly like the Airtable
+	# attachment URLs it replaces — n8n, Remotion and the browser all fetch
+	# these without a session. Unguessable paths are the protection.
+	handle_path /media/* {
+		root * /srv/media
+		header Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
+	handle {
+		reverse_proxy web:3000 {
+			header_up X-Forwarded-Proto {scheme}
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

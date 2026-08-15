@@ -16,20 +16,22 @@
  * reviewable: run it twice, diff the output, and the transformation itself is
  * what gets checked rather than each of its results.
  *
- * WHAT IT DELIBERATELY WILL NOT DO
+ * THE FOUR THAT ARE NOT QUERIES
  *
  * Four nodes write attachments — `"Imagine Scenă": [{url}]` — and relied on
  * Airtable going and fetching those bytes. That download is the one thing the
- * database cannot do. Converting them by dropping the attachment field would
- * leave a scene looking generated with nothing behind it, so the script
- * REFUSES them and names them instead. They need a download chain, built
- * separately.
+ * database cannot do, so those four become a single POST to
+ * /api/media/ingest, which stores the file and applies the node's other fields
+ * in the same transaction and answers with the scene in Airtable's own shape.
+ * Dropping the attachment field instead would leave a scene looking generated
+ * with nothing behind it, so an unrecognised attachment mapping still throws.
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
 
 const AIRTABLE_TYPE = "n8n-nodes-base.airtable";
 const PG_CRED = { id: "eRjiNDQFuDSTJpGK", name: "HOV Postgres" };
+const INGEST_CRED = { id: "8kpY42LmZaBYBzfY", name: "HOV Media Ingest" };
 
 const ENTITY_BY_TABLE = {
   tbl0zT7ilefOqE3xk: "project",
@@ -140,21 +142,71 @@ const sqlLit = (s) => `'${String(s).replace(/'/g, "''")}'`;
  * at_write then applies. Literal values are quoted; expression values are
  * inlined so they still evaluate in the node's own context.
  */
-function buildColumnObject(value, nodeName) {
+function buildColumnObject(value, nodeName, skip = []) {
   const entries = [];
   for (const [k, v] of Object.entries(value)) {
-    if (k === "id") continue;
+    if (k === "id" || skip.includes(k)) continue;
     if (ATTACHMENT_FIELDS.includes(k)) {
-      throw new Error(
-        `${nodeName}: writes the attachment field "${k}". Airtable fetched those ` +
-          `bytes itself; Postgres cannot. This node needs a download chain — ` +
-          `see "The four nodes that need more than a query" in CLAUDE.md.`,
-      );
+      throw new Error(`${nodeName}: unexpected attachment field "${k}"`);
     }
     const key = JSON.stringify(k);
     entries.push(`${key}: ${isExpr(v) ? exprBody(v).replace(/^\{\{|\}\}$/g, "").trim() : JSON.stringify(v)}`);
   }
-  return `{{ JSON.stringify({ ${entries.join(", ")} }) }}`;
+  return `{ ${entries.join(", ")} }`;
+}
+
+/** The same object, wrapped for embedding in SQL. */
+const columnObjectSql = (value, nodeName) =>
+  `{{ JSON.stringify(${buildColumnObject(value, nodeName)}) }}`;
+
+const FIELD_BY_ATTACHMENT = {
+  "Imagine Scenă": "image",
+  "Video Scenă": "video",
+  "Versiuni Imagine": "image_version",
+};
+
+/**
+ * The four nodes that write an attachment become a single HTTP call.
+ *
+ * Airtable accepted `[{url}]` and went and fetched the bytes itself. That
+ * download is the one thing the database cannot do, so it moves to
+ * /api/media/ingest, which stores the file and applies the node's other fields
+ * in the SAME transaction — a scene must never end up holding a new image while
+ * still claiming to await the old one.
+ *
+ * The endpoint answers with the scene in Airtable's own shape, so this is a
+ * drop-in: `Wait Image Approval` and the rest read $json exactly as before.
+ */
+function buildIngest(params, nodeName) {
+  const value = params.columns?.value ?? {};
+  const attachKey = Object.keys(value).find((k) => k in FIELD_BY_ATTACHMENT);
+  const field = FIELD_BY_ATTACHMENT[attachKey];
+
+  // `[{ url: <expr> }]` / `[{ "url": <expr> }]` — pull the expression back out.
+  const raw = String(value[attachKey] ?? "");
+  const m = raw.match(/\[\s*\{\s*"?url"?\s*:\s*([\s\S]+?)\s*\}\s*\]/);
+  if (!m) throw new Error(`${nodeName}: cannot read the url out of "${attachKey}": ${raw}`);
+  const urlExpr = m[1].replace(/\}\}\s*$/, "").trim();
+
+  const idExpr = exprBody(String(value.id)).replace(/^\{\{|\}\}$/g, "").trim();
+  const rest = buildColumnObject(value, nodeName, [attachKey]);
+
+  return {
+    method: "POST",
+    url: "http://web:3000/api/media/ingest",
+    // A credential rather than {{ $env.MEDIA_INGEST_KEY }}: n8n can be
+    // configured to block env access inside nodes, and whether it currently
+    // does is not something the port should depend on. This is also how the
+    // FAL header is already wired on this instance.
+    authentication: "genericCredentialType",
+    genericAuthType: "httpHeaderAuth",
+    sendBody: true,
+    specifyBody: "json",
+    jsonBody:
+      `={{ JSON.stringify({ sceneId: ${idExpr}, field: ${JSON.stringify(field)}, ` +
+      `url: ${urlExpr}, fields: ${rest} }) }}`,
+    options: { timeout: 180000 },
+  };
 }
 
 function buildUpdate(entity, params, nodeName) {
@@ -162,13 +214,13 @@ function buildUpdate(entity, params, nodeName) {
   if (value.id === undefined) throw new Error(`${nodeName}: update with no id mapping`);
   return (
     `select * from hov.at_write(${dq(entity)}, ${dq(inlineExpr(value.id))},\n` +
-    `  ${dq(buildColumnObject(value, nodeName))}::jsonb)`
+    `  ${dq(columnObjectSql(value, nodeName))}::jsonb)`
   );
 }
 
 function buildCreate(entity, params, nodeName) {
   const value = params.columns?.value ?? {};
-  return `select * from hov.at_create(${dq(entity)},\n  ${dq(buildColumnObject(value, nodeName))}::jsonb)`;
+  return `select * from hov.at_create(${dq(entity)},\n  ${dq(columnObjectSql(value, nodeName))}::jsonb)`;
 }
 
 // ---------------------------------------------------------------------------
@@ -178,6 +230,19 @@ function convert(node) {
   const tableId = p.table?.value ?? p.table;
   const entity = ENTITY_BY_TABLE[tableId];
   if (!entity) throw new Error(`${node.name}: unknown table ${tableId}`);
+
+  // Attachment writers take the other road entirely.
+  const mapped = p.columns?.value ?? {};
+  if (Object.keys(mapped).some((k) => ATTACHMENT_FIELDS.includes(k))) {
+    const { parameters, type, typeVersion, credentials, ...rest } = node;
+    return {
+      ...rest,
+      type: "n8n-nodes-base.httpRequest",
+      typeVersion: 4.2,
+      parameters: buildIngest(p, node.name),
+      credentials: { httpHeaderAuth: INGEST_CRED },
+    };
+  }
 
   const op = p.operation ?? "get"; // a missing operation is Airtable's "get"
   const query =

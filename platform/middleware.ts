@@ -7,6 +7,11 @@ export function middleware(req: NextRequest) {
   const expected = process.env.SITE_PASSWORD;
   if (!expected) return NextResponse.next();
   if (req.nextUrl.pathname === "/login") return NextResponse.next();
+  // n8n posts generated assets here from inside the compose network. It has no
+  // browser session, so the password gate would bounce it to /login and the
+  // image would be lost with a 200 nobody looks at. The route authenticates
+  // itself with MEDIA_INGEST_KEY instead.
+  if (req.nextUrl.pathname === "/api/media/ingest") return NextResponse.next();
   if (req.cookies.get("vf_auth")?.value === expected) return NextResponse.next();
   const url = req.nextUrl.clone();
   url.pathname = "/login";

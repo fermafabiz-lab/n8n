@@ -97,6 +97,11 @@ services:
       TZ: Europe/Bucharest
       MEDIA_ROOT: /media
       MEDIA_BASE_URL: https://${SITE_HOST}/media
+      # Shared secret for /api/media/ingest, which n8n posts generated assets
+      # to. It is exempt from the site password (n8n has no browser session),
+      # so this header is the only thing standing in front of a route that
+      # writes to disk and to the database.
+      MEDIA_INGEST_KEY: ${MEDIA_INGEST_KEY}
       # Which data backend answers. "airtable" (default) is still the source
       # of truth; "postgres" points the site at the hov database. Flip it in
       # .env, then `docker compose up -d web` — env vars are fixed when a

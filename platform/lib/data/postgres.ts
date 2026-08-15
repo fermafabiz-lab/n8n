@@ -604,3 +604,90 @@ export async function restoreVersionOfScene(
       "saved drafts still need their storage decision (see lib/data/postgres.ts).",
   );
 }
+
+// ---------------------------------------------------------------------------
+// Media ingest
+// ---------------------------------------------------------------------------
+
+/**
+ * Record a file that has just been written into the media store, and apply the
+ * scene's other field changes in the same transaction.
+ *
+ * The transaction is the point. Airtable did all of this in one PATCH: the
+ * image landed, the approval flags cleared and the status moved together. Split
+ * across separate statements, a failure between them leaves a scene claiming to
+ * await an image it already has, or holding an image nobody will ever be asked
+ * to approve — and the batch's gates read exactly those columns.
+ *
+ * `image` and `video` are one-per-scene (there is a unique index saying so), so
+ * a new one replaces the old ROW. The old FILE is deliberately left on disk:
+ * saved drafts point at it by path, and deleting it would empty the one feature
+ * that exists to recover a bad re-roll.
+ */
+export async function attachMedia(opts: {
+  sceneId: string;
+  field: "image" | "video" | "image_version";
+  path: string;
+  filename: string | null;
+  contentType: string | null;
+  sizeBytes: number;
+  sourceUrl: string;
+  fields?: Record<string, unknown>;
+}): Promise<{ id: string; createdTime: string; fields: Record<string, unknown> } | null> {
+  const client = await pool().connect();
+  try {
+    await client.query("begin");
+
+    if (opts.field !== "image_version") {
+      await client.query(
+        `delete from hov.attachment where scene_id = $1 and field = $2`,
+        [opts.sceneId, opts.field],
+      );
+    }
+
+    await client.query(
+      `insert into hov.attachment
+         (scene_id, field, path, filename, content_type, size_bytes, source_url)
+       values ($1, $2, $3, $4, $5, $6, $7)
+       on conflict (path) do update set
+         scene_id = excluded.scene_id,
+         field    = excluded.field,
+         filename = excluded.filename,
+         source_url = excluded.source_url`,
+      [
+        opts.sceneId,
+        opts.field,
+        opts.path,
+        opts.filename,
+        opts.contentType,
+        opts.sizeBytes,
+        opts.sourceUrl,
+      ],
+    );
+
+    // Same Airtable field names the workflows already use — at_write owns the
+    // translation, so there is one field map, not two.
+    if (opts.fields && Object.keys(opts.fields).length) {
+      await client.query(`select hov.at_write('scene', $1, $2::jsonb)`, [
+        opts.sceneId,
+        JSON.stringify(opts.fields),
+      ]);
+    }
+
+    // Hand back the scene exactly as an Airtable node would have — the nodes
+    // this replaces sat in the middle of a chain, and whatever follows them
+    // reads $json without caring who produced it.
+    const { rows } = await client.query(
+      `select id, "createdTime", fields from hov.at_scene where id = $1`,
+      [opts.sceneId],
+    );
+
+    await client.query("commit");
+    return rows[0] ?? null;
+  } catch (e) {
+    await client.query("rollback").catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+}

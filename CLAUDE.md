@@ -1769,16 +1769,73 @@ each one inside the per-record loop for that reason — collect every URL first
 and fetch them later and you get a few hundred dead links with no way to tell
 which. Do not "optimise" that into two passes.
 
+### Two backends, one switch
+
+`platform/lib/data.ts` now answers from either backend, chosen by
+`DATA_BACKEND`:
+
+| value | reads/writes | when |
+|---|---|---|
+| `airtable` (default) | the base n8n still uses | now |
+| `postgres` | the `hov` database | once the workflows are ported |
+
+Flip it in `/opt/n8n/.env`, then **`docker compose up -d web`** — env vars are
+fixed when a container is created, so a restart does nothing. `DATABASE_URL`
+lives in compose rather than `platform.env` on purpose: that file is rewritten
+from GitHub Secrets on every deploy, and this connection string names a service
+on the compose network and never leaves the box.
+
+**Do not flip it while the workflows still write Airtable.** The site would
+render a frozen picture — the last import — while n8n updated rows nobody was
+reading.
+
+**The derivation is shared, and that is the point.** A scene's displayed status
+is not stored anywhere; it is reconstructed from checkboxes plus asset
+existence (see the long comment in `buildScene`). That logic, the status
+vocabulary, and the `Project`/`Scene` types all live in
+`platform/lib/data/derive.ts`, and **both** backends call it. Each adapter's
+only job is to turn its own rows into the neutral `RawProject`/`RawScene`
+shapes. Duplicating the derivation per backend would let them drift silently
+and would make comparing them meaningless — which is the whole method for
+verifying this migration.
+
+`app/actions.ts` still calls `writeSceneFields` and friends with **Airtable
+field names** (`{ "Aprobare Voce": true }`) in fourteen places. The Postgres
+adapter translates them (`SCENE_FIELDS` / `PROJECT_FIELDS` / `SCRIPT_FIELDS`),
+rather than those fourteen call sites being rewritten while both backends are
+supposed to behave identically. An unmapped name **throws** instead of being
+dropped — a silently ignored write is exactly the divergence the parallel run
+exists to catch. When Airtable is gone, the call sites can move to column names
+and those maps can go with them.
+
+Two things the Postgres side does better, both free:
+
+- `updateEditingOptions` is `editing_options || $1::jsonb`, one statement.
+  The Airtable version was a read-modify-write, i.e. a lost update waiting for
+  two approvals to land together.
+- `deleteProjectDeep` is one `delete` and the foreign keys cascade. Airtable
+  needed three paginated calls in the right order, and a half-finished delete
+  left orphans nothing could reach.
+
+Verified against the real database on 2026-08-15: 56 projects, correct status
+derivation and progress, editing options parsed out of jsonb, cast and
+per-character voice assignments intact, covers and scene images resolving to
+the media store, `scene_final_url` correctly winning over the stored
+attachment, and scene orders 1/101/102/103 in the right sequence.
+
 ### Still owed before Airtable can be cancelled
 
-1. A `PostgresAdapter` behind the existing signatures in `platform/lib/data.ts`
-   — the file already says it was built for this ("Later: swap in a
-   PostgresAdapter without touching any page or component"). The 11 direct
-   `fetch` calls to `api.airtable.com` outside it have to come in first.
+1. ~~A `PostgresAdapter` behind the existing signatures in
+   `platform/lib/data.ts`.~~ Done — see above. (The note that used to live
+   here said 11 direct `fetch` calls to `api.airtable.com` had to be pulled in
+   first; on inspection all 11 were already *inside* `lib/data.ts`. Nothing
+   outside it ever talked to Airtable directly.)
 2. Every Airtable node in the 4 live workflows, one at a time, with
-   `node scripts/check-n8n.mjs` after each.
+   `node scripts/check-n8n.mjs` after each. **This is the step that decides the
+   cutover** — the site can be flipped in a second, the workflows cannot.
 3. Admin screens for the three hand-edited tables.
-4. A final `import-from-airtable.mjs` run at cutover, then cancel the plan.
+4. A final `import-from-airtable.mjs` run at cutover, flip `DATA_BACKEND`,
+   then cancel the plan.
 
 
 ## Environment

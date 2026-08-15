@@ -10,195 +10,59 @@
 //   AIRTABLE_SCENES_TABLE   table name or tbl... id for scenes (default: "Scene")
 // Without them the app serves demo data so the UI is reviewable before wiring.
 
-export type StatusKind = "wait" | "run" | "done" | "err" | "idle";
+// Data layer — the site's whole view of the pipeline's state.
+//
+// Two backends live behind these functions, chosen by DATA_BACKEND:
+//
+//   airtable (default)  the base n8n still reads and writes — the source of truth
+//   postgres            the hov database on the box, populated and running in parallel
+//
+// They are meant to be indistinguishable. Everything that turns a stored row
+// into a Project or a Scene — the status derivation above all — lives once, in
+// ./data/derive.ts, and both backends call it. What differs is only where the
+// rows come from.
+//
+// Airtable env vars (still required while it is the source of truth):
+//   AIRTABLE_API_KEY        personal access token with data.records:read
+//   AIRTABLE_BASE_ID        the app... id of the production base
+//   AIRTABLE_PROJECTS_TABLE table name or tbl... id for projects (default: "Proiecte")
+//   AIRTABLE_SCENES_TABLE   table name or tbl... id for scenes (default: "Scene")
+// Without them the app serves demo data so the UI is reviewable before wiring.
+//
+// Postgres env vars (used only when DATA_BACKEND=postgres):
+//   DATABASE_URL            postgresql://hov:...@postgres:5432/hov
+//   MEDIA_BASE_URL          https://house-of-videos.com/media
 
-export interface Project {
-  id: string;
-  name: string;
-  lengthSeconds: number | null;
-  tone: string | null;
-  status: string;
-  statusKind: StatusKind;
-  progress: number; // 0..1
-  finalVideoUrl: string | null;
-  aspect: "16:9" | "9:16";
-  updatedAt: string | null;
-  /** First scene's generated image — the dashboard card cover. */
-  coverUrl?: string | null;
-  /** Overlay options, editable right up to final assembly. */
-  editing: EditingOptions;
-  /** The batch is holding, waiting for those options to be confirmed. */
-  awaitingFinalSettings: boolean;
-  /** Video category id (lib/categories.ts); older projects have none. */
-  category: string | null;
-  /** Spoken language ("Română", "English", …) — narrows every voice picker. */
-  language: string;
-  /** The project's main narrator voice id (empty when none was picked). */
-  narratorVoice: string;
-  /** "off" | "characters" | "chapters" — how narration voices work. */
-  multiVoiceMode: string;
-  /** Extra voice ids picked on the form (characters or chapter narrators). */
-  cast: string[];
-  /** Character name -> voice id overrides (characters mode). */
-  castAssign: Record<string, string>;
-  /**
-   * Chapter number -> voice id overrides (chapters mode), plus "hook" for the
-   * opening scene. Without an entry a chapter falls back to its positional
-   * cast voice, which is how every project behaved before this existed.
-   */
-  chapterVoices: Record<string, string>;
-}
+import {
+  buildProject,
+  buildScene,
+  buildVersions,
+  classifyStatus,
+  MAX_VERSIONS_PER_KIND,
+  type RawProject,
+  type RawScene,
+} from "./data/derive";
+import * as pgBackend from "./data/postgres";
 
-export interface EditingOptions {
-  captions: boolean;
-  hookTitle: boolean;
-  chapterCards: boolean;
-  endScreen: boolean;
-  /** Scene sound effects in the final mix — the Veo clips' own ambience,
-   *  ducked under the narration. Off = narration (+ music) only. */
-  sfx: boolean;
-  /** Background music AND the synthesized boom/whoosh/riser accents. Both
-   *  are composed here, not in the footage, so they ride one switch. */
-  music: boolean;
-}
+export type {
+  StatusKind,
+  EditingOptions,
+  Project,
+  Scene,
+  SceneVersion,
+  ScriptInfo,
+} from "./data/derive";
+export { MAX_VERSIONS_PER_KIND } from "./data/derive";
+
+import type { Project, Scene, ScriptInfo, SceneVersion, StatusKind } from "./data/derive";
 
 /**
- * A generated asset the producer chose to keep before replacing it.
- *
- * Regeneration overwrites in place — there is exactly one image and one clip
- * per scene, and the pipeline never keeps what it replaces. So a re-roll that
- * comes back worse used to be unrecoverable; this is the way back.
+ * Which backend answers. Airtable unless explicitly switched, because
+ * Airtable is still what n8n writes — pointing the site at Postgres while the
+ * workflows write Airtable would show the producer a frozen picture.
  */
-export interface SceneVersion {
-  id: string;
-  kind: "image" | "video";
-  /** Playable/renderable URL, resolved at read time for image versions. */
-  url: string | null;
-  /** The prompt that produced it — how you tell two versions apart. */
-  prompt: string | null;
-  /**
-   * Flow media id of an image version. Restoring an image without it leaves
-   * the scene unable to generate video at all ("Prep Video Regen" refuses a
-   * scene with no Image Media ID), so it travels with the version.
-   */
-  mediaId: string | null;
-  at: string | null;
-  /** Filed by a replacing path rather than by the "Save draft" button. */
-  auto: boolean;
-  /**
-   * The asset that was live immediately before the current one — what a
-   * producer means by "the previous generation". At most one per kind, and
-   * only an automatic keep can claim it: a manual save files the asset that
-   * is still on the scene, which is not a previous anything.
-   */
-  last: boolean;
-}
+const USE_PG = process.env.DATA_BACKEND === "postgres";
 
-export interface Scene {
-  id: string;
-  order: number;
-  label: string;
-  narration: string | null;
-  imagePrompt: string | null;
-  /** What the clip DOES — the direction handed to Veo. */
-  videoPrompt: string | null;
-  imageUrl: string | null;
-  videoUrl: string | null;
-  voiceUrl: string | null;
-  sceneApproved: boolean;
-  rewriteRequested: boolean;
-  imageApproved: boolean;
-  videoApproved: boolean;
-  /** Voice review gate, before any video is generated. */
-  voiceApproved: boolean;
-  /** n8n clears these once the regeneration lands (or is rejected), so a
-   *  set flag means "a regeneration is in flight right now". */
-  regenImage: boolean;
-  regenVideo: boolean;
-  regenVoice: boolean;
-  /** "Observații Scenă" — reviewer feedback in, rejection reasons back out. */
-  note: string | null;
-  /** Refs (E1, E3…) of the Evidence claims backing this scene's narration.
-   *  Validated by the scripting workflow — an invented ID never lands here. */
-  evidenceRef: string | null;
-  /** Scripting couldn't back this scene's factual claim with a real source. */
-  needsFactCheck: boolean;
-  /** Drafts kept before a regeneration replaced them, newest last. */
-  versions: SceneVersion[];
-  status: string;
-  statusKind: StatusKind;
-}
-
-// Airtable status text → semantic kind + rough pipeline progress.
-// Keys are lowercased and diacritics-stripped before lookup, so both
-// "Așteaptă Aprobare Imagine" and "Asteapta Aprobare Imagine" match.
-const STATUS_MAP: Array<{ match: RegExp; kind: StatusKind; progress: number }> = [
-  { match: /finalizat|finished|done/, kind: "done", progress: 1 },
-  { match: /eroare|failed|error/, kind: "err", progress: 0.3 },
-  { match: /setari finale/, kind: "wait", progress: 0.92 },
-  { match: /asamblare/, kind: "run", progress: 0.95 },
-  { match: /aprobare video/, kind: "wait", progress: 0.85 },
-  { match: /generare video/, kind: "run", progress: 0.7 },
-  { match: /aprobare voce/, kind: "wait", progress: 0.65 },
-  { match: /generare voce/, kind: "run", progress: 0.6 },
-  { match: /aprobare imagine/, kind: "wait", progress: 0.55 },
-  { match: /generare imagine/, kind: "run", progress: 0.4 },
-  { match: /awaiting_approval|aprobare script/, kind: "wait", progress: 0.2 },
-  { match: /script/, kind: "run", progress: 0.15 },
-  { match: /in lucru|desfasurare/, kind: "run", progress: 0.5 },
-  { match: /planificare|planificat/, kind: "wait", progress: 0.05 },
-];
-
-// Airtable status values are Romanian (n8n writes them); the UI is English.
-// Translate at display time so nothing in Airtable/n8n has to change.
-const STATUS_LABELS: Array<{ match: RegExp; label: string }> = [
-  { match: /^finalizat/, label: "Finished" },
-  { match: /setari finale/, label: "Awaiting Final Settings" },
-  { match: /asamblare/, label: "Assembling" },
-  { match: /asteapta aprobare video/, label: "Awaiting Video Approval" },
-  { match: /asteapta aprobare voce/, label: "Awaiting Voice Approval" },
-  { match: /asteapta aprobare imagine/, label: "Awaiting Image Approval" },
-  { match: /generare voce/, label: "Generating Voice" },
-  { match: /asteapta aprobare script|aprobare script/, label: "Awaiting Script Approval" },
-  { match: /generare video/, label: "Generating Video" },
-  { match: /generare imagine/, label: "Generating Image" },
-  { match: /generare script|scriere script/, label: "Writing Script" },
-  { match: /video gata/, label: "Video Ready" },
-  { match: /^eroare/, label: "Error" },
-  { match: /in lucru|in desfasurare/, label: "In Progress" },
-  { match: /in asteptare/, label: "Queued" },
-  { match: /planificare|planificat/, label: "Planned" },
-];
-
-function normalizeStatus(raw: string): string {
-  return raw
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
-}
-
-function displayStatus(raw: string): string {
-  const s = normalizeStatus(raw);
-  for (const { match, label } of STATUS_LABELS) {
-    if (match.test(s)) {
-      // Keep any suffix like " · 7/12" that follows the known status text.
-      const extra = raw.match(/\s*[·:]\s*\d.*$/);
-      return extra ? `${label}${extra[0]}` : label;
-    }
-  }
-  return raw;
-}
-
-function classifyStatus(raw: string): { kind: StatusKind; progress: number } {
-  const s = raw
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
-  for (const { match, kind, progress } of STATUS_MAP) {
-    if (match.test(s)) return { kind, progress };
-  }
-  return { kind: "idle", progress: 0 };
-}
 
 // Airtable field names as n8n writes them today. Several have grown
 // organically (including the "Lenght" typo) — this is the single place
@@ -333,7 +197,15 @@ const BASE_ID = process.env.AIRTABLE_BASE_ID;
 const PROJECTS_TABLE = process.env.AIRTABLE_PROJECTS_TABLE || "Proiecte";
 const SCENES_TABLE = process.env.AIRTABLE_SCENES_TABLE || "Scene";
 
-export const isConfigured = Boolean(API_KEY && BASE_ID);
+/**
+ * Is a real backend wired up, or is the app serving demo data?
+ *
+ * Callers use this to decide whether a write is a no-op ("Demo mode — nothing
+ * was written"), so it has to answer for whichever backend is actually
+ * selected. Asking Airtable's env vars while running on Postgres would tell
+ * every server action to pretend it wrote something.
+ */
+export const isConfigured = USE_PG ? pgBackend.isConfigured : Boolean(API_KEY && BASE_ID);
 
 interface AirtableRecord {
   id: string;
@@ -362,146 +234,43 @@ async function airtableList(table: string, params: string): Promise<AirtableReco
   return records;
 }
 
-function toProject(r: AirtableRecord): Project {
-  const status = String(pick(r.fields, F.projectStatus) ?? "—");
-  const { kind, progress } = classifyStatus(status);
-  // Stored as JSON by n8n; anything missing (or an older project) means the
-  // overlay was on.
-  let opts: Partial<EditingOptions> = {};
-  try {
-    opts = JSON.parse(String(pick(r.fields, F.projectEditing) ?? "{}")) ?? {};
-  } catch {
-    opts = {};
-  }
+/**
+ * Airtable record → the neutral shape, and nothing more.
+ *
+ * All the judgement — status translation, the sfx/music defaults, which keys
+ * of Editing Options mean what — lives in buildProject() so the Postgres
+ * backend reaches the same answers from different rows.
+ */
+function toRawProject(r: AirtableRecord): RawProject {
   return {
     id: r.id,
-    name: String(pick(r.fields, F.projectName) ?? "Untitled project"),
-    lengthSeconds: Number(pick(r.fields, F.projectLength)) || null,
+    name: String(pick(r.fields, F.projectName) ?? ""),
     tone: (pick(r.fields, F.projectTone) as string) ?? null,
-    status: displayStatus(status),
-    statusKind: kind,
-    progress,
+    aspectRaw: pick(r.fields, F.projectAspect),
+    noCaptions: pick(r.fields, F.projectNoCaptions) === true,
+    lengthSeconds: Number(pick(r.fields, F.projectLength)) || null,
+    statusRaw: String(pick(r.fields, F.projectStatus) ?? "—"),
     finalVideoUrl: (pick(r.fields, F.projectFinalVideo) as string) ?? null,
-    aspect: pick(r.fields, F.projectAspect) === "9:16" ? "9:16" : "16:9",
-    updatedAt: r.createdTime,
-    editing: {
-      captions: pick(r.fields, F.projectNoCaptions) !== true,
-      hookTitle: opts.hookTitle !== false,
-      chapterCards: opts.chapterCards !== false,
-      endScreen: opts.endScreen !== false,
-      // The clips' own sound is the footage's natural audio, so it is ON
-      // unless switched off — a film over silent clips sounds dead. Music
-      // is the opposite: nothing in it comes from the scene, so it is
-      // opt-IN. Both were wrong the other way round once and the result
-      // was unrelated stingers over stripped-out ambience.
-      sfx: opts.sfx !== false,
-      music: opts.music === true,
-    },
-    awaitingFinalSettings: /setari finale/.test(normalizeStatus(status)),
-    category: typeof (opts as { category?: unknown }).category === "string"
-      ? String((opts as { category?: string }).category)
-      : null,
+    editingRaw: pick(r.fields, F.projectEditing),
     // The film's spoken language, as the creation form recorded it. Read so
-    // every later voice picker can narrow to voices that speak it, exactly
-    // like the creation form does — otherwise swapping a narrator on a
-    // Romanian project offers the English library again.
+    // every later voice picker can narrow to voices that speak it — otherwise
+    // swapping a narrator on a Romanian project offers the English library.
     language: String(r.fields["Language"] ?? ""),
-    narratorVoice: String(r.fields["Voice ID"] ?? ""),
-    multiVoiceMode: String((opts as { multiVoiceMode?: string }).multiVoiceMode ?? "off"),
-    cast: Array.isArray((opts as { cast?: unknown }).cast)
-      ? ((opts as { cast?: unknown[] }).cast as unknown[]).filter(
-          (v): v is string => typeof v === "string" && v.includes("_"),
-        )
-      : [],
-    castAssign:
-      typeof (opts as { castAssign?: unknown }).castAssign === "object" &&
-      (opts as { castAssign?: unknown }).castAssign !== null
-        ? ((opts as { castAssign?: Record<string, string> }).castAssign as Record<string, string>)
-        : {},
-    chapterVoices:
-      typeof (opts as { chapterVoices?: unknown }).chapterVoices === "object" &&
-      (opts as { chapterVoices?: unknown }).chapterVoices !== null
-        ? ((opts as { chapterVoices?: Record<string, string> })
-            .chapterVoices as Record<string, string>)
-        : {},
+    voiceId: String(r.fields["Voice ID"] ?? ""),
+    createdAt: r.createdTime,
   };
 }
 
-function toScene(r: AirtableRecord, index: number): Scene {
-  const rawStatus = String(pick(r.fields, F.sceneStatus) ?? "—");
-  const imageApproved = Boolean(pick(r.fields, F.sceneImageApproved));
-  const videoApproved = Boolean(pick(r.fields, F.sceneVideoApproved));
-  const voiceApproved = Boolean(pick(r.fields, F.sceneVoiceApproved));
-  const sceneApproved = Boolean(pick(r.fields, F.sceneApproved));
-  const regenImage = Boolean(pick(r.fields, F.sceneRegenImage));
-  const regenVoice = Boolean(pick(r.fields, F.sceneRegenVoice));
-  const regenVideo = Boolean(pick(r.fields, F.sceneRegenVideo));
-  const imageUrl = firstAttachmentUrl(pick(r.fields, F.sceneImage));
-  const voiceUrl = (pick(r.fields, F.sceneVoice) as string) ?? null;
-  const order = Number(pick(r.fields, F.sceneOrder)) || index + 1;
-  const videoUrl =
-    ((pick(r.fields, F.sceneVideo) as string) || null) ??
-    firstAttachmentUrl(pick(r.fields, F.sceneVideoAttachment));
+function toProject(r: AirtableRecord): Project {
+  return buildProject(toRawProject(r));
+}
 
-  /*
-   * The scene's state, DERIVED — the stored text is a poor witness.
-   *
-   * n8n only writes that field when a loop physically reaches the scene, and
-   * it only ever writes result states: grep the workflow and you find
-   * "Așteaptă Aprobare Imagine/Voce/Video" and "Finalizat", never "Generare
-   * Imagine" or "Generare Voce". So the value on a scene the batch has not
-   * touched yet is still whatever Scripting set at creation — "Generare
-   * Script", *Writing script* — which is the one stage that is definitely
-   * over: its text is written AND approved.
-   *
-   * Harmless while every scene fitted in one batch. Past the cap it becomes
-   * the main thing the producer sees: on a 15-scene film seven scenes sit at
-   * "Writing script" indefinitely, which reads as scripting being stuck and
-   * sends everyone hunting for a bug in the wrong workflow.
-   *
-   * Every gate in the pipeline keys off checkboxes plus "does the asset
-   * exist" — exactly what we have here — so the state can be reconstructed
-   * instead of trusted. The stored text is kept only where it says something
-   * that cannot be derived: an error, an explicit rewrite, and the scripting
-   * phase before the scene text is approved.
-   */
-  const norm = normalizeStatus(rawStatus);
-  const status =
-    /eroare|failed|error/.test(norm) || /regenerare text/.test(norm)
-      ? rawStatus
-      : regenImage
-        ? "Generare Imagine"
-        : regenVoice
-          ? "Generare Voce"
-          : regenVideo
-            ? "Generare Video"
-            : videoApproved
-              ? "Finalizat"
-              : videoUrl
-                ? "Așteaptă Aprobare Video"
-                : !sceneApproved
-                  ? rawStatus
-                  : // Script approved, nothing generated: the batch simply
-                    // has not got to it. "Queued" is the honest word — which
-                    // scene is being worked on right now is an estimate, and
-                    // ProductionActivity is where that estimate belongs.
-                    !imageUrl
-                    ? "In Asteptare"
-                    : !imageApproved
-                      ? "Așteaptă Aprobare Imagine"
-                      : // voiceApproved with no take = a cinematic (silent)
-                        // project, where Scripting pre-checks the box and
-                        // nothing is ever synthesized.
-                        !voiceApproved
-                        ? voiceUrl
-                          ? "Așteaptă Aprobare Voce"
-                          : "Generare Voce"
-                        : "Generare Video";
-  const { kind } = classifyStatus(status);
+/** Airtable record → the neutral shape. Derivation lives in buildScene(). */
+function toRawScene(r: AirtableRecord): RawScene & { createdAt: string | null } {
+  const files = pick(r.fields, F.sceneVersionFiles);
   return {
     id: r.id,
-    order,
-    label: `S${index + 1}`,
+    order: Number(pick(r.fields, F.sceneOrder)) || null,
     narration: (pick(r.fields, F.sceneNarration) as string) ?? null,
     imagePrompt: (pick(r.fields, F.sceneImagePrompt) as string) ?? null,
     // Older rows can hold a URL here instead of a direction; showing that as
@@ -509,38 +278,39 @@ function toScene(r: AirtableRecord, index: number): Scene {
     videoPrompt: ((v) => (v && !/^https?:\/\//i.test(v.trim()) ? v : null))(
       (pick(r.fields, F.sceneVideoPrompt) as string) ?? null,
     ),
-    imageUrl,
-    videoUrl,
-    voiceUrl,
-    sceneApproved,
-    rewriteRequested: /regenerare text/.test(norm),
-    voiceApproved,
-    imageApproved,
-    videoApproved,
-    regenImage,
-    regenVideo,
-    regenVoice,
+    imageUrl: firstAttachmentUrl(pick(r.fields, F.sceneImage)),
+    videoUrl:
+      ((pick(r.fields, F.sceneVideo) as string) || null) ??
+      firstAttachmentUrl(pick(r.fields, F.sceneVideoAttachment)),
+    voiceUrl: (pick(r.fields, F.sceneVoice) as string) ?? null,
+    sceneApproved: Boolean(pick(r.fields, F.sceneApproved)),
+    imageApproved: Boolean(pick(r.fields, F.sceneImageApproved)),
+    voiceApproved: Boolean(pick(r.fields, F.sceneVoiceApproved)),
+    videoApproved: Boolean(pick(r.fields, F.sceneVideoApproved)),
+    regenImage: Boolean(pick(r.fields, F.sceneRegenImage)),
+    regenVideo: Boolean(pick(r.fields, F.sceneRegenVideo)),
+    regenVoice: Boolean(pick(r.fields, F.sceneRegenVoice)),
     note: (pick(r.fields, F.sceneNote) as string) ?? null,
     evidenceRef: (pick(r.fields, F.sceneEvidenceRef) as string) || null,
     needsFactCheck: Boolean(pick(r.fields, F.sceneNeedsFactCheck)),
-    versions: readVersions(r.fields),
-    status: displayStatus(status),
-    statusKind: kind,
+    versions: buildVersions(
+      pick(r.fields, F.sceneVersions),
+      Array.isArray(files) ? (files as Array<{ filename?: string; url?: string }>) : [],
+    ),
+    statusRaw: String(pick(r.fields, F.sceneStatus) ?? "—"),
+    createdAt: r.createdTime,
   };
 }
 
-/**
- * Ground truth for "did the project actually get created?".
- *
- * The n8n webhook's answer is not evidence — it can time out, or return 200
- * while a later node fails. This asks Airtable directly for a project with
- * this name created in the last few minutes, so the UI never claims success
- * for a record that does not exist.
- */
+function toScene(r: AirtableRecord, index: number): Scene {
+  return buildScene(toRawScene(r), index);
+}
+
 export async function findRecentProjectByName(
   name: string,
   withinMs = 5 * 60 * 1000,
 ): Promise<string | null> {
+  if (USE_PG) return pgBackend.findRecentProjectByName(name, withinMs);
   if (!isConfigured || !name.trim()) return null;
   const escaped = name.trim().replace(/'/g, "\\'");
   const formula = encodeURIComponent(`{Nume Proiect}='${escaped}'`);
@@ -556,6 +326,7 @@ export async function findRecentProjectByName(
 }
 
 export async function getProjects(): Promise<Project[]> {
+  if (USE_PG) return pgBackend.getProjects();
   if (!isConfigured) return DEMO_PROJECTS;
   const records = await airtableList(PROJECTS_TABLE, "pageSize=100");
 
@@ -592,6 +363,7 @@ export async function getProjects(): Promise<Project[]> {
  * (which also sweeps the whole Scene table for covers).
  */
 export async function getStatusCounts(): Promise<{ run: number; wait: number; err: number }> {
+  if (USE_PG) return pgBackend.getStatusCounts();
   const counts = { run: 0, wait: 0, err: 0 };
   const tally = (status: string) => {
     const { kind } = classifyStatus(status);
@@ -619,6 +391,7 @@ export async function getStatusCounts(): Promise<{ run: number; wait: number; er
 }
 
 export async function getProject(id: string): Promise<Project | null> {
+  if (USE_PG) return pgBackend.getProject(id);
   if (!isConfigured) return DEMO_PROJECTS.find((p) => p.id === id) ?? DEMO_PROJECTS[0];
   const res = await fetch(
     `https://api.airtable.com/v0/${BASE_ID}/${encodeURIComponent(PROJECTS_TABLE)}/${id}`,
@@ -629,6 +402,7 @@ export async function getProject(id: string): Promise<Project | null> {
 }
 
 export async function getScenes(projectId: string): Promise<Scene[]> {
+  if (USE_PG) return pgBackend.getScenes(projectId);
   if (!isConfigured) return DEMO_SCENES;
   // Scene records link to their project via a Project_ID text field.
   const formula = encodeURIComponent(`{Project_ID} = "${projectId}"`);
@@ -810,6 +584,7 @@ export async function writeSceneApproval(
   kind: "image" | "video",
   action: "approve" | "regenerate",
 ): Promise<void> {
+  if (USE_PG) return pgBackend.writeSceneApproval(sceneId, kind, action);
   // Field names must match the Airtable Scene table exactly (diacritics
   // included) — n8n polls these very checkboxes.
   const fields =
@@ -836,6 +611,7 @@ export async function writeProjectFields(
   projectId: string,
   fields: Record<string, unknown>,
 ): Promise<void> {
+  if (USE_PG) return pgBackend.writeProjectFields(projectId, fields);
   await airtablePatch(PROJECTS_TABLE, projectId, fields);
 }
 
@@ -848,6 +624,7 @@ export async function updateEditingOptions(
   projectId: string,
   patch: Record<string, unknown>,
 ): Promise<void> {
+  if (USE_PG) return pgBackend.updateEditingOptions(projectId, patch);
   const res = await fetch(
     `https://api.airtable.com/v0/${BASE_ID}/${encodeURIComponent(PROJECTS_TABLE)}/${projectId}`,
     { headers: { Authorization: `Bearer ${API_KEY}` }, cache: "no-store" },
@@ -866,6 +643,7 @@ export async function updateEditingOptions(
 }
 
 export async function getProjectScript(projectId: string): Promise<string | null> {
+  if (USE_PG) return pgBackend.getProjectScript(projectId);
   if (!isConfigured) return DEMO_SCRIPT;
   const res = await fetch(
     `https://api.airtable.com/v0/${BASE_ID}/${encodeURIComponent(PROJECTS_TABLE)}/${projectId}`,
@@ -896,13 +674,8 @@ the spectacle it will soon export as war...`;
 
 const SCRIPTS_TABLE = process.env.AIRTABLE_SCRIPTS_TABLE || "Scripturi";
 
-export interface ScriptInfo {
-  id: string;
-  content: string;
-  status: string;
-}
-
 export async function getProjectScriptInfo(projectId: string): Promise<ScriptInfo | null> {
+  if (USE_PG) return pgBackend.getProjectScriptInfo(projectId);
   if (!isConfigured) {
     return { id: "demo-script", content: DEMO_SCRIPT, status: "awaiting_approval" };
   }
@@ -932,11 +705,13 @@ export async function writeScriptFields(
   scriptId: string,
   fields: Record<string, unknown>,
 ): Promise<void> {
+  if (USE_PG) return pgBackend.writeScriptFields(scriptId, fields);
   await airtablePatch(SCRIPTS_TABLE, scriptId, fields);
 }
 
 /** Reviewer feedback consumed (and cleared) by the n8n regen chains. */
 export async function writeSceneFeedback(sceneId: string, feedback: string): Promise<void> {
+  if (USE_PG) return pgBackend.writeSceneFeedback(sceneId, feedback);
   await airtablePatch(SCENES_TABLE, sceneId, { "Observații Scenă": feedback });
 }
 
@@ -959,6 +734,7 @@ export async function readSceneNarration(
   imagePrompt: string;
   imageApproved: boolean;
 }> {
+  if (USE_PG) return pgBackend.readSceneNarration(sceneId);
   if (!isConfigured)
     return { narration: "", hasVoice: false, imagePrompt: "", imageApproved: false };
   const res = await fetch(
@@ -993,6 +769,7 @@ export async function readSceneVideoInputs(sceneId: string): Promise<{
   hasImageMediaId: boolean;
   hasMotionPrompt: boolean;
 }> {
+  if (USE_PG) return pgBackend.readSceneVideoInputs(sceneId);
   if (!isConfigured)
     return { hasClip: false, hasImageMediaId: false, hasMotionPrompt: false };
   const res = await fetch(
@@ -1017,6 +794,7 @@ export async function writeSceneScript(
   sceneId: string,
   fields: { narration?: string; imagePrompt?: string; approve?: boolean },
 ): Promise<void> {
+  if (USE_PG) return pgBackend.writeSceneScript(sceneId, fields);
   const patch: Record<string, unknown> = {};
   if (typeof fields.narration === "string") patch["Script Scenă"] = fields.narration;
   if (typeof fields.imagePrompt === "string") patch["Imagine First Frame"] = fields.imagePrompt;
@@ -1052,7 +830,6 @@ async function fetchSceneRecord(
  * to grow it, and each image draft is a real file in the base. The oldest of
  * a kind is dropped past this — and the drop is reported, never silent.
  */
-export const MAX_VERSIONS_PER_KIND = 12;
 
 /**
  * Identity of the asset currently on the scene, for de-duplication.
@@ -1085,6 +862,7 @@ export async function saveVersionOfScene(
 ): Promise<
   { saved: true; dropped: number } | { saved: false; reason: string }
 > {
+  if (USE_PG) return pgBackend.saveVersionOfScene(sceneId, kind, opts);
   const f = await fetchSceneRecord(sceneId);
   const url =
     kind === "image"
@@ -1205,6 +983,7 @@ export async function restoreVersionOfScene(
 ): Promise<
   { restored: true; kind: "image" | "video" } | { restored: false; reason: string }
 > {
+  if (USE_PG) return pgBackend.restoreVersionOfScene(sceneId, versionId);
   const f = await fetchSceneRecord(sceneId);
   const version = readVersions(f).find((v) => v.id === versionId);
   if (!version || !version.url) {
@@ -1248,6 +1027,7 @@ export async function restoreVersionOfScene(
 }
 
 export async function requestSceneRewrite(sceneId: string): Promise<void> {
+  if (USE_PG) return pgBackend.requestSceneRewrite(sceneId);
   await airtablePatch(SCENES_TABLE, sceneId, {
     "Status Producție Scenă": "Regenerare Text",
     "Aprobare Scenă": false,
@@ -1271,6 +1051,7 @@ export async function requestSceneRewrite(sceneId: string): Promise<void> {
  * refused: unapproved, editable, awaiting review.
  */
 export async function releaseSceneRewrite(sceneId: string): Promise<void> {
+  if (USE_PG) return pgBackend.releaseSceneRewrite(sceneId);
   await airtablePatch(SCENES_TABLE, sceneId, {
     "Status Producție Scenă": "Generare Script",
   });
@@ -1299,6 +1080,7 @@ async function airtableDelete(table: string, ids: string[]): Promise<void> {
  * may already be published from there).
  */
 export async function deleteProjectDeep(projectId: string): Promise<void> {
+  if (USE_PG) return pgBackend.deleteProjectDeep(projectId);
   // Linked scripts come from the project record itself.
   const projRes = await fetch(
     `https://api.airtable.com/v0/${BASE_ID}/${encodeURIComponent(PROJECTS_TABLE)}/${projectId}`,
@@ -1328,6 +1110,7 @@ export async function writeSceneFields(
   sceneId: string,
   fields: Record<string, unknown>,
 ): Promise<void> {
+  if (USE_PG) return pgBackend.writeSceneFields(sceneId, fields);
   await airtablePatch(SCENES_TABLE, sceneId, fields);
 }
 
@@ -1335,6 +1118,7 @@ export async function requestVoiceRegen(
   sceneId: string,
   narration?: string,
 ): Promise<void> {
+  if (USE_PG) return pgBackend.requestVoiceRegen(sceneId, narration);
   const patch: Record<string, unknown> = {
     "Regenerează Voce": true,
     // A fresh take has to be listened to again, and any clip built on the

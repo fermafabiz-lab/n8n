@@ -97,6 +97,15 @@ services:
       TZ: Europe/Bucharest
       MEDIA_ROOT: /media
       MEDIA_BASE_URL: https://${SITE_HOST}/media
+      # Which data backend answers. "airtable" (default) is still the source
+      # of truth; "postgres" points the site at the hov database. Flip it in
+      # .env, then `docker compose up -d web` — env vars are fixed when a
+      # container is created, so a restart is not enough.
+      DATA_BACKEND: ${DATA_BACKEND:-airtable}
+      # Deliberately NOT in platform.env: that file is rewritten from GitHub
+      # Secrets on every deploy, and this connection string never leaves the
+      # box — it names a service on the compose network.
+      DATABASE_URL: postgresql://hov:${HOV_DB_PASSWORD}@postgres:5432/hov
     group_add:
       - "2000"   # hovmedia — shared write access to ./media
     volumes:

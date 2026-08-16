@@ -3099,6 +3099,30 @@ body:has(.mkt) .vignette {
   opacity: 0.92;
   animation: arcdrift 22s ease-in-out infinite;
 }
+/* The counter-phase echo on the opposite corner — the prototype's heroWash.
+   Dimmer than the main arc and drifting the other way, so it reads as the
+   same light source bouncing rather than a second one. */
+.mkt-arc2 {
+  position: absolute;
+  left: -280px;
+  bottom: -320px;
+  width: 780px;
+  height: 800px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(
+    closest-side,
+    rgba(20, 18, 28, 0) 0 54%,
+    rgba(77, 52, 132, 0.35) 65%,
+    rgba(122, 79, 214, 0.5) 78%,
+    rgba(178, 153, 231, 0.42) 87%,
+    rgba(20, 18, 28, 0.12) 94%,
+    rgba(20, 18, 28, 0) 100%
+  );
+  filter: blur(22px);
+  opacity: 0.8;
+  animation: arcdrift 30s ease-in-out infinite reverse;
+}
 .mkt-spot {
   position: absolute;
   right: 60px;
@@ -3722,6 +3746,11 @@ body:has(.mkt) .vignette {
     right: -640px;
     top: -420px;
     opacity: 0.55;
+  }
+  .mkt-arc2 {
+    left: -420px;
+    bottom: -460px;
+    opacity: 0.5;
   }
   .mkt-head .ctas {
     flex-wrap: wrap;

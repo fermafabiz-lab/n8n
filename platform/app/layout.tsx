@@ -76,7 +76,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <span className="bmark" aria-hidden="true" />
               <span className="w1">House of Videos</span>
             </Link>
-            <Link href="/" className="navlink on">
+            <Link href="/projects" className="navlink on">
               Projects
             </Link>
             <Link href="/admin" className="navlink">

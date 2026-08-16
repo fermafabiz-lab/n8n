@@ -111,7 +111,7 @@ export default function ProductionTicker() {
     pulse.wait > 0 ? "amber" : pulse.err > 0 ? "red" : pulse.run > 0 ? "blue" : "";
 
   return (
-    <Link href="/" className="ticker" title="Production status — click for the floor">
+    <Link href="/projects" className="ticker" title="Production status — click for the floor">
       <span className={`tdot ${dot}`} />
       {parts.length ? parts.join(" · ") : "ALL QUIET"}
     </Link>

@@ -1978,7 +1978,7 @@ select:focus-visible {
   grid-template-columns: minmax(0, 1fr) 400px;
   gap: 24px;
   align-items: start;
-  padding: 0 34px 40px;
+  padding: 44px 34px 44px;
 }
 .brief .form {
   max-width: none;
@@ -1998,13 +1998,17 @@ select:focus-visible {
   margin-top: 16px;
   background: var(--card-fill);
   border-radius: 28px;
-  box-shadow: var(--shadow);
+  /* Deliberately heavier than --shadow. These cards are the page's subject —
+     everything else is ground — and a two-layer cast (a tight contact shadow
+     plus a wide soft one) is what reads as a card LIFTED off the surface
+     rather than a panel tinted onto it. */
+  box-shadow: 0 2px 6px rgba(24, 20, 40, 0.06), 0 18px 44px rgba(24, 20, 40, 0.16);
   padding: 30px 34px 34px;
   transition: var(--tr);
 }
 .brief .form > .fsec:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
+  transform: translateY(-3px);
+  box-shadow: 0 4px 10px rgba(24, 20, 40, 0.07), 0 26px 60px rgba(24, 20, 40, 0.2);
 }
 .brief .form > .fsec > header {
   border-bottom: none;
@@ -2037,133 +2041,6 @@ select:focus-visible {
   margin-left: 0;
 }
 
-/* --- "you are here" rail at the head of the form --- */
-.fprog {
-  position: sticky;
-  /* Low enough to clear the fade under the site's nav entirely. At 84 the
-     rail's own top edge sat inside that fade and the two washed into each
-     other; the scrim now finishes on exactly this line, so the rail begins
-     where the fade ends and never carries any of it. */
-  top: 100px;
-  z-index: 5;
-  margin: 0;
-  padding: 14px 22px;
-  border-radius: var(--r-md);
-  background: rgba(252, 252, 253, 0.86);
-  backdrop-filter: blur(18px) saturate(1.4);
-  border-bottom: 1px solid var(--line);
-  border-radius: var(--r-lg) var(--r-lg) 0 0;
-  display: flex;
-  align-items: baseline;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-/* Once the rail is stuck, it grows upward to the top of the screen — same
-   surface, same blur, so it reads as one bar — and THAT is what the form's
-   text disappears into. It is the mirror of the bottom, where the form
-   dissolves into the "Start production" bar.
-
-   It has to be the rail's own extension rather than a strip belonging to the
-   page: a page-level strip either fades above the rail, and then blurred
-   headings show through it, or fades below it, and then it greys the rail
-   itself. Growing the bar has neither problem, because the bar is opaque and
-   ends exactly where its text begins.
-
-   Only when stuck. Unstuck, the rail sits in the middle of the page and this
-   would hang a dark slab over whatever is above the form. */
-.fprog::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 100%;
-  height: 0;
-  /* The bar's own tint over an OPAQUE base, not `inherit`. The bar is 86%
-     opaque, which is right where it sits — a frosted panel over content —
-     but wrong for the extension: the remaining 14% is a hundred pixels of
-     scrolling form text showing straight through, faint but there. Painting
-     the same tint over the page colour gives the same shade with nothing
-     behind it. */
-  background:
-    linear-gradient(rgba(252, 252, 253, 0.86), rgba(252, 252, 253, 0.86)),
-    var(--bg);
-  -webkit-backdrop-filter: blur(18px) saturate(1.4);
-  backdrop-filter: blur(18px) saturate(1.4);
-  pointer-events: none;
-}
-.fprog.stuck {
-  /* Square while stuck. The bar's rounded top corners leave a notch each
-     side that neither the bar nor its extension covers — the extension is a
-     rectangle butting against a curve — and form text shows through them.
-     That is the leak in the top-left corner. A rounded corner is only there
-     to sit on the form's own top edge anyway; against the screen's edge it
-     has nothing to round. */
-  border-radius: 0;
-}
-.fprog.stuck::before {
-  /* The rail's sticky top: exactly the distance from the screen's edge down
-     to the bar, so the two meet with no seam and no overshoot. */
-  height: 100px;
-}
-.fprog-lead {
-  font-family: var(--f-mono), ui-monospace, Menlo, monospace;
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--accent);
-}
-.fprog ol {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  gap: 11px;
-  flex-wrap: wrap;
-}
-.fprog li a {
-  display: flex;
-  align-items: baseline;
-  gap: 5px;
-  font-family: var(--f-mono), ui-monospace, Menlo, monospace;
-  font-size: 9.5px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--dim);
-  transition: color 0.2s;
-}
-/* Five labels don't fit one line on a 600px column, and a rail that wraps
-   costs height in a sticky element. Only the step you're on needs naming —
-   the numbers alone still carry "five, you're on two". */
-@media (max-width: 1500px) {
-  .fprog li:not(.on) .l {
-    display: none;
-  }
-}
-.fprog li.past a {
-  color: var(--soft);
-}
-.fprog li.on a {
-  color: var(--ink);
-}
-.fprog li.on .n {
-  color: var(--accent);
-}
-.fprog li a:hover {
-  color: var(--ink);
-}
-
-/* The action stays attached to the form instead of hiding at the end of it. */
-.fsubmit {
-  position: sticky;
-  bottom: 0;
-  margin: 28px -34px 0;
-  padding: 18px 34px;
-  background: rgba(252, 252, 253, 0.86);
-  backdrop-filter: blur(18px) saturate(1.4);
-  border-top: 1px solid var(--line);
-  border-radius: 0 0 var(--r-lg) var(--r-lg);
-}
 .callsheet {
   position: sticky;
   top: 104px;
@@ -2768,20 +2645,12 @@ select:focus-visible {
   flex-direction: column;
   gap: 14px;
   align-self: start;
-  /* A sticky element taller than the viewport cannot stick — it scrolls with
-     the page and only pins once its bottom arrives, which reads as the panel
-     "not following". The estimate is short enough today, but its rows grow
-     with the finishes list, so bound it and let the panel scroll inside
-     itself rather than silently losing its stickiness. */
-  max-height: calc(100vh - 104px);
-  overflow-y: auto;
-  scrollbar-width: thin;
 }
 .nb-est {
-  border-radius: var(--r-lg);
+  border-radius: 28px;
   background: radial-gradient(120% 100% at 100% 0%, var(--accent-deep) 0%, #1a1a1f 55%, #0f0f12 100%);
-  box-shadow: var(--shadow-lg);
-  padding: 24px 24px 26px;
+  box-shadow: 0 2px 6px rgba(24, 20, 40, 0.08), 0 22px 54px rgba(24, 20, 40, 0.26);
+  padding: 22px 24px 24px;
 }
 .nb-est .dpill {
   display: inline-flex;
@@ -2806,8 +2675,8 @@ select:focus-visible {
    will use for the chosen tone (lib/tone-type.ts mirrors the render). White on
    the dark panel; the tone faces are all loaded app-wide already. */
 .nb-est .sprev {
-  margin: 16px 0 0;
-  font-size: 27px;
+  margin: 14px 0 0;
+  font-size: 25px;
   line-height: 1.14;
   color: var(--panel-ink);
   overflow-wrap: anywhere;
@@ -2827,14 +2696,17 @@ select:focus-visible {
   text-wrap: pretty;
 }
 .nb-est .rows {
-  margin-top: 18px;
+  margin-top: 14px;
 }
+/* Row rhythm is tuned so the whole panel clears a laptop viewport: it must
+   never need a scrollbar of its own — the producer reads it while filling the
+   form, and a panel you have to scroll to finish reading is not a summary. */
 .nb-est .rows > div {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 0;
+  padding: 8px 0;
   border-bottom: 1px solid var(--panel-line);
 }
 .nb-est .rows dt {
@@ -2857,7 +2729,7 @@ select:focus-visible {
    the form — so type=submit works exactly as before. */
 .nb-est .go {
   width: 100%;
-  margin-top: 20px;
+  margin-top: 18px;
   font-family: inherit;
   font-size: 14.5px;
   font-weight: 600;
@@ -3798,10 +3670,13 @@ body:has(.mkt) .vignette {
   opacity: 0.85;
   animation: arcdrift 24s ease-in-out infinite;
 }
+/* Inside the form column now, not spanning the shell. That is what brings the
+   estimate rail up to the same line as "Start a video" instead of starting it
+   a header's height further down. */
 .nb-head {
   position: relative;
-  padding: 44px 34px 6px;
-  max-width: 620px;
+  padding: 0 0 4px;
+  max-width: 560px;
 }
 .nb-head h1 {
   margin: 20px 0 0;

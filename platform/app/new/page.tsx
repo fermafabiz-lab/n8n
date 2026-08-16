@@ -5,7 +5,6 @@ import { createProject, type ActionResult } from "@/app/actions";
 import CategoryPicker, { type CategoryMeta } from "@/components/CategoryPicker";
 import { DEFAULT_CATEGORY, getCategory } from "@/lib/categories";
 import Toggle from "@/components/Toggle";
-import FormProgress from "@/components/FormProgress";
 import LanguagePicker from "@/components/LanguagePicker";
 import { languageByCode } from "@/lib/languages";
 import { toneType } from "@/lib/tone-type";
@@ -194,19 +193,6 @@ export default function NewVideo() {
       <div className="nb-shell">
         <div className="arc" aria-hidden="true" />
 
-        <div className="nb-head">
-          <span className="nb-pill">
-            <i />
-            New project
-          </span>
-          <h1>Start a video</h1>
-          <p>
-            Fill in the brief and the pipeline takes it from there. Everything
-            after this happens without you — until the script and the scenes
-            come back for approval.
-          </p>
-        </div>
-
         <form
           action={formAction}
           onKeyDown={(e) => {
@@ -234,9 +220,23 @@ export default function NewVideo() {
         >
           <div className="brief">
             <div className="form">
-              <FormProgress />
+              {/* The header rides in the form column so the estimate rail
+                  starts on the same line as the title rather than a header's
+                  height below it. */}
+              <div className="nb-head">
+                <span className="nb-pill">
+                  <i />
+                  New project
+                </span>
+                <h1>Start a video</h1>
+                <p>
+                  Fill in the brief and the pipeline takes it from there.
+                  Everything after this happens without you — until the script
+                  and the scenes come back for approval.
+                </p>
+              </div>
 
-              <section className="fsec" style={{ marginTop: 0 }}>
+              <section className="fsec">
                 <header>
                   <h2>What is it about</h2>
                   <span className="no">01</span>
@@ -424,6 +424,26 @@ export default function NewVideo() {
                     ))}
                   </div>
                 </div>
+                <div className="field" style={{ marginTop: 18 }}>
+                  <label>Format</label>
+                  <input type="hidden" name="aspect" value={aspect} />
+                  <div className="seg" role="group" aria-label="Format">
+                    <button
+                      type="button"
+                      className={aspect === "16:9" ? "on" : ""}
+                      onClick={() => setAspect("16:9")}
+                    >
+                      16:9 horizontal
+                    </button>
+                    <button
+                      type="button"
+                      className={aspect === "9:16" ? "on" : ""}
+                      onClick={() => setAspect("9:16")}
+                    >
+                      9:16 vertical
+                    </button>
+                  </div>
+                </div>
               </section>
 
               <section className="fsec">
@@ -550,10 +570,6 @@ export default function NewVideo() {
                     <dd>{aspect === "9:16" ? "9:16 vertical" : "16:9 horizontal"}</dd>
                   </div>
                   <div>
-                    <dt>Look</dt>
-                    <dd className={style ? "" : "off"}>{style || "unset"}</dd>
-                  </div>
-                  <div>
                     <dt>Finishes</dt>
                     <dd className={finishList ? "" : "off"}>{finishList || "None — bare cut"}</dd>
                   </div>
@@ -564,28 +580,6 @@ export default function NewVideo() {
                     </dd>
                   </div>
                 </dl>
-
-                {/* Format lives in the rail: it is a property of the delivered
-                    file, which is what this panel describes. */}
-                <div className="field" style={{ marginTop: 16 }}>
-                  <input type="hidden" name="aspect" value={aspect} />
-                  <div className="seg" role="group" aria-label="Format">
-                    <button
-                      type="button"
-                      className={aspect === "16:9" ? "on" : ""}
-                      onClick={() => setAspect("16:9")}
-                    >
-                      16:9
-                    </button>
-                    <button
-                      type="button"
-                      className={aspect === "9:16" ? "on" : ""}
-                      onClick={() => setAspect("9:16")}
-                    >
-                      9:16
-                    </button>
-                  </div>
-                </div>
 
                 {state && (
                   <p className={`formmsg ${state.ok ? "ok" : "err"}`}>{state.message}</p>

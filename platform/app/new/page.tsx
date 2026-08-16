@@ -31,6 +31,22 @@ const TONES = [
 
 const PACES = ["Slow", "Normal", "Fast"];
 
+/** Dashed suggestion chips under the subject — one click fills the field. */
+const SUGGESTIONS = [
+  "The last lighthouse keepers",
+  "How Rome fed a million people",
+  "Cities that never woke up",
+];
+
+/** Length presets, in seconds. The slider snaps to 8s — one scene. */
+const LENGTH_PRESETS = [
+  { label: "32s", s: 32 },
+  { label: "1 min", s: 64 },
+  { label: "2 min", s: 120 },
+  { label: "4 min", s: 240 },
+  { label: "8 min", s: 480 },
+];
+
 /**
  * The overlay finishes, as numbered switch rows. Field names and yes/no
  * values are the exact strings createProject() forwards to n8n — the
@@ -104,13 +120,16 @@ const VOICE_LABELS: Record<string, string> = {
 };
 
 /**
- * The brief. The form holds the centre; a live project preview sits to its
- * left, deliberately dimmed — it confirms what you typed rather than
- * competing for attention — and the right rail is held for illustrated
- * stickers. The preview's title uses the exact typeface the film's titles
- * will use for the chosen tone (lib/tone-type.ts mirrors the render's
- * presetForTone), so the site shows the film's own dress before a single
- * frame is produced.
+ * The brief, in the handoff's Start-screen layout: the form as a stack of
+ * numbered cushioned cards, and a sticky rail on the right holding the dark
+ * ESTIMATE panel — which absorbed the old call-sheet preview (including the
+ * tone-typeface title, lib/tone-type.ts mirroring the render) and now also
+ * carries the submit — plus the genre pole and the what-happens-next card.
+ *
+ * Every posted field name and value vocabulary is byte-identical to before:
+ * name, category, cat_*, cast_voices, language, length, tone, pace, style,
+ * voice_id, aspect, the yes|no finishes, lore, reference_image. The frozen
+ * contract with the n8n webhook survives any redesign.
  */
 export default function NewVideo() {
   const [state, formAction, pending] = useActionState(submit, null);
@@ -135,13 +154,18 @@ export default function NewVideo() {
   const lang = languageByCode(language);
   const languageName = lang?.name ?? "English";
   const scenes = Math.max(1, Math.round(length / 8));
+  const words = scenes * 22;
+  const chapters = Math.max(1, Math.ceil(length / 120));
   const tt = toneType(tone);
   const silent = catMeta.voiceMode === "silent";
+  const gates = silent ? 3 : 4;
   const finishList = FINISHES.filter(
     (f) => finishes[f.name] && !(silent && f.name === "captions"),
   )
     .map((f) => f.sheet)
     .join(" · ");
+  const lengthLabel = `${Math.floor(length / 60)}:${String(length % 60).padStart(2, "0")}`;
+  const sliderFill = `${(Math.min(Math.max(length, 16), 480) - 16) / (480 - 16) * 100}%`;
 
   return (
     <main className="page">
@@ -161,9 +185,10 @@ export default function NewVideo() {
         onKeyDown={(e) => {
           // Enter in a text field implicitly submits an HTML form, and here
           // submitting means starting a real production run: a project is
-          // written to Airtable, scripting starts, model credits are spent.
-          // Pressing Enter after typing the title, or to accept a voice
-          // search, did exactly that. Starting a film should take a click.
+          // written to the database, scripting starts, model credits are
+          // spent. Pressing Enter after typing the title, or to accept a
+          // voice search, did exactly that. Starting a film should take a
+          // click.
           //
           // Only INPUT is blocked, deliberately. A textarea's Enter is a
           // newline and never submits, and a button's Enter is that button's
@@ -181,75 +206,13 @@ export default function NewVideo() {
         }}
       >
         <div className="brief">
-          {/* ---- the live project preview ---- */}
-          <aside className="callsheet">
-            <div className="eyebrow">
-              <span>Project preview</span>
-              <span className="sp" />
-              <span className="n">LIVE</span>
-            </div>
-            <div className="slate">
-              <div className="slabel">Title preview · {tone}</div>
-              <div
-                className={`sprev ${name ? "" : "blank"} ${tt.className}`}
-                style={tt.uppercase ? { textTransform: "uppercase" } : undefined}
-              >
-                {name || "Untitled film"}
-              </div>
-              <div className="srule" />
-            </div>
-            <dl className="cs">
-              <div>
-                <dt>Category</dt>
-                <dd>
-                  {catMeta.categoryLabel}
-                  {!catMeta.ready && <span style={{ color: "var(--dim)" }}> · in development</span>}
-                </dd>
-              </div>
-              <div>
-                <dt>Tone</dt>
-                <dd>{tone}</dd>
-              </div>
-              <div>
-                <dt>Length</dt>
-                <dd>
-                  {length || "—"}s · ≈{scenes} scene{scenes === 1 ? "" : "s"}
-                </dd>
-              </div>
-              <div>
-                <dt>Format</dt>
-                <dd>{aspect === "9:16" ? "9:16 vertical" : "16:9 horizontal"}</dd>
-              </div>
-              <div>
-                <dt>Voices</dt>
-                <dd>{VOICE_LABELS[catMeta.voiceMode] ?? catMeta.voiceMode}</dd>
-              </div>
-              <div>
-                <dt>Finishes</dt>
-                <dd className={finishList ? "" : "off"}>{finishList || "None — bare cut"}</dd>
-              </div>
-              <div>
-                <dt>Language</dt>
-                <dd>{lang ? `${lang.name} · ${lang.endonym}` : "—"}</dd>
-              </div>
-              <div>
-                <dt>Pace</dt>
-                <dd>{pace}</dd>
-              </div>
-            </dl>
-            <p className="csnote">
-              This fills in as you type. The title above is set in the exact
-              typeface your film&apos;s titles will use for this tone.
-            </p>
-          </aside>
-
-          {/* ---- the form: the one thing on this page to fill in ---- */}
+          {/* ---- the form: a stack of numbered cards ---- */}
           <div className="form">
             <FormProgress />
-            <section className="fsec" style={{ marginTop: 0 }}>
+            <section className="fsec">
               <header>
                 <span className="no">01</span>
-                <h2>Subject</h2>
+                <h2>What is it about</h2>
               </header>
               <div className="field">
                 <input
@@ -267,8 +230,22 @@ export default function NewVideo() {
                   Keep it short — it becomes the title shown in the video.
                   Style details go in the Style field, not here.
                 </p>
+                <div className="sugrow" aria-label="Suggestions">
+                  {SUGGESTIONS.map((s) => (
+                    <button type="button" key={s} className="sug" onClick={() => setName(s)}>
+                      {s}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="field" style={{ marginTop: 18 }}>
+            </section>
+
+            <section className="fsec">
+              <header>
+                <span className="no">02</span>
+                <h2>Format &amp; voices</h2>
+              </header>
+              <div className="field" style={{ marginBottom: 18 }}>
                 <label>Language</label>
                 {/* The film's ONE language control. n8n only ever interpolates
                     this value into prompts (never compares it), so the English
@@ -281,53 +258,28 @@ export default function NewVideo() {
                   what the voice pickers below are narrowed to.
                 </p>
               </div>
-            </section>
-
-            <section className="fsec">
-              <header>
-                <span className="no">02</span>
-                <h2>Format &amp; voices</h2>
-              </header>
-              {/* The Language field lives one section up, so the value is
-                  threaded down rather than read from the DOM — both voice
-                  pickers narrow to voices that speak it. */}
+              {/* The Language field lives just above, so the value is threaded
+                  down rather than read from the DOM — both voice pickers
+                  narrow to voices that speak it. */}
               <CategoryPicker onMeta={setCatMeta} language={language} />
-              <div className="cols2" style={{ marginTop: 18 }}>
-                <div className="field">
-                  <label htmlFor="length">
-                    Length (seconds) — ≈ {scenes} scenes of 8s
-                  </label>
-                  <input
-                    id="length"
-                    name="length"
-                    type="number"
-                    min={16}
-                    max={480}
-                    step={1}
-                    value={length}
-                    onChange={(e) => setLength(Number(e.target.value) || 0)}
-                    required
-                  />
-                </div>
-                <div className="field">
-                  <label>Format</label>
-                  <input type="hidden" name="aspect" value={aspect} />
-                  <div className="chiprow" role="group" aria-label="Format" style={{ paddingTop: 6 }}>
-                    <button
-                      type="button"
-                      className={`pchip ${aspect === "16:9" ? "on" : ""}`}
-                      onClick={() => setAspect("16:9")}
-                    >
-                      16:9 horizontal
-                    </button>
-                    <button
-                      type="button"
-                      className={`pchip ${aspect === "9:16" ? "on" : ""}`}
-                      onClick={() => setAspect("9:16")}
-                    >
-                      9:16 vertical
-                    </button>
-                  </div>
+              <div className="field" style={{ marginTop: 18 }}>
+                <label>Format</label>
+                <input type="hidden" name="aspect" value={aspect} />
+                <div className="chiprow" role="group" aria-label="Format" style={{ paddingTop: 6 }}>
+                  <button
+                    type="button"
+                    className={`pchip ${aspect === "16:9" ? "on" : ""}`}
+                    onClick={() => setAspect("16:9")}
+                  >
+                    16:9 horizontal
+                  </button>
+                  <button
+                    type="button"
+                    className={`pchip ${aspect === "9:16" ? "on" : ""}`}
+                    onClick={() => setAspect("9:16")}
+                  >
+                    9:16 vertical
+                  </button>
                 </div>
               </div>
             </section>
@@ -335,10 +287,11 @@ export default function NewVideo() {
             <section className="fsec">
               <header>
                 <span className="no">03</span>
-                <h2>Tone &amp; pace</h2>
+                <h2>How it should feel</h2>
                 <span className="fhint">shapes writing · palette · type</span>
               </header>
               <div className="field">
+                <label>Tone</label>
                 <input type="hidden" name="tone" value={tone} />
                 <div className="chiprow" role="group" aria-label="Tone">
                   {TONES.map((t) => (
@@ -354,22 +307,82 @@ export default function NewVideo() {
                 </div>
                 <p style={{ margin: "10px 0 0", fontSize: 12, color: "var(--dim)" }}>
                   Independent of the category: it shapes the writing, the
-                  palette, the music — and the typeface in the preview is the
-                  one this tone puts on screen.
+                  palette, the music — and the title in the estimate panel is
+                  set in the typeface this tone puts on screen.
                 </p>
               </div>
               <div className="field" style={{ marginTop: 16 }}>
                 <label>Pace</label>
                 <input type="hidden" name="pace" value={pace} />
-                <div className="chiprow" role="group" aria-label="Pace">
+                <div className="seg" role="group" aria-label="Pace">
                   {PACES.map((p) => (
                     <button
                       type="button"
                       key={p}
-                      className={`pchip ${pace === p ? "on" : ""}`}
+                      className={pace === p ? "on" : ""}
                       onClick={() => setPace(p)}
                     >
                       {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="field" style={{ marginTop: 16 }}>
+                <label htmlFor="style">Visual style</label>
+                <input
+                  id="style"
+                  name="style"
+                  placeholder="ex. photorealistic, golden hour, 35mm"
+                />
+              </div>
+            </section>
+
+            <section className="fsec">
+              <header>
+                <span className="no">04</span>
+                <h2>How long</h2>
+              </header>
+              <div className="field">
+                <div className="lenhead">
+                  <b>{lengthLabel}</b>
+                  <span className="m">
+                    {length}s · ≈{scenes} scene{scenes === 1 ? "" : "s"} of 8s
+                  </span>
+                  {/* The named field. The slider drives it; this allows an
+                      exact number the slider's 8s snap can't reach. */}
+                  <input
+                    id="length"
+                    name="length"
+                    type="number"
+                    min={16}
+                    max={480}
+                    step={1}
+                    value={length}
+                    onChange={(e) => setLength(Number(e.target.value) || 0)}
+                    required
+                    aria-label="Length in seconds"
+                  />
+                </div>
+                <input
+                  type="range"
+                  className="lenslider"
+                  min={16}
+                  max={480}
+                  step={8}
+                  value={Math.min(Math.max(length, 16), 480)}
+                  onChange={(e) => setLength(Number(e.target.value))}
+                  style={{ ["--fill" as string]: sliderFill }}
+                  aria-label="Length"
+                />
+                <div className="chiprow" role="group" aria-label="Length presets">
+                  {LENGTH_PRESETS.map((p) => (
+                    <button
+                      type="button"
+                      key={p.s}
+                      className={`pchip ${length === p.s ? "on" : ""}`}
+                      onClick={() => setLength(p.s)}
+                    >
+                      {p.label}
                     </button>
                   ))}
                 </div>
@@ -378,7 +391,7 @@ export default function NewVideo() {
 
             <section className="fsec">
               <header>
-                <span className="no">04</span>
+                <span className="no">05</span>
                 <h2>Finishes</h2>
                 <span className="fhint">changeable until the final render</span>
               </header>
@@ -414,19 +427,11 @@ export default function NewVideo() {
 
             <section className="fsec">
               <header>
-                <span className="no">05</span>
-                <h2>Style &amp; canon</h2>
+                <span className="no">06</span>
+                <h2>Canon &amp; reference</h2>
                 <span className="fhint">optional</span>
               </header>
               <div className="field">
-                <label htmlFor="style">Visual style</label>
-                <input
-                  id="style"
-                  name="style"
-                  placeholder="ex. photorealistic, golden hour, 35mm"
-                />
-              </div>
-              <div className="field" style={{ marginTop: 16 }}>
                 <label htmlFor="lore">Lore / canon context</label>
                 <textarea
                   id="lore"
@@ -460,34 +465,103 @@ export default function NewVideo() {
                 </p>
               </div>
             </section>
-
-            {state && (
-              <p className={`formmsg ${state.ok ? "ok" : "err"}`} style={{ marginTop: 24 }}>
-                {state.message}
-              </p>
-            )}
-
-            <div className="fsubmit">
-              {/* The only way to start a film. Explicitly type="submit" —
-                  it is the default, but the form deliberately blocks Enter
-                  above, so the one control that IS meant to submit should
-                  say so where a reader will see it. */}
-              <button
-                type="submit"
-                className="btn gold"
-                disabled={pending}
-                style={{ padding: "12px 26px" }}
-              >
-                {pending ? "Starting…" : "Start production"}
-              </button>
-            </div>
           </div>
 
-          {/* Reserved for the illustrated stickers. Empty on purpose — it
-              holds the form's centre line, so adding the art later won't
-              shift a layout the producer has already learned. */}
-          <aside className="briefart" aria-hidden="true">
-            <GenreSpiral />
+          {/* ---- the rail: estimate (with the submit), pole, next steps.
+               Inside the <form>, so the submit button below still submits. */}
+          <aside className="rail">
+            <div className="nb-est">
+              <span className="dpill">
+                <i />
+                Estimate · fills in as you type
+              </span>
+              <div
+                className={`sprev ${name ? "" : "blank"} ${tt.className}`}
+                style={tt.uppercase ? { textTransform: "uppercase" } : undefined}
+              >
+                {name || "Untitled film"}
+              </div>
+              <p className="blurb">
+                {tone.toLowerCase()} · {pace.toLowerCase()} pace ·{" "}
+                {(VOICE_LABELS[catMeta.voiceMode] ?? catMeta.voiceMode).toLowerCase()},{" "}
+                in {languageName}. The title above is set in the exact typeface
+                your film&apos;s titles will use for this tone.
+              </p>
+              <dl className="rows">
+                <div>
+                  <dt>Category</dt>
+                  <dd>
+                    {catMeta.categoryLabel}
+                    {!catMeta.ready && " · in development"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Finished length</dt>
+                  <dd>
+                    {lengthLabel} · {scenes} scene{scenes === 1 ? "" : "s"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Narration</dt>
+                  <dd>≈ {words.toLocaleString()} words</dd>
+                </div>
+                <div>
+                  <dt>Chapters</dt>
+                  <dd>{chapters}</dd>
+                </div>
+                <div>
+                  <dt>Format</dt>
+                  <dd>{aspect === "9:16" ? "9:16 vertical" : "16:9 horizontal"}</dd>
+                </div>
+                <div>
+                  <dt>Finishes</dt>
+                  <dd className={finishList ? "" : "off"}>{finishList || "None — bare cut"}</dd>
+                </div>
+                <div>
+                  <dt>Approval gates</dt>
+                  <dd>
+                    {gates} — script, images{silent ? "" : ", voices"}, clips
+                  </dd>
+                </div>
+              </dl>
+
+              {state && (
+                <p className={`formmsg ${state.ok ? "ok" : "err"}`}>{state.message}</p>
+              )}
+
+              {/* The only way to start a film. Explicitly type="submit" — the
+                  form deliberately blocks Enter, so the one control that IS
+                  meant to submit should say so where a reader will see it. */}
+              <button type="submit" className="go" disabled={pending}>
+                {pending ? "Starting…" : "Start production"}
+              </button>
+              <span className="csnote">
+                You approve the script before a single frame is rendered.
+              </span>
+            </div>
+
+            <div className="railpole" aria-hidden="true">
+              <GenreSpiral />
+              <span className="polecap">Every look it can make</span>
+            </div>
+
+            <div className="nb-next">
+              <span className="klabel">What happens next</span>
+              {[
+                { t: "The script arrives", b: "Chapters, then narration, then a scene plan." },
+                { t: "You approve it", b: "Edit anything before a frame is made." },
+                { t: "Scenes render", b: "Images, voices and motion, gate by gate." },
+                { t: "The cut lands", b: "Stitched, graded and ready on the project page." },
+              ].map((s) => (
+                <div className="step" key={s.t}>
+                  <i />
+                  <div>
+                    <b>{s.t}</b>
+                    <p>{s.b}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </aside>
         </div>
       </form>

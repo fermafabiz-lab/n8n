@@ -584,8 +584,11 @@ async function upsert2(client, table, rows) {
   if (!rows.length) return;
   const cols = Object.keys(rows[0]);
   const params = cols.map((_, i) => `$${i + 1}`).join(", ");
+  // (scene_id, field, path), not (path): a file may be both a scene's live
+  // asset and a saved draft of it, so path alone stopped being unique when
+  // drafts landed (db/003). The global unique this used to target is gone.
   const sql = `insert into hov.${table} (${cols.join(", ")}) values (${params})
-               on conflict (path) do nothing`;
+               on conflict (scene_id, field, path) do nothing`;
   for (const row of rows) await client.query(sql, cols.map((c) => row[c]));
   stats.written[table] = (stats.written[table] ?? 0) + rows.length;
 }

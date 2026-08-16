@@ -117,7 +117,14 @@ body {
     Roboto, sans-serif;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
+  /* `clip`, not `hidden`. Both stop sideways scrolling, but `hidden` can make
+     the body a scroll container, and a scroll container is what any sticky or
+     fixed descendant ends up measuring itself against instead of the viewport.
+     Browsers disagree about whether body's overflow propagates to the viewport
+     first, which is exactly the kind of disagreement that produces "the bar
+     stays for you and moves for me". `clip` is never a scroll container, so
+     there is nothing to disagree about. */
+  overflow-x: clip;
 }
 
 /* Small tracked label — the structural device this direction runs on. Pairs a
@@ -196,26 +203,7 @@ select:focus-visible {
    against a 1560px max-width. */
 .page.nb {
   max-width: none;
-  /* Gives back the 72px the nav occupied in flow before it went fixed below
-     (16px of top padding + a 56px pill), so the shell starts on exactly the
-     line it did when the bar was sticky. */
-  padding: 72px 20px 0;
-}
-/* The bar is FIXED on this page, not sticky.
-   Sticky was already holding in Chromium, but `body` carries
-   overflow-x: hidden — which makes the body a scroll container, and a scroll
-   container is what a sticky child measures itself against. Firefox honours
-   that strictly and drops the bar as the page scrolls; Chromium papers over
-   it. position:fixed is measured against the viewport and cannot be affected
-   by an ancestor's overflow at all, so the bar stays put in every browser.
-   Scoped to this page deliberately: the other screens still lay out around a
-   nav that occupies flow, and switching them would shift each of them up by
-   72px unseen. */
-body:has(.nb) .nav {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
+  padding: 0 20px;
 }
 
 /* The brief supplies its own ground: the shell starts right under the nav and
@@ -319,13 +307,27 @@ body:has(.nb) .navfade {
   );
 }
 
+/* The bar is FIXED, on every page, and unconditionally.
+   It was sticky, which measured itself against the nearest scroll container
+   rather than the viewport — see the note on body's overflow above. The first
+   attempt at this fixed it only on the brief, via `body:has(.nb) .nav`; that
+   made the bar behave differently on one page than the others for no reason a
+   reader could see, and it depends on the selector matching, which is one more
+   thing that can quietly not happen. Fixed everywhere is simpler and has no
+   condition to fail.
+   Every page's <main> carries .page, which pays back the 72px the bar used to
+   occupy in flow (16px padding + a 56px pill), so nothing moved. The landing
+   is the exception and needs nothing: it hides the app bar entirely and
+   carries its own. */
 /* nav */
 /* Floating pill rather than a full-width bar with a rule under it. The bar
    drew a hard line across the page and cut the bloom in half; detached, the
    light runs behind it. */
 .nav {
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
   z-index: 100;
   padding: 16px 20px 0;
   background: transparent;
@@ -377,7 +379,9 @@ body:has(.nb) .navfade {
 .page {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0 28px;
+  /* 72px of top padding replaces the height the fixed bar no longer occupies
+     in flow: 16px of nav padding plus its 56px pill. */
+  padding: 72px 28px 0;
   position: relative;
   z-index: 1;
 }

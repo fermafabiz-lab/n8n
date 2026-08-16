@@ -3917,3 +3917,344 @@ body:has(.mkt) .vignette {
     padding: 24px 20px 26px;
   }
 }
+
+
+/* ============================================================
+   Projects — the library and control room.
+   Hero and stat strip live inside one rounded shell with the lit
+   arc clipped into it; the library below is the existing grid,
+   restyled. Same shell language as the brief, so the two screens
+   read as one app.
+   ============================================================ */
+.page.pj {
+  max-width: 1400px;
+  padding: 0 20px;
+}
+.pj-shell {
+  position: relative;
+  margin-top: 10px;
+  border-radius: var(--r-shell);
+  background: var(--shell);
+  /* clip, not hidden — hidden makes this a scroll container and the library's
+     sticky toolbar below would stop pinning. Same trap as the brief. */
+  overflow: hidden;
+  overflow: clip;
+}
+.pj-shell .arc {
+  position: absolute;
+  right: -400px;
+  top: -380px;
+  width: 800px;
+  height: 860px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(
+    closest-side,
+    rgba(20, 18, 28, 0) 0 54%,
+    rgba(77, 52, 132, 0.8) 64%,
+    var(--accent) 77%,
+    var(--accent-lift) 87%,
+    rgba(20, 18, 28, 0.24) 94%,
+    rgba(20, 18, 28, 0) 100%
+  );
+  filter: blur(20px);
+  opacity: 0.8;
+  animation: arcdrift 26s ease-in-out infinite;
+}
+.pj-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 372px;
+  gap: 44px;
+  padding: 44px 44px 40px;
+}
+.pj-welcome {
+  display: flex;
+  flex-direction: column;
+}
+.pj-welcome h1 {
+  margin: 0;
+  font-family: var(--f-display), var(--f-ui), sans-serif;
+  font-size: clamp(46px, 6vw, 78px);
+  font-weight: 500;
+  letter-spacing: -0.045em;
+  line-height: 0.98;
+  color: var(--ink);
+}
+/* The second line is the same face at 300 — a weight change, not a face
+   change, which is what keeps the pair reading as one voice. */
+.pj-welcome .lead {
+  margin: 14px 0 0;
+  font-family: var(--f-display), var(--f-ui), sans-serif;
+  font-size: clamp(24px, 2.6vw, 34px);
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  line-height: 1.14;
+  color: var(--soft);
+  text-wrap: pretty;
+}
+.pj-welcome .sub {
+  margin: 20px 0 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--soft);
+  max-width: 460px;
+  text-wrap: pretty;
+}
+.pj-gap {
+  flex: 1;
+  min-height: 26px;
+}
+.pj-ctas {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.pj-cta,
+.pj-ghost {
+  font-family: inherit;
+  font-size: 15px;
+  white-space: nowrap;
+  border-radius: var(--r-pill);
+  padding: 16px 32px;
+  cursor: pointer;
+  transition: var(--tr);
+  display: inline-block;
+  text-align: center;
+}
+.pj-cta {
+  color: var(--panel-ink);
+  background: var(--near-black);
+  border: none;
+  box-shadow: var(--shadow-btn);
+}
+.pj-ghost {
+  color: var(--ink);
+  background: var(--card2);
+  border: 1px solid rgba(24, 20, 40, 0.09);
+  padding: 13px 22px;
+  font-size: 13.5px;
+  box-shadow: var(--shadow-sm);
+}
+.pj-cta:hover {
+  transform: translateY(-3px);
+}
+.pj-ghost:hover {
+  transform: translateY(-2px);
+}
+
+/* The live panel — the one dark surface on this screen, so it reads as the
+   thing that is actually happening while everything else is a record. */
+/* Takes its own height rather than stretching to the hero's. The design draws
+   it with three live films, which fills the column; with one it stretched and
+   left a band of empty dark panel that read as something failing to load. */
+.pj-live {
+  align-self: start;
+  border-radius: var(--r-lg);
+  padding: 20px 22px 22px;
+  display: flex;
+  flex-direction: column;
+  background: radial-gradient(130% 100% at 100% 0%, var(--accent-deep) 0%, #1a1a1f 52%, #0f0f12 100%);
+  box-shadow: var(--shadow-lg);
+}
+.pj-live .lhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pj-live .lhead .k {
+  font-family: var(--f-mono), ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent-lift);
+}
+.pj-live .lhead .auto {
+  font-family: var(--f-mono), ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  color: var(--panel-body);
+}
+.pj-live .lrow {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 13px 0;
+  border-top: 1px solid var(--panel-line);
+  margin-top: 13px;
+}
+.pj-live .lrow + .lrow {
+  margin-top: 0;
+}
+.pj-live .ltop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pj-live .lname {
+  font-size: 13.5px;
+  color: var(--panel-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pj-live .lpct {
+  font-family: var(--f-mono), ui-monospace, Menlo, monospace;
+  font-size: 11.5px;
+  color: var(--accent-lift);
+  flex: none;
+}
+.pj-live .lbar {
+  position: relative;
+  display: block;
+  height: 3px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+.pj-live .lbar i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, rgba(178, 153, 231, 0.7), var(--accent-lift));
+  display: block;
+}
+/* The sweep is the only thing on the page that says "this is moving right
+   now" without a number changing. It is decoration, so the global
+   reduced-motion rule stopping it costs nothing. */
+.pj-live .lbar i.sheen {
+  width: 18%;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0));
+  animation: pjsweep 5s linear infinite;
+}
+@keyframes pjsweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}
+.pj-live .lstep {
+  font-family: var(--f-mono), ui-monospace, Menlo, monospace;
+  font-size: 10.5px;
+  color: var(--panel-body);
+}
+.pj-live .lnote {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--panel-body);
+  padding-top: 12px;
+  margin-top: 13px;
+  border-top: 1px solid var(--panel-line);
+  text-wrap: pretty;
+}
+.pj-live .lnote.lempty {
+  margin-top: 16px;
+  border-top: none;
+  padding-top: 0;
+}
+
+/* Stat strip — inside the shell, divided by hairlines rather than boxed. */
+.page.pj .stats {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  border-top: 1px solid rgba(24, 20, 40, 0.08);
+  gap: 0;
+  margin: 0;
+}
+.page.pj .stat {
+  padding: 22px 24px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: none;
+  border-right: 1px solid rgba(24, 20, 40, 0.08);
+  background: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+.page.pj .stat:last-child {
+  border-right: none;
+}
+.page.pj .stat small {
+  font-family: var(--f-mono), ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.page.pj .stat b {
+  font-family: var(--f-display), var(--f-ui), sans-serif;
+  font-size: 42px;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--ink);
+}
+.page.pj .stat b.zero {
+  color: var(--faint);
+}
+.page.pj .stat .note {
+  font-size: 12.5px;
+  color: var(--dim);
+}
+
+.pj-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 26px 12px 60px;
+  font-size: 13.5px;
+  color: var(--dim);
+}
+
+/* --- the library toolbar, now a frosted sticky pill --- */
+.page.pj .eyebrow.prow {
+  position: sticky;
+  top: 10px;
+  z-index: 5;
+  margin-top: 18px;
+  margin-bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 18px;
+  border-radius: var(--r-pill);
+  border-bottom: none;
+  background: rgba(252, 252, 253, 0.92);
+  backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: var(--shadow-sm);
+}
+.page.pj .ftab {
+  border-radius: var(--r-pill);
+  padding: 8px 14px;
+  font-size: 13.5px;
+  letter-spacing: 0;
+  text-transform: none;
+  border: none;
+}
+.page.pj .ftab.on {
+  background: var(--accent-a12);
+  color: var(--ink);
+}
+.page.pj .projects {
+  margin-top: 18px;
+}
+
+@media (max-width: 1080px) {
+  .pj-hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+    padding: 32px 24px 30px;
+  }
+  .page.pj .stat {
+    padding: 18px 20px 20px;
+  }
+}

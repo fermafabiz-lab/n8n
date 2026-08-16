@@ -3,6 +3,7 @@ import AutoRefresh from "@/components/AutoRefresh";
 import OpsPanel from "@/components/OpsPanel";
 import StageChime from "@/components/StageChime";
 import ProjectsGrid from "@/components/ProjectsGrid";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -49,8 +50,16 @@ export default async function Dashboard() {
           ? "Everything is running on its own."
           : "All quiet on the production floor.";
 
+  /**
+   * "On the floor now" — the live panel. Real running projects, newest first,
+   * capped at three because the panel is a glance, not a list; the toolbar
+   * below is where you go through everything. `progress` is the same 0..1 the
+   * cards use, so the two can never disagree.
+   */
+  const onFloor = projects.filter((p) => p.statusKind === "run").slice(0, 3);
+
   return (
-    <main className="page">
+    <main className="page pj">
       <AutoRefresh seconds={15} />
       <StageChime
         items={projects.map((p) => ({
@@ -65,17 +74,101 @@ export default async function Dashboard() {
                   : "working",
         }))}
       />
-      <div className="hero">
-        {/* The em is a block in CSS — the serif line breaks itself. */}
-        <h1>
-          Welcome back.
-          <em>{heroLine}</em>
-        </h1>
-        <p>
-          {waiting.length > 0
-            ? "Open a project below to review and approve. Everything else keeps moving without you."
-            : "Start a new video or check on a finished one."}
-        </p>
+      <div className="pj-shell">
+        <div className="arc" aria-hidden="true" />
+
+        <div className="pj-hero">
+          <div className="pj-welcome">
+            <h1>Welcome back.</h1>
+            <p className="lead">{heroLine}</p>
+            <p className="sub">
+              {waiting.length > 0
+                ? "Open a project below to review and approve. Everything else keeps moving without you."
+                : "Start a new video or check on a finished one."}
+            </p>
+            <span className="pj-gap" />
+            <div className="pj-ctas">
+              <Link href="/new" className="pj-cta">
+                Start a video
+              </Link>
+              {/* Deep-links the library's own filter rather than being a
+                  second, separate view of the same thing. */}
+              <Link href="/projects?filter=wait" className="pj-ghost">
+                Everything waiting on me
+              </Link>
+            </div>
+          </div>
+
+          <aside className="pj-live">
+            <span className="lhead">
+              <span className="k">On the floor now</span>
+              <span className="auto">auto 15s</span>
+            </span>
+            {onFloor.length === 0 ? (
+              <span className="lnote lempty">
+                Nothing is rendering right now. Start a video and it will show
+                up here while it runs.
+              </span>
+            ) : (
+              onFloor.map((p) => (
+                <div className="lrow" key={p.id}>
+                  <span className="ltop">
+                    <span className="lname">{short(p.name, 34)}</span>
+                    <span className="lpct">{Math.round(p.progress * 100)}%</span>
+                  </span>
+                  <span className="lbar">
+                    <i style={{ width: `${Math.round(p.progress * 100)}%` }} />
+                    <i className="sheen" />
+                  </span>
+                  <span className="lstep">{p.status}</span>
+                </div>
+              ))
+            )}
+            <span className="lnote">
+              {waiting.length > 0
+                ? `${waiting.length} ${waiting.length === 1 ? "film needs" : "films need"} your review. The rest keeps moving while this tab is closed.`
+                : "Nothing here needs you. The queue keeps moving while this tab is closed."}
+            </span>
+          </aside>
+        </div>
+
+        <div className="stats">
+          <div className="stat">
+            <small>In production</small>
+            <b>{running}</b>
+            <span className="note">
+              {running > 0 ? "moving without you" : "nothing running"}
+            </span>
+          </div>
+          <div className="stat">
+            <small>Awaiting your review</small>
+            {/* A zero here is good news, so it is set in the muted ink rather
+                than full weight — the eye should not stop on it. */}
+            <b className={waiting.length === 0 ? "zero" : ""}>{waiting.length}</b>
+            <span className="note">
+              {waiting.length === 0 ? "nothing is blocked on you" : "waiting on a decision"}
+            </span>
+          </div>
+          <div className="stat">
+            <small>Finished</small>
+            <b className={finished === 0 ? "zero" : ""}>{finished}</b>
+            <span className="note">delivered</span>
+          </div>
+          {extraTiles.map((t) => (
+            <div className="stat" key={t.label}>
+              <small>{t.label}</small>
+              <b className={t.n === 0 ? "zero" : ""}>{t.n}</b>
+              <span className="note">
+                {t.label === "Needs a fix" ? "stopped mid-run" : "status unrecognised"}
+              </span>
+            </div>
+          ))}
+          <div className="stat">
+            <small>Total projects</small>
+            <b>{projects.length}</b>
+            <span className="note">all time</span>
+          </div>
+        </div>
       </div>
 
       {!isConfigured && (
@@ -85,31 +178,6 @@ export default async function Dashboard() {
           production base — the page will switch over automatically.
         </div>
       )}
-
-      <div className="stats">
-        <div className="stat">
-          <small>In production</small>
-          <b>{running}</b>
-        </div>
-        <div className="stat">
-          <small>Awaiting your review</small>
-          <b>{waiting.length}</b>
-        </div>
-        <div className="stat">
-          <small>Finished</small>
-          <b>{finished}</b>
-        </div>
-        {extraTiles.map((t) => (
-          <div className="stat" key={t.label}>
-            <small>{t.label}</small>
-            <b>{t.n}</b>
-          </div>
-        ))}
-        <div className="stat">
-          <small>Total projects</small>
-          <b>{projects.length}</b>
-        </div>
-      </div>
 
       <OpsPanel />
 
@@ -127,6 +195,16 @@ export default async function Dashboard() {
       ) : (
         <ProjectsGrid projects={projects} />
       )}
+
+      <footer className="pj-foot">
+        <span className="brandline">
+          <span className="bmark" aria-hidden="true" />
+          House of Videos
+        </span>
+        <span>
+          {projects.length} {projects.length === 1 ? "project" : "projects"} · one house
+        </span>
+      </footer>
     </main>
   );
 }

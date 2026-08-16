@@ -1857,28 +1857,40 @@ select:focus-visible {
   flex-wrap: wrap;
   gap: 8px;
 }
+/* Sentence case in the UI face, not tracked mono uppercase. These carry real
+   words a producer reads and compares — "Contemplative" against "Documentary"
+   — and all-caps mono at 10.5px turns a vocabulary into a row of labels. The
+   tracked mono is kept for the eyebrows and meta lines, which is structure
+   rather than choice. */
 .pchip {
-  background: none;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 7px 14px;
+  background: var(--card2);
+  border: 1px solid rgba(24, 20, 40, 0.07);
+  border-radius: var(--r-pill);
+  padding: 10px 17px;
   cursor: pointer;
-  font-family: var(--f-mono), ui-monospace, Menlo, monospace;
-  font-size: 10.5px;
-  font-weight: 500;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
   color: var(--soft);
-  transition: all 0.15s;
+  box-shadow: var(--shadow-sm);
+  transition: var(--tr);
+}
+.pchip:hover {
+  transform: translateY(-2px);
+  color: var(--ink);
 }
 .pchip:hover {
   border-color: var(--line2);
   color: var(--ink);
 }
 .pchip.on {
-  border-color: rgba(122, 79, 214, 0.55);
-  background: var(--accent-a08);
-  color: var(--accent-deep);
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #f7f7f8;
+  box-shadow: var(--accent-cast);
 }
 
 /* --- the brief's title screen ---
@@ -1959,20 +1971,15 @@ select:focus-visible {
    exists now so adding them later doesn't move anything. */
 .brief {
   display: grid;
-  /* The handoff's Start screen: the form's numbered cards on the left, a
-     sticky 396px rail on the right holding the estimate panel (which now
-     carries the live preview AND the submit), the genre pole, and the
-     what-happens-next card. The old layout was preview | one-card form |
-     empty art gutter. */
-  grid-template-columns: minmax(0, 1fr) 396px;
-  max-width: 1150px;
-  margin: 0 auto;
-  gap: 26px;
+  /* Form cards left, the estimate rail right. The rail is short now — the
+     genre pole and the next-steps card were removed — which is what lets it
+     actually STICK: a rail taller than the viewport scrolls with the page no
+     matter what position:sticky says. */
+  grid-template-columns: minmax(0, 1fr) 400px;
+  gap: 24px;
   align-items: start;
-  padding-bottom: 90px;
+  padding: 0 34px 40px;
 }
-/* The form column is a STACK of cards now, one per section, so the wrapper
-   itself goes transparent — the surface moved down a level. */
 .brief .form {
   max-width: none;
   padding: 0;
@@ -1984,16 +1991,50 @@ select:focus-visible {
   display: flex;
   flex-direction: column;
 }
-/* Each numbered section is its own cushioned card, per the handoff. */
+/* Each numbered section is its own cushioned card. The lift on hover is the
+   "floaty" of the whole screen: nothing is nailed down, everything answers
+   the pointer a little. */
 .brief .form > .fsec {
-  margin-top: 14px;
+  margin-top: 16px;
   background: var(--card-fill);
-  border-radius: var(--r-lg);
+  border-radius: 28px;
   box-shadow: var(--shadow);
-  padding: 24px 28px 28px;
+  padding: 30px 34px 34px;
+  transition: var(--tr);
+}
+.brief .form > .fsec:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
 }
 .brief .form > .fsec > header {
-  border-bottom: 1px solid var(--line-soft);
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: 20px;
+  align-items: baseline;
+}
+.brief .form > .fsec > header h2 {
+  font-size: 25px;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+}
+/* The index moves to the far right and wears parentheses, as drawn. It is
+   ordinal, not a step you act on, so it sits out of the reading path. */
+.brief .form > .fsec > header .no {
+  order: 3;
+  margin-left: auto;
+  font-family: var(--f-display), var(--f-ui), sans-serif;
+  font-size: 14px;
+  letter-spacing: 0;
+  color: var(--faint);
+}
+.brief .form > .fsec > header .no::before {
+  content: "(";
+}
+.brief .form > .fsec > header .no::after {
+  content: ")";
+}
+.brief .form > .fsec > header .fhint {
+  margin-left: 0;
 }
 
 /* --- "you are here" rail at the head of the form --- */
@@ -2721,11 +2762,20 @@ select:focus-visible {
    ============================================================ */
 .brief .rail {
   position: sticky;
-  top: 96px;
+  /* Clears the app nav's floating pill. */
+  top: 88px;
   display: flex;
   flex-direction: column;
   gap: 14px;
   align-self: start;
+  /* A sticky element taller than the viewport cannot stick — it scrolls with
+     the page and only pins once its bottom arrives, which reads as the panel
+     "not following". The estimate is short enough today, but its rows grow
+     with the finishes list, so bound it and let the panel scroll inside
+     itself rather than silently losing its stickiness. */
+  max-height: calc(100vh - 104px);
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 .nb-est {
   border-radius: var(--r-lg);
@@ -2851,89 +2901,6 @@ select:focus-visible {
 }
 .nb-est .formmsg.err {
   color: #f5a8a2;
-}
-
-/* The genre pole, re-homed from the old right-hand gutter into the rail.
-   No panel behind it, masked fades top and bottom — the handoff's spec and
-   the old .gspiral treatment agree on this. The pole's own geometry lives in
-   GenreSpiral.tsx and is untouched; only its anchor changes: the old track
-   pinned it to the page edge, here it is centred in a 396px rail. */
-.railpole {
-  position: relative;
-  height: 560px;
-  overflow: hidden;
-}
-.railpole .gspiral {
-  left: 50%;
-  right: auto;
-  transform: translateX(-50%);
-  width: 300px;
-}
-.railpole .polecap {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: 6px;
-  z-index: 4;
-  white-space: nowrap;
-  font-family: var(--f-mono), ui-monospace, Menlo, monospace;
-  font-size: 10.5px;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: #3b3b45;
-  background: rgba(252, 252, 253, 0.72);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  border-radius: var(--r-pill);
-  padding: 7px 15px;
-  box-shadow: var(--shadow-sm);
-}
-
-/* What happens next — dot-led steps, first dot accent. */
-.nb-next {
-  border-radius: var(--r-lg);
-  background: var(--card-fill);
-  box-shadow: var(--shadow-sm);
-  padding: 20px 22px 22px;
-  display: flex;
-  flex-direction: column;
-  gap: 13px;
-}
-.nb-next .klabel {
-  font-family: var(--f-mono), ui-monospace, Menlo, monospace;
-  font-size: 10.5px;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--dim);
-}
-.nb-next .step {
-  display: flex;
-  gap: 11px;
-  align-items: flex-start;
-}
-.nb-next .step i {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  margin-top: 6px;
-  flex: none;
-  display: block;
-  background: rgba(24, 20, 40, 0.18);
-}
-.nb-next .step:first-of-type i {
-  background: var(--accent);
-}
-.nb-next .step b {
-  display: block;
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--ink);
-}
-.nb-next .step p {
-  margin: 2px 0 0;
-  font-size: 12.5px;
-  color: var(--dim);
-  line-height: 1.45;
 }
 
 /* Dashed suggestion chips under the subject field. */
@@ -3778,5 +3745,232 @@ body:has(.mkt) .vignette {
   }
   .mkt-nav .links {
     display: none;
+  }
+}
+
+
+/* ============================================================
+   The brief's shell, header and voice-mode cards — the handoff's
+   Start screen. Everything floats: the shell holds the light, the
+   cards lift to the pointer, nothing is boxed in by a border.
+   ============================================================ */
+.nb-shell {
+  position: relative;
+  max-width: 1240px;
+  margin: 10px auto 0;
+  border-radius: var(--r-shell);
+  background: var(--shell);
+  /* `clip`, NOT `hidden` — and this is load-bearing, not a preference.
+     overflow:hidden makes an element a scroll container, and a scroll
+     container is what position:sticky measures itself against; the estimate
+     rail inside then sticks to a box that is itself scrolling away, so it
+     rides up the page and vanishes. Caught on a screenshot: the rail was
+     simply absent halfway down the form. overflow:clip clips identically —
+     border-radius included — without creating that scroll container, so the
+     rail sticks to the viewport as intended.
+     `hidden` is declared first as the fallback for anything too old to know
+     `clip`: there it keeps the arc inside the rounded shell and loses only
+     the stickiness. */
+  overflow: hidden;
+  overflow: clip;
+}
+/* The lit arc, clipped by the shell exactly as on the landing — which is the
+   condition that lets it run at the handoff's own blur and still read as
+   light rather than as a drawn ring. */
+.nb-shell .arc {
+  position: absolute;
+  right: -430px;
+  top: -330px;
+  width: 860px;
+  height: 900px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(
+    closest-side,
+    rgba(20, 18, 28, 0) 0 54%,
+    rgba(77, 52, 132, 0.85) 64%,
+    var(--accent) 77%,
+    var(--accent-lift) 87%,
+    rgba(20, 18, 28, 0.26) 94%,
+    rgba(20, 18, 28, 0) 100%
+  );
+  filter: blur(20px);
+  opacity: 0.85;
+  animation: arcdrift 24s ease-in-out infinite;
+}
+.nb-head {
+  position: relative;
+  padding: 44px 34px 6px;
+  max-width: 620px;
+}
+.nb-head h1 {
+  margin: 20px 0 0;
+  font-family: var(--f-display), var(--f-ui), sans-serif;
+  font-size: clamp(38px, 5vw, 62px);
+  line-height: 1;
+  font-weight: 500;
+  letter-spacing: -0.045em;
+  color: var(--ink);
+}
+.nb-head p {
+  margin: 16px 0 0;
+  font-size: 15.5px;
+  line-height: 1.6;
+  color: var(--soft);
+  max-width: 480px;
+  text-wrap: pretty;
+}
+.nb-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #fdfdfe;
+  color: var(--accent);
+  border-radius: var(--r-pill);
+  padding: 7px 16px;
+  font-size: 13.5px;
+  box-shadow: var(--shadow-sm);
+}
+.nb-pill i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: block;
+}
+
+/* The subject field: a real textarea, as drawn, with the inset that makes it
+   read as somewhere to write rather than somewhere to read. */
+.nb-ta {
+  width: 100%;
+  box-sizing: border-box;
+  resize: none;
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink);
+  background: var(--card2);
+  border: 1px solid rgba(24, 20, 40, 0.09);
+  border-radius: 16px;
+  padding: 14px 16px;
+  box-shadow: inset 0 1px 2px rgba(24, 20, 40, 0.05);
+  transition: var(--tr);
+}
+.nb-ta:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: inset 0 1px 2px rgba(24, 20, 40, 0.05), 0 0 0 3px var(--accent-a12);
+}
+.nb-ta::placeholder {
+  color: var(--disabled);
+}
+
+/* Selectable cards with a waveform, the shape the handoff gives the voice
+   choice. Reused for the multi-voice MODE, so the two decisions that shape
+   the soundtrack are made with the same control instead of one being a
+   dropdown hidden among the option rows. */
+.optcards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+.optcard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 16px 16px 18px;
+  border-radius: 18px;
+  transition: var(--tr);
+  background: var(--card2);
+  border: 1px solid rgba(24, 20, 40, 0.07);
+  box-shadow: var(--shadow-sm);
+}
+.optcard:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow);
+}
+.optcard.on {
+  background: linear-gradient(160deg, var(--accent-deep), #14141a);
+  border-color: transparent;
+  box-shadow: var(--shadow-lg);
+}
+/* The waveform is drawn, not an asset: repeating bars masked to fade out to
+   the right, so it reads as a take running past the edge of the card. */
+.optcard .wave {
+  display: block;
+  width: 100%;
+  height: 30px;
+  border-radius: 6px;
+  background: repeating-linear-gradient(90deg, var(--accent-a28) 0 2px, transparent 2px 7px);
+  opacity: 0.55;
+  -webkit-mask-image: linear-gradient(90deg, #000 0 55%, transparent 100%);
+  mask-image: linear-gradient(90deg, #000 0 55%, transparent 100%);
+}
+.optcard.on .wave {
+  background: repeating-linear-gradient(90deg, var(--accent-lift) 0 2px, transparent 2px 7px);
+  opacity: 0.9;
+}
+.optcard b {
+  font-family: var(--f-display), var(--f-ui), sans-serif;
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.optcard.on b {
+  color: var(--panel-ink);
+}
+.optcard span {
+  font-size: 12.5px;
+  color: var(--dim);
+  line-height: 1.4;
+}
+.optcard.on span {
+  color: var(--panel-body);
+}
+.optcard:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.optcard:disabled:hover {
+  transform: none;
+}
+
+.nb-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 26px 12px 44px;
+  max-width: 1240px;
+  margin: 0 auto;
+  font-size: 13.5px;
+  color: var(--dim);
+}
+
+@media (max-width: 980px) {
+  .brief {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 0 18px 32px;
+  }
+  /* The rail stops sticking and lands at the end, where a form's submit
+     belongs on a phone. */
+  .brief .rail {
+    position: static;
+  }
+  .nb-head {
+    padding: 32px 18px 0;
+  }
+  .nb-shell .arc {
+    right: -520px;
+    top: -420px;
+    opacity: 0.5;
+  }
+  .brief .form > .fsec {
+    padding: 24px 20px 26px;
   }
 }

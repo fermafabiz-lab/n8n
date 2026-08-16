@@ -196,7 +196,26 @@ select:focus-visible {
    against a 1560px max-width. */
 .page.nb {
   max-width: none;
-  padding: 0 20px;
+  /* Gives back the 72px the nav occupied in flow before it went fixed below
+     (16px of top padding + a 56px pill), so the shell starts on exactly the
+     line it did when the bar was sticky. */
+  padding: 72px 20px 0;
+}
+/* The bar is FIXED on this page, not sticky.
+   Sticky was already holding in Chromium, but `body` carries
+   overflow-x: hidden — which makes the body a scroll container, and a scroll
+   container is what a sticky child measures itself against. Firefox honours
+   that strictly and drops the bar as the page scrolls; Chromium papers over
+   it. position:fixed is measured against the viewport and cannot be affected
+   by an ancestor's overflow at all, so the bar stays put in every browser.
+   Scoped to this page deliberately: the other screens still lay out around a
+   nav that occupies flow, and switching them would shift each of them up by
+   72px unseen. */
+body:has(.nb) .nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
 }
 
 /* The brief supplies its own ground: the shell starts right under the nav and

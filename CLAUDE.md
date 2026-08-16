@@ -2024,6 +2024,35 @@ Thirteen `search` nodes, four distinct filters between them:
 | `{Status General}='Finalizat'` | `fields->>'Status General' = 'Finalizat'` |
 | `OR({Status Producție Scenă}='A', …='B')` | `fields->>'Status Producție Scenă' in ('A','B')` |
 
+### The second cutover held — 2026-08-16, ~15:20 UTC
+
+A full film ran end to end on Postgres with nothing left of Airtable in the
+path: Orchestrator → Scripting → Media Generation → Final Assembly, four
+executions, all green, twenty minutes. *A race between a snail and a turtle*,
+32s, 5 scenes, 2 chapters, `Finalizat`, final video written.
+
+What that actually proves, beyond "it works":
+
+- **`/api/media/ingest` carries real generated assets.** Five images and five
+  clips landed in the media store at content-addressed paths and serve over
+  HTTPS. That is the code replacing the one thing Airtable did that a database
+  cannot, and until this film it had only ever been tested by hand.
+- **The shim carries the twenty-one raw-HTTP nodes.** Scripting reads its
+  genre profile and style card through it, and writes evidence through it.
+- **Chapter zero survives.** `ordinal` 0 for HOOK, 1 for the real chapter, and
+  `scene_order` 1/101/102/103/104 — the chapter*100 + scene encoding intact.
+
+**Two bugs only a real film could find**, both mine, both now fixed: the
+twenty-one HTTP nodes the type-filtered port never saw, and a CHECK constraint
+that made chapter zero uncommittable while the import had already nulled 47
+hook markers and reported them as repairs.
+
+**Not yet exercised on Postgres** — these are where the next surprise lives:
+regenerations of image, voice, video and scene text (which is where three of
+the four ingest nodes are), saved drafts through the UI, Resume and
+restart-scripting, multi-voice and cast, a reference image on creation, and any
+film past the batch cap of 8 scenes.
+
 ### The cutover was rolled back — 2026-08-16, 14:40 UTC
 
 **Counting Airtable nodes undercounted the dependency, and the first test film

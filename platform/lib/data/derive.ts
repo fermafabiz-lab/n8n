@@ -601,3 +601,95 @@ export const EXAMPLE_EDITABLE = [
 export type GenrePatch = Partial<Pick<GenreProfile, (typeof GENRE_EDITABLE)[number]>>;
 export type LibraryPatch = Partial<Pick<LibraryScript, (typeof LIBRARY_EDITABLE)[number]>>;
 export type ExamplePatch = Partial<Pick<ScriptExample, (typeof EXAMPLE_EDITABLE)[number]>>;
+
+/**
+ * What filing a draft should change, decided without touching any store.
+ *
+ * The bookkeeping around saved drafts is the fiddly part — de-duplicating
+ * against every prior draft, moving the "previous generation" marker, pruning
+ * the oldest past the cap — and it is identical whichever backend holds the
+ * bytes. Only two things differ per backend: where the file goes, and how a
+ * draft is pointed back at the scene.
+ *
+ * Kept as a pure function so the decision can be reasoned about on its own.
+ * `platform/lib/data.ts` still carries the Airtable original inline; the two
+ * must agree, and this is the copy that runs.
+ */
+export function planVersionSave(opts: {
+  /** The scene's existing `Versiuni Media` entries, raw. */
+  list: Array<Record<string, unknown>>;
+  kind: "image" | "video";
+  /** Stable identity of the live asset — see the note on de-duplication. */
+  key: string;
+  auto: boolean;
+  prompt: string | null;
+  mediaId: string | null;
+  /** For video drafts, which store the link rather than a copy. */
+  url: string | null;
+  nowIso: string;
+  /** Monotonic enough to order drafts; the Airtable original uses Date.now(). */
+  stamp: number;
+}):
+  | { action: "duplicate" }
+  | { action: "marker"; list: Array<Record<string, unknown>> }
+  | {
+      action: "file";
+      list: Array<Record<string, unknown>>;
+      entry: Record<string, unknown>;
+      dropped: number;
+    } {
+  const { list, kind, key, auto } = opts;
+
+  // Already kept. Checked against EVERY draft of this kind, not just the
+  // newest: restoring A then B then A again would otherwise file a second
+  // copy of A each time round.
+  const existing = list.find((e) => e?.kind === kind && e?.key === key);
+  if (existing) {
+    if (!auto) return { action: "duplicate" };
+    // Nothing new to file — but this IS the asset being replaced right now, so
+    // it takes the "Last generation" marker over from whoever held it.
+    // Without this the label goes stale exactly when de-duplication bites:
+    // restore an older draft, regenerate, and the asset just replaced is one
+    // that was already on file.
+    return {
+      action: "marker",
+      list: list.map((e) => (e?.kind === kind ? { ...e, last: e === existing } : e)),
+    };
+  }
+
+  const id = `v${opts.stamp.toString(36)}`;
+  const entry: Record<string, unknown> = {
+    id,
+    kind,
+    key,
+    auto,
+    // Only an automatic keep is a "previous generation": it files the asset a
+    // replacement is about to overwrite. A manual save files the asset that is
+    // still live, so it claims nothing.
+    ...(auto ? { last: true } : {}),
+    prompt: opts.prompt,
+    at: opts.nowIso,
+  };
+  if (kind === "image") {
+    entry.file = `${id}.png`;
+    entry.mediaId = opts.mediaId;
+  } else {
+    entry.url = opts.url;
+  }
+
+  // Oldest-first within the kind, so the cap drops the least useful draft.
+  const next = [
+    ...(auto ? list.map((e) => (e?.kind === kind ? { ...e, last: false } : e)) : list),
+    entry,
+  ];
+  const ofKind = next.filter((e) => e?.kind === kind);
+  const drop = new Set(
+    ofKind.slice(0, Math.max(0, ofKind.length - MAX_VERSIONS_PER_KIND)).map((e) => e.id),
+  );
+  return {
+    action: "file",
+    list: next.filter((e) => !drop.has(e.id)),
+    entry,
+    dropped: drop.size,
+  };
+}

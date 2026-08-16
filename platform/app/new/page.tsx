@@ -3,9 +3,9 @@
 import { useActionState, useState } from "react";
 import { createProject, type ActionResult } from "@/app/actions";
 import CategoryPicker, { type CategoryMeta } from "@/components/CategoryPicker";
+import { DEFAULT_CATEGORY, getCategory } from "@/lib/categories";
 import Toggle from "@/components/Toggle";
 import FormProgress from "@/components/FormProgress";
-import GenreSpiral from "@/components/GenreSpiral";
 import LanguagePicker from "@/components/LanguagePicker";
 import { languageByCode } from "@/lib/languages";
 import { toneType } from "@/lib/tone-type";
@@ -36,6 +36,23 @@ const SUGGESTIONS = [
   "The last lighthouse keepers",
   "How Rome fed a million people",
   "Cities that never woke up",
+];
+
+/**
+ * The "Look" chips. Each one FILLS the free-text style field rather than
+ * replacing it: the chips are the eight looks the prototype draws, but a
+ * producer who wants "35mm, golden hour, handheld" must still be able to
+ * write it, and the posted `style` value stays a plain string either way.
+ */
+const LOOKS = [
+  "Documentary",
+  "Nature",
+  "History",
+  "Coast",
+  "Mountains",
+  "Space",
+  "Cyberpunk",
+  "Horror",
 ];
 
 /** Length presets, in seconds. The slider snaps to 8s — one scene. */
@@ -144,11 +161,16 @@ export default function NewVideo() {
   const [finishes, setFinishes] = useState<Record<string, boolean>>(
     Object.fromEntries(FINISHES.map((f) => [f.name, f.default])),
   );
+  const [style, setStyle] = useState("");
+  // The category selection lives here because BOTH halves of CategoryPicker
+  // read it and they are rendered in different cards.
+  const [category, setCategory] = useState(DEFAULT_CATEGORY);
+  const [catValues, setCatValues] = useState<Record<string, string | boolean>>({});
   const [catMeta, setCatMeta] = useState<CategoryMeta>({
-    category: "story",
-    categoryLabel: "Story",
+    category: DEFAULT_CATEGORY,
+    categoryLabel: getCategory(DEFAULT_CATEGORY).label,
     voiceMode: "off",
-    ready: true,
+    ready: getCategory(DEFAULT_CATEGORY).ready,
   });
 
   const lang = languageByCode(language);
@@ -168,403 +190,429 @@ export default function NewVideo() {
   const sliderFill = `${(Math.min(Math.max(length, 16), 480) - 16) / (480 - 16) * 100}%`;
 
   return (
-    <main className="page">
-      <div className="hero titlescreen">
-        <h1>
-          Start a <em>new video</em>
-        </h1>
-        <p>
-          Fill in the brief and the factory takes it from there. You&apos;ll be
-          asked to review the script, then the images, then the videos.
-        </p>
-        <span className="scrollcue">The brief</span>
-      </div>
+    <main className="page nb">
+      <div className="nb-shell">
+        <div className="arc" aria-hidden="true" />
 
-      <form
-        action={formAction}
-        onKeyDown={(e) => {
-          // Enter in a text field implicitly submits an HTML form, and here
-          // submitting means starting a real production run: a project is
-          // written to the database, scripting starts, model credits are
-          // spent. Pressing Enter after typing the title, or to accept a
-          // voice search, did exactly that. Starting a film should take a
-          // click.
-          //
-          // Only INPUT is blocked, deliberately. A textarea's Enter is a
-          // newline and never submits, and a button's Enter is that button's
-          // own activation — so "Start production" still works from the
-          // keyboard, and so do the tone chips and the finish toggles (all
-          // type="button"). isComposing guards IME entry, where Enter commits
-          // a candidate rather than reaching the form at all.
-          if (
-            e.key === "Enter" &&
-            !e.nativeEvent.isComposing &&
-            (e.target as HTMLElement).tagName === "INPUT"
-          ) {
-            e.preventDefault();
-          }
-        }}
-      >
-        <div className="brief">
-          {/* ---- the form: a stack of numbered cards ---- */}
-          <div className="form">
-            <FormProgress />
-            <section className="fsec">
-              <header>
-                <span className="no">01</span>
-                <h2>What is it about</h2>
-              </header>
-              <div className="field">
-                <input
-                  id="name"
-                  name="name"
-                  className="bigin"
-                  placeholder="History of Germany in WW2"
-                  maxLength={140}
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  autoComplete="off"
-                />
-                <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--dim)" }}>
-                  Keep it short — it becomes the title shown in the video.
-                  Style details go in the Style field, not here.
-                </p>
-                <div className="sugrow" aria-label="Suggestions">
-                  {SUGGESTIONS.map((s) => (
-                    <button type="button" key={s} className="sug" onClick={() => setName(s)}>
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </section>
+        <div className="nb-head">
+          <span className="nb-pill">
+            <i />
+            New project
+          </span>
+          <h1>Start a video</h1>
+          <p>
+            Fill in the brief and the pipeline takes it from there. Everything
+            after this happens without you — until the script and the scenes
+            come back for approval.
+          </p>
+        </div>
 
-            <section className="fsec">
-              <header>
-                <span className="no">02</span>
-                <h2>Format &amp; voices</h2>
-              </header>
-              <div className="field" style={{ marginBottom: 18 }}>
-                <label>Language</label>
-                {/* The film's ONE language control. n8n only ever interpolates
-                    this value into prompts (never compares it), so the English
-                    name is what gets posted — unambiguous to the writer model
-                    — while the list shows the endonym and the ISO code. */}
-                <input type="hidden" name="language" value={languageName} />
-                <LanguagePicker value={language} onChange={setLanguage} />
-                <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--dim)" }}>
-                  The script is written and narrated in this language, and it is
-                  what the voice pickers below are narrowed to.
-                </p>
-              </div>
-              {/* The Language field lives just above, so the value is threaded
-                  down rather than read from the DOM — both voice pickers
-                  narrow to voices that speak it. */}
-              <CategoryPicker onMeta={setCatMeta} language={language} />
-              <div className="field" style={{ marginTop: 18 }}>
-                <label>Format</label>
-                <input type="hidden" name="aspect" value={aspect} />
-                <div className="chiprow" role="group" aria-label="Format" style={{ paddingTop: 6 }}>
-                  <button
-                    type="button"
-                    className={`pchip ${aspect === "16:9" ? "on" : ""}`}
-                    onClick={() => setAspect("16:9")}
-                  >
-                    16:9 horizontal
-                  </button>
-                  <button
-                    type="button"
-                    className={`pchip ${aspect === "9:16" ? "on" : ""}`}
-                    onClick={() => setAspect("9:16")}
-                  >
-                    9:16 vertical
-                  </button>
-                </div>
-              </div>
-            </section>
+        <form
+          action={formAction}
+          onKeyDown={(e) => {
+            // Enter in a text field implicitly submits an HTML form, and here
+            // submitting means starting a real production run: a project is
+            // written to the database, scripting starts, model credits are
+            // spent. Pressing Enter after typing the title, or to accept a
+            // voice search, did exactly that. Starting a film should take a
+            // click.
+            //
+            // Only INPUT is blocked, deliberately. A textarea's Enter is a
+            // newline and never submits, and a button's Enter is that
+            // button's own activation — so "Start production" still works
+            // from the keyboard, and so do every chip and toggle (all
+            // type="button"). isComposing guards IME entry, where Enter
+            // commits a candidate rather than reaching the form at all.
+            if (
+              e.key === "Enter" &&
+              !e.nativeEvent.isComposing &&
+              (e.target as HTMLElement).tagName === "INPUT"
+            ) {
+              e.preventDefault();
+            }
+          }}
+        >
+          <div className="brief">
+            <div className="form">
+              <FormProgress />
 
-            <section className="fsec">
-              <header>
-                <span className="no">03</span>
-                <h2>How it should feel</h2>
-                <span className="fhint">shapes writing · palette · type</span>
-              </header>
-              <div className="field">
-                <label>Tone</label>
-                <input type="hidden" name="tone" value={tone} />
-                <div className="chiprow" role="group" aria-label="Tone">
-                  {TONES.map((t) => (
-                    <button
-                      type="button"
-                      key={t}
-                      className={`pchip ${tone === t ? "on" : ""}`}
-                      onClick={() => setTone(t)}
-                    >
-                      {t}
-                    </button>
-                  ))}
-                </div>
-                <p style={{ margin: "10px 0 0", fontSize: 12, color: "var(--dim)" }}>
-                  Independent of the category: it shapes the writing, the
-                  palette, the music — and the title in the estimate panel is
-                  set in the typeface this tone puts on screen.
-                </p>
-              </div>
-              <div className="field" style={{ marginTop: 16 }}>
-                <label>Pace</label>
-                <input type="hidden" name="pace" value={pace} />
-                <div className="seg" role="group" aria-label="Pace">
-                  {PACES.map((p) => (
-                    <button
-                      type="button"
-                      key={p}
-                      className={pace === p ? "on" : ""}
-                      onClick={() => setPace(p)}
-                    >
-                      {p}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="field" style={{ marginTop: 16 }}>
-                <label htmlFor="style">Visual style</label>
-                <input
-                  id="style"
-                  name="style"
-                  placeholder="ex. photorealistic, golden hour, 35mm"
-                />
-              </div>
-            </section>
-
-            <section className="fsec">
-              <header>
-                <span className="no">04</span>
-                <h2>How long</h2>
-              </header>
-              <div className="field">
-                <div className="lenhead">
-                  <b>{lengthLabel}</b>
-                  <span className="m">
-                    {length}s · ≈{scenes} scene{scenes === 1 ? "" : "s"} of 8s
-                  </span>
-                  {/* The named field. The slider drives it; this allows an
-                      exact number the slider's 8s snap can't reach. */}
-                  <input
-                    id="length"
-                    name="length"
-                    type="number"
-                    min={16}
-                    max={480}
-                    step={1}
-                    value={length}
-                    onChange={(e) => setLength(Number(e.target.value) || 0)}
+              <section className="fsec" style={{ marginTop: 0 }}>
+                <header>
+                  <h2>What is it about</h2>
+                  <span className="no">01</span>
+                </header>
+                <div className="field">
+                  <textarea
+                    id="name"
+                    name="name"
+                    className="nb-ta"
+                    rows={3}
+                    placeholder="A documentary about the last lighthouse keepers — who they were, and what happened when the lamps went automatic."
+                    maxLength={140}
                     required
-                    aria-label="Length in seconds"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
                   />
-                </div>
-                <input
-                  type="range"
-                  className="lenslider"
-                  min={16}
-                  max={480}
-                  step={8}
-                  value={Math.min(Math.max(length, 16), 480)}
-                  onChange={(e) => setLength(Number(e.target.value))}
-                  style={{ ["--fill" as string]: sliderFill }}
-                  aria-label="Length"
-                />
-                <div className="chiprow" role="group" aria-label="Length presets">
-                  {LENGTH_PRESETS.map((p) => (
-                    <button
-                      type="button"
-                      key={p.s}
-                      className={`pchip ${length === p.s ? "on" : ""}`}
-                      onClick={() => setLength(p.s)}
-                    >
-                      {p.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </section>
-
-            <section className="fsec">
-              <header>
-                <span className="no">05</span>
-                <h2>Finishes</h2>
-                <span className="fhint">changeable until the final render</span>
-              </header>
-              <div className="swlist">
-                {FINISHES.map((f, i) => {
-                  const disabled = silent && f.name === "captions";
-                  const on = !disabled && finishes[f.name];
-                  return (
-                    <div key={f.name} className={`swrow ${on ? "on" : ""}`}>
-                      <span className="no">{String(i + 1).padStart(2, "0")}</span>
-                      <div>
-                        <h4>{f.label}</h4>
-                        <p>
-                          {disabled
-                            ? "No spoken words in this category — captions don't apply."
-                            : on
-                              ? f.on
-                              : f.off}
-                        </p>
-                      </div>
-                      <input type="hidden" name={f.name} value={on ? "yes" : "no"} />
-                      <Toggle
-                        checked={on}
-                        disabled={disabled}
-                        ariaLabel={f.label}
-                        onChange={(v) => setFinishes((p) => ({ ...p, [f.name]: v }))}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-
-            <section className="fsec">
-              <header>
-                <span className="no">06</span>
-                <h2>Canon &amp; reference</h2>
-                <span className="fhint">optional</span>
-              </header>
-              <div className="field">
-                <label htmlFor="lore">Lore / canon context</label>
-                <textarea
-                  id="lore"
-                  name="lore"
-                  rows={4}
-                  maxLength={8000}
-                  placeholder="For niche topics (Backrooms levels, SCP, game/franchise lore): paste the actual wiki/canon details here. The script treats this as ground truth — names, entities and mechanics come from this text, not invented."
-                  style={{ resize: "vertical" }}
-                />
-                <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--dim)" }}>
-                  Leave empty for well-known topics — the AI&apos;s own
-                  knowledge is enough for history, science, brands etc.
-                </p>
-              </div>
-              <div className="field" style={{ marginTop: 16 }}>
-                <label htmlFor="reference_image">
-                  Reference image for the first scene
-                </label>
-                <input
-                  type="file"
-                  id="reference_image"
-                  name="reference_image"
-                  accept="image/jpeg,image/png,image/webp"
-                />
-                <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--dim)" }}>
-                  Optional — upload a photo and the first scene&apos;s image is
-                  generated FROM it: the exact subject, design and look are
-                  treated as ground truth (ex. your car, your product, a real
-                  place). The rest of the film chains off that first frame.
-                  JPG/PNG/WebP, max 6&nbsp;MB.
-                </p>
-              </div>
-            </section>
-          </div>
-
-          {/* ---- the rail: estimate (with the submit), pole, next steps.
-               Inside the <form>, so the submit button below still submits. */}
-          <aside className="rail">
-            <div className="nb-est">
-              <span className="dpill">
-                <i />
-                Estimate · fills in as you type
-              </span>
-              <div
-                className={`sprev ${name ? "" : "blank"} ${tt.className}`}
-                style={tt.uppercase ? { textTransform: "uppercase" } : undefined}
-              >
-                {name || "Untitled film"}
-              </div>
-              <p className="blurb">
-                {tone.toLowerCase()} · {pace.toLowerCase()} pace ·{" "}
-                {(VOICE_LABELS[catMeta.voiceMode] ?? catMeta.voiceMode).toLowerCase()},{" "}
-                in {languageName}. The title above is set in the exact typeface
-                your film&apos;s titles will use for this tone.
-              </p>
-              <dl className="rows">
-                <div>
-                  <dt>Category</dt>
-                  <dd>
-                    {catMeta.categoryLabel}
-                    {!catMeta.ready && " · in development"}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Finished length</dt>
-                  <dd>
-                    {lengthLabel} · {scenes} scene{scenes === 1 ? "" : "s"}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Narration</dt>
-                  <dd>≈ {words.toLocaleString()} words</dd>
-                </div>
-                <div>
-                  <dt>Chapters</dt>
-                  <dd>{chapters}</dd>
-                </div>
-                <div>
-                  <dt>Format</dt>
-                  <dd>{aspect === "9:16" ? "9:16 vertical" : "16:9 horizontal"}</dd>
-                </div>
-                <div>
-                  <dt>Finishes</dt>
-                  <dd className={finishList ? "" : "off"}>{finishList || "None — bare cut"}</dd>
-                </div>
-                <div>
-                  <dt>Approval gates</dt>
-                  <dd>
-                    {gates} — script, images{silent ? "" : ", voices"}, clips
-                  </dd>
-                </div>
-              </dl>
-
-              {state && (
-                <p className={`formmsg ${state.ok ? "ok" : "err"}`}>{state.message}</p>
-              )}
-
-              {/* The only way to start a film. Explicitly type="submit" — the
-                  form deliberately blocks Enter, so the one control that IS
-                  meant to submit should say so where a reader will see it. */}
-              <button type="submit" className="go" disabled={pending}>
-                {pending ? "Starting…" : "Start production"}
-              </button>
-              <span className="csnote">
-                You approve the script before a single frame is rendered.
-              </span>
-            </div>
-
-            <div className="railpole" aria-hidden="true">
-              <GenreSpiral />
-              <span className="polecap">Every look it can make</span>
-            </div>
-
-            <div className="nb-next">
-              <span className="klabel">What happens next</span>
-              {[
-                { t: "The script arrives", b: "Chapters, then narration, then a scene plan." },
-                { t: "You approve it", b: "Edit anything before a frame is made." },
-                { t: "Scenes render", b: "Images, voices and motion, gate by gate." },
-                { t: "The cut lands", b: "Stitched, graded and ready on the project page." },
-              ].map((s) => (
-                <div className="step" key={s.t}>
-                  <i />
-                  <div>
-                    <b>{s.t}</b>
-                    <p>{s.b}</p>
+                  <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--dim)" }}>
+                    Keep it short — it becomes the title shown in the video.
+                    Style details go in the Look field, not here.
+                  </p>
+                  <div className="sugrow" aria-label="Suggestions">
+                    {SUGGESTIONS.map((sg) => (
+                      <button type="button" key={sg} className="sug" onClick={() => setName(sg)}>
+                        {sg}
+                      </button>
+                    ))}
                   </div>
                 </div>
-              ))}
+                <div className="field" style={{ marginTop: 22 }}>
+                  <label>What kind of film</label>
+                  <CategoryPicker
+                    part="category"
+                    onMeta={setCatMeta}
+                    language={language}
+                    selected={category}
+                    onSelected={setCategory}
+                    values={catValues}
+                    onValues={setCatValues}
+                  />
+                </div>
+              </section>
+
+              <section className="fsec">
+                <header>
+                  <h2>How it should feel</h2>
+                  <span className="no">02</span>
+                </header>
+                <div className="field">
+                  <label>Tone</label>
+                  <input type="hidden" name="tone" value={tone} />
+                  <div className="chiprow" role="group" aria-label="Tone">
+                    {TONES.map((t) => (
+                      <button
+                        type="button"
+                        key={t}
+                        className={`pchip ${tone === t ? "on" : ""}`}
+                        onClick={() => setTone(t)}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="field" style={{ marginTop: 18 }}>
+                  <label htmlFor="style">Look</label>
+                  <div className="chiprow" role="group" aria-label="Look">
+                    {LOOKS.map((l) => (
+                      <button
+                        type="button"
+                        key={l}
+                        className={`pchip ${style === l ? "on" : ""}`}
+                        onClick={() => setStyle(style === l ? "" : l)}
+                      >
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                  {/* The chips are shortcuts INTO this field, never a
+                      replacement for it — the posted `style` is whatever
+                      ends up here, so a written look survives untouched. */}
+                  <input
+                    id="style"
+                    name="style"
+                    value={style}
+                    onChange={(e) => setStyle(e.target.value)}
+                    placeholder="…or describe it: photorealistic, golden hour, 35mm"
+                    style={{ marginTop: 10 }}
+                    autoComplete="off"
+                  />
+                </div>
+                <div className="field" style={{ marginTop: 18 }}>
+                  <label>Pace</label>
+                  <input type="hidden" name="pace" value={pace} />
+                  <div className="seg" role="group" aria-label="Pace">
+                    {PACES.map((p) => (
+                      <button
+                        type="button"
+                        key={p}
+                        className={pace === p ? "on" : ""}
+                        onClick={() => setPace(p)}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </section>
+
+              <section className="fsec">
+                <header>
+                  <h2>Who narrates it</h2>
+                  <span className="no">03</span>
+                </header>
+                <CategoryPicker
+                  part="voices"
+                  onMeta={setCatMeta}
+                  language={language}
+                  selected={category}
+                  onSelected={setCategory}
+                  values={catValues}
+                  onValues={setCatValues}
+                />
+                <div className="field" style={{ marginTop: 18 }}>
+                  <label>Language</label>
+                  {/* The film's ONE language control. n8n only ever
+                      interpolates this value into prompts (never compares
+                      it), so the English name is what gets posted, while the
+                      list shows the endonym and the ISO code. */}
+                  <input type="hidden" name="language" value={languageName} />
+                  <LanguagePicker value={language} onChange={setLanguage} />
+                  <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--dim)" }}>
+                    The script is written and narrated in this language, and it
+                    is what the voice pickers are narrowed to.
+                  </p>
+                </div>
+              </section>
+
+              <section className="fsec">
+                <header>
+                  <h2>How long</h2>
+                  <span className="no">04</span>
+                </header>
+                <div className="field">
+                  <div className="lenhead">
+                    <b>{lengthLabel}</b>
+                    <span className="m">
+                      {length} seconds · {scenes} scene{scenes === 1 ? "" : "s"}
+                    </span>
+                    {/* The named field. The slider drives it; this allows an
+                        exact number the slider's 8s snap cannot reach. */}
+                    <input
+                      id="length"
+                      name="length"
+                      type="number"
+                      min={16}
+                      max={480}
+                      step={1}
+                      value={length}
+                      onChange={(e) => setLength(Number(e.target.value) || 0)}
+                      required
+                      aria-label="Length in seconds"
+                    />
+                  </div>
+                  <input
+                    type="range"
+                    className="lenslider"
+                    min={16}
+                    max={480}
+                    step={8}
+                    value={Math.min(Math.max(length, 16), 480)}
+                    onChange={(e) => setLength(Number(e.target.value))}
+                    style={{ ["--fill" as string]: sliderFill }}
+                    aria-label="Length"
+                  />
+                  <div className="chiprow" role="group" aria-label="Length presets">
+                    {LENGTH_PRESETS.map((p) => (
+                      <button
+                        type="button"
+                        key={p.s}
+                        className={`pchip ${length === p.s ? "on" : ""}`}
+                        onClick={() => setLength(p.s)}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </section>
+
+              <section className="fsec">
+                <header>
+                  <h2>Finishes</h2>
+                  <span className="fhint">changeable until the final render</span>
+                  <span className="no">05</span>
+                </header>
+                <div className="swlist">
+                  {FINISHES.map((f, i) => {
+                    const disabled = silent && f.name === "captions";
+                    const on = !disabled && finishes[f.name];
+                    return (
+                      <div key={f.name} className={`swrow ${on ? "on" : ""}`}>
+                        <span className="no">{String(i + 1).padStart(2, "0")}</span>
+                        <div>
+                          <h4>{f.label}</h4>
+                          <p>
+                            {disabled
+                              ? "No spoken words in this category — captions don't apply."
+                              : on
+                                ? f.on
+                                : f.off}
+                          </p>
+                        </div>
+                        <input type="hidden" name={f.name} value={on ? "yes" : "no"} />
+                        <Toggle
+                          checked={on}
+                          disabled={disabled}
+                          ariaLabel={f.label}
+                          onChange={(v) => setFinishes((p) => ({ ...p, [f.name]: v }))}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+
+              <section className="fsec">
+                <header>
+                  <h2>Canon &amp; reference</h2>
+                  <span className="fhint">optional</span>
+                  <span className="no">06</span>
+                </header>
+                <div className="field">
+                  <label htmlFor="lore">Lore / canon context</label>
+                  <textarea
+                    id="lore"
+                    name="lore"
+                    className="nb-ta"
+                    rows={4}
+                    maxLength={8000}
+                    placeholder="For niche topics (Backrooms levels, SCP, game/franchise lore): paste the actual wiki/canon details here. The script treats this as ground truth — names, entities and mechanics come from this text, not invented."
+                    style={{ resize: "vertical" }}
+                  />
+                  <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--dim)" }}>
+                    Leave empty for well-known topics — the AI&apos;s own
+                    knowledge is enough for history, science, brands etc.
+                  </p>
+                </div>
+                <div className="field" style={{ marginTop: 16 }}>
+                  <label htmlFor="reference_image">Reference image for the first scene</label>
+                  <input
+                    type="file"
+                    id="reference_image"
+                    name="reference_image"
+                    accept="image/jpeg,image/png,image/webp"
+                  />
+                  <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--dim)" }}>
+                    Optional — upload a photo and the first scene&apos;s image
+                    is generated FROM it: the exact subject, design and look are
+                    treated as ground truth (ex. your car, your product, a real
+                    place). The rest of the film chains off that first frame.
+                    JPG/PNG/WebP, max 6&nbsp;MB.
+                  </p>
+                </div>
+              </section>
             </div>
-          </aside>
-        </div>
-      </form>
+
+            {/* The estimate. Inside the <form>, so its submit button submits;
+                sticky, so it travels with the page as the brief is filled. */}
+            <aside className="rail">
+              <div className="nb-est">
+                <span className="dpill">
+                  <i />
+                  Estimate · fills in as you type
+                </span>
+                <div
+                  className={`sprev ${name ? "" : "blank"} ${tt.className}`}
+                  style={tt.uppercase ? { textTransform: "uppercase" } : undefined}
+                >
+                  {name || "Untitled film"}
+                </div>
+                <p className="blurb">
+                  {tone.toLowerCase()} · {pace.toLowerCase()} pace ·{" "}
+                  {(VOICE_LABELS[catMeta.voiceMode] ?? catMeta.voiceMode).toLowerCase()},
+                  in {languageName}. The title above is set in the exact typeface
+                  your film&apos;s titles will use for this tone.
+                </p>
+                <dl className="rows">
+                  <div>
+                    <dt>Category</dt>
+                    <dd>
+                      {catMeta.categoryLabel}
+                      {!catMeta.ready && " · in development"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Finished length</dt>
+                    <dd>
+                      {lengthLabel} · {scenes} scene{scenes === 1 ? "" : "s"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Narration</dt>
+                    <dd>≈ {words.toLocaleString()} words</dd>
+                  </div>
+                  <div>
+                    <dt>Chapters</dt>
+                    <dd>{chapters}</dd>
+                  </div>
+                  <div>
+                    <dt>Format</dt>
+                    <dd>{aspect === "9:16" ? "9:16 vertical" : "16:9 horizontal"}</dd>
+                  </div>
+                  <div>
+                    <dt>Look</dt>
+                    <dd className={style ? "" : "off"}>{style || "unset"}</dd>
+                  </div>
+                  <div>
+                    <dt>Finishes</dt>
+                    <dd className={finishList ? "" : "off"}>{finishList || "None — bare cut"}</dd>
+                  </div>
+                  <div>
+                    <dt>Approval gates</dt>
+                    <dd>
+                      {gates} — script, images{silent ? "" : ", voices"}, clips
+                    </dd>
+                  </div>
+                </dl>
+
+                {/* Format lives in the rail: it is a property of the delivered
+                    file, which is what this panel describes. */}
+                <div className="field" style={{ marginTop: 16 }}>
+                  <input type="hidden" name="aspect" value={aspect} />
+                  <div className="seg" role="group" aria-label="Format">
+                    <button
+                      type="button"
+                      className={aspect === "16:9" ? "on" : ""}
+                      onClick={() => setAspect("16:9")}
+                    >
+                      16:9
+                    </button>
+                    <button
+                      type="button"
+                      className={aspect === "9:16" ? "on" : ""}
+                      onClick={() => setAspect("9:16")}
+                    >
+                      9:16
+                    </button>
+                  </div>
+                </div>
+
+                {state && (
+                  <p className={`formmsg ${state.ok ? "ok" : "err"}`}>{state.message}</p>
+                )}
+
+                {/* The only way to start a film. Explicitly type="submit" —
+                    the form deliberately blocks Enter, so the one control that
+                    IS meant to submit should say so where a reader sees it. */}
+                <button type="submit" className="go" disabled={pending}>
+                  {pending ? "Starting…" : "Start production"}
+                </button>
+                <span className="csnote">
+                  You approve the script before a single frame is rendered.
+                </span>
+              </div>
+            </aside>
+          </div>
+        </form>
+      </div>
+
+      <footer className="nb-foot">
+        <span className="brandline" style={{ fontSize: 15 }}>
+          <span className="bmark" aria-hidden="true" />
+          House of Videos
+        </span>
+        <span>Brief → script → scenes → film</span>
+      </footer>
     </main>
   );
 }

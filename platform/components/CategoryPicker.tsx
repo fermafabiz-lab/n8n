@@ -15,36 +15,58 @@ export interface CategoryMeta {
 }
 
 /**
- * Category rows + the selected category's own options. The choice and every
- * option value are submitted with the form as hidden/named inputs
- * (`category`, `cat_<option>`); the server action packs them into the
+ * One card in the multi-voice chooser. The hint text in categories.ts is a
+ * paragraph covering all three modes at once — right for a dropdown's help
+ * text, far too long for a card — so each mode gets its own line here.
+ */
+const MODE_BLURB: Record<string, string> = {
+  off: "One voice reads the whole film.",
+  characters: "The script becomes dialogue between the story's characters.",
+  chapters: "Each chapter is read by a different narrator from your cast.",
+};
+
+/**
+ * Category rows + the selected category's own options + the voice setup. The
+ * choice and every option value are submitted with the form as hidden/named
+ * inputs (`category`, `cat_<option>`); the server action packs them into the
  * payload for n8n — nothing about that contract changes with the styling.
  *
- * Categories render as an editorial index (hairline rows, serif names, a mono
- * tag for the unfinished ones) rather than a grid of boxes; the selected row
- * is marked by an amber dot and full-ink type, not by a border.
+ * `part` splits the render across two cards on the brief — "what kind of film"
+ * belongs with the subject, "who says it" with the voices — while the state
+ * that both halves read stays in ONE place: the page owns it and passes it
+ * down, because two independent instances would each keep their own selection
+ * and the halves would disagree the moment either changed.
  */
 export default function CategoryPicker({
   onMeta,
   language = "",
+  part = "all",
+  selected,
+  onSelected,
+  values,
+  onValues,
 }: {
-  /** Reports selection changes upward so the call sheet can mirror them. */
+  /** Reports selection changes upward so the estimate can mirror them. */
   onMeta?: (meta: CategoryMeta) => void;
   /**
    * The film's language, forwarded to both voice pickers so the narrator and
    * the cast are drawn from voices that actually speak it. Lives on the page
-   * rather than here because the Language field is in an earlier section.
+   * rather than here because the Language field is in another section.
    */
   language?: string;
+  /** Which half to draw. "all" keeps the original single-block behaviour. */
+  part?: "all" | "category" | "voices";
+  selected: string;
+  onSelected: (id: string) => void;
+  values: Record<string, string | boolean>;
+  onValues: (next: Record<string, string | boolean>) => void;
 }) {
-  const [selected, setSelected] = useState(DEFAULT_CATEGORY);
-  const [values, setValues] = useState<Record<string, string | boolean>>({});
   const cat = getCategory(selected);
 
   const val = (name: string, def: string | boolean) =>
     values[`${selected}:${name}`] ?? def;
   const setVal = (name: string, v: string | boolean) =>
-    setValues((p) => ({ ...p, [`${selected}:${name}`]: v }));
+    onValues({ ...values, [`${selected}:${name}`]: v });
 
   const mv = cat.options.find((o) => o.name === "multi_voice");
   const mode = mv ? String(val("multi_voice", mv.default)) : "off";
@@ -62,9 +84,16 @@ export default function CategoryPicker({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected, mode]);
 
+  const showCategory = part === "all" || part === "category";
+  const showVoices = part === "all" || part === "voices";
+
   return (
     <div className="field">
-      <input type="hidden" name="category" value={selected} />
+      {/* The hidden input rides with the CATEGORY half, so the value is
+          submitted exactly once however the two halves are placed. */}
+      {showCategory && <input type="hidden" name="category" value={selected} />}
+      {showCategory && (
+      <>
       <div className="catrows">
         {CATEGORIES.map((c) => {
           const isSel = c.id === selected;
@@ -73,7 +102,7 @@ export default function CategoryPicker({
               type="button"
               key={c.id}
               className={`catrow ${isSel ? "on" : ""}`}
-              onClick={() => setSelected(c.id)}
+              onClick={() => onSelected(c.id)}
             >
               <h4>
                 <span className="dotmk">●</span>
@@ -94,9 +123,9 @@ export default function CategoryPicker({
         </p>
       )}
 
-      {cat.options.length > 0 && (
+      {cat.options.filter((o) => o.name !== "multi_voice").length > 0 && (
         <div style={{ marginTop: 6 }}>
-          {cat.options.map((o) => {
+          {cat.options.filter((o) => o.name !== "multi_voice").map((o) => {
             const v = val(o.name, o.default);
             const on = v === true || v === "true";
             return (
@@ -142,6 +171,38 @@ export default function CategoryPicker({
               </div>
             );
           })}
+        </div>
+      )}
+
+      </>
+      )}
+
+      {showVoices && (
+      <>
+      {/* The multi-voice mode, as selectable cards rather than a dropdown
+          buried in the option rows: it decides the shape of the whole
+          soundtrack, so it gets the same control the voices themselves get.
+          The submitted name and values are unchanged — cat_multi_voice, with
+          off / characters / chapters. */}
+      {mv && !cat.noNarration && (
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ display: "block", marginBottom: 9 }}>{mv.label}</label>
+          <input type="hidden" name="cat_multi_voice" value={mode} />
+          <div className="optcards">
+            {mv.choices?.map((c) => (
+              <button
+                type="button"
+                key={c.value}
+                className={`optcard ${mode === c.value ? "on" : ""}`}
+                onClick={() => setVal("multi_voice", c.value)}
+                aria-pressed={mode === c.value}
+              >
+                <span className="wave" />
+                <b>{c.label}</b>
+                <span>{MODE_BLURB[c.value] ?? ""}</span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -194,6 +255,8 @@ export default function CategoryPicker({
             <CastPicker mode={mode} hasNarrator={withNarrator} language={language} />
           )}
         </div>
+      )}
+      </>
       )}
     </div>
   );

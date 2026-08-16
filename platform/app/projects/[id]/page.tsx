@@ -328,7 +328,7 @@ export default async function ProductionRoom({
         {/* Breadcrumb + live status in one tracked line; the name itself is
             the title right below, not crumb text. */}
         <div className="eyebrow" style={{ marginBottom: 20 }}>
-          <Link href="/">Projects</Link>
+          <Link href="/projects">Projects</Link>
           <span style={{ color: "var(--dim)" }}>/</span>
           <span>
             <span className={`stdot ${project.statusKind}`}>●</span>{" "}

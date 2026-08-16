@@ -190,6 +190,23 @@ select:focus-visible {
   outline-offset: 2px;
 }
 
+/* The brief opts out of the app-wide 1200px column. .page caps every page,
+   and the shell lives inside it — so the shell's own max-width was simply
+   unreachable and the extra width never appeared. Measured: 1144px rendered
+   against a 1560px max-width. */
+.page.nb {
+  max-width: none;
+  padding: 0 20px;
+}
+
+/* The brief supplies its own ground: the shell starts right under the nav and
+   is opaque, so there is no page content to blur behind the bar — the strip
+   only ever showed as a horizontal seam across the top of the shell. The nav's
+   own frosted pill still floats over everything. */
+body:has(.nb) .navfade {
+  display: none;
+}
+
 /* THE LIT ARC — the system's one signature background element.
    Not a bloom. A bloom is brightest at its centre and dies outward, which on a
    light ground is nearly invisible; this is an oversized RING, hollow in the
@@ -1975,10 +1992,17 @@ select:focus-visible {
      genre pole and the next-steps card were removed — which is what lets it
      actually STICK: a rail taller than the viewport scrolls with the page no
      matter what position:sticky says. */
-  grid-template-columns: minmax(0, 1fr) 400px;
-  gap: 24px;
+  grid-template-columns: minmax(0, 1fr) 430px;
+  gap: 28px;
   align-items: start;
-  padding: 44px 34px 44px;
+  /* Top padding is small ON PURPOSE, and the header carries the breathing
+     room instead (see .nb-head). position:sticky only pins once you scroll —
+     at rest the rail sits wherever the grid puts it — so a large padding here
+     starts the panel far below its 88px sticky line and a viewport-height
+     panel then runs off the bottom of the screen. Measured before the fix:
+     22px past the fold. Keeping the grid's top near the sticky line makes the
+     resting and pinned positions agree. */
+  padding: 14px 40px 44px;
 }
 .brief .form {
   max-width: none;
@@ -2645,8 +2669,22 @@ select:focus-visible {
   flex-direction: column;
   gap: 14px;
   align-self: start;
+  /* Fills the screen instead of stopping short of it. The panel used to be
+     content-height (588px in a 900px viewport), which left a band of bare
+     ground under it that read as the column having run out rather than as
+     deliberate space. */
+  height: calc(100vh - 104px);
+  /* …but never smaller than its own content: on a short window the panel
+     keeps its natural height and simply extends past the fold, which is far
+     better than crushing the rows into each other. */
+  min-height: 600px;
 }
 .nb-est {
+  /* A flex column so the rows can absorb whatever height is going and the
+     submit stays pinned to the bottom edge of the panel. */
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   border-radius: 28px;
   background: radial-gradient(120% 100% at 100% 0%, var(--accent-deep) 0%, #1a1a1f 55%, #0f0f12 100%);
   box-shadow: 0 2px 6px rgba(24, 20, 40, 0.08), 0 22px 54px rgba(24, 20, 40, 0.26);
@@ -2697,6 +2735,12 @@ select:focus-visible {
 }
 .nb-est .rows {
   margin-top: 14px;
+  /* The rows keep their own rhythm — spreading them to fill the panel was the
+     first attempt and it read as a stretched table, ~76px of air per row for
+     a single line of text. The slack goes to ONE place instead: the margin
+     above the submit (see .go), where a gap reads as deliberate separation
+     between the summary and the action it leads to. */
+  flex: 0 0 auto;
 }
 /* Row rhythm is tuned so the whole panel clears a laptop viewport: it must
    never need a scrollbar of its own — the producer reads it while filling the
@@ -2706,7 +2750,7 @@ select:focus-visible {
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  padding: 8px 0;
+  padding: 11px 0;
   border-bottom: 1px solid var(--panel-line);
 }
 .nb-est .rows dt {
@@ -2729,7 +2773,10 @@ select:focus-visible {
    the form — so type=submit works exactly as before. */
 .nb-est .go {
   width: 100%;
-  margin-top: 18px;
+  /* auto, not a fixed value: this is what absorbs the panel's spare height
+     and pins the action to the bottom edge however tall the screen is. */
+  margin-top: auto;
+  flex: none;
   font-family: inherit;
   font-size: 14.5px;
   font-weight: 600;
@@ -3626,9 +3673,14 @@ body:has(.mkt) .vignette {
    Start screen. Everything floats: the shell holds the light, the
    cards lift to the pointer, nothing is boxed in by a border.
    ============================================================ */
+/* 1560, not the prototype's 1280: the design was drawn at a fixed 1280 canvas,
+   and holding that as a max-width on a real desktop leaves a third of the
+   screen as empty gutter. The form column gets the extra room; the rail is
+   only slightly wider, since a summary column past ~430 starts to read as a
+   second body of text rather than a sidebar. */
 .nb-shell {
   position: relative;
-  max-width: 1240px;
+  max-width: 1560px;
   margin: 10px auto 0;
   border-radius: var(--r-shell);
   background: var(--shell);
@@ -3675,8 +3727,8 @@ body:has(.mkt) .vignette {
    a header's height further down. */
 .nb-head {
   position: relative;
-  padding: 0 0 4px;
-  max-width: 560px;
+  padding: 26px 0 4px;
+  max-width: 620px;
 }
 .nb-head h1 {
   margin: 20px 0 0;

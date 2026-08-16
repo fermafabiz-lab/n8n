@@ -2058,9 +2058,39 @@ Rolled back in about four minutes: five PUTs from
 had been created in Postgres and therefore never existed in Airtable — which is
 exactly why the rollback had to happen on the first film rather than the tenth.
 
-**Before trying again:** convert the 21 HTTP nodes, audit every Code node the
-query above returns, and re-run the whole scan expecting it to answer zero
-before publishing anything.
+**Done, 2026-08-16.** The 21 HTTP nodes were not rewritten — they were
+**rerouted**. `/api/at` on the site answers in Airtable's own dialect over the
+same `at_*` views, so converting one is a change of host and nothing else:
+
+    https://api.airtable.com/v0/applPyJjvNzyxJkbv/tblkNIy…/rec…
+    http://web:3000/api/at/tblkNIy…/rec…
+
+Method, body and every downstream `$json.fields[…]` stay as they were, which
+matters because several of those bodies are IIFEs that parse a model's reply
+into a fields object. Auth swaps the Airtable PAT for the `HOV Media Ingest`
+header credential.
+
+The shim answers only the four request shapes these nodes make — GET a record,
+GET a filtered list, PATCH, POST a batch — and the four `filterByFormula`
+shapes they send. Anything else **throws**: unknown table, unrecognised
+formula, unmapped field, all 422. Verified including hostile text
+(`it's "fine" — 100% $5`, a newline, diacritics) round-tripping byte for byte.
+
+**The Code nodes turned out to be a non-issue.** Zero of them build Airtable
+URLs or name a table; three read `.fields` from upstream, which both the
+compatibility layer and the shim provide, and the rest mention Airtable only in
+comments.
+
+**The scan that now answers zero** — note the substitution, without which the
+shim's own URLs count as Airtable references:
+
+```python
+s = re.sub(r'http://web:3000/api/at[^"\ ]*', '', json.dumps(node))
+flagged = ('api.airtable.com' in s or 'applPyJjvNzyxJkbv' in s
+           or re.search(r'tbl[A-Za-z0-9]{14}', s) or 'airtable' in node['type'].lower())
+```
+
+44 Postgres nodes, 21 through the shim, 0 remaining — across all five.
 
 ### The first cutover attempt — 2026-08-15, 22:46 UTC
 

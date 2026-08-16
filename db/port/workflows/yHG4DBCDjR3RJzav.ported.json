@@ -2647,15 +2647,15 @@
     {
       "parameters": {
         "method": "PATCH",
-        "url": "={{ 'https://api.airtable.com/v0/applPyJjvNzyxJkbv/tblkNIyOUeLnKqako/' + $('Split Regen List').item.json.id }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "airtableTokenApi",
+        "url": "={{ 'http://web:3000/api/at/tblkNIyOUeLnKqako/' + $('Split Regen List').item.json.id }}",
+        "authentication": "genericCredentialType",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { typecast: true, fields: { 'Observații Scenă': 'Image regeneration REJECTED: ' + String(($json.error && ($json.error.description || $json.error.message)) || 'the image service refused this prompt').slice(0, 400) + ' — edit the image prompt and press Regenerate again.', 'Regenerează Imagine': false } } }}",
         "options": {
           "timeout": 30000
-        }
+        },
+        "genericAuthType": "httpHeaderAuth"
       },
       "id": "b6a332a5-cafa-4be3-951d-ea769a464cb2",
       "name": "Mark Image Regen Rejected",
@@ -2672,6 +2672,10 @@
         "airtableTokenApi": {
           "id": "TPSvrVbCvTyOfNpL",
           "name": "Airtable Personal Access Token account"
+        },
+        "httpHeaderAuth": {
+          "id": "8kpY42LmZaBYBzfY",
+          "name": "HOV Media Ingest"
         }
       },
       "onError": "continueRegularOutput"
@@ -3278,12 +3282,12 @@
     },
     {
       "parameters": {
-        "url": "={{ 'https://api.airtable.com/v0/applPyJjvNzyxJkbv/tbl0zT7ilefOqE3xk/' + $('Receive Batch Input').first().json.Project_ID }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "airtableTokenApi",
+        "url": "={{ 'http://web:3000/api/at/tbl0zT7ilefOqE3xk/' + $('Receive Batch Input').first().json.Project_ID }}",
+        "authentication": "genericCredentialType",
         "options": {
           "timeout": 20000
-        }
+        },
+        "genericAuthType": "httpHeaderAuth"
       },
       "id": "76ad1f0a-21ba-4057-97a5-34a8e0c37181",
       "name": "AB Load Project",
@@ -3297,6 +3301,10 @@
         "airtableTokenApi": {
           "id": "TPSvrVbCvTyOfNpL",
           "name": "Airtable Personal Access Token account"
+        },
+        "httpHeaderAuth": {
+          "id": "8kpY42LmZaBYBzfY",
+          "name": "HOV Media Ingest"
         }
       },
       "notes": "The multi-voice cast lives in the project's Editing Options JSON."
@@ -3841,17 +3849,21 @@
         192
       ],
       "parameters": {
-        "url": "={{ 'https://api.airtable.com/v0/applPyJjvNzyxJkbv/tbl0zT7ilefOqE3xk/' + $('Receive Batch Input').first().json.Project_ID }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "airtableTokenApi",
+        "url": "={{ 'http://web:3000/api/at/tbl0zT7ilefOqE3xk/' + $('Receive Batch Input').first().json.Project_ID }}",
+        "authentication": "genericCredentialType",
         "options": {
           "timeout": 20000
-        }
+        },
+        "genericAuthType": "httpHeaderAuth"
       },
       "credentials": {
         "airtableTokenApi": {
           "id": "TPSvrVbCvTyOfNpL",
           "name": "Airtable Personal Access Token account"
+        },
+        "httpHeaderAuth": {
+          "id": "8kpY42LmZaBYBzfY",
+          "name": "HOV Media Ingest"
         }
       }
     },

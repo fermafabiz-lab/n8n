@@ -1278,20 +1278,24 @@
       ],
       "parameters": {
         "method": "PATCH",
-        "url": "={{ 'https://api.airtable.com/v0/applPyJjvNzyxJkbv/tbl0zT7ilefOqE3xk/' + $json.projectId }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "airtableTokenApi",
+        "url": "={{ 'http://web:3000/api/at/tbl0zT7ilefOqE3xk/' + $json.projectId }}",
+        "authentication": "genericCredentialType",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ fields: { 'Editing Options': $json.editingOptions }, typecast: true }) }}",
         "options": {
           "timeout": 15000
-        }
+        },
+        "genericAuthType": "httpHeaderAuth"
       },
       "credentials": {
         "airtableTokenApi": {
           "id": "TPSvrVbCvTyOfNpL",
           "name": "Airtable Personal Access Token account"
+        },
+        "httpHeaderAuth": {
+          "id": "8kpY42LmZaBYBzfY",
+          "name": "HOV Media Ingest"
         }
       }
     }

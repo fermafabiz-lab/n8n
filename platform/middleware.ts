@@ -12,6 +12,11 @@ export function middleware(req: NextRequest) {
   // image would be lost with a 200 nobody looks at. The route authenticates
   // itself with MEDIA_INGEST_KEY instead.
   if (req.nextUrl.pathname === "/api/media/ingest") return NextResponse.next();
+  // Same reasoning for the Airtable-shaped shim the workflows call: no browser
+  // session, its own shared secret, and a redirect to /login would answer 200
+  // with an HTML page that every one of those nodes would happily parse as a
+  // record.
+  if (req.nextUrl.pathname.startsWith("/api/at/")) return NextResponse.next();
   if (req.cookies.get("vf_auth")?.value === expected) return NextResponse.next();
   const url = req.nextUrl.clone();
   url.pathname = "/login";

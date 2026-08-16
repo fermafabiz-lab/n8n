@@ -51,6 +51,18 @@ function pool(): Pool {
   return globalForPg.hovPool;
 }
 
+/**
+ * Escape hatch for the Airtable-shaped shim, which needs the same pool but
+ * builds its own SQL. Exported rather than duplicating the connection setup —
+ * two pools in one process is how a box runs out of Postgres slots.
+ */
+export async function atQuery<T = Record<string, unknown>>(
+  sql: string,
+  params: unknown[] = [],
+): Promise<T[]> {
+  return query<T>(sql, params);
+}
+
 async function query<T = Record<string, unknown>>(
   sql: string,
   params: unknown[] = [],

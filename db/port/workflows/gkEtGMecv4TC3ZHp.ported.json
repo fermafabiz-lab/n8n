@@ -665,12 +665,12 @@
     },
     {
       "parameters": {
-        "url": "={{ 'https://api.airtable.com/v0/applPyJjvNzyxJkbv/Script%20Library?maxRecords=3&filterByFormula=' + encodeURIComponent(\"AND({Active}=1, OR({Tone}='\" + ($('Receive Project Data').first().json.Tonalitate || '') + \"', {Category}='\" + ($('Receive Project Data').first().json.Tonalitate || '') + \"'))\") }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "airtableTokenApi",
+        "url": "={{ 'http://web:3000/api/at/Script%20Library?maxRecords=3&filterByFormula=' + encodeURIComponent(\"AND({Active}=1, OR({Tone}='\" + ($('Receive Project Data').first().json.Tonalitate || '') + \"', {Category}='\" + ($('Receive Project Data').first().json.Tonalitate || '') + \"'))\") }}",
+        "authentication": "genericCredentialType",
         "options": {
           "timeout": 20000
-        }
+        },
+        "genericAuthType": "httpHeaderAuth"
       },
       "id": "a07a3bfb-3754-47b4-9b44-230ab3f04c73",
       "name": "Fetch Style Card",
@@ -685,6 +685,10 @@
         "airtableTokenApi": {
           "id": "TPSvrVbCvTyOfNpL",
           "name": "Airtable Personal Access Token account"
+        },
+        "httpHeaderAuth": {
+          "id": "8kpY42LmZaBYBzfY",
+          "name": "HOV Media Ingest"
         }
       },
       "onError": "continueRegularOutput",
@@ -1085,12 +1089,12 @@
     },
     {
       "parameters": {
-        "url": "={{ 'https://api.airtable.com/v0/applPyJjvNzyxJkbv/Genre%20Profiles?maxRecords=1&filterByFormula=' + encodeURIComponent(\"AND({Active}=1, LOWER({Tone})='\" + String($('Receive Project Data').first().json.Tonalitate || 'Documentary').trim().toLowerCase().replace(/'/g, \"\\\\'\") + \"')\") }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "airtableTokenApi",
+        "url": "={{ 'http://web:3000/api/at/Genre%20Profiles?maxRecords=1&filterByFormula=' + encodeURIComponent(\"AND({Active}=1, LOWER({Tone})='\" + String($('Receive Project Data').first().json.Tonalitate || 'Documentary').trim().toLowerCase().replace(/'/g, \"\\\\'\") + \"')\") }}",
+        "authentication": "genericCredentialType",
         "options": {
           "timeout": 15000
-        }
+        },
+        "genericAuthType": "httpHeaderAuth"
       },
       "id": "cacb4c54-1027-4315-abc1-b6f8bb62c890",
       "name": "Fetch Genre Profile",
@@ -1107,6 +1111,10 @@
         "airtableTokenApi": {
           "id": "TPSvrVbCvTyOfNpL",
           "name": "Airtable Personal Access Token account"
+        },
+        "httpHeaderAuth": {
+          "id": "8kpY42LmZaBYBzfY",
+          "name": "HOV Media Ingest"
         }
       },
       "onError": "continueRegularOutput"
@@ -1129,12 +1137,12 @@
     },
     {
       "parameters": {
-        "url": "={{ 'https://api.airtable.com/v0/applPyJjvNzyxJkbv/tblkNIyOUeLnKqako/' + $json.body.scene_id }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "airtableTokenApi",
+        "url": "={{ 'http://web:3000/api/at/tblkNIyOUeLnKqako/' + $json.body.scene_id }}",
+        "authentication": "genericCredentialType",
         "options": {
           "timeout": 20000
-        }
+        },
+        "genericAuthType": "httpHeaderAuth"
       },
       "id": "b7489ffe-fd1a-4156-8234-331801095fe0",
       "name": "Load Scene",
@@ -1148,17 +1156,21 @@
         "airtableTokenApi": {
           "id": "TPSvrVbCvTyOfNpL",
           "name": "Airtable Personal Access Token account"
+        },
+        "httpHeaderAuth": {
+          "id": "8kpY42LmZaBYBzfY",
+          "name": "HOV Media Ingest"
         }
       }
     },
     {
       "parameters": {
-        "url": "={{ 'https://api.airtable.com/v0/applPyJjvNzyxJkbv/tbl0zT7ilefOqE3xk/' + ($('Load Scene').first().json.fields['Project_ID'] || '') }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "airtableTokenApi",
+        "url": "={{ 'http://web:3000/api/at/tbl0zT7ilefOqE3xk/' + ($('Load Scene').first().json.fields['Project_ID'] || '') }}",
+        "authentication": "genericCredentialType",
         "options": {
           "timeout": 20000
-        }
+        },
+        "genericAuthType": "httpHeaderAuth"
       },
       "id": "e981ae69-06e5-446a-a8d6-7e91c7c591c9",
       "name": "Load Project Bible",
@@ -1175,6 +1187,10 @@
         "airtableTokenApi": {
           "id": "TPSvrVbCvTyOfNpL",
           "name": "Airtable Personal Access Token account"
+        },
+        "httpHeaderAuth": {
+          "id": "8kpY42LmZaBYBzfY",
+          "name": "HOV Media Ingest"
         }
       },
       "onError": "continueRegularOutput"
@@ -1214,15 +1230,15 @@
     {
       "parameters": {
         "method": "PATCH",
-        "url": "={{ 'https://api.airtable.com/v0/applPyJjvNzyxJkbv/tblkNIyOUeLnKqako/' + $('Scene Regen Webhook').first().json.body.scene_id }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "airtableTokenApi",
+        "url": "={{ 'http://web:3000/api/at/tblkNIyOUeLnKqako/' + $('Scene Regen Webhook').first().json.body.scene_id }}",
+        "authentication": "genericCredentialType",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ (() => { const raw = String((((($json.choices || [])[0] || {}).message) || {}).content || '').replace(/^```json\\s*/i, '').replace(/```\\s*$/, '').trim(); let p; try { p = JSON.parse(raw); } catch (e) { p = {}; } const cur = $('Load Scene').first().json.fields; const fields = { 'Script Scenă': p.narrator_text || cur['Script Scenă'], 'Prompt Vizual': p.visual_scene_description || cur['Prompt Vizual'], 'Imagine First Frame': p.image_prompt || cur['Imagine First Frame'], 'Video Scenă URL': p.video_motion_prompt || cur['Video Scenă URL'], 'Status Producție Scenă': 'Generare Script', 'Aprobare Scenă': false, 'Observații Scenă': '' }; /* The take was read from the OLD line. Nothing downstream compares text to audio, and the media batch never re-records over an existing voiceover, so without this the scene keeps a narration and an audio track that disagree. Guarded on a take actually existing: a scene not yet voiced needs no flag, and a cinematic project has no speech at all. */ if (cur['Voiceover URL']) { fields['Aprobare Voce'] = false; fields['Regenerează Voce'] = true; fields['Aprobare Video'] = false; } return { typecast: true, fields }; })() }}",
         "options": {
           "timeout": 30000
-        }
+        },
+        "genericAuthType": "httpHeaderAuth"
       },
       "id": "015fe415-d52d-4a46-bce8-fb7ad47a47bc",
       "name": "Write Scene Rewrite",
@@ -1239,21 +1255,25 @@
         "airtableTokenApi": {
           "id": "TPSvrVbCvTyOfNpL",
           "name": "Airtable Personal Access Token account"
+        },
+        "httpHeaderAuth": {
+          "id": "8kpY42LmZaBYBzfY",
+          "name": "HOV Media Ingest"
         }
       }
     },
     {
       "parameters": {
         "method": "PATCH",
-        "url": "={{ 'https://api.airtable.com/v0/applPyJjvNzyxJkbv/tblkNIyOUeLnKqako/' + $('Scene Regen Webhook').first().json.body.scene_id }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "airtableTokenApi",
+        "url": "={{ 'http://web:3000/api/at/tblkNIyOUeLnKqako/' + $('Scene Regen Webhook').first().json.body.scene_id }}",
+        "authentication": "genericCredentialType",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { typecast: true, fields: { 'Status Producție Scenă': 'Generare Script', 'Observații Scenă': 'Scene rewrite FAILED: ' + String(($json.error && ($json.error.message || $json.error.description)) || 'the rewrite service did not answer').slice(0, 300) + ' — press Regenerate scene again.' } } }}",
         "options": {
           "timeout": 30000
-        }
+        },
+        "genericAuthType": "httpHeaderAuth"
       },
       "id": "bdf73e98-9ffb-45ae-b2ea-2f9009a269e2",
       "name": "Mark Scene Regen Failed",
@@ -1270,6 +1290,10 @@
         "airtableTokenApi": {
           "id": "TPSvrVbCvTyOfNpL",
           "name": "Airtable Personal Access Token account"
+        },
+        "httpHeaderAuth": {
+          "id": "8kpY42LmZaBYBzfY",
+          "name": "HOV Media Ingest"
         }
       },
       "onError": "continueRegularOutput"
@@ -1292,12 +1316,12 @@
     },
     {
       "parameters": {
-        "url": "={{ 'https://api.airtable.com/v0/applPyJjvNzyxJkbv/tblkNIyOUeLnKqako/' + $json.body.scene_id }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "airtableTokenApi",
+        "url": "={{ 'http://web:3000/api/at/tblkNIyOUeLnKqako/' + $json.body.scene_id }}",
+        "authentication": "genericCredentialType",
         "options": {
           "timeout": 20000
-        }
+        },
+        "genericAuthType": "httpHeaderAuth"
       },
       "id": "8da9c4a8-acdb-4c72-af4f-1bed3d577685",
       "name": "IR Load Scene",
@@ -1311,17 +1335,21 @@
         "airtableTokenApi": {
           "id": "TPSvrVbCvTyOfNpL",
           "name": "Airtable Personal Access Token account"
+        },
+        "httpHeaderAuth": {
+          "id": "8kpY42LmZaBYBzfY",
+          "name": "HOV Media Ingest"
         }
       }
     },
     {
       "parameters": {
-        "url": "={{ 'https://api.airtable.com/v0/applPyJjvNzyxJkbv/tblkNIyOUeLnKqako?pageSize=100&filterByFormula=' + encodeURIComponent(\"{Project_ID}='\" + ($('IR Load Scene').first().json.fields['Project_ID'] || '') + \"'\") }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "airtableTokenApi",
+        "url": "={{ 'http://web:3000/api/at/tblkNIyOUeLnKqako?pageSize=100&filterByFormula=' + encodeURIComponent(\"{Project_ID}='\" + ($('IR Load Scene').first().json.fields['Project_ID'] || '') + \"'\") }}",
+        "authentication": "genericCredentialType",
         "options": {
           "timeout": 20000
-        }
+        },
+        "genericAuthType": "httpHeaderAuth"
       },
       "id": "37c4926b-7cfb-4f4c-a3ab-d26b6ccb2a34",
       "name": "IR Load Siblings",
@@ -1335,17 +1363,21 @@
         "airtableTokenApi": {
           "id": "TPSvrVbCvTyOfNpL",
           "name": "Airtable Personal Access Token account"
+        },
+        "httpHeaderAuth": {
+          "id": "8kpY42LmZaBYBzfY",
+          "name": "HOV Media Ingest"
         }
       }
     },
     {
       "parameters": {
-        "url": "={{ 'https://api.airtable.com/v0/applPyJjvNzyxJkbv/tbl0zT7ilefOqE3xk/' + ($('IR Load Scene').first().json.fields['Project_ID'] || '') }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "airtableTokenApi",
+        "url": "={{ 'http://web:3000/api/at/tbl0zT7ilefOqE3xk/' + ($('IR Load Scene').first().json.fields['Project_ID'] || '') }}",
+        "authentication": "genericCredentialType",
         "options": {
           "timeout": 20000
-        }
+        },
+        "genericAuthType": "httpHeaderAuth"
       },
       "id": "2c48d250-dcec-44cf-9c46-ebf9d80684ac",
       "name": "IR Load Project",
@@ -1359,6 +1391,10 @@
         "airtableTokenApi": {
           "id": "TPSvrVbCvTyOfNpL",
           "name": "Airtable Personal Access Token account"
+        },
+        "httpHeaderAuth": {
+          "id": "8kpY42LmZaBYBzfY",
+          "name": "HOV Media Ingest"
         }
       }
     },
@@ -1467,15 +1503,15 @@
     {
       "parameters": {
         "method": "PATCH",
-        "url": "={{ 'https://api.airtable.com/v0/applPyJjvNzyxJkbv/tblkNIyOUeLnKqako/' + $('IR Build Request').first().json.sceneId }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "airtableTokenApi",
+        "url": "={{ 'http://web:3000/api/at/tblkNIyOUeLnKqako/' + $('IR Build Request').first().json.sceneId }}",
+        "authentication": "genericCredentialType",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ (() => { let id = ''; (function walk(o) { if (id) return; if (typeof o === 'string') { if (o.includes('-image:') || o.includes('-asset:')) id = o; return; } if (Array.isArray(o)) { for (const v of o) { if (id) return; walk(v); } return; } if (o && typeof o === 'object') { for (const k of Object.keys(o)) { if (id) return; walk(o[k]); } } })($json); return { typecast: true, fields: { 'Imagine Scenă': [{ url: (($('IR Generate Image').first().json.images || [])[0] || {}).url }], 'Image Media ID': id, 'Aprobare Imagine': false, 'Regenerează Imagine': false, 'Observații Scenă': '' } }; })() }}",
         "options": {
           "timeout": 30000
-        }
+        },
+        "genericAuthType": "httpHeaderAuth"
       },
       "id": "430a71f8-9623-47b9-a28c-c51cac0c6be6",
       "name": "IR Write Image",
@@ -1492,21 +1528,25 @@
         "airtableTokenApi": {
           "id": "TPSvrVbCvTyOfNpL",
           "name": "Airtable Personal Access Token account"
+        },
+        "httpHeaderAuth": {
+          "id": "8kpY42LmZaBYBzfY",
+          "name": "HOV Media Ingest"
         }
       }
     },
     {
       "parameters": {
         "method": "PATCH",
-        "url": "={{ 'https://api.airtable.com/v0/applPyJjvNzyxJkbv/tblkNIyOUeLnKqako/' + $('Image Regen Webhook').first().json.body.scene_id }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "airtableTokenApi",
+        "url": "={{ 'http://web:3000/api/at/tblkNIyOUeLnKqako/' + $('Image Regen Webhook').first().json.body.scene_id }}",
+        "authentication": "genericCredentialType",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { typecast: true, fields: { 'Regenerează Imagine': false, 'Observații Scenă': 'Image regeneration REJECTED: ' + String(($json.error && ($json.error.description || $json.error.message)) || 'the image service refused this prompt').slice(0, 400) + ' — edit the image prompt and press Regenerate again.' } } }}",
         "options": {
           "timeout": 30000
-        }
+        },
+        "genericAuthType": "httpHeaderAuth"
       },
       "id": "42f38dd2-5e9a-4c81-9d58-c361d7ef049a",
       "name": "IR Mark Rejected",
@@ -1523,6 +1563,10 @@
         "airtableTokenApi": {
           "id": "TPSvrVbCvTyOfNpL",
           "name": "Airtable Personal Access Token account"
+        },
+        "httpHeaderAuth": {
+          "id": "8kpY42LmZaBYBzfY",
+          "name": "HOV Media Ingest"
         }
       },
       "onError": "continueRegularOutput"
@@ -1545,12 +1589,12 @@
     },
     {
       "parameters": {
-        "url": "={{ 'https://api.airtable.com/v0/applPyJjvNzyxJkbv/tblkNIyOUeLnKqako/' + $json.body.scene_id }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "airtableTokenApi",
+        "url": "={{ 'http://web:3000/api/at/tblkNIyOUeLnKqako/' + $json.body.scene_id }}",
+        "authentication": "genericCredentialType",
         "options": {
           "timeout": 20000
-        }
+        },
+        "genericAuthType": "httpHeaderAuth"
       },
       "id": "1c432598-4968-47fe-82ac-8cc697932c8e",
       "name": "VR Load Scene",
@@ -1564,17 +1608,21 @@
         "airtableTokenApi": {
           "id": "TPSvrVbCvTyOfNpL",
           "name": "Airtable Personal Access Token account"
+        },
+        "httpHeaderAuth": {
+          "id": "8kpY42LmZaBYBzfY",
+          "name": "HOV Media Ingest"
         }
       }
     },
     {
       "parameters": {
-        "url": "={{ 'https://api.airtable.com/v0/applPyJjvNzyxJkbv/tbl0zT7ilefOqE3xk/' + ($('VR Load Scene').first().json.fields['Project_ID'] || '') }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "airtableTokenApi",
+        "url": "={{ 'http://web:3000/api/at/tbl0zT7ilefOqE3xk/' + ($('VR Load Scene').first().json.fields['Project_ID'] || '') }}",
+        "authentication": "genericCredentialType",
         "options": {
           "timeout": 20000
-        }
+        },
+        "genericAuthType": "httpHeaderAuth"
       },
       "id": "b0d3134e-bf5f-4892-9306-8c1f81253c0b",
       "name": "VR Load Project",
@@ -1588,6 +1636,10 @@
         "airtableTokenApi": {
           "id": "TPSvrVbCvTyOfNpL",
           "name": "Airtable Personal Access Token account"
+        },
+        "httpHeaderAuth": {
+          "id": "8kpY42LmZaBYBzfY",
+          "name": "HOV Media Ingest"
         }
       }
     },
@@ -1855,15 +1907,15 @@
     {
       "parameters": {
         "method": "PATCH",
-        "url": "={{ 'https://api.airtable.com/v0/applPyJjvNzyxJkbv/tblkNIyOUeLnKqako/' + $('Voice Regen Webhook').first().json.body.scene_id }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "airtableTokenApi",
+        "url": "={{ 'http://web:3000/api/at/tblkNIyOUeLnKqako/' + $('Voice Regen Webhook').first().json.body.scene_id }}",
+        "authentication": "genericCredentialType",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { typecast: true, fields: { 'Voiceover URL': 'https://drive.google.com/uc?export=download&id=' + $('VR Upload Audio').first().json.id, 'Status Producție Scenă': 'Așteaptă Aprobare Voce', 'Aprobare Voce': false, 'Regenerează Voce': false, 'Observații Scenă': '' } } }}",
         "options": {
           "timeout": 30000
-        }
+        },
+        "genericAuthType": "httpHeaderAuth"
       },
       "id": "654d5ddc-e239-4b3c-90f9-4a74bf0ab54a",
       "name": "VR Write Voice",
@@ -1880,6 +1932,10 @@
         "airtableTokenApi": {
           "id": "TPSvrVbCvTyOfNpL",
           "name": "Airtable Personal Access Token account"
+        },
+        "httpHeaderAuth": {
+          "id": "8kpY42LmZaBYBzfY",
+          "name": "HOV Media Ingest"
         }
       }
     },
@@ -1898,12 +1954,12 @@
     },
     {
       "parameters": {
-        "url": "={{ 'https://api.airtable.com/v0/applPyJjvNzyxJkbv/tbl0zT7ilefOqE3xk/' + $('Receive Project Data').first().json.Project_ID }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "airtableTokenApi",
+        "url": "={{ 'http://web:3000/api/at/tbl0zT7ilefOqE3xk/' + $('Receive Project Data').first().json.Project_ID }}",
+        "authentication": "genericCredentialType",
         "options": {
           "timeout": 15000
-        }
+        },
+        "genericAuthType": "httpHeaderAuth"
       },
       "id": "135901e4-ddda-4c3b-b457-aeb904abb1cd",
       "name": "Fetch Project Record",
@@ -1917,6 +1973,10 @@
         "airtableTokenApi": {
           "id": "TPSvrVbCvTyOfNpL",
           "name": "Airtable Personal Access Token account"
+        },
+        "httpHeaderAuth": {
+          "id": "8kpY42LmZaBYBzfY",
+          "name": "HOV Media Ingest"
         }
       },
       "notes": "Editing Options (category, multi-voice mode, cast) live on the project record; the trigger inputs don't carry them."
@@ -1936,12 +1996,12 @@
     },
     {
       "parameters": {
-        "url": "={{ 'https://api.airtable.com/v0/applPyJjvNzyxJkbv/tblkNIyOUeLnKqako?filterByFormula=' + encodeURIComponent(\"{Project_ID}='\" + ($('VR Load Scene').first().json.fields['Project_ID'] || '') + \"'\") }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "airtableTokenApi",
+        "url": "={{ 'http://web:3000/api/at/tblkNIyOUeLnKqako?filterByFormula=' + encodeURIComponent(\"{Project_ID}='\" + ($('VR Load Scene').first().json.fields['Project_ID'] || '') + \"'\") }}",
+        "authentication": "genericCredentialType",
         "options": {
           "timeout": 20000
-        }
+        },
+        "genericAuthType": "httpHeaderAuth"
       },
       "id": "313be9f2-ec91-442e-be53-fc39347e5b57",
       "name": "VR Load All Scenes",
@@ -1955,6 +2015,10 @@
         "airtableTokenApi": {
           "id": "TPSvrVbCvTyOfNpL",
           "name": "Airtable Personal Access Token account"
+        },
+        "httpHeaderAuth": {
+          "id": "8kpY42LmZaBYBzfY",
+          "name": "HOV Media Ingest"
         }
       },
       "notes": "Characters are assigned voices by first appearance across the WHOLE project, so a single-scene regen must see all scenes to reproduce the same assignment."
@@ -2157,20 +2221,24 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "https://api.airtable.com/v0/applPyJjvNzyxJkbv/tblU26cUiQQV2eNdg",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "airtableTokenApi",
+        "url": "http://web:3000/api/at/tblU26cUiQQV2eNdg",
+        "authentication": "genericCredentialType",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ records: $json.records || [], typecast: true }) }}",
         "options": {
           "timeout": 15000
-        }
+        },
+        "genericAuthType": "httpHeaderAuth"
       },
       "credentials": {
         "airtableTokenApi": {
           "id": "TPSvrVbCvTyOfNpL",
           "name": "Airtable Personal Access Token account"
+        },
+        "httpHeaderAuth": {
+          "id": "8kpY42LmZaBYBzfY",
+          "name": "HOV Media Ingest"
         }
       },
       "onError": "continueRegularOutput"

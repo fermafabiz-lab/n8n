@@ -30,6 +30,18 @@
 import { readFileSync, writeFileSync } from "node:fs";
 
 const AIRTABLE_TYPE = "n8n-nodes-base.airtable";
+
+/**
+ * The base URL of the Airtable-shaped shim on the site.
+ *
+ * Twenty-one nodes call api.airtable.com by hand — the Airtable node could not
+ * do what they needed — and the first port, which filtered by node type, never
+ * saw one of them. Rewriting their bodies was not an option: several are IIFEs
+ * that parse a model's reply into a fields object. So only the host changes,
+ * and the shim answers in Airtable's own dialect.
+ */
+const AIRTABLE_API = "https://api.airtable.com/v0/applPyJjvNzyxJkbv";
+const SHIM_API = "http://web:3000/api/at";
 const PG_CRED = { id: "eRjiNDQFuDSTJpGK", name: "HOV Postgres" };
 const INGEST_CRED = { id: "8kpY42LmZaBYBzfY", name: "HOV Media Ingest" };
 
@@ -283,8 +295,32 @@ const write = flags.includes("--write");
 const wf = JSON.parse(readFileSync(file, "utf8"));
 
 const done = [];
+const rerouted = [];
 const refused = [];
+
+/** An HTTP node that talks to Airtable: change the host, keep everything else. */
+function reroute(n) {
+  const p = { ...n.parameters };
+  p.url = String(p.url).split(AIRTABLE_API).join(SHIM_API);
+  // The Airtable PAT credential is replaced by the shim's shared header. The
+  // node keeps its method, body, timeout and onError exactly as they were.
+  if (p.authentication === "predefinedCredentialType") {
+    p.authentication = "genericCredentialType";
+    p.genericAuthType = "httpHeaderAuth";
+    delete p.nodeCredentialType;
+  }
+  return {
+    ...n,
+    parameters: p,
+    credentials: { ...(n.credentials ?? {}), httpHeaderAuth: INGEST_CRED },
+  };
+}
+
 wf.nodes = wf.nodes.map((n) => {
+  if (n.type === "n8n-nodes-base.httpRequest" && JSON.stringify(n).includes(AIRTABLE_API)) {
+    rerouted.push(n.name);
+    return reroute(n);
+  }
   if (n.type !== AIRTABLE_TYPE) return n;
   try {
     const out = convert(n);
@@ -297,8 +333,9 @@ wf.nodes = wf.nodes.map((n) => {
 });
 
 console.log(`\n${wf.name}`);
-console.log(`  converted ${done.length}:`);
+console.log(`  converted ${done.length}, rerouted ${rerouted.length}:`);
 for (const n of done) console.log(`    · ${n}`);
+for (const n of rerouted) console.log(`    → ${n}  (http → shim)`);
 if (refused.length) {
   console.log(`  REFUSED ${refused.length}:`);
   for (const r of refused) console.log(`    · ${r}`);

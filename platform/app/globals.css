@@ -307,30 +307,25 @@ body:has(.nb) .navfade {
   );
 }
 
-/* The bar is FIXED, on every page, and unconditionally.
-   It was sticky, which measured itself against the nearest scroll container
-   rather than the viewport — see the note on body's overflow above. The first
-   attempt at this fixed it only on the brief, via `body:has(.nb) .nav`; that
-   made the bar behave differently on one page than the others for no reason a
-   reader could see, and it depends on the selector matching, which is one more
-   thing that can quietly not happen. Fixed everywhere is simpler and has no
-   condition to fail.
-   Every page's <main> carries .page, which pays back the 72px the bar used to
-   occupy in flow (16px padding + a 56px pill), so nothing moved. The landing
-   is the exception and needs nothing: it hides the app bar entirely and
-   carries its own. */
 /* nav */
 /* Floating pill rather than a full-width bar with a rule under it. The bar
    drew a hard line across the page and cut the bloom in half; detached, the
    light runs behind it. */
 .nav {
-  position: fixed;
+  position: sticky;
   top: 0;
-  left: 0;
-  right: 0;
   z-index: 100;
   padding: 16px 20px 0;
   background: transparent;
+}
+/* On the brief the bar SCROLLS AWAY — it is part of the page, like the header
+   and the cards, exactly as the design has it. Not sticky and not fixed:
+   either of those keeps it on screen, and on this page that means a bar
+   sitting on top of the form you are filling in. `relative` occupies the same
+   space in flow as `sticky` did, so nothing below it moves. */
+body:has(.nb) .nav {
+  position: relative;
+  top: auto;
 }
 .nav .in {
   /* Matches .page (1200 max-width, 28px gutter) so the brand sits on the same
@@ -379,9 +374,7 @@ body:has(.nb) .navfade {
 .page {
   max-width: 1200px;
   margin: 0 auto;
-  /* 72px of top padding replaces the height the fixed bar no longer occupies
-     in flow: 16px of nav padding plus its 56px pill. */
-  padding: 72px 28px 0;
+  padding: 0 28px;
   position: relative;
   z-index: 1;
 }

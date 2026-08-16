@@ -2024,9 +2024,48 @@ Thirteen `search` nodes, four distinct filters between them:
 | `{Status General}='Finalizat'` | `fields->>'Status General' = 'Finalizat'` |
 | `OR({Status Producție Scenă}='A', …='B')` | `fields->>'Status Producție Scenă' in ('A','B')` |
 
-### The cutover happened — 2026-08-15, 22:46 UTC
+### The cutover was rolled back — 2026-08-16, 14:40 UTC
 
-Airtable is no longer read or written by anything. What ran, in order:
+**Counting Airtable nodes undercounted the dependency, and the first test film
+found it in ninety seconds.**
+
+The port converted every `n8n-nodes-base.airtable` node: 48 of them, all five
+workflows, verified. What it never looked at was **21 `httpRequest` nodes that
+call `api.airtable.com` by hand** — `Fetch Project Record`, `Fetch Genre
+Profile`, `Save Evidence`, `Write Scene Rewrite`, `IR Write Image`, and
+sixteen more, spread across Claude Scripting, Media Generation and the
+Orchestrator. They exist because the Airtable node could not do what those
+steps needed; the note on `Fetch Project Record` says as much.
+
+So the very first new project 403'd on its second node: the record had been
+created in Postgres, and that raw GET went looking for it in Airtable.
+
+**The right query is not by node type:**
+
+    select w.name, n->>'name', n->>'type'
+    from workflow_entity w, json_array_elements(w.nodes::json) n
+    where w.active and lower(n::text) like '%airtable%';
+
+That answers 48 for Media Generation's type filter and **11 / 4 / 1 / 32**
+across the four workflows for the honest one — including Code nodes
+(`Parse Approved From Airtable`, `Choose Bible`, `Prep Evidence Rows`…) that
+still need auditing to see which merely read `fields` from upstream, which the
+compatibility layer already covers, and which build Airtable URLs themselves.
+
+Rolled back in about four minutes: five PUTs from
+`db/port/workflows/*.original.json`, then `DATA_BACKEND=airtable` and
+`docker compose up -d web`. Nothing was lost but the test project itself, which
+had been created in Postgres and therefore never existed in Airtable — which is
+exactly why the rollback had to happen on the first film rather than the tenth.
+
+**Before trying again:** convert the 21 HTTP nodes, audit every Code node the
+query above returns, and re-run the whole scan expecting it to answer zero
+before publishing anything.
+
+### The first cutover attempt — 2026-08-15, 22:46 UTC
+
+**Superseded by the rollback above.** What ran, and what it proved, is still
+accurate; what it missed is the section above. What ran, in order:
 
 1. `search_executions` returned zero running/waiting.
 2. `pg_dump` of `hov` to `/opt/n8n/backups_hov_pre_cutover.sql.gz`.

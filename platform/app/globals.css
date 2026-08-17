@@ -4460,10 +4460,77 @@ body:has(.mkt) .vignette {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 14px;
+  flex-wrap: wrap;
+  gap: 16px;
   padding: 26px 0 6px;
   font-size: 13px;
   color: var(--dim);
+}
+
+/* --- pager. Same pills as every other control on the site: white surface,
+   hairline, soft shadow, 2px lift to the pointer, accent fill when chosen. --- */
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.pgbtn,
+.pgnum {
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--ink);
+  background: var(--card2);
+  border: 1px solid rgba(24, 20, 40, 0.09);
+  border-radius: var(--r-pill);
+  padding: 9px 16px;
+  box-shadow: var(--shadow-sm);
+  transition: var(--tr);
+  white-space: nowrap;
+}
+.pgnum {
+  min-width: 38px;
+  padding: 9px 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.pgbtn:hover:not(:disabled),
+.pgnum:hover:not(.on) {
+  transform: translateY(-2px);
+}
+.pgnum.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #f7f7f8;
+  box-shadow: var(--accent-cast);
+  cursor: default;
+}
+/* Disabled at the ends rather than hidden: a control that disappears at the
+   edge makes the row jump width as you page through it. */
+.pgbtn:disabled {
+  opacity: 0.45;
+  cursor: default;
+  box-shadow: none;
+}
+.pgnums {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pggap {
+  color: var(--faint);
+  padding: 0 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 720px) {
+  /* The numbers are the first thing to go on a phone — Previous/Next still
+     reach every page, just one at a time. */
+  .pgnums {
+    display: none;
+  }
 }
 
 @media (max-width: 1080px) {

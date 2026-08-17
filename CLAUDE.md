@@ -2090,6 +2090,18 @@ Two things about the wiring:
   access inside nodes can be switched off, and the port should not depend on
   whether it currently is. Same pattern as the FAL header.
 
+**`IR Write Image` was the one attachment write the port missed** — found
+2026-08-17, three site-triggered image regens 500-ing in a row. It had been
+rerouted to `/api/at` like an ordinary PATCH, but its body writes `Imagine
+Scenă`, and the shim refuses attachments BY DESIGN. The failure shape is
+nasty: the image is generated and uploaded to Flow, then the write dies, so
+money is spent, the scene keeps its regen flag, and the site shows the
+in-flight state — the producer sees a regeneration that "takes forever"
+until the batch's own (working) regen loop happens to pick the scene up.
+Fixed by moving it onto `/api/media/ingest` with the same body shape as
+`Write Scene Image`. When auditing the port, grep the BODIES for attachment
+fields, not just the URLs for `api.airtable.com`.
+
 Writing an `image` or `video` replaces that scene's attachment ROW. The old
 FILE stays on disk on purpose: saved drafts point at it by path, and deleting
 it would empty the one feature that exists to recover a bad re-roll.

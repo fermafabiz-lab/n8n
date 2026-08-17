@@ -795,14 +795,23 @@ Four things are load-bearing:
   Props` and `buildProject()` in `platform/lib/data/derive.ts` resolve it in
   exactly that order — out of step, the site would show a rate the render is
   not using.
-- **The refusal rule exists in THREE copies** (`speed.mjs`, `derive.ts`, the
-  n8n node) because it runs in three languages: out of range, unparseable, or
-  within 0.01 of 1 → leave the film alone. Verified to agree on 25 inputs.
-  Change one, change all three.
+- **The refusal rule exists in FOUR copies** — `speed.mjs`, `derive.ts`, and
+  the n8n nodes `Build Remotion Props` and `Normalize Webhook Input` — because
+  it runs in three languages at four points on the path: out of range,
+  unparseable, or within 0.01 of 1 → leave the film alone. Verified to agree on
+  25 inputs. Change one, change all four.
 
-The site edits it in two places, the same pair sound uses: `FinalSettings`
-before the render and `SoundSettings` ("Sound and speed of this film") after,
-which writes the merged options and re-fires the assemble webhook. Speed is a
+The site sets it in THREE places, and the brief is the one that was missed
+first: `/new` posts `speed` beside `pace` — the WORD still goes to the two
+writing prompts that read it, and is DERIVED from the rate so the pair can
+never contradict each other — and `Normalize Webhook Input` puts the number
+into Editing Options at creation. Without that last hop the brief could only
+ever choose a word, and the degree (0.8 versus 0.9) had nowhere to live; the
+first version of this feature shipped with the picker on the project page only,
+which reads as "nothing changed" from the screen the producer actually starts
+on. Then `FinalSettings` before the render and `SoundSettings` ("Sound and
+speed of this film") after, which writes the merged options and re-fires the
+assemble webhook. Speed is a
 number, so it cannot join `FinalSettings`' `OPTIONS` list (booleans with a
 Toggle) — hence `ToggleKey` narrowing `keyof EditingOptions`, and a separate
 `changeCount` so "Apply 1 change" cannot omit the one change that alters the
@@ -1473,6 +1482,7 @@ the pipeline already produces.
   button and pressing Enter on it still start the project.
 - **The /new form's field names are a frozen contract.** `createProject()`
   posts `name, category, cat_*, cast_voices, language, length, tone, pace,
+  speed,
   style, voice_id, aspect, captions/hook_title/chapter_cards/end_screen/sfx
   (yes|no)` to the n8n webhook. Any redesign keeps those names and value
   vocabularies byte-identical — the 2026-08 editorial rebuild moved them into

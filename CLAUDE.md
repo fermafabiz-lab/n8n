@@ -1260,14 +1260,48 @@ the pipeline already produces.
 
 - The project page auto-refreshes every 10s, which remounts components. Drafts
   in progress must be backed by `sessionStorage` to survive it.
-- **The app and the render share one type system.** Fraunces / Inter Tight /
-  IBM Plex Mono are loaded in `platform/app/layout.tsx` via `next/font` and
-  mirror `remotion/src/style.ts`, so the site looks like the films it makes.
+- **The app and the render share one type system.** **Outfit** / Inter / IBM
+  Plex Mono are loaded in `platform/app/layout.tsx` via `next/font` and mirror
+  `remotion/src/style.ts`, so the site looks like the films it makes.
   `latin-ext` is required here for the same reason as in the render — Romanian
-  project names carry ș and ț. Direction is "editorial": hairlines and tracked
-  mono labels instead of nested bordered boxes, one bloom behind the headline,
-  no gradient-filled text. Review and approval surfaces deliberately kept their
-  density — only the chrome changed.
+  project names carry ș and ț. Review and approval surfaces deliberately kept
+  their density — only the chrome changed.
+
+  **This bullet used to say Fraunces / Inter Tight and "editorial", and it was
+  wrong from 2026-08-15 to 2026-08-17** — the Daylight refresh (below) moved
+  both the site and the render to Outfit on the 15th and nobody corrected the
+  memory. A stale line here is worse than a missing one: it is read as current
+  and reasoned from. Anything that names a face or a direction gets corrected
+  in the same commit that changes it.
+- **The design system is "Daylight" (2026-08-15), and the token layer at the
+  top of `globals.css` is its single owner.** Light grey ground `#ececed`, one
+  purple accent `#7a4fd6` with a deep `#4d3484` and a lift `#b299e7` derived by
+  a fixed mix rule, pill buttons (`999px`), cushioned cards (24–28px radius,
+  soft shadows), near-black radial panels for anything that must feel like a
+  gate, and `cubic-bezier(.2,.8,.2,1)` at ~0.38s as the one ease. The
+  reference prototypes and the full token list live in
+  `design/handoff-visual-refresh/README.md` — **that file, not this section, is
+  the spec**; what belongs here is only where the rebuild stands and what bit.
+  It replaced the previous dark "editorial" direction wholesale, so a component
+  that draws its own colours instead of reading tokens had to be found by hand
+  (`721215f`) — the token layer cannot invert what does not ask it.
+- **The Daylight rebuild is three screens, and only two and a half are done.**
+  Landing (`platform/app/landing`, and it is now the site's front door),
+  the brief (`platform/app/new`, including the genre pole), and the projects
+  library (hero, cards, toolbar with search + segmented view + count,
+  pagination at 15/page) have all landed. **The per-project workspace —
+  screen 3, the stage stepper and the approval panels in
+  `platform/app/projects/[id]` — has NOT been rebuilt**: it still wears the
+  token layer and nothing more. That is the largest open piece of site work,
+  and it is the screen every approval gate lives on, so restyle it rather than
+  rewriting it: `SceneBoard`, `AssemblyStatus`, `ProductionActivity`,
+  `AudioReview`, `ScriptReview` and `StageNav` each carry hard-won behaviour
+  documented above, and the handoff's own rule is "keep every existing
+  control; restyle, don't remove".
+- `platform/lib/tone-type.ts`'s comments still describe the empty case as
+  "inherit Fraunces". It inherits **Outfit** now. The behaviour is correct —
+  an empty class means "inherit the display face" — only the name in the
+  comment is stale.
 - **Generic class names are already taken.** `globals.css` has app-wide
   blocks like `.empty` (an empty-state with `padding: 80px 0`), `.card`,
   `.field`, `.chip`. Using one as a local modifier silently inherits it: the

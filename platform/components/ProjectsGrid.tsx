@@ -89,6 +89,8 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
   const [pending, startTransition] = useTransition();
   const [filter, setFilter] = useState<"all" | StatusKind>("all");
   const [view, setView] = useState<"grid" | "list">("grid");
+  /** Filters title and category live, exactly as the design's search does. */
+  const [query, setQuery] = useState("");
   // Hover preview on finished covers: the final video plays muted in the
   // card. Mounted only after ~350ms of hover intent — the bytes come through
   // our own /api/media proxy (Drive-hosted), so drive-by hovers must not
@@ -132,8 +134,17 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
 
   const counts = new Map<string, number>([["all", projects.length]]);
   for (const p of projects) counts.set(p.statusKind, (counts.get(p.statusKind) ?? 0) + 1);
-  const shown =
-    filter === "all" ? projects : projects.filter((p) => p.statusKind === filter);
+  const q = query.trim().toLowerCase();
+  const shown = (filter === "all" ? projects : projects.filter((p) => p.statusKind === filter))
+    // Title AND category, because a producer looking for "the nature one" is
+    // as likely to remember the kind of film as its name.
+    .filter(
+      (p) =>
+        !q ||
+        p.name.toLowerCase().includes(q) ||
+        (p.category ?? "").toLowerCase().includes(q) ||
+        (p.tone ?? "").toLowerCase().includes(q),
+    );
 
   const toggle = (id: string) =>
     setSelected((prev) => {
@@ -196,6 +207,16 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
           )}
         </span>
         <span className="sp" />
+        <span className="psearch">
+          <span aria-hidden="true">⌕</span>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search titles and themes"
+            aria-label="Search projects"
+            autoComplete="off"
+          />
+        </span>
         <span className="vtog">
           <button
             type="button"
@@ -424,6 +445,14 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
               <span className={`st ${p.statusKind}`}>{badgeLabel(p)}</span>
             </Link>
           ))}
+        </div>
+      )}
+
+      {shown.length > 0 && (
+        <div className="pshowing">
+          <span>
+            Showing {shown.length} of {projects.length}
+          </span>
         </div>
       )}
     </>

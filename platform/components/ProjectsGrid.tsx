@@ -46,6 +46,41 @@ const short = (s: string, n: number) =>
  * into checkboxes and a two-step Delete removes every selected project
  * (scenes + scripts + project record; Drive media stays).
  */
+/**
+ * The card's first meta word. The film's own category when it has one (they
+ * are what the library is actually sorted by in a producer's head), falling
+ * back to the tone, which every project has.
+ */
+function categoryLabel(p: { category: string | null; tone: string | null }): string {
+  if (p.category) {
+    return p.category.charAt(0).toUpperCase() + p.category.slice(1);
+  }
+  return p.tone || "Film";
+}
+
+/** mm:ss — the runtime chip on the still and the card's meta line. */
+function runtimeOf(sec: number | null): string {
+  if (!sec || sec <= 0) return "—";
+  return `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, "0")}`;
+}
+
+/**
+ * "4 min ago". Deliberately coarse: the card is scanned, and a timestamp to
+ * the second invites reading it as progress when it is only a write time.
+ */
+function agoOf(iso: string | null): string {
+  if (!iso) return "";
+  const ms = Date.now() - new Date(iso).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return "";
+  const m = Math.round(ms / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m} min ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h} ${h === 1 ? "hour" : "hours"} ago`;
+  const d = Math.round(h / 24);
+  return d === 1 ? "yesterday" : `${d} days ago`;
+}
+
 export default function ProjectsGrid({ projects }: { projects: Project[] }) {
   const [manage, setManage] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -265,6 +300,11 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
                   className={`art ${p.coverUrl ? "" : `fallback${(i % 4) + 1}`}`}
                   style={p.coverUrl ? { backgroundImage: `url(${p.coverUrl})` } : undefined}
                 />
+                {/* Top-and-bottom scrim. The chips sit ON the still, and a
+                    still is whatever the film generated — it can be bright,
+                    pale or busy, so the chips need their own ground rather
+                    than luck. */}
+                <span className="scrim" aria-hidden="true" />
                 {/* Re-checked at render, not just at arm time: a manage
                     toggle or the 15s refetch can invalidate a hover that
                     never got its mouseleave. */}
@@ -303,23 +343,40 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
                     {selected.has(p.id) ? "✓" : ""}
                   </span>
                 )}
+                <span className="rt">{runtimeOf(p.lengthSeconds)}</span>
               </div>
               <div className="body">
                 <ExpandableTitle text={p.name} as="h3" clampChars={80} />
                 <div className="meta">
-                  {p.lengthSeconds ? `${p.lengthSeconds}s` : "—"}
-                  {p.tone ? ` · ${p.tone}` : ""}
+                  {categoryLabel(p)} · {runtimeOf(p.lengthSeconds)}
                 </div>
-                <div className="track">
-                  <i
-                    className={p.statusKind === "idle" ? "" : p.statusKind}
-                    style={{ width: `${Math.round(p.progress * 100)}%` }}
-                  />
-                </div>
+                {/* The bar and the step line belong to work in flight. On a
+                    finished film a full bar says nothing the Finished chip
+                    has not already said, and on an idle one it is a lie. */}
+                {(p.statusKind === "run" || p.statusKind === "err") && (
+                  <div className="prog">
+                    <div className="track">
+                      <i
+                        className={p.statusKind}
+                        style={{ width: `${Math.round(p.progress * 100)}%` }}
+                      />
+                    </div>
+                    <div className="stepline">
+                      <span>{p.status}</span>
+                      <span>{Math.round(p.progress * 100)}%</span>
+                    </div>
+                  </div>
+                )}
                 <div className="foot">
-                  <span>{p.status}</span>
+                  <span>{agoOf(p.updatedAt) || p.status}</span>
                   <span className="go">
-                    {manage ? (selected.has(p.id) ? "Selected" : "Tap to select") : "Open →"}
+                    {manage
+                      ? selected.has(p.id)
+                        ? "Selected"
+                        : "Tap to select"
+                      : p.statusKind === "done"
+                        ? "Watch →"
+                        : "Open →"}
                   </span>
                 </div>
               </div>

@@ -4258,3 +4258,144 @@ body:has(.mkt) .vignette {
     padding: 18px 20px 20px;
   }
 }
+
+
+/* --- Projects: the cards, floaty --- */
+.page.pj .proj {
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  background: var(--card-fill);
+  border: none;
+  box-shadow: 0 2px 6px rgba(24, 20, 40, 0.06), 0 14px 34px rgba(24, 20, 40, 0.14);
+  transition: var(--tr);
+}
+.page.pj .proj:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 10px rgba(24, 20, 40, 0.07), 0 24px 54px rgba(24, 20, 40, 0.2);
+}
+/* aspect-ratio has to be cleared, not just overridden by height: the base rule
+   sets 16/9, and an element with BOTH an aspect-ratio and a fixed height
+   derives its WIDTH from them — 152px tall became 270px wide inside a 440px
+   card, with the card's own background showing beside the still. */
+.page.pj .proj .cover {
+  position: relative;
+  aspect-ratio: auto;
+  width: 100%;
+  height: 152px;
+  border-radius: 0;
+  border: none;
+  overflow: hidden;
+}
+/* The base card's bottom-only scrim is replaced by .scrim, which darkens both
+   ends — two stacked scrims would double the bottom. */
+.page.pj .proj .cover::after {
+  display: none;
+}
+/* Top and bottom only — the middle stays clear so the still is still a still.
+   The chips ride on the two dark ends. */
+.page.pj .proj .cover .scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(12, 11, 17, 0.5) 0%,
+    rgba(12, 11, 17, 0.08) 42%,
+    rgba(12, 11, 17, 0.62) 100%
+  );
+}
+.page.pj .proj .badge {
+  position: absolute;
+  z-index: 2;
+  top: 12px;
+  left: 12px;
+  backdrop-filter: none;
+}
+/* Near-opaque, not a translucent tint: the chip sits on a picture nobody
+   chose, so its legibility cannot depend on what is behind it. */
+.page.pj .proj .badge.run,
+.page.pj .proj .badge.wait {
+  background: rgba(238, 231, 252, 0.94);
+  color: var(--accent-deep);
+  box-shadow: none;
+}
+.page.pj .proj .badge.done {
+  background: rgba(214, 240, 229, 0.92);
+  color: #2b6b52;
+  box-shadow: none;
+}
+.page.pj .proj .badge.err {
+  background: rgba(250, 226, 223, 0.92);
+  color: #a03c33;
+  box-shadow: none;
+}
+.page.pj .proj .rt {
+  position: absolute;
+  z-index: 2;
+  right: 12px;
+  bottom: 12px;
+  font-family: var(--f-mono), ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(15, 14, 20, 0.6);
+  border-radius: 6px;
+  padding: 3px 8px;
+}
+.page.pj .proj .body {
+  padding: 15px 17px 17px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.page.pj .proj h3 {
+  margin: 0;
+  font-family: var(--f-display), var(--f-ui), sans-serif;
+  font-size: 17.5px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  color: var(--ink);
+}
+.page.pj .proj .meta {
+  font-family: var(--f-mono), ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--dim);
+  margin: 0;
+}
+.page.pj .proj .prog {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.page.pj .proj .track {
+  height: 3px;
+  border-radius: 3px;
+  background: rgba(24, 20, 40, 0.09);
+  margin: 0;
+}
+.page.pj .proj .stepline {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-family: var(--f-mono), ui-monospace, Menlo, monospace;
+  font-size: 10.5px;
+  color: var(--dim);
+}
+.page.pj .proj .foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 2px;
+  font-size: 12px;
+  color: var(--faint);
+  border: none;
+}
+.page.pj .proj .foot .go {
+  font-size: 12.5px;
+  color: var(--accent);
+  white-space: nowrap;
+}

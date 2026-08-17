@@ -61,7 +61,19 @@ const LENGTH_PRESETS = [
   { label: "2 min", s: 120 },
   { label: "4 min", s: 240 },
   { label: "8 min", s: 480 },
+  { label: "10 min", s: 600 },
+  { label: "12 min", s: 720 },
 ];
+
+/**
+ * The slider's ends, and the number field's.
+ *
+ * One owner, because the range input, the number input and the fill
+ * percentage all have to agree — they were three copies of `480`, and a
+ * preset above a stale max is a chip that moves the slider nowhere.
+ */
+const LENGTH_MIN = 16;
+const LENGTH_MAX = LENGTH_PRESETS[LENGTH_PRESETS.length - 1].s;
 
 /**
  * The overlay finishes, as numbered switch rows. Field names and yes/no
@@ -186,7 +198,8 @@ export default function NewVideo() {
     .map((f) => f.sheet)
     .join(" · ");
   const lengthLabel = `${Math.floor(length / 60)}:${String(length % 60).padStart(2, "0")}`;
-  const sliderFill = `${(Math.min(Math.max(length, 16), 480) - 16) / (480 - 16) * 100}%`;
+  const sliderPos = Math.min(Math.max(length, LENGTH_MIN), LENGTH_MAX);
+  const sliderFill = `${((sliderPos - LENGTH_MIN) / (LENGTH_MAX - LENGTH_MIN)) * 100}%`;
 
   return (
     <main className="page nb">
@@ -391,8 +404,8 @@ export default function NewVideo() {
                       id="length"
                       name="length"
                       type="number"
-                      min={16}
-                      max={480}
+                      min={LENGTH_MIN}
+                      max={LENGTH_MAX}
                       step={1}
                       value={length}
                       onChange={(e) => setLength(Number(e.target.value) || 0)}
@@ -403,10 +416,10 @@ export default function NewVideo() {
                   <input
                     type="range"
                     className="lenslider"
-                    min={16}
-                    max={480}
+                    min={LENGTH_MIN}
+                    max={LENGTH_MAX}
                     step={8}
-                    value={Math.min(Math.max(length, 16), 480)}
+                    value={sliderPos}
                     onChange={(e) => setLength(Number(e.target.value))}
                     style={{ ["--fill" as string]: sliderFill }}
                     aria-label="Length"

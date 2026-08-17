@@ -1946,6 +1946,23 @@ at `postgres:5432/hov` on the compose network.
 does any attempt to write an attachment. A silently ignored write is precisely
 the divergence that would make a parallel run look successful while it was not.
 
+**And the schema refuses too — a value Airtable swallowed for months can now
+abort a run.** First one found in the wild, 2026-08-16 15:20: a
+`restart-scripting` run (orchestrator 4225 → scripting child 4226) died at
+`Create Chapter Records` with
+
+    new row for relation "chapter" violates check constraint "chapter_ordinal_check"
+    Failing row contains (…, HOOK, …, 0, Aprobat, …)
+
+The **hook chapter is created with `Ordine: 0`**, and the CHECK rejects it.
+Airtable had no constraints, so this shipped invisibly. Runs after 15:27
+succeeded, so something changed — constraint, payload, or simply a project
+without a hook — but which is unconfirmed, and a film whose hook cannot be
+written loses its opening card. Treat this as the first of a class: **every
+place the old code wrote a lazy `0` or `null` is now a candidate abort**, and
+the two zeroing entries under Airtable are the map of where those are. The
+failure is at least loud, which is the improvement.
+
 ### The four nodes that need more than a query — solved
 
 `Write Scene Image`, `Write Regen Image`, `Write Regen Video` and
@@ -2026,6 +2043,47 @@ and leaving them parked is not available through the API. The consequences:
 - `settings` is stricter on PUT than on GET: it rejects `binaryMode` and
   `availableInMCP`, which GET happily returns. Send `{"executionOrder": "v1"}`
   alone — the server merges rather than replaces, and the other two survive.
+
+### …but the UI does stage drafts, and one is parked right now with its Drive uploads broken
+
+The entry above is about `PUT /workflows/{id}`. **The editor is different: opening
+a workflow in the n8n UI and saving stages a real draft**, and `versionId` then
+stops matching `activeVersionId` until someone presses Publish. So "a draft
+cannot exist" is true of the API and false of the instance.
+
+Observed 2026-08-17: `3. Media Generation` has `versionId`
+`d85a3f8c-5cda-4dc0-96d3-9e8fac91aa2a` against `activeVersionId`
+`f7f59a08-05a5-4f73-81a4-742e46880544`, the draft saved at 12:37. Diffed
+node-for-node against the live version, it is identical except for key-reorder
+noise and one thing that matters: **all six Google Drive *upload* nodes have
+lost `resource: file` + `operation: upload`** — `Upload Audio to Drive`,
+`Upload Scene To Drive`, `Upload Regen Clip To Drive`, `Upload VR Audio`,
+`Upload VR Clip`, `AB Upload Audio`. The `Share *` siblings kept
+`operation: share`.
+
+**The port is not the culprit** — `db/port/workflows/yHG4DBCDjR3RJzav.ported.json`
+still has `op=upload res=file` on all six. This is the same stripping the
+cloud→self-hosted import did, which means it is the **editor** dropping a Drive
+node's action when it round-trips a node type it cannot fully resolve. Publishing
+that draft would break every voice and clip upload in the pipeline, silently:
+the nodes do not error, they just have no resolvable action.
+
+So: **discard it, or re-set `resource`/`operation` on those six before
+publishing.** And check for this after any UI visit to a workflow with Drive
+nodes:
+
+    jq -r '.nodes[]|select(.type|test("googleDrive"))|.name+" "+(.parameters.operation//"MISSING")'
+
+Two reading traps come with the draft model, and together they cost an hour:
+
+- **`get_workflow_details` returns the DRAFT.** To see what is actually running,
+  `get_workflow_version` with `activeVersionId`.
+- **`search_workflows`' `updatedAt` reports the PUBLISHED version.** A workflow
+  edited three minutes ago can look untouched for a day. Combined with a copy
+  fetched earlier in a long session, that is how Media Generation got read as
+  "still 22 Airtable nodes" on 08-17 — a workflow fully on Postgres since the
+  day before. Re-fetch before concluding anything about the current state, and
+  compare `.workflow.updatedAt` against what the search tool claimed.
 
 ### The write mechanism: dollar-quoting, not parameters
 
@@ -2405,8 +2463,19 @@ generated FROM it. The chain, and where each piece lives:
 
 ## Open work
 
-- **The OpenAI account is out of credits, and that is what stops the
-  pipeline today** — not any workflow defect. Execution 1783 (2026-08-08,
+- **Do not publish the Media Generation draft** parked since 2026-08-17 12:37 —
+  it has `resource`/`operation` stripped from all six Google Drive upload nodes.
+  Discard it back to `activeVersionId` `f7f59a08-05a5-4f73-81a4-742e46880544`, or
+  re-set them first. Full account under the n8n lessons.
+- **Confirm the hook chapter's ordinal survives Postgres.** `chapter_ordinal_check`
+  rejected `Ordine: 0` on 2026-08-16 (execution 4225 → 4226). Later runs
+  succeeded, but whether the constraint, the payload or the absence of a hook is
+  what changed is unknown.
+- ~~The OpenAI account is out of credits~~ — **resolved.** Full pipelines ran to
+  a finished film on 08-13, 08-14 and 08-16, and both `recCoZWsZBOrIU69L` and
+  `rec1GITgUCq4mEsUd` read `Finalizat` with a final video. The entry is kept for
+  its map of which nodes share that account — still the fastest way to see the
+  blast radius of a billing failure. Original note: execution 1783 (2026-08-08,
   project "Death cominig up to take someone into the underworld",
   `recCoZWsZBOrIU69L`) died at `Rebuild Story Bible` with *"You have no
   credits remaining"*, after the script had been written, edited and
@@ -2420,6 +2489,7 @@ generated FROM it. The chain, and where each piece lives:
   Scenă` and releases the "Regenerare Text" status, so nothing hangs.
   That project is mid-flight: Story Bible and approved script exist, no
   chapters and no scenes. `restart-scripting` is the door back in.
+  (Both of those projects have since finished — see the strike-through above.)
 - **Ask Dan for `hookTitle`.** Scripting should write a 3-6 word line meant
   for the screen and n8n should pass it in `Build Remotion Props`; the prop
   already exists and bypasses the isTitleLike gate. Until then, projects whose

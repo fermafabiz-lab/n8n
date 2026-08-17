@@ -46,6 +46,27 @@ const short = (s: string, n: number) =>
  * into checkboxes and a two-step Delete removes every selected project
  * (scenes + scripts + project record; Drive media stays).
  */
+/** Projects per page. */
+const PAGE_SIZE = 15;
+
+/**
+ * The page numbers to actually draw: always the first and last, always the
+ * current and its neighbours, with an ellipsis standing in for the rest. A
+ * library of 57 films is four pages and needs none of this; one of 600 is
+ * forty, and forty pills is not a control, it is a wall.
+ */
+function pageNumbers(current: number, total: number): Array<number | "gap"> {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const out: Array<number | "gap"> = [1];
+  const lo = Math.max(2, current - 1);
+  const hi = Math.min(total - 1, current + 1);
+  if (lo > 2) out.push("gap");
+  for (let n = lo; n <= hi; n++) out.push(n);
+  if (hi < total - 1) out.push("gap");
+  out.push(total);
+  return out;
+}
+
 /**
  * The card's first meta word. The film's own category when it has one (they
  * are what the library is actually sorted by in a producer's head), falling
@@ -91,6 +112,7 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
   const [view, setView] = useState<"grid" | "list">("grid");
   /** Filters title and category live, exactly as the design's search does. */
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
   // Hover preview on finished covers: the final video plays muted in the
   // card. Mounted only after ~350ms of hover intent — the bytes come through
   // our own /api/media proxy (Drive-hosted), so drive-by hovers must not
@@ -135,7 +157,7 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
   const counts = new Map<string, number>([["all", projects.length]]);
   for (const p of projects) counts.set(p.statusKind, (counts.get(p.statusKind) ?? 0) + 1);
   const q = query.trim().toLowerCase();
-  const shown = (filter === "all" ? projects : projects.filter((p) => p.statusKind === filter))
+  const matched = (filter === "all" ? projects : projects.filter((p) => p.statusKind === filter))
     // Title AND category, because a producer looking for "the nature one" is
     // as likely to remember the kind of film as its name.
     .filter(
@@ -145,6 +167,17 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
         (p.category ?? "").toLowerCase().includes(q) ||
         (p.tone ?? "").toLowerCase().includes(q),
     );
+
+  const totalPages = Math.max(1, Math.ceil(matched.length / PAGE_SIZE));
+  /**
+   * Clamped at render rather than trusted from state. Filtering, searching and
+   * the 15s refetch all shrink the list under a page number that was valid a
+   * moment ago — and a page past the end renders as an empty library, which
+   * reads as "everything is gone" rather than "you are on page 4 of 2".
+   */
+  const current = Math.min(Math.max(1, page), totalPages);
+  const from = (current - 1) * PAGE_SIZE;
+  const shown = matched.slice(from, from + PAGE_SIZE);
 
   const toggle = (id: string) =>
     setSelected((prev) => {
@@ -198,7 +231,10 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
                 key={f.key}
                 type="button"
                 className={`ftab ${filter === f.key ? "on" : ""}`}
-                onClick={() => setFilter(f.key)}
+                onClick={() => {
+                  setFilter(f.key);
+                  setPage(1);
+                }}
               >
                 {f.label}
                 <span className="c">{counts.get(f.key) ?? 0}</span>
@@ -211,7 +247,10 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
           <span aria-hidden="true">⌕</span>
           <input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setPage(1);
+            }}
             placeholder="Search titles and themes"
             aria-label="Search projects"
             autoComplete="off"
@@ -448,11 +487,51 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
         </div>
       )}
 
-      {shown.length > 0 && (
+      {matched.length > 0 && (
         <div className="pshowing">
           <span>
-            Showing {shown.length} of {projects.length}
+            Showing {from + 1}–{from + shown.length} of {matched.length}
+            {matched.length !== projects.length ? ` (${projects.length} total)` : ""}
           </span>
+          {totalPages > 1 && (
+            <nav className="pager" aria-label="Projects pages">
+              <button
+                type="button"
+                className="pgbtn"
+                onClick={() => setPage(current - 1)}
+                disabled={current === 1}
+              >
+                ← Previous
+              </button>
+              <span className="pgnums">
+                {pageNumbers(current, totalPages).map((n, i) =>
+                  n === "gap" ? (
+                    <span className="pggap" key={`gap${i}`}>
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      key={n}
+                      className={`pgnum ${n === current ? "on" : ""}`}
+                      onClick={() => setPage(n)}
+                      aria-current={n === current ? "page" : undefined}
+                    >
+                      {n}
+                    </button>
+                  ),
+                )}
+              </span>
+              <button
+                type="button"
+                className="pgbtn"
+                onClick={() => setPage(current + 1)}
+                disabled={current === totalPages}
+              >
+                Next →
+              </button>
+            </nav>
+          )}
         </div>
       )}
     </>

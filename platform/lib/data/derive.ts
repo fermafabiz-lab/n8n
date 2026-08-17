@@ -28,6 +28,44 @@ export interface EditingOptions {
   /** Background music AND the synthesized boom/whoosh/riser accents. Both
    *  are composed here, not in the footage, so they ride one switch. */
   music: boolean;
+  /** Playback rate of the finished film: 0.9 slow, 1 normal, 1.1 fast.
+   *
+   *  This is what the creation form's PACE control finally means. Before it
+   *  existed, PACE reached exactly two prompt lines in Claude Scripting
+   *  (`Pace: Slow`, a hint with no rule) and nothing else read the field —
+   *  which is why it demonstrably changed nothing. The rate is applied to the
+   *  ALREADY-RENDERED film by the render server, so the picture, the
+   *  narration, the music and every baked-in graphic all move together; see
+   *  remotion/server/speed.mjs for why no earlier step can own it. */
+  speed: number;
+}
+
+/** The three PACE values, as speeds. Mirrors SPEED_BY_PACE in speed.mjs. */
+export const SPEED_BY_PACE: Record<string, number> = {
+  slow: 0.9,
+  normal: 1,
+  fast: 1.1,
+};
+
+/**
+ * Read a stored speed, defaulting to 1 for anything missing or unusable.
+ *
+ * Mirrors `normalizeSpeed()` in remotion/server/speed.mjs — the render server
+ * is the one that acts on the number, and it refuses the same values this
+ * refuses, so the control can never show a rate the film will not be given.
+ * Keep the two in lockstep; a project stored before this existed has no
+ * `speed` key at all and reads as 1, which is exactly what those films are.
+ */
+export function normalizeSpeed(value: unknown): number {
+  if (typeof value === "string") {
+    const byName = SPEED_BY_PACE[value.trim().toLowerCase()];
+    if (byName !== undefined) return byName;
+  }
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return 1;
+  if (n < 0.5 || n > 2) return 1;
+  if (Math.abs(n - 1) < 0.01) return 1;
+  return n;
 }
 
 export interface Project {
@@ -162,6 +200,9 @@ export interface RawProject {
   voiceId: string;
   createdAt: string | null;
   coverUrl?: string | null;
+  /** The creation form's PACE choice ("Slow" | "Normal" | "Fast"). It is the
+   *  DEFAULT for editing.speed — see the fallback in buildProject. */
+  paceRaw?: unknown;
 }
 
 export interface RawScene {
@@ -309,6 +350,18 @@ export function buildProject(r: RawProject): Project {
       // was unrelated stingers over stripped-out ambience.
       sfx: opts.sfx !== false,
       music: opts.music === true,
+      // Editing Options is the OVERRIDE, the project's PACE field the default.
+      // Two sources on purpose: PACE is chosen on the brief and stored on the
+      // project, so falling back to it means every film already in the
+      // database honours the choice its producer made, with nothing to
+      // migrate — while a later change on the site writes `speed` and wins.
+      // `Build Remotion Props` resolves it in exactly this order, and the two
+      // must stay in step or the control would show a rate the render is not
+      // using.
+      speed:
+        opts.speed === undefined || opts.speed === null
+          ? normalizeSpeed(r.paceRaw)
+          : normalizeSpeed(opts.speed),
     },
     awaitingFinalSettings: /setari finale/.test(normalizeStatus(r.statusRaw)),
     category: typeof opts.category === "string" ? opts.category : null,

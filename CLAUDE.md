@@ -730,7 +730,69 @@ is built only inside that guard (a `-1` input index would break the graph).
 - The ffmpeg bundled with Remotion in `node_modules` is a **stripped build**
   — no `sidechaincompress`, `alimiter`, `asplit`, `afade`, `anullsink`,
   `aloop`. The mix graph cannot be rehearsed locally with it; validate the
-  graph by reading it, and test on Railway.
+  graph by reading it, and test on Railway. **A Claude Code web session has no
+  system ffmpeg at all** — the only binary on the box is Playwright's, built
+  `--disable-everything` (pad/crop/scale, vp8, png; no `setpts`, no `atempo`,
+  no x264). So a filter graph written here cannot be run here either way.
+
+### Playback speed — what PACE finally means
+
+`Editing Options.speed` (0.9 / 1 / 1.1) re-times the finished film, and it is
+the **first real effect the brief's PACE control has ever had**. Before
+2026-08-17 `Slow | Normal | Fast` reached exactly two places: a bare
+`Pace: Slow` line interpolated into `Generate Outline` and `Write Chapter
+Narration`. A hint to a model with no rule attached, and nothing else read the
+field — so the producer's "it doesn't change anything" was simply correct.
+Worth remembering as a shape: **a value that is stored, passed through several
+workflows and interpolated into a prompt can still be inert**, and it looks
+implemented from every angle except the film.
+
+Applied by `remotion/server/speed.mjs` (a NEW file — `assemble.mjs` is
+untouched) after Remotion draws, `setpts=PTS/rate,fps=24` plus
+`atempo=rate`. `/render` strips `speed` off the body, so the props the
+composition receives are byte-identical to before.
+
+**The obvious place is the wrong one, and the reason is the retime.** In
+`assemble.mjs` every scene already lasts as long as its own narration
+(`eff = voiceDur + 0.35`) and the clip is time-stretched to fill it, so slowing
+the narration would stretch the picture for free. Three things kill it: that
+stretch is clamped to `[0.65, 1.5]` and spills into a **frozen tail** past the
+top, so "slow" would mean slower in some scenes and stuttering in others; it
+moves only the picture, leaving the pauses, the music bed and the graphics on
+their old timing; and the scene times computed there feed the graphics pass, so
+captions, chapter cards and the end screen would all need rescaling in lockstep.
+On the finished file there is one stream of each left, so nothing can drift.
+`atempo` resamples without shifting pitch — a slowed narrator sounds slower,
+not deeper.
+
+Four things are load-bearing:
+
+- **A failed speed pass must keep the film.** The job completes un-retimed and
+  reports `speedError`. The render is minutes of headless Chrome at ~2 fps; the
+  re-time is seconds. Losing the former to save the latter is a bad trade.
+- **`Graphics Guard` sees a new status, `retiming`.** It only throws on
+  `error` and otherwise passes through, so this reads as "keep polling" — but
+  the retime shares the render's poll budget (`MAX_POLLS = 360` at 5s = 30 min).
+  Long film plus a slow re-encode both come out of that ceiling.
+- **Editing Options is the OVERRIDE, the project's `Pace` field the DEFAULT.**
+  Two sources on purpose: falling back to `Pace` means all 56 films already in
+  the database honour the choice their producer made, with nothing to migrate,
+  while a later change on the site writes `speed` and wins. `Build Remotion
+  Props` and `buildProject()` in `platform/lib/data/derive.ts` resolve it in
+  exactly that order — out of step, the site would show a rate the render is
+  not using.
+- **The refusal rule exists in THREE copies** (`speed.mjs`, `derive.ts`, the
+  n8n node) because it runs in three languages: out of range, unparseable, or
+  within 0.01 of 1 → leave the film alone. Verified to agree on 25 inputs.
+  Change one, change all three.
+
+The site edits it in two places, the same pair sound uses: `FinalSettings`
+before the render and `SoundSettings` ("Sound and speed of this film") after,
+which writes the merged options and re-fires the assemble webhook. Speed is a
+number, so it cannot join `FinalSettings`' `OPTIONS` list (booleans with a
+Toggle) — hence `ToggleKey` narrowing `keyof EditingOptions`, and a separate
+`changeCount` so "Apply 1 change" cannot omit the one change that alters the
+film's whole length.
 
 ### The Cinematic category (silent film)
 
@@ -2084,6 +2146,34 @@ Two reading traps come with the draft model, and together they cost an hour:
   "still 22 Airtable nodes" on 08-17 — a workflow fully on Postgres since the
   day before. Re-fetch before concluding anything about the current state, and
   compare `.workflow.updatedAt` against what the search tool claimed.
+
+**The MCP connector stages a draft too — `update_workflow` does NOT publish.**
+Third case, and it behaves like the editor rather than like the PUT: after an
+`update_workflow` the workflow's `versionId` is the new version, `updatedAt`
+moves, `get_workflow_details` returns the change — and `activeVersionId` still
+points at the old one, so **production keeps running the previous version**.
+Nothing in the tool's answer says so; it reports `appliedOperations: 1` and a
+URL. Found on 2026-08-17 while wiring `speed` into `Build Remotion Props`: the
+edit read back perfectly and would have changed nothing at all.
+
+So an MCP edit is two steps, and the second one needs the version id:
+
+    publish_workflow { workflowId, versionId: <the id from get_workflow_history> }
+
+Pass `versionId` explicitly rather than letting it publish "the current draft" —
+that is the exact hazard the Media Generation draft above is: whatever is parked
+goes live with your change. Before publishing anything, diff the draft against
+the version you meant to build on, node by node, and confirm the ONLY entry that
+differs is yours:
+
+    # nodes differing between the saved original and the draft
+    [k for k in draft if original.get(k) != draft[k]]
+
+For the speed edit that list was exactly `['Build Remotion Props']` and all
+three Google Drive nodes still had their `resource`/`operation`, which is what
+made the publish safe. `get_workflow_history` is also how you tell the two
+apart at a glance: the newest entry carries the `versionName` you passed, and
+if `activeVersionId` is not that id, your change is parked.
 
 ### The write mechanism: dollar-quoting, not parameters
 

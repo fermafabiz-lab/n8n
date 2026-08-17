@@ -737,8 +737,22 @@ is built only inside that guard (a `-1` input index would break the graph).
 
 ### Playback speed — what PACE finally means
 
-`Editing Options.speed` (0.9 / 1 / 1.1) re-times the finished film, and it is
-the **first real effect the brief's PACE control has ever had**. Before
+`Editing Options.speed` re-times the finished film, and it is the **first real
+effect the brief's PACE control has ever had**. The word is the decision and
+the multiplier is the degree: Slow offers **0.9× or 0.8×**, Fast **1.1× or
+1.25×**, Normal is one thing. One number could not be both safe and noticeable
+— 0.9/1.1 is a real change but modest (a podcast at 1.1×), 0.8/1.25 is
+unmistakably a different film — so picking one for everybody meant either a
+control that gets called inert again or one that overshoots.
+
+**Widening the range needed no change outside `SpeedPicker.tsx`**, which is the
+property to preserve: the refusal rule takes any rate inside `[0.5, 2]` that is
+not within 0.01 of 1, so the rates are never enumerated downstream. A fifth
+rate is a one-file change as long as it stays in that window. `SPEED_BY_PACE`
+still maps the three WORDS to the gentle defaults, because it doubles as the
+fallback for a project whose only stored signal is `Pace: Slow` — if the
+picker's default and that map disagreed, clicking Slow would give a different
+film from a project that arrived with Slow and never touched the control. Before
 2026-08-17 `Slow | Normal | Fast` reached exactly two places: a bare
 `Pace: Slow` line interpolated into `Generate Outline` and `Write Chapter
 Narration`. A hint to a model with no rule attached, and nothing else read the

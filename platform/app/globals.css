@@ -3126,6 +3126,21 @@ body:has(.nb) .nav {
   box-shadow: var(--shadow-sm);
 }
 
+/* The degree row under Slow / Fast in SpeedPicker: the same control, one step
+   quieter, so the word stays the primary decision and the multiplier reads as
+   a refinement of it rather than as a second, competing choice. Mono because
+   it is a number, matching every other measured value on these panels. */
+.seg.speedrates {
+  gap: 2px;
+  padding: 3px;
+}
+.seg.speedrates button {
+  font-family: var(--f-mono), ui-monospace, monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  padding: 6px 13px;
+}
+
 /* ============================================================
    The marketing landing (/landing) — the handoff's first screen,
    with placeholder copy and stats to be replaced. Namespaced

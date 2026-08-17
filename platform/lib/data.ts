@@ -267,6 +267,7 @@ function toRawProject(r: AirtableRecord): RawProject {
     // every later voice picker can narrow to voices that speak it — otherwise
     // swapping a narrator on a Romanian project offers the English library.
     language: String(r.fields["Language"] ?? ""),
+    paceRaw: r.fields["Pace"],
     voiceId: String(r.fields["Voice ID"] ?? ""),
     createdAt: r.createdTime,
   };
@@ -445,7 +446,7 @@ const DEMO_PROJECTS: Project[] = [
     finalVideoUrl: null,
     aspect: "16:9" as const,
     updatedAt: null,
-    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: true, music: false },
+    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: true, music: false, speed: 1 },
     awaitingFinalSettings: false,
     category: "story",
     language: "English",
@@ -466,7 +467,7 @@ const DEMO_PROJECTS: Project[] = [
     finalVideoUrl: null,
     aspect: "16:9" as const,
     updatedAt: null,
-    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: true, music: false },
+    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: true, music: false, speed: 1 },
     awaitingFinalSettings: false,
     category: "story",
     language: "English",
@@ -487,7 +488,7 @@ const DEMO_PROJECTS: Project[] = [
     finalVideoUrl: null,
     aspect: "16:9" as const,
     updatedAt: null,
-    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: true, music: false },
+    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: true, music: false, speed: 1 },
     awaitingFinalSettings: false,
     category: "story",
     language: "English",
@@ -508,7 +509,7 @@ const DEMO_PROJECTS: Project[] = [
     finalVideoUrl: "#",
     aspect: "16:9" as const,
     updatedAt: null,
-    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: true, music: false },
+    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: true, music: false, speed: 1 },
     awaitingFinalSettings: false,
     category: "story",
     language: "English",

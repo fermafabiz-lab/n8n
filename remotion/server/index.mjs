@@ -15,6 +15,7 @@ import {registerInspect} from './inspect.mjs';
 import {registerTranscript} from './transcript.mjs';
 import {registerAnalyze} from './analyze.mjs';
 import {registerTts} from './tts.mjs';
+import {normalizeSpeed, applySpeed} from './speed.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OUTPUT_DIR = path.join(__dirname, 'output');
@@ -62,7 +63,13 @@ function getBundleLocation() {
 const jobs = new Map(); // jobId -> {status, progress, outputFile, error}
 
 app.post('/render', async (req, res) => {
-	const inputProps = req.body;
+	// `speed` is OURS, not Remotion's: it is stripped out here so the props the
+	// composition receives stay byte-identical to what they were before this
+	// existed. The film is re-timed after it is drawn — see speed.mjs for why
+	// that is the only place it can happen without three surfaces drifting
+	// apart. An unrecognised value normalizes to 1, i.e. leaves the film alone.
+	const {speed: rawSpeed, ...inputProps} = req.body ?? {};
+	const speed = normalizeSpeed(rawSpeed);
 	if (!inputProps || !inputProps.finalVideoUrl) {
 		return res.status(400).json({error: 'finalVideoUrl is required in the request body'});
 	}
@@ -113,7 +120,38 @@ app.post('/render', async (req, res) => {
 				},
 			});
 
-			jobs.set(jobId, {status: 'done', progress: 1, outputFile: `${jobId}.mp4`, error: null});
+			// The speed pass, if the film is not being left at its natural rate.
+			// It replaces the served file rather than adding a second one, so
+			// every caller downstream — the status endpoint, n8n's download, the
+			// Drive upload — keeps working with no knowledge of it.
+			//
+			// A FAILURE HERE MUST NOT LOSE THE FILM. The render is the expensive
+			// part (minutes of headless Chrome); the re-time is seconds. If
+			// ffmpeg refuses, the job completes with the un-retimed film and says
+			// so in `speedError`, because shipping the film at the wrong speed is
+			// obviously better than shipping nothing and making the producer
+			// re-render to find out why.
+			let served = `${jobId}.mp4`;
+			let speedError = null;
+			if (speed !== 1) {
+				const job = jobs.get(jobId);
+				if (job) job.status = 'retiming';
+				const retimed = path.join(OUTPUT_DIR, `${jobId}-x${speed}.mp4`);
+				try {
+					await applySpeed(outputLocation, retimed, speed);
+					served = path.basename(retimed);
+				} catch (err) {
+					speedError = String((err && err.message) || err);
+				}
+			}
+			jobs.set(jobId, {
+				status: 'done',
+				progress: 1,
+				outputFile: served,
+				error: null,
+				speed,
+				speedError,
+			});
 		} catch (err) {
 			jobs.set(jobId, {
 				status: 'error',

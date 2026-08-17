@@ -23,6 +23,7 @@ import {
   deleteProjectDeep,
   updateEditingOptions,
 } from "@/lib/data";
+import { normalizeSpeed } from "@/lib/data/derive";
 import {
   getAliveAssembly,
   getAliveProduction,
@@ -832,6 +833,8 @@ export async function confirmFinalSettings(
     endScreen: boolean;
     sfx: boolean;
     music: boolean;
+    /** Playback rate of the finished film — see EditingOptions.speed. */
+    speed: number;
   },
 ): Promise<ActionResult> {
   if (!isConfigured) {
@@ -850,6 +853,7 @@ export async function confirmFinalSettings(
         endScreen: settings.endScreen,
         sfx: settings.sfx,
         music: settings.music,
+        speed: normalizeSpeed(settings.speed),
       });
     }
     await writeProjectFields(projectId, { "Status General": "Asamblare" });
@@ -952,21 +956,29 @@ export async function rerenderWithSound(
   projectId: string,
   sfx: boolean,
   music: boolean,
+  /** Playback rate of the finished film — see EditingOptions.speed. Carried
+   *  here rather than in its own action because it changes the film the same
+   *  way sound does: write the merged options, re-fire assemble, and the
+   *  scenes are never regenerated. */
+  speed: number = 1,
 ): Promise<ActionResult> {
   if (!isConfigured) {
     return { ok: true, message: "Demo mode — nothing was written." };
   }
+  const rate = normalizeSpeed(speed);
   try {
-    await updateEditingOptions(projectId, { sfx, music });
+    await updateEditingOptions(projectId, { sfx, music, speed: rate });
   } catch (e) {
     return { ok: false, message: friendlyError(e) };
   }
   const fired = await fireAssembleWebhook(projectId);
   if (!fired.ok) return fired;
   revalidatePath(`/projects/${projectId}`);
+  const pace =
+    rate === 1 ? "normal speed" : `${rate}× speed`;
   return {
     ok: true,
-    message: `Saved (effects ${sfx ? "on" : "off"}, music ${music ? "on" : "off"}) — re-rendering now. The new video replaces this one in a few minutes.`,
+    message: `Saved (effects ${sfx ? "on" : "off"}, music ${music ? "on" : "off"}, ${pace}) — re-rendering now. The new video replaces this one in a few minutes.`,
   };
 }
 

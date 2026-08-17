@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { confirmFinalSettings, type ActionResult } from "@/app/actions";
 import Toggle from "@/components/Toggle";
+import SpeedPicker from "@/components/SpeedPicker";
 import { useSetPendingStage } from "@/components/StageNav";
 import type { EditingOptions } from "@/lib/data";
 
@@ -17,8 +18,15 @@ import type { EditingOptions } from "@/lib/data";
  * default path is one click ("Keep initial settings"), and the toggles are
  * there for the rarer case where something should come off.
  */
+/** Only the switch-shaped options belong in the list below — `speed` is a
+ *  number and gets its own row, so `keyof EditingOptions` is too wide and
+ *  would type `opts[o.key]` as `number | boolean`. */
+type ToggleKey = {
+  [K in keyof EditingOptions]: EditingOptions[K] extends boolean ? K : never;
+}[keyof EditingOptions];
+
 const OPTIONS: Array<{
-  key: keyof EditingOptions;
+  key: ToggleKey;
   label: string;
   on: string;
   off: string;
@@ -93,7 +101,12 @@ export default function FinalSettings({
   // is simply not there.
   const rows = OPTIONS.filter((o) => !(silent && o.spokenOnly));
   const changedKeys = rows.filter((o) => opts[o.key] !== initial[o.key]);
-  const changed = changedKeys.length > 0;
+  // Speed is a number, so it cannot join OPTIONS (booleans with a Toggle) and
+  // is counted separately — but it must be counted, or "Apply 1 change" would
+  // omit the one change that alters the film's whole length.
+  const speedMoved = opts.speed !== initial.speed;
+  const changed = changedKeys.length > 0 || speedMoved;
+  const changeCount = changedKeys.length + (speedMoved ? 1 : 0);
   const done = msg?.ok === true;
   const router = useRouter();
   const setPendingStage = useSetPendingStage();
@@ -170,6 +183,29 @@ export default function FinalSettings({
             </div>
           );
         })}
+        {/* Not a switch, so it sits at the end of the same numbered index
+            rather than pretending to be one. It is offered on a silent film
+            too: a cinematic project has no narration to slow down, but the
+            picture, the music and the graphics all still re-time. */}
+        <div className={`swrow ${opts.speed !== 1 ? "on" : ""}`}>
+          <span className="no">{String(rows.length + 1).padStart(2, "0")}</span>
+          <div>
+            <h4>
+              Speed
+              {speedMoved && <span className="chg">changed</span>}
+            </h4>
+            <p>
+              How fast the finished film plays. This is what the PACE choice on
+              the brief sets — before now it only nudged the writing prompts and
+              left the video untouched.
+            </p>
+          </div>
+          <SpeedPicker
+            value={opts.speed}
+            onChange={(v) => setOpts((p) => ({ ...p, speed: v }))}
+            disabled={done}
+          />
+        </div>
       </div>
 
       <div
@@ -194,7 +230,7 @@ export default function FinalSettings({
             : pending
               ? "…"
               : changed
-                ? `Apply ${changedKeys.length} change${changedKeys.length === 1 ? "" : "s"} & render`
+                ? `Apply ${changeCount} change${changeCount === 1 ? "" : "s"} & render`
                 : "Keep initial settings & render"}
         </button>
         {changed && !done && (

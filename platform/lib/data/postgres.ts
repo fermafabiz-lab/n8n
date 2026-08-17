@@ -99,13 +99,14 @@ interface ProjectRow {
   editing_options: unknown;
   language: string;
   voice_id: string;
+  pace: string | null;
   created_at: Date | null;
   cover_path?: string | null;
 }
 
 const PROJECT_COLS = `p.id, p.name, p.tone, p.aspect, p.no_captions, p.length_seconds,
                       p.status, p.final_video_url, p.editing_options, p.language,
-                      p.voice_id, p.created_at`;
+                      p.voice_id, p.pace, p.created_at`;
 
 function toRawProject(r: ProjectRow): RawProject {
   return {
@@ -120,6 +121,7 @@ function toRawProject(r: ProjectRow): RawProject {
     editingRaw: r.editing_options,
     language: r.language ?? "",
     voiceId: r.voice_id ?? "",
+    paceRaw: r.pace,
     createdAt: r.created_at ? r.created_at.toISOString() : null,
     coverUrl: mediaUrl(r.cover_path ?? null),
   };

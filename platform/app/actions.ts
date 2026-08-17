@@ -1224,6 +1224,12 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     Lenght: Number(formData.get("length") ?? 64),
     Tonalitate: String(formData.get("tone") ?? "Dark"),
     Pace: String(formData.get("pace") ?? "Normal"),
+    // The exact playback rate the brief's PACE control chose. `Pace` above is
+    // still the word, because Claude Scripting interpolates it into two
+    // writing prompts — but the word cannot tell 0.8 from 0.9, so the number
+    // rides alongside it and `Normalize Webhook Input` puts it in Editing
+    // Options. Absent or unusable resolves to 1 on every reader.
+    speed: normalizeSpeed(formData.get("speed")),
     Style: String(formData.get("style") ?? ""),
     // In chapters mode (and no-narrator characters mode) there is no
     // narrator picker; the first cast voice doubles as the project voice so

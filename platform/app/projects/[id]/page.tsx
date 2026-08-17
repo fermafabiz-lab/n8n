@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProject, getProjectScriptInfo, getScenes, type Scene } from "@/lib/data";
@@ -68,16 +69,23 @@ function pipeline(
   const staged = scenes.filter((s) => s.imageUrl);
   const stagedImages = staged.length > 0 && staged.every((s) => s.imageApproved);
   const stagedVoices = stagedImages && staged.every((s) => s.voiceApproved);
+  // `name` is the stage, `note` is where that stage stands. They used to be
+  // one string ("Images · 8/15"), which is the whole reason a step could only
+  // ever be a pill — the stepper is cards now and the two lines are separate.
+  // Both still come from this one function, so the cards, the fractions and
+  // the progress bar cannot disagree with each other.
   return [
-    { key: "script", name: "Script", state: "done" },
+    { key: "script", name: "Script", note: "approved", state: "done" },
     {
       key: "scenes",
-      name: scenesDone ? "Scenes" : `Scenes · ${scenesApproved}/${total}`,
+      name: "Scenes",
+      note: scenesDone ? "approved" : `${scenesApproved}/${total}`,
       state: scenesDone ? "done" : "act",
     },
     {
       key: "images",
-      name: imagesDone ? "Images" : `Images · ${imagesApproved}/${total}`,
+      name: "Images",
+      note: imagesDone ? "approved" : `${imagesApproved}/${total}`,
       state: imagesDone ? "done" : scenesDone && !stagedImages ? "act" : "next",
     },
     // Dropped entirely for a silent film rather than shown green: an "Audio"
@@ -88,14 +96,16 @@ function pipeline(
       : [
           {
             key: "audio",
-            name: audioDone ? "Audio" : `Audio · ${voicesApproved}/${total}`,
+            name: "Audio",
+            note: audioDone ? "approved" : `${voicesApproved}/${total}`,
             state:
               audioDone ? "done" : stagedImages && !stagedVoices ? "act" : "next",
           },
         ]),
     {
       key: "video",
-      name: videoDone ? "Video" : `Video · ${videosApproved}/${total}`,
+      name: "Video",
+      note: videoDone ? "approved" : `${videosApproved}/${total}`,
       state: videoDone ? "done" : stagedVoices ? "act" : "next",
     },
     {
@@ -103,6 +113,12 @@ function pipeline(
       // waits on a decision that isn't an approval.
       key: "final",
       name: "Final touches",
+      note:
+        projectDone || assembling
+          ? "confirmed"
+          : awaitingSettings || videoDone
+            ? "needs you"
+            : "queued",
       state:
         projectDone || assembling
           ? "done"
@@ -115,6 +131,7 @@ function pipeline(
     {
       key: "assembly",
       name: "Assembly",
+      note: projectDone ? "finished" : assembling ? "rendering" : "queued",
       state: projectDone ? "done" : assembling ? "act" : "next",
     },
   ];
@@ -163,6 +180,12 @@ export default async function ProductionRoom({
     assembling,
     silent,
   );
+  // Progress for the header bar. Deliberately a count of pipeline() STATES
+  // rather than a second traversal of the scenes: any other derivation could
+  // drift from the cards, and a bar that disagrees with the stepper it sits
+  // above is worse than no bar. Silent films have six stages, not seven, so
+  // the denominator is the list's own length.
+  const stepsDone = steps.filter((s) => s.state === "done").length;
 
   // Whether the voice gate is on the page. Computed once because SceneBoard
   // needs the same answer: it owns the image and video steps only, and may
@@ -327,45 +350,69 @@ export default async function ProductionRoom({
       <div className="room">
         {/* Breadcrumb + live status in one tracked line; the name itself is
             the title right below, not crumb text. */}
-        <div className="eyebrow" style={{ marginBottom: 20 }}>
-          <Link href="/projects">Projects</Link>
-          <span style={{ color: "var(--dim)" }}>/</span>
-          <span>
-            <span className={`stdot ${project.statusKind}`}>●</span>{" "}
-            {project.status}
-          </span>
-        </div>
-        <div className="roomhead">
-          <div style={{ minWidth: 0, flex: 1 }}>
-            {/* The title wears the film's own typeface for this tone — the
-                same face the hook and chapter cards will render in. */}
-            <ExpandableTitle
-              text={project.name}
-              as="h1"
-              clampChars={110}
-              className={`ptitle ${toneType(project.tone).className}`}
-              style={
-                toneType(project.tone).uppercase
-                  ? { textTransform: "uppercase" }
-                  : undefined
-              }
-            />
-            <div className="specs">
-              {project.category && <span>{getCategory(project.category).label}</span>}
-              {project.lengthSeconds && <span>{project.lengthSeconds}s</span>}
-              {scenes.length > 0 && <span>{scenes.length} scenes</span>}
-              <span>{project.aspect}</span>
-              {project.tone && <span>{project.tone}</span>}
+        <div className="wk-shell">
+          <div className="arc wk-arc" aria-hidden />
+          <div className="wk-head">
+            <div className="wk-id">
+              <div className="eyebrow" style={{ marginBottom: 16 }}>
+                <Link href="/projects">Projects</Link>
+                <span style={{ color: "var(--dim)" }}>/</span>
+                {/* The status as a pill with a dot that pulses only while
+                    something is moving. It replaced a bare ● in the crumb
+                    line: same information, but it now reads as the state of
+                    the film rather than as punctuation. */}
+                <span className={`wk-state ${project.statusKind}`}>
+                  <span className="wk-dot" />
+                  {project.status}
+                </span>
+              </div>
+              {/* The title wears the film's own typeface for this tone — the
+                  same face the hook and chapter cards will render in. */}
+              <ExpandableTitle
+                text={project.name}
+                as="h1"
+                clampChars={110}
+                className={`ptitle ${toneType(project.tone).className}`}
+                style={
+                  toneType(project.tone).uppercase
+                    ? { textTransform: "uppercase" }
+                    : undefined
+                }
+              />
+              <div className="specs">
+                {project.category && <span>{getCategory(project.category).label}</span>}
+                {project.lengthSeconds && <span>{project.lengthSeconds}s</span>}
+                {scenes.length > 0 && <span>{scenes.length} scenes</span>}
+                <span>{project.aspect}</span>
+                {project.tone && <span>{project.tone}</span>}
+              </div>
+            </div>
+            <div className="wk-side">
+              {/* Counted off the same pipeline() states the stepper draws, so
+                  the bar can never claim a stage the cards do not show as
+                  done. Only shown once there are scenes: before that every
+                  stage but Script is unknowable and a 1/7 bar on a project
+                  still being written reads as progress that has stalled. */}
+              {scenes.length > 0 && (
+                <div className="wk-prog">
+                  <span className="lbl">
+                    {stepsDone}/{steps.length} stages done
+                  </span>
+                  <span className="wk-bar">
+                    <i style={{ width: `${(stepsDone / steps.length) * 100}%` }} />
+                  </span>
+                </div>
+              )}
+              {project.statusKind !== "done" && (
+                <ResumeButton
+                  projectId={id}
+                  running={hasRunning}
+                  phase={writing ? "scripting" : "production"}
+                  hasScenes={scenes.length > 0}
+                />
+              )}
             </div>
           </div>
-          {project.statusKind !== "done" && (
-            <ResumeButton
-              projectId={id}
-              running={hasRunning}
-              phase={writing ? "scripting" : "production"}
-              hasScenes={scenes.length > 0}
-            />
-          )}
         </div>
 
         {project.finalVideoUrl && project.finalVideoUrl.startsWith("http") && (
@@ -402,6 +449,7 @@ export default async function ProductionRoom({
               projectId={id}
               initialSfx={project.editing.sfx}
               initialMusic={project.editing.music}
+              initialSpeed={project.editing.speed}
             />
           </div>
         )}
@@ -414,11 +462,16 @@ export default async function ProductionRoom({
               // the producer can always get back to the panel that stops it.
               const frozen = renderLocked && s.key !== "assembly";
               const cls = `ps ${s.state}${viewing === s.key ? " sel" : ""}${frozen ? " frozen" : ""}`;
+              /* Each step is a link to itself: that is the whole way back to an
+                 earlier stage. The active one links to the bare page so
+                 clicking it again returns to "whatever is live now".
+
+                 The `display: contents` wrapper this used to need is gone with
+                 the .pl connector it existed to carry — the card IS the flex
+                 item now, so a wrapper would have to opt out of the layout to
+                 stay harmless. */
               return (
-                <span key={s.key} style={{ display: "contents" }}>
-                  {/* Each step is a link to itself: that is the whole way back
-                      to an earlier stage. The active one links to the bare page
-                      so clicking it again returns to "whatever is live now". */}
+                <Fragment key={s.key}>
                   {frozen ? (
                     <span
                       className={cls}
@@ -426,7 +479,8 @@ export default async function ProductionRoom({
                       title="Locked while the final render is running — stop the render to go back"
                     >
                       <span className="ic">{s.state === "done" ? "✓" : i + 1}</span>
-                      {s.name}
+                      <span className="ps-name">{s.name}</span>
+                      <span className="ps-note">{s.note}</span>
                     </span>
                   ) : (
                     <StageLink
@@ -439,11 +493,11 @@ export default async function ProductionRoom({
                       className={cls}
                     >
                       <span className="ic">{s.state === "done" ? "✓" : i + 1}</span>
-                      {s.name}
+                      <span className="ps-name">{s.name}</span>
+                      <span className="ps-note">{s.note}</span>
                     </StageLink>
                   )}
-                  {i < steps.length - 1 && <span className="pl" />}
-                </span>
+                </Fragment>
               );
             })}
           </div>

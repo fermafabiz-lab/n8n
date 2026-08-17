@@ -672,36 +672,179 @@ body:has(.nb) .nav {
   margin-bottom: 30px;
 }
 
+/* The workspace header sits in the same shell the landing and the library
+   use, so the three screens read as one product. `clip`, not `hidden`: this
+   would otherwise become a scroll container and the sticky surfaces further
+   down the page would stop pinning — the same trap documented on .pj-shell. */
+.wk-shell {
+  position: relative;
+  border-radius: var(--r-shell);
+  background: var(--shell);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  overflow: clip;
+  margin-bottom: 26px;
+}
+/* The lit arc, sized for a header rather than for a full hero.
+   `.wk-shell .wk-arc`, not `.wk-arc`: the shared geometry above is 0-2-0, so a
+   single class here loses to it and every value below would be silently
+   dropped — which is what put the bright band across the progress label and
+   the Resume button on the first try. The handoff's rule is that the lit band
+   never crosses text, so this pushes the ring far enough out that only its
+   soft outer glow reaches the right column. */
+.wk-shell .wk-arc {
+  right: -520px;
+  top: -450px;
+  width: 820px;
+  height: 820px;
+  opacity: 0.6;
+}
+.wk-head {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 36px;
+  flex-wrap: wrap;
+  padding: 30px 34px 32px;
+}
+.wk-id {
+  min-width: 0;
+  flex: 1 1 380px;
+}
+.wk-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 14px;
+}
+/* Status as a frosted pill instead of a bare dot in the crumb line. The dot
+   pulses only while something is actually moving — a pulse on a finished or
+   failed project is decoration claiming to be a signal. */
+.wk-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 12px 4px 10px;
+  border-radius: var(--r-pill);
+  background: rgba(252, 252, 253, 0.86);
+  backdrop-filter: blur(18px);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+  color: var(--soft);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.wk-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--dim);
+}
+.wk-state.wait .wk-dot { background: var(--accent); }
+.wk-state.run .wk-dot { background: var(--blue); }
+.wk-state.done .wk-dot { background: var(--green); }
+.wk-state.err .wk-dot { background: var(--red); }
+.wk-state.wait .wk-dot,
+.wk-state.run .wk-dot {
+  animation: wkpulse 1.9s ease-in-out infinite;
+}
+@keyframes wkpulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+/* How far through the stages the film is. Derived from the same pipeline()
+   states the stepper draws, so the bar and the cards can never disagree. */
+.wk-prog {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 7px;
+}
+.wk-prog .lbl {
+  font-family: var(--f-mono), ui-monospace, monospace;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.wk-bar {
+  width: 220px;
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: rgba(24, 20, 40, 0.1);
+  overflow: hidden;
+}
+.wk-bar i {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: linear-gradient(90deg, var(--accent-deep), var(--accent));
+  transition: width var(--dur) var(--ease);
+}
+
+/* The stage stepper: equal cards, one per stage, not a chain of small pills.
+   Each card carries the stage NAME and, under it, that stage's state — the
+   fraction used to be crammed into the name ("Images · 8/15") on one line,
+   which is why it could only ever be a pill.
+
+   Equal widths come from `flex: 1 1 0`, not from a column count: the step
+   list is 7 stages normally and 6 for a silent film (the Audio step is
+   dropped, not greyed — see the cinematic notes in CLAUDE.md), so a
+   grid-template-columns count would have to be threaded in from the page.
+   `min-width` keeps them legible and turns the row into a scroller on a
+   phone instead of crushing seven cards into 390px. */
 .pipe {
   display: flex;
   gap: 10px;
-  align-items: center;
-  margin-bottom: 34px;
+  align-items: stretch;
+  margin-bottom: 30px;
   overflow-x: auto;
-  padding: 4px 2px 10px;
+  padding: 4px 2px 12px;
 }
 .ps {
+  flex: 1 1 0;
+  min-width: 138px;
   display: flex;
-  align-items: center;
-  gap: 10px;
-  background: var(--card);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 14px 16px 15px;
+  border-radius: var(--r-md);
+  background: var(--card-fill);
   border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 9px 18px 9px 12px;
-  font-size: 13px;
-  font-weight: 550;
-  white-space: nowrap;
-}
-/* The steps are links now — each one goes back to its own stage. */
-.ps {
+  box-shadow: var(--shadow-sm);
   text-decoration: none;
-  color: inherit;
+  color: var(--soft);
   cursor: pointer;
-  transition: border-color 0.15s ease, transform 0.15s ease;
+  transition: var(--tr);
 }
 .ps:hover {
-  border-color: var(--line2);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow);
+}
+.ps:active {
   transform: translateY(-1px);
+}
+.ps-name {
+  font-family: var(--f-display), system-ui, sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: var(--ink);
+}
+/* --dim, never --faint: this label sits on the cushioned card gradient,
+   which ends at #e6e6ea, and --faint is only guaranteed on --card2. */
+.ps-note {
+  font-family: var(--f-mono), ui-monospace, monospace;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dim);
 }
 /* Held still while the final render runs. Not a link, so it must not offer
    a link's affordances either — no lift, no pointer. */
@@ -818,54 +961,68 @@ body:has(.nb) .nav {
 }
 .ps.frozen {
   cursor: not-allowed;
-  opacity: 0.4;
+  opacity: 0.45;
 }
 .ps.frozen:hover {
-  border-color: var(--line);
   transform: none;
+  box-shadow: var(--shadow-sm);
 }
 /* Currently being revisited: reads as "you are looking at this one", which
-   is deliberately distinct from .act ("the pipeline is here"). */
+   is deliberately distinct from .act ("the pipeline is here"). The ring used
+   to be rgba(120,170,255) — a blue left over from the dark system, and the
+   one thing on this screen that belonged to no palette. Daylight has exactly
+   one accent, so "selected" and "active" are told apart by SHAPE (a ring
+   versus a dark card), not by inventing a second hue. */
 .ps.sel {
-  border-color: rgba(120, 170, 255, 0.55);
-  box-shadow: 0 0 0 3px rgba(120, 170, 255, 0.1);
-  color: var(--text);
+  border-color: var(--accent-a28);
+  box-shadow: 0 0 0 3px var(--accent-a12), var(--shadow-sm);
 }
 .ps .ic {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   display: grid;
   place-items: center;
+  flex: none;
+  font-family: var(--f-mono), ui-monospace, monospace;
   font-size: 11px;
 }
 .ps.done .ic {
-  background: rgba(31, 157, 99, 0.16);
-  color: var(--green);
-}
-.ps.done {
-  color: var(--soft);
-}
-.ps.act {
-  border-color: var(--accent-a28);
-  box-shadow: 0 0 0 3px var(--accent-a08), 0 4px 18px var(--accent-a12);
-}
-.ps.act .ic {
   background: var(--accent-a16);
   color: var(--accent);
 }
-.ps.next {
-  color: var(--dim);
+.ps.done .ps-name {
+  color: var(--soft);
+}
+/* The active step is the one dark card in the row: the design's way of saying
+   "the pipeline is HERE" without a second accent colour, and the same near-
+   black panel the gates use, so the two read as one family. */
+.ps.act {
+  background: var(--panel);
+  border-color: transparent;
+  box-shadow: var(--shadow-lg);
+}
+.ps.act .ps-name {
+  color: var(--panel-ink);
+}
+.ps.act .ps-note {
+  color: var(--accent-lift);
+}
+.ps.act .ic {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--accent-lift);
+}
+/* Looking at the step the pipeline is also on: the ring has to survive on
+   the dark card, where --accent-a12 would be invisible. */
+.ps.act.sel {
+  box-shadow: 0 0 0 3px var(--accent-a28), var(--shadow-lg);
+}
+.ps.next .ps-name {
+  color: var(--soft);
 }
 .ps.next .ic {
   background: rgba(24, 20, 40, 0.06);
   color: var(--dim);
-}
-.pl {
-  width: 22px;
-  height: 1px;
-  background: var(--line2);
-  flex: none;
 }
 
 .stage {
@@ -2445,6 +2602,24 @@ body:has(.nb) .nav {
   .ptitle {
     font-size: clamp(24px, 7.6vw, 34px);
   }
+  /* The header shell keeps its shape but loses the desktop padding, and the
+     progress column stops being right-aligned — at this width it sits under
+     the title, where a right edge reads as a stray indent. */
+  .wk-head {
+    padding: 22px 20px 24px;
+    gap: 20px;
+  }
+  .wk-side,
+  .wk-prog {
+    align-items: flex-start;
+  }
+  .wk-bar {
+    width: min(220px, 100%);
+  }
+  .wk-arc {
+    right: -340px;
+    top: -400px;
+  }
   .eyebrow {
     flex-wrap: wrap;
     row-gap: 10px;
@@ -3940,7 +4115,14 @@ body:has(.mkt) .vignette {
   overflow: hidden;
   overflow: clip;
 }
-.pj-shell .arc {
+/* The lit arc is only ever positioned by its SHELL — `.arc` alone carries the
+   gradient but no geometry, so a new shell that forgets to claim it here gets
+   a 800px block in normal flow instead of a backdrop. That is exactly what the
+   workspace header did on the first attempt: 660px of empty space above the
+   title, which looks like a broken layout and is a missing selector. Any
+   further shell goes in this list. */
+.pj-shell .arc,
+.wk-shell .arc {
   position: absolute;
   right: -400px;
   top: -380px;

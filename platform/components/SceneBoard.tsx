@@ -235,18 +235,20 @@ export default function SceneBoard({
    * screen for a second — which looked like the click had been ignored.
    *
    * With neither, this is the live page: the step is the first thing the
-   * active scene still owes — image, then voice, then clip, the pipeline's
-   * own order.
+   * active scene still owes — voice, then image, then clip, the pipeline's
+   * own order. Voice first because the batch synthesizes every take before
+   * it generates a single image: takes are the first asset that exists, so
+   * they are the first thing worth the producer's attention.
    */
   const pendingStage = usePendingStage();
   const focusNow: "images" | "video" | null =
     pendingStage === "images" || pendingStage === "video" ? pendingStage : focus;
   const step: Step =
     focusNow ??
-    (active && !active.imageApproved
-      ? "images"
-      : audioPanel && active && !active.voiceApproved
-        ? "audio"
+    (audioPanel && active && !active.voiceApproved
+      ? "audio"
+      : active && !active.imageApproved
+        ? "images"
         : "video");
 
   // The monitor shows the asset the CURRENT step is deciding on, not simply

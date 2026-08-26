@@ -33,7 +33,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-// Pipeline position derived from scene states: images → video → assembly.
+// Pipeline position derived from scene states: audio + images → video → assembly.
 function pipeline(
   scenes: Scene[],
   projectDone: boolean,
@@ -66,9 +66,15 @@ function pipeline(
   // blocking production was an unapproved take. The fractions stay
   // project-wide (the film really does need all of them); only the "you are
   // here" marker follows the staged scenes.
-  const staged = scenes.filter((s) => s.imageUrl);
-  const stagedImages = staged.length > 0 && staged.every((s) => s.imageApproved);
-  const stagedVoices = stagedImages && staged.every((s) => s.voiceApproved);
+  // Takes and images are generated in ONE batch pass now (audio loop first,
+  // image loop second) and reviewed at one combined gate, so Audio and
+  // Images can both be the active step at once — each keys off its own
+  // asset, not off the other's completion.
+  const stagedI = scenes.filter((s) => s.imageUrl);
+  const stagedImages = stagedI.length > 0 && stagedI.every((s) => s.imageApproved);
+  const stagedV = scenes.filter((s) => s.voiceUrl);
+  const stagedVoices =
+    silent || (stagedV.length > 0 && stagedV.every((s) => s.voiceApproved));
   // `name` is the stage, `note` is where that stage stands. They used to be
   // one string ("Images · 8/15"), which is the whole reason a step could only
   // ever be a pill — the stepper is cards now and the two lines are separate.
@@ -82,15 +88,11 @@ function pipeline(
       note: scenesDone ? "approved" : `${scenesApproved}/${total}`,
       state: scenesDone ? "done" : "act",
     },
-    {
-      key: "images",
-      name: "Images",
-      note: imagesDone ? "approved" : `${imagesApproved}/${total}`,
-      state: imagesDone ? "done" : scenesDone && !stagedImages ? "act" : "next",
-    },
-    // Dropped entirely for a silent film rather than shown green: an "Audio"
-    // chip on a film with no narration is a step the producer keeps clicking
-    // into to find nothing.
+    // Audio sits BEFORE Images: the batch synthesizes every take first, so
+    // takes are the first asset the producer can act on. Dropped entirely
+    // for a silent film rather than shown green: an "Audio" chip on a film
+    // with no narration is a step the producer keeps clicking into to find
+    // nothing.
     ...(silent
       ? []
       : [
@@ -99,14 +101,20 @@ function pipeline(
             name: "Audio",
             note: audioDone ? "approved" : `${voicesApproved}/${total}`,
             state:
-              audioDone ? "done" : stagedImages && !stagedVoices ? "act" : "next",
+              audioDone ? "done" : scenesDone && !stagedVoices ? "act" : "next",
           },
         ]),
+    {
+      key: "images",
+      name: "Images",
+      note: imagesDone ? "approved" : `${imagesApproved}/${total}`,
+      state: imagesDone ? "done" : scenesDone && !stagedImages ? "act" : "next",
+    },
     {
       key: "video",
       name: "Video",
       note: videoDone ? "approved" : `${videosApproved}/${total}`,
-      state: videoDone ? "done" : stagedVoices ? "act" : "next",
+      state: videoDone ? "done" : stagedImages && stagedVoices ? "act" : "next",
     },
     {
       // Its own step, because it is the one place the pipeline stops and
@@ -140,8 +148,8 @@ function pipeline(
 const STAGE_KEYS = [
   "script",
   "scenes",
-  "images",
   "audio",
+  "images",
   "video",
   "final",
   "assembly",
@@ -191,17 +199,21 @@ export default async function ProductionRoom({
   // needs the same answer: it owns the image and video steps only, and may
   // hand a scene to the audio step just when this panel is there to catch it.
   //
-  // Scoped to the scenes that HAVE a picture, never to the whole project.
-  // n8n runs media generation in batches (Sort & Cap, CAP=8) and every gate
-  // in it — `Evaluate Image Approval`, `Evaluate Voice Approval` — counts
-  // only the scenes of the current batch. A project bigger than one batch
-  // therefore always has scenes with nothing generated yet, and requiring
-  // `scenes.every(imageApproved)` made this panel unreachable for them: the
-  // producer could never approve the takes, so the batch sat at its voice
-  // gate forever and production looked frozen with no error anywhere.
-  // "Every image that exists is signed off" is the same question the batch
-  // asks, expressed in what the site can see.
-  const withImage = scenes.filter((s) => s.imageUrl);
+  // The panel no longer waits for any image. The batch synthesizes every
+  // take FIRST, generates images second, and holds at ONE combined gate
+  // (`Evaluate Image Approval` in n8n counts both approvals), so takes are
+  // reviewable minutes after the scenes are signed off — while the images
+  // are still being generated. Requiring approved images here would hide
+  // the takes for exactly the window they exist to fill.
+  //
+  // Still scoped to the scenes that HAVE the asset, never to the whole
+  // project: n8n runs media generation in batches (Sort & Cap, CAP=8) and
+  // its gate counts only the batch's own scenes. A project bigger than one
+  // batch always has scenes with nothing generated yet, and a project-wide
+  // `every()` once made this panel unreachable — the producer could never
+  // approve the takes, so the batch sat at its gate forever and production
+  // looked frozen with no error anywhere.
+  const withVoice = scenes.filter((s) => s.voiceUrl);
   const audioPanel =
     scenes.length > 0 &&
     // A silent film has no takes to review, and its scenes are created with
@@ -211,9 +223,7 @@ export default async function ProductionRoom({
     showing(
       "audio",
       scenes.every((s) => s.sceneApproved) &&
-        withImage.length > 0 &&
-        withImage.every((s) => s.imageApproved) &&
-        withImage.some((s) => !s.voiceApproved),
+        withVoice.some((s) => !s.voiceApproved),
     );
 
   // Script review phase: the Scripturi record is still awaiting approval.

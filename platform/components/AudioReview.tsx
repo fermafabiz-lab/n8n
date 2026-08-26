@@ -271,15 +271,20 @@ export default function AudioReview({
    * — and treating those as "still being synthesized" was a hard deadlock:
    * `missing` never reached 0, "Approve all" stayed disabled, the batch sat
    * at its voice gate forever, and the producer saw a frozen production with
-   * no error anywhere. A picture is what marks a scene as staged: the batch
-   * generates the images first, so the scenes with an image are exactly the
-   * ones that will be given a take this pass.
+   * no error anywhere.
    *
-   * Falls back to the whole project when nothing has a picture yet, so the
+   * A TAKE is what marks a scene as staged now: the batch synthesizes every
+   * take FIRST and generates images second, so the scenes with a take are
+   * exactly the ones staged this pass. (This used to key off images, from
+   * the old image-first order — on any pass after the first that hid the
+   * fresh takes behind the PREVIOUS batch's pictures for exactly the window
+   * the audio-first order created them to fill.)
+   *
+   * Falls back to the whole project when nothing has a take yet, so the
    * "being synthesized" message still reads correctly at the very start.
    */
   const inPlay = useMemo(() => {
-    const staged = scenes.filter((s) => s.imageUrl);
+    const staged = scenes.filter((s) => s.voiceUrl);
     return staged.length > 0 ? staged : scenes;
   }, [scenes]);
 

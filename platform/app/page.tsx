@@ -63,7 +63,10 @@ export default function Landing() {
           <div className="in">
             <Link href="/" className="brandline">
               <span className="bmark" aria-hidden="true" />
-              House of Videos
+              {/* Wrapped so a phone can drop the words and keep the mark —
+                  the pill holds two buttons now and does not fit otherwise,
+                  and the headline directly below says the name anyway. */}
+              <span className="bword">House of Videos</span>
             </Link>
             <span className="links">
               <a href="#pipeline">Pipeline</a>
@@ -71,9 +74,19 @@ export default function Landing() {
               <a href="#pricing">Pricing</a>
               <a href="#contact">Contact</a>
             </span>
-            <Link href="/new" className="mkt-cta-dark">
-              Start a video
-            </Link>
+            {/* Two doors, not one. The landing is where a returning
+                producer arrives too, and until now the only way from it to
+                the films already in production was the wordmark — which goes
+                back to this same page. The pair sits inside the pill's own
+                right padding, so the bar simply grows to hold them. */}
+            <span className="acts">
+              <Link href="/projects" className="mkt-cta-light">
+                Projects
+              </Link>
+              <Link href="/new" className="mkt-cta-dark">
+                Start a video
+              </Link>
+            </span>
           </div>
         </nav>
 

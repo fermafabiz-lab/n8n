@@ -3053,6 +3053,14 @@ body:has(.mkt) .vignette {
   padding: 9px 9px 9px 24px;
   box-shadow: var(--shadow-nav);
 }
+/* The two doors on the right, inside the pill's own 9px of padding. The bar
+   is auto-width and centred, so adding one simply makes it wider — which is
+   the whole reason nothing here shrinks to fit. */
+.mkt-nav .acts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .mkt-nav .links {
   display: flex;
   gap: 4px;
@@ -3085,6 +3093,27 @@ body:has(.mkt) .vignette {
 }
 .mkt-cta-dark:hover {
   transform: translateY(-2px);
+}
+/* The secondary door: same type size and the same pill height as the dark
+   one — a white surface with a hairline, so the two read as a pair with a
+   clear primary rather than as a button and a link. */
+.mkt-cta-light {
+  white-space: nowrap;
+  font-family: inherit;
+  font-size: 14.5px;
+  color: var(--ink);
+  background: #fdfdfe;
+  border: 1px solid rgba(24, 20, 40, 0.1);
+  border-radius: var(--r-pill);
+  padding: 11px 22px;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: var(--tr);
+  display: inline-block;
+}
+.mkt-cta-light:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
 }
 .mkt-head {
   position: relative;
@@ -3630,6 +3659,12 @@ body:has(.mkt) .vignette {
   letter-spacing: -0.02em;
   color: var(--ink);
 }
+/* The mark never wraps away from its word, and the word never wraps in on
+   itself: three stacked lines of "House / of / Videos" is what a squeezed
+   pill does otherwise. */
+.mkt .brandline .bword {
+  white-space: nowrap;
+}
 .mkt .brandline .bmark {
   width: 17px;
   height: 17px;
@@ -3680,6 +3715,22 @@ body:has(.mkt) .vignette {
   }
   .mkt-nav .links {
     display: none;
+  }
+}
+
+/* On a phone the pill has to hold two buttons at full size, and it cannot do
+   that and the wordmark as well. The mark stays — it is the link home and the
+   identity — and the words go, because the headline three lines below is
+   literally "House of Videos makes films while you sleep". Shrinking the type
+   instead would make every label harder to read to save a name that is
+   already on screen. */
+@media (max-width: 660px) {
+  .mkt .brandline .bword {
+    display: none;
+  }
+  .mkt-nav .in {
+    gap: 14px;
+    padding-left: 16px;
   }
 }
 

@@ -425,7 +425,16 @@ export default async function ProductionRoom({
           </div>
         </div>
 
-        {project.finalVideoUrl && project.finalVideoUrl.startsWith("http") && (
+        {/* The finished film belongs to Assembly, not to every step. It used
+            to render on all of them — the player, its sound settings and the
+            download sat above the Script panel, above Voice review, above the
+            scene board — so whichever step you clicked, the first thing on
+            screen was the final cut. `showing` with auto=true keeps it on the
+            LIVE page (a delivered film should open on its film) while
+            confining it to Assembly once you are stepping through. */}
+        {showing("assembly", true) &&
+          project.finalVideoUrl &&
+          project.finalVideoUrl.startsWith("http") && (
           <div className="finalvideo">
             <div className="vwrap">
               <MediaPlayer
@@ -581,7 +590,13 @@ export default async function ProductionRoom({
             phase (every scene approved) and until production hands over to
             final settings/assembly. Answers what the batch is doing, whether
             anything was refused, and how much tail is beyond the batch cap. */}
-        {scenes.length > 0 &&
+        {/* Live progress belongs to the live page. Stepping back to Script or
+            Audio to look at one thing should not carry "the batch is on scene
+            7" along with it — that is the state of the whole film, not of the
+            panel you opened. The failure list below stays on every step on
+            purpose: a broken generation is worth seeing wherever you are. */}
+        {!viewing &&
+          scenes.length > 0 &&
           scenes.every((s) => s.sceneApproved) &&
           !project.awaitingFinalSettings &&
           !assembling &&

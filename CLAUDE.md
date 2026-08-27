@@ -700,8 +700,12 @@ is built only inside that guard (a `-1` input index would break the graph).
   were manual; they are not. So a change to `remotion/server/` is live once
   the branch is pushed and the build goes green, and the way to check which
   code is running is the deployment's commit hash, not a guess.
-- **Never push while a final render is running.** A Railway deploy replaces
-  the container, which kills a render in flight — and the producer sees a
+- **Never push while a final render is running — ANY push, not just one that
+  touches `remotion/`.** A commit changing only `db/` triggered a Railway
+  build on 2026-08-27 (deployment `bbf90578`, commit `cad28c1`), so the path
+  filter below cannot be relied on as a safety rule. Treat every push as a
+  container replacement. A Railway deploy replaces the container, which kills
+  a render in flight — and the producer sees a
   film that simply never arrives, with nothing in the site to explain it.
   Since 2026-08-14 Railway watches `["/remotion/**"]`, so commits touching
   only `platform/` or documentation no longer rebuild it; anything under

@@ -169,12 +169,31 @@ export default async function ProductionRoom({
   // touches" had no way back to its script. Absent => today's behaviour,
   // exactly: every panel keeps its own automatic condition.
   const stageParam = (await searchParams)?.stage;
-  const viewing: StageKey | null = STAGE_KEYS.includes(stageParam as StageKey)
+  const explicit: StageKey | null = STAGE_KEYS.includes(stageParam as StageKey)
     ? (stageParam as StageKey)
     : null;
-  const showing = (k: StageKey, auto: boolean) => (viewing ? viewing === k : auto);
   const project = await getProject(id);
   if (!project) notFound();
+
+  /**
+   * Where the page lands when nobody named a step.
+   *
+   * A delivered film has nothing left to review, so the un-stepped page was
+   * showing its final cut AND, underneath, the whole scene board — every clip
+   * of the film again, individually, under approve/regenerate controls that
+   * are all signed off. Opening a finished project should open the film.
+   *
+   * Requires the video to actually be there, not merely a "done" status: on a
+   * project marked finished with no file, landing on Assembly would trade a
+   * cluttered page for an empty one, and the scene board is then the only
+   * thing left to look at.
+   */
+  const delivered =
+    project.statusKind === "done" &&
+    !!project.finalVideoUrl &&
+    project.finalVideoUrl.startsWith("http");
+  const viewing: StageKey | null = explicit ?? (delivered ? "assembly" : null);
+  const showing = (k: StageKey, auto: boolean) => (viewing ? viewing === k : auto);
 
   const scenes = await getScenes(id);
   const assembling = /assembling/i.test(project.status);
@@ -530,9 +549,12 @@ export default async function ProductionRoom({
           </div>
         ) : (
           // Not shown for Assembly while it IS the live step: the pipeline is
-          // there, so calling it "an earlier step" would be a lie.
-          viewing &&
-          !(viewing === "assembly" && assembling) && (
+          // there, so calling it "an earlier step" would be a lie. Same for a
+          // delivered film, where Assembly is the end of the line and also
+          // where the page now lands by itself — keyed on `explicit` so that
+          // landing never announces itself as looking back.
+          explicit &&
+          !(explicit === "assembly" && (assembling || delivered)) && (
             // Without this the page just looks stale: the panel on screen is
             // not the one the pipeline is waiting on, and nothing said so.
             <div className="setupnote" style={{ marginBottom: 20 }}>

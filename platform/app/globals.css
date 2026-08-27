@@ -4686,3 +4686,126 @@ body:has(.mkt) .vignette {
 .ascript .btn:hover {
   transform: translateY(-2px);
 }
+
+
+/* ============================================================
+   Images & Video — the review stage.
+   Same rule as the other review panels: the thing you act on is
+   an object that floats, not a box drawn on the page. Here the
+   object is the MONITOR, and the asset is set INTO it — the
+   picture and the clip used to bleed to the card's own edge, so
+   a black 16:9 video squared off the rounded corners and the
+   bubble stopped reading as a bubble at exactly the moment it
+   held a clip. Padding + an inner radius is the whole fix, and
+   it has to be on .scr rather than on the media: MediaPlayer
+   fills its parent absolutely, and the drafts preview, the
+   fallback art and the scrim all live in there too.
+   ============================================================ */
+.stage .monitor {
+  background: var(--card2);
+  border: none;
+  border-radius: 26px;
+  padding: 14px;
+  box-shadow: 0 2px 5px rgba(24, 20, 40, 0.05), 0 16px 38px rgba(24, 20, 40, 0.13);
+  overflow: visible;
+}
+/* The frame the asset sits in. overflow:hidden is what rounds the video's
+   own corners — a <video> element cannot be given a radius that its native
+   controls respect, so the clip has to be masked by its holder. */
+.stage .monitor .scr {
+  border-radius: 16px;
+  overflow: hidden;
+  background: #0d0d10;
+}
+/* The scene tag and the caption are positioned against .scr, so they follow
+   the inset automatically; only the caption needs to come in off the rounded
+   corner it now sits above. */
+.stage .monitor .cap {
+  left: 22px;
+  right: 22px;
+  bottom: 18px;
+}
+
+/* The strip below is part of the same bubble now, not a second panel bolted
+   under it: no ground of its own and no hairline, so the card reads as one
+   surface holding a frame and its contact sheet. */
+.stage .filmstrip {
+  background: none;
+  border-top: 0;
+  padding: 14px 0 2px;
+  gap: 10px;
+}
+.stage .fspage {
+  background: none;
+  padding: 8px 0 0;
+}
+/* Each thumbnail floats too — the same object rule, one size down. The
+   selected one keeps its accent ring as a halo rather than a hard border, so
+   it does not cut a square corner across the rounded frame. */
+.stage .fr {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(24, 20, 40, 0.06), 0 6px 16px rgba(24, 20, 40, 0.11);
+}
+.stage .fr:hover {
+  box-shadow: 0 3px 7px rgba(24, 20, 40, 0.08), 0 12px 26px rgba(24, 20, 40, 0.16);
+}
+.stage .fr.sel,
+.stage .fr.act {
+  box-shadow: 0 0 0 2px var(--accent), 0 8px 20px rgba(122, 79, 214, 0.26);
+}
+.stage .fsnav {
+  border: none;
+  border-radius: var(--r-pill);
+  width: 34px;
+  background: var(--card2);
+  box-shadow: var(--shadow-sm);
+  color: var(--soft);
+  transition: var(--tr);
+}
+.stage .fsnav:hover:not(:disabled) {
+  transform: translateY(-1px);
+  color: var(--accent);
+}
+
+/* The inspector's cards are the same object as the monitor, at rail width. */
+.stage .insp .card {
+  background: var(--card2);
+  border: none;
+  border-radius: 22px;
+  box-shadow: 0 2px 5px rgba(24, 20, 40, 0.05), 0 14px 32px rgba(24, 20, 40, 0.12);
+}
+/* Controls sitting on white need the hairline the grey card used to give
+   them — and :not(.ok) so the primary action keeps its accent instead of
+   being repainted white with a white label on it. */
+.stage .insp .abtn:not(.ok) {
+  background: var(--card2);
+  border: 1px solid rgba(24, 20, 40, 0.1);
+  border-radius: var(--r-pill);
+  box-shadow: var(--shadow-sm);
+  transition: var(--tr);
+}
+.stage .insp .abtn.ok {
+  border-radius: var(--r-pill);
+  transition: var(--tr);
+}
+.stage .insp .abtn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+/* The two prompt fields are recessed into the card, like the narration box
+   in a take: the card is the object, the text is set into it. */
+.stage .insp textarea {
+  background: #f8f8fa !important;
+  border: 1px solid rgba(24, 20, 40, 0.09) !important;
+  border-radius: 14px !important;
+  box-shadow: inset 0 1px 2px rgba(24, 20, 40, 0.05);
+}
+/* A grid item's default `min-width: auto` refuses to shrink below its
+   content's min-content width, so on a phone both columns kept their desktop
+   width and the monitor ran a full screen-width past the right edge — with
+   the filmstrip's own overflow:auto never getting a chance to scroll, because
+   nothing was ever narrower than its contents. Pre-dates the bubble; fixed
+   here because these are the panels being looked at. */
+.stage > * {
+  min-width: 0;
+}

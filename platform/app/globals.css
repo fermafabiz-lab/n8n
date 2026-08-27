@@ -4542,3 +4542,103 @@ body:has(.mkt) .vignette {
     order: 9;
   }
 }
+
+
+/* ============================================================
+   Voice review — each take floats on its own.
+   Scoped to .avoice so none of it reaches ScriptReview, which
+   shares the .script wrapper.
+   ============================================================ */
+
+/* The take. A white surface lifted off the panel rather than a bordered box
+   drawn on it: these are the things you act on one at a time, so each one has
+   to read as its own object. The border goes with the shadow — a card that is
+   BOTH outlined and lifted reads as two containers stacked. */
+.avoice .card.take {
+  background: var(--card2);
+  border: none;
+  border-radius: 18px;
+  padding: 16px 18px !important;
+  box-shadow: 0 2px 5px rgba(24, 20, 40, 0.05), 0 12px 28px rgba(24, 20, 40, 0.12);
+  transition: var(--tr);
+}
+.avoice .card.take:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 9px rgba(24, 20, 40, 0.06), 0 20px 44px rgba(24, 20, 40, 0.16);
+}
+/* The playing take keeps the accent ring, but as a halo rather than a hard
+   2px outline — the outline sat outside the shadow and cut a square corner
+   across the rounded card. */
+.avoice .card.take[style*="outline"] {
+  outline: none !important;
+  box-shadow: 0 0 0 2px var(--accent), 0 12px 28px rgba(122, 79, 214, 0.22);
+}
+
+/* The take's own controls sit on the white card, so they need a hairline to
+   separate from it — on the panel they had the card's grey to sit against. */
+.avoice .take .abtn {
+  background: var(--card2);
+  border: 1px solid rgba(24, 20, 40, 0.1);
+  border-radius: var(--r-pill);
+  box-shadow: var(--shadow-sm);
+  transition: var(--tr);
+}
+.avoice .take .abtn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+/* The play control is round, as drawn. Targeted by its own class, not by
+   :first-of-type — that matched the first .abtn inside EVERY group in the
+   take, so the "Voice: auto" selector was collapsed into a 34px circle with
+   its label cut off. Caught on a screenshot. */
+.avoice .take .abtn.playbtn {
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+/* The narration box inside a take: recessed, so the card reads as the object
+   and the text as something set into it. */
+.avoice .take textarea {
+  background: #f8f8fa;
+  border: 1px solid rgba(24, 20, 40, 0.09);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* Change narrator: one full-width centred row, as the design draws it —
+   it applies to the WHOLE project, so it should not sit in a corner looking
+   like one more per-take control. */
+.avoice .abtn.narrowide {
+  display: block;
+  width: 100%;
+  text-align: center;
+  padding: 15px 20px;
+  border-radius: var(--r-pill);
+  background: var(--card2);
+  border: 1px solid rgba(24, 20, 40, 0.09);
+  box-shadow: var(--shadow-sm);
+  font-size: 14px;
+  transition: var(--tr);
+}
+.avoice .abtn.narrowide:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+
+/* The download row's pills match every other pill on the site. */
+.avoice .btn {
+  border-radius: var(--r-pill);
+  background: var(--card2);
+  border: 1px solid rgba(24, 20, 40, 0.09);
+  box-shadow: var(--shadow-sm);
+  transition: var(--tr);
+}
+.avoice .btn:hover {
+  transform: translateY(-2px);
+}

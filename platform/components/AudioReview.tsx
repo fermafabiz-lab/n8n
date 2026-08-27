@@ -370,7 +370,7 @@ export default function AudioReview({
   const totalSeconds = withAudio.reduce((a, s) => a + (durations[s.id] ?? 0), 0);
 
   return (
-    <div className="script" style={{ marginTop: 24 }}>
+    <div className="script avoice" style={{ marginTop: 24 }}>
       <div className="sechead">
         <h2>Voice review</h2>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -785,13 +785,13 @@ export default function AudioReview({
             </p>
           </div>
         ) : (
-          <button className="abtn" onClick={() => setShowVoice(true)}>
-            🎚 Change narrator for the whole project
+          <button className="abtn narrowide" onClick={() => setShowVoice(true)}>
+            ♪ Change narrator for the whole project
           </button>
         )}
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {inPlay.map((s, i) => {
           const flag = flagFor(s, durations[s.id]);
           const fit = fitProblem(durations[s.id], clipDurations[s.id]);
@@ -801,19 +801,17 @@ export default function AudioReview({
           const audioIndex = withAudio.findIndex((w) => w.id === s.id);
           return (
             <div
-              className="card"
+              className="card take"
               key={s.id}
               style={{
                 padding: "12px 14px",
                 outline: isPlaying ? "2px solid var(--accent)" : undefined,
-                borderLeft: flag ? "3px solid var(--accent)" : undefined,
               }}
             >
               <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
                 <button
-                  className="abtn"
+                  className="abtn playbtn"
                   disabled={!s.voiceUrl}
-                  style={{ minWidth: 44, padding: "6px 10px" }}
                   onClick={() => (isPlaying ? stop() : playFrom(audioIndex, false))}
                 >
                   {isPlaying ? "■" : "▶"}

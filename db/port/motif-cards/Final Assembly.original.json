@@ -1,0 +1,2473 @@
+{
+  "id": "BY22Vlhh20Xdkr5Z",
+  "name": "4. Final Assembly",
+  "active": true,
+  "isArchived": false,
+  "versionId": "c9c3eaca-440f-469e-8581-1e1d5d81028c",
+  "activeVersionId": "5b12ef65-31f0-4a5b-8ec0-656349f0fecc",
+  "triggerCount": 2,
+  "createdAt": "2026-08-02T17:21:54.927Z",
+  "updatedAt": "2026-08-17T20:46:31.419Z",
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "connections": {
+    "Receive Project ID": {
+      "main": [
+        [
+          {
+            "node": "Fetch Approved Scenes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Timeline": {
+      "main": [
+        [
+          {
+            "node": "Submit Render",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Submit Render": {
+      "main": [
+        [
+          {
+            "node": "Wait Render",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Render": {
+      "main": [
+        [
+          {
+            "node": "Check Render",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Render": {
+      "main": [
+        [
+          {
+            "node": "Render Guard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Render Done": {
+      "main": [
+        [
+          {
+            "node": "Fetch Script Titles",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait Render",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Approved Scenes": {
+      "main": [
+        [
+          {
+            "node": "Prepare Clips",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assemble Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Assemble Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Assemble Input": {
+      "main": [
+        [
+          {
+            "node": "Fetch Approved Scenes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Probe Webhook": {
+      "main": [
+        [
+          {
+            "node": "Probe Prep",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Probe Prep": {
+      "main": [
+        [
+          {
+            "node": "Probe Route",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Probe Route": {
+      "main": [
+        [
+          {
+            "node": "Submit Render",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Clip Duration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Render Result": {
+      "main": [
+        [
+          {
+            "node": "Upload Final To Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Final To Drive": {
+      "main": [
+        [
+          {
+            "node": "Share Final Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Share Final Video": {
+      "main": [
+        [
+          {
+            "node": "Set Final Link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Final Link": {
+      "main": [
+        [
+          {
+            "node": "Update Project Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Remotion Props": {
+      "main": [
+        [
+          {
+            "node": "Submit Graphics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Submit Graphics": {
+      "main": [
+        [
+          {
+            "node": "Wait Graphics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Graphics": {
+      "main": [
+        [
+          {
+            "node": "Check Graphics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Graphics": {
+      "main": [
+        [
+          {
+            "node": "Graphics Guard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Graphics Done": {
+      "main": [
+        [
+          {
+            "node": "Get Render Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait Graphics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Clips": {
+      "main": [
+        [
+          {
+            "node": "Fetch Project Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Script Titles": {
+      "main": [
+        [
+          {
+            "node": "Build Remotion Props",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Project Info": {
+      "main": [
+        [
+          {
+            "node": "Find Music Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Music Folder": {
+      "main": [
+        [
+          {
+            "node": "List Music",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Music Track": {
+      "main": [
+        [
+          {
+            "node": "Share Music Track",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Music": {
+      "main": [
+        [
+          {
+            "node": "Match Tone Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Match Tone Folder": {
+      "main": [
+        [
+          {
+            "node": "List Tone Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Tone Folder": {
+      "main": [
+        [
+          {
+            "node": "Pick Music Track",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Share Music Track": {
+      "main": [
+        [
+          {
+            "node": "Find Vids Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Vids Folder": {
+      "main": [
+        [
+          {
+            "node": "Build Timeline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render Guard": {
+      "main": [
+        [
+          {
+            "node": "Render Lost?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render Lost?": {
+      "main": [
+        [
+          {
+            "node": "Build Timeline",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If Render Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Graphics Guard": {
+      "main": [
+        [
+          {
+            "node": "Graphics Lost?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Graphics Lost?": {
+      "main": [
+        [
+          {
+            "node": "Build Remotion Props",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If Graphics Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "Project_ID"
+            },
+            {
+              "name": "Aspect"
+            },
+            {
+              "name": "No_Captions"
+            }
+          ]
+        }
+      },
+      "id": "8bf7bf45-af6b-43fc-ad7e-ac12b2183d87",
+      "name": "Receive Project ID",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1584,
+        160
+      ]
+    },
+    {
+      "id": "ee354ba7-fa27-42b7-b0d4-6f48ed6ac808",
+      "name": "Fetch Approved Scenes",
+      "position": [
+        -1360,
+        160
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select id, \"createdTime\", fields from hov.at_scene\nwhere fields->>'Project_ID' = $hov${{ $json.Project_ID }}$hov$\n  and (fields->>'Aprobare Scenă')::boolean",
+        "options": {}
+      }
+    },
+    {
+      "id": "96cae148-cd89-4610-9436-47107c3ec8b1",
+      "name": "Update Project Status",
+      "position": [
+        1808,
+        160
+      ],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select * from hov.at_write($hov$project$hov$, $hov${{ $('Fetch Approved Scenes').first().json.fields.Project_ID }}$hov$,\n  $hov${{ JSON.stringify({ \"Status General\": \"Finalizat\", \"Link Video Final\": $json.video_url || ($json.video && $json.video.url) }) }}$hov$::jsonb)",
+        "options": {}
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build the request for OUR ffmpeg assemble endpoint (Railway). The server\n// measures each clip itself and silence-pads every voiceover to its scene's\n// exact video length; aspect picks the output canvas.\nconst clips = $('Prepare Clips').all();\nif (!clips.length) throw new Error('No clips to assemble.');\nconst scenes = clips.map(c => ({\n  videoUrl: c.json.url,\n  audioUrl: (c.json.voiceUrl && c.json.voiceUrl.startsWith('http')) ? c.json.voiceUrl : undefined,\n}));\nconst sceneChapters = clips.map(c => c.json.chapter || 0);\n\n// Aspect resolution order: trigger input -> webhook body -> project field\n// -> 16:9. Reading a nonexistent Airtable field is safely undefined.\nlet trig = {};\ntry { if ($('Receive Project ID').isExecuted) trig = $('Receive Project ID').first().json; } catch (e) {}\ntry { if (!trig.Aspect && $('Normalize Assemble Input').isExecuted) trig = $('Normalize Assemble Input').first().json; } catch (e) {}\nconst pf = ($('Fetch Project Info').first().json.fields) || {};\nconst aspect = (trig.Aspect === '9:16' || pf['Format'] === '9:16') ? '9:16' : '16:9';\n\nlet opts = {};\ntry { opts = JSON.parse(pf['Editing Options'] || '{}') || {}; } catch (e) {}\n\n// TWO independent switches, both sent explicitly — the server's implicit\n// defaults must never decide this.\n//\n// sfx: the Scene Final URL clips are RAW Veo output, so their audio track is\n// Veo's generated ambience (the submit prompt bans speech and music, leaving\n// natural sound effects only). ON → mixed at SFX_LEVEL under the narration,\n// sidechain-ducked server-side so narration stays predominant. Default ON:\n// silent footage under a voice sounds dead.\n//\n// SFX_LEVEL was 0.25 and judged too subtle on a real SFX-only render\n// (Warhammer, 2026-08-10) — audible only in headphones, in the gaps. 0.35\n// lifts the effects without touching the ducking, so the voice still wins\n// whenever it speaks. Tune HERE; the server's own default is never used.\nconst SFX_LEVEL = 0.35;\nconst sfxOn = opts.sfx !== false;\n\n// music: a background track from the Drive 'Muzica' folder AND the\n// synthesized boom/whoosh/riser accents at hook, chapter cuts and end\n// screen. Neither comes from the scene — both are composed here — so they\n// share one opt-IN switch. The accents used to play unconditionally, which\n// is how a film ended up carrying music unrelated to its footage.\nconst musicOn = opts.music === true;\nlet musicUrl;\nif (musicOn) {\n  try { musicUrl = $('Pick Music Track').first().json.url || undefined; } catch (e) {}\n}\n\nreturn [{ json: { body: {\n  scenes,\n  sceneChapters,\n  musicUrl,\n  aspect,\n  nativeAudio: sfxOn ? SFX_LEVEL : false,\n  stingers: musicOn,\n}, sceneCount: scenes.length, tone: pf.Tonalitate || 'default', aspect, musicUrl: musicUrl || null, sfx: sfxOn, sfxLevel: sfxOn ? SFX_LEVEL : 0, music: musicOn } }];"
+      },
+      "id": "6407caeb-36dd-404c-afac-e92ccf806a87",
+      "name": "Build Timeline",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1136,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-55dd.up.railway.app/assemble",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "a834bfa934hsfn3149sadn34"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "389e3845-4e4a-4b67-a15d-61f08f7db963",
+      "name": "Submit Render",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -912,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 5
+      },
+      "id": "f2842e12-ee53-4eb5-b486-4cf3b62f119c",
+      "name": "Wait Render",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -720,
+        160
+      ],
+      "webhookId": "c01a9670-3c71-4b7e-bba0-4eae0fdeba01"
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://n8n-production-55dd.up.railway.app/assemble/' + $('Submit Render').first().json.jobId + '/status' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "a834bfa934hsfn3149sadn34"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "f42eeb20-369a-48ea-857a-cd7607d13e8d",
+      "name": "Check Render",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -544,
+        160
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = $input.first().json;\n// A mid-render Railway deploy replaces the container and wipes the\n// in-memory job map: the poll answers 404 'job not found' although nothing\n// was wrong with the job. The work died with the container, so the only\n// recovery is resubmitting — flagged here, routed by 'Render Lost?'.\nconst httpErr = j.error && typeof j.error === 'object' ? String(j.error.message || j.error.description || '') : (typeof j.error === 'string' && !j.status ? j.error : '');\n// 180 polls x 5s = 15 minutes, the SAME ceiling this loop always had. The\n// interval came down from 20s because 'Wait Render' sleeps BEFORE the first\n// check: measured on execution 3599, ffmpeg had finished a one-scene film\n// well inside the first 20s and n8n slept all of it. Any change to the Wait\n// node has to move this number by the same factor or the ceiling moves with\n// it — at 5s the old cap of 45 would time out after 3m45s and kill every\n// long assemble.\nconst MAX_POLLS = 180;\nif (/not.*found|404/i.test(httpErr)) {\n  if ($runIndex > MAX_POLLS) throw new Error('assemble job lost repeatedly (' + $runIndex + ' polls) — giving up.');\n  return [{ json: { lost: true, status: 'lost' } }];\n}\nconst s = (j.status || '').toLowerCase();\nif (s === 'error') {\n  throw new Error('assemble failed: ' + (j.error || 'unknown'));\n}\nif ($runIndex > MAX_POLLS) {\n  throw new Error('assemble timed out after ' + $runIndex + ' polls. Last status: ' + s);\n}\nreturn [{ json: Object.assign({ lost: false }, j) }];"
+      },
+      "id": "fa312d45-a753-40bf-ad2a-2c48b90e1980",
+      "name": "Render Guard",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -352,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "render-done",
+              "leftValue": "={{ $json.status }}",
+              "operator": {
+                "operation": "equals",
+                "type": "string"
+              },
+              "rightValue": "done"
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          }
+        },
+        "options": {}
+      },
+      "id": "4aa085b3-3e96-4f37-895d-de9e692905b4",
+      "name": "If Render Done",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -176,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.outputUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "a834bfa934hsfn3149sadn34"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          },
+          "timeout": 120000
+        }
+      },
+      "id": "8d998bb2-bfc8-47ad-bd6a-ccd379af6808",
+      "name": "Get Render Result",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        0,
+        160
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://fal.run/fal-ai/ffmpeg-api/metadata",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { media_url: $json.url } }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "e0a6c24c-2ec8-4b4a-8caf-c1b71b15ddb3",
+      "name": "Get Clip Duration",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1184,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "let scenes = $input.all().slice();\nconst seen = new Set();\nscenes = scenes.filter(s => { const id = s.json.id; if (!id || seen.has(id)) return false; seen.add(id); return true; });\nscenes = scenes.filter(s => { const v = (s.json.fields || {})['Scene Final URL'] || ''; return v.startsWith('http'); });\nconst ord = it => { const f = it.json.fields || {}; return (typeof f['Ordine Scenă'] === 'number') ? f['Ordine Scenă'] : null; };\nscenes.sort((a, b) => {\n  const oa = ord(a), ob = ord(b);\n  if (oa !== null && ob !== null && oa !== ob) return oa - ob;\n  const t = new Date(a.json.createdTime) - new Date(b.json.createdTime);\n  if (t) return t;\n  return a.json.id < b.json.id ? -1 : 1;\n});\nif (!scenes.length) throw new Error('No scenes with a final muxed clip (Scene Final URL) found for this project.');\nreturn scenes.map((s, i) => {\n  const o = ord(s);\n  // Ordine Scenă = chapter*100 + scene (hook = 1 → chapter 0).\n  const chapter = o !== null ? Math.floor(o / 100) : (i === 0 ? 0 : 1);\n  return { json: {\n    id: s.json.id,\n    url: s.json.fields['Scene Final URL'],\n    voiceUrl: s.json.fields['Voiceover URL'] || '',\n    // Same strip as both TTS paths: speaker tags ([NARRATOR], [CHARACTER: X])\n    // are routing, not narration — without this they showed up in captions.\n    narratorText: String(s.json.fields['Script Scenă'] || '').replace(/\\[[^\\]]{0,60}\\]\\s*/g, ' ').replace(/\\s+/g, ' ').trim(),\n    chapter,\n  } };\n});"
+      },
+      "id": "b7cd8183-0f04-418f-9498-c8cf249fc8e3",
+      "name": "Prepare Clips",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1248,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "assemble",
+        "options": {}
+      },
+      "id": "11679c73-f670-4970-b71b-4e96263d3484",
+      "name": "Assemble Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1808,
+        320
+      ],
+      "webhookId": "60acac33-8199-48c5-86df-85bbe7b751ee",
+      "disabled": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// Website/manual retrigger path: accept {Project_ID, aspect?, captions?} in\n// the POST body and hand downstream the same shape the sub-workflow trigger\n// gives.\nconst b = $json.body || {};\nconst id = b.Project_ID || b.project_id || '';\nif (!id) throw new Error('Project_ID missing in webhook body');\nreturn [{ json: {\n  Project_ID: id,\n  Aspect: b.aspect === '9:16' ? '9:16' : (b.aspect || ''),\n  No_Captions: (b.captions === 'no' || b.no_captions === true) ? 'yes' : '',\n} }];"
+      },
+      "id": "322ad4ac-65fe-4060-9b67-a50942d255b7",
+      "name": "Normalize Assemble Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1584,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "probe",
+        "options": {}
+      },
+      "id": "d3eebec1-a349-4a9a-b9ca-2d7e037fdc15",
+      "name": "Probe Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1808,
+        480
+      ],
+      "webhookId": "2dd3a2a7-0130-4cc3-8226-89c747eccd12"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Diagnostic harness (draft only): route a metadata or compose request\n// through the existing fal-credentialed nodes.\nconst b = $json.body || {};\nif (b.mode === 'compose') return [{ json: { body: b.compose } }];\nreturn [{ json: { url: b.media_url } }];"
+      },
+      "id": "71ca5ffc-30ba-4977-8f68-957f31770b47",
+      "name": "Probe Prep",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1648,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "is-compose",
+              "leftValue": "={{ $json.body !== undefined }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          }
+        },
+        "options": {}
+      },
+      "id": "c53e44bd-bd02-4140-8539-be4ba7e0b472",
+      "name": "Probe Route",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1488,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "name": "={{ 'final-' + $('Fetch Approved Scenes').first().json.fields.Project_ID + '-' + $now.toMillis() + '.mp4' }}",
+        "driveId": {
+          "__rl": true,
+          "cachedResultName": "My Drive",
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ ((($('Find Vids Folder').first().json.files || [])[0] || {}).id) || 'root' }}"
+        },
+        "options": {},
+        "resource": "file",
+        "operation": "upload"
+      },
+      "id": "e49477ba-eb1a-400f-9a4f-fcf928cd6caa",
+      "name": "Upload Final To Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        224,
+        160
+      ],
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "operation": "share",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Upload Final To Drive').item.json.id }}"
+        },
+        "permissionsUi": {
+          "permissionsValues": {
+            "role": "reader",
+            "type": "anyone"
+          }
+        },
+        "options": {}
+      },
+      "id": "4477e5f2-bc0c-418b-b0a6-25be2bec70d1",
+      "name": "Share Final Video",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        432,
+        160
+      ],
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "const driveId = $('Upload Final To Drive').first().json.id;\nreturn [{ json: {\n  video_url: 'https://drive.google.com/uc?export=download&id=' + driveId,\n  verify: $('Render Guard').last().json.verify || null,\n} }];"
+      },
+      "id": "6bc9d77d-3bc7-4418-867f-c0cd1b08cbcd",
+      "name": "Set Final Link",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        160
+      ]
+    },
+    {
+      "id": "b922e468-db3d-418e-9e6c-871e47706523",
+      "name": "Fetch Project Info",
+      "position": [
+        -1184,
+        160
+      ],
+      "executeOnce": true,
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select id, \"createdTime\", fields from hov.at_project\nwhere id = $hov${{ $('Fetch Approved Scenes').first().json.fields.Project_ID }}$hov$",
+        "options": {}
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Graphics pass: hook title, chapter markers, transitions, captions,\n// grade and end screen over the ffmpeg-assembled video. Scene timings and\n// real narration lengths come from the assemble step's own ffprobe\n// verification, so captions pace with the actual voice.\nconst status = $('Render Guard').last().json; // {outputUrl, verify}\nif (!status.outputUrl) throw new Error('assemble outputUrl missing');\nconst clips = $('Prepare Clips').all();\nconst v = status.verify || {};\nconst starts = v.sceneStartsSeconds || [];\nconst voices = v.voiceDurationsSeconds || [];\nconst total = v.videoSeconds || 0;\nconst scenes = clips.map((c, i) => {\n  const start = starts[i] ?? (i * 8);\n  const end = (i + 1 < starts.length) ? starts[i + 1] : total;\n  return {\n    narratorText: c.json.narratorText || '',\n    startSeconds: start,\n    durationSeconds: Math.max(0.5, end - start),\n    chapter: c.json.chapter || 0,\n    speechSeconds: voices[i] || undefined,\n  };\n});\nconst pf = $('Fetch Project Info').first().json.fields || {};\n\n// Aspect + captions: trigger input -> webhook body -> project fields -> defaults.\nlet trig = {};\ntry { if ($('Receive Project ID').isExecuted) trig = $('Receive Project ID').first().json; } catch (e) {}\ntry { if (!trig.Aspect && !trig.No_Captions && $('Normalize Assemble Input').isExecuted) trig = $('Normalize Assemble Input').first().json; } catch (e) {}\nconst aspectRatio = (trig.Aspect === '9:16' || pf['Format'] === '9:16') ? '9:16' : '16:9';\n\n// Per-overlay toggles chosen in the site form, stored as JSON on the\n// project ('Editing Options'). Missing field/old projects = everything on.\nlet opts = {};\ntry { opts = JSON.parse(pf['Editing Options'] || '{}') || {}; } catch (e) { opts = {}; }\n\n// How hard the montage re-frames across a cut. 0 holds ONE framing for the\n// whole film; 1 and 2 contrast the framing at every scene boundary.\n//\n// Sent explicitly, and defaulting to 0, because omitting it made Remotion\n// derive it from the tone's editing energy - which is 1 for most tones, so\n// every film got the contrast whether it suited the footage or not. Measured\n// on a 15-scene dialogue film: scale jumps of 0.075 to 0.135 plus a position\n// shift, on all 14 boundaries. The planner is blind to the footage, and the\n// contrast only reads as a new shot when consecutive scenes actually look\n// different. On a two-hander every scene is the same two people in the same\n// place, so it reads as a zoom of the same shot - reported three times as a\n// zoom bug, and it was never a bug, it was this setting.\n//\n// Still a button, not a decision: a project that wants the contrast back sets\n// montageIntensity in its Editing Options.\nconst montageIntensity = [0, 1, 2].includes(opts.montageIntensity) ? opts.montageIntensity : 0;\n\n// A cinematic (silent) project's Script Scenă is an unspoken shot note, not\n// narration. THREE surfaces read that field as if it were spoken, and each\n// one puts the beat sheet on screen: captions print it, the chapter card\n// borrows its first eight words when the chapter has no title of its own,\n// and a text card lifts figures out of it (a year or a duration in a stage\n// direction reads to the pattern exactly like a fact the narration speaks).\n// Captions were the only one visible to the producer, which is how the other\n// two survived. One flag now tells the render, and all three read it.\nconst narrationIsSpoken = opts.category !== 'cinematic';\nconst showCaptions = !(trig.No_Captions === 'yes' || pf['Fără Subtitrări'] === true) && narrationIsSpoken;\n\n// Real chapter titles from the linked script's [CHAPTER n: title] markers.\nconst chapterTitles = {};\ntry {\n  const sc = ($('Fetch Script Titles').first().json.fields || {})['Script Content'] || '';\n  const re = /\\[CHAPTER\\s+(\\d+)\\s*:\\s*([^\\]]+)\\]/g;\n  let m;\n  while ((m = re.exec(sc))) chapterTitles[m[1]] = m[2].trim();\n} catch (e) {}\n\nreturn [{ json: { body: {\n  finalVideoUrl: status.outputUrl,\n  projectTitle: pf['Nume Proiect'] || 'Video Factory',\n  scenes,\n  tone: pf['Tonalitate'] || 'Dark',\n  channelName: 'Video Factory',\n  aspectRatio,\n  showCaptions,\n  narrationIsSpoken,\n  montageIntensity,\n  showHookTitle: opts.hookTitle !== false,\n  showChapterCards: opts.chapterCards !== false,\n  showEndScreen: opts.endScreen !== false,\n  chapterTitles,\n} } }];"
+      },
+      "id": "18857c6d-78fa-4173-98c7-9b0c63c733eb",
+      "name": "Build Remotion Props",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        128,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-55dd.up.railway.app/render",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "a834bfa934hsfn3149sadn34"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "69ca0442-2af2-4e12-ba88-9619d634693b",
+      "name": "Submit Graphics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        256,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 5
+      },
+      "id": "448a3759-f9d0-4120-93e0-d3655045ae7b",
+      "name": "Wait Graphics",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        384,
+        0
+      ],
+      "webhookId": "1329c5af-29b6-489f-8f34-ef73316e2012"
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://n8n-production-55dd.up.railway.app/render/' + $('Submit Graphics').first().json.jobId + '/status' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "a834bfa934hsfn3149sadn34"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "69c6a475-0d3b-41cb-be8e-c3018dbaa967",
+      "name": "Check Graphics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        512,
+        0
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = $input.first().json;\n// Same deploy-wipes-the-job recovery as Render Guard: 404 from the status\n// poll means the container restarted mid-render, not that the render broke.\nconst httpErr = j.error && typeof j.error === 'object' ? String(j.error.message || j.error.description || '') : (typeof j.error === 'string' && !j.status ? j.error : '');\n// First render also bundles the project, and Chromium renders take minutes,\n// not seconds — allow up to ~30 min before declaring a hang. 360 polls x 5s\n// is exactly the ceiling the old 90 x 20s gave; the interval came down so a\n// finished render is noticed within 5s instead of up to 20. Move the Wait\n// node and this number moves with it, or the ceiling silently shrinks.\nconst MAX_POLLS = 360;\nif (/not.*found|404/i.test(httpErr)) {\n  if ($runIndex > MAX_POLLS) throw new Error('graphics job lost repeatedly (' + $runIndex + ' polls) — giving up.');\n  return [{ json: { lost: true, status: 'lost' } }];\n}\nconst s = (j.status || '').toLowerCase();\nif (s === 'error') throw new Error('Remotion render failed: ' + (j.error || 'unknown'));\nif ($runIndex > MAX_POLLS) throw new Error('Remotion render timed out after ' + $runIndex + ' polls. Last status: ' + s + ' progress: ' + (j.progress || 0));\nreturn [{ json: Object.assign({ lost: false }, j) }];"
+      },
+      "id": "2a4dd118-a9b9-4a77-9422-9dff1d581e15",
+      "name": "Graphics Guard",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "done",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "id": "graphics-done"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8201da09-503a-4777-a200-32773c7ca2f3",
+      "name": "If Graphics Done",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        768,
+        0
+      ]
+    },
+    {
+      "id": "2157aa36-b0c7-4362-94bb-58ea2bf639c2",
+      "name": "Fetch Script Titles",
+      "position": [
+        0,
+        0
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "onError": "continueRegularOutput",
+      "notes": "Chapter titles for the impact cards come from the script's [CHAPTER n: title] markers. Missing script degrades to the narration-excerpt fallback.",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select id, \"createdTime\", fields from hov.at_script\nwhere id = $hov${{ (($('Fetch Project Info').first().json.fields || {}).scripts || [])[0] || 'missing' }}$hov$",
+        "options": {}
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/drive/v3/files?fields=files(id,name)&q=name%20%3D%20%27Muzica%27%20and%20mimeType%20%3D%20%27application%2Fvnd.google-apps.folder%27%20and%20trashed%20%3D%20false",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "2c5f6e62-86b7-4c9a-b374-c8ad7071c7e9",
+      "name": "Find Music Folder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1184,
+        704
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "onError": "continueRegularOutput",
+      "notes": "Background music lives in the user's Drive folder named 'Muzica'. Missing folder = video without music, never an error."
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://www.googleapis.com/drive/v3/files?pageSize=200&fields=files(id,name,mimeType)&q=' + encodeURIComponent(\"'\" + ((($json.files || [])[0] || {}).id || 'missing') + \"' in parents and trashed = false\") }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "40cbc6cf-0348-484c-945d-1255bad7183e",
+      "name": "List Music",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1024,
+        320
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Track selection order:\n//   1. files inside the tone-matched subfolder (Muzica/Dark, Muzica/Default...)\n//   2. loose files in Muzica whose NAME contains the tone (dark-1.mp3)\n//   3. loose files named default*\n//   4. any loose file\n// Multiple candidates -> random pick, so repeat videos vary.\nconst norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');\nconst isFile = (f) => f && f.id && !(f.mimeType || '').includes('folder');\nlet tone = 'default';\ntry { tone = norm($('Fetch Project Info').first().json.fields.Tonalitate); } catch (e) {}\nlet subFiles = [];\ntry { subFiles = ($input.first().json.files || []).filter(isFile); } catch (e) {}\nlet rootFiles = [];\ntry { rootFiles = ($('List Music').first().json.files || []).filter(isFile); } catch (e) {}\nconst byTone = rootFiles.filter(f => norm(f.name).includes(tone));\nconst byDefault = rootFiles.filter(f => norm(f.name).includes('default'));\nconst pool = subFiles.length ? subFiles : (byTone.length ? byTone : (byDefault.length ? byDefault : rootFiles));\nif (!pool.length) return [{ json: { url: null, name: null, reason: 'no tracks in Muzica folder' } }];\nconst t = pool[Math.floor(Math.random() * pool.length)];\n// Served through our Railway media proxy so ffmpeg gets a real audio\n// stream (Drive's direct links answer with redirects/HTML).\nreturn [{ json: { id: t.id, name: t.name, matched: subFiles.length ? 'subfolder' : (byTone.length ? 'tone-name' : (byDefault.length ? 'default' : 'any')), url: 'https://n8n-production-55dd.up.railway.app/media?id=' + t.id } }];"
+      },
+      "id": "d3a3a5bb-d18a-4682-b152-ef69f1b98efd",
+      "name": "Pick Music Track",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -864,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "share",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.id || 'missing' }}"
+        },
+        "permissionsUi": {
+          "permissionsValues": {
+            "role": "reader",
+            "type": "anyone"
+          }
+        },
+        "options": {}
+      },
+      "id": "dd46ecf9-25d4-44b0-9434-d3f591751fd1",
+      "name": "Share Music Track",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -704,
+        320
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput",
+      "notes": "Idempotent: makes the picked track link-readable so the media proxy can stream it."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Subfolder-per-tone layout: Muzica/Dark, Muzica/Epic, ... If a subfolder\n// matches the project's Tonalitate (or 'Default' as fallback), its files\n// are preferred over loose files in the root.\nconst norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');\nlet tone = 'default';\ntry { tone = norm($('Fetch Project Info').first().json.fields.Tonalitate); } catch (e) {}\nlet folders = [];\ntry { folders = ($input.first().json.files || []).filter(f => (f.mimeType || '').includes('folder')); } catch (e) {}\nconst hit = folders.find(f => norm(f.name).includes(tone)) || folders.find(f => norm(f.name).includes('default')) || null;\nreturn [{ json: { folderId: hit ? hit.id : null, folderName: hit ? hit.name : null } }];"
+      },
+      "id": "28cc0b50-9923-48cc-b7e0-27fd109624cd",
+      "name": "Match Tone Folder",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -944,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://www.googleapis.com/drive/v3/files?pageSize=200&fields=files(id,name,mimeType)&q=' + encodeURIComponent(\"'\" + ($json.folderId || 'missing') + \"' in parents and trashed = false\") }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "cca7d4c8-27a8-4bba-8167-2850cf587632",
+      "name": "List Tone Folder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -784,
+        448
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/drive/v3/files?fields=files(id,name)&q=name%20%3D%20%27Final%20Vids%27%20and%20mimeType%20%3D%20%27application%2Fvnd.google-apps.folder%27%20and%20trashed%20%3D%20false",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "057ae445-9ddd-47ae-b41a-da07dbed782e",
+      "name": "Find Vids Folder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -576,
+        448
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "onError": "continueRegularOutput",
+      "notes": "Final renders are organized into the Drive folder named 'Final Vids'; missing folder falls back to My Drive root."
+    },
+    {
+      "id": "08d9f608-acaa-4b04-b0c4-b6245bdaffc3",
+      "name": "Render Lost?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -780,
+        180
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "render-lost",
+              "leftValue": "={{ $json.lost === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "720d1548-b049-4a72-a548-48cd2aaf38e5",
+      "name": "Graphics Lost?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        700,
+        120
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "graphics-lost",
+              "leftValue": "={{ $json.lost === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    }
+  ],
+  "nodeGroups": [],
+  "activeVersion": {
+    "nodes": [
+      {
+        "parameters": {
+          "workflowInputs": {
+            "values": [
+              {
+                "name": "Project_ID"
+              },
+              {
+                "name": "Aspect"
+              },
+              {
+                "name": "No_Captions"
+              }
+            ]
+          }
+        },
+        "id": "8bf7bf45-af6b-43fc-ad7e-ac12b2183d87",
+        "name": "Receive Project ID",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "position": [
+          -1584,
+          160
+        ]
+      },
+      {
+        "id": "ee354ba7-fa27-42b7-b0d4-6f48ed6ac808",
+        "name": "Fetch Approved Scenes",
+        "position": [
+          -1360,
+          160
+        ],
+        "alwaysOutputData": true,
+        "executeOnce": true,
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "select id, \"createdTime\", fields from hov.at_scene\nwhere fields->>'Project_ID' = $hov${{ $json.Project_ID }}$hov$\n  and (fields->>'Aprobare Scenă')::boolean",
+          "options": {}
+        }
+      },
+      {
+        "id": "96cae148-cd89-4610-9436-47107c3ec8b1",
+        "name": "Update Project Status",
+        "position": [
+          1808,
+          160
+        ],
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "select * from hov.at_write($hov$project$hov$, $hov${{ $('Fetch Approved Scenes').first().json.fields.Project_ID }}$hov$,\n  $hov${{ JSON.stringify({ \"Status General\": \"Finalizat\", \"Link Video Final\": $json.video_url || ($json.video && $json.video.url) }) }}$hov$::jsonb)",
+          "options": {}
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "// Build the request for OUR ffmpeg assemble endpoint (Railway). The server\n// measures each clip itself and silence-pads every voiceover to its scene's\n// exact video length; aspect picks the output canvas.\nconst clips = $('Prepare Clips').all();\nif (!clips.length) throw new Error('No clips to assemble.');\nconst scenes = clips.map(c => ({\n  videoUrl: c.json.url,\n  audioUrl: (c.json.voiceUrl && c.json.voiceUrl.startsWith('http')) ? c.json.voiceUrl : undefined,\n}));\nconst sceneChapters = clips.map(c => c.json.chapter || 0);\n\n// Aspect resolution order: trigger input -> webhook body -> project field\n// -> 16:9. Reading a nonexistent Airtable field is safely undefined.\nlet trig = {};\ntry { if ($('Receive Project ID').isExecuted) trig = $('Receive Project ID').first().json; } catch (e) {}\ntry { if (!trig.Aspect && $('Normalize Assemble Input').isExecuted) trig = $('Normalize Assemble Input').first().json; } catch (e) {}\nconst pf = ($('Fetch Project Info').first().json.fields) || {};\nconst aspect = (trig.Aspect === '9:16' || pf['Format'] === '9:16') ? '9:16' : '16:9';\n\nlet opts = {};\ntry { opts = JSON.parse(pf['Editing Options'] || '{}') || {}; } catch (e) {}\n\n// TWO independent switches, both sent explicitly — the server's implicit\n// defaults must never decide this.\n//\n// sfx: the Scene Final URL clips are RAW Veo output, so their audio track is\n// Veo's generated ambience (the submit prompt bans speech and music, leaving\n// natural sound effects only). ON → mixed at SFX_LEVEL under the narration,\n// sidechain-ducked server-side so narration stays predominant. Default ON:\n// silent footage under a voice sounds dead.\n//\n// SFX_LEVEL was 0.25 and judged too subtle on a real SFX-only render\n// (Warhammer, 2026-08-10) — audible only in headphones, in the gaps. 0.35\n// lifts the effects without touching the ducking, so the voice still wins\n// whenever it speaks. Tune HERE; the server's own default is never used.\nconst SFX_LEVEL = 0.35;\nconst sfxOn = opts.sfx !== false;\n\n// music: a background track from the Drive 'Muzica' folder AND the\n// synthesized boom/whoosh/riser accents at hook, chapter cuts and end\n// screen. Neither comes from the scene — both are composed here — so they\n// share one opt-IN switch. The accents used to play unconditionally, which\n// is how a film ended up carrying music unrelated to its footage.\nconst musicOn = opts.music === true;\nlet musicUrl;\nif (musicOn) {\n  try { musicUrl = $('Pick Music Track').first().json.url || undefined; } catch (e) {}\n}\n\nreturn [{ json: { body: {\n  scenes,\n  sceneChapters,\n  musicUrl,\n  aspect,\n  nativeAudio: sfxOn ? SFX_LEVEL : false,\n  stingers: musicOn,\n}, sceneCount: scenes.length, tone: pf.Tonalitate || 'default', aspect, musicUrl: musicUrl || null, sfx: sfxOn, sfxLevel: sfxOn ? SFX_LEVEL : 0, music: musicOn } }];"
+        },
+        "id": "6407caeb-36dd-404c-afac-e92ccf806a87",
+        "name": "Build Timeline",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -1136,
+          160
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://n8n-production-55dd.up.railway.app/assemble",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "x-api-key",
+                "value": "a834bfa934hsfn3149sadn34"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ $json.body }}",
+          "options": {
+            "timeout": 60000
+          }
+        },
+        "id": "389e3845-4e4a-4b67-a15d-61f08f7db963",
+        "name": "Submit Render",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          -912,
+          160
+        ]
+      },
+      {
+        "parameters": {
+          "amount": 5
+        },
+        "id": "f2842e12-ee53-4eb5-b486-4cf3b62f119c",
+        "name": "Wait Render",
+        "type": "n8n-nodes-base.wait",
+        "typeVersion": 1.1,
+        "position": [
+          -720,
+          160
+        ],
+        "webhookId": "c01a9670-3c71-4b7e-bba0-4eae0fdeba01"
+      },
+      {
+        "parameters": {
+          "url": "={{ 'https://n8n-production-55dd.up.railway.app/assemble/' + $('Submit Render').first().json.jobId + '/status' }}",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "x-api-key",
+                "value": "a834bfa934hsfn3149sadn34"
+              }
+            ]
+          },
+          "options": {
+            "timeout": 30000
+          }
+        },
+        "id": "f42eeb20-369a-48ea-857a-cd7607d13e8d",
+        "name": "Check Render",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          -544,
+          160
+        ],
+        "onError": "continueRegularOutput"
+      },
+      {
+        "parameters": {
+          "jsCode": "const j = $input.first().json;\n// A mid-render Railway deploy replaces the container and wipes the\n// in-memory job map: the poll answers 404 'job not found' although nothing\n// was wrong with the job. The work died with the container, so the only\n// recovery is resubmitting — flagged here, routed by 'Render Lost?'.\nconst httpErr = j.error && typeof j.error === 'object' ? String(j.error.message || j.error.description || '') : (typeof j.error === 'string' && !j.status ? j.error : '');\n// 180 polls x 5s = 15 minutes, the SAME ceiling this loop always had. The\n// interval came down from 20s because 'Wait Render' sleeps BEFORE the first\n// check: measured on execution 3599, ffmpeg had finished a one-scene film\n// well inside the first 20s and n8n slept all of it. Any change to the Wait\n// node has to move this number by the same factor or the ceiling moves with\n// it — at 5s the old cap of 45 would time out after 3m45s and kill every\n// long assemble.\nconst MAX_POLLS = 180;\nif (/not.*found|404/i.test(httpErr)) {\n  if ($runIndex > MAX_POLLS) throw new Error('assemble job lost repeatedly (' + $runIndex + ' polls) — giving up.');\n  return [{ json: { lost: true, status: 'lost' } }];\n}\nconst s = (j.status || '').toLowerCase();\nif (s === 'error') {\n  throw new Error('assemble failed: ' + (j.error || 'unknown'));\n}\nif ($runIndex > MAX_POLLS) {\n  throw new Error('assemble timed out after ' + $runIndex + ' polls. Last status: ' + s);\n}\nreturn [{ json: Object.assign({ lost: false }, j) }];"
+        },
+        "id": "fa312d45-a753-40bf-ad2a-2c48b90e1980",
+        "name": "Render Guard",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -352,
+          160
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "combinator": "and",
+            "conditions": [
+              {
+                "id": "render-done",
+                "leftValue": "={{ $json.status }}",
+                "operator": {
+                  "operation": "equals",
+                  "type": "string"
+                },
+                "rightValue": "done"
+              }
+            ],
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 3
+            }
+          },
+          "options": {}
+        },
+        "id": "4aa085b3-3e96-4f37-895d-de9e692905b4",
+        "name": "If Render Done",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          -176,
+          160
+        ]
+      },
+      {
+        "parameters": {
+          "url": "={{ $json.outputUrl }}",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "x-api-key",
+                "value": "a834bfa934hsfn3149sadn34"
+              }
+            ]
+          },
+          "options": {
+            "response": {
+              "response": {
+                "responseFormat": "file"
+              }
+            },
+            "timeout": 120000
+          }
+        },
+        "id": "8d998bb2-bfc8-47ad-bd6a-ccd379af6808",
+        "name": "Get Render Result",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          0,
+          160
+        ],
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 5000
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://fal.run/fal-ai/ffmpeg-api/metadata",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ { media_url: $json.url } }}",
+          "options": {
+            "timeout": 60000
+          }
+        },
+        "id": "e0a6c24c-2ec8-4b4a-8caf-c1b71b15ddb3",
+        "name": "Get Clip Duration",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          -1184,
+          320
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "let scenes = $input.all().slice();\nconst seen = new Set();\nscenes = scenes.filter(s => { const id = s.json.id; if (!id || seen.has(id)) return false; seen.add(id); return true; });\nscenes = scenes.filter(s => { const v = (s.json.fields || {})['Scene Final URL'] || ''; return v.startsWith('http'); });\nconst ord = it => { const f = it.json.fields || {}; return (typeof f['Ordine Scenă'] === 'number') ? f['Ordine Scenă'] : null; };\nscenes.sort((a, b) => {\n  const oa = ord(a), ob = ord(b);\n  if (oa !== null && ob !== null && oa !== ob) return oa - ob;\n  const t = new Date(a.json.createdTime) - new Date(b.json.createdTime);\n  if (t) return t;\n  return a.json.id < b.json.id ? -1 : 1;\n});\nif (!scenes.length) throw new Error('No scenes with a final muxed clip (Scene Final URL) found for this project.');\nreturn scenes.map((s, i) => {\n  const o = ord(s);\n  // Ordine Scenă = chapter*100 + scene (hook = 1 → chapter 0).\n  const chapter = o !== null ? Math.floor(o / 100) : (i === 0 ? 0 : 1);\n  return { json: {\n    id: s.json.id,\n    url: s.json.fields['Scene Final URL'],\n    voiceUrl: s.json.fields['Voiceover URL'] || '',\n    // Same strip as both TTS paths: speaker tags ([NARRATOR], [CHARACTER: X])\n    // are routing, not narration — without this they showed up in captions.\n    narratorText: String(s.json.fields['Script Scenă'] || '').replace(/\\[[^\\]]{0,60}\\]\\s*/g, ' ').replace(/\\s+/g, ' ').trim(),\n    chapter,\n  } };\n});"
+        },
+        "id": "b7cd8183-0f04-418f-9498-c8cf249fc8e3",
+        "name": "Prepare Clips",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -1248,
+          160
+        ]
+      },
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "assemble",
+          "options": {}
+        },
+        "id": "11679c73-f670-4970-b71b-4e96263d3484",
+        "name": "Assemble Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          -1808,
+          320
+        ],
+        "webhookId": "60acac33-8199-48c5-86df-85bbe7b751ee",
+        "disabled": false
+      },
+      {
+        "parameters": {
+          "jsCode": "// Website/manual retrigger path: accept {Project_ID, aspect?, captions?} in\n// the POST body and hand downstream the same shape the sub-workflow trigger\n// gives.\nconst b = $json.body || {};\nconst id = b.Project_ID || b.project_id || '';\nif (!id) throw new Error('Project_ID missing in webhook body');\nreturn [{ json: {\n  Project_ID: id,\n  Aspect: b.aspect === '9:16' ? '9:16' : (b.aspect || ''),\n  No_Captions: (b.captions === 'no' || b.no_captions === true) ? 'yes' : '',\n} }];"
+        },
+        "id": "322ad4ac-65fe-4060-9b67-a50942d255b7",
+        "name": "Normalize Assemble Input",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -1584,
+          320
+        ]
+      },
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "probe",
+          "options": {}
+        },
+        "id": "d3eebec1-a349-4a9a-b9ca-2d7e037fdc15",
+        "name": "Probe Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          -1808,
+          480
+        ],
+        "webhookId": "2dd3a2a7-0130-4cc3-8226-89c747eccd12"
+      },
+      {
+        "parameters": {
+          "jsCode": "// Diagnostic harness (draft only): route a metadata or compose request\n// through the existing fal-credentialed nodes.\nconst b = $json.body || {};\nif (b.mode === 'compose') return [{ json: { body: b.compose } }];\nreturn [{ json: { url: b.media_url } }];"
+        },
+        "id": "71ca5ffc-30ba-4977-8f68-957f31770b47",
+        "name": "Probe Prep",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -1648,
+          480
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "combinator": "and",
+            "conditions": [
+              {
+                "id": "is-compose",
+                "leftValue": "={{ $json.body !== undefined }}",
+                "operator": {
+                  "operation": "true",
+                  "singleValue": true,
+                  "type": "boolean"
+                },
+                "rightValue": ""
+              }
+            ],
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "loose",
+              "version": 3
+            }
+          },
+          "options": {}
+        },
+        "id": "c53e44bd-bd02-4140-8539-be4ba7e0b472",
+        "name": "Probe Route",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          -1488,
+          480
+        ]
+      },
+      {
+        "parameters": {
+          "name": "={{ 'final-' + $('Fetch Approved Scenes').first().json.fields.Project_ID + '-' + $now.toMillis() + '.mp4' }}",
+          "driveId": {
+            "__rl": true,
+            "cachedResultName": "My Drive",
+            "mode": "list",
+            "value": "My Drive"
+          },
+          "folderId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "={{ ((($('Find Vids Folder').first().json.files || [])[0] || {}).id) || 'root' }}"
+          },
+          "options": {},
+          "resource": "file",
+          "operation": "upload"
+        },
+        "id": "e49477ba-eb1a-400f-9a4f-fcf928cd6caa",
+        "name": "Upload Final To Drive",
+        "type": "n8n-nodes-base.googleDrive",
+        "typeVersion": 3,
+        "position": [
+          224,
+          160
+        ],
+        "retryOnFail": true,
+        "maxTries": 5,
+        "waitBetweenTries": 5000
+      },
+      {
+        "parameters": {
+          "operation": "share",
+          "fileId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "={{ $('Upload Final To Drive').item.json.id }}"
+          },
+          "permissionsUi": {
+            "permissionsValues": {
+              "role": "reader",
+              "type": "anyone"
+            }
+          },
+          "options": {}
+        },
+        "id": "4477e5f2-bc0c-418b-b0a6-25be2bec70d1",
+        "name": "Share Final Video",
+        "type": "n8n-nodes-base.googleDrive",
+        "typeVersion": 3,
+        "position": [
+          432,
+          160
+        ],
+        "retryOnFail": true,
+        "maxTries": 5,
+        "waitBetweenTries": 5000
+      },
+      {
+        "parameters": {
+          "jsCode": "const driveId = $('Upload Final To Drive').first().json.id;\nreturn [{ json: {\n  video_url: 'https://drive.google.com/uc?export=download&id=' + driveId,\n  verify: $('Render Guard').last().json.verify || null,\n} }];"
+        },
+        "id": "6bc9d77d-3bc7-4418-867f-c0cd1b08cbcd",
+        "name": "Set Final Link",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          624,
+          160
+        ]
+      },
+      {
+        "id": "b922e468-db3d-418e-9e6c-871e47706523",
+        "name": "Fetch Project Info",
+        "position": [
+          -1184,
+          160
+        ],
+        "executeOnce": true,
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "select id, \"createdTime\", fields from hov.at_project\nwhere id = $hov${{ $('Fetch Approved Scenes').first().json.fields.Project_ID }}$hov$",
+          "options": {}
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "// Graphics pass: hook title, chapter markers, transitions, captions,\n// grade and end screen over the ffmpeg-assembled video. Scene timings and\n// real narration lengths come from the assemble step's own ffprobe\n// verification, so captions pace with the actual voice.\nconst status = $('Render Guard').last().json; // {outputUrl, verify}\nif (!status.outputUrl) throw new Error('assemble outputUrl missing');\nconst clips = $('Prepare Clips').all();\nconst v = status.verify || {};\nconst starts = v.sceneStartsSeconds || [];\nconst voices = v.voiceDurationsSeconds || [];\nconst total = v.videoSeconds || 0;\nconst scenes = clips.map((c, i) => {\n  const start = starts[i] ?? (i * 8);\n  const end = (i + 1 < starts.length) ? starts[i + 1] : total;\n  return {\n    narratorText: c.json.narratorText || '',\n    startSeconds: start,\n    durationSeconds: Math.max(0.5, end - start),\n    chapter: c.json.chapter || 0,\n    speechSeconds: voices[i] || undefined,\n  };\n});\nconst pf = $('Fetch Project Info').first().json.fields || {};\n\n// Aspect + captions: trigger input -> webhook body -> project fields -> defaults.\nlet trig = {};\ntry { if ($('Receive Project ID').isExecuted) trig = $('Receive Project ID').first().json; } catch (e) {}\ntry { if (!trig.Aspect && !trig.No_Captions && $('Normalize Assemble Input').isExecuted) trig = $('Normalize Assemble Input').first().json; } catch (e) {}\nconst aspectRatio = (trig.Aspect === '9:16' || pf['Format'] === '9:16') ? '9:16' : '16:9';\n\n// Per-overlay toggles chosen in the site form, stored as JSON on the\n// project ('Editing Options'). Missing field/old projects = everything on.\nlet opts = {};\ntry { opts = JSON.parse(pf['Editing Options'] || '{}') || {}; } catch (e) { opts = {}; }\n\n// Playback speed of the finished film — the first thing the brief's PACE\n// control has ever actually changed. Before this it reached exactly two\n// prompt lines in Claude Scripting (`Pace: Slow`, a hint with no rule) and\n// nothing else read the field, which is why it changed nothing.\n//\n// Editing Options is the OVERRIDE (written by the site's Final touches and\n// 'Sound and speed' panels); the project's Pace field is the DEFAULT, so\n// every film already in the database honours the choice its producer made\n// with nothing to migrate. buildProject() in platform/lib/data/derive.ts\n// resolves it in exactly this order — keep the two in step, or the site\n// would show a rate the render is not using.\n//\n// The render server applies it AFTER Remotion draws, so the picture, the\n// narration, the music and every baked-in graphic re-time together; see\n// remotion/server/speed.mjs for why no earlier step can own it.\nconst PACE_SPEED = { slow: 0.9, normal: 1, fast: 1.1 };\nlet speed = 1;\n{\n  const stored = (opts.speed === undefined || opts.speed === null) ? String(pf['Pace'] || '') : opts.speed;\n  const named = PACE_SPEED[String(stored).trim().toLowerCase()];\n  const n = named !== undefined ? named : Number(stored);\n  // The same refusal rule normalizeSpeed() applies on the server and on the\n  // site: out of range, unparseable, or within a rounding error of 1 means\n  // leave the film alone rather than guess.\n  if (Number.isFinite(n) && n >= 0.5 && n <= 2 && Math.abs(n - 1) >= 0.01) speed = n;\n}\n\n// A cinematic (silent) project's Script Scenă is an unspoken shot note, not\n// narration. THREE surfaces read that field as if it were spoken, and each\n// one puts the beat sheet on screen: captions print it, the chapter card\n// borrows its first eight words when the chapter has no title of its own,\n// and a text card lifts figures out of it (a year or a duration in a stage\n// direction reads to the pattern exactly like a fact the narration speaks).\n// Captions were the only one visible to the producer, which is how the other\n// two survived. One flag now tells the render, and all three read it.\nconst narrationIsSpoken = opts.category !== 'cinematic';\nconst showCaptions = !(trig.No_Captions === 'yes' || pf['Fără Subtitrări'] === true) && narrationIsSpoken;\n\n// Real chapter titles from the linked script's [CHAPTER n: title] markers.\nconst chapterTitles = {};\ntry {\n  const sc = ($('Fetch Script Titles').first().json.fields || {})['Script Content'] || '';\n  const re = /\\[CHAPTER\\s+(\\d+)\\s*:\\s*([^\\]]+)\\]/g;\n  let m;\n  while ((m = re.exec(sc))) chapterTitles[m[1]] = m[2].trim();\n} catch (e) {}\n\nreturn [{ json: { body: {\n  finalVideoUrl: status.outputUrl,\n  projectTitle: pf['Nume Proiect'] || 'Video Factory',\n  scenes,\n  tone: pf['Tonalitate'] || 'Dark',\n  channelName: 'Video Factory',\n  aspectRatio,\n  showCaptions,\n  narrationIsSpoken,\n  showHookTitle: opts.hookTitle !== false,\n  showChapterCards: opts.chapterCards !== false,\n  showEndScreen: opts.endScreen !== false,\n  chapterTitles,\n  // Stripped off the props by /render before Remotion sees them — the\n  // composition's inputs stay exactly as they were.\n  speed,\n} } }];"
+        },
+        "id": "18857c6d-78fa-4173-98c7-9b0c63c733eb",
+        "name": "Build Remotion Props",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          128,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://n8n-production-55dd.up.railway.app/render",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "x-api-key",
+                "value": "a834bfa934hsfn3149sadn34"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ $json.body }}",
+          "options": {
+            "timeout": 60000
+          }
+        },
+        "id": "69ca0442-2af2-4e12-ba88-9619d634693b",
+        "name": "Submit Graphics",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          256,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "amount": 5
+        },
+        "id": "448a3759-f9d0-4120-93e0-d3655045ae7b",
+        "name": "Wait Graphics",
+        "type": "n8n-nodes-base.wait",
+        "typeVersion": 1.1,
+        "position": [
+          384,
+          0
+        ],
+        "webhookId": "1329c5af-29b6-489f-8f34-ef73316e2012"
+      },
+      {
+        "parameters": {
+          "url": "={{ 'https://n8n-production-55dd.up.railway.app/render/' + $('Submit Graphics').first().json.jobId + '/status' }}",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "x-api-key",
+                "value": "a834bfa934hsfn3149sadn34"
+              }
+            ]
+          },
+          "options": {
+            "timeout": 30000
+          }
+        },
+        "id": "69c6a475-0d3b-41cb-be8e-c3018dbaa967",
+        "name": "Check Graphics",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          512,
+          0
+        ],
+        "onError": "continueRegularOutput"
+      },
+      {
+        "parameters": {
+          "jsCode": "const j = $input.first().json;\n// Same deploy-wipes-the-job recovery as Render Guard: 404 from the status\n// poll means the container restarted mid-render, not that the render broke.\nconst httpErr = j.error && typeof j.error === 'object' ? String(j.error.message || j.error.description || '') : (typeof j.error === 'string' && !j.status ? j.error : '');\n// First render also bundles the project, and Chromium renders take minutes,\n// not seconds — allow up to ~30 min before declaring a hang. 360 polls x 5s\n// is exactly the ceiling the old 90 x 20s gave; the interval came down so a\n// finished render is noticed within 5s instead of up to 20. Move the Wait\n// node and this number moves with it, or the ceiling silently shrinks.\nconst MAX_POLLS = 360;\nif (/not.*found|404/i.test(httpErr)) {\n  if ($runIndex > MAX_POLLS) throw new Error('graphics job lost repeatedly (' + $runIndex + ' polls) — giving up.');\n  return [{ json: { lost: true, status: 'lost' } }];\n}\nconst s = (j.status || '').toLowerCase();\nif (s === 'error') throw new Error('Remotion render failed: ' + (j.error || 'unknown'));\nif ($runIndex > MAX_POLLS) throw new Error('Remotion render timed out after ' + $runIndex + ' polls. Last status: ' + s + ' progress: ' + (j.progress || 0));\nreturn [{ json: Object.assign({ lost: false }, j) }];"
+        },
+        "id": "2a4dd118-a9b9-4a77-9422-9dff1d581e15",
+        "name": "Graphics Guard",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          640,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 3
+            },
+            "conditions": [
+              {
+                "leftValue": "={{ $json.status }}",
+                "rightValue": "done",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                },
+                "id": "graphics-done"
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "8201da09-503a-4777-a200-32773c7ca2f3",
+        "name": "If Graphics Done",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          768,
+          0
+        ]
+      },
+      {
+        "id": "2157aa36-b0c7-4362-94bb-58ea2bf639c2",
+        "name": "Fetch Script Titles",
+        "position": [
+          0,
+          0
+        ],
+        "alwaysOutputData": true,
+        "executeOnce": true,
+        "onError": "continueRegularOutput",
+        "notes": "Chapter titles for the impact cards come from the script's [CHAPTER n: title] markers. Missing script degrades to the narration-excerpt fallback.",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "select id, \"createdTime\", fields from hov.at_script\nwhere id = $hov${{ (($('Fetch Project Info').first().json.fields || {}).scripts || [])[0] || 'missing' }}$hov$",
+          "options": {}
+        }
+      },
+      {
+        "parameters": {
+          "url": "https://www.googleapis.com/drive/v3/files?fields=files(id,name)&q=name%20%3D%20%27Muzica%27%20and%20mimeType%20%3D%20%27application%2Fvnd.google-apps.folder%27%20and%20trashed%20%3D%20false",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "googleDriveOAuth2Api",
+          "options": {
+            "timeout": 20000
+          }
+        },
+        "id": "2c5f6e62-86b7-4c9a-b374-c8ad7071c7e9",
+        "name": "Find Music Folder",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          -1184,
+          704
+        ],
+        "alwaysOutputData": true,
+        "executeOnce": true,
+        "onError": "continueRegularOutput",
+        "notes": "Background music lives in the user's Drive folder named 'Muzica'. Missing folder = video without music, never an error."
+      },
+      {
+        "parameters": {
+          "url": "={{ 'https://www.googleapis.com/drive/v3/files?pageSize=200&fields=files(id,name,mimeType)&q=' + encodeURIComponent(\"'\" + ((($json.files || [])[0] || {}).id || 'missing') + \"' in parents and trashed = false\") }}",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "googleDriveOAuth2Api",
+          "options": {
+            "timeout": 20000
+          }
+        },
+        "id": "40cbc6cf-0348-484c-945d-1255bad7183e",
+        "name": "List Music",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          -1024,
+          320
+        ],
+        "alwaysOutputData": true,
+        "executeOnce": true,
+        "onError": "continueRegularOutput"
+      },
+      {
+        "parameters": {
+          "jsCode": "// Track selection order:\n//   1. files inside the tone-matched subfolder (Muzica/Dark, Muzica/Default...)\n//   2. loose files in Muzica whose NAME contains the tone (dark-1.mp3)\n//   3. loose files named default*\n//   4. any loose file\n// Multiple candidates -> random pick, so repeat videos vary.\nconst norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');\nconst isFile = (f) => f && f.id && !(f.mimeType || '').includes('folder');\nlet tone = 'default';\ntry { tone = norm($('Fetch Project Info').first().json.fields.Tonalitate); } catch (e) {}\nlet subFiles = [];\ntry { subFiles = ($input.first().json.files || []).filter(isFile); } catch (e) {}\nlet rootFiles = [];\ntry { rootFiles = ($('List Music').first().json.files || []).filter(isFile); } catch (e) {}\nconst byTone = rootFiles.filter(f => norm(f.name).includes(tone));\nconst byDefault = rootFiles.filter(f => norm(f.name).includes('default'));\nconst pool = subFiles.length ? subFiles : (byTone.length ? byTone : (byDefault.length ? byDefault : rootFiles));\nif (!pool.length) return [{ json: { url: null, name: null, reason: 'no tracks in Muzica folder' } }];\nconst t = pool[Math.floor(Math.random() * pool.length)];\n// Served through our Railway media proxy so ffmpeg gets a real audio\n// stream (Drive's direct links answer with redirects/HTML).\nreturn [{ json: { id: t.id, name: t.name, matched: subFiles.length ? 'subfolder' : (byTone.length ? 'tone-name' : (byDefault.length ? 'default' : 'any')), url: 'https://n8n-production-55dd.up.railway.app/media?id=' + t.id } }];"
+        },
+        "id": "d3a3a5bb-d18a-4682-b152-ef69f1b98efd",
+        "name": "Pick Music Track",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -864,
+          320
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "share",
+          "fileId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "={{ $json.id || 'missing' }}"
+          },
+          "permissionsUi": {
+            "permissionsValues": {
+              "role": "reader",
+              "type": "anyone"
+            }
+          },
+          "options": {}
+        },
+        "id": "dd46ecf9-25d4-44b0-9434-d3f591751fd1",
+        "name": "Share Music Track",
+        "type": "n8n-nodes-base.googleDrive",
+        "typeVersion": 3,
+        "position": [
+          -704,
+          320
+        ],
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 5000,
+        "alwaysOutputData": true,
+        "onError": "continueRegularOutput",
+        "notes": "Idempotent: makes the picked track link-readable so the media proxy can stream it."
+      },
+      {
+        "parameters": {
+          "jsCode": "// Subfolder-per-tone layout: Muzica/Dark, Muzica/Epic, ... If a subfolder\n// matches the project's Tonalitate (or 'Default' as fallback), its files\n// are preferred over loose files in the root.\nconst norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');\nlet tone = 'default';\ntry { tone = norm($('Fetch Project Info').first().json.fields.Tonalitate); } catch (e) {}\nlet folders = [];\ntry { folders = ($input.first().json.files || []).filter(f => (f.mimeType || '').includes('folder')); } catch (e) {}\nconst hit = folders.find(f => norm(f.name).includes(tone)) || folders.find(f => norm(f.name).includes('default')) || null;\nreturn [{ json: { folderId: hit ? hit.id : null, folderName: hit ? hit.name : null } }];"
+        },
+        "id": "28cc0b50-9923-48cc-b7e0-27fd109624cd",
+        "name": "Match Tone Folder",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -944,
+          448
+        ]
+      },
+      {
+        "parameters": {
+          "url": "={{ 'https://www.googleapis.com/drive/v3/files?pageSize=200&fields=files(id,name,mimeType)&q=' + encodeURIComponent(\"'\" + ($json.folderId || 'missing') + \"' in parents and trashed = false\") }}",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "googleDriveOAuth2Api",
+          "options": {
+            "timeout": 20000
+          }
+        },
+        "id": "cca7d4c8-27a8-4bba-8167-2850cf587632",
+        "name": "List Tone Folder",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          -784,
+          448
+        ],
+        "alwaysOutputData": true,
+        "executeOnce": true,
+        "onError": "continueRegularOutput"
+      },
+      {
+        "parameters": {
+          "url": "https://www.googleapis.com/drive/v3/files?fields=files(id,name)&q=name%20%3D%20%27Final%20Vids%27%20and%20mimeType%20%3D%20%27application%2Fvnd.google-apps.folder%27%20and%20trashed%20%3D%20false",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "googleDriveOAuth2Api",
+          "options": {
+            "timeout": 20000
+          }
+        },
+        "id": "057ae445-9ddd-47ae-b41a-da07dbed782e",
+        "name": "Find Vids Folder",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          -576,
+          448
+        ],
+        "alwaysOutputData": true,
+        "executeOnce": true,
+        "onError": "continueRegularOutput",
+        "notes": "Final renders are organized into the Drive folder named 'Final Vids'; missing folder falls back to My Drive root."
+      },
+      {
+        "id": "08d9f608-acaa-4b04-b0c4-b6245bdaffc3",
+        "name": "Render Lost?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          -780,
+          180
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "typeValidation": "loose",
+              "version": 3
+            },
+            "conditions": [
+              {
+                "id": "render-lost",
+                "leftValue": "={{ $json.lost === true }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        }
+      },
+      {
+        "id": "720d1548-b049-4a72-a548-48cd2aaf38e5",
+        "name": "Graphics Lost?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          700,
+          120
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "typeValidation": "loose",
+              "version": 3
+            },
+            "conditions": [
+              {
+                "id": "graphics-lost",
+                "leftValue": "={{ $json.lost === true }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        }
+      }
+    ],
+    "connections": {
+      "Receive Project ID": {
+        "main": [
+          [
+            {
+              "node": "Fetch Approved Scenes",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Timeline": {
+        "main": [
+          [
+            {
+              "node": "Submit Render",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Submit Render": {
+        "main": [
+          [
+            {
+              "node": "Wait Render",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Wait Render": {
+        "main": [
+          [
+            {
+              "node": "Check Render",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Check Render": {
+        "main": [
+          [
+            {
+              "node": "Render Guard",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "If Render Done": {
+        "main": [
+          [
+            {
+              "node": "Fetch Script Titles",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Wait Render",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Fetch Approved Scenes": {
+        "main": [
+          [
+            {
+              "node": "Prepare Clips",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Assemble Webhook": {
+        "main": [
+          [
+            {
+              "node": "Normalize Assemble Input",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Normalize Assemble Input": {
+        "main": [
+          [
+            {
+              "node": "Fetch Approved Scenes",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Probe Webhook": {
+        "main": [
+          [
+            {
+              "node": "Probe Prep",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Probe Prep": {
+        "main": [
+          [
+            {
+              "node": "Probe Route",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Probe Route": {
+        "main": [
+          [
+            {
+              "node": "Submit Render",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Get Clip Duration",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Render Result": {
+        "main": [
+          [
+            {
+              "node": "Upload Final To Drive",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Upload Final To Drive": {
+        "main": [
+          [
+            {
+              "node": "Share Final Video",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Share Final Video": {
+        "main": [
+          [
+            {
+              "node": "Set Final Link",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Set Final Link": {
+        "main": [
+          [
+            {
+              "node": "Update Project Status",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Remotion Props": {
+        "main": [
+          [
+            {
+              "node": "Submit Graphics",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Submit Graphics": {
+        "main": [
+          [
+            {
+              "node": "Wait Graphics",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Wait Graphics": {
+        "main": [
+          [
+            {
+              "node": "Check Graphics",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Check Graphics": {
+        "main": [
+          [
+            {
+              "node": "Graphics Guard",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "If Graphics Done": {
+        "main": [
+          [
+            {
+              "node": "Get Render Result",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Wait Graphics",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Prepare Clips": {
+        "main": [
+          [
+            {
+              "node": "Fetch Project Info",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Fetch Script Titles": {
+        "main": [
+          [
+            {
+              "node": "Build Remotion Props",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Fetch Project Info": {
+        "main": [
+          [
+            {
+              "node": "Find Music Folder",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Find Music Folder": {
+        "main": [
+          [
+            {
+              "node": "List Music",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Pick Music Track": {
+        "main": [
+          [
+            {
+              "node": "Share Music Track",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "List Music": {
+        "main": [
+          [
+            {
+              "node": "Match Tone Folder",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Match Tone Folder": {
+        "main": [
+          [
+            {
+              "node": "List Tone Folder",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "List Tone Folder": {
+        "main": [
+          [
+            {
+              "node": "Pick Music Track",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Share Music Track": {
+        "main": [
+          [
+            {
+              "node": "Find Vids Folder",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Find Vids Folder": {
+        "main": [
+          [
+            {
+              "node": "Build Timeline",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Render Guard": {
+        "main": [
+          [
+            {
+              "node": "Render Lost?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Render Lost?": {
+        "main": [
+          [
+            {
+              "node": "Build Timeline",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "If Render Done",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Graphics Guard": {
+        "main": [
+          [
+            {
+              "node": "Graphics Lost?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Graphics Lost?": {
+        "main": [
+          [
+            {
+              "node": "Build Remotion Props",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "If Graphics Done",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "nodeGroups": []
+  },
+  "tags": [],
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
+  },
+  "parentFolderId": null,
+  "scopes": [
+    "execution:reveal",
+    "workflow:create",
+    "workflow:delete",
+    "workflow:disableRedaction",
+    "workflow:enableRedaction",
+    "workflow:execute",
+    "workflow:execute-chat",
+    "workflow:export",
+    "workflow:import",
+    "workflow:list",
+    "workflow:move",
+    "workflow:publish",
+    "workflow:read",
+    "workflow:share",
+    "workflow:unpublish",
+    "workflow:unshare",
+    "workflow:update"
+  ],
+  "canExecute": true
+}

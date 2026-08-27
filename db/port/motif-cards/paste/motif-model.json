@@ -1,0 +1,10 @@
+{
+  "model": {
+    "__rl": true,
+    "value": "gpt-5.4",
+    "mode": "list",
+    "cachedResultName": "gpt-5.4"
+  },
+  "builtInTools": {},
+  "options": {}
+}

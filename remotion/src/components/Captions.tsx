@@ -1,6 +1,7 @@
 import React from 'react';
 import {AbsoluteFill, useCurrentFrame, useVideoConfig} from 'remotion';
-import type {Palette, SceneCaption} from '../types';
+import type {SceneCaption} from '../types';
+import type {CaptionAccent} from '../captionColor';
 import type {StylePreset} from '../style';
 
 /**
@@ -26,6 +27,33 @@ const buildChunks = (text: string) => {
 	return {words, chunks};
 };
 
+/**
+ * Which words are worth an accent, judged over the WHOLE line rather than one
+ * word at a time.
+ *
+ * The per-word version of this test counted any capitalised word, which is
+ * only a keyword rule in a language that capitalises proper nouns and nothing
+ * else mid-sentence. The scripts are Romanian, every sentence opens with a
+ * capital, and the chunker cuts every four words — so "Bocancii", "Uite",
+ * "După", "Feribot" all scored, and the accent stopped meaning anything.
+ *
+ * A capital only counts when the previous word did not end a sentence. Numbers
+ * always count, and so do very long words, which is where the rule started.
+ */
+const keywordFlags = (words: string[]): boolean[] =>
+	words.map((word, i) => {
+		const clean = word.replace(/[^\p{L}\p{N}]/gu, '');
+		if (!clean) return false;
+		if (/\d/.test(clean)) return true;
+		if (/^\p{Lu}/u.test(clean)) {
+			const prev = i > 0 ? words[i - 1] : null;
+			// Sentence-initial, so the capital says nothing about the word.
+			if (prev === null || /[.!?:;…]["'”’)\]]?$/.test(prev)) return false;
+			return true;
+		}
+		return clean.length >= 11;
+	});
+
 const findActive = (scenes: SceneCaption[], seconds: number) => {
 	const scene = scenes.find(
 		(s) => seconds >= s.startSeconds && seconds < s.startSeconds + s.durationSeconds,
@@ -34,6 +62,7 @@ const findActive = (scenes: SceneCaption[], seconds: number) => {
 
 	const {words, chunks} = buildChunks(scene.narratorText);
 	if (words.length === 0) return null;
+	const flags = keywordFlags(words);
 
 	// Words are spoken during speechSeconds; fall back to a ~2.6 words/sec
 	// estimate if the measurement is missing.
@@ -50,29 +79,30 @@ const findActive = (scenes: SceneCaption[], seconds: number) => {
 	let count = 0;
 	for (const chunk of chunks) {
 		if (wordIndex < count + chunk.length) {
-			return {chunk, activeInChunk: wordIndex - count};
+			return {
+				chunk,
+				activeInChunk: wordIndex - count,
+				keywords: flags.slice(count, count + chunk.length),
+			};
 		}
 		count += chunk.length;
 	}
 	return null;
 };
 
-const isKeyword = (word: string): boolean => {
-	const clean = word.replace(/[^\p{L}\p{N}]/gu, '');
-	if (!clean) return false;
-	if (/\d/.test(clean)) return true; // numbers and years
-	return /^\p{Lu}/u.test(clean) || clean.length >= 11;
-};
-
 export const Captions: React.FC<{
 	scenes: SceneCaption[];
-	palette: Palette;
+	/**
+	 * Colour for the spoken word and for keywords, or null for the colourless
+	 * default — see src/captionColor.ts for what decides this.
+	 */
+	accent: CaptionAccent;
 	preset: StylePreset;
 	/** Hide captions before this time (while the hook title owns the frame). */
 	suppressUntilSeconds?: number;
 	/** Vertical (9:16) framing: bigger type, raised safe-zone position. */
 	portrait?: boolean;
-}> = ({scenes, palette, preset, suppressUntilSeconds = 0, portrait = false}) => {
+}> = ({scenes, accent, preset, suppressUntilSeconds = 0, portrait = false}) => {
 	const frame = useCurrentFrame();
 	const {fps} = useVideoConfig();
 	const seconds = frame / fps;
@@ -124,13 +154,25 @@ export const Captions: React.FC<{
 			>
 				{active.chunk.map((word, i) => {
 					const activeNow = i === active.activeInChunk;
-					const keyword = isKeyword(word);
+					const keyword = active.keywords[i];
+					// Without an accent the karaoke read has to come from
+					// somewhere, and opacity 1 against 0.92 is not a difference
+					// anyone can see. So the colourless mode spends its whole
+					// contrast budget on the spoken word — full white against a
+					// clearly held-back white — and leaves keywords alone, since a
+					// second bright word would compete with the one being said.
+					const color = accent
+						? activeNow || keyword
+							? accent
+							: '#FFFFFF'
+						: '#FFFFFF';
+					const opacity = accent ? (activeNow ? 1 : 0.92) : activeNow ? 1 : 0.72;
 					return (
 						<span
 							key={i}
 							style={{
-								color: activeNow || keyword ? palette.primary : '#FFFFFF',
-								opacity: activeNow ? 1 : 0.92,
+								color,
+								opacity,
 								// Last resort for a single word longer than the line box
 								// (compound German/Romanian nouns, URLs read aloud).
 								overflowWrap: 'anywhere',

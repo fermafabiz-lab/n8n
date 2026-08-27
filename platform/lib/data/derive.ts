@@ -30,6 +30,43 @@ export interface EditingOptions {
   music: boolean;
 }
 
+/**
+ * A drawn card the pipeline chose for this film — a route chart, a departure
+ * board — as stored on the project by Claude Scripting.
+ *
+ * The producer sees these in Final touches and can drop any of them before the
+ * render. That is deliberate and not a formality: a motif is a decision of
+ * TASTE, and this project already has one expensive lesson about a system
+ * making a taste decision on its own (the montage planner that passed every
+ * acceptance target while producing something a viewer read as a rendering
+ * fault). The validator in the pipeline can prove a card is truthful; only a
+ * person can say it is wanted.
+ */
+export interface MotifCard {
+  /** Index into the film's scene list, as the pipeline numbered it. */
+  sceneIndex: number;
+  /** Ordine Scenă — the anchor the render actually resolves against. */
+  sceneOrder?: number;
+  variant: string;
+  /** Small tracked word naming the graphic ("Ruta", "Orar"). */
+  label?: string;
+  /** Route: the stops, in travel order. */
+  stops?: string[];
+  /** Schedule: the timetable lines. */
+  rows?: Array<{ label: string; value: string }>;
+  /** The one line the footage cannot say — a distance, a margin. */
+  note?: string;
+  /**
+   * "ok" — every string on the card was proved against the script.
+   * "review" — the provenance is real but the transformation is not something
+   * code can check, so it is the one a person should actually look at.
+   */
+  verdict?: "ok" | "review";
+  /** The pipeline's own one-line case for the card. */
+  why?: string;
+  seconds?: number;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -45,6 +82,8 @@ export interface Project {
   coverUrl?: string | null;
   /** Overlay options, editable right up to final assembly. */
   editing: EditingOptions;
+  /** Drawn cards chosen by the pipeline, droppable in Final touches. */
+  motifCards: MotifCard[];
   /** The batch is holding, waiting for those options to be confirmed. */
   awaitingFinalSettings: boolean;
   /** Video category id (lib/categories.ts); older projects have none. */
@@ -281,6 +320,43 @@ function parseEditing(raw: unknown): Record<string, unknown> {
   }
 }
 
+/**
+ * Motif cards come from a MODEL, through a validator, through jsonb — so this
+ * reads defensively and keeps only what can actually be drawn. A malformed
+ * card is dropped here rather than rendered as an empty rectangle.
+ */
+function parseMotifCards(raw: unknown): MotifCard[] {
+  if (!Array.isArray(raw)) return [];
+  const out: MotifCard[] = [];
+  for (const item of raw) {
+    const c = asRecord(item);
+    const variant = typeof c.variant === "string" ? c.variant : "";
+    if (!variant || typeof c.sceneIndex !== "number") continue;
+    const stops = Array.isArray(c.stops)
+      ? (c.stops as unknown[]).filter((v): v is string => typeof v === "string")
+      : undefined;
+    const rows = Array.isArray(c.rows)
+      ? (c.rows as unknown[])
+          .map((r) => asRecord(r))
+          .filter((r) => typeof r.label === "string" && typeof r.value === "string")
+          .map((r) => ({ label: String(r.label), value: String(r.value) }))
+      : undefined;
+    out.push({
+      sceneIndex: c.sceneIndex,
+      ...(typeof c.sceneOrder === "number" ? { sceneOrder: c.sceneOrder } : {}),
+      variant,
+      ...(typeof c.label === "string" ? { label: c.label } : {}),
+      ...(stops?.length ? { stops } : {}),
+      ...(rows?.length ? { rows } : {}),
+      ...(typeof c.note === "string" ? { note: c.note } : {}),
+      ...(c.verdict === "review" || c.verdict === "ok" ? { verdict: c.verdict } : {}),
+      ...(typeof c.why === "string" ? { why: c.why } : {}),
+      ...(typeof c.seconds === "number" ? { seconds: c.seconds } : {}),
+    });
+  }
+  return out;
+}
+
 export function buildProject(r: RawProject): Project {
   const { kind, progress } = classifyStatus(r.statusRaw);
   const opts = parseEditing(r.editingRaw);
@@ -318,6 +394,7 @@ export function buildProject(r: RawProject): Project {
     cast: Array.isArray(opts.cast)
       ? (opts.cast as unknown[]).filter((v): v is string => typeof v === "string" && v.includes("_"))
       : [],
+    motifCards: parseMotifCards(opts.motifCards),
     castAssign: asRecord(opts.castAssign) as Record<string, string>,
     chapterVoices: asRecord(opts.chapterVoices) as Record<string, string>,
   };

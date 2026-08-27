@@ -481,7 +481,12 @@ export default async function ProductionRoom({
         )}
 
         {showing("final", project.awaitingFinalSettings) && (
-          <FinalSettings projectId={id} initial={project.editing} silent={silent} />
+          <FinalSettings
+            projectId={id}
+            initial={project.editing}
+            motifCards={project.motifCards}
+            silent={silent}
+          />
         )}
 
         {showing("assembly", assembling && !project.finalVideoUrl) &&

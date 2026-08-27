@@ -10,9 +10,12 @@ import {FilmLayer, gradeForTone} from './components/FilmLayer';
 import {Transitions, kenBurnsTransform} from './components/Transitions';
 import {planMontage, shotAt, shotTransform} from './montage';
 import {TextCard} from './components/TextCard';
+import {RouteCard} from './components/RouteCard';
+import {ScheduleCard} from './components/ScheduleCard';
 import {buildTextCards, toMontageCards} from './textCards';
 import {SourceVideo} from './components/SourceVideo';
 import {presetForTone} from './style';
+import {resolveCaptionAccent} from './captionColor';
 import type {FinalVideoProps} from './types';
 
 export const FinalVideo: React.FC<FinalVideoProps> = ({
@@ -27,6 +30,7 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 	hookTitleDurationInSeconds,
 	aspectRatio,
 	showCaptions,
+	captionColor,
 	montageIntensity,
 	showHookTitle = true,
 	hookTitle = '',
@@ -42,6 +46,9 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 	const frame = useCurrentFrame();
 	const seconds = frame / fps;
 	const preset = presetForTone(tone);
+	// Resolved once per render, not per caption word: the legibility guard in
+	// here bisects, and there is one accent for the whole film.
+	const captionAccent = useMemo(() => resolveCaptionAccent(captionColor), [captionColor]);
 
 	// Titles come from a free-text form field, and people paste entire
 	// prompts into it (seen in production: a ~3000-char master prompt became
@@ -153,16 +160,45 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 	);
 	// Cards are material, not rhythm, so they land even at intensity 0 — turning
 	// the montage off must not throw away a sourced claim.
-	// Half a frame of lead, which makes a shot boundary land on the NEAREST
-	// frame instead of the next one. Scene times arrive as floats from the
-	// assembly and almost never sit on a frame line: scene 3 of a real film
-	// started at 17.141s while its picture actually cut at 17.133s (frame 514),
-	// so the framing changed one frame later than the footage did — a single
-	// frame showing the NEW scene at the PREVIOUS scene's framing, then a jump.
-	// That lone mismatched frame is what reads as "one frame is zoomed compared
-	// to the rest of the scene", and a scene detector sees it as two changes a
-	// frame apart where the film has one.
-	const shot = shotAt(shots, seconds + 0.5 / fps);
+	// Half a frame of lead, because OffthreadVideo samples the source at the
+	// CENTRE of a frame's display interval — `(f + 0.5) / fps`, not `f / fps`.
+	//
+	// That is measured, not assumed, and the assumption cost a round trip: the
+	// lead was removed on the reasoning that a frame shows `f / fps`, which
+	// would put the picture change at `ceil(cut * fps)`. Rendering the film
+	// settled it. The tahiti montage cuts at exactly 22.375s; frame 670 is the
+	// old scene and frame 671 is the new one, and 671 is `round(22.375 * 30)`,
+	// not `ceil(671.25)`. Centre sampling is the only rule that predicts that.
+	//
+	// So the frame the picture changes on is `round(cut * fps)`, and asking
+	// `shotAt` at `seconds + 0.5 / fps` is exactly how you land on it.
+	//
+	// The lead is only half the fix, and on its own it was never enough: it
+	// corrects for where a boundary sits INSIDE a frame, and until
+	// server/assemble.mjs started snapping, the boundaries themselves were
+	// wrong — the reported scene starts drifted from the real picture cuts by
+	// -0.021s to +0.084s, because the montage encodes each segment to a whole
+	// frame of its own 24fps grid and the rounding accumulates down the concat.
+	// Half a frame (0.033s) cannot cover 0.084s. Snapping makes the times true;
+	// this makes the framing land on the frame the picture actually changes.
+	// Remove either one and the mismatch comes back.
+	//
+	// The epsilon is the third piece, and it is not padding. Both sides reduce
+	// to the SAME inequality — `f >= cut * fps - 0.5` — so they can only ever
+	// disagree on a tie, and a tie is exactly what a 24fps source in a 30fps
+	// composition keeps producing: every cut sits at .0/.25/.5/.75 of a frame,
+	// and the .5 ones put the boundary precisely on the comparison. There the
+	// two sides are computed by different arithmetic (the decoder's, and this
+	// expression's), so a cut whose seconds value is not representable in
+	// binary breaks the tie one way for the picture and the other way for the
+	// framing. Measured on the tahiti film: 33.9167, 38.9167 and 63.4167 all
+	// changed picture on frame N while the framing waited for N+1 — one frame
+	// of the NEW scene wearing the OLD scene's framing, which is exactly the
+	// "first frame of the scene sits somewhere else and only settles on the
+	// second" report. A microsecond is four ten-thousandths of a frame: far
+	// below anything the edit can express, far above the 1e-14 the doubles
+	// disagree by.
+	const shot = shotAt(shots, seconds + 0.5 / fps + 1e-6);
 	const activeCard =
 		shot?.kind === 'card' && shot.cardIndex !== undefined ? cards[shot.cardIndex] : null;
 	// Rendered as Sequences rather than from `shot`, so each card's own clock
@@ -193,6 +229,18 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 			return seconds >= from && seconds < from + IMPACT_CARD_SECONDS;
 		});
 
+	/**
+	 * A card is one Sequence and one duration whatever it holds; only the
+	 * drawing differs. Kept as a function rather than a nested ternary because
+	 * the list is going to grow — a motif per film is the whole point.
+	 */
+	const renderCard = (card: (typeof cards)[number], seconds: number) => {
+		if (card.variant === 'route') return <RouteCard card={card} seconds={seconds} preset={preset} />;
+		if (card.variant === 'schedule')
+			return <ScheduleCard card={card} seconds={seconds} preset={preset} />;
+		return <TextCard card={card} seconds={seconds} preset={preset} />;
+	};
+
 	return (
         <AbsoluteFill style={{backgroundColor: palette.background}}>
             {/* Footage starts on frame 1 — the title plays OVER the hook scene. */}
@@ -215,16 +263,11 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 						<SourceVideo src={finalVideoUrl} />
 					</AbsoluteFill>
 					<FilmLayer tone={tone} />
-					{/* With the montage running, the framing jumps ARE the cuts, so
-					    the per-scene luminance dip has to go: a dip mid-HOLD would
-					    break the very shot that is meant to run across scenes. The
-					    chapter treatment stays. */}
-					<Transitions
-						scenes={scenes}
-						tone={tone}
-						chapterCards={showChapterCards}
-						sceneDips={intensity === 0}
-					/>
+					{/* Chapter boundaries only. An ordinary scene cut is already a
+					    change of picture in the footage, at every intensity — laying a
+					    luminance dip over it made two transitions out of one, and that
+					    is what read as a fault. See Transitions. */}
+					<Transitions scenes={scenes} tone={tone} chapterCards={showChapterCards} />
 					{/* Captions go dark under a card. The card is already text, and
 					    the whole reason a card earns its place is that it shows what
 					    the narration is NOT saying — printing the spoken line over it
@@ -232,7 +275,7 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 					{showCaptions && !activeCard && !chapterCardUp && (
 						<Captions
 							scenes={scenes}
-							palette={palette}
+							accent={captionAccent}
 							preset={preset}
 							suppressUntilSeconds={hookSeconds - 0.4}
 							portrait={aspectRatio === '9:16'}
@@ -244,18 +287,19 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 					    never lands two in a row or over the hook. */}
 					{cardShots.map((cs) => (
 						<Sequence
-							key={`tc-${cs.startSeconds}`}
-							from={Math.round(cs.startSeconds * fps)}
-							durationInFrames={Math.max(1, Math.round(cs.durationSeconds * fps))}
-						>
-							<TextCard
-								card={cards[cs.cardIndex as number]}
-								// The planner may have squeezed the card to fit its scene, so
-								// the SHOT owns the duration, not the spec — otherwise the exit
-								// fade gets cut off mid-burn.
-								seconds={cs.durationSeconds}
-								preset={preset}
-							/>
+                            key={`tc-${cs.startSeconds}`}
+                            from={Math.round(cs.startSeconds * fps)}
+                            durationInFrames={Math.max(1, Math.round(cs.durationSeconds * fps))}>
+							{/* One Sequence, several kinds of card. The planner places TIME
+							    and never learns which — so a motif costs it nothing, and the
+							    choice belongs here, where the content finally is.
+							    The planner may have squeezed the card to fit its scene, so
+							    the SHOT owns the duration, not the spec — otherwise the exit
+							    fade gets cut off mid-burn. */}
+							{renderCard(
+								cards[cs.cardIndex as number],
+								cs.durationSeconds,
+							)}
 						</Sequence>
 					))}
 					{showChapterCards &&
@@ -306,17 +350,17 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 				// than starting there. The duration grows by the same amount, so
 				// the film still ends when it always did — the lead is borrowed
 				// from the tail of the footage, which the flash is covering.
-				<Sequence
+				(<Sequence
 					from={Math.max(0, videoFrames - Math.round(FLASH_LEAD * fps))}
 					durationInFrames={outroFrames + Math.round(FLASH_LEAD * fps)}
 				>
-					<OutroCard
+                    <OutroCard
 						channelName={channelName}
 						subscribeText={subscribeText}
 						palette={palette}
 						portrait={aspectRatio === '9:16'}
 					/>
-				</Sequence>
+                </Sequence>)
 			)}
         </AbsoluteFill>
     );

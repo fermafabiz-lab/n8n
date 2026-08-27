@@ -47,6 +47,7 @@ import * as pgBackend from "./data/postgres";
 export type {
   StatusKind,
   EditingOptions,
+  MotifCard,
   Project,
   Scene,
   SceneVersion,
@@ -454,6 +455,7 @@ const DEMO_PROJECTS: Project[] = [
     cast: [],
     castAssign: {},
     chapterVoices: {},
+    motifCards: [],
   },
   {
     id: "demo-2",
@@ -475,6 +477,7 @@ const DEMO_PROJECTS: Project[] = [
     cast: [],
     castAssign: {},
     chapterVoices: {},
+    motifCards: [],
   },
   {
     id: "demo-3",
@@ -496,6 +499,7 @@ const DEMO_PROJECTS: Project[] = [
     cast: [],
     castAssign: {},
     chapterVoices: {},
+    motifCards: [],
   },
   {
     id: "demo-4",
@@ -517,6 +521,7 @@ const DEMO_PROJECTS: Project[] = [
     cast: [],
     castAssign: {},
     chapterVoices: {},
+    motifCards: [],
   },
 ];
 

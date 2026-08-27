@@ -6,91 +6,81 @@ import {CURVES, curveAt} from '../easing';
 import {FLASH_PEAK, LightLeak, flashEnvelope, flashSweep} from './LightLeak';
 
 /**
- * Scene/chapter transitions over the single continuous video layer (a true
- * cross-dissolve would need two decoded copies of the footage — not worth the
- * render cost).
+ * Chapter transitions over the single continuous video layer.
  *
- * Same-chapter cuts get a quick luminance dip, eased into a bell rather than
- * the linear triangle it used to be. Chapter changes are handled by whichever
- * element owns that boundary: with cards on, the card's own light leak IS the
- * transition; with cards off, a leak replaces the old dip-to-black, because
- * cutting to black for a quarter second on a 60s film costs more momentum than
- * the boundary is worth.
+ * An ordinary scene boundary gets NOTHING from this component, and that
+ * absence is the point. It used to dip the luminance there — 40% for a third
+ * of a second — from the era when the whole film was one unbroken clip and a
+ * scene boundary had no picture change of its own to announce it. The
+ * assembled montage is now one clip per scene concatenated, so the picture
+ * genuinely cuts at every boundary (ffmpeg finds a hard cut on every scene
+ * start of the tahiti film), and the dip had become a second transition laid
+ * over a real one: the tail of the outgoing scene faded down, the head of the
+ * incoming faded up, and the cut itself sat in the trough. Measured on a
+ * render, 39-56% of the frame's luminance at all thirteen cuts. That reads as
+ * a brightness pump around every cut — reported as "the frames move badly, it
+ * looks like an error", which is exactly what a viewer should call it.
+ *
+ * A chapter change still needs an owner, because there the job is to mark a
+ * step up from an ordinary cut rather than to mark the cut: with cards on, the
+ * card's own light leak IS the transition; with cards off, a leak stands in
+ * for it, because cutting to black for a quarter second on a 60s film costs
+ * more momentum than the boundary is worth.
  */
 export const Transitions: React.FC<{
 	scenes: SceneCaption[];
 	tone: string;
 	/**
 	 * Whether chapter cards are rendered. When they are, they own the chapter
-	 * boundary — dipping or flaring here as well would stack two effects on the
-	 * same frame.
+	 * boundary — flaring here as well would stack two effects on one frame.
 	 */
 	chapterCards?: boolean;
-	/**
-	 * Whether to dip at ordinary scene boundaries. Off once the montage is
-	 * planning shots: there the framing jumps are the cuts, scene boundaries
-	 * are no longer special, and a HOLD deliberately runs straight through
-	 * one — dipping there would break the shot it exists to create.
-	 */
-	sceneDips?: boolean;
-}> = ({scenes, tone, chapterCards = true, sceneDips = true}) => {
+}> = ({scenes, tone, chapterCards = true}) => {
 	const frame = useCurrentFrame();
 	const {fps} = useVideoConfig();
 	const t = frame / fps;
 
 	const k = toneKey(tone);
 	const dark = /dark|horror|conspiracy|mystery/.test(k);
-	const cutHalf = dark ? 0.22 : 0.16; // half-width of a scene-cut dip
-	const cutDepth = dark ? 0.55 : 0.4;
 	const chapterLeakHalf = dark ? 0.42 : 0.38;
 
-	let dip = 0;
 	let leak: {amount: number; sweep: number} | null = null;
 	for (let i = 1; i < scenes.length; i++) {
+		// The footage owns an ordinary cut: it changes picture there by itself.
+		if ((scenes[i].chapter ?? 0) === (scenes[i - 1].chapter ?? 0)) continue;
+		if (chapterCards) continue; // the card owns this frame
 		const boundary = scenes[i].startSeconds;
-		const isChapterChange = (scenes[i].chapter ?? 0) !== (scenes[i - 1].chapter ?? 0);
-		if (isChapterChange && chapterCards) continue; // the card owns this frame
-		if (!isChapterChange && !sceneDips) continue; // the montage owns the cut
-		const half = isChapterChange ? chapterLeakHalf : cutHalf;
 		const d = Math.abs(t - boundary);
-		if (d >= half) continue;
-		if (isChapterChange) {
-			// The window is placed so the envelope's PEAK lands on the boundary,
-			// not so the window is centred on it. Those are different: the attack
-			// is only 28% of the envelope, so a centred window flashed brightest
-			// well before the cut it exists to hide. Same correction the chapter
-			// card needed — see CARD_FLASH_LEAD.
-			const span = 2 * half;
-			const p = (t - (boundary - FLASH_PEAK * span)) / span;
-			const amount = flashEnvelope(p);
-			if (!leak || amount > leak.amount) leak = {amount, sweep: p};
-		} else {
-			// Eased bell: soft at the edges, rounded on the cut. The old
-			// triangular ramp changed brightness at a constant rate, which reads
-			// as a shutter rather than a dip.
-			dip = Math.max(dip, cutDepth * curveAt(1 - d / half, CURVES.inOutCubic));
-		}
+		if (d >= chapterLeakHalf) continue;
+		// The window is placed so the envelope's PEAK lands on the boundary,
+		// not so the window is centred on it. Those are different: the attack
+		// is only 28% of the envelope, so a centred window flashed brightest
+		// well before the cut it exists to hide. Same correction the chapter
+		// card needed — see CARD_FLASH_LEAD.
+		const span = 2 * chapterLeakHalf;
+		const p = (t - (boundary - FLASH_PEAK * span)) / span;
+		const amount = flashEnvelope(p);
+		if (!leak || amount > leak.amount) leak = {amount, sweep: p};
 	}
 
-	if (dip <= 0.01 && !leak) return null;
+	if (!leak) return null;
 	return (
 		<AbsoluteFill style={{pointerEvents: 'none'}}>
-			{dip > 0.01 && <AbsoluteFill style={{background: '#000', opacity: dip}} />}
-			{leak && (
-				<LightLeak
-					amount={leak.amount}
-					sweep={flashSweep(leak.sweep)}
-					hue={dark ? 'cool' : 'warm'}
-				/>
-			)}
+			<LightLeak
+				amount={leak.amount}
+				sweep={flashSweep(leak.sweep)}
+				hue={dark ? 'cool' : 'warm'}
+			/>
 		</AbsoluteFill>
 	);
 };
 
 /**
  * Ken Burns on the continuous footage: slow push-in with alternating drift
- * per scene. The transform snaps at scene boundaries, but the snap lands
- * inside the Transitions dip so it's never visible.
+ * per scene. The transform snaps at scene boundaries, and the snap is hidden
+ * by the boundary itself: the footage cuts to a different picture on the same
+ * frame, so there is no continuity for the eye to measure the jump against.
+ * (Only a fallback now — `planMontage` returns a shot for every scene.)
  */
 export const kenBurnsTransform = (
 	scenes: SceneCaption[],

@@ -33,7 +33,7 @@ const CaptionProbe: React.FC<{portrait: boolean}> = ({portrait}) => (
 		<Backdrop />
 		<Captions
 			scenes={SCENES}
-			palette={DEFAULT_PALETTE}
+			accent={null}
 			preset={presetForTone('Documentary')}
 			portrait={portrait}
 		/>

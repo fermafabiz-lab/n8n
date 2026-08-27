@@ -772,8 +772,12 @@ export default function SceneBoard({
               direction, with no field on screen to explain why. On a silent
               film it is the whole story, since the narration is neither
               spoken nor captioned.
+
+              Video step only, like every other control here: it was the one
+              block that had escaped the step scoping, so the Images page
+              offered a field about the CLIP under a heading about pictures.
             */}
-            {!active.videoApproved && active.videoPrompt !== null && (
+            {step === "video" && !active.videoApproved && active.videoPrompt !== null && (
               <div style={{ marginTop: 16, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
                 <label
                   style={{ display: "block", fontSize: 12, color: "var(--dim)", marginBottom: 6 }}

@@ -375,7 +375,7 @@ export default function AudioReview({
   const totalSeconds = withAudio.reduce((a, s) => a + (durations[s.id] ?? 0), 0);
 
   return (
-    <div className="script avoice" style={{ marginTop: 24 }}>
+    <div className="script avoice reviewpanel" style={{ marginTop: 24 }}>
       <div className="sechead">
         <h2>Voice review</h2>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>

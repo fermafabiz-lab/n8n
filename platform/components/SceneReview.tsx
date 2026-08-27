@@ -95,7 +95,7 @@ export default function SceneReview({
   };
 
   return (
-    <div className="script">
+    <div className="script reviewpanel">
       <div className="sechead">
         <h2>Scene review</h2>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -149,7 +149,7 @@ export default function SceneReview({
         {scenes.map((s, i) => {
           const d = draftFor(s);
           return (
-            <div className="card" key={s.id}>
+            <div className="card take" key={s.id}>
               <div className="kv" style={{ borderBottom: "none", paddingBottom: 6 }}>
                 <h5 style={{ margin: 0 }}>
                   S{i + 1} · Scene

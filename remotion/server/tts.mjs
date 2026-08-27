@@ -1,21 +1,33 @@
 // Multi-voice TTS: synthesizes a list of tagged segments — each with its own
-// voice — through ai33 and concatenates them into ONE mp3, with a natural
-// breath between speaker turns. This is what makes "characters speak" mode
-// possible: ai33 renders one voice per request, so a dialogue scene needs
-// N requests stitched together, and stitching lives here where ffmpeg is.
+// voice — through ElevenLabs and concatenates them into ONE mp3, with a
+// natural breath between speaker turns. This is what makes "characters speak"
+// mode possible: one voice per request, so a dialogue scene needs N requests
+// stitched together, and stitching lives here where ffmpeg is.
 //
-// POST /tts-multi { segments: [{text, voice_id}], apiKey, gapMs? } -> { jobId }
-//   apiKey is the ai33 key, passed per-request so this server stores no
-//   TTS credentials.
+// POST /tts-multi { segments: [{text, voice_id}], gapMs? } -> { jobId }
 // GET  /tts-multi/:jobId/status -> { status, outputUrl } (same job store as
 //   /render and /assemble).
+//
+// The key comes from THIS server's environment, not from the request body.
+// It used to travel in the body, which meant it also sat in plaintext inside
+// an n8n node's JSON expression — visible to anyone who opened the node, and
+// carried into every export of that workflow. `apiKey` in the body is still
+// accepted so an older caller does not break mid-migration, but nothing sends
+// it any more and the fallback should go once nothing does.
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import {randomUUID} from 'crypto';
 import {execFile} from 'child_process';
 
-const AI33 = 'https://api.ai33.pro/v3';
+const ELEVEN = 'https://api.elevenlabs.io/v1';
+/**
+ * The model ai33 never let us choose. `eleven_multilingual_v2` is the closest
+ * equivalent to what it was doing on our behalf, and it is what the n8n nodes
+ * ask for too — the two must agree, or a regenerated line comes back in a
+ * different voice character from the batch that made its neighbours.
+ */
+const MODEL = 'eleven_multilingual_v2';
 
 function run(cmd, args, timeoutMs = 5 * 60 * 1000) {
 	return new Promise((resolve, reject) => {
@@ -26,48 +38,47 @@ function run(cmd, args, timeoutMs = 5 * 60 * 1000) {
 	});
 }
 
-async function ai33Synthesize(text, voiceId, apiKey) {
-	const form = new FormData();
-	form.set('text', text);
-	form.set('voice_id', voiceId);
-	form.set('speed', '1');
-	const submit = await fetch(`${AI33}/text-to-speech`, {
+/**
+ * One line, one voice, one request.
+ *
+ * ai33 worked on tasks — submit, then poll every three seconds until an audio
+ * URL appeared, then download it. ElevenLabs answers with the mp3, so the
+ * whole loop and its runaway-guard are gone. Measured on a real line: 2.7s
+ * for one call against a 3s minimum for a single poll cycle.
+ *
+ * The stored ids carry an `elevenlabs_` prefix from the ai33 era. It is
+ * stripped here rather than migrated in the database, because that prefix is
+ * also the validity test in five places (`voice_id.includes('_')`) — remove it
+ * from storage and an empty id becomes indistinguishable from a missing one.
+ */
+async function synthesize(text, voiceId, apiKey) {
+	const id = String(voiceId).replace(/^elevenlabs_/, '');
+	const res = await fetch(`${ELEVEN}/text-to-speech/${encodeURIComponent(id)}`, {
 		method: 'POST',
-		headers: {'xi-api-key': apiKey},
-		body: form,
+		headers: {'xi-api-key': apiKey, 'Content-Type': 'application/json'},
+		body: JSON.stringify({text, model_id: MODEL}),
 	});
-	if (!submit.ok) throw new Error(`ai33 submit: HTTP ${submit.status} ${(await submit.text()).slice(0, 200)}`);
-	const {task_id: taskId} = await submit.json();
-	if (!taskId) throw new Error('ai33 submit: no task_id in response');
-
-	// ai33 tasks normally finish in 5-30s; 3s polling for ~4 minutes.
-	for (let i = 0; i < 80; i++) {
-		await new Promise((r) => setTimeout(r, 3000));
-		const poll = await fetch(`${AI33}/task/${taskId}`, {headers: {'xi-api-key': apiKey}});
-		if (!poll.ok) continue;
-		const j = await poll.json();
-		const d = (j && j.data) || j || {};
-		const st = String(d.status || '').toLowerCase();
-		if (['failed', 'error', 'cancelled'].includes(st)) {
-			throw new Error(`ai33 task failed: ${JSON.stringify(d).slice(0, 300)}`);
-		}
-		const audioUrl = (d.metadata && d.metadata.audio_url) || d.audio_url || j.audio_url;
-		if (st === 'done' && audioUrl) {
-			const dl = await fetch(audioUrl, {redirect: 'follow'});
-			if (!dl.ok) throw new Error(`ai33 audio download: HTTP ${dl.status}`);
-			return Buffer.from(await dl.arrayBuffer());
-		}
+	if (!res.ok) {
+		// The body carries ElevenLabs' own reason — a dead voice id, an
+		// exhausted quota — and losing it would turn every failure into "HTTP
+		// 400" with nothing to act on.
+		throw new Error(`ElevenLabs TTS: HTTP ${res.status} ${(await res.text()).slice(0, 300)}`);
 	}
-	throw new Error('ai33 task timed out');
+	return Buffer.from(await res.arrayBuffer());
 }
 
 export function registerTts(app, {jobs, outputDir}) {
 	app.post('/tts-multi', (req, res) => {
-		const {segments, apiKey, gapMs} = req.body || {};
+		const {segments, apiKey: bodyKey, gapMs} = req.body || {};
+		const apiKey = process.env.ELEVENLABS_API_KEY || bodyKey;
 		if (!Array.isArray(segments) || segments.length === 0) {
 			return res.status(400).json({error: 'segments: [{text, voice_id}] is required'});
 		}
-		if (!apiKey) return res.status(400).json({error: 'apiKey (ai33) is required'});
+		if (!apiKey) {
+			return res
+				.status(500)
+				.json({error: 'ELEVENLABS_API_KEY is not set on the render server'});
+		}
 		for (const s of segments) {
 			if (!s || !String(s.text || '').trim() || !s.voice_id) {
 				return res.status(400).json({error: 'every segment needs text and voice_id'});
@@ -81,11 +92,13 @@ export function registerTts(app, {jobs, outputDir}) {
 		(async () => {
 			const work = fs.mkdtempSync(path.join(os.tmpdir(), 'ttsmulti-'));
 			try {
-				// Sequential on purpose: ai33 rate-limits per key, and a scene
-				// rarely has more than a handful of turns.
+				// Sequential on purpose. The account allows five concurrent
+				// requests, so this could be parallel — but it was sequential
+				// under ai33's per-key rate limit and a scene rarely has more
+				// than a handful of turns. One change at a time.
 				const files = [];
 				for (let i = 0; i < segments.length; i++) {
-					const buf = await ai33Synthesize(
+					const buf = await synthesize(
 						String(segments[i].text).trim(),
 						String(segments[i].voice_id),
 						String(apiKey),

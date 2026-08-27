@@ -18,7 +18,7 @@ conversation. Keep it updated when a hard-won lesson is learned.
 | **Airtable** | base "Database Video" | The single source of truth for project + scene state |
 | **Render server** | `remotion/server/` on Railway | ffmpeg + Remotion: `/assemble`, `/tts-multi`, `/media`, `/transcript`, `/inspect` |
 
-External services: **ai33** (TTS), **fal.ai** (images), **Google Flow via
+External services: **ElevenLabs** (TTS), **fal.ai** (images), **Google Flow via
 useapi** (video clips, Veo 3.1), **OpenAI** (scripting), **Google Drive**
 (asset storage).
 
@@ -213,6 +213,56 @@ These each cost hours. Do not rediscover them.
   leaving them with no resolvable action rather than an error. Every upload
   node needed `resource: file` + `operation: upload` re-set by hand, and
   `VR Find Audio Folder` needed `operation: search`.
+
+### TTS: ElevenLabs direct, since 2026-08-27
+
+ai33 was an ElevenLabs **reseller** — same `xi-api-key` header, same voices,
+ids wearing an `elevenlabs_` prefix. Going direct was a change of endpoint and
+of FLOW, not of concepts, and it removed more than it added.
+
+- **The poll loops are gone.** ai33 worked on tasks: submit, wait, poll every
+  3s, guard against a runaway loop, then download a URL. ElevenLabs answers
+  with the mp3. Thirteen nodes across two workflows became three native
+  `@elevenlabs/n8n-nodes-elevenlabs` nodes (`AB Speak`, `Speak VR`,
+  `VR Speak`), and Media Generation went 162 → 148 nodes, Scripting 107 → 103.
+  Five of those deletions were a chain that had had **no input at all** for
+  months — the leftover CLAUDE.md used to say to ignore.
+- **Stored voice ids survive, and that was checked before anything moved.**
+  `hpp4J3VqNfWAUOO0d1Us` resolves at ElevenLabs to Bella, so no project lost
+  its narrator. The `elevenlabs_` prefix STAYS in the database and is stripped
+  at the call: it is also the validity test in five places
+  (`voice_id.includes('_')`), so removing it would make an empty id
+  indistinguishable from a missing one.
+- **The audio lands where the uploads already look.** The speech node writes
+  binary `data`, `audio/mp3` — verified on a real synthesis, 32 kB from one
+  Romanian line — which is the default the Google Drive upload nodes read, so
+  not one upload node changed.
+- **`VR Download Audio` / `AB Download Audio` stay.** They look like part of
+  the ai33 path and are not: the multi-voice path still fetches a URL from the
+  render server. Check inbound edges before deleting a node that "obviously"
+  belongs to the thing you are removing.
+- **Model is `eleven_multilingual_v2`** in all three nodes AND in
+  `server/tts.mjs`. ai33 never let us choose one, so this is the closest
+  equivalent — and the four must agree, or a regenerated line comes back in a
+  different voice character from the batch that made its neighbours.
+- **The key left the node bodies.** `/tts-multi` used to take the TTS key in
+  its JSON body, which meant a plaintext secret sat inside an n8n expression —
+  visible on opening the node, and carried into every export. The render
+  server now reads `ELEVENLABS_API_KEY` from its own environment. **The old
+  ai33 key was exposed in a transcript on 08-27 and must be revoked.**
+- Two environments need the key: **GitHub repo Secrets** as
+  `ELEVENLABS_API_KEY` (the deploy writes `platform.env`, used by
+  `/api/voices`) and **Railway** as the same name. n8n uses its own typed
+  `ElevenLabs account` credential (`VbtLxHjVO7QySxfz`) instead.
+- **Voices can finally be looked up by id.** ai33 had no such endpoint
+  (`/v3/voices/<id>` answered 404), so `resolveNames` scanned eight pages and
+  then abused the free-text search with the id as the needle — and a cast from
+  a large library sat past the scan, which is how a project printed
+  "elevenlabs · …oKomo" at the producer. `GET /v1/voices/{id}` answers
+  directly; a miss now means the voice is gone, not merely far down a list.
+- **Pagination changed shape**: `/v2/voices` is cursor-based
+  (`next_page_token` + `has_more`), not numbered. `/api/voices` still speaks
+  page numbers to the picker and walks tokens to reach the window.
 
 ### Content filters — deterministic, never blindly retry
 

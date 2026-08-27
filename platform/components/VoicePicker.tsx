@@ -22,7 +22,7 @@ const PROVIDERS = [
 
 /**
  * Voice picker with inline audio previews. The chosen prefixed voice_id is
- * submitted with the form and flows n8n -> ai33 TTS unchanged.
+ * submitted with the form and flows n8n -> ElevenLabs TTS unchanged.
  */
 export default function VoicePicker({
   name = "voice_id",

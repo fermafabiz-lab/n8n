@@ -34,7 +34,7 @@ Secrets (all required — the deploy fails fast if any is blank):
 | `AIRTABLE_API_KEY` | Airtable PAT, scopes `data.records:read` **and** `:write` |
 | `AIRTABLE_BASE_ID` | the `app...` id of the base |
 | `N8N_API_KEY` | from the n8n instance, Settings → n8n API |
-| `AI33_API_KEY` | ai33, used by `/api/voices` |
+| `ELEVENLABS_API_KEY` | ElevenLabs, used by `/api/voices` |
 | `SITE_PASSWORD` | shared password gate. **Blank disables the gate entirely** and publishes the site, which is why it is required |
 | `SSH_HOST` / `SSH_USER` / `SSH_KEY` | the deploy key, `/root/.ssh/gh_deploy` on the box |
 

@@ -130,12 +130,11 @@ ninety seconds the last time it was needed.
   ("these bypass every gate below"), not something this change introduced — but
   this change is what makes it reachable, and it is worth deciding whether the
   two should merge instead.
-- **`review` cards reach a panel that is not deployed.** The validator
+- **`review` cards reach a panel that is now live.** The validator
   separates "proved" from "provenance is real but the transformation is
   unprovable" on purpose, and the second set is badged *worth a look* in Final
-  touches — which is written and building, but still only in the working tree.
-  Until the site ships, a `review` card goes to screen unseen. If that is not
-  acceptable in the meantime, change one line in `Validate Motif Cards` to
+  touches, where the producer can switch it off before the render. If the
+  badge ever proves too quiet, change one line in `Validate Motif Cards` to
   accept only `ok`.
 - **The prompt has never met the model.** Every rule was tested against the
   validator, and the validator against a real film — including rejecting the
@@ -143,7 +142,9 @@ ninety seconds the last time it was needed.
   actually choosing cards. The node is live now, so **the next film scripted is
   the test**; compare what it picks against `remotion/motif/candidate-mine.json`
   (scene 3 and scene 6), and read the `MOTIF …` lines in the execution log.
-- **The site is not deployed yet.** Cards will be chosen, stored and rendered
-  from the next film onward, but the Final touches panel that lets a producer
-  drop one only exists in the working tree. Until it ships, a card goes to
-  screen unreviewed.
+- ~~The site is not deployed yet.~~ **Shipped 2026-08-27** in `fbc24e9`, along
+  with the render server (the push touches `remotion/`, so Railway rebuilt too
+  — which it had to: without `RouteCard`/`ScheduleCard` on the box a `route`
+  card would have rendered as a blank ink rectangle). Site deploy green, render
+  server `/health` ok, so the whole path is live: choose → validate → store →
+  review in Final touches → draw.

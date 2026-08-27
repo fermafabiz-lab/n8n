@@ -15,26 +15,6 @@ import RegenBadge from "@/components/RegenBadge";
  * the user then approved what LOOKED like their edit but wasn't (seen in
  * production: scenes generated from the unedited script).
  */
-/**
- * Splits an approved script into its chapter blocks so each can be its own
- * card. The marker line stays with the text under it — `[CHAPTER 1: …]` is
- * that block's heading, not a separate thing. Anything before the first
- * marker (or a script with no markers at all) comes back as one block, so a
- * script written without them still renders.
- */
-function chapterBlocks(text: string): Array<{ head: string; body: string }> {
-  const parts = text.split(/^\s*(\[CHAPTER[^\]]*\])\s*$/gim);
-  const out: Array<{ head: string; body: string }> = [];
-  let lead = (parts[0] ?? "").trim();
-  if (lead) out.push({ head: "", body: lead });
-  for (let i = 1; i < parts.length; i += 2) {
-    const head = (parts[i] ?? "").trim();
-    const body = (parts[i + 1] ?? "").trim();
-    if (head || body) out.push({ head, body });
-  }
-  return out.length ? out : [{ head: "", body: text.trim() }];
-}
-
 export default function ScriptReview({
   projectId,
   scriptId,
@@ -106,19 +86,33 @@ export default function ScriptReview({
           <span className="chip ok">Approved</span>
         </div>
         <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--soft)" }}>
-          This is the text the film was built from — the chapters, scenes,
-          narration and image prompts all come from it, so it is kept exactly
-          as approved. Individual scenes can still be reopened and rewritten
-          from the Scenes step; rewriting the script itself would mean
-          producing the film again from the top.
+          This is the text the film was built from. You can edit it here and
+          save — but the scenes, narration and image prompts were already
+          derived from the approved version, so changing this text does not
+          rewrite them. To change what is on screen, edit the scene itself
+          from the Scenes step; to rebuild the whole film from a new script,
+          restart the writing.
         </p>
-        <div className="chapters">
-          {chapterBlocks(content).map((c, i) => (
-            <div className="chapblock" key={i}>
-              {c.head && <span className="chead">{c.head}</span>}
-              <p>{c.body}</p>
-            </div>
-          ))}
+        <textarea
+          className="scriptbox"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          rows={18}
+          spellCheck={false}
+        />
+        {msg && (
+          <p className={`formmsg ${msg.ok ? "ok" : "err"}`} style={{ marginTop: 10 }}>
+            {msg.message}
+          </p>
+        )}
+        <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+          <button
+            className="btn gold"
+            disabled={pending || !dirty}
+            onClick={() => run(() => saveScript(projectId, scriptId, text))}
+          >
+            {pending ? "Saving…" : "Save changes"}
+          </button>
         </div>
         <div
           style={{ marginTop: 8, fontSize: 12, color: "var(--dim)", textAlign: "right" }}

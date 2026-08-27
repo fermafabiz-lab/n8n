@@ -4854,51 +4854,19 @@ body:has(.mkt) .vignette {
 }
 
 
-/* --- Script: the approved text as floating chapter cards --- */
-.ascript .chapters {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-/* One card per chapter rather than one long recessed block. The script IS a
-   document — that is why .reviewpanel deliberately does not cover it — but
-   its chapters are the units a producer reads and refers to, so they get the
-   same floating surface as a scene or a take. */
-.ascript .chapblock {
-  background: var(--card2);
-  border: none;
-  border-radius: 18px;
-  padding: 20px 22px;
-  box-shadow: 0 2px 5px rgba(24, 20, 40, 0.05), 0 12px 28px rgba(24, 20, 40, 0.12);
-  transition: var(--tr);
-}
-.ascript .chapblock:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 9px rgba(24, 20, 40, 0.06), 0 20px 44px rgba(24, 20, 40, 0.16);
-}
-/* The marker line is the block's heading, so it is set as one — mono and
-   tracked, the same device every other structural label on the site uses. */
-.ascript .chapblock .chead {
-  display: block;
-  font-family: var(--f-mono), ui-monospace, Menlo, monospace;
-  font-size: 11.5px;
-  letter-spacing: 0.06em;
-  color: var(--accent-deep);
-  margin-bottom: 10px;
-}
-.ascript .chapblock p {
-  margin: 0;
-  font-size: 14.5px;
-  line-height: 1.7;
-  color: #3a3a44;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  text-wrap: pretty;
-}
-/* The editable draft keeps ONE field — the script is saved whole, and cutting
-   it into per-chapter inputs would change what gets written back. It gets the
-   recessed treatment instead, inside the same floating language. */
-.ascript textarea {
+/* --- Script: one floating field holding the whole text --- */
+/* ONE field, holding the whole script. It was briefly one card per chapter,
+   which is not what a script is to work on: you read it in chapters but you
+   EDIT it as one continuous text, and cutting it into blocks means deciding
+   which block a rewritten sentence belongs to. It also matches what actually
+   gets saved — the script is written back whole. */
+.ascript textarea,
+.ascript .scriptbox {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  font-family: inherit;
+  color: var(--ink);
   background: #f8f8fa;
   border: 1px solid rgba(24, 20, 40, 0.09);
   border-radius: 16px;

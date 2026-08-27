@@ -3289,6 +3289,14 @@ body:has(.mkt) .vignette {
   padding: 9px 9px 9px 24px;
   box-shadow: var(--shadow-nav);
 }
+/* The two doors on the right, inside the pill's own 9px of padding. The bar
+   is auto-width and centred, so adding one simply makes it wider — which is
+   the whole reason nothing here shrinks to fit. */
+.mkt-nav .acts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .mkt-nav .links {
   display: flex;
   gap: 4px;
@@ -3321,6 +3329,27 @@ body:has(.mkt) .vignette {
 }
 .mkt-cta-dark:hover {
   transform: translateY(-2px);
+}
+/* The secondary door: same type size and the same pill height as the dark
+   one — a white surface with a hairline, so the two read as a pair with a
+   clear primary rather than as a button and a link. */
+.mkt-cta-light {
+  white-space: nowrap;
+  font-family: inherit;
+  font-size: 14.5px;
+  color: var(--ink);
+  background: #fdfdfe;
+  border: 1px solid rgba(24, 20, 40, 0.1);
+  border-radius: var(--r-pill);
+  padding: 11px 22px;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: var(--tr);
+  display: inline-block;
+}
+.mkt-cta-light:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
 }
 .mkt-head {
   position: relative;
@@ -3866,6 +3895,12 @@ body:has(.mkt) .vignette {
   letter-spacing: -0.02em;
   color: var(--ink);
 }
+/* The mark never wraps away from its word, and the word never wraps in on
+   itself: three stacked lines of "House / of / Videos" is what a squeezed
+   pill does otherwise. */
+.mkt .brandline .bword {
+  white-space: nowrap;
+}
 .mkt .brandline .bmark {
   width: 17px;
   height: 17px;
@@ -3916,6 +3951,22 @@ body:has(.mkt) .vignette {
   }
   .mkt-nav .links {
     display: none;
+  }
+}
+
+/* On a phone the pill has to hold two buttons at full size, and it cannot do
+   that and the wordmark as well. The mark stays — it is the link home and the
+   identity — and the words go, because the headline three lines below is
+   literally "House of Videos makes films while you sleep". Shrinking the type
+   instead would make every label harder to read to save a name that is
+   already on screen. */
+@media (max-width: 660px) {
+  .mkt .brandline .bword {
+    display: none;
+  }
+  .mkt-nav .in {
+    gap: 14px;
+    padding-left: 16px;
   }
 }
 
@@ -4784,4 +4835,271 @@ body:has(.mkt) .vignette {
     width: 100%;
     order: 9;
   }
+}
+
+
+/* ============================================================
+   Review panels — Voice review and Scene review.
+   Both ask the same thing of the producer: go through a list of
+   scenes one at a time and act on each. So each row is a card
+   that floats, and both panels carry .reviewpanel to say so.
+   Deliberately NOT on .script itself — ScriptReview shares that
+   wrapper and is one continuous document, not a list of things
+   to act on.
+   ============================================================ */
+
+/* The take. A white surface lifted off the panel rather than a bordered box
+   drawn on it: these are the things you act on one at a time, so each one has
+   to read as its own object. The border goes with the shadow — a card that is
+   BOTH outlined and lifted reads as two containers stacked. */
+.reviewpanel .card.take {
+  background: var(--card2);
+  border: none;
+  border-radius: 18px;
+  padding: 16px 18px !important;
+  box-shadow: 0 2px 5px rgba(24, 20, 40, 0.05), 0 12px 28px rgba(24, 20, 40, 0.12);
+  transition: var(--tr);
+}
+.reviewpanel .card.take:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 9px rgba(24, 20, 40, 0.06), 0 20px 44px rgba(24, 20, 40, 0.16);
+}
+/* The playing take keeps the accent ring, but as a halo rather than a hard
+   2px outline — the outline sat outside the shadow and cut a square corner
+   across the rounded card. */
+.reviewpanel .card.take[style*="outline"] {
+  outline: none !important;
+  box-shadow: 0 0 0 2px var(--accent), 0 12px 28px rgba(122, 79, 214, 0.22);
+}
+
+/* The take's own controls sit on the white card, so they need a hairline to
+   separate from it — on the panel they had the card's grey to sit against.
+   :not(.ok) matters: the primary action carries the accent gradient, and a
+   plain `.abtn` rule here painted it white and left its white label on a
+   white surface. Caught on a screenshot — "Approve scene" was invisible. */
+.reviewpanel .take .abtn:not(.ok) {
+  background: var(--card2);
+  border: 1px solid rgba(24, 20, 40, 0.1);
+  border-radius: var(--r-pill);
+  box-shadow: var(--shadow-sm);
+  transition: var(--tr);
+}
+.reviewpanel .take .abtn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+/* The primary action keeps its accent, and gets the same pill shape and lift
+   as everything else in the take. */
+.reviewpanel .take .abtn.ok {
+  border-radius: var(--r-pill);
+  transition: var(--tr);
+}
+/* The play control is round, as drawn. Targeted by its own class, not by
+   :first-of-type — that matched the first .abtn inside EVERY group in the
+   take, so the "Voice: auto" selector was collapsed into a 34px circle with
+   its label cut off. Caught on a screenshot. */
+.reviewpanel .take .abtn.playbtn {
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+/* The narration box inside a take: recessed, so the card reads as the object
+   and the text as something set into it. */
+.reviewpanel .take textarea {
+  background: #f8f8fa;
+  border: 1px solid rgba(24, 20, 40, 0.09);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* Change narrator: one full-width centred row, as the design draws it —
+   it applies to the WHOLE project, so it should not sit in a corner looking
+   like one more per-take control. */
+.reviewpanel .abtn.narrowide {
+  display: block;
+  width: 100%;
+  text-align: center;
+  padding: 15px 20px;
+  border-radius: var(--r-pill);
+  background: var(--card2);
+  border: 1px solid rgba(24, 20, 40, 0.09);
+  box-shadow: var(--shadow-sm);
+  font-size: 14px;
+  transition: var(--tr);
+}
+.reviewpanel .abtn.narrowide:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+
+/* The download row's pills match every other pill on the site. */
+.reviewpanel .btn {
+  border-radius: var(--r-pill);
+  background: var(--card2);
+  border: 1px solid rgba(24, 20, 40, 0.09);
+  box-shadow: var(--shadow-sm);
+  transition: var(--tr);
+}
+.reviewpanel .btn:hover {
+  transform: translateY(-2px);
+}
+
+
+/* --- Script: one floating field holding the whole text --- */
+/* ONE field, holding the whole script. It was briefly one card per chapter,
+   which is not what a script is to work on: you read it in chapters but you
+   EDIT it as one continuous text, and cutting it into blocks means deciding
+   which block a rewritten sentence belongs to. It also matches what actually
+   gets saved — the script is written back whole. */
+.ascript textarea,
+.ascript .scriptbox {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  font-family: inherit;
+  color: var(--ink);
+  background: #f8f8fa;
+  border: 1px solid rgba(24, 20, 40, 0.09);
+  border-radius: 16px;
+  padding: 16px 18px;
+  font-size: 14.5px;
+  line-height: 1.7;
+  box-shadow: inset 0 1px 2px rgba(24, 20, 40, 0.05);
+}
+.ascript .btn {
+  border-radius: var(--r-pill);
+  box-shadow: var(--shadow-sm);
+  transition: var(--tr);
+}
+.ascript .btn:hover {
+  transform: translateY(-2px);
+}
+
+
+/* ============================================================
+   Images & Video — the review stage.
+   Same rule as the other review panels: the thing you act on is
+   an object that floats, not a box drawn on the page. Here the
+   object is the MONITOR, and the asset is set INTO it — the
+   picture and the clip used to bleed to the card's own edge, so
+   a black 16:9 video squared off the rounded corners and the
+   bubble stopped reading as a bubble at exactly the moment it
+   held a clip. Padding + an inner radius is the whole fix, and
+   it has to be on .scr rather than on the media: MediaPlayer
+   fills its parent absolutely, and the drafts preview, the
+   fallback art and the scrim all live in there too.
+   ============================================================ */
+.stage .monitor {
+  background: var(--card2);
+  border: none;
+  border-radius: 26px;
+  padding: 14px;
+  box-shadow: 0 2px 5px rgba(24, 20, 40, 0.05), 0 16px 38px rgba(24, 20, 40, 0.13);
+  overflow: visible;
+}
+/* The frame the asset sits in. overflow:hidden is what rounds the video's
+   own corners — a <video> element cannot be given a radius that its native
+   controls respect, so the clip has to be masked by its holder. */
+.stage .monitor .scr {
+  border-radius: 16px;
+  overflow: hidden;
+  background: #0d0d10;
+}
+/* The scene tag and the caption are positioned against .scr, so they follow
+   the inset automatically; only the caption needs to come in off the rounded
+   corner it now sits above. */
+.stage .monitor .cap {
+  left: 22px;
+  right: 22px;
+  bottom: 18px;
+}
+
+/* The strip below is part of the same bubble now, not a second panel bolted
+   under it: no ground of its own and no hairline, so the card reads as one
+   surface holding a frame and its contact sheet. */
+.stage .filmstrip {
+  background: none;
+  border-top: 0;
+  padding: 14px 0 2px;
+  gap: 10px;
+}
+.stage .fspage {
+  background: none;
+  padding: 8px 0 0;
+}
+/* Each thumbnail floats too — the same object rule, one size down. The
+   selected one keeps its accent ring as a halo rather than a hard border, so
+   it does not cut a square corner across the rounded frame. */
+.stage .fr {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(24, 20, 40, 0.06), 0 6px 16px rgba(24, 20, 40, 0.11);
+}
+.stage .fr:hover {
+  box-shadow: 0 3px 7px rgba(24, 20, 40, 0.08), 0 12px 26px rgba(24, 20, 40, 0.16);
+}
+.stage .fr.sel,
+.stage .fr.act {
+  box-shadow: 0 0 0 2px var(--accent), 0 8px 20px rgba(122, 79, 214, 0.26);
+}
+.stage .fsnav {
+  border: none;
+  border-radius: var(--r-pill);
+  width: 34px;
+  background: var(--card2);
+  box-shadow: var(--shadow-sm);
+  color: var(--soft);
+  transition: var(--tr);
+}
+.stage .fsnav:hover:not(:disabled) {
+  transform: translateY(-1px);
+  color: var(--accent);
+}
+
+/* The inspector's cards are the same object as the monitor, at rail width. */
+.stage .insp .card {
+  background: var(--card2);
+  border: none;
+  border-radius: 22px;
+  box-shadow: 0 2px 5px rgba(24, 20, 40, 0.05), 0 14px 32px rgba(24, 20, 40, 0.12);
+}
+/* Controls sitting on white need the hairline the grey card used to give
+   them — and :not(.ok) so the primary action keeps its accent instead of
+   being repainted white with a white label on it. */
+.stage .insp .abtn:not(.ok) {
+  background: var(--card2);
+  border: 1px solid rgba(24, 20, 40, 0.1);
+  border-radius: var(--r-pill);
+  box-shadow: var(--shadow-sm);
+  transition: var(--tr);
+}
+.stage .insp .abtn.ok {
+  border-radius: var(--r-pill);
+  transition: var(--tr);
+}
+.stage .insp .abtn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+/* The two prompt fields are recessed into the card, like the narration box
+   in a take: the card is the object, the text is set into it. */
+.stage .insp textarea {
+  background: #f8f8fa !important;
+  border: 1px solid rgba(24, 20, 40, 0.09) !important;
+  border-radius: 14px !important;
+  box-shadow: inset 0 1px 2px rgba(24, 20, 40, 0.05);
+}
+/* A grid item's default `min-width: auto` refuses to shrink below its
+   content's min-content width, so on a phone both columns kept their desktop
+   width and the monitor ran a full screen-width past the right edge — with
+   the filmstrip's own overflow:auto never getting a chance to scroll, because
+   nothing was ever narrower than its contents. Pre-dates the bubble; fixed
+   here because these are the panels being looked at. */
+.stage > * {
+  min-width: 0;
 }

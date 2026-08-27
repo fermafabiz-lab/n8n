@@ -16,6 +16,7 @@ import {
 import type { Scene } from "@/lib/data";
 import { useVoiceLabels, useVoiceNames } from "@/lib/voice-names";
 import { downloadSrc, mediaSrc } from "@/lib/media";
+import { chapterKeys as chapterKeysOf, chapterOf as chapterOfOrder } from "@/lib/chapters";
 import RegenBadge from "@/components/RegenBadge";
 import VoicePicker from "@/components/VoicePicker";
 
@@ -83,7 +84,7 @@ function fitProblem(voice: number | undefined, clip: number | undefined): string
  */
 export function castIndexFor(order: number, castSize: number): number {
   if (castSize <= 0) return -1;
-  const ch = Math.floor(order / 100);
+  const ch = chapterOfOrder(order);
   if (ch <= 0) return -1;
   return (ch - 1) % castSize;
 }
@@ -147,9 +148,8 @@ export default function AudioReview({
   // loop only ever sees a capped batch; here the whole project is in hand, so
   // counting the scenes gives the same answer.
   const chapterCount =
-    new Set(
-      scenes.map((s) => Math.floor(s.order / 100)).filter((c) => c > 0),
-    ).size || 1;
+    new Set(scenes.map((s) => chapterOfOrder(s.order)).filter((c) => c > 0))
+      .size || 1;
   const [msg, setMsg] = useState<ActionResult | null>(null);
   const [pending, setPending] = useState(false);
   const [playingId, setPlayingId] = useState<string | null>(null);
@@ -205,19 +205,15 @@ export default function AudioReview({
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // ---- chapters mode -------------------------------------------------
-  // Scene order encodes the chapter: 101/102 are chapter 1, 201 chapter 2,
-  // anything under 100 is the hook. n8n derives it the same way, and so
-  // does castIndexFor above.
-  const chapterOf = (s: Scene): number =>
-    Number.isFinite(s.order) ? Math.floor(s.order / 100) : 0;
-  // Every chapter present, in order, with "hook" first when one exists.
-  const chapterKeys = useMemo(() => {
-    const nums = [...new Set(scenes.map(chapterOf).filter((c) => c > 0))].sort(
-      (a, b) => a - b,
-    );
-    const keys = nums.map(String);
-    return scenes.some((s) => chapterOf(s) === 0) ? ["hook", ...keys] : keys;
-  }, [scenes]);
+  // The chapter rule itself lives in lib/chapters.ts — n8n's AB Pick Voice,
+  // the narration-bundle route and the scene board all derive it the same
+  // way, and a private copy here is how "Chapter 2" comes to mean two
+  // different sets of scenes on one page.
+  const chapterOf = (s: Scene): number => chapterOfOrder(s.order);
+  const chapterKeys = useMemo(
+    () => chapterKeysOf(scenes.map((s) => s.order)),
+    [scenes],
+  );
   /** What a chapter is read by today: an explicit pick, else the cast order. */
   const chapterVoiceOf = (key: string): string => {
     const set = chapterVoices[key];

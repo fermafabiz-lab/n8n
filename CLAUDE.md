@@ -1521,6 +1521,30 @@ the pipeline already produces.
   vocabularies byte-identical — the 2026-08 editorial rebuild moved them into
   hidden inputs bound to React state, nothing more. Every non-submit button
   inside the form must carry `type="button"`.
+- **The filmstrip splits by chapter, and the chapter rule has ONE owner.**
+  Paging the strip by 8 fixed the crowding a 44-scene film caused but not the
+  navigation — "page 3 of 6" says nothing about where you are in a film. The
+  strip is now cut by chapter on the Images and Video steps, with a tab per
+  chapter carrying `approved/total` **for the step being reviewed**, so the
+  row answers the question it is looked at for: which chapter still needs me.
+  Paging survives *inside* a chapter for the rare one over 8 scenes.
+  Three things are load-bearing:
+  - **The current chapter is DERIVED from the selected scene, never held as
+    state.** A tab and a selection that can disagree is a strip showing one
+    chapter while the monitor below reviews a scene from another. Clicking a
+    tab selects a scene (the first still owing a decision for this step, else
+    the first of the chapter); selecting from anywhere else moves the tab.
+  - **A film with one chapter keeps the plain paging.** Orders are not always
+    chapter-encoded — a short film numbers its scenes 1, 2, 3, which all fall
+    in the hook, and `ceil(Lenght / 120)` makes anything under two minutes one
+    chapter by construction. `groupsByChapter()` owns that test; a row holding
+    a single "Hook" button is noise.
+  - **`lib/chapters.ts` is the single owner of `floor(order / 100)`.** It had
+    been written by hand in three places (the voice panel, the narration-bundle
+    route, `castIndexFor`) and n8n's `AB Pick Voice` / `VR Pick Voice` derive
+    it the same way. A fourth copy is how "Chapter 2" comes to label one set of
+    scenes while the download named "chapter 2" produces another. Note the
+    numbered chapters sort NUMERICALLY — a lexical sort puts 10 before 9.
 - **A step you stepped back to must show ITS OWN asset.** `SceneBoard`'s
   monitor played the clip whenever one existed, so revisiting Images put a
   video player over the picture being judged — the wrong asset for the
@@ -1719,9 +1743,10 @@ the pipeline already produces.
   re-synthesized line can come back at a different sample rate and concat
   refuses inputs that disagree; and there is **no gap between takes** — the
   bundle is the narration as the cut plays it, and one that drifts from the
-  video is worse than none. Chapter is `floor(Ordine Scenă / 100)`, the same
-  rule as `AB Pick Voice` and `AudioReview`'s `chapterOf` — all three must
-  agree or "Chapter 2" downloads different lines from the ones labelled Ch. 2.
+  video is worse than none. Chapter comes from `lib/chapters.ts`, which is now
+  the single owner of `floor(Ordine Scenă / 100)` — the same rule `AB Pick
+  Voice` uses in n8n. They must agree or "Chapter 2" downloads different lines
+  from the ones labelled Ch. 2.
 - **That put ffmpeg in the site's own image** (`apk add ffmpeg` in the
   Dockerfile runner stage). The alternative was the Railway render server,
   which already has ffmpeg — but the site holds neither its URL nor its key,

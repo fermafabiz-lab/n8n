@@ -1143,6 +1143,52 @@ body:has(.nb) .nav {
   color: var(--dim);
   text-align: center;
 }
+/* Chapter tabs over the filmstrip. Built on the same segmented control the
+   rest of the app uses, with two additions: a count, because the question
+   asked of this row is "which chapter still needs me", and a `full` state so
+   a finished chapter reads as finished without opening it. Scrolls sideways
+   rather than wrapping — a film with many chapters must not push the strip
+   itself down the page. */
+.fschap {
+  display: flex;
+  gap: 3px;
+  padding: 10px 14px 0;
+  background: var(--bg2);
+  overflow-x: auto;
+}
+.fschap button {
+  flex: none;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: var(--r-pill);
+  padding: 7px 14px;
+  border: 1px solid transparent;
+  transition: var(--tr);
+  color: var(--dim);
+  background: transparent;
+}
+.fschap button:hover {
+  color: var(--ink);
+}
+.fschap button.on {
+  color: var(--ink);
+  background: var(--bg3, #fdfdfe);
+  border-color: var(--line2);
+  box-shadow: var(--shadow-sm);
+}
+.fschap .cnt {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+.fschap button.full .cnt {
+  color: var(--ok, #2e7d5b);
+}
 .fr {
   flex: none;
   width: 104px;

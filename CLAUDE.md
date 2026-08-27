@@ -1368,6 +1368,24 @@ the pipeline already produces.
   vocabularies byte-identical — the 2026-08 editorial rebuild moved them into
   hidden inputs bound to React state, nothing more. Every non-submit button
   inside the form must carry `type="button"`.
+- **A `<video>` cannot be given a corner its own controls respect, so the clip
+  has to be masked by its holder.** The Images/Video monitor drew the asset
+  edge-to-edge, which was invisible while it held a picture and obvious the
+  moment it held a clip: the black 16:9 rectangle squared off the card's
+  rounded corners, and the bubble stopped being a bubble at exactly the frame
+  the producer is judging. The radius belongs on `.scr` with `overflow:
+  hidden`, not on the media — `MediaPlayer` fills its parent absolutely, and
+  the same mask then also serves the fallback art, the drafts preview and the
+  scrim.
+- **A grid item's `min-width: auto` outranks every overflow rule inside it.**
+  `.stage`'s two columns kept their desktop width on a phone and the monitor
+  ran a full screen past the right edge — while the filmstrip's own
+  `overflow-x: auto` sat there doing nothing, because nothing was ever
+  narrower than its contents for it to scroll. `min-width: 0` on the items is
+  the whole fix, and the symptom to recognise is a child that *can* scroll
+  and doesn't. Measure the item against its track (`getBoundingClientRect`),
+  not the page: the page-level scrollWidth blamed the stepper, which was only
+  being dragged along.
 - **A step you stepped back to must show ITS OWN asset.** `SceneBoard`'s
   monitor played the clip whenever one existed, so revisiting Images put a
   video player over the picture being judged — the wrong asset for the

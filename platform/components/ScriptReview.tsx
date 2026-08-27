@@ -15,6 +15,26 @@ import RegenBadge from "@/components/RegenBadge";
  * the user then approved what LOOKED like their edit but wasn't (seen in
  * production: scenes generated from the unedited script).
  */
+/**
+ * Splits an approved script into its chapter blocks so each can be its own
+ * card. The marker line stays with the text under it — `[CHAPTER 1: …]` is
+ * that block's heading, not a separate thing. Anything before the first
+ * marker (or a script with no markers at all) comes back as one block, so a
+ * script written without them still renders.
+ */
+function chapterBlocks(text: string): Array<{ head: string; body: string }> {
+  const parts = text.split(/^\s*(\[CHAPTER[^\]]*\])\s*$/gim);
+  const out: Array<{ head: string; body: string }> = [];
+  let lead = (parts[0] ?? "").trim();
+  if (lead) out.push({ head: "", body: lead });
+  for (let i = 1; i < parts.length; i += 2) {
+    const head = (parts[i] ?? "").trim();
+    const body = (parts[i + 1] ?? "").trim();
+    if (head || body) out.push({ head, body });
+  }
+  return out.length ? out : [{ head: "", body: text.trim() }];
+}
+
 export default function ScriptReview({
   projectId,
   scriptId,
@@ -80,7 +100,7 @@ export default function ScriptReview({
   // and a fixed-height box with its own scrollbar fights exactly that.
   if (locked) {
     return (
-      <div className="script">
+      <div className="script ascript">
         <div className="sechead">
           <h2>Script</h2>
           <span className="chip ok">Approved</span>
@@ -92,21 +112,13 @@ export default function ScriptReview({
           from the Scenes step; rewriting the script itself would mean
           producing the film again from the top.
         </p>
-        <div
-          style={{
-            width: "100%",
-            background: "var(--bg2)",
-            border: "1px solid var(--line2)",
-            borderRadius: 12,
-            color: "var(--ink)",
-            fontSize: 14.5,
-            lineHeight: 1.7,
-            padding: "16px 18px",
-            whiteSpace: "pre-wrap",
-            overflowWrap: "anywhere",
-          }}
-        >
-          {content}
+        <div className="chapters">
+          {chapterBlocks(content).map((c, i) => (
+            <div className="chapblock" key={i}>
+              {c.head && <span className="chead">{c.head}</span>}
+              <p>{c.body}</p>
+            </div>
+          ))}
         </div>
         <div
           style={{ marginTop: 8, fontSize: 12, color: "var(--dim)", textAlign: "right" }}
@@ -118,7 +130,7 @@ export default function ScriptReview({
   }
 
   return (
-    <div className="script">
+    <div className="script ascript">
       <div className="sechead">
         <h2>Script review</h2>
         {regenerating ? (

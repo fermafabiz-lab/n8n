@@ -46,6 +46,62 @@ const short = (s: string, n: number) =>
  * into checkboxes and a two-step Delete removes every selected project
  * (scenes + scripts + project record; Drive media stays).
  */
+/** Projects per page. */
+const PAGE_SIZE = 15;
+
+/**
+ * The page numbers to actually draw: always the first and last, always the
+ * current and its neighbours, with an ellipsis standing in for the rest. A
+ * library of 57 films is four pages and needs none of this; one of 600 is
+ * forty, and forty pills is not a control, it is a wall.
+ */
+function pageNumbers(current: number, total: number): Array<number | "gap"> {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const out: Array<number | "gap"> = [1];
+  const lo = Math.max(2, current - 1);
+  const hi = Math.min(total - 1, current + 1);
+  if (lo > 2) out.push("gap");
+  for (let n = lo; n <= hi; n++) out.push(n);
+  if (hi < total - 1) out.push("gap");
+  out.push(total);
+  return out;
+}
+
+/**
+ * The card's first meta word. The film's own category when it has one (they
+ * are what the library is actually sorted by in a producer's head), falling
+ * back to the tone, which every project has.
+ */
+function categoryLabel(p: { category: string | null; tone: string | null }): string {
+  if (p.category) {
+    return p.category.charAt(0).toUpperCase() + p.category.slice(1);
+  }
+  return p.tone || "Film";
+}
+
+/** mm:ss — the runtime chip on the still and the card's meta line. */
+function runtimeOf(sec: number | null): string {
+  if (!sec || sec <= 0) return "—";
+  return `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, "0")}`;
+}
+
+/**
+ * "4 min ago". Deliberately coarse: the card is scanned, and a timestamp to
+ * the second invites reading it as progress when it is only a write time.
+ */
+function agoOf(iso: string | null): string {
+  if (!iso) return "";
+  const ms = Date.now() - new Date(iso).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return "";
+  const m = Math.round(ms / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m} min ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h} ${h === 1 ? "hour" : "hours"} ago`;
+  const d = Math.round(h / 24);
+  return d === 1 ? "yesterday" : `${d} days ago`;
+}
+
 export default function ProjectsGrid({ projects }: { projects: Project[] }) {
   const [manage, setManage] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -54,6 +110,9 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
   const [pending, startTransition] = useTransition();
   const [filter, setFilter] = useState<"all" | StatusKind>("all");
   const [view, setView] = useState<"grid" | "list">("grid");
+  /** Filters title and category live, exactly as the design's search does. */
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
   // Hover preview on finished covers: the final video plays muted in the
   // card. Mounted only after ~350ms of hover intent — the bytes come through
   // our own /api/media proxy (Drive-hosted), so drive-by hovers must not
@@ -97,8 +156,28 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
 
   const counts = new Map<string, number>([["all", projects.length]]);
   for (const p of projects) counts.set(p.statusKind, (counts.get(p.statusKind) ?? 0) + 1);
-  const shown =
-    filter === "all" ? projects : projects.filter((p) => p.statusKind === filter);
+  const q = query.trim().toLowerCase();
+  const matched = (filter === "all" ? projects : projects.filter((p) => p.statusKind === filter))
+    // Title AND category, because a producer looking for "the nature one" is
+    // as likely to remember the kind of film as its name.
+    .filter(
+      (p) =>
+        !q ||
+        p.name.toLowerCase().includes(q) ||
+        (p.category ?? "").toLowerCase().includes(q) ||
+        (p.tone ?? "").toLowerCase().includes(q),
+    );
+
+  const totalPages = Math.max(1, Math.ceil(matched.length / PAGE_SIZE));
+  /**
+   * Clamped at render rather than trusted from state. Filtering, searching and
+   * the 15s refetch all shrink the list under a page number that was valid a
+   * moment ago — and a page past the end renders as an empty library, which
+   * reads as "everything is gone" rather than "you are on page 4 of 2".
+   */
+  const current = Math.min(Math.max(1, page), totalPages);
+  const from = (current - 1) * PAGE_SIZE;
+  const shown = matched.slice(from, from + PAGE_SIZE);
 
   const toggle = (id: string) =>
     setSelected((prev) => {
@@ -152,7 +231,10 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
                 key={f.key}
                 type="button"
                 className={`ftab ${filter === f.key ? "on" : ""}`}
-                onClick={() => setFilter(f.key)}
+                onClick={() => {
+                  setFilter(f.key);
+                  setPage(1);
+                }}
               >
                 {f.label}
                 <span className="c">{counts.get(f.key) ?? 0}</span>
@@ -161,6 +243,19 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
           )}
         </span>
         <span className="sp" />
+        <span className="psearch">
+          <span aria-hidden="true">⌕</span>
+          <input
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setPage(1);
+            }}
+            placeholder="Search titles and themes"
+            aria-label="Search projects"
+            autoComplete="off"
+          />
+        </span>
         <span className="vtog">
           <button
             type="button"
@@ -265,6 +360,11 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
                   className={`art ${p.coverUrl ? "" : `fallback${(i % 4) + 1}`}`}
                   style={p.coverUrl ? { backgroundImage: `url(${p.coverUrl})` } : undefined}
                 />
+                {/* Top-and-bottom scrim. The chips sit ON the still, and a
+                    still is whatever the film generated — it can be bright,
+                    pale or busy, so the chips need their own ground rather
+                    than luck. */}
+                <span className="scrim" aria-hidden="true" />
                 {/* Re-checked at render, not just at arm time: a manage
                     toggle or the 15s refetch can invalidate a hover that
                     never got its mouseleave. */}
@@ -303,23 +403,40 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
                     {selected.has(p.id) ? "✓" : ""}
                   </span>
                 )}
+                <span className="rt">{runtimeOf(p.lengthSeconds)}</span>
               </div>
               <div className="body">
                 <ExpandableTitle text={p.name} as="h3" clampChars={80} />
                 <div className="meta">
-                  {p.lengthSeconds ? `${p.lengthSeconds}s` : "—"}
-                  {p.tone ? ` · ${p.tone}` : ""}
+                  {categoryLabel(p)} · {runtimeOf(p.lengthSeconds)}
                 </div>
-                <div className="track">
-                  <i
-                    className={p.statusKind === "idle" ? "" : p.statusKind}
-                    style={{ width: `${Math.round(p.progress * 100)}%` }}
-                  />
-                </div>
+                {/* The bar and the step line belong to work in flight. On a
+                    finished film a full bar says nothing the Finished chip
+                    has not already said, and on an idle one it is a lie. */}
+                {(p.statusKind === "run" || p.statusKind === "err") && (
+                  <div className="prog">
+                    <div className="track">
+                      <i
+                        className={p.statusKind}
+                        style={{ width: `${Math.round(p.progress * 100)}%` }}
+                      />
+                    </div>
+                    <div className="stepline">
+                      <span>{p.status}</span>
+                      <span>{Math.round(p.progress * 100)}%</span>
+                    </div>
+                  </div>
+                )}
                 <div className="foot">
-                  <span>{p.status}</span>
+                  <span>{agoOf(p.updatedAt) || p.status}</span>
                   <span className="go">
-                    {manage ? (selected.has(p.id) ? "Selected" : "Tap to select") : "Open →"}
+                    {manage
+                      ? selected.has(p.id)
+                        ? "Selected"
+                        : "Tap to select"
+                      : p.statusKind === "done"
+                        ? "Watch →"
+                        : "Open →"}
                   </span>
                 </div>
               </div>
@@ -367,6 +484,54 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
               <span className={`st ${p.statusKind}`}>{badgeLabel(p)}</span>
             </Link>
           ))}
+        </div>
+      )}
+
+      {matched.length > 0 && (
+        <div className="pshowing">
+          <span>
+            Showing {from + 1}–{from + shown.length} of {matched.length}
+            {matched.length !== projects.length ? ` (${projects.length} total)` : ""}
+          </span>
+          {totalPages > 1 && (
+            <nav className="pager" aria-label="Projects pages">
+              <button
+                type="button"
+                className="pgbtn"
+                onClick={() => setPage(current - 1)}
+                disabled={current === 1}
+              >
+                ← Previous
+              </button>
+              <span className="pgnums">
+                {pageNumbers(current, totalPages).map((n, i) =>
+                  n === "gap" ? (
+                    <span className="pggap" key={`gap${i}`}>
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      key={n}
+                      className={`pgnum ${n === current ? "on" : ""}`}
+                      onClick={() => setPage(n)}
+                      aria-current={n === current ? "page" : undefined}
+                    >
+                      {n}
+                    </button>
+                  ),
+                )}
+              </span>
+              <button
+                type="button"
+                className="pgbtn"
+                onClick={() => setPage(current + 1)}
+                disabled={current === totalPages}
+              >
+                Next →
+              </button>
+            </nav>
+          )}
         </div>
       )}
     </>

@@ -71,12 +71,10 @@ export default function ProductionActivity({
   // a time and in order, so the first scene missing the current stage's
   // asset is the one being worked on — presented as such, not as a fact.
   const noImage = batch.filter((s) => !s.imageUrl);
-  const unappImage = batch.filter((s) => !s.imageApproved);
   // On a silent film nothing is ever synthesized, so both voice phases are
   // empty rather than pending — otherwise the panel announces "next pass
   // starts with the voiceovers" for a film that has none, forever.
   const noVoice = silent ? [] : batch.filter((s) => !s.voiceUrl);
-  const unappVoice = silent ? [] : batch.filter((s) => !s.voiceApproved);
   const noClip = batch.filter((s) => !s.videoUrl);
   const unappClip = batch.filter((s) => !s.videoApproved);
   // `text` describes a batch that is RUNNING; `idle` the same stage when
@@ -84,20 +82,26 @@ export default function ProductionActivity({
   // right now." and "Generating images · 1/8" one line apart — two
   // statements that cannot both be true, on the screen a producer checks
   // precisely to find out whether anything is happening.
+  // Scenes still owing an asset approval for the combined gate — takes and
+  // images are reviewed together now, so the review phase counts both.
+  const unappAsset = batch.filter(
+    (s) => !s.imageApproved || (!silent && !s.voiceApproved),
+  );
+  // The batch's own order: every take first, every image second, ONE
+  // combined review, then clips. Mirrors the stage chain in n8n — a panel
+  // narrating a different order than the machine runs is worse than none.
   const phase =
-    noImage.length > 0
-      ? { text: "Generating images", idle: "Next pass starts with images", done: batch.length - noImage.length, current: noImage[0].label, review: false }
-      : unappImage.length > 0
-        ? { text: "Images ready — reviewing", idle: "Images ready — reviewing", done: batch.length - unappImage.length, current: null, review: true }
-        : noVoice.length > 0
-          ? { text: "Synthesizing voiceovers", idle: "Next pass starts with the voiceovers", done: batch.length - noVoice.length, current: noVoice[0].label, review: false }
-          : unappVoice.length > 0
-            ? { text: "Voices ready — reviewing", idle: "Voices ready — reviewing", done: batch.length - unappVoice.length, current: null, review: true }
-            : noClip.length > 0
-              ? { text: "Generating video clips", idle: "Next pass starts with the clips", done: batch.length - noClip.length, current: noClip[0].label, review: false }
-              : unappClip.length > 0
-                ? { text: "Clips ready — reviewing", idle: "Clips ready — reviewing", done: batch.length - unappClip.length, current: null, review: true }
-                : null;
+    noVoice.length > 0
+      ? { text: "Synthesizing voiceovers", idle: "Next pass starts with the voiceovers", done: batch.length - noVoice.length, current: noVoice[0].label, review: false }
+      : noImage.length > 0
+        ? { text: "Generating images", idle: "Next pass starts with images", done: batch.length - noImage.length, current: noImage[0].label, review: false }
+        : unappAsset.length > 0
+          ? { text: silent ? "Images ready — reviewing" : "Takes and images ready — reviewing", idle: silent ? "Images ready — reviewing" : "Takes and images ready — reviewing", done: batch.length - unappAsset.length, current: null, review: true }
+          : noClip.length > 0
+            ? { text: "Generating video clips", idle: "Next pass starts with the clips", done: batch.length - noClip.length, current: noClip[0].label, review: false }
+            : unappClip.length > 0
+              ? { text: "Clips ready — reviewing", idle: "Clips ready — reviewing", done: batch.length - unappClip.length, current: null, review: true }
+              : null;
 
   // Regenerations in flight, across the whole project (regens ride their own
   // webhooks, so they can run outside the batch).

@@ -15,6 +15,12 @@ import {
 } from "@/app/actions";
 import type { Scene, StatusKind } from "@/lib/data";
 import { mediaSrc } from "@/lib/media";
+import {
+  chapterKeyOf,
+  chapterKeys,
+  chapterLabel,
+  groupsByChapter,
+} from "@/lib/chapters";
 import { explainRefusal } from "@/lib/refusals";
 import MediaPlayer from "@/components/MediaPlayer";
 import RegenBadge from "@/components/RegenBadge";
@@ -235,18 +241,20 @@ export default function SceneBoard({
    * screen for a second — which looked like the click had been ignored.
    *
    * With neither, this is the live page: the step is the first thing the
-   * active scene still owes — image, then voice, then clip, the pipeline's
-   * own order.
+   * active scene still owes — voice, then image, then clip, the pipeline's
+   * own order. Voice first because the batch synthesizes every take before
+   * it generates a single image: takes are the first asset that exists, so
+   * they are the first thing worth the producer's attention.
    */
   const pendingStage = usePendingStage();
   const focusNow: "images" | "video" | null =
     pendingStage === "images" || pendingStage === "video" ? pendingStage : focus;
   const step: Step =
     focusNow ??
-    (active && !active.imageApproved
-      ? "images"
-      : audioPanel && active && !active.voiceApproved
-        ? "audio"
+    (audioPanel && active && !active.voiceApproved
+      ? "audio"
+      : active && !active.imageApproved
+        ? "images"
         : "video");
 
   // The monitor shows the asset the CURRENT step is deciding on, not simply
@@ -280,25 +288,64 @@ export default function SceneBoard({
   const videoControls =
     step === "video" && !!active && !!active.videoUrl && !active.videoApproved;
 
-  // A 44-scene project turned the filmstrip into a wall of unreadable
-  // thumbnails. Page it by 8 with arrows; picking a scene from the list in
-  // the inspector jumps the strip to that scene's page.
+  /**
+   * The filmstrip is split by chapter, and paged inside it.
+   *
+   * A 44-scene project turned the strip into a wall of unreadable thumbnails,
+   * and paging it by 8 fixed the crowding without fixing the navigation: page
+   * 3 of 6 says nothing about where you are in the film. Chapters are the
+   * divisions the producer actually thinks in — and the ones the script was
+   * written in — so they carry the strip whenever a film has more than one.
+   *
+   * Films that are one chapter keep the plain paging exactly as it was:
+   * anything under two minutes is a single chapter by construction
+   * (`ceil(Lenght / 120)`), and a row holding one "Hook" button is noise.
+   */
   const PAGE_SIZE = 8;
-  const pageCount = Math.max(1, Math.ceil(scenes.length / PAGE_SIZE));
-  const activeIndex = Math.max(
+  const orders = scenes.map((s) => s.order);
+  const byChapter = groupsByChapter(orders);
+  const chapters = byChapter ? chapterKeys(orders) : [];
+  // Derived from the active scene, never held as state: a chapter tab and a
+  // selection that can disagree is a strip showing one chapter while the
+  // monitor below reviews a scene from another.
+  const chapter = chapterKeyOf(active?.order ?? scenes[0]?.order ?? 0);
+  const frames = scenes.map((s, i) => ({ s, i }));
+  const pool = byChapter
+    ? frames.filter(({ s }) => chapterKeyOf(s.order) === chapter)
+    : frames;
+  const pageCount = Math.max(1, Math.ceil(pool.length / PAGE_SIZE));
+  const posInPool = Math.max(
     0,
-    scenes.findIndex((s) => s.id === active?.id),
+    pool.findIndex(({ s }) => s.id === active?.id),
   );
-  const [pageRaw, setPage] = useState(() => Math.floor(activeIndex / PAGE_SIZE));
+  const [pageRaw, setPage] = useState(() => Math.floor(posInPool / PAGE_SIZE));
   const page = Math.min(pageRaw, pageCount - 1);
   const select = (id: string) => {
     setSelectedId(id);
-    const i = scenes.findIndex((s) => s.id === id);
+    const target = scenes.find((s) => s.id === id);
+    if (!target) return;
+    // Position within the pool the strip will show AFTER this selection —
+    // which is that scene's own chapter, not the one currently on screen.
+    const next = byChapter
+      ? scenes.filter((s) => chapterKeyOf(s.order) === chapterKeyOf(target.order))
+      : scenes;
+    const i = next.findIndex((s) => s.id === id);
     if (i >= 0) setPage(Math.floor(i / PAGE_SIZE));
   };
-  const visible = scenes
-    .map((s, i) => ({ s, i }))
-    .slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+  /** Approved / total for one chapter, for the step being reviewed. */
+  const chapterStat = (key: string) => {
+    const inCh = scenes.filter((s) => chapterKeyOf(s.order) === key);
+    return { done: inCh.filter((s) => approvedFor(s, step)).length, total: inCh.length };
+  };
+  // Landing on a chapter puts you on the first scene that still owes a
+  // decision for THIS step — the reason to open a chapter at all — and on its
+  // first scene once the chapter is signed off.
+  const openChapter = (key: string) => {
+    const inCh = scenes.filter((s) => chapterKeyOf(s.order) === key);
+    if (inCh.length === 0) return;
+    select((inCh.find((s) => !approvedFor(s, step)) ?? inCh[0]).id);
+  };
+  const visible = pool.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
 
   // Bulk approval is about the assets that EXIST.
   //
@@ -372,6 +419,28 @@ export default function SceneBoard({
               </>
             )}
           </div>
+          {byChapter && (
+            <div className="fschap">
+              {chapters.map((key) => {
+                const { done, total } = chapterStat(key);
+                const full = total > 0 && done === total;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    className={`${key === chapter ? "on" : ""} ${full ? "full" : ""}`}
+                    onClick={() => openChapter(key)}
+                    title={`${chapterLabel(key)} — ${done} of ${total} approved for this step`}
+                  >
+                    {chapterLabel(key)}
+                    <span className="cnt">
+                      {done}/{total}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <div className="filmstrip">
             {pageCount > 1 && (
               <button
@@ -419,8 +488,9 @@ export default function SceneBoard({
           </div>
           {pageCount > 1 && (
             <div className="fspage">
-              Scenes {page * PAGE_SIZE + 1}–
-              {Math.min(scenes.length, (page + 1) * PAGE_SIZE)} of {scenes.length}
+              {byChapter ? `${chapterLabel(chapter)}: scenes ` : "Scenes "}
+              {page * PAGE_SIZE + 1}–{Math.min(pool.length, (page + 1) * PAGE_SIZE)} of{" "}
+              {pool.length}
             </div>
           )}
         </div>
@@ -770,8 +840,12 @@ export default function SceneBoard({
               direction, with no field on screen to explain why. On a silent
               film it is the whole story, since the narration is neither
               spoken nor captioned.
+
+              Video step only, like every other control here: it was the one
+              block that had escaped the step scoping, so the Images page
+              offered a field about the CLIP under a heading about pictures.
             */}
-            {!active.videoApproved && active.videoPrompt !== null && (
+            {step === "video" && !active.videoApproved && active.videoPrompt !== null && (
               <div style={{ marginTop: 16, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
                 <label
                   style={{ display: "block", fontSize: 12, color: "var(--dim)", marginBottom: 6 }}

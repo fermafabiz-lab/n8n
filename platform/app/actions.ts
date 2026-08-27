@@ -23,6 +23,7 @@ import {
   deleteProjectDeep,
   updateEditingOptions,
 } from "@/lib/data";
+import { normalizeSpeed } from "@/lib/data/derive";
 import {
   getAliveAssembly,
   getAliveProduction,
@@ -832,6 +833,8 @@ export async function confirmFinalSettings(
     endScreen: boolean;
     sfx: boolean;
     music: boolean;
+    /** Playback rate of the finished film — see EditingOptions.speed. */
+    speed: number;
   },
   /**
    * The drawn cards the producer KEPT, when they dropped any.
@@ -859,6 +862,7 @@ export async function confirmFinalSettings(
         endScreen: settings.endScreen,
         sfx: settings.sfx,
         music: settings.music,
+        speed: normalizeSpeed(settings.speed),
       });
     }
     // Same merge, separate condition: the cards change even when no toggle
@@ -967,21 +971,29 @@ export async function rerenderWithSound(
   projectId: string,
   sfx: boolean,
   music: boolean,
+  /** Playback rate of the finished film — see EditingOptions.speed. Carried
+   *  here rather than in its own action because it changes the film the same
+   *  way sound does: write the merged options, re-fire assemble, and the
+   *  scenes are never regenerated. */
+  speed: number = 1,
 ): Promise<ActionResult> {
   if (!isConfigured) {
     return { ok: true, message: "Demo mode — nothing was written." };
   }
+  const rate = normalizeSpeed(speed);
   try {
-    await updateEditingOptions(projectId, { sfx, music });
+    await updateEditingOptions(projectId, { sfx, music, speed: rate });
   } catch (e) {
     return { ok: false, message: friendlyError(e) };
   }
   const fired = await fireAssembleWebhook(projectId);
   if (!fired.ok) return fired;
   revalidatePath(`/projects/${projectId}`);
+  const pace =
+    rate === 1 ? "normal speed" : `${rate}× speed`;
   return {
     ok: true,
-    message: `Saved (effects ${sfx ? "on" : "off"}, music ${music ? "on" : "off"}) — re-rendering now. The new video replaces this one in a few minutes.`,
+    message: `Saved (effects ${sfx ? "on" : "off"}, music ${music ? "on" : "off"}, ${pace}) — re-rendering now. The new video replaces this one in a few minutes.`,
   };
 }
 
@@ -1227,6 +1239,12 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     Lenght: Number(formData.get("length") ?? 64),
     Tonalitate: String(formData.get("tone") ?? "Dark"),
     Pace: String(formData.get("pace") ?? "Normal"),
+    // The exact playback rate the brief's PACE control chose. `Pace` above is
+    // still the word, because Claude Scripting interpolates it into two
+    // writing prompts — but the word cannot tell 0.8 from 0.9, so the number
+    // rides alongside it and `Normalize Webhook Input` puts it in Editing
+    // Options. Absent or unusable resolves to 1 on every reader.
+    speed: normalizeSpeed(formData.get("speed")),
     Style: String(formData.get("style") ?? ""),
     // In chapters mode (and no-narrator characters mode) there is no
     // narrator picker; the first cast voice doubles as the project voice so

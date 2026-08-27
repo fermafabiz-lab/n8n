@@ -16,6 +16,7 @@ import {
 import type { Scene } from "@/lib/data";
 import { useVoiceLabels, useVoiceNames } from "@/lib/voice-names";
 import { downloadSrc, mediaSrc } from "@/lib/media";
+import { chapterKeys as chapterKeysOf, chapterOf as chapterOfOrder } from "@/lib/chapters";
 import RegenBadge from "@/components/RegenBadge";
 import VoicePicker from "@/components/VoicePicker";
 
@@ -83,7 +84,7 @@ function fitProblem(voice: number | undefined, clip: number | undefined): string
  */
 export function castIndexFor(order: number, castSize: number): number {
   if (castSize <= 0) return -1;
-  const ch = Math.floor(order / 100);
+  const ch = chapterOfOrder(order);
   if (ch <= 0) return -1;
   return (ch - 1) % castSize;
 }
@@ -147,9 +148,8 @@ export default function AudioReview({
   // loop only ever sees a capped batch; here the whole project is in hand, so
   // counting the scenes gives the same answer.
   const chapterCount =
-    new Set(
-      scenes.map((s) => Math.floor(s.order / 100)).filter((c) => c > 0),
-    ).size || 1;
+    new Set(scenes.map((s) => chapterOfOrder(s.order)).filter((c) => c > 0))
+      .size || 1;
   const [msg, setMsg] = useState<ActionResult | null>(null);
   const [pending, setPending] = useState(false);
   const [playingId, setPlayingId] = useState<string | null>(null);
@@ -205,19 +205,15 @@ export default function AudioReview({
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // ---- chapters mode -------------------------------------------------
-  // Scene order encodes the chapter: 101/102 are chapter 1, 201 chapter 2,
-  // anything under 100 is the hook. n8n derives it the same way, and so
-  // does castIndexFor above.
-  const chapterOf = (s: Scene): number =>
-    Number.isFinite(s.order) ? Math.floor(s.order / 100) : 0;
-  // Every chapter present, in order, with "hook" first when one exists.
-  const chapterKeys = useMemo(() => {
-    const nums = [...new Set(scenes.map(chapterOf).filter((c) => c > 0))].sort(
-      (a, b) => a - b,
-    );
-    const keys = nums.map(String);
-    return scenes.some((s) => chapterOf(s) === 0) ? ["hook", ...keys] : keys;
-  }, [scenes]);
+  // The chapter rule itself lives in lib/chapters.ts — n8n's AB Pick Voice,
+  // the narration-bundle route and the scene board all derive it the same
+  // way, and a private copy here is how "Chapter 2" comes to mean two
+  // different sets of scenes on one page.
+  const chapterOf = (s: Scene): number => chapterOfOrder(s.order);
+  const chapterKeys = useMemo(
+    () => chapterKeysOf(scenes.map((s) => s.order)),
+    [scenes],
+  );
   /** What a chapter is read by today: an explicit pick, else the cast order. */
   const chapterVoiceOf = (key: string): string => {
     const set = chapterVoices[key];
@@ -271,15 +267,20 @@ export default function AudioReview({
    * — and treating those as "still being synthesized" was a hard deadlock:
    * `missing` never reached 0, "Approve all" stayed disabled, the batch sat
    * at its voice gate forever, and the producer saw a frozen production with
-   * no error anywhere. A picture is what marks a scene as staged: the batch
-   * generates the images first, so the scenes with an image are exactly the
-   * ones that will be given a take this pass.
+   * no error anywhere.
    *
-   * Falls back to the whole project when nothing has a picture yet, so the
+   * A TAKE is what marks a scene as staged now: the batch synthesizes every
+   * take FIRST and generates images second, so the scenes with a take are
+   * exactly the ones staged this pass. (This used to key off images, from
+   * the old image-first order — on any pass after the first that hid the
+   * fresh takes behind the PREVIOUS batch's pictures for exactly the window
+   * the audio-first order created them to fill.)
+   *
+   * Falls back to the whole project when nothing has a take yet, so the
    * "being synthesized" message still reads correctly at the very start.
    */
   const inPlay = useMemo(() => {
-    const staged = scenes.filter((s) => s.imageUrl);
+    const staged = scenes.filter((s) => s.voiceUrl);
     return staged.length > 0 ? staged : scenes;
   }, [scenes]);
 
@@ -370,7 +371,7 @@ export default function AudioReview({
   const totalSeconds = withAudio.reduce((a, s) => a + (durations[s.id] ?? 0), 0);
 
   return (
-    <div className="script" style={{ marginTop: 24 }}>
+    <div className="script avoice reviewpanel" style={{ marginTop: 24 }}>
       <div className="sechead">
         <h2>Voice review</h2>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -785,13 +786,13 @@ export default function AudioReview({
             </p>
           </div>
         ) : (
-          <button className="abtn" onClick={() => setShowVoice(true)}>
-            🎚 Change narrator for the whole project
+          <button className="abtn narrowide" onClick={() => setShowVoice(true)}>
+            ♪ Change narrator for the whole project
           </button>
         )}
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {inPlay.map((s, i) => {
           const flag = flagFor(s, durations[s.id]);
           const fit = fitProblem(durations[s.id], clipDurations[s.id]);
@@ -801,19 +802,17 @@ export default function AudioReview({
           const audioIndex = withAudio.findIndex((w) => w.id === s.id);
           return (
             <div
-              className="card"
+              className="card take"
               key={s.id}
               style={{
                 padding: "12px 14px",
                 outline: isPlaying ? "2px solid var(--accent)" : undefined,
-                borderLeft: flag ? "3px solid var(--accent)" : undefined,
               }}
             >
               <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
                 <button
-                  className="abtn"
+                  className="abtn playbtn"
                   disabled={!s.voiceUrl}
-                  style={{ minWidth: 44, padding: "6px 10px" }}
                   onClick={() => (isPlaying ? stop() : playFrom(audioIndex, false))}
                 >
                   {isPlaying ? "■" : "▶"}

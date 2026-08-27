@@ -431,8 +431,9 @@ order, sorted last, and fell off the end forever.
 
 **Every gate in the batch counts the BATCH's scenes; every gate on the site
 counted the PROJECT's — and that mismatch deadlocked any film bigger than 8
-scenes.** `Evaluate Image Approval` and `Evaluate Voice Approval` both scope
-themselves to `$('Sort & Cap Scenes').all()`, so n8n only ever asks "are the
+scenes.** `Evaluate Image Approval` (since 2026-08-18 the one combined asset
+gate — the separate voice gate is gone) scopes itself to
+`$('Sort & Cap Scenes').all()`, so n8n only ever asks "are the
 scenes of this pass signed off". The site asked "are ALL the scenes signed
 off", which on a 15-scene project is unreachable by construction: seven
 scenes have no picture and no take until a later pass, and a later pass only
@@ -730,7 +731,92 @@ is built only inside that guard (a `-1` input index would break the graph).
 - The ffmpeg bundled with Remotion in `node_modules` is a **stripped build**
   — no `sidechaincompress`, `alimiter`, `asplit`, `afade`, `anullsink`,
   `aloop`. The mix graph cannot be rehearsed locally with it; validate the
-  graph by reading it, and test on Railway.
+  graph by reading it, and test on Railway. **A Claude Code web session has no
+  system ffmpeg at all** — the only binary on the box is Playwright's, built
+  `--disable-everything` (pad/crop/scale, vp8, png; no `setpts`, no `atempo`,
+  no x264). So a filter graph written here cannot be run here either way.
+
+### Playback speed — what PACE finally means
+
+`Editing Options.speed` re-times the finished film, and it is the **first real
+effect the brief's PACE control has ever had**. The word is the decision and
+the multiplier is the degree: Slow offers **0.9× or 0.8×**, Fast **1.1× or
+1.25×**, Normal is one thing. One number could not be both safe and noticeable
+— 0.9/1.1 is a real change but modest (a podcast at 1.1×), 0.8/1.25 is
+unmistakably a different film — so picking one for everybody meant either a
+control that gets called inert again or one that overshoots.
+
+**Widening the range needed no change outside `SpeedPicker.tsx`**, which is the
+property to preserve: the refusal rule takes any rate inside `[0.5, 2]` that is
+not within 0.01 of 1, so the rates are never enumerated downstream. A fifth
+rate is a one-file change as long as it stays in that window. `SPEED_BY_PACE`
+still maps the three WORDS to the gentle defaults, because it doubles as the
+fallback for a project whose only stored signal is `Pace: Slow` — if the
+picker's default and that map disagreed, clicking Slow would give a different
+film from a project that arrived with Slow and never touched the control. Before
+2026-08-17 `Slow | Normal | Fast` reached exactly two places: a bare
+`Pace: Slow` line interpolated into `Generate Outline` and `Write Chapter
+Narration`. A hint to a model with no rule attached, and nothing else read the
+field — so the producer's "it doesn't change anything" was simply correct.
+Worth remembering as a shape: **a value that is stored, passed through several
+workflows and interpolated into a prompt can still be inert**, and it looks
+implemented from every angle except the film.
+
+Applied by `remotion/server/speed.mjs` (a NEW file — `assemble.mjs` is
+untouched) after Remotion draws, `setpts=PTS/rate,fps=24` plus
+`atempo=rate`. `/render` strips `speed` off the body, so the props the
+composition receives are byte-identical to before.
+
+**The obvious place is the wrong one, and the reason is the retime.** In
+`assemble.mjs` every scene already lasts as long as its own narration
+(`eff = voiceDur + 0.35`) and the clip is time-stretched to fill it, so slowing
+the narration would stretch the picture for free. Three things kill it: that
+stretch is clamped to `[0.65, 1.5]` and spills into a **frozen tail** past the
+top, so "slow" would mean slower in some scenes and stuttering in others; it
+moves only the picture, leaving the pauses, the music bed and the graphics on
+their old timing; and the scene times computed there feed the graphics pass, so
+captions, chapter cards and the end screen would all need rescaling in lockstep.
+On the finished file there is one stream of each left, so nothing can drift.
+`atempo` resamples without shifting pitch — a slowed narrator sounds slower,
+not deeper.
+
+Four things are load-bearing:
+
+- **A failed speed pass must keep the film.** The job completes un-retimed and
+  reports `speedError`. The render is minutes of headless Chrome at ~2 fps; the
+  re-time is seconds. Losing the former to save the latter is a bad trade.
+- **`Graphics Guard` sees a new status, `retiming`.** It only throws on
+  `error` and otherwise passes through, so this reads as "keep polling" — but
+  the retime shares the render's poll budget (`MAX_POLLS = 360` at 5s = 30 min).
+  Long film plus a slow re-encode both come out of that ceiling.
+- **Editing Options is the OVERRIDE, the project's `Pace` field the DEFAULT.**
+  Two sources on purpose: falling back to `Pace` means all 56 films already in
+  the database honour the choice their producer made, with nothing to migrate,
+  while a later change on the site writes `speed` and wins. `Build Remotion
+  Props` and `buildProject()` in `platform/lib/data/derive.ts` resolve it in
+  exactly that order — out of step, the site would show a rate the render is
+  not using.
+- **The refusal rule exists in FOUR copies** — `speed.mjs`, `derive.ts`, and
+  the n8n nodes `Build Remotion Props` and `Normalize Webhook Input` — because
+  it runs in three languages at four points on the path: out of range,
+  unparseable, or within 0.01 of 1 → leave the film alone. Verified to agree on
+  25 inputs. Change one, change all four.
+
+The site sets it in THREE places, and the brief is the one that was missed
+first: `/new` posts `speed` beside `pace` — the WORD still goes to the two
+writing prompts that read it, and is DERIVED from the rate so the pair can
+never contradict each other — and `Normalize Webhook Input` puts the number
+into Editing Options at creation. Without that last hop the brief could only
+ever choose a word, and the degree (0.8 versus 0.9) had nowhere to live; the
+first version of this feature shipped with the picker on the project page only,
+which reads as "nothing changed" from the screen the producer actually starts
+on. Then `FinalSettings` before the render and `SoundSettings` ("Sound and
+speed of this film") after, which writes the merged options and re-fires the
+assemble webhook. Speed is a
+number, so it cannot join `FinalSettings`' `OPTIONS` list (booleans with a
+Toggle) — hence `ToggleKey` narrowing `keyof EditingOptions`, and a separate
+`changeCount` so "Apply 1 change" cannot omit the one change that alters the
+film's whole length.
 
 ### The Cinematic category (silent film)
 
@@ -745,9 +831,9 @@ each piece handles it:
   math still drives scene count, so do not remove it. Scenes are created
   with **`Aprobare Voce` already checked**.
 - **Media Generation**: `AB No Speech?` (after `AB Load Project`) loops
-  past TTS entirely; `Evaluate Voice Approval` waives the Voiceover-URL
-  requirement for cinematic. The audio stage therefore completes on its
-  own and video starts immediately.
+  past TTS entirely; the combined asset gate (`Evaluate Image Approval`)
+  waives the Voiceover-URL requirement for cinematic. The audio stage
+  therefore completes on its own and only the images gate the pass.
 - **Final Assembly**: scenes have no `audioUrl`; `/assemble`'s `it.a ??
   it.v` fallback makes each clip's own track the scene's main audio (the
   Veo prompt guardrail keeps it speech/music-free), scene length = clip
@@ -800,31 +886,63 @@ each piece handles it:
   never moved again. `reopenStep` now reads the project's category and leaves
   the voice alone on a silent film. **Any new cascade must do the same.**
 
-### The stage chain in Media Generation
+### The stage chain in Media Generation — audio first, ONE asset gate (2026-08-18)
 
-The three stages are gated the same way — a loop, then a Wait/Fetch/Evaluate/If
-cycle that holds until every scene is approved:
+Takes and images are independent — the image loop never reads a voice field,
+the audio loop never reads an image — so the batch no longer holds a human
+gate between them. It synthesizes **every take first**, generates **every
+image second** in the same uninterrupted pass, and waits at a single combined
+gate before video. The producer reviews a scene's take and picture together:
+one visit before the expensive stage instead of two, and takes are listenable
+minutes after scene approval, while images are still being generated.
 
 ```
-If All Images Approved →  Refetch Scenes For Audio → Loop Audio
-Loop Audio        out[0] →  Wait Voice Approval  (out[1] is the loop body)
-If All Voices Approved →  Refetch Scenes For Video → Loop Scenes
-If All Videos Approved →  Prep Finalizat List
+Sort & Cap Scenes → Refetch Scenes For Audio → Sort Scenes For Audio → Loop Audio
+Loop Audio  out[0] → Replay Scenes For Images → Loop Images   (out[1] is the loop body)
+Loop Images out[0] → Wait Image Approval → Fetch Scene Images
+  → Evaluate Image Approval → If Any Regen → If All Images Approved
+If All Images Approved out[0] → Refetch Scenes For Video → …video stage…
+If All Videos Approved → Prep Finalizat List
 ```
 
-The voice gate used to be **unreachable in both directions**: nothing fed
-`Wait Voice Approval` except its own cycle, and `If All Voices Approved`'s
-true output went nowhere. `Loop Audio`'s done output was dangling too. On top
-of that, `If All Images Approved` started audio *and* video at once — so
-production looked like it skipped straight to clips, and every voice had to be
-regenerated by hand afterwards. An orphaned gate does not error; the branch
-just ends in mid-air.
+Despite its name, **`Evaluate Image Approval` is the combined gate**: it
+counts image AND voice approvals (each requiring the asset to actually
+exist), carries the cinematic waiver (`AB Load Project` may not have run when
+every scene was already voiced — the try/catch default of `noSpeech = false`
+is correct then), and keeps the in-batch image-regen dispatch. Voice regen
+raised while the gate polls is covered by the standalone `scene-voice-regen`
+webhook, exactly as it covered the old separate voice gate. The old gate
+(`Wait Voice Approval` / `Fetch Scene Voices` / `Evaluate Voice Approval` /
+`If All Voices Approved`) was removed after a by-name audit found zero
+references.
 
-When touching this chain, check each loop's **out[0] (done)** actually reaches
-the next gate, and that each gate's **out[0] (approved)** actually reaches the
-next stage. `Submit TTS` and the `Submit Mux*` nodes are leftovers from an
-older inline audio path and are deliberately disconnected — n8n warns about
-them on every publish. Ignore those four; do not wire them back.
+**`Replay Scenes For Images` is load-bearing, not a formality.** Loop Audio's
+done output must never feed Loop Images directly: items that skip synthesis
+re-enter the audio loop carrying the PROJECT record (`Needs Voice?` → `AB
+Current Scene` → `AB Load Project` → `AB No Speech?` → back), and one of
+those reaching `Build Image Request` kills the whole batch with "no image
+prompt". The replay re-emits `$('Sort & Cap Scenes')` verbatim — same
+records, same pending-first order (the n-1 image chain and the regen's
+`recs[i-1]` both assume it), and the audio stage between them writes only
+voice fields, so no freshness is lost. It is a Code node on purpose: the
+ported Postgres nodes carry `{{ }}` without the `=` prefix and run fine, but
+the MCP validator flags that form, and a new query node written either way
+was a coin-flip — a replay has no expression-format question at all.
+
+A history lesson that still applies: the voice gate was once **unreachable in
+both directions** (nothing fed it, its approved output went nowhere), and an
+orphaned gate does not error — the branch just ends in mid-air. When touching
+this chain, check each loop's **out[0] (done)** actually reaches the next
+stage, and each gate's **out[0] (approved)** actually reaches the one after.
+`Submit TTS` and the `Submit Mux*` nodes are leftovers from an older inline
+audio path and are deliberately disconnected — n8n warns about them on every
+publish. Ignore those four; do not wire them back.
+
+The site mirrors the order: `audioPanel` (project page) unlocks on scene
+approval alone — requiring approved images there would hide the takes for
+exactly the window they now exist to fill — the stepper shows Audio before
+Images with each card keyed to its own asset (both can be "act" at once),
+and `SceneBoard` routes the active scene voice → image → clip.
 
 ### Remotion / the edit
 
@@ -1397,14 +1515,48 @@ the pipeline already produces.
 
 - The project page auto-refreshes every 10s, which remounts components. Drafts
   in progress must be backed by `sessionStorage` to survive it.
-- **The app and the render share one type system.** Fraunces / Inter Tight /
-  IBM Plex Mono are loaded in `platform/app/layout.tsx` via `next/font` and
-  mirror `remotion/src/style.ts`, so the site looks like the films it makes.
+- **The app and the render share one type system.** **Outfit** / Inter / IBM
+  Plex Mono are loaded in `platform/app/layout.tsx` via `next/font` and mirror
+  `remotion/src/style.ts`, so the site looks like the films it makes.
   `latin-ext` is required here for the same reason as in the render — Romanian
-  project names carry ș and ț. Direction is "editorial": hairlines and tracked
-  mono labels instead of nested bordered boxes, one bloom behind the headline,
-  no gradient-filled text. Review and approval surfaces deliberately kept their
-  density — only the chrome changed.
+  project names carry ș and ț. Review and approval surfaces deliberately kept
+  their density — only the chrome changed.
+
+  **This bullet used to say Fraunces / Inter Tight and "editorial", and it was
+  wrong from 2026-08-15 to 2026-08-17** — the Daylight refresh (below) moved
+  both the site and the render to Outfit on the 15th and nobody corrected the
+  memory. A stale line here is worse than a missing one: it is read as current
+  and reasoned from. Anything that names a face or a direction gets corrected
+  in the same commit that changes it.
+- **The design system is "Daylight" (2026-08-15), and the token layer at the
+  top of `globals.css` is its single owner.** Light grey ground `#ececed`, one
+  purple accent `#7a4fd6` with a deep `#4d3484` and a lift `#b299e7` derived by
+  a fixed mix rule, pill buttons (`999px`), cushioned cards (24–28px radius,
+  soft shadows), near-black radial panels for anything that must feel like a
+  gate, and `cubic-bezier(.2,.8,.2,1)` at ~0.38s as the one ease. The
+  reference prototypes and the full token list live in
+  `design/handoff-visual-refresh/README.md` — **that file, not this section, is
+  the spec**; what belongs here is only where the rebuild stands and what bit.
+  It replaced the previous dark "editorial" direction wholesale, so a component
+  that draws its own colours instead of reading tokens had to be found by hand
+  (`721215f`) — the token layer cannot invert what does not ask it.
+- **The Daylight rebuild is three screens, and only two and a half are done.**
+  Landing (`platform/app/landing`, and it is now the site's front door),
+  the brief (`platform/app/new`, including the genre pole), and the projects
+  library (hero, cards, toolbar with search + segmented view + count,
+  pagination at 15/page) have all landed. **The per-project workspace —
+  screen 3, the stage stepper and the approval panels in
+  `platform/app/projects/[id]` — has NOT been rebuilt**: it still wears the
+  token layer and nothing more. That is the largest open piece of site work,
+  and it is the screen every approval gate lives on, so restyle it rather than
+  rewriting it: `SceneBoard`, `AssemblyStatus`, `ProductionActivity`,
+  `AudioReview`, `ScriptReview` and `StageNav` each carry hard-won behaviour
+  documented above, and the handoff's own rule is "keep every existing
+  control; restyle, don't remove".
+- `platform/lib/tone-type.ts`'s comments still describe the empty case as
+  "inherit Fraunces". It inherits **Outfit** now. The behaviour is correct —
+  an empty class means "inherit the display face" — only the name in the
+  comment is stale.
 - **Generic class names are already taken.** `globals.css` has app-wide
   blocks like `.empty` (an empty-state with `padding: 80px 0`), `.card`,
   `.field`, `.chip`. Using one as a local modifier silently inherits it: the
@@ -1500,11 +1652,54 @@ the pipeline already produces.
   button and pressing Enter on it still start the project.
 - **The /new form's field names are a frozen contract.** `createProject()`
   posts `name, category, cat_*, cast_voices, language, length, tone, pace,
+  speed,
   style, voice_id, aspect, captions/hook_title/chapter_cards/end_screen/sfx
   (yes|no)` to the n8n webhook. Any redesign keeps those names and value
   vocabularies byte-identical — the 2026-08 editorial rebuild moved them into
   hidden inputs bound to React state, nothing more. Every non-submit button
   inside the form must carry `type="button"`.
+- **The filmstrip splits by chapter, and the chapter rule has ONE owner.**
+  Paging the strip by 8 fixed the crowding a 44-scene film caused but not the
+  navigation — "page 3 of 6" says nothing about where you are in a film. The
+  strip is now cut by chapter on the Images and Video steps, with a tab per
+  chapter carrying `approved/total` **for the step being reviewed**, so the
+  row answers the question it is looked at for: which chapter still needs me.
+  Paging survives *inside* a chapter for the rare one over 8 scenes.
+  Three things are load-bearing:
+  - **The current chapter is DERIVED from the selected scene, never held as
+    state.** A tab and a selection that can disagree is a strip showing one
+    chapter while the monitor below reviews a scene from another. Clicking a
+    tab selects a scene (the first still owing a decision for this step, else
+    the first of the chapter); selecting from anywhere else moves the tab.
+  - **A film with one chapter keeps the plain paging.** Orders are not always
+    chapter-encoded — a short film numbers its scenes 1, 2, 3, which all fall
+    in the hook, and `ceil(Lenght / 120)` makes anything under two minutes one
+    chapter by construction. `groupsByChapter()` owns that test; a row holding
+    a single "Hook" button is noise.
+  - **`lib/chapters.ts` is the single owner of `floor(order / 100)`.** It had
+    been written by hand in three places (the voice panel, the narration-bundle
+    route, `castIndexFor`) and n8n's `AB Pick Voice` / `VR Pick Voice` derive
+    it the same way. A fourth copy is how "Chapter 2" comes to label one set of
+    scenes while the download named "chapter 2" produces another. Note the
+    numbered chapters sort NUMERICALLY — a lexical sort puts 10 before 9.
+- **A `<video>` cannot be given a corner its own controls respect, so the clip
+  has to be masked by its holder.** The Images/Video monitor drew the asset
+  edge-to-edge, which was invisible while it held a picture and obvious the
+  moment it held a clip: the black 16:9 rectangle squared off the card's
+  rounded corners, and the bubble stopped being a bubble at exactly the frame
+  the producer is judging. The radius belongs on `.scr` with `overflow:
+  hidden`, not on the media — `MediaPlayer` fills its parent absolutely, and
+  the same mask then also serves the fallback art, the drafts preview and the
+  scrim.
+- **A grid item's `min-width: auto` outranks every overflow rule inside it.**
+  `.stage`'s two columns kept their desktop width on a phone and the monitor
+  ran a full screen past the right edge — while the filmstrip's own
+  `overflow-x: auto` sat there doing nothing, because nothing was ever
+  narrower than its contents for it to scroll. `min-width: 0` on the items is
+  the whole fix, and the symptom to recognise is a child that *can* scroll
+  and doesn't. Measure the item against its track (`getBoundingClientRect`),
+  not the page: the page-level scrollWidth blamed the stepper, which was only
+  being dragged along.
 - **A step you stepped back to must show ITS OWN asset.** `SceneBoard`'s
   monitor played the clip whenever one existed, so revisiting Images put a
   video player over the picture being judged — the wrong asset for the
@@ -1703,9 +1898,10 @@ the pipeline already produces.
   re-synthesized line can come back at a different sample rate and concat
   refuses inputs that disagree; and there is **no gap between takes** — the
   bundle is the narration as the cut plays it, and one that drifts from the
-  video is worse than none. Chapter is `floor(Ordine Scenă / 100)`, the same
-  rule as `AB Pick Voice` and `AudioReview`'s `chapterOf` — all three must
-  agree or "Chapter 2" downloads different lines from the ones labelled Ch. 2.
+  video is worse than none. Chapter comes from `lib/chapters.ts`, which is now
+  the single owner of `floor(Ordine Scenă / 100)` — the same rule `AB Pick
+  Voice` uses in n8n. They must agree or "Chapter 2" downloads different lines
+  from the ones labelled Ch. 2.
 - **That put ffmpeg in the site's own image** (`apk add ffmpeg` in the
   Dockerfile runner stage). The alternative was the Railway render server,
   which already has ffmpeg — but the site holds neither its URL nor its key,
@@ -2049,6 +2245,23 @@ at `postgres:5432/hov` on the compose network.
 does any attempt to write an attachment. A silently ignored write is precisely
 the divergence that would make a parallel run look successful while it was not.
 
+**And the schema refuses too — a value Airtable swallowed for months can now
+abort a run.** First one found in the wild, 2026-08-16 15:20: a
+`restart-scripting` run (orchestrator 4225 → scripting child 4226) died at
+`Create Chapter Records` with
+
+    new row for relation "chapter" violates check constraint "chapter_ordinal_check"
+    Failing row contains (…, HOOK, …, 0, Aprobat, …)
+
+The **hook chapter is created with `Ordine: 0`**, and the CHECK rejects it.
+Airtable had no constraints, so this shipped invisibly. Runs after 15:27
+succeeded, so something changed — constraint, payload, or simply a project
+without a hook — but which is unconfirmed, and a film whose hook cannot be
+written loses its opening card. Treat this as the first of a class: **every
+place the old code wrote a lazy `0` or `null` is now a candidate abort**, and
+the two zeroing entries under Airtable are the map of where those are. The
+failure is at least loud, which is the improvement.
+
 ### The four nodes that need more than a query — solved
 
 `Write Scene Image`, `Write Regen Image`, `Write Regen Video` and
@@ -2090,6 +2303,18 @@ Two things about the wiring:
   access inside nodes can be switched off, and the port should not depend on
   whether it currently is. Same pattern as the FAL header.
 
+**`IR Write Image` was the one attachment write the port missed** — found
+2026-08-17, three site-triggered image regens 500-ing in a row. It had been
+rerouted to `/api/at` like an ordinary PATCH, but its body writes `Imagine
+Scenă`, and the shim refuses attachments BY DESIGN. The failure shape is
+nasty: the image is generated and uploaded to Flow, then the write dies, so
+money is spent, the scene keeps its regen flag, and the site shows the
+in-flight state — the producer sees a regeneration that "takes forever"
+until the batch's own (working) regen loop happens to pick the scene up.
+Fixed by moving it onto `/api/media/ingest` with the same body shape as
+`Write Scene Image`. When auditing the port, grep the BODIES for attachment
+fields, not just the URLs for `api.airtable.com`.
+
 Writing an `image` or `video` replaces that scene's attachment ROW. The old
 FILE stays on disk on purpose: saved drafts point at it by path, and deleting
 it would empty the one feature that exists to recover a bad re-roll.
@@ -2129,6 +2354,75 @@ and leaving them parked is not available through the API. The consequences:
 - `settings` is stricter on PUT than on GET: it rejects `binaryMode` and
   `availableInMCP`, which GET happily returns. Send `{"executionOrder": "v1"}`
   alone — the server merges rather than replaces, and the other two survive.
+
+### …but the UI does stage drafts, and one is parked right now with its Drive uploads broken
+
+The entry above is about `PUT /workflows/{id}`. **The editor is different: opening
+a workflow in the n8n UI and saving stages a real draft**, and `versionId` then
+stops matching `activeVersionId` until someone presses Publish. So "a draft
+cannot exist" is true of the API and false of the instance.
+
+Observed 2026-08-17: `3. Media Generation` has `versionId`
+`d85a3f8c-5cda-4dc0-96d3-9e8fac91aa2a` against `activeVersionId`
+`f7f59a08-05a5-4f73-81a4-742e46880544`, the draft saved at 12:37. Diffed
+node-for-node against the live version, it is identical except for key-reorder
+noise and one thing that matters: **all six Google Drive *upload* nodes have
+lost `resource: file` + `operation: upload`** — `Upload Audio to Drive`,
+`Upload Scene To Drive`, `Upload Regen Clip To Drive`, `Upload VR Audio`,
+`Upload VR Clip`, `AB Upload Audio`. The `Share *` siblings kept
+`operation: share`.
+
+**The port is not the culprit** — `db/port/workflows/yHG4DBCDjR3RJzav.ported.json`
+still has `op=upload res=file` on all six. This is the same stripping the
+cloud→self-hosted import did, which means it is the **editor** dropping a Drive
+node's action when it round-trips a node type it cannot fully resolve. Publishing
+that draft would break every voice and clip upload in the pipeline, silently:
+the nodes do not error, they just have no resolvable action.
+
+So: **discard it, or re-set `resource`/`operation` on those six before
+publishing.** And check for this after any UI visit to a workflow with Drive
+nodes:
+
+    jq -r '.nodes[]|select(.type|test("googleDrive"))|.name+" "+(.parameters.operation//"MISSING")'
+
+Two reading traps come with the draft model, and together they cost an hour:
+
+- **`get_workflow_details` returns the DRAFT.** To see what is actually running,
+  `get_workflow_version` with `activeVersionId`.
+- **`search_workflows`' `updatedAt` reports the PUBLISHED version.** A workflow
+  edited three minutes ago can look untouched for a day. Combined with a copy
+  fetched earlier in a long session, that is how Media Generation got read as
+  "still 22 Airtable nodes" on 08-17 — a workflow fully on Postgres since the
+  day before. Re-fetch before concluding anything about the current state, and
+  compare `.workflow.updatedAt` against what the search tool claimed.
+
+**The MCP connector stages a draft too — `update_workflow` does NOT publish.**
+Third case, and it behaves like the editor rather than like the PUT: after an
+`update_workflow` the workflow's `versionId` is the new version, `updatedAt`
+moves, `get_workflow_details` returns the change — and `activeVersionId` still
+points at the old one, so **production keeps running the previous version**.
+Nothing in the tool's answer says so; it reports `appliedOperations: 1` and a
+URL. Found on 2026-08-17 while wiring `speed` into `Build Remotion Props`: the
+edit read back perfectly and would have changed nothing at all.
+
+So an MCP edit is two steps, and the second one needs the version id:
+
+    publish_workflow { workflowId, versionId: <the id from get_workflow_history> }
+
+Pass `versionId` explicitly rather than letting it publish "the current draft" —
+that is the exact hazard the Media Generation draft above is: whatever is parked
+goes live with your change. Before publishing anything, diff the draft against
+the version you meant to build on, node by node, and confirm the ONLY entry that
+differs is yours:
+
+    # nodes differing between the saved original and the draft
+    [k for k in draft if original.get(k) != draft[k]]
+
+For the speed edit that list was exactly `['Build Remotion Props']` and all
+three Google Drive nodes still had their `resource`/`operation`, which is what
+made the publish safe. `get_workflow_history` is also how you tell the two
+apart at a glance: the newest entry carries the `versionName` you passed, and
+if `activeVersionId` is not that id, your change is parked.
 
 ### The write mechanism: dollar-quoting, not parameters
 
@@ -2537,15 +2831,22 @@ generated FROM it. The chain, and where each piece lives:
 
 ## Open work
 
-- ~~**The OpenAI account is out of credits.**~~ **Topped up — confirmed by the
-  producer 2026-08-27.** The note below is kept because the FAILURE MODE is
-  worth recognising, not because it is current: every writing path shares one
-  account, so an empty one takes out whole-script writing AND per-scene
-  rewriting at once, and both fail in a way that reads like a broken button.
-  Check the account before concluding a workflow is broken — and check the
-  DATE on a note like this before repeating it, which is how this one survived
-  nineteen days and got told to the producer as fact. Execution 1783
-  (2026-08-08,
+- **Do not publish the Media Generation draft** parked since 2026-08-17 12:37 —
+  it has `resource`/`operation` stripped from all six Google Drive upload nodes.
+  Discard it back to `activeVersionId` `f7f59a08-05a5-4f73-81a4-742e46880544`, or
+  re-set them first. Full account under the n8n lessons.
+- **Confirm the hook chapter's ordinal survives Postgres.** `chapter_ordinal_check`
+  rejected `Ordine: 0` on 2026-08-16 (execution 4225 → 4226). Later runs
+  succeeded, but whether the constraint, the payload or the absence of a hook is
+  what changed is unknown.
+- ~~The OpenAI account is out of credits~~ — **resolved.** Full pipelines ran to
+  a finished film on 08-13, 08-14 and 08-16, and both `recCoZWsZBOrIU69L` and
+  `rec1GITgUCq4mEsUd` read `Finalizat` with a final video. The entry is kept for
+  its map of which nodes share that account — still the fastest way to see the
+  blast radius of a billing failure. **Check the DATE on a note like this
+  before repeating it**: this one had been resolved for a fortnight and was
+  still told to the producer as a live blocker on 08-27, which cost a round
+  trip and some of their patience. Original note: execution 1783 (2026-08-08,
   project "Death cominig up to take someone into the underworld",
   `recCoZWsZBOrIU69L`) died at `Rebuild Story Bible` with *"You have no
   credits remaining"*, after the script had been written, edited and
@@ -2559,6 +2860,7 @@ generated FROM it. The chain, and where each piece lives:
   Scenă` and releases the "Regenerare Text" status, so nothing hangs.
   That project is mid-flight: Story Bible and approved script exist, no
   chapters and no scenes. `restart-scripting` is the door back in.
+  (Both of those projects have since finished — see the strike-through above.)
 - **Ask Dan for `hookTitle`.** Scripting should write a 3-6 word line meant
   for the screen and n8n should pass it in `Build Remotion Props`; the prop
   already exists and bypasses the isTitleLike gate. Until then, projects whose

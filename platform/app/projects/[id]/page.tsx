@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProject, getProjectScriptInfo, getScenes, type Scene } from "@/lib/data";
@@ -32,7 +33,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-// Pipeline position derived from scene states: images → video → assembly.
+// Pipeline position derived from scene states: audio + images → video → assembly.
 function pipeline(
   scenes: Scene[],
   projectDone: boolean,
@@ -65,44 +66,67 @@ function pipeline(
   // blocking production was an unapproved take. The fractions stay
   // project-wide (the film really does need all of them); only the "you are
   // here" marker follows the staged scenes.
-  const staged = scenes.filter((s) => s.imageUrl);
-  const stagedImages = staged.length > 0 && staged.every((s) => s.imageApproved);
-  const stagedVoices = stagedImages && staged.every((s) => s.voiceApproved);
+  // Takes and images are generated in ONE batch pass now (audio loop first,
+  // image loop second) and reviewed at one combined gate, so Audio and
+  // Images can both be the active step at once — each keys off its own
+  // asset, not off the other's completion.
+  const stagedI = scenes.filter((s) => s.imageUrl);
+  const stagedImages = stagedI.length > 0 && stagedI.every((s) => s.imageApproved);
+  const stagedV = scenes.filter((s) => s.voiceUrl);
+  const stagedVoices =
+    silent || (stagedV.length > 0 && stagedV.every((s) => s.voiceApproved));
+  // `name` is the stage, `note` is where that stage stands. They used to be
+  // one string ("Images · 8/15"), which is the whole reason a step could only
+  // ever be a pill — the stepper is cards now and the two lines are separate.
+  // Both still come from this one function, so the cards, the fractions and
+  // the progress bar cannot disagree with each other.
   return [
-    { key: "script", name: "Script", state: "done" },
+    { key: "script", name: "Script", note: "approved", state: "done" },
     {
       key: "scenes",
-      name: scenesDone ? "Scenes" : `Scenes · ${scenesApproved}/${total}`,
+      name: "Scenes",
+      note: scenesDone ? "approved" : `${scenesApproved}/${total}`,
       state: scenesDone ? "done" : "act",
     },
-    {
-      key: "images",
-      name: imagesDone ? "Images" : `Images · ${imagesApproved}/${total}`,
-      state: imagesDone ? "done" : scenesDone && !stagedImages ? "act" : "next",
-    },
-    // Dropped entirely for a silent film rather than shown green: an "Audio"
-    // chip on a film with no narration is a step the producer keeps clicking
-    // into to find nothing.
+    // Audio sits BEFORE Images: the batch synthesizes every take first, so
+    // takes are the first asset the producer can act on. Dropped entirely
+    // for a silent film rather than shown green: an "Audio" chip on a film
+    // with no narration is a step the producer keeps clicking into to find
+    // nothing.
     ...(silent
       ? []
       : [
           {
             key: "audio",
-            name: audioDone ? "Audio" : `Audio · ${voicesApproved}/${total}`,
+            name: "Audio",
+            note: audioDone ? "approved" : `${voicesApproved}/${total}`,
             state:
-              audioDone ? "done" : stagedImages && !stagedVoices ? "act" : "next",
+              audioDone ? "done" : scenesDone && !stagedVoices ? "act" : "next",
           },
         ]),
     {
+      key: "images",
+      name: "Images",
+      note: imagesDone ? "approved" : `${imagesApproved}/${total}`,
+      state: imagesDone ? "done" : scenesDone && !stagedImages ? "act" : "next",
+    },
+    {
       key: "video",
-      name: videoDone ? "Video" : `Video · ${videosApproved}/${total}`,
-      state: videoDone ? "done" : stagedVoices ? "act" : "next",
+      name: "Video",
+      note: videoDone ? "approved" : `${videosApproved}/${total}`,
+      state: videoDone ? "done" : stagedImages && stagedVoices ? "act" : "next",
     },
     {
       // Its own step, because it is the one place the pipeline stops and
       // waits on a decision that isn't an approval.
       key: "final",
       name: "Final touches",
+      note:
+        projectDone || assembling
+          ? "confirmed"
+          : awaitingSettings || videoDone
+            ? "needs you"
+            : "queued",
       state:
         projectDone || assembling
           ? "done"
@@ -115,6 +139,7 @@ function pipeline(
     {
       key: "assembly",
       name: "Assembly",
+      note: projectDone ? "finished" : assembling ? "rendering" : "queued",
       state: projectDone ? "done" : assembling ? "act" : "next",
     },
   ];
@@ -123,8 +148,8 @@ function pipeline(
 const STAGE_KEYS = [
   "script",
   "scenes",
-  "images",
   "audio",
+  "images",
   "video",
   "final",
   "assembly",
@@ -144,12 +169,31 @@ export default async function ProductionRoom({
   // touches" had no way back to its script. Absent => today's behaviour,
   // exactly: every panel keeps its own automatic condition.
   const stageParam = (await searchParams)?.stage;
-  const viewing: StageKey | null = STAGE_KEYS.includes(stageParam as StageKey)
+  const explicit: StageKey | null = STAGE_KEYS.includes(stageParam as StageKey)
     ? (stageParam as StageKey)
     : null;
-  const showing = (k: StageKey, auto: boolean) => (viewing ? viewing === k : auto);
   const project = await getProject(id);
   if (!project) notFound();
+
+  /**
+   * Where the page lands when nobody named a step.
+   *
+   * A delivered film has nothing left to review, so the un-stepped page was
+   * showing its final cut AND, underneath, the whole scene board — every clip
+   * of the film again, individually, under approve/regenerate controls that
+   * are all signed off. Opening a finished project should open the film.
+   *
+   * Requires the video to actually be there, not merely a "done" status: on a
+   * project marked finished with no file, landing on Assembly would trade a
+   * cluttered page for an empty one, and the scene board is then the only
+   * thing left to look at.
+   */
+  const delivered =
+    project.statusKind === "done" &&
+    !!project.finalVideoUrl &&
+    project.finalVideoUrl.startsWith("http");
+  const viewing: StageKey | null = explicit ?? (delivered ? "assembly" : null);
+  const showing = (k: StageKey, auto: boolean) => (viewing ? viewing === k : auto);
 
   const scenes = await getScenes(id);
   const assembling = /assembling/i.test(project.status);
@@ -163,22 +207,32 @@ export default async function ProductionRoom({
     assembling,
     silent,
   );
+  // Progress for the header bar. Deliberately a count of pipeline() STATES
+  // rather than a second traversal of the scenes: any other derivation could
+  // drift from the cards, and a bar that disagrees with the stepper it sits
+  // above is worse than no bar. Silent films have six stages, not seven, so
+  // the denominator is the list's own length.
+  const stepsDone = steps.filter((s) => s.state === "done").length;
 
   // Whether the voice gate is on the page. Computed once because SceneBoard
   // needs the same answer: it owns the image and video steps only, and may
   // hand a scene to the audio step just when this panel is there to catch it.
   //
-  // Scoped to the scenes that HAVE a picture, never to the whole project.
-  // n8n runs media generation in batches (Sort & Cap, CAP=8) and every gate
-  // in it — `Evaluate Image Approval`, `Evaluate Voice Approval` — counts
-  // only the scenes of the current batch. A project bigger than one batch
-  // therefore always has scenes with nothing generated yet, and requiring
-  // `scenes.every(imageApproved)` made this panel unreachable for them: the
-  // producer could never approve the takes, so the batch sat at its voice
-  // gate forever and production looked frozen with no error anywhere.
-  // "Every image that exists is signed off" is the same question the batch
-  // asks, expressed in what the site can see.
-  const withImage = scenes.filter((s) => s.imageUrl);
+  // The panel no longer waits for any image. The batch synthesizes every
+  // take FIRST, generates images second, and holds at ONE combined gate
+  // (`Evaluate Image Approval` in n8n counts both approvals), so takes are
+  // reviewable minutes after the scenes are signed off — while the images
+  // are still being generated. Requiring approved images here would hide
+  // the takes for exactly the window they exist to fill.
+  //
+  // Still scoped to the scenes that HAVE the asset, never to the whole
+  // project: n8n runs media generation in batches (Sort & Cap, CAP=8) and
+  // its gate counts only the batch's own scenes. A project bigger than one
+  // batch always has scenes with nothing generated yet, and a project-wide
+  // `every()` once made this panel unreachable — the producer could never
+  // approve the takes, so the batch sat at its gate forever and production
+  // looked frozen with no error anywhere.
+  const withVoice = scenes.filter((s) => s.voiceUrl);
   const audioPanel =
     scenes.length > 0 &&
     // A silent film has no takes to review, and its scenes are created with
@@ -188,9 +242,7 @@ export default async function ProductionRoom({
     showing(
       "audio",
       scenes.every((s) => s.sceneApproved) &&
-        withImage.length > 0 &&
-        withImage.every((s) => s.imageApproved) &&
-        withImage.some((s) => !s.voiceApproved),
+        withVoice.some((s) => !s.voiceApproved),
     );
 
   // Script review phase: the Scripturi record is still awaiting approval.
@@ -327,48 +379,81 @@ export default async function ProductionRoom({
       <div className="room">
         {/* Breadcrumb + live status in one tracked line; the name itself is
             the title right below, not crumb text. */}
-        <div className="eyebrow" style={{ marginBottom: 20 }}>
-          <Link href="/projects">Projects</Link>
-          <span style={{ color: "var(--dim)" }}>/</span>
-          <span>
-            <span className={`stdot ${project.statusKind}`}>●</span>{" "}
-            {project.status}
-          </span>
-        </div>
-        <div className="roomhead">
-          <div style={{ minWidth: 0, flex: 1 }}>
-            {/* The title wears the film's own typeface for this tone — the
-                same face the hook and chapter cards will render in. */}
-            <ExpandableTitle
-              text={project.name}
-              as="h1"
-              clampChars={110}
-              className={`ptitle ${toneType(project.tone).className}`}
-              style={
-                toneType(project.tone).uppercase
-                  ? { textTransform: "uppercase" }
-                  : undefined
-              }
-            />
-            <div className="specs">
-              {project.category && <span>{getCategory(project.category).label}</span>}
-              {project.lengthSeconds && <span>{project.lengthSeconds}s</span>}
-              {scenes.length > 0 && <span>{scenes.length} scenes</span>}
-              <span>{project.aspect}</span>
-              {project.tone && <span>{project.tone}</span>}
+        <div className="wk-shell">
+          <div className="arc wk-arc" aria-hidden />
+          <div className="wk-head">
+            <div className="wk-id">
+              <div className="eyebrow" style={{ marginBottom: 16 }}>
+                <Link href="/projects">Projects</Link>
+                <span style={{ color: "var(--dim)" }}>/</span>
+                {/* The status as a pill with a dot that pulses only while
+                    something is moving. It replaced a bare ● in the crumb
+                    line: same information, but it now reads as the state of
+                    the film rather than as punctuation. */}
+                <span className={`wk-state ${project.statusKind}`}>
+                  <span className="wk-dot" />
+                  {project.status}
+                </span>
+              </div>
+              {/* The title wears the film's own typeface for this tone — the
+                  same face the hook and chapter cards will render in. */}
+              <ExpandableTitle
+                text={project.name}
+                as="h1"
+                clampChars={110}
+                className={`ptitle ${toneType(project.tone).className}`}
+                style={
+                  toneType(project.tone).uppercase
+                    ? { textTransform: "uppercase" }
+                    : undefined
+                }
+              />
+              <div className="specs">
+                {project.category && <span>{getCategory(project.category).label}</span>}
+                {project.lengthSeconds && <span>{project.lengthSeconds}s</span>}
+                {scenes.length > 0 && <span>{scenes.length} scenes</span>}
+                <span>{project.aspect}</span>
+                {project.tone && <span>{project.tone}</span>}
+              </div>
+            </div>
+            <div className="wk-side">
+              {/* Counted off the same pipeline() states the stepper draws, so
+                  the bar can never claim a stage the cards do not show as
+                  done. Only shown once there are scenes: before that every
+                  stage but Script is unknowable and a 1/7 bar on a project
+                  still being written reads as progress that has stalled. */}
+              {scenes.length > 0 && (
+                <div className="wk-prog">
+                  <span className="lbl">
+                    {stepsDone}/{steps.length} stages done
+                  </span>
+                  <span className="wk-bar">
+                    <i style={{ width: `${(stepsDone / steps.length) * 100}%` }} />
+                  </span>
+                </div>
+              )}
+              {project.statusKind !== "done" && (
+                <ResumeButton
+                  projectId={id}
+                  running={hasRunning}
+                  phase={writing ? "scripting" : "production"}
+                  hasScenes={scenes.length > 0}
+                />
+              )}
             </div>
           </div>
-          {project.statusKind !== "done" && (
-            <ResumeButton
-              projectId={id}
-              running={hasRunning}
-              phase={writing ? "scripting" : "production"}
-              hasScenes={scenes.length > 0}
-            />
-          )}
         </div>
 
-        {project.finalVideoUrl && project.finalVideoUrl.startsWith("http") && (
+        {/* The finished film belongs to Assembly, not to every step. It used
+            to render on all of them — the player, its sound settings and the
+            download sat above the Script panel, above Voice review, above the
+            scene board — so whichever step you clicked, the first thing on
+            screen was the final cut. `showing` with auto=true keeps it on the
+            LIVE page (a delivered film should open on its film) while
+            confining it to Assembly once you are stepping through. */}
+        {showing("assembly", true) &&
+          project.finalVideoUrl &&
+          project.finalVideoUrl.startsWith("http") && (
           <div className="finalvideo">
             <div className="vwrap">
               <MediaPlayer
@@ -402,6 +487,7 @@ export default async function ProductionRoom({
               projectId={id}
               initialSfx={project.editing.sfx}
               initialMusic={project.editing.music}
+              initialSpeed={project.editing.speed}
             />
           </div>
         )}
@@ -414,11 +500,16 @@ export default async function ProductionRoom({
               // the producer can always get back to the panel that stops it.
               const frozen = renderLocked && s.key !== "assembly";
               const cls = `ps ${s.state}${viewing === s.key ? " sel" : ""}${frozen ? " frozen" : ""}`;
+              /* Each step is a link to itself: that is the whole way back to an
+                 earlier stage. The active one links to the bare page so
+                 clicking it again returns to "whatever is live now".
+
+                 The `display: contents` wrapper this used to need is gone with
+                 the .pl connector it existed to carry — the card IS the flex
+                 item now, so a wrapper would have to opt out of the layout to
+                 stay harmless. */
               return (
-                <span key={s.key} style={{ display: "contents" }}>
-                  {/* Each step is a link to itself: that is the whole way back
-                      to an earlier stage. The active one links to the bare page
-                      so clicking it again returns to "whatever is live now". */}
+                <Fragment key={s.key}>
                   {frozen ? (
                     <span
                       className={cls}
@@ -426,7 +517,8 @@ export default async function ProductionRoom({
                       title="Locked while the final render is running — stop the render to go back"
                     >
                       <span className="ic">{s.state === "done" ? "✓" : i + 1}</span>
-                      {s.name}
+                      <span className="ps-name">{s.name}</span>
+                      <span className="ps-note">{s.note}</span>
                     </span>
                   ) : (
                     <StageLink
@@ -439,11 +531,11 @@ export default async function ProductionRoom({
                       className={cls}
                     >
                       <span className="ic">{s.state === "done" ? "✓" : i + 1}</span>
-                      {s.name}
+                      <span className="ps-name">{s.name}</span>
+                      <span className="ps-note">{s.note}</span>
                     </StageLink>
                   )}
-                  {i < steps.length - 1 && <span className="pl" />}
-                </span>
+                </Fragment>
               );
             })}
           </div>
@@ -457,9 +549,12 @@ export default async function ProductionRoom({
           </div>
         ) : (
           // Not shown for Assembly while it IS the live step: the pipeline is
-          // there, so calling it "an earlier step" would be a lie.
-          viewing &&
-          !(viewing === "assembly" && assembling) && (
+          // there, so calling it "an earlier step" would be a lie. Same for a
+          // delivered film, where Assembly is the end of the line and also
+          // where the page now lands by itself — keyed on `explicit` so that
+          // landing never announces itself as looking back.
+          explicit &&
+          !(explicit === "assembly" && (assembling || delivered)) && (
             // Without this the page just looks stale: the panel on screen is
             // not the one the pipeline is waiting on, and nothing said so.
             <div className="setupnote" style={{ marginBottom: 20 }}>
@@ -522,7 +617,13 @@ export default async function ProductionRoom({
             phase (every scene approved) and until production hands over to
             final settings/assembly. Answers what the batch is doing, whether
             anything was refused, and how much tail is beyond the batch cap. */}
-        {scenes.length > 0 &&
+        {/* Live progress belongs to the live page. Stepping back to Script or
+            Audio to look at one thing should not carry "the batch is on scene
+            7" along with it — that is the state of the whole film, not of the
+            panel you opened. The failure list below stays on every step on
+            purpose: a broken generation is worth seeing wherever you are. */}
+        {!viewing &&
+          scenes.length > 0 &&
           scenes.every((s) => s.sceneApproved) &&
           !project.awaitingFinalSettings &&
           !assembling &&

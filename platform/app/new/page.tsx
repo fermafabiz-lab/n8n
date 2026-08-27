@@ -5,10 +5,11 @@ import { createProject, type ActionResult } from "@/app/actions";
 import CategoryPicker, { type CategoryMeta } from "@/components/CategoryPicker";
 import { DEFAULT_CATEGORY, getCategory } from "@/lib/categories";
 import Toggle from "@/components/Toggle";
-import FormProgress from "@/components/FormProgress";
 import LanguagePicker from "@/components/LanguagePicker";
 import { languageByCode } from "@/lib/languages";
 import { toneType } from "@/lib/tone-type";
+import SpeedPicker from "@/components/SpeedPicker";
+import { SPEED_BY_PACE } from "@/lib/data/derive";
 
 async function submit(_prev: ActionResult | null, formData: FormData) {
   return createProject(formData);
@@ -29,7 +30,6 @@ const TONES = [
   "Motivational",
 ];
 
-const PACES = ["Slow", "Normal", "Fast"];
 
 /** Dashed suggestion chips under the subject — one click fills the field. */
 const SUGGESTIONS = [
@@ -62,7 +62,19 @@ const LENGTH_PRESETS = [
   { label: "2 min", s: 120 },
   { label: "4 min", s: 240 },
   { label: "8 min", s: 480 },
+  { label: "10 min", s: 600 },
+  { label: "12 min", s: 720 },
 ];
+
+/**
+ * The slider's ends, and the number field's.
+ *
+ * One owner, because the range input, the number input and the fill
+ * percentage all have to agree — they were three copies of `480`, and a
+ * preset above a stale max is a chip that moves the slider nowhere.
+ */
+const LENGTH_MIN = 16;
+const LENGTH_MAX = LENGTH_PRESETS[LENGTH_PRESETS.length - 1].s;
 
 /**
  * The overlay finishes, as numbered switch rows. Field names and yes/no
@@ -147,6 +159,11 @@ const VOICE_LABELS: Record<string, string> = {
  * name, category, cat_*, cast_voices, language, length, tone, pace, style,
  * voice_id, aspect, the yes|no finishes, lore, reference_image. The frozen
  * contract with the n8n webhook survives any redesign.
+ *
+ * `speed` is the one ADDITION (2026-08-17), and `pace` is unchanged beside it:
+ * the word still goes to the two writing prompts that read it, while the
+ * number is what actually re-times the film. The word is derived from the
+ * number so they can never disagree.
  */
 export default function NewVideo() {
   const [state, formAction, pending] = useActionState(submit, null);
@@ -154,7 +171,11 @@ export default function NewVideo() {
   const [tone, setTone] = useState("Dark");
   const [length, setLength] = useState(64);
   const [aspect, setAspect] = useState<"16:9" | "9:16">("16:9");
-  const [pace, setPace] = useState("Normal");
+  // The rate is the state; the WORD the webhook wants is derived from it.
+  // SPEED_BY_PACE maps the words to the gentle defaults, so Normal posts 1
+  // and a project that only ever carried "Slow" still resolves the same way.
+  const [speed, setSpeed] = useState(SPEED_BY_PACE.normal);
+  const pace = speed < 1 ? "Slow" : speed > 1 ? "Fast" : "Normal";
   // The language as an ISO code — the picker's own currency. What n8n gets
   // is the English name, below.
   const [language, setLanguage] = useState("en");
@@ -187,25 +208,13 @@ export default function NewVideo() {
     .map((f) => f.sheet)
     .join(" · ");
   const lengthLabel = `${Math.floor(length / 60)}:${String(length % 60).padStart(2, "0")}`;
-  const sliderFill = `${(Math.min(Math.max(length, 16), 480) - 16) / (480 - 16) * 100}%`;
+  const sliderPos = Math.min(Math.max(length, LENGTH_MIN), LENGTH_MAX);
+  const sliderFill = `${((sliderPos - LENGTH_MIN) / (LENGTH_MAX - LENGTH_MIN)) * 100}%`;
 
   return (
     <main className="page nb">
       <div className="nb-shell">
         <div className="arc" aria-hidden="true" />
-
-        <div className="nb-head">
-          <span className="nb-pill">
-            <i />
-            New project
-          </span>
-          <h1>Start a video</h1>
-          <p>
-            Fill in the brief and the pipeline takes it from there. Everything
-            after this happens without you — until the script and the scenes
-            come back for approval.
-          </p>
-        </div>
 
         <form
           action={formAction}
@@ -234,9 +243,23 @@ export default function NewVideo() {
         >
           <div className="brief">
             <div className="form">
-              <FormProgress />
+              {/* The header rides in the form column so the estimate rail
+                  starts on the same line as the title rather than a header's
+                  height below it. */}
+              <div className="nb-head">
+                <span className="nb-pill">
+                  <i />
+                  New project
+                </span>
+                <h1>Start a video</h1>
+                <p>
+                  Fill in the brief and the pipeline takes it from there.
+                  Everything after this happens without you — until the script
+                  and the scenes come back for approval.
+                </p>
+              </div>
 
-              <section className="fsec" style={{ marginTop: 0 }}>
+              <section className="fsec">
                 <header>
                   <h2>What is it about</h2>
                   <span className="no">01</span>
@@ -329,19 +352,18 @@ export default function NewVideo() {
                 </div>
                 <div className="field" style={{ marginTop: 18 }}>
                   <label>Pace</label>
+                  {/* Two posted values from one control. `pace` is the WORD and
+                      part of the frozen webhook contract — Claude Scripting
+                      interpolates it into two writing prompts. `speed` is the
+                      exact rate the render re-times the finished film to, and
+                      it is what makes this control change the film at all.
+
+                      The word is DERIVED from the rate rather than held
+                      separately, so the two cannot contradict each other: there
+                      is no way to post Pace: Slow alongside a speed of 1.1. */}
                   <input type="hidden" name="pace" value={pace} />
-                  <div className="seg" role="group" aria-label="Pace">
-                    {PACES.map((p) => (
-                      <button
-                        type="button"
-                        key={p}
-                        className={pace === p ? "on" : ""}
-                        onClick={() => setPace(p)}
-                      >
-                        {p}
-                      </button>
-                    ))}
-                  </div>
+                  <input type="hidden" name="speed" value={speed} />
+                  <SpeedPicker value={speed} onChange={setSpeed} />
                 </div>
               </section>
 
@@ -391,8 +413,8 @@ export default function NewVideo() {
                       id="length"
                       name="length"
                       type="number"
-                      min={16}
-                      max={480}
+                      min={LENGTH_MIN}
+                      max={LENGTH_MAX}
                       step={1}
                       value={length}
                       onChange={(e) => setLength(Number(e.target.value) || 0)}
@@ -403,10 +425,10 @@ export default function NewVideo() {
                   <input
                     type="range"
                     className="lenslider"
-                    min={16}
-                    max={480}
+                    min={LENGTH_MIN}
+                    max={LENGTH_MAX}
                     step={8}
-                    value={Math.min(Math.max(length, 16), 480)}
+                    value={sliderPos}
                     onChange={(e) => setLength(Number(e.target.value))}
                     style={{ ["--fill" as string]: sliderFill }}
                     aria-label="Length"
@@ -422,6 +444,26 @@ export default function NewVideo() {
                         {p.label}
                       </button>
                     ))}
+                  </div>
+                </div>
+                <div className="field" style={{ marginTop: 18 }}>
+                  <label>Format</label>
+                  <input type="hidden" name="aspect" value={aspect} />
+                  <div className="seg" role="group" aria-label="Format">
+                    <button
+                      type="button"
+                      className={aspect === "16:9" ? "on" : ""}
+                      onClick={() => setAspect("16:9")}
+                    >
+                      16:9 horizontal
+                    </button>
+                    <button
+                      type="button"
+                      className={aspect === "9:16" ? "on" : ""}
+                      onClick={() => setAspect("9:16")}
+                    >
+                      9:16 vertical
+                    </button>
                   </div>
                 </div>
               </section>
@@ -550,10 +592,6 @@ export default function NewVideo() {
                     <dd>{aspect === "9:16" ? "9:16 vertical" : "16:9 horizontal"}</dd>
                   </div>
                   <div>
-                    <dt>Look</dt>
-                    <dd className={style ? "" : "off"}>{style || "unset"}</dd>
-                  </div>
-                  <div>
                     <dt>Finishes</dt>
                     <dd className={finishList ? "" : "off"}>{finishList || "None — bare cut"}</dd>
                   </div>
@@ -564,28 +602,6 @@ export default function NewVideo() {
                     </dd>
                   </div>
                 </dl>
-
-                {/* Format lives in the rail: it is a property of the delivered
-                    file, which is what this panel describes. */}
-                <div className="field" style={{ marginTop: 16 }}>
-                  <input type="hidden" name="aspect" value={aspect} />
-                  <div className="seg" role="group" aria-label="Format">
-                    <button
-                      type="button"
-                      className={aspect === "16:9" ? "on" : ""}
-                      onClick={() => setAspect("16:9")}
-                    >
-                      16:9
-                    </button>
-                    <button
-                      type="button"
-                      className={aspect === "9:16" ? "on" : ""}
-                      onClick={() => setAspect("9:16")}
-                    >
-                      9:16
-                    </button>
-                  </div>
-                </div>
 
                 {state && (
                   <p className={`formmsg ${state.ok ? "ok" : "err"}`}>{state.message}</p>

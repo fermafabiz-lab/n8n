@@ -19,6 +19,7 @@ import os from "os";
 import path from "path";
 import { getProject, getScenes } from "@/lib/data";
 import { driveId, safeFilename } from "@/lib/media";
+import { chapterOf } from "@/lib/chapters";
 import { concatMp3 } from "@/lib/mp3";
 
 export const runtime = "nodejs";
@@ -62,15 +63,6 @@ const hasFfmpeg = (): Promise<boolean> => {
 	}
 	return ffmpegProbe;
 };
-
-/**
- * Scene order encodes the chapter — 101/102 are chapter 1, 201 chapter 2,
- * anything under 100 is the hook. Same rule as `AB Pick Voice` in n8n and
- * `chapterOf` in AudioReview; the three have to agree or a "Chapter 2"
- * download would hold different lines from the ones the panel labels Ch. 2.
- */
-const chapterOf = (order: number): number =>
-	Number.isFinite(order) ? Math.floor(order / 100) : 0;
 
 export async function GET(req: Request) {
 	const params = new URL(req.url).searchParams;

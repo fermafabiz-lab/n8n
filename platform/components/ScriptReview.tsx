@@ -80,33 +80,39 @@ export default function ScriptReview({
   // and a fixed-height box with its own scrollbar fights exactly that.
   if (locked) {
     return (
-      <div className="script">
+      <div className="script ascript">
         <div className="sechead">
           <h2>Script</h2>
           <span className="chip ok">Approved</span>
         </div>
         <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--soft)" }}>
-          This is the text the film was built from — the chapters, scenes,
-          narration and image prompts all come from it, so it is kept exactly
-          as approved. Individual scenes can still be reopened and rewritten
-          from the Scenes step; rewriting the script itself would mean
-          producing the film again from the top.
+          This is the text the film was built from. You can edit it here and
+          save — but the scenes, narration and image prompts were already
+          derived from the approved version, so changing this text does not
+          rewrite them. To change what is on screen, edit the scene itself
+          from the Scenes step; to rebuild the whole film from a new script,
+          restart the writing.
         </p>
-        <div
-          style={{
-            width: "100%",
-            background: "var(--bg2)",
-            border: "1px solid var(--line2)",
-            borderRadius: 12,
-            color: "var(--ink)",
-            fontSize: 14.5,
-            lineHeight: 1.7,
-            padding: "16px 18px",
-            whiteSpace: "pre-wrap",
-            overflowWrap: "anywhere",
-          }}
-        >
-          {content}
+        <textarea
+          className="scriptbox"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          rows={18}
+          spellCheck={false}
+        />
+        {msg && (
+          <p className={`formmsg ${msg.ok ? "ok" : "err"}`} style={{ marginTop: 10 }}>
+            {msg.message}
+          </p>
+        )}
+        <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+          <button
+            className="btn gold"
+            disabled={pending || !dirty}
+            onClick={() => run(() => saveScript(projectId, scriptId, text))}
+          >
+            {pending ? "Saving…" : "Save changes"}
+          </button>
         </div>
         <div
           style={{ marginTop: 8, fontSize: 12, color: "var(--dim)", textAlign: "right" }}
@@ -118,7 +124,7 @@ export default function ScriptReview({
   }
 
   return (
-    <div className="script">
+    <div className="script ascript">
       <div className="sechead">
         <h2>Script review</h2>
         {regenerating ? (

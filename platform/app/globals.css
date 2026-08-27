@@ -117,7 +117,14 @@ body {
     Roboto, sans-serif;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
+  /* `clip`, not `hidden`. Both stop sideways scrolling, but `hidden` can make
+     the body a scroll container, and a scroll container is what any sticky or
+     fixed descendant ends up measuring itself against instead of the viewport.
+     Browsers disagree about whether body's overflow propagates to the viewport
+     first, which is exactly the kind of disagreement that produces "the bar
+     stays for you and moves for me". `clip` is never a scroll container, so
+     there is nothing to disagree about. */
+  overflow-x: clip;
 }
 
 /* Small tracked label — the structural device this direction runs on. Pairs a
@@ -188,6 +195,23 @@ input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
   outline-offset: 2px;
+}
+
+/* The brief opts out of the app-wide 1200px column. .page caps every page,
+   and the shell lives inside it — so the shell's own max-width was simply
+   unreachable and the extra width never appeared. Measured: 1144px rendered
+   against a 1560px max-width. */
+.page.nb {
+  max-width: none;
+  padding: 0 20px;
+}
+
+/* The brief supplies its own ground: the shell starts right under the nav and
+   is opaque, so there is no page content to blur behind the bar — the strip
+   only ever showed as a horizontal seam across the top of the shell. The nav's
+   own frosted pill still floats over everything. */
+body:has(.nb) .navfade {
+  display: none;
 }
 
 /* THE LIT ARC — the system's one signature background element.
@@ -293,6 +317,15 @@ select:focus-visible {
   z-index: 100;
   padding: 16px 20px 0;
   background: transparent;
+}
+/* On the brief the bar SCROLLS AWAY — it is part of the page, like the header
+   and the cards, exactly as the design has it. Not sticky and not fixed:
+   either of those keeps it on screen, and on this page that means a bar
+   sitting on top of the form you are filling in. `relative` occupies the same
+   space in flow as `sticky` did, so nothing below it moves. */
+body:has(.nb) .nav {
+  position: relative;
+  top: auto;
 }
 .nav .in {
   /* Matches .page (1200 max-width, 28px gutter) so the brand sits on the same
@@ -639,36 +672,179 @@ select:focus-visible {
   margin-bottom: 30px;
 }
 
+/* The workspace header sits in the same shell the landing and the library
+   use, so the three screens read as one product. `clip`, not `hidden`: this
+   would otherwise become a scroll container and the sticky surfaces further
+   down the page would stop pinning — the same trap documented on .pj-shell. */
+.wk-shell {
+  position: relative;
+  border-radius: var(--r-shell);
+  background: var(--shell);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  overflow: clip;
+  margin-bottom: 26px;
+}
+/* The lit arc, sized for a header rather than for a full hero.
+   `.wk-shell .wk-arc`, not `.wk-arc`: the shared geometry above is 0-2-0, so a
+   single class here loses to it and every value below would be silently
+   dropped — which is what put the bright band across the progress label and
+   the Resume button on the first try. The handoff's rule is that the lit band
+   never crosses text, so this pushes the ring far enough out that only its
+   soft outer glow reaches the right column. */
+.wk-shell .wk-arc {
+  right: -520px;
+  top: -450px;
+  width: 820px;
+  height: 820px;
+  opacity: 0.6;
+}
+.wk-head {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 36px;
+  flex-wrap: wrap;
+  padding: 30px 34px 32px;
+}
+.wk-id {
+  min-width: 0;
+  flex: 1 1 380px;
+}
+.wk-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 14px;
+}
+/* Status as a frosted pill instead of a bare dot in the crumb line. The dot
+   pulses only while something is actually moving — a pulse on a finished or
+   failed project is decoration claiming to be a signal. */
+.wk-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 12px 4px 10px;
+  border-radius: var(--r-pill);
+  background: rgba(252, 252, 253, 0.86);
+  backdrop-filter: blur(18px);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+  color: var(--soft);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.wk-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--dim);
+}
+.wk-state.wait .wk-dot { background: var(--accent); }
+.wk-state.run .wk-dot { background: var(--blue); }
+.wk-state.done .wk-dot { background: var(--green); }
+.wk-state.err .wk-dot { background: var(--red); }
+.wk-state.wait .wk-dot,
+.wk-state.run .wk-dot {
+  animation: wkpulse 1.9s ease-in-out infinite;
+}
+@keyframes wkpulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+/* How far through the stages the film is. Derived from the same pipeline()
+   states the stepper draws, so the bar and the cards can never disagree. */
+.wk-prog {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 7px;
+}
+.wk-prog .lbl {
+  font-family: var(--f-mono), ui-monospace, monospace;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.wk-bar {
+  width: 220px;
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: rgba(24, 20, 40, 0.1);
+  overflow: hidden;
+}
+.wk-bar i {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: linear-gradient(90deg, var(--accent-deep), var(--accent));
+  transition: width var(--dur) var(--ease);
+}
+
+/* The stage stepper: equal cards, one per stage, not a chain of small pills.
+   Each card carries the stage NAME and, under it, that stage's state — the
+   fraction used to be crammed into the name ("Images · 8/15") on one line,
+   which is why it could only ever be a pill.
+
+   Equal widths come from `flex: 1 1 0`, not from a column count: the step
+   list is 7 stages normally and 6 for a silent film (the Audio step is
+   dropped, not greyed — see the cinematic notes in CLAUDE.md), so a
+   grid-template-columns count would have to be threaded in from the page.
+   `min-width` keeps them legible and turns the row into a scroller on a
+   phone instead of crushing seven cards into 390px. */
 .pipe {
   display: flex;
   gap: 10px;
-  align-items: center;
-  margin-bottom: 34px;
+  align-items: stretch;
+  margin-bottom: 30px;
   overflow-x: auto;
-  padding: 4px 2px 10px;
+  padding: 4px 2px 12px;
 }
 .ps {
+  flex: 1 1 0;
+  min-width: 138px;
   display: flex;
-  align-items: center;
-  gap: 10px;
-  background: var(--card);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 14px 16px 15px;
+  border-radius: var(--r-md);
+  background: var(--card-fill);
   border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 9px 18px 9px 12px;
-  font-size: 13px;
-  font-weight: 550;
-  white-space: nowrap;
-}
-/* The steps are links now — each one goes back to its own stage. */
-.ps {
+  box-shadow: var(--shadow-sm);
   text-decoration: none;
-  color: inherit;
+  color: var(--soft);
   cursor: pointer;
-  transition: border-color 0.15s ease, transform 0.15s ease;
+  transition: var(--tr);
 }
 .ps:hover {
-  border-color: var(--line2);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow);
+}
+.ps:active {
   transform: translateY(-1px);
+}
+.ps-name {
+  font-family: var(--f-display), system-ui, sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: var(--ink);
+}
+/* --dim, never --faint: this label sits on the cushioned card gradient,
+   which ends at #e6e6ea, and --faint is only guaranteed on --card2. */
+.ps-note {
+  font-family: var(--f-mono), ui-monospace, monospace;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dim);
 }
 /* Held still while the final render runs. Not a link, so it must not offer
    a link's affordances either — no lift, no pointer. */
@@ -785,54 +961,68 @@ select:focus-visible {
 }
 .ps.frozen {
   cursor: not-allowed;
-  opacity: 0.4;
+  opacity: 0.45;
 }
 .ps.frozen:hover {
-  border-color: var(--line);
   transform: none;
+  box-shadow: var(--shadow-sm);
 }
 /* Currently being revisited: reads as "you are looking at this one", which
-   is deliberately distinct from .act ("the pipeline is here"). */
+   is deliberately distinct from .act ("the pipeline is here"). The ring used
+   to be rgba(120,170,255) — a blue left over from the dark system, and the
+   one thing on this screen that belonged to no palette. Daylight has exactly
+   one accent, so "selected" and "active" are told apart by SHAPE (a ring
+   versus a dark card), not by inventing a second hue. */
 .ps.sel {
-  border-color: rgba(120, 170, 255, 0.55);
-  box-shadow: 0 0 0 3px rgba(120, 170, 255, 0.1);
-  color: var(--text);
+  border-color: var(--accent-a28);
+  box-shadow: 0 0 0 3px var(--accent-a12), var(--shadow-sm);
 }
 .ps .ic {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   display: grid;
   place-items: center;
+  flex: none;
+  font-family: var(--f-mono), ui-monospace, monospace;
   font-size: 11px;
 }
 .ps.done .ic {
-  background: rgba(31, 157, 99, 0.16);
-  color: var(--green);
-}
-.ps.done {
-  color: var(--soft);
-}
-.ps.act {
-  border-color: var(--accent-a28);
-  box-shadow: 0 0 0 3px var(--accent-a08), 0 4px 18px var(--accent-a12);
-}
-.ps.act .ic {
   background: var(--accent-a16);
   color: var(--accent);
 }
-.ps.next {
-  color: var(--dim);
+.ps.done .ps-name {
+  color: var(--soft);
+}
+/* The active step is the one dark card in the row: the design's way of saying
+   "the pipeline is HERE" without a second accent colour, and the same near-
+   black panel the gates use, so the two read as one family. */
+.ps.act {
+  background: var(--panel);
+  border-color: transparent;
+  box-shadow: var(--shadow-lg);
+}
+.ps.act .ps-name {
+  color: var(--panel-ink);
+}
+.ps.act .ps-note {
+  color: var(--accent-lift);
+}
+.ps.act .ic {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--accent-lift);
+}
+/* Looking at the step the pipeline is also on: the ring has to survive on
+   the dark card, where --accent-a12 would be invisible. */
+.ps.act.sel {
+  box-shadow: 0 0 0 3px var(--accent-a28), var(--shadow-lg);
+}
+.ps.next .ps-name {
+  color: var(--soft);
 }
 .ps.next .ic {
   background: rgba(24, 20, 40, 0.06);
   color: var(--dim);
-}
-.pl {
-  width: 22px;
-  height: 1px;
-  background: var(--line2);
-  flex: none;
 }
 
 .stage {
@@ -952,6 +1142,52 @@ select:focus-visible {
   font-size: 11.5px;
   color: var(--dim);
   text-align: center;
+}
+/* Chapter tabs over the filmstrip. Built on the same segmented control the
+   rest of the app uses, with two additions: a count, because the question
+   asked of this row is "which chapter still needs me", and a `full` state so
+   a finished chapter reads as finished without opening it. Scrolls sideways
+   rather than wrapping — a film with many chapters must not push the strip
+   itself down the page. */
+.fschap {
+  display: flex;
+  gap: 3px;
+  padding: 10px 14px 0;
+  background: var(--bg2);
+  overflow-x: auto;
+}
+.fschap button {
+  flex: none;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: var(--r-pill);
+  padding: 7px 14px;
+  border: 1px solid transparent;
+  transition: var(--tr);
+  color: var(--dim);
+  background: transparent;
+}
+.fschap button:hover {
+  color: var(--ink);
+}
+.fschap button.on {
+  color: var(--ink);
+  background: var(--bg3, #fdfdfe);
+  border-color: var(--line2);
+  box-shadow: var(--shadow-sm);
+}
+.fschap .cnt {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+.fschap button.full .cnt {
+  color: var(--ok, #2e7d5b);
 }
 .fr {
   flex: none;
@@ -1975,10 +2211,17 @@ select:focus-visible {
      genre pole and the next-steps card were removed — which is what lets it
      actually STICK: a rail taller than the viewport scrolls with the page no
      matter what position:sticky says. */
-  grid-template-columns: minmax(0, 1fr) 400px;
-  gap: 24px;
+  grid-template-columns: minmax(0, 1fr) 430px;
+  gap: 28px;
   align-items: start;
-  padding: 0 34px 40px;
+  /* Top padding is small ON PURPOSE, and the header carries the breathing
+     room instead (see .nb-head). position:sticky only pins once you scroll —
+     at rest the rail sits wherever the grid puts it — so a large padding here
+     starts the panel far below its 88px sticky line and a viewport-height
+     panel then runs off the bottom of the screen. Measured before the fix:
+     22px past the fold. Keeping the grid's top near the sticky line makes the
+     resting and pinned positions agree. */
+  padding: 14px 40px 44px;
 }
 .brief .form {
   max-width: none;
@@ -1998,13 +2241,17 @@ select:focus-visible {
   margin-top: 16px;
   background: var(--card-fill);
   border-radius: 28px;
-  box-shadow: var(--shadow);
+  /* Deliberately heavier than --shadow. These cards are the page's subject —
+     everything else is ground — and a two-layer cast (a tight contact shadow
+     plus a wide soft one) is what reads as a card LIFTED off the surface
+     rather than a panel tinted onto it. */
+  box-shadow: 0 2px 6px rgba(24, 20, 40, 0.06), 0 18px 44px rgba(24, 20, 40, 0.16);
   padding: 30px 34px 34px;
   transition: var(--tr);
 }
 .brief .form > .fsec:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
+  transform: translateY(-3px);
+  box-shadow: 0 4px 10px rgba(24, 20, 40, 0.07), 0 26px 60px rgba(24, 20, 40, 0.2);
 }
 .brief .form > .fsec > header {
   border-bottom: none;
@@ -2037,133 +2284,6 @@ select:focus-visible {
   margin-left: 0;
 }
 
-/* --- "you are here" rail at the head of the form --- */
-.fprog {
-  position: sticky;
-  /* Low enough to clear the fade under the site's nav entirely. At 84 the
-     rail's own top edge sat inside that fade and the two washed into each
-     other; the scrim now finishes on exactly this line, so the rail begins
-     where the fade ends and never carries any of it. */
-  top: 100px;
-  z-index: 5;
-  margin: 0;
-  padding: 14px 22px;
-  border-radius: var(--r-md);
-  background: rgba(252, 252, 253, 0.86);
-  backdrop-filter: blur(18px) saturate(1.4);
-  border-bottom: 1px solid var(--line);
-  border-radius: var(--r-lg) var(--r-lg) 0 0;
-  display: flex;
-  align-items: baseline;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-/* Once the rail is stuck, it grows upward to the top of the screen — same
-   surface, same blur, so it reads as one bar — and THAT is what the form's
-   text disappears into. It is the mirror of the bottom, where the form
-   dissolves into the "Start production" bar.
-
-   It has to be the rail's own extension rather than a strip belonging to the
-   page: a page-level strip either fades above the rail, and then blurred
-   headings show through it, or fades below it, and then it greys the rail
-   itself. Growing the bar has neither problem, because the bar is opaque and
-   ends exactly where its text begins.
-
-   Only when stuck. Unstuck, the rail sits in the middle of the page and this
-   would hang a dark slab over whatever is above the form. */
-.fprog::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 100%;
-  height: 0;
-  /* The bar's own tint over an OPAQUE base, not `inherit`. The bar is 86%
-     opaque, which is right where it sits — a frosted panel over content —
-     but wrong for the extension: the remaining 14% is a hundred pixels of
-     scrolling form text showing straight through, faint but there. Painting
-     the same tint over the page colour gives the same shade with nothing
-     behind it. */
-  background:
-    linear-gradient(rgba(252, 252, 253, 0.86), rgba(252, 252, 253, 0.86)),
-    var(--bg);
-  -webkit-backdrop-filter: blur(18px) saturate(1.4);
-  backdrop-filter: blur(18px) saturate(1.4);
-  pointer-events: none;
-}
-.fprog.stuck {
-  /* Square while stuck. The bar's rounded top corners leave a notch each
-     side that neither the bar nor its extension covers — the extension is a
-     rectangle butting against a curve — and form text shows through them.
-     That is the leak in the top-left corner. A rounded corner is only there
-     to sit on the form's own top edge anyway; against the screen's edge it
-     has nothing to round. */
-  border-radius: 0;
-}
-.fprog.stuck::before {
-  /* The rail's sticky top: exactly the distance from the screen's edge down
-     to the bar, so the two meet with no seam and no overshoot. */
-  height: 100px;
-}
-.fprog-lead {
-  font-family: var(--f-mono), ui-monospace, Menlo, monospace;
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--accent);
-}
-.fprog ol {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  gap: 11px;
-  flex-wrap: wrap;
-}
-.fprog li a {
-  display: flex;
-  align-items: baseline;
-  gap: 5px;
-  font-family: var(--f-mono), ui-monospace, Menlo, monospace;
-  font-size: 9.5px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--dim);
-  transition: color 0.2s;
-}
-/* Five labels don't fit one line on a 600px column, and a rail that wraps
-   costs height in a sticky element. Only the step you're on needs naming —
-   the numbers alone still carry "five, you're on two". */
-@media (max-width: 1500px) {
-  .fprog li:not(.on) .l {
-    display: none;
-  }
-}
-.fprog li.past a {
-  color: var(--soft);
-}
-.fprog li.on a {
-  color: var(--ink);
-}
-.fprog li.on .n {
-  color: var(--accent);
-}
-.fprog li a:hover {
-  color: var(--ink);
-}
-
-/* The action stays attached to the form instead of hiding at the end of it. */
-.fsubmit {
-  position: sticky;
-  bottom: 0;
-  margin: 28px -34px 0;
-  padding: 18px 34px;
-  background: rgba(252, 252, 253, 0.86);
-  backdrop-filter: blur(18px) saturate(1.4);
-  border-top: 1px solid var(--line);
-  border-radius: 0 0 var(--r-lg) var(--r-lg);
-}
 .callsheet {
   position: sticky;
   top: 104px;
@@ -2528,6 +2648,24 @@ select:focus-visible {
   .ptitle {
     font-size: clamp(24px, 7.6vw, 34px);
   }
+  /* The header shell keeps its shape but loses the desktop padding, and the
+     progress column stops being right-aligned — at this width it sits under
+     the title, where a right edge reads as a stray indent. */
+  .wk-head {
+    padding: 22px 20px 24px;
+    gap: 20px;
+  }
+  .wk-side,
+  .wk-prog {
+    align-items: flex-start;
+  }
+  .wk-bar {
+    width: min(220px, 100%);
+  }
+  .wk-arc {
+    right: -340px;
+    top: -400px;
+  }
   .eyebrow {
     flex-wrap: wrap;
     row-gap: 10px;
@@ -2768,20 +2906,26 @@ select:focus-visible {
   flex-direction: column;
   gap: 14px;
   align-self: start;
-  /* A sticky element taller than the viewport cannot stick — it scrolls with
-     the page and only pins once its bottom arrives, which reads as the panel
-     "not following". The estimate is short enough today, but its rows grow
-     with the finishes list, so bound it and let the panel scroll inside
-     itself rather than silently losing its stickiness. */
-  max-height: calc(100vh - 104px);
-  overflow-y: auto;
-  scrollbar-width: thin;
+  /* Fills the screen instead of stopping short of it. The panel used to be
+     content-height (588px in a 900px viewport), which left a band of bare
+     ground under it that read as the column having run out rather than as
+     deliberate space. */
+  height: calc(100vh - 104px);
+  /* …but never smaller than its own content: on a short window the panel
+     keeps its natural height and simply extends past the fold, which is far
+     better than crushing the rows into each other. */
+  min-height: 600px;
 }
 .nb-est {
-  border-radius: var(--r-lg);
+  /* A flex column so the rows can absorb whatever height is going and the
+     submit stays pinned to the bottom edge of the panel. */
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border-radius: 28px;
   background: radial-gradient(120% 100% at 100% 0%, var(--accent-deep) 0%, #1a1a1f 55%, #0f0f12 100%);
-  box-shadow: var(--shadow-lg);
-  padding: 24px 24px 26px;
+  box-shadow: 0 2px 6px rgba(24, 20, 40, 0.08), 0 22px 54px rgba(24, 20, 40, 0.26);
+  padding: 22px 24px 24px;
 }
 .nb-est .dpill {
   display: inline-flex;
@@ -2806,8 +2950,8 @@ select:focus-visible {
    will use for the chosen tone (lib/tone-type.ts mirrors the render). White on
    the dark panel; the tone faces are all loaded app-wide already. */
 .nb-est .sprev {
-  margin: 16px 0 0;
-  font-size: 27px;
+  margin: 14px 0 0;
+  font-size: 25px;
   line-height: 1.14;
   color: var(--panel-ink);
   overflow-wrap: anywhere;
@@ -2827,14 +2971,23 @@ select:focus-visible {
   text-wrap: pretty;
 }
 .nb-est .rows {
-  margin-top: 18px;
+  margin-top: 14px;
+  /* The rows keep their own rhythm — spreading them to fill the panel was the
+     first attempt and it read as a stretched table, ~76px of air per row for
+     a single line of text. The slack goes to ONE place instead: the margin
+     above the submit (see .go), where a gap reads as deliberate separation
+     between the summary and the action it leads to. */
+  flex: 0 0 auto;
 }
+/* Row rhythm is tuned so the whole panel clears a laptop viewport: it must
+   never need a scrollbar of its own — the producer reads it while filling the
+   form, and a panel you have to scroll to finish reading is not a summary. */
 .nb-est .rows > div {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 0;
+  padding: 11px 0;
   border-bottom: 1px solid var(--panel-line);
 }
 .nb-est .rows dt {
@@ -2857,7 +3010,10 @@ select:focus-visible {
    the form — so type=submit works exactly as before. */
 .nb-est .go {
   width: 100%;
-  margin-top: 20px;
+  /* auto, not a fixed value: this is what absorbs the panel's spare height
+     and pins the action to the bottom edge however tall the screen is. */
+  margin-top: auto;
+  flex: none;
   font-family: inherit;
   font-size: 14.5px;
   font-weight: 600;
@@ -3016,6 +3172,21 @@ select:focus-visible {
   box-shadow: var(--shadow-sm);
 }
 
+/* The degree row under Slow / Fast in SpeedPicker: the same control, one step
+   quieter, so the word stays the primary decision and the multiplier reads as
+   a refinement of it rather than as a second, competing choice. Mono because
+   it is a number, matching every other measured value on these panels. */
+.seg.speedrates {
+  gap: 2px;
+  padding: 3px;
+}
+.seg.speedrates button {
+  font-family: var(--f-mono), ui-monospace, monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  padding: 6px 13px;
+}
+
 /* ============================================================
    The marketing landing (/landing) — the handoff's first screen,
    with placeholder copy and stats to be replaced. Namespaced
@@ -3118,6 +3289,14 @@ body:has(.mkt) .vignette {
   padding: 9px 9px 9px 24px;
   box-shadow: var(--shadow-nav);
 }
+/* The two doors on the right, inside the pill's own 9px of padding. The bar
+   is auto-width and centred, so adding one simply makes it wider — which is
+   the whole reason nothing here shrinks to fit. */
+.mkt-nav .acts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .mkt-nav .links {
   display: flex;
   gap: 4px;
@@ -3150,6 +3329,27 @@ body:has(.mkt) .vignette {
 }
 .mkt-cta-dark:hover {
   transform: translateY(-2px);
+}
+/* The secondary door: same type size and the same pill height as the dark
+   one — a white surface with a hairline, so the two read as a pair with a
+   clear primary rather than as a button and a link. */
+.mkt-cta-light {
+  white-space: nowrap;
+  font-family: inherit;
+  font-size: 14.5px;
+  color: var(--ink);
+  background: #fdfdfe;
+  border: 1px solid rgba(24, 20, 40, 0.1);
+  border-radius: var(--r-pill);
+  padding: 11px 22px;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: var(--tr);
+  display: inline-block;
+}
+.mkt-cta-light:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
 }
 .mkt-head {
   position: relative;
@@ -3695,6 +3895,12 @@ body:has(.mkt) .vignette {
   letter-spacing: -0.02em;
   color: var(--ink);
 }
+/* The mark never wraps away from its word, and the word never wraps in on
+   itself: three stacked lines of "House / of / Videos" is what a squeezed
+   pill does otherwise. */
+.mkt .brandline .bword {
+  white-space: nowrap;
+}
 .mkt .brandline .bmark {
   width: 17px;
   height: 17px;
@@ -3748,15 +3954,36 @@ body:has(.mkt) .vignette {
   }
 }
 
+/* On a phone the pill has to hold two buttons at full size, and it cannot do
+   that and the wordmark as well. The mark stays — it is the link home and the
+   identity — and the words go, because the headline three lines below is
+   literally "House of Videos makes films while you sleep". Shrinking the type
+   instead would make every label harder to read to save a name that is
+   already on screen. */
+@media (max-width: 660px) {
+  .mkt .brandline .bword {
+    display: none;
+  }
+  .mkt-nav .in {
+    gap: 14px;
+    padding-left: 16px;
+  }
+}
+
 
 /* ============================================================
    The brief's shell, header and voice-mode cards — the handoff's
    Start screen. Everything floats: the shell holds the light, the
    cards lift to the pointer, nothing is boxed in by a border.
    ============================================================ */
+/* 1560, not the prototype's 1280: the design was drawn at a fixed 1280 canvas,
+   and holding that as a max-width on a real desktop leaves a third of the
+   screen as empty gutter. The form column gets the extra room; the rail is
+   only slightly wider, since a summary column past ~430 starts to read as a
+   second body of text rather than a sidebar. */
 .nb-shell {
   position: relative;
-  max-width: 1240px;
+  max-width: 1560px;
   margin: 10px auto 0;
   border-radius: var(--r-shell);
   background: var(--shell);
@@ -3798,9 +4025,12 @@ body:has(.mkt) .vignette {
   opacity: 0.85;
   animation: arcdrift 24s ease-in-out infinite;
 }
+/* Inside the form column now, not spanning the shell. That is what brings the
+   estimate rail up to the same line as "Start a video" instead of starting it
+   a header's height further down. */
 .nb-head {
   position: relative;
-  padding: 44px 34px 6px;
+  padding: 26px 0 4px;
   max-width: 620px;
 }
 .nb-head h1 {
@@ -3973,4 +4203,903 @@ body:has(.mkt) .vignette {
   .brief .form > .fsec {
     padding: 24px 20px 26px;
   }
+}
+
+
+/* ============================================================
+   Projects — the library and control room.
+   Hero and stat strip live inside one rounded shell with the lit
+   arc clipped into it; the library below is the existing grid,
+   restyled. Same shell language as the brief, so the two screens
+   read as one app.
+   ============================================================ */
+.page.pj {
+  max-width: 1400px;
+  padding: 0 20px;
+}
+.pj-shell {
+  position: relative;
+  margin-top: 10px;
+  border-radius: var(--r-shell);
+  background: var(--shell);
+  /* clip, not hidden — hidden makes this a scroll container and the library's
+     sticky toolbar below would stop pinning. Same trap as the brief. */
+  overflow: hidden;
+  overflow: clip;
+}
+/* The lit arc is only ever positioned by its SHELL — `.arc` alone carries the
+   gradient but no geometry, so a new shell that forgets to claim it here gets
+   a 800px block in normal flow instead of a backdrop. That is exactly what the
+   workspace header did on the first attempt: 660px of empty space above the
+   title, which looks like a broken layout and is a missing selector. Any
+   further shell goes in this list. */
+.pj-shell .arc,
+.wk-shell .arc {
+  position: absolute;
+  right: -400px;
+  top: -380px;
+  width: 800px;
+  height: 860px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(
+    closest-side,
+    rgba(20, 18, 28, 0) 0 54%,
+    rgba(77, 52, 132, 0.8) 64%,
+    var(--accent) 77%,
+    var(--accent-lift) 87%,
+    rgba(20, 18, 28, 0.24) 94%,
+    rgba(20, 18, 28, 0) 100%
+  );
+  filter: blur(20px);
+  opacity: 0.8;
+  animation: arcdrift 26s ease-in-out infinite;
+}
+.pj-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 372px;
+  gap: 44px;
+  padding: 44px 44px 40px;
+}
+.pj-welcome {
+  display: flex;
+  flex-direction: column;
+}
+.pj-welcome h1 {
+  margin: 0;
+  font-family: var(--f-display), var(--f-ui), sans-serif;
+  font-size: clamp(46px, 6vw, 78px);
+  font-weight: 500;
+  letter-spacing: -0.045em;
+  line-height: 0.98;
+  color: var(--ink);
+}
+/* The second line is the same face at 300 — a weight change, not a face
+   change, which is what keeps the pair reading as one voice. */
+.pj-welcome .lead {
+  margin: 14px 0 0;
+  font-family: var(--f-display), var(--f-ui), sans-serif;
+  font-size: clamp(24px, 2.6vw, 34px);
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  line-height: 1.14;
+  color: var(--soft);
+  text-wrap: pretty;
+}
+.pj-welcome .sub {
+  margin: 20px 0 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--soft);
+  max-width: 460px;
+  text-wrap: pretty;
+}
+.pj-gap {
+  flex: 1;
+  min-height: 26px;
+}
+.pj-ctas {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.pj-cta,
+.pj-ghost {
+  font-family: inherit;
+  font-size: 15px;
+  white-space: nowrap;
+  border-radius: var(--r-pill);
+  padding: 16px 32px;
+  cursor: pointer;
+  transition: var(--tr);
+  display: inline-block;
+  text-align: center;
+}
+.pj-cta {
+  color: var(--panel-ink);
+  background: var(--near-black);
+  border: none;
+  box-shadow: var(--shadow-btn);
+}
+.pj-ghost {
+  color: var(--ink);
+  background: var(--card2);
+  border: 1px solid rgba(24, 20, 40, 0.09);
+  padding: 13px 22px;
+  font-size: 13.5px;
+  box-shadow: var(--shadow-sm);
+}
+.pj-cta:hover {
+  transform: translateY(-3px);
+}
+.pj-ghost:hover {
+  transform: translateY(-2px);
+}
+
+/* The live panel — the one dark surface on this screen, so it reads as the
+   thing that is actually happening while everything else is a record. */
+/* Takes its own height rather than stretching to the hero's. The design draws
+   it with three live films, which fills the column; with one it stretched and
+   left a band of empty dark panel that read as something failing to load. */
+.pj-live {
+  align-self: start;
+  border-radius: var(--r-lg);
+  padding: 20px 22px 22px;
+  display: flex;
+  flex-direction: column;
+  background: radial-gradient(130% 100% at 100% 0%, var(--accent-deep) 0%, #1a1a1f 52%, #0f0f12 100%);
+  box-shadow: var(--shadow-lg);
+}
+.pj-live .lhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pj-live .lhead .k {
+  font-family: var(--f-mono), ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent-lift);
+}
+.pj-live .lhead .auto {
+  font-family: var(--f-mono), ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  color: var(--panel-body);
+}
+.pj-live .lrow {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 13px 0;
+  border-top: 1px solid var(--panel-line);
+  margin-top: 13px;
+}
+.pj-live .lrow + .lrow {
+  margin-top: 0;
+}
+.pj-live .ltop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pj-live .lname {
+  font-size: 13.5px;
+  color: var(--panel-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pj-live .lpct {
+  font-family: var(--f-mono), ui-monospace, Menlo, monospace;
+  font-size: 11.5px;
+  color: var(--accent-lift);
+  flex: none;
+}
+.pj-live .lbar {
+  position: relative;
+  display: block;
+  height: 3px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+.pj-live .lbar i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, rgba(178, 153, 231, 0.7), var(--accent-lift));
+  display: block;
+}
+/* The sweep is the only thing on the page that says "this is moving right
+   now" without a number changing. It is decoration, so the global
+   reduced-motion rule stopping it costs nothing. */
+.pj-live .lbar i.sheen {
+  width: 18%;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0));
+  animation: pjsweep 5s linear infinite;
+}
+@keyframes pjsweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}
+.pj-live .lstep {
+  font-family: var(--f-mono), ui-monospace, Menlo, monospace;
+  font-size: 10.5px;
+  color: var(--panel-body);
+}
+.pj-live .lnote {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--panel-body);
+  padding-top: 12px;
+  margin-top: 13px;
+  border-top: 1px solid var(--panel-line);
+  text-wrap: pretty;
+}
+.pj-live .lnote.lempty {
+  margin-top: 16px;
+  border-top: none;
+  padding-top: 0;
+}
+
+/* Stat strip — inside the shell, divided by hairlines rather than boxed. */
+.page.pj .stats {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  border-top: 1px solid rgba(24, 20, 40, 0.08);
+  gap: 0;
+  margin: 0;
+}
+.page.pj .stat {
+  padding: 22px 24px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: none;
+  border-right: 1px solid rgba(24, 20, 40, 0.08);
+  background: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+.page.pj .stat:last-child {
+  border-right: none;
+}
+.page.pj .stat small {
+  font-family: var(--f-mono), ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.page.pj .stat b {
+  font-family: var(--f-display), var(--f-ui), sans-serif;
+  font-size: 42px;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--ink);
+}
+.page.pj .stat b.zero {
+  color: var(--faint);
+}
+.page.pj .stat .note {
+  font-size: 12.5px;
+  color: var(--dim);
+}
+
+.pj-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 26px 12px 60px;
+  font-size: 13.5px;
+  color: var(--dim);
+}
+
+/* --- the library toolbar, now a frosted sticky pill --- */
+.page.pj .eyebrow.prow {
+  position: sticky;
+  top: 10px;
+  z-index: 5;
+  margin-top: 18px;
+  margin-bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 18px;
+  border-radius: var(--r-pill);
+  border-bottom: none;
+  background: rgba(252, 252, 253, 0.92);
+  backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: var(--shadow-sm);
+}
+.page.pj .ftab {
+  border-radius: var(--r-pill);
+  padding: 8px 14px;
+  font-size: 13.5px;
+  letter-spacing: 0;
+  text-transform: none;
+  border: none;
+}
+.page.pj .ftab.on {
+  background: var(--accent-a12);
+  color: var(--ink);
+}
+.page.pj .projects {
+  margin-top: 18px;
+}
+
+@media (max-width: 1080px) {
+  .pj-hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+    padding: 32px 24px 30px;
+  }
+  .page.pj .stat {
+    padding: 18px 20px 20px;
+  }
+}
+
+
+/* --- Projects: the cards, floaty --- */
+.page.pj .proj {
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  background: var(--card-fill);
+  border: none;
+  box-shadow: 0 2px 6px rgba(24, 20, 40, 0.06), 0 14px 34px rgba(24, 20, 40, 0.14);
+  transition: var(--tr);
+}
+.page.pj .proj:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 10px rgba(24, 20, 40, 0.07), 0 24px 54px rgba(24, 20, 40, 0.2);
+}
+/* aspect-ratio has to be cleared, not just overridden by height: the base rule
+   sets 16/9, and an element with BOTH an aspect-ratio and a fixed height
+   derives its WIDTH from them — 152px tall became 270px wide inside a 440px
+   card, with the card's own background showing beside the still. */
+.page.pj .proj .cover {
+  position: relative;
+  aspect-ratio: auto;
+  width: 100%;
+  height: 152px;
+  border-radius: 0;
+  border: none;
+  overflow: hidden;
+}
+/* The base card's bottom-only scrim is replaced by .scrim, which darkens both
+   ends — two stacked scrims would double the bottom. */
+.page.pj .proj .cover::after {
+  display: none;
+}
+/* Top and bottom only — the middle stays clear so the still is still a still.
+   The chips ride on the two dark ends. */
+.page.pj .proj .cover .scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(12, 11, 17, 0.5) 0%,
+    rgba(12, 11, 17, 0.08) 42%,
+    rgba(12, 11, 17, 0.62) 100%
+  );
+}
+.page.pj .proj .badge {
+  position: absolute;
+  z-index: 2;
+  top: 12px;
+  left: 12px;
+  backdrop-filter: none;
+}
+/* Near-opaque, not a translucent tint: the chip sits on a picture nobody
+   chose, so its legibility cannot depend on what is behind it. */
+.page.pj .proj .badge.run,
+.page.pj .proj .badge.wait {
+  background: rgba(238, 231, 252, 0.94);
+  color: var(--accent-deep);
+  box-shadow: none;
+}
+.page.pj .proj .badge.done {
+  background: rgba(214, 240, 229, 0.92);
+  color: #2b6b52;
+  box-shadow: none;
+}
+.page.pj .proj .badge.err {
+  background: rgba(250, 226, 223, 0.92);
+  color: #a03c33;
+  box-shadow: none;
+}
+.page.pj .proj .rt {
+  position: absolute;
+  z-index: 2;
+  right: 12px;
+  bottom: 12px;
+  font-family: var(--f-mono), ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(15, 14, 20, 0.6);
+  border-radius: 6px;
+  padding: 3px 8px;
+}
+.page.pj .proj .body {
+  padding: 15px 17px 17px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.page.pj .proj h3 {
+  margin: 0;
+  font-family: var(--f-display), var(--f-ui), sans-serif;
+  font-size: 17.5px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  color: var(--ink);
+}
+.page.pj .proj .meta {
+  font-family: var(--f-mono), ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--dim);
+  margin: 0;
+}
+.page.pj .proj .prog {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.page.pj .proj .track {
+  height: 3px;
+  border-radius: 3px;
+  background: rgba(24, 20, 40, 0.09);
+  margin: 0;
+}
+.page.pj .proj .stepline {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-family: var(--f-mono), ui-monospace, Menlo, monospace;
+  font-size: 10.5px;
+  color: var(--dim);
+}
+.page.pj .proj .foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 2px;
+  font-size: 12px;
+  color: var(--faint);
+  border: none;
+}
+.page.pj .proj .foot .go {
+  font-size: 12.5px;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+
+/* --- Projects toolbar: search + segmented view toggle --- */
+.psearch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: var(--r-pill);
+  background: var(--card2);
+  border: 1px solid rgba(24, 20, 40, 0.09);
+  width: 218px;
+  flex: none;
+  color: var(--faint);
+  font-size: 12.5px;
+}
+.psearch input {
+  flex: 1;
+  min-width: 0;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 0;
+}
+.psearch input::placeholder {
+  color: var(--faint);
+}
+/* Grid | Index as one segmented control with a shared outline, rather than
+   two loose words — it is a single choice with two states. */
+.page.pj .vtog {
+  display: flex;
+  border-radius: var(--r-pill);
+  overflow: hidden;
+  border: 1px solid rgba(24, 20, 40, 0.09);
+  background: var(--card2);
+  flex: none;
+  gap: 0;
+}
+.page.pj .vtog button {
+  font-family: inherit;
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+  border: none;
+  padding: 8px 15px;
+  transition: var(--tr);
+  background: transparent;
+  color: var(--dim);
+}
+.page.pj .vtog button.on {
+  background: var(--accent-a12);
+  color: var(--ink);
+}
+.pshowing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 26px 0 6px;
+  font-size: 13px;
+  color: var(--dim);
+}
+
+/* --- pager. Same pills as every other control on the site: white surface,
+   hairline, soft shadow, 2px lift to the pointer, accent fill when chosen. --- */
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.pgbtn,
+.pgnum {
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--ink);
+  background: var(--card2);
+  border: 1px solid rgba(24, 20, 40, 0.09);
+  border-radius: var(--r-pill);
+  padding: 9px 16px;
+  box-shadow: var(--shadow-sm);
+  transition: var(--tr);
+  white-space: nowrap;
+}
+.pgnum {
+  min-width: 38px;
+  padding: 9px 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.pgbtn:hover:not(:disabled),
+.pgnum:hover:not(.on) {
+  transform: translateY(-2px);
+}
+.pgnum.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #f7f7f8;
+  box-shadow: var(--accent-cast);
+  cursor: default;
+}
+/* Disabled at the ends rather than hidden: a control that disappears at the
+   edge makes the row jump width as you page through it. */
+.pgbtn:disabled {
+  opacity: 0.45;
+  cursor: default;
+  box-shadow: none;
+}
+.pgnums {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pggap {
+  color: var(--faint);
+  padding: 0 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 720px) {
+  /* The numbers are the first thing to go on a phone — Previous/Next still
+     reach every page, just one at a time. */
+  .pgnums {
+    display: none;
+  }
+}
+
+@media (max-width: 1080px) {
+  .page.pj .eyebrow.prow {
+    flex-wrap: wrap;
+  }
+  .psearch {
+    width: 100%;
+    order: 9;
+  }
+}
+
+
+/* ============================================================
+   Review panels — Voice review and Scene review.
+   Both ask the same thing of the producer: go through a list of
+   scenes one at a time and act on each. So each row is a card
+   that floats, and both panels carry .reviewpanel to say so.
+   Deliberately NOT on .script itself — ScriptReview shares that
+   wrapper and is one continuous document, not a list of things
+   to act on.
+   ============================================================ */
+
+/* The take. A white surface lifted off the panel rather than a bordered box
+   drawn on it: these are the things you act on one at a time, so each one has
+   to read as its own object. The border goes with the shadow — a card that is
+   BOTH outlined and lifted reads as two containers stacked. */
+.reviewpanel .card.take {
+  background: var(--card2);
+  border: none;
+  border-radius: 18px;
+  padding: 16px 18px !important;
+  box-shadow: 0 2px 5px rgba(24, 20, 40, 0.05), 0 12px 28px rgba(24, 20, 40, 0.12);
+  transition: var(--tr);
+}
+.reviewpanel .card.take:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 9px rgba(24, 20, 40, 0.06), 0 20px 44px rgba(24, 20, 40, 0.16);
+}
+/* The playing take keeps the accent ring, but as a halo rather than a hard
+   2px outline — the outline sat outside the shadow and cut a square corner
+   across the rounded card. */
+.reviewpanel .card.take[style*="outline"] {
+  outline: none !important;
+  box-shadow: 0 0 0 2px var(--accent), 0 12px 28px rgba(122, 79, 214, 0.22);
+}
+
+/* The take's own controls sit on the white card, so they need a hairline to
+   separate from it — on the panel they had the card's grey to sit against.
+   :not(.ok) matters: the primary action carries the accent gradient, and a
+   plain `.abtn` rule here painted it white and left its white label on a
+   white surface. Caught on a screenshot — "Approve scene" was invisible. */
+.reviewpanel .take .abtn:not(.ok) {
+  background: var(--card2);
+  border: 1px solid rgba(24, 20, 40, 0.1);
+  border-radius: var(--r-pill);
+  box-shadow: var(--shadow-sm);
+  transition: var(--tr);
+}
+.reviewpanel .take .abtn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+/* The primary action keeps its accent, and gets the same pill shape and lift
+   as everything else in the take. */
+.reviewpanel .take .abtn.ok {
+  border-radius: var(--r-pill);
+  transition: var(--tr);
+}
+/* The play control is round, as drawn. Targeted by its own class, not by
+   :first-of-type — that matched the first .abtn inside EVERY group in the
+   take, so the "Voice: auto" selector was collapsed into a 34px circle with
+   its label cut off. Caught on a screenshot. */
+.reviewpanel .take .abtn.playbtn {
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+/* The narration box inside a take: recessed, so the card reads as the object
+   and the text as something set into it. */
+.reviewpanel .take textarea {
+  background: #f8f8fa;
+  border: 1px solid rgba(24, 20, 40, 0.09);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* Change narrator: one full-width centred row, as the design draws it —
+   it applies to the WHOLE project, so it should not sit in a corner looking
+   like one more per-take control. */
+.reviewpanel .abtn.narrowide {
+  display: block;
+  width: 100%;
+  text-align: center;
+  padding: 15px 20px;
+  border-radius: var(--r-pill);
+  background: var(--card2);
+  border: 1px solid rgba(24, 20, 40, 0.09);
+  box-shadow: var(--shadow-sm);
+  font-size: 14px;
+  transition: var(--tr);
+}
+.reviewpanel .abtn.narrowide:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+
+/* The download row's pills match every other pill on the site. */
+.reviewpanel .btn {
+  border-radius: var(--r-pill);
+  background: var(--card2);
+  border: 1px solid rgba(24, 20, 40, 0.09);
+  box-shadow: var(--shadow-sm);
+  transition: var(--tr);
+}
+.reviewpanel .btn:hover {
+  transform: translateY(-2px);
+}
+
+
+/* --- Script: one floating field holding the whole text --- */
+/* ONE field, holding the whole script. It was briefly one card per chapter,
+   which is not what a script is to work on: you read it in chapters but you
+   EDIT it as one continuous text, and cutting it into blocks means deciding
+   which block a rewritten sentence belongs to. It also matches what actually
+   gets saved — the script is written back whole. */
+.ascript textarea,
+.ascript .scriptbox {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  font-family: inherit;
+  color: var(--ink);
+  background: #f8f8fa;
+  border: 1px solid rgba(24, 20, 40, 0.09);
+  border-radius: 16px;
+  padding: 16px 18px;
+  font-size: 14.5px;
+  line-height: 1.7;
+  box-shadow: inset 0 1px 2px rgba(24, 20, 40, 0.05);
+}
+.ascript .btn {
+  border-radius: var(--r-pill);
+  box-shadow: var(--shadow-sm);
+  transition: var(--tr);
+}
+.ascript .btn:hover {
+  transform: translateY(-2px);
+}
+
+
+/* ============================================================
+   Images & Video — the review stage.
+   Same rule as the other review panels: the thing you act on is
+   an object that floats, not a box drawn on the page. Here the
+   object is the MONITOR, and the asset is set INTO it — the
+   picture and the clip used to bleed to the card's own edge, so
+   a black 16:9 video squared off the rounded corners and the
+   bubble stopped reading as a bubble at exactly the moment it
+   held a clip. Padding + an inner radius is the whole fix, and
+   it has to be on .scr rather than on the media: MediaPlayer
+   fills its parent absolutely, and the drafts preview, the
+   fallback art and the scrim all live in there too.
+   ============================================================ */
+.stage .monitor {
+  background: var(--card2);
+  border: none;
+  border-radius: 26px;
+  padding: 14px;
+  box-shadow: 0 2px 5px rgba(24, 20, 40, 0.05), 0 16px 38px rgba(24, 20, 40, 0.13);
+  overflow: visible;
+}
+/* The frame the asset sits in. overflow:hidden is what rounds the video's
+   own corners — a <video> element cannot be given a radius that its native
+   controls respect, so the clip has to be masked by its holder. */
+.stage .monitor .scr {
+  border-radius: 16px;
+  overflow: hidden;
+  background: #0d0d10;
+}
+/* The scene tag and the caption are positioned against .scr, so they follow
+   the inset automatically; only the caption needs to come in off the rounded
+   corner it now sits above. */
+.stage .monitor .cap {
+  left: 22px;
+  right: 22px;
+  bottom: 18px;
+}
+
+/* The strip below is part of the same bubble now, not a second panel bolted
+   under it: no ground of its own and no hairline, so the card reads as one
+   surface holding a frame and its contact sheet. */
+.stage .filmstrip {
+  background: none;
+  border-top: 0;
+  padding: 14px 0 2px;
+  gap: 10px;
+}
+.stage .fspage {
+  background: none;
+  padding: 8px 0 0;
+}
+/* Each thumbnail floats too — the same object rule, one size down. The
+   selected one keeps its accent ring as a halo rather than a hard border, so
+   it does not cut a square corner across the rounded frame. */
+.stage .fr {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(24, 20, 40, 0.06), 0 6px 16px rgba(24, 20, 40, 0.11);
+}
+.stage .fr:hover {
+  box-shadow: 0 3px 7px rgba(24, 20, 40, 0.08), 0 12px 26px rgba(24, 20, 40, 0.16);
+}
+.stage .fr.sel,
+.stage .fr.act {
+  box-shadow: 0 0 0 2px var(--accent), 0 8px 20px rgba(122, 79, 214, 0.26);
+}
+.stage .fsnav {
+  border: none;
+  border-radius: var(--r-pill);
+  width: 34px;
+  background: var(--card2);
+  box-shadow: var(--shadow-sm);
+  color: var(--soft);
+  transition: var(--tr);
+}
+.stage .fsnav:hover:not(:disabled) {
+  transform: translateY(-1px);
+  color: var(--accent);
+}
+
+/* The inspector's cards are the same object as the monitor, at rail width. */
+.stage .insp .card {
+  background: var(--card2);
+  border: none;
+  border-radius: 22px;
+  box-shadow: 0 2px 5px rgba(24, 20, 40, 0.05), 0 14px 32px rgba(24, 20, 40, 0.12);
+}
+/* Controls sitting on white need the hairline the grey card used to give
+   them — and :not(.ok) so the primary action keeps its accent instead of
+   being repainted white with a white label on it. */
+.stage .insp .abtn:not(.ok) {
+  background: var(--card2);
+  border: 1px solid rgba(24, 20, 40, 0.1);
+  border-radius: var(--r-pill);
+  box-shadow: var(--shadow-sm);
+  transition: var(--tr);
+}
+.stage .insp .abtn.ok {
+  border-radius: var(--r-pill);
+  transition: var(--tr);
+}
+.stage .insp .abtn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+/* The two prompt fields are recessed into the card, like the narration box
+   in a take: the card is the object, the text is set into it. */
+.stage .insp textarea {
+  background: #f8f8fa !important;
+  border: 1px solid rgba(24, 20, 40, 0.09) !important;
+  border-radius: 14px !important;
+  box-shadow: inset 0 1px 2px rgba(24, 20, 40, 0.05);
+}
+/* A grid item's default `min-width: auto` refuses to shrink below its
+   content's min-content width, so on a phone both columns kept their desktop
+   width and the monitor ran a full screen-width past the right edge — with
+   the filmstrip's own overflow:auto never getting a chance to scroll, because
+   nothing was ever narrower than its contents. Pre-dates the bubble; fixed
+   here because these are the panels being looked at. */
+.stage > * {
+  min-width: 0;
 }

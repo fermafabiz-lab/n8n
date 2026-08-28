@@ -1754,6 +1754,21 @@ the pipeline already produces.
   last part is deliberately narrow: never in controlled mode (it would change
   a project's saved voice behind the producer's back) and never on the
   unfiltered English list, which keeps its historical default voice.
+- **The provider selector is gone, and it had been LYING rather than merely
+  idle** (2026-08-28, spotted by the producer). ai33 was an aggregator, so
+  `VoicePicker` offered ElevenLabs / Minimax / Edge / Kokoro; going direct left
+  one provider, and `/api/voices` stopped reading the `provider` parameter
+  altogether — it survives only in a comment. So choosing Minimax returned an
+  ElevenLabs list, and the label claimed the voice was something it was not,
+  with that claim following the id into the film. This is the Captions-toggle
+  rule again — a control that cannot change the outcome reads as a decision —
+  except one step worse, because this one asserted a falsehood instead of
+  doing nothing. **The database was audited before assuming it was cosmetic**:
+  22 project narrator voices and 6 cast voices, every one `elevenlabs_`, so
+  nobody ever picked one and there is nothing to repair. Worth knowing why
+  that check mattered — a stored `minimax_…` id would pass the
+  `voice_id.includes('_')` validity test in all five places that use it and
+  then fail at ElevenLabs, which is a silent break, not a loud one.
 - **A metadata-only filter is not the search a human does.** The first
   language filter scanned pages with an empty query and kept only voices whose
   `language`/`accent` named the language — it surfaced TWO Romanian voices on

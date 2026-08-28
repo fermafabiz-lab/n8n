@@ -13,16 +13,20 @@ interface Voice {
   preview_url: string | null;
 }
 
-const PROVIDERS = [
-  { id: "elevenlabs", label: "ElevenLabs (best quality)" },
-  { id: "minimax", label: "Minimax" },
-  { id: "edge", label: "Edge (free)" },
-  { id: "kokoro", label: "Kokoro" },
-];
-
 /**
  * Voice picker with inline audio previews. The chosen prefixed voice_id is
  * submitted with the form and flows n8n -> ElevenLabs TTS unchanged.
+ *
+ * There is NO provider selector any more, and its removal is a correction
+ * rather than a simplification. ai33 was an aggregator, so the picker offered
+ * ElevenLabs / Minimax / Edge / Kokoro; going direct left exactly one
+ * provider, and `/api/voices` stopped reading the `provider` parameter
+ * altogether. The control therefore did nothing at all — pick Minimax and the
+ * list that came back was still ElevenLabs — which is worse than inert: the
+ * label claimed the voice was something it was not, and that claim followed
+ * the id into the film. Same rule as the Captions toggle a cinematic project
+ * no longer shows: a control that cannot change the outcome reads as a
+ * decision, and this one read as a wrong one.
  */
 export default function VoicePicker({
   name = "voice_id",
@@ -56,7 +60,6 @@ export default function VoicePicker({
    */
   language?: string;
 }) {
-  const [provider, setProvider] = useState("elevenlabs");
   const [q, setQ] = useState("");
   const [voices, setVoices] = useState<Voice[]>([]);
   const [internal, setInternal] = useState("elevenlabs_hpp4J3VqNfWAUOO0d1Us");
@@ -98,7 +101,7 @@ export default function VoicePicker({
       setError(null);
       try {
         const res = await fetch(
-          `/api/voices?provider=${provider}&q=${encodeURIComponent(q)}` +
+          `/api/voices?q=${encodeURIComponent(q)}` +
             (lang ? `&lang=${encodeURIComponent(lang)}` : ""),
         );
         const data = await res.json();
@@ -114,7 +117,7 @@ export default function VoicePicker({
       }
     }, 300);
     return () => clearTimeout(t);
-  }, [provider, q, lang]);
+  }, [q, lang]);
 
   /**
    * Keep the selection inside the language on screen.
@@ -156,18 +159,10 @@ export default function VoicePicker({
     <div className="field">
       <label>{label}</label>
       {!controlled && !multi && <input type="hidden" name={name} value={selected} />}
-      <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-        <select
-          value={provider}
-          onChange={(e) => setProvider(e.target.value)}
-          style={{ flex: "0 0 46%" }}
-        >
-          {PROVIDERS.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.label}
-            </option>
-          ))}
-        </select>
+      {/* The search box had 54% of this row; with the provider selector gone
+          it takes the whole width, which is the better half anyway — this is
+          the control that actually narrows a library of hundreds. */}
+      <div style={{ marginBottom: 10 }}>
         <input
           placeholder="Search: warm, deep, narration, british…"
           value={q}
@@ -208,8 +203,7 @@ export default function VoicePicker({
             <>
               Nothing in this library mentions <b>{langState.label}</b>, so every voice
               is shown. Multilingual voices read it anyway — what you lose is the
-              native accent, not the language. Another provider above may have a
-              native one.
+              native accent, not the language.
             </>
           )}
         </p>

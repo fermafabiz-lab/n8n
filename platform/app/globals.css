@@ -1035,19 +1035,14 @@ body:has(.nb) .nav {
   grid-template-columns: 1fr minmax(340px, 400px);
   gap: 18px;
 
-  /* This one panel is wider than the page it sits in, on purpose.
-     `.page` caps everything at 1200 because the room's other panels are
-     READING surfaces — a script, a list of takes — and a 1400px line of text
-     is worse than a narrow one. This panel is the opposite: a picture to judge
-     and a contact sheet under it, both of which are strictly better with more
-     room, and the strip pays for width in rows it does not have to spend.
-     100vw includes the scrollbar, hence the 64px of slack rather than the
-     48 the gutters actually need. */
-  width: min(1440px, calc(100vw - 64px));
-  max-width: none;
-  position: relative;
-  left: 50%;
-  transform: translateX(-50%);
+  /* It ends where the stepper ends. This panel was briefly wider than the
+     page — the extra room genuinely buys the strip rows it does not have to
+     spend — and it was the wrong trade: the room reads as a stack of panels
+     under one row of stage buttons, and one panel breaking that line makes
+     the page look broken rather than generous. `.pipe` pads its cards by 2px,
+     so this pads by 2px, and the bubbles line up with the Script card's left
+     edge and the Assembly card's right edge exactly as the script panel does. */
+  padding: 0 2px;
 }
 .monitor {
   background: var(--card);

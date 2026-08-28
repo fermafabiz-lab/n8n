@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   languageByCode,
   narrowsUsefully,
-  normLang,
   voiceMatchesLanguage,
   voiceMentionsLanguage,
   type Language,
@@ -60,19 +59,15 @@ const shape = (v: Record<string, unknown>): VoiceRow => {
 /**
  * How a language search reaches the voices that are actually there.
  *
- * The first version scanned pages with an empty query and kept only voices
- * whose metadata NAMED the language. It surfaced two Romanian voices on a
- * library that visibly holds more, because a metadata scan over the first few
- * hundred entries is not the same search a human does. Typing "romanian" into
- * the box found them, so the provider's own search reaches deeper and reads
- * fields we cannot see.
+ * Two earlier attempts got this wrong in the same way — by searching a set
+ * that did not contain the answer. The first scanned pages of metadata and
+ * surfaced two Romanian voices on a library holding thousands. The second, the
+ * ElevenLabs migration, pointed the whole thing at `/v2/voices`, which is the
+ * ACCOUNT's own voices: 21 English premades, so the count went to zero and the
+ * filter silently gave up and showed everything.
  *
- * So both are used and merged: the upstream search for the language name, plus
- * the metadata scan. Metadata-confirmed voices rank above ones that only came
- * back from the name search, but neither is thrown away.
+ * The library has a language filter of its own. Use it — see `fetchShared`.
  */
-const NAME_PAGES = 4;
-const SCAN_PAGES = 6;
 const PAGE = 100;
 const MAX_RESULTS = 120;
 
@@ -99,8 +94,10 @@ export async function GET(req: NextRequest) {
   }
 
   /**
-   * One upstream page. Cursor-based: `next_page_token` rather than a number,
-   * which is why `walk` below carries the token instead of counting.
+   * One page of the ACCOUNT's own voices. Cursor-based: `next_page_token`
+   * rather than a number, which is why `listPage` carries the token instead
+   * of counting. This set is small and entirely English — it is the familiar
+   * default list, never the place to look for a language.
    */
   const fetchPage = async (size: number, query: string, token?: string) => {
     const url = new URL(`${ELEVEN}/v2/voices`);
@@ -119,18 +116,54 @@ export async function GET(req: NextRequest) {
     };
   };
 
-  /** Walk pages of one upstream query, collecting rows. */
-  const walk = async (query: string, pages: number): Promise<VoiceRow[]> => {
-    const out: VoiceRow[] = [];
-    let token: string | undefined;
-    for (let p = 0; p < pages; p++) {
-      const data = await fetchPage(PAGE, query, token);
-      const rows = data.voices ?? [];
-      out.push(...rows.map(shape));
-      token = data.next_page_token ?? undefined;
-      if (!data.has_more || !token || rows.length === 0) break;
-    }
-    return out;
+  /**
+   * The SHARED voice library — what a person means by "the ElevenLabs voices",
+   * and the endpoint the language filter HAS to use.
+   *
+   * Reading the wrong one is exactly what broke this feature. `/v2/voices`
+   * lists only the ACCOUNT's own voices: here that is 21 English premades and
+   * nothing else — measured against the live API, `has_more: false` and every
+   * single label `en`. No search and no scan over that set can ever surface a
+   * Romanian voice, so the filter below always fell through to "nothing
+   * mentions Romanian, so every voice is shown", with those same 21 English
+   * voices underneath it. The producer read that, correctly, as the language
+   * selector not working.
+   *
+   * `/v1/shared-voices` takes `language` as an ISO code NATIVELY, so upstream
+   * does the narrowing and the old scan-and-merge guesswork is not needed for
+   * it at all. Verified live: `language=ro` returns Mihai (transylvanian),
+   * Cornel, Roxana, Razvan — 4811 in total.
+   *
+   * Its rows are FLAT where `/v2/voices` nests under `labels`, which `shape()`
+   * already tolerates: it reads `labels[k] ?? v[k]`.
+   *
+   * A shared voice is directly usable — no "add to library" step. Verified by
+   * synthesizing a Romanian line with one: HTTP 200, audio/mpeg, billed. That
+   * check mattered, because offering a voice the pipeline then cannot speak
+   * would fail at the take rather than at the click.
+   */
+  const fetchShared = async (opts: {
+    language?: string;
+    search?: string;
+    size: number;
+  }) => {
+    const url = new URL(`${ELEVEN}/v1/shared-voices`);
+    url.searchParams.set("page_size", String(Math.min(100, opts.size)));
+    if (opts.language) url.searchParams.set("language", opts.language);
+    if (opts.search) url.searchParams.set("search", opts.search);
+    const res = await fetch(url, {
+      headers: { "xi-api-key": key },
+      next: { revalidate: 3600 },
+    });
+    if (!res.ok) throw new Error(`ElevenLabs library: HTTP ${res.status}`);
+    const data = (await res.json()) as {
+      voices?: Array<Record<string, unknown>>;
+      has_more?: boolean;
+    };
+    return {
+      voices: (data.voices ?? []).map(shape),
+      has_more: Boolean(data.has_more),
+    };
   };
 
   /**
@@ -159,41 +192,42 @@ export async function GET(req: NextRequest) {
 
   if (lang) {
     try {
-      // The upstream search AND the metadata scan, then merged. Run together —
-      // both are cached for an hour, so this costs one round of requests per
-      // language per hour, not one per keystroke.
-      const [byName, scanned] = await Promise.all([
-        walk(lang.name, NAME_PAGES).catch(() => [] as VoiceRow[]),
-        walk("", SCAN_PAGES).catch(() => [] as VoiceRow[]),
-      ]);
+      // The library, narrowed upstream on the ISO code it thinks in. The
+      // producer's own words go up as `search` in the same request rather than
+      // being applied afterwards — filtering locally would only ever search
+      // the 100 rows that happened to come back.
+      const lib = await fetchShared({ language: lang.code, search: q, size: PAGE });
 
-      const seen = new Set<string>();
+      // Upstream's filter is FUZZY, and that is measured rather than assumed:
+      // `language=ro` came back 68 Romanian out of 100, and `language=ro` plus
+      // `search=warm` only 33 — a multilingual voice labelled `en` is offered
+      // for `ro` because it is verified to read it. Good enough as a SET,
+      // wrong as an ORDER, so the same two metadata tests the pre-migration
+      // version used still rank the result: labelled with the language first,
+      // merely mentioning it second, nothing thrown away. That also keeps the
+      // picker's "N labelled with the language, the rest matched by name or
+      // description" line true, which a blanket `confirmed = count` would have
+      // quietly turned into a lie.
       const confirmed: VoiceRow[] = [];
       const likely: VoiceRow[] = [];
-      for (const v of [...byName, ...scanned]) {
+      const seen = new Set<string>();
+      for (const v of lib.voices) {
         if (!v.voice_id || seen.has(v.voice_id)) continue;
         seen.add(v.voice_id);
         if (voiceMatchesLanguage(v, lang)) confirmed.push(v);
         else if (voiceMentionsLanguage(v, lang)) likely.push(v);
       }
 
-      // The producer's own search narrows WITHIN the language, locally —
-      // the upstream search is already spent on the language name.
-      const needle = normLang(q);
-      const keep = (v: VoiceRow) =>
-        !needle ||
-        normLang(`${v.name} ${v.description ?? ""} ${v.accent ?? ""}`).includes(needle);
-
-      const voices = [...confirmed, ...likely].filter(keep).slice(0, MAX_RESULTS);
+      const voices = [...confirmed, ...likely].slice(0, MAX_RESULTS);
       if (voices.length > 0) {
         return NextResponse.json({
           voices,
-          has_more: false,
+          has_more: lib.has_more,
           language: {
             applied: true,
             code: lang.code,
             label: lang.name,
-            confirmed: confirmed.filter(keep).length,
+            confirmed: confirmed.length,
             total: voices.length,
           },
         });
@@ -212,7 +246,26 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    return NextResponse.json(await listPage(Number(page) || 1, 24, q));
+    const own = await listPage(Number(page) || 1, 24, q);
+    // A SEARCH has to reach the library, not just the account's own voices.
+    // Under ai33 typing "romanian" found Romanian voices; against the 21
+    // premades alone it finds nothing at all. Own voices stay first because
+    // they are the familiar default list this baseline case exists to show —
+    // and the historical default narrator is among them.
+    if (q) {
+      const lib = await fetchShared({ search: q, size: PAGE }).catch(() => null);
+      if (lib) {
+        const seen = new Set(own.voices.map((v) => v.voice_id));
+        const extra = lib.voices.filter((v) => !seen.has(v.voice_id));
+        if (extra.length > 0) {
+          return NextResponse.json({
+            voices: [...own.voices, ...extra].slice(0, MAX_RESULTS),
+            has_more: false,
+          });
+        }
+      }
+    }
+    return NextResponse.json(own);
   } catch (e) {
     return NextResponse.json({ error: String((e as Error).message) }, { status: 502 });
   }

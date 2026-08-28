@@ -1769,6 +1769,31 @@ the pipeline already produces.
   that check mattered — a stored `minimax_…` id would pass the
   `voice_id.includes('_')` validity test in all five places that use it and
   then fail at ElevenLabs, which is a silent break, not a loud one.
+- **`/v2/voices` is the ACCOUNT's own voices — 21 English premades — and
+  pointing the language filter at it killed the feature** (2026-08-28). The
+  ElevenLabs migration replaced ai33's aggregated catalogue with that endpoint,
+  so the filter was searching a set that could not contain the answer:
+  `has_more: false`, every label `en`, zero Romanian voices reachable by any
+  scan or search. It then fell through to its own "nothing mentions Romanian,
+  so every voice is shown" branch, and the producer correctly read that as the
+  selector not working. **The library is `/v1/shared-voices`**, which takes
+  `language` as an ISO code natively — 4811 Romanian voices, Mihai
+  (transylvanian), Cornel, Roxana. Its rows are FLAT where `/v2/voices` nests
+  under `labels`, which `shape()` already tolerates (`labels[k] ?? v[k]`), so
+  no second shaper was needed.
+  Two things were verified against the live API before the rewrite, because
+  each could have failed at the take rather than at the click: a shared voice
+  id **synthesizes directly**, no "add to library" step (HTTP 200, audio/mpeg,
+  billed), and `/v1/voices/{id}` **resolves** it, which is what the audio
+  panel's name labels need.
+  **And upstream's language filter is FUZZY, which is measured, not assumed**:
+  `language=ro` returned 68 Romanian out of 100, and `language=ro&search=warm`
+  only 33 — a multilingual voice labelled `en` is offered for `ro` because it
+  is verified to read it. Right as a SET, wrong as an ORDER, so
+  `voiceMatchesLanguage`/`voiceMentionsLanguage` still rank the result exactly
+  as they did pre-migration. Deleting them because "upstream already filtered"
+  would also have made the picker's "N labelled with the language, the rest
+  matched by name or description" line a lie.
 - **A metadata-only filter is not the search a human does.** The first
   language filter scanned pages with an empty query and kept only voices whose
   `language`/`accent` named the language — it surfaced TWO Romanian voices on

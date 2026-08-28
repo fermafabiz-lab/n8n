@@ -9,6 +9,7 @@ import {
   saveCastAssignments,
   saveChapterVoices,
   sceneAction,
+  setPlaybackSpeed,
   useChapterNarrators,
   useSingleNarrator,
   type ActionResult,
@@ -18,7 +19,31 @@ import { useVoiceLabels, useVoiceNames } from "@/lib/voice-names";
 import { downloadSrc, mediaSrc } from "@/lib/media";
 import { chapterKeys as chapterKeysOf, chapterOf as chapterOfOrder } from "@/lib/chapters";
 import RegenBadge from "@/components/RegenBadge";
+import SpeedPicker from "@/components/SpeedPicker";
 import VoicePicker from "@/components/VoicePicker";
+
+/**
+ * Play a take at the film's pace.
+ *
+ * `preservesPitch` is the load-bearing half and it is set explicitly rather
+ * than left to the default: the render re-times with ffmpeg `atempo`, which
+ * resamples WITHOUT shifting pitch, so a preview that let the browser drop
+ * pitch with the rate would audition a slowed narrator as a deeper one — a
+ * different voice, not a slower reading, and the producer would be judging
+ * something the film will never do. The two vendor-prefixed spellings are
+ * still what older WebKit and Gecko read.
+ */
+function setRate(el: HTMLMediaElement | null, rate: number) {
+  if (!el) return;
+  const m = el as HTMLMediaElement & {
+    mozPreservesPitch?: boolean;
+    webkitPreservesPitch?: boolean;
+  };
+  m.preservesPitch = true;
+  m.mozPreservesPitch = true;
+  m.webkitPreservesPitch = true;
+  el.playbackRate = rate;
+}
 
 /**
  * Voice review gate — sits between scene approval and video generation.
@@ -122,9 +147,17 @@ export default function AudioReview({
   chapterVoices = {},
   language = "",
   projectName = "",
+  speed = 1,
 }: {
   projectId: string;
   scenes: Scene[];
+  /**
+   * The film's playback rate, resolved by buildProject the same way every
+   * other surface resolves it (Editing Options overrides, the brief's Pace
+   * word is the fallback). Passed in rather than read here so the panel can
+   * never show a rate the render is not using.
+   */
+  speed?: number;
   /** Only used to name downloaded files — a take called "S3 narration.mp3"
    *  is indistinguishable from every other project's third take. */
   projectName?: string;
@@ -203,6 +236,34 @@ export default function AudioReview({
       .map((v) => ({ id: v, label: shortVoice(v) })),
   ];
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // ---- pace ----------------------------------------------------------
+  /**
+   * Shown immediately on click, then dropped once the server's value catches
+   * up. The page re-renders itself every 10s, so a rate held only in local
+   * state would be reverted mid-audition by a refresh that landed before the
+   * write did — and one held only in the prop would leave the picker dead for
+   * the length of a round trip.
+   */
+  const [pendingRate, setPendingRate] = useState<number | null>(null);
+  const rate = pendingRate ?? speed;
+  useEffect(() => {
+    if (pendingRate !== null && Math.abs(pendingRate - speed) < 1e-9) {
+      setPendingRate(null);
+    }
+  }, [speed, pendingRate]);
+
+  /** Read by playFrom, which builds each element fresh. A closure over `rate`
+   *  would not do: "Play all" schedules the NEXT take from inside the current
+   *  one's onended, so a rate changed mid-run would not reach it. */
+  const rateRef = useRef(rate);
+  useEffect(() => {
+    rateRef.current = rate;
+    // Changing the pace while a take is playing retimes it on the spot, which
+    // is the whole point of auditioning here — you hear the difference on the
+    // line you are already listening to.
+    setRate(audioRef.current, rate);
+  }, [rate]);
 
   // ---- chapters mode -------------------------------------------------
   // The chapter rule itself lives in lib/chapters.ts — n8n's AB Pick Voice,
@@ -347,6 +408,7 @@ export default function AudioReview({
     if (!scene?.voiceUrl) return stop();
     audioRef.current?.pause();
     const a = new Audio(audioSrc(scene.voiceUrl));
+    setRate(a, rateRef.current);
     audioRef.current = a;
     setPlayingId(scene.id);
     setPlayAll(continuous);
@@ -411,10 +473,71 @@ export default function AudioReview({
           <>
             {" "}
             Full narration: <b>{Math.round(totalSeconds)}s</b> across{" "}
-            {withAudio.length} lines.
+            {withAudio.length} lines
+            {/* At any pace but 1× the take lengths stop being the film's
+                lengths, and this is the number the producer is actually
+                after. Said here rather than in the pace card so the running
+                time is stated once, in the place it was already stated. */}
+            {rate !== 1 && (
+              <>
+                {" "}
+                — <b>{Math.round(totalSeconds / rate)}s</b> at {rate}×
+              </>
+            )}
+            .
           </>
         )}
       </p>
+
+      {/*
+        Pace, decided here rather than at Final touches.
+
+        This is the cheapest moment it can be decided: the takes exist, the
+        pictures and clips do not, so a film that turns out too slow costs one
+        click instead of a re-render — and until now the control lived only on
+        screens that come AFTER every clip has been paid for.
+
+        It writes the same Editing Options.speed those screens write. One
+        stored value behind three doors, never a fourth setting.
+      */}
+      {withAudio.length > 0 && (
+        <div className="card" style={{ padding: "14px 16px", marginBottom: 14 }}>
+          <div className="kv" style={{ borderBottom: "none", paddingBottom: 8 }}>
+            <h5 style={{ margin: 0 }}>Pace — how fast the finished film plays</h5>
+            <span style={{ fontSize: 12, color: "var(--dim)" }}>
+              {rate === 1 ? "Normal" : `${rate}×`}
+            </span>
+          </div>
+          <SpeedPicker
+            value={rate}
+            /* Serialized on purpose. Two writes in flight could land out of
+               order, leaving the stored rate different from the lit chip with
+               nothing to correct it — the optimistic value only clears when
+               the server agrees, so a stale winner would stick. */
+            disabled={pending}
+            onChange={(v) => {
+              setPendingRate(v);
+              void run(() => setPlaybackSpeed(projectId, v));
+            }}
+          />
+          {/* Deliberately does not repeat "pitch unchanged" — SpeedPicker's
+              own note says it one line above, and the same caveat twice in
+              one card reads as two different claims. */}
+          <p
+            style={{
+              margin: "10px 0 0",
+              fontSize: 11.5,
+              color: "var(--dim)",
+              maxWidth: 620,
+            }}
+          >
+            Every take you play here follows this pace — including while it is
+            playing, so you hear the change on the line you are already
+            listening to. It is the same time-stretch the render applies, so
+            this is what the film will sound like.
+          </p>
+        </div>
+      )}
 
       {/*
         The narration on its own. It exists nowhere else: the pipeline stores

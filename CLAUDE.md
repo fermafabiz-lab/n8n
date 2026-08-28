@@ -861,7 +861,7 @@ Four things are load-bearing:
   unparseable, or within 0.01 of 1 → leave the film alone. Verified to agree on
   25 inputs. Change one, change all four.
 
-The site sets it in THREE places, and the brief is the one that was missed
+The site sets it in FOUR places, and the brief is the one that was missed
 first: `/new` posts `speed` beside `pace` — the WORD still goes to the two
 writing prompts that read it, and is DERIVED from the rate so the pair can
 never contradict each other — and `Normalize Webhook Input` puts the number
@@ -876,6 +876,40 @@ number, so it cannot join `FinalSettings`' `OPTIONS` list (booleans with a
 Toggle) — hence `ToggleKey` narrowing `keyof EditingOptions`, and a separate
 `changeCount` so "Apply 1 change" cannot omit the one change that alters the
 film's whole length.
+
+**The fourth door is the AUDIO step, and it is the only one that is cheap**
+(2026-08-28). The other three all sit either before any take exists or after
+every clip has been paid for, so "this film is too slow" was a discovery that
+cost a re-render at best. At the voice gate the takes exist and no picture
+does, which makes it the one moment the decision is free — `AudioReview` now
+carries the same `SpeedPicker` and writes the same `Editing Options.speed`
+through `setPlaybackSpeed`. One stored value behind four doors; there is no
+fourth setting, and **the refusal rule still has exactly four copies** — this
+added a surface, not a rate semantic.
+
+What makes it a real audition rather than a label is that every take the panel
+plays is retimed to the chosen rate. Three things are load-bearing:
+
+- **`preservesPitch` is set explicitly, not left to the default.** The render
+  re-times with `atempo`, which resamples WITHOUT shifting pitch. A preview
+  that let the browser drop pitch along with the rate would audition a slowed
+  narrator as a *deeper* one — a different voice, not a slower reading — so
+  the producer would be judging something the film will never do. Both vendor
+  spellings are set too; older WebKit and Gecko read those.
+- **`playFrom` reads the rate from a REF, not from its closure.** "Play all"
+  schedules the next take from inside the current one's `onended`, so the
+  callback holds whatever rate was current when that element was built. A
+  rate changed mid-run would apply to the line playing and to nothing after
+  it. Verified in a real browser: a take started after the change carries it.
+- **The picker is disabled while its write is in flight.** The lit chip is
+  optimistic and only clears once the server's value agrees, so two writes
+  landing out of order would leave storage on the loser with nothing left to
+  correct it. Serializing is cheaper than reconciling.
+
+Changing the pace while a take is playing retimes it on the spot — that is
+the point, and it is what the panel says out loud, because hearing the
+difference on the line already playing is the whole reason the control is
+there rather than two screens later.
 
 ### The Cinematic category (silent film)
 

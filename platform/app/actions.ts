@@ -1096,6 +1096,45 @@ export async function saveCastAssignments(
   }
 }
 
+/**
+ * Set the film's playback speed from the AUDIO step, before any picture
+ * exists.
+ *
+ * It writes the same `Editing Options.speed` that Final touches and the
+ * post-render sound panel write — one stored value behind three doors, so a
+ * pace chosen here is the one those two show later rather than a fourth
+ * setting to reconcile.
+ *
+ * What it deliberately does NOT do is fire a render, which is the whole
+ * difference from `rerenderWithSound`: at the audio step there is no film to
+ * re-cut, so the value simply waits for assembly, where speed.mjs applies it.
+ * That is also why this is the cheapest possible moment to make the decision —
+ * the alternative is discovering the film is too slow after paying for every
+ * clip.
+ */
+export async function setPlaybackSpeed(
+  projectId: string,
+  speed: number,
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  const rate = normalizeSpeed(speed);
+  try {
+    await updateEditingOptions(projectId, { speed: rate });
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message:
+        rate === 1
+          ? "Pace set to normal — the film plays as recorded."
+          : `Pace set to ${rate}× — applied to the whole film at assembly, picture and narration together.`,
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
 export async function approveAllScenes(
   projectId: string,
   sceneIds: string[],

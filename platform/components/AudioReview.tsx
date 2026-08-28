@@ -6,10 +6,11 @@ import {
   changeProjectVoice,
   regenerateVoice,
   reopenStep,
+  reopenPlaybackSpeed,
+  savePlaybackSpeed,
   saveCastAssignments,
   saveChapterVoices,
   sceneAction,
-  setPlaybackSpeed,
   useChapterNarrators,
   useSingleNarrator,
   type ActionResult,
@@ -148,6 +149,7 @@ export default function AudioReview({
   language = "",
   projectName = "",
   speed = 1,
+  speedLocked = false,
 }: {
   projectId: string;
   scenes: Scene[];
@@ -158,6 +160,8 @@ export default function AudioReview({
    * never show a rate the render is not using.
    */
   speed?: number;
+  /** Whether the pace has been signed off — see EditingOptions.speedLocked. */
+  speedLocked?: boolean;
   /** Only used to name downloaded files — a take called "S3 narration.mp3"
    *  is indistinguishable from every other project's third take. */
   projectName?: string;
@@ -239,19 +243,38 @@ export default function AudioReview({
 
   // ---- pace ----------------------------------------------------------
   /**
-   * Shown immediately on click, then dropped once the server's value catches
-   * up. The page re-renders itself every 10s, so a rate held only in local
-   * state would be reverted mid-audition by a refresh that landed before the
-   * write did — and one held only in the prop would leave the picker dead for
-   * the length of a round trip.
+   * The pace being auditioned, which is NOT yet the pace of the film — it
+   * becomes that only when Save is pressed.
+   *
+   * Backed by sessionStorage because this page re-renders itself every 10s:
+   * an unsaved choice held in component state alone would be thrown away
+   * mid-listen by a refresh, which is the one thing an audition control
+   * cannot survive. Null means "no draft" and the stored rate shows through,
+   * so a saved project reads its own value rather than a remembered one.
    */
-  const [pendingRate, setPendingRate] = useState<number | null>(null);
-  const rate = pendingRate ?? speed;
+  const paceKey = `vf-pace:${projectId}`;
+  const [draftRate, setDraftRate] = useState<number | null>(null);
   useEffect(() => {
-    if (pendingRate !== null && Math.abs(pendingRate - speed) < 1e-9) {
-      setPendingRate(null);
-    }
-  }, [speed, pendingRate]);
+    try {
+      const saved = sessionStorage.getItem(paceKey);
+      if (saved !== null) setDraftRate(Number(saved));
+    } catch {}
+  }, [paceKey]);
+  const pickRate = (v: number) => {
+    setDraftRate(v);
+    try {
+      sessionStorage.setItem(paceKey, String(v));
+    } catch {}
+  };
+  const clearDraft = () => {
+    setDraftRate(null);
+    try {
+      sessionStorage.removeItem(paceKey);
+    } catch {}
+  };
+  /** What the panel plays at, and what Save would store. */
+  const rate = draftRate ?? speed;
+  const paceDirty = draftRate !== null && Math.abs(draftRate - speed) > 1e-9;
 
   /** Read by playFrom, which builds each element fresh. A closure over `rate`
    *  would not do: "Play all" schedules the NEXT take from inside the current
@@ -430,6 +453,18 @@ export default function AudioReview({
 
   const fmt = (d: number | undefined) =>
     d === undefined ? "…" : d === 0 ? "—" : `${d.toFixed(1)}s`;
+  /**
+   * A take's length in the finished film, which is its own length only at 1×.
+   *
+   * Shown as "3.2s → 4.0s" so the raw figure survives: `flagFor` and
+   * `fitProblem` both judge the RECORDING (against its word count and against
+   * its shot), and neither question is about the pace — the retime scales the
+   * picture and the voice together, so a take that fits its shot at 1× fits it
+   * at every rate. Replacing the number rather than extending it would have
+   * made those two flags read as though they were measuring the retimed value.
+   */
+  const fmtAtPace = (d: number | undefined) =>
+    d === undefined || d === 0 || rate === 1 ? null : `${(d / rate).toFixed(1)}s`;
   const totalSeconds = withAudio.reduce((a, s) => a + (durations[s.id] ?? 0), 0);
 
   return (
@@ -504,38 +539,109 @@ export default function AudioReview({
         <div className="card" style={{ padding: "14px 16px", marginBottom: 14 }}>
           <div className="kv" style={{ borderBottom: "none", paddingBottom: 8 }}>
             <h5 style={{ margin: 0 }}>Pace — how fast the finished film plays</h5>
-            <span style={{ fontSize: 12, color: "var(--dim)" }}>
-              {rate === 1 ? "Normal" : `${rate}×`}
-            </span>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              {/* Always the STORED rate, never the draft — the picker below
+                  already shows what is selected, and a chip that agreed with
+                  it would leave nothing on screen saying the choice has not
+                  been written yet. */}
+              <span
+                className={
+                  speedLocked ? "chip ok" : paceDirty ? "chip wait" : "chip"
+                }
+              >
+                {speed === 1 ? "Normal" : `${speed}×`}
+                {speedLocked ? " · saved" : paceDirty ? " · not saved yet" : ""}
+              </span>
+              {speedLocked && (
+                // The way back, the same shape every other signed-off step on
+                // this page offers. Without it the first Save would be
+                // permanent, which is not a decision anyone should have to
+                // make from a preview.
+                <button
+                  className="abtn"
+                  disabled={pending}
+                  onClick={() => run(() => reopenPlaybackSpeed(projectId))}
+                  title="Reopen the pace — the film keeps this one until you save a new one"
+                >
+                  ✎ Make changes
+                </button>
+              )}
+            </div>
           </div>
-          <SpeedPicker
-            value={rate}
-            /* Serialized on purpose. Two writes in flight could land out of
-               order, leaving the stored rate different from the lit chip with
-               nothing to correct it — the optimistic value only clears when
-               the server agrees, so a stale winner would stick. */
-            disabled={pending}
-            onChange={(v) => {
-              setPendingRate(v);
-              void run(() => setPlaybackSpeed(projectId, v));
-            }}
-          />
-          {/* Deliberately does not repeat "pitch unchanged" — SpeedPicker's
-              own note says it one line above, and the same caveat twice in
-              one card reads as two different claims. */}
-          <p
-            style={{
-              margin: "10px 0 0",
-              fontSize: 11.5,
-              color: "var(--dim)",
-              maxWidth: 620,
-            }}
-          >
-            Every take you play here follows this pace — including while it is
-            playing, so you hear the change on the line you are already
-            listening to. It is the same time-stretch the render applies, so
-            this is what the film will sound like.
-          </p>
+
+          {speedLocked ? (
+            <p style={{ margin: 0, fontSize: 12.5, color: "var(--soft)" }}>
+              Signed off. The film renders at{" "}
+              <b>{speed === 1 ? "normal speed" : `${speed}×`}</b>
+              {speed !== 1 && totalSeconds > 0 && (
+                <>
+                  {" "}
+                  — {Math.round(totalSeconds)}s of narration becomes{" "}
+                  <b>{Math.round(totalSeconds / speed)}s</b>
+                </>
+              )}
+              . Press <b>Make changes</b> to pick a different one.
+            </p>
+          ) : (
+            <>
+              <SpeedPicker value={rate} disabled={pending} onChange={pickRate} />
+              {/* Deliberately does not repeat "pitch unchanged" — SpeedPicker's
+                  own note says it one line above, and the same caveat twice in
+                  one card reads as two different claims. */}
+              <p
+                style={{
+                  margin: "10px 0 0",
+                  fontSize: 11.5,
+                  color: "var(--dim)",
+                  maxWidth: 620,
+                }}
+              >
+                Nothing is stored until you save — try the rates against the
+                takes first. Every take you play here follows the one selected,
+                including while it is playing, so you hear the change on the
+                line you are already listening to. It is the same time-stretch
+                the render applies, so this is what the film will sound like.
+              </p>
+              {/* A plain row, not `.abtns` — that class stretches each button
+                  to fill the width, which is right for the per-scene controls
+                  and far too loud for a card-level commit. Matches the
+                  Apply/Cancel rows on the chapter and narrator cards. */}
+              <div
+                style={{
+                  display: "flex",
+                  gap: 10,
+                  flexWrap: "wrap",
+                  marginTop: 10,
+                }}
+              >
+                <button
+                  className="abtn ok"
+                  disabled={pending}
+                  onClick={() =>
+                    run(async () => {
+                      const r = await savePlaybackSpeed(projectId, rate);
+                      // Only on success: a cleared draft after a failed write
+                      // would silently drop the choice back to the stored rate
+                      // while the error message says it was not saved.
+                      if (r.ok) clearDraft();
+                      return r;
+                    })
+                  }
+                >
+                  {pending
+                    ? "…"
+                    : paceDirty
+                      ? `✓ Save pace — ${rate === 1 ? "Normal" : `${rate}×`}`
+                      : "✓ Save this pace"}
+                </button>
+                {paceDirty && (
+                  <button className="abtn" disabled={pending} onClick={clearDraft}>
+                    Cancel — keep {speed === 1 ? "Normal" : `${speed}×`}
+                  </button>
+                )}
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -955,6 +1061,17 @@ export default function AudioReview({
                       style={{ fontSize: 12, color: "var(--dim)", fontVariantNumeric: "tabular-nums" }}
                     >
                       {fmt(durations[s.id])}
+                      {/* The same X → Y the running total shows, per line, so
+                          the pace can be judged against the scene it will
+                          actually change rather than against the film's sum. */}
+                      {fmtAtPace(durations[s.id]) && (
+                        <>
+                          {" → "}
+                          <b style={{ color: "var(--soft)" }}>
+                            {fmtAtPace(durations[s.id])}
+                          </b>
+                        </>
+                      )}
                     </span>
                     {mode === "chapters" && chapterKeys.length > 0 && (() => {
                       const ch = chapterOf(s);

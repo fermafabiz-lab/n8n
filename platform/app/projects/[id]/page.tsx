@@ -653,6 +653,7 @@ export default async function ProductionRoom({
             castAssign={project.castAssign}
             chapterVoices={project.chapterVoices}
             speed={project.editing.speed}
+            speedLocked={project.editing.speedLocked}
           />
         )}
 

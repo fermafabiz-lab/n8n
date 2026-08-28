@@ -861,7 +861,7 @@ Four things are load-bearing:
   unparseable, or within 0.01 of 1 → leave the film alone. Verified to agree on
   25 inputs. Change one, change all four.
 
-The site sets it in FOUR places, and the brief is the one that was missed
+The site sets it in THREE places, and the brief is the one that was missed
 first: `/new` posts `speed` beside `pace` — the WORD still goes to the two
 writing prompts that read it, and is DERIVED from the rate so the pair can
 never contradict each other — and `Normalize Webhook Input` puts the number
@@ -869,23 +869,59 @@ into Editing Options at creation. Without that last hop the brief could only
 ever choose a word, and the degree (0.8 versus 0.9) had nowhere to live; the
 first version of this feature shipped with the picker on the project page only,
 which reads as "nothing changed" from the screen the producer actually starts
-on. Then `FinalSettings` before the render and `SoundSettings` ("Sound and
-speed of this film") after, which writes the merged options and re-fires the
-assemble webhook. Speed is a
-number, so it cannot join `FinalSettings`' `OPTIONS` list (booleans with a
-Toggle) — hence `ToggleKey` narrowing `keyof EditingOptions`, and a separate
-`changeCount` so "Apply 1 change" cannot omit the one change that alters the
-film's whole length.
+on. Then the **audio step**, which is where the decision is actually made, and
+`SoundSettings` ("Sound and speed of this film") after the render, which writes
+the merged options and re-fires the assemble webhook.
 
-**The fourth door is the AUDIO step, and it is the only one that is cheap**
-(2026-08-28). The other three all sit either before any take exists or after
-every clip has been paid for, so "this film is too slow" was a discovery that
-cost a re-render at best. At the voice gate the takes exist and no picture
-does, which makes it the one moment the decision is free — `AudioReview` now
-carries the same `SpeedPicker` and writes the same `Editing Options.speed`
-through `setPlaybackSpeed`. One stored value behind four doors; there is no
-fourth setting, and **the refusal rule still has exactly four copies** — this
-added a surface, not a rate semantic.
+**`FinalSettings` no longer touches it** (2026-08-28). It used to carry a
+`SpeedPicker` as a numbered row, which is why the paragraph above used to talk
+about `ToggleKey` narrowing `keyof EditingOptions` and a separate `changeCount`
+"so Apply 1 change cannot omit the one change that alters the film's whole
+length" — none of that is about speed any more. `ToggleKey` stays, because
+`speed` is still a number in `EditingOptions` and `keyof` would still widen
+`opts[o.key]` to `number | boolean`; note it now also admits `speedLocked`,
+harmlessly, since `OPTIONS` is an explicit list.
+
+**`confirmFinalSettings` omits `speed` from its payload entirely, and that is
+load-bearing rather than tidy.** `updateEditingOptions` MERGES, so an absent
+key leaves the stored rate alone — while a settings object still carrying a
+defaulted `speed: 1` would have overwritten the producer's choice on every
+single render. Same shape as the Airtable bug where a mapped numeric field
+with no value wrote a literal `0`: the field that destroys data is the one
+nobody meant to send.
+
+**The audio step is the only door that is cheap** (2026-08-28). The brief comes
+before any take exists and `SoundSettings` after every clip has been paid for,
+so "this film is too slow" was a discovery that cost a re-render at best. At
+the voice gate the takes exist and no picture does, which makes it the one
+moment the decision is free — `AudioReview` carries the `SpeedPicker` and
+writes `Editing Options.speed` through `savePlaybackSpeed`. One stored value
+behind three doors; there is no separate setting, and **the refusal rule still
+has exactly four copies** — this added a surface, not a rate semantic.
+
+**Nothing is stored until Save.** The picker sets a DRAFT, so the rates can be
+tried against the takes without writing; `savePlaybackSpeed` commits the rate
+and sets `speedLocked` in the same write (two writes could leave a project
+signed off at a pace it never stored, and only one of those halves is visible
+on screen). Once locked the picker is gone and the card offers **`✎ Make
+changes`** → `reopenPlaybackSpeed`, which clears the lock ONLY and leaves the
+rate — reopening means "let me look again", not "throw away what I chose".
+`speedLocked` is read strictly as `=== true`, so every film made before it
+existed reads as unlocked rather than arriving frozen.
+
+**The draft is backed by `sessionStorage` (`vf-pace:<projectId>`), and it has
+to be**: this page re-renders itself every 10 seconds, so an unsaved choice
+held in component state alone would be thrown away mid-listen — the one thing
+an audition control cannot survive. It is read after mount, never in the state
+initializer, or the server render and the hydration disagree.
+
+**Each take shows `3.0s → 3.3s`**, its own length and its length in the film,
+alongside the same figure for the whole narration. The raw number stays rather
+than being replaced, because `flagFor` and `fitProblem` both judge the
+RECORDING — against its word count, and against its shot — and neither
+question is about the pace: the retime scales picture and voice together, so a
+take that fits its shot at 1× fits it at every rate. Replacing the number
+would have made those two flags read as though they measured the retimed value.
 
 What makes it a real audition rather than a label is that every take the panel
 plays is retimed to the chosen rate. Three things are load-bearing:

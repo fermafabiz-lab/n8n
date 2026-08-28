@@ -833,8 +833,14 @@ export async function confirmFinalSettings(
     endScreen: boolean;
     sfx: boolean;
     music: boolean;
-    /** Playback rate of the finished film — see EditingOptions.speed. */
-    speed: number;
+    /* NO `speed` here, on purpose. The pace is decided and signed off at the
+       audio step, which is the only moment it is free to change, and this
+       panel must not be able to move it — nor to reset it. Because
+       updateEditingOptions MERGES, omitting the key leaves the stored rate
+       untouched; sending a defaulted one would have written `speed: 1` over
+       the producer's choice on every render, which is the same shape as the
+       Airtable bug where a mapped numeric field with no value wrote a
+       literal 0. */
   },
   /**
    * The drawn cards the producer KEPT, when they dropped any.
@@ -862,7 +868,6 @@ export async function confirmFinalSettings(
         endScreen: settings.endScreen,
         sfx: settings.sfx,
         music: settings.music,
-        speed: normalizeSpeed(settings.speed),
       });
     }
     // Same merge, separate condition: the cards change even when no toggle
@@ -1112,7 +1117,7 @@ export async function saveCastAssignments(
  * the alternative is discovering the film is too slow after paying for every
  * clip.
  */
-export async function setPlaybackSpeed(
+export async function savePlaybackSpeed(
   projectId: string,
   speed: number,
 ): Promise<ActionResult> {
@@ -1121,14 +1126,42 @@ export async function setPlaybackSpeed(
   }
   const rate = normalizeSpeed(speed);
   try {
-    await updateEditingOptions(projectId, { speed: rate });
+    // Locked in the same write as the rate it locks. Two writes could leave
+    // a project signed off at a pace it never stored, or storing a pace
+    // nobody signed off — and only one of those two is visible on screen.
+    await updateEditingOptions(projectId, { speed: rate, speedLocked: true });
     revalidatePath(`/projects/${projectId}`);
     return {
       ok: true,
       message:
         rate === 1
-          ? "Pace set to normal — the film plays as recorded."
-          : `Pace set to ${rate}× — applied to the whole film at assembly, picture and narration together.`,
+          ? "Pace saved — normal, the film plays as recorded."
+          : `Pace saved — ${rate}×, applied to the whole film at assembly, picture and narration together.`,
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/**
+ * Reopen the pace after it was signed off.
+ *
+ * Deliberately clears the lock ONLY, leaving the stored rate alone: reopening
+ * means "I want to look at this again", not "throw away what I chose", so the
+ * picker comes back sitting on the pace the film currently has.
+ */
+export async function reopenPlaybackSpeed(
+  projectId: string,
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    await updateEditingOptions(projectId, { speedLocked: false });
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message: "Pace reopened — pick a new one and save it again.",
     };
   } catch (e) {
     return { ok: false, message: friendlyError(e) };

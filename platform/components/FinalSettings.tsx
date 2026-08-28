@@ -4,7 +4,6 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { confirmFinalSettings, type ActionResult } from "@/app/actions";
 import Toggle from "@/components/Toggle";
-import SpeedPicker from "@/components/SpeedPicker";
 import { useSetPendingStage } from "@/components/StageNav";
 import type { EditingOptions, MotifCard } from "@/lib/data";
 
@@ -18,9 +17,11 @@ import type { EditingOptions, MotifCard } from "@/lib/data";
  * default path is one click ("Keep initial settings"), and the toggles are
  * there for the rarer case where something should come off.
  */
-/** Only the switch-shaped options belong in the list below — `speed` is a
- *  number and gets its own row, so `keyof EditingOptions` is too wide and
- *  would type `opts[o.key]` as `number | boolean`. */
+/** Only the switch-shaped options belong in the list below. `keyof
+ *  EditingOptions` is too wide — it would type `opts[o.key]` as
+ *  `number | boolean` because of `speed` — so this narrows to the boolean
+ *  keys. It admits `speedLocked` too, which is boolean but is not a setting
+ *  this panel owns; OPTIONS is an explicit list, so it simply never appears. */
 type ToggleKey = {
   [K in keyof EditingOptions]: EditingOptions[K] extends boolean ? K : never;
 }[keyof EditingOptions];
@@ -138,15 +139,17 @@ export default function FinalSettings({
   // is simply not there.
   const rows = OPTIONS.filter((o) => !(silent && o.spokenOnly));
   const changedKeys = rows.filter((o) => opts[o.key] !== initial[o.key]);
-  // Speed is a number, so it cannot join OPTIONS (booleans with a Toggle) and
-  // is counted separately — but it must be counted, or "Apply 1 change" would
-  // omit the one change that alters the film's whole length.
-  const speedMoved = opts.speed !== initial.speed;
-  // A dropped animation counts for the same reason speed does: it changes the
+  // The pace is NOT here any more — it is decided and signed off at the audio
+  // step, the one moment it costs nothing, and this panel neither shows it nor
+  // writes it. (confirmFinalSettings therefore omits `speed` entirely rather
+  // than sending a default, which would overwrite that choice on every
+  // render.)
+  //
+  // A dropped animation still counts alongside the toggles: it changes the
   // film, and a button reading "Keep initial settings" after you switched one
   // off would be telling you something untrue.
-  const changed = changedKeys.length > 0 || speedMoved || dropped.length > 0;
-  const changeCount = changedKeys.length + (speedMoved ? 1 : 0) + dropped.length;
+  const changed = changedKeys.length > 0 || dropped.length > 0;
+  const changeCount = changedKeys.length + dropped.length;
   const done = msg?.ok === true;
   const router = useRouter();
   const setPendingStage = useSetPendingStage();
@@ -228,29 +231,6 @@ export default function FinalSettings({
             </div>
           );
         })}
-        {/* Not a switch, so it sits at the end of the same numbered index
-            rather than pretending to be one. It is offered on a silent film
-            too: a cinematic project has no narration to slow down, but the
-            picture, the music and the graphics all still re-time. */}
-        <div className={`swrow ${opts.speed !== 1 ? "on" : ""}`}>
-          <span className="no">{String(rows.length + 1).padStart(2, "0")}</span>
-          <div>
-            <h4>
-              Speed
-              {speedMoved && <span className="chg">changed</span>}
-            </h4>
-            <p>
-              How fast the finished film plays. This is what the PACE choice on
-              the brief sets — before now it only nudged the writing prompts and
-              left the video untouched.
-            </p>
-          </div>
-          <SpeedPicker
-            value={opts.speed}
-            onChange={(v) => setOpts((p) => ({ ...p, speed: v }))}
-            disabled={done}
-          />
-        </div>
       </div>
 
       {/* Drawn cards. Absent entirely when the pipeline chose none, which is

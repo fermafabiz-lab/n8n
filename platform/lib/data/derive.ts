@@ -38,6 +38,17 @@ export interface EditingOptions {
    *  narration, the music and every baked-in graphic all move together; see
    *  remotion/server/speed.mjs for why no earlier step can own it. */
   speed: number;
+  /**
+   * Whether the producer has signed the pace off at the audio step.
+   *
+   * The pace is auditioned by ear, so the picker has to stay live while a
+   * take plays — which means the panel cannot tell "still deciding" from
+   * "decided" on its own. This is that signal, and nothing but the audio
+   * panel reads it: the render resolves `speed` whatever this says.
+   * Absent on every project stored before it existed, which reads as false
+   * and leaves those films editable, the safe direction.
+   */
+  speedLocked: boolean;
 }
 
 /** The three PACE values, as speeds. Mirrors SPEED_BY_PACE in speed.mjs. */
@@ -438,6 +449,10 @@ export function buildProject(r: RawProject): Project {
         opts.speed === undefined || opts.speed === null
           ? normalizeSpeed(r.paceRaw)
           : normalizeSpeed(opts.speed),
+      // Strictly `=== true`, so a project with no such key — every film made
+      // before the audio step could sign the pace off — reads as unlocked
+      // and keeps its control rather than arriving frozen.
+      speedLocked: opts.speedLocked === true,
     },
     awaitingFinalSettings: /setari finale/.test(normalizeStatus(r.statusRaw)),
     category: typeof opts.category === "string" ? opts.category : null,

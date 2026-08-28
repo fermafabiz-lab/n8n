@@ -214,11 +214,16 @@ These each cost hours. Do not rediscover them.
   node needed `resource: file` + `operation: upload` re-set by hand, and
   `VR Find Audio Folder` needed `operation: search`.
 
-### TTS: ElevenLabs direct, since 2026-08-27
+### TTS: ElevenLabs direct — written 2026-08-27, LIVE since 2026-08-28
 
 ai33 was an ElevenLabs **reseller** — same `xi-api-key` header, same voices,
 ids wearing an `elevenlabs_` prefix. Going direct was a change of endpoint and
 of FLOW, not of concepts, and it removed more than it added.
+
+Note the two dates, and that this heading said "since 2026-08-27" for a day
+while production was still calling ai33: the repo half deployed and the two
+n8n halves stayed parked as unpublished drafts. Everything below describes
+the workflows as they now actually run, verified against `activeVersionId`.
 
 - **The poll loops are gone.** ai33 worked on tasks: submit, wait, poll every
   3s, guard against a runaway loop, then download a URL. ElevenLabs answers
@@ -2890,35 +2895,54 @@ generated FROM it. The chain, and where each piece lives:
   nodes carry `resource: file` + `operation: upload` again in everything now
   parked. The *check* stays worth running after any UI visit; the specific
   draft it warned about does not exist.
-- **The ElevenLabs TTS migration is written and NOT LIVE** (audited 2026-08-28).
-  Commit `8ffcf57` shipped the repo half — which deployed — while both n8n
-  halves sit as unpublished drafts, so **production still synthesizes through
-  ai33**. This is the `update_workflow`-does-not-publish trap, caught by
-  comparing `activeVersionId` rather than by reading `get_workflow_details`:
+- **The ElevenLabs TTS migration went live 2026-08-28**, on the producer's
+  say-so, after sitting written-but-parked for a day. Commit `8ffcf57` had
+  shipped the repo half — which deployed — while both n8n halves stayed
+  unpublished drafts, so production kept synthesizing through ai33 with
+  nothing on screen to say so. Textbook `update_workflow`-does-not-publish,
+  and it was invisible from `get_workflow_details` (which returns the DRAFT);
+  only `activeVersionId` told the truth.
 
-  | Workflow | active | parked |
+  | Workflow | now active | was active |
   |---|---|---|
-  | Media Generation `yHG4DBCDjR3RJzav` | `97321056` (08-26, the audio-first reorder) | `5935ff37`, `c1cd26d0` (08-27) |
-  | Claude Scripting `gkEtGMecv4TC3ZHp` | `8211a0e5` (08-17) | six versions (08-27) |
+  | Media Generation `yHG4DBCDjR3RJzav` | `c1cd26d0` | `97321056` (08-26, the audio-first reorder) |
+  | Claude Scripting `gkEtGMecv4TC3ZHp` | `4ce12fa6` | `8211a0e5` (08-17) |
 
-  Both drafts were diffed node-for-node against their active version and are
-  clean — no dangling `$('<deleted node>')` references, Drive uploads intact,
-  and on Media Generation the ONLY differences are the TTS nodes, so the
-  audio-first reorder is carried forward untouched.
+  Both drafts were diffed node-for-node against their active version first.
+  Media Generation's differed ONLY in the TTS nodes — no dangling
+  `$('<deleted node>')` references, all twelve Drive nodes keeping their
+  `resource`/`operation` — so the audio-first reorder was carried forward
+  intact and is verified live. **Scripting's carried two unrelated features**,
+  the voice-regen swap *and* the whole motif-card chain, so publishing it
+  shipped both: that is "whatever is parked goes live with your change" in
+  the concrete, and the motif chain is now in the scripting happy path
+  without ever having run on a real film.
 
-  Two things to know before publishing either. **Scripting's draft bundles two
-  unrelated features** — the ElevenLabs voice-regen swap *and* the whole
-  motif-card chain spliced in-line between `Save scenes To Airtable1` and
-  `Wait For Scene Approval` — so publishing it ships both; that is the
-  "whatever is parked goes live with your change" hazard in the concrete.
-  And **publishing does not change how the audio sounds**: the new nodes and
-  `remotion/server/tts.mjs` both pin `eleven_multilingual_v2`, deliberately,
-  which is the model ai33 was already choosing. The migration buys direct
-  billing, one call instead of a 3s poll loop, and *access* to the
-  `voice_settings` ai33 silently dropped — not a better take. Changing the
-  model or the settings is a separate decision, and the two copies of `MODEL`
-  must move together or a regenerated line comes back in a different voice
-  character from its neighbours.
+  **It does not change how the audio sounds, and that was true before the
+  publish too.** The new nodes and `remotion/server/tts.mjs` both pin
+  `eleven_multilingual_v2` on purpose — the model ai33 was already choosing —
+  so the migration buys direct billing, one call instead of a 3s poll loop,
+  and *access* to the `voice_settings` ai33 silently dropped. Not a better
+  take. The node exposes `additionalOptions.voiceSettings` and
+  `languageCode`; using them is the separate change that would actually move
+  the sound, and the two copies of `MODEL` must move together or a
+  regenerated line comes back in a different voice character from its
+  neighbours.
+- **`setNodeCredential` applies IN PLACE to the live version — it does not
+  stage a draft**, which makes it the exception to the rule two bullets up.
+  Verified on both workflows 2026-08-28: `versionId` and `activeVersionId`
+  were unchanged afterwards, `versionCounter` did not move, no new entry
+  appeared in `get_workflow_history`, and only `updatedAt` advanced. So a
+  credential fix needs no `publish_workflow` — and, less comfortably, it
+  cannot be staged or reviewed before it is live. Do not batch one into an
+  `update_workflow` call alongside node edits you meant to park.
+- **`credentials: None` is redaction, never evidence — prove it with a
+  control.** The API blanks every node's credential binding, so the question
+  "is this new node bound?" cannot be read. The cheap test is a differential
+  one: dump a node that provably works (a Google Drive upload that has been
+  uploading for months) alongside the node in doubt. Both read `None`, which
+  settles that the field carries no signal. Then use the documented remedy —
+  setting is idempotent, so just set it and the unknown becomes a known.
 - **Confirm the hook chapter's ordinal survives Postgres.** `chapter_ordinal_check`
   rejected `Ordine: 0` on 2026-08-16 (execution 4225 → 4226). Later runs
   succeeded, but whether the constraint, the payload or the absence of a hook is

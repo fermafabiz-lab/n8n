@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
   approveAllOfKind,
   cancelVideoRegen,
@@ -289,19 +289,26 @@ export default function SceneBoard({
     step === "video" && !!active && !!active.videoUrl && !active.videoApproved;
 
   /**
-   * The filmstrip is split by chapter, and paged inside it.
+   * The filmstrip is split by chapter, and WRAPS inside it.
    *
-   * A 44-scene project turned the strip into a wall of unreadable thumbnails,
-   * and paging it by 8 fixed the crowding without fixing the navigation: page
-   * 3 of 6 says nothing about where you are in the film. Chapters are the
-   * divisions the producer actually thinks in — and the ones the script was
-   * written in — so they carry the strip whenever a film has more than one.
+   * A 44-scene project turned the strip into a wall of unreadable thumbnails.
+   * The first fix was paging by 8, which cured the crowding without curing the
+   * navigation: page 3 of 6 says nothing about where you are in the film.
+   * Chapters are the divisions the producer actually thinks in — and the ones
+   * the script was written in — so they carry the strip whenever a film has
+   * more than one.
    *
-   * Films that are one chapter keep the plain paging exactly as it was:
-   * anything under two minutes is a single chapter by construction
-   * (`ceil(Lenght / 120)`), and a row holding one "Hook" button is noise.
+   * With chapters carrying it, the paging inside a chapter became the thing in
+   * the way: a chapter is about eight scenes by construction
+   * (`ceil(Lenght / 120)` makes one every two minutes), so its scenes very
+   * nearly fit already and the arrows existed to hide the last one or two.
+   * The strip now shows the WHOLE chapter and wraps — up to three rows, then
+   * it scrolls. Nothing is hidden behind a control any more.
+   *
+   * Films that are one chapter render exactly the same way, minus the tabs:
+   * anything under two minutes is a single chapter by construction, and a row
+   * holding one "Hook" button is noise.
    */
-  const PAGE_SIZE = 8;
   const orders = scenes.map((s) => s.order);
   const byChapter = groupsByChapter(orders);
   const chapters = byChapter ? chapterKeys(orders) : [];
@@ -313,25 +320,7 @@ export default function SceneBoard({
   const pool = byChapter
     ? frames.filter(({ s }) => chapterKeyOf(s.order) === chapter)
     : frames;
-  const pageCount = Math.max(1, Math.ceil(pool.length / PAGE_SIZE));
-  const posInPool = Math.max(
-    0,
-    pool.findIndex(({ s }) => s.id === active?.id),
-  );
-  const [pageRaw, setPage] = useState(() => Math.floor(posInPool / PAGE_SIZE));
-  const page = Math.min(pageRaw, pageCount - 1);
-  const select = (id: string) => {
-    setSelectedId(id);
-    const target = scenes.find((s) => s.id === id);
-    if (!target) return;
-    // Position within the pool the strip will show AFTER this selection —
-    // which is that scene's own chapter, not the one currently on screen.
-    const next = byChapter
-      ? scenes.filter((s) => chapterKeyOf(s.order) === chapterKeyOf(target.order))
-      : scenes;
-    const i = next.findIndex((s) => s.id === id);
-    if (i >= 0) setPage(Math.floor(i / PAGE_SIZE));
-  };
+  const select = (id: string) => setSelectedId(id);
   /** Approved / total for one chapter, for the step being reviewed. */
   const chapterStat = (key: string) => {
     const inCh = scenes.filter((s) => chapterKeyOf(s.order) === key);
@@ -345,7 +334,30 @@ export default function SceneBoard({
     if (inCh.length === 0) return;
     select((inCh.find((s) => !approvedFor(s, step)) ?? inCh[0]).id);
   };
-  const visible = pool.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+  /**
+   * Keep the selected frame in view once the strip is deep enough to scroll.
+   *
+   * Selecting from the inspector's Scenes list can land on a scene in the
+   * fourth row, below the strip's own fold — the monitor changed and the strip
+   * appeared not to.
+   *
+   * Deliberately NOT `scrollIntoView`: that walks every scrollable ancestor,
+   * so it also moved the PAGE, and on the first render — where the effect runs
+   * with nothing to correct — it left the project page opening 182px down.
+   * Measured, so it is not a guess. This adjusts the strip's own scrollTop and
+   * touches nothing else, and only when the frame is actually outside it, so a
+   * click on a visible frame moves nothing at all.
+   */
+  const selRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = selRef.current;
+    const strip = el?.parentElement;
+    if (!el || !strip) return;
+    const er = el.getBoundingClientRect();
+    const sr = strip.getBoundingClientRect();
+    if (er.top < sr.top) strip.scrollTop -= sr.top - er.top;
+    else if (er.bottom > sr.bottom) strip.scrollTop += er.bottom - sr.bottom;
+  }, [active?.id]);
 
   // Bulk approval is about the assets that EXIST.
   //
@@ -442,17 +454,7 @@ export default function SceneBoard({
             </div>
           )}
           <div className="filmstrip">
-            {pageCount > 1 && (
-              <button
-                className="fsnav"
-                onClick={() => setPage(Math.max(0, page - 1))}
-                disabled={page === 0}
-                aria-label="Previous scenes"
-              >
-                ‹
-              </button>
-            )}
-            {visible.map(({ s, i }) => (
+            {pool.map(({ s, i }) => (
               <div
                 // Selection is its own class: it used to reuse "act", which
                 // also paints the blinking amber "generating" dot — so the
@@ -460,6 +462,7 @@ export default function SceneBoard({
                 // green/grey approval light.
                 className={`fr ${frClass(s, step)} ${s.id === active?.id ? "sel" : ""}`}
                 key={s.id}
+                ref={s.id === active?.id ? selRef : undefined}
                 onClick={() => setSelectedId(s.id)}
                 role="button"
                 tabIndex={0}
@@ -475,24 +478,7 @@ export default function SceneBoard({
                 <span className="dot" />
               </div>
             ))}
-            {pageCount > 1 && (
-              <button
-                className="fsnav"
-                onClick={() => setPage(Math.min(pageCount - 1, page + 1))}
-                disabled={page === pageCount - 1}
-                aria-label="Next scenes"
-              >
-                ›
-              </button>
-            )}
           </div>
-          {pageCount > 1 && (
-            <div className="fspage">
-              {byChapter ? `${chapterLabel(chapter)}: scenes ` : "Scenes "}
-              {page * PAGE_SIZE + 1}–{Math.min(pool.length, (page + 1) * PAGE_SIZE)} of{" "}
-              {pool.length}
-            </div>
-          )}
         </div>
       </div>
 

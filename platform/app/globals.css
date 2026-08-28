@@ -1027,8 +1027,27 @@ body:has(.nb) .nav {
 
 .stage {
   display: grid;
-  grid-template-columns: 1.55fr 1fr;
+  /* The monitor takes the room, because it holds the thing being judged AND
+     the contact sheet under it: the strip wraps now, so every extra pixel of
+     width is one less row it has to spend. The inspector is a rail of labels
+     and buttons and stops improving past ~400, so it is capped there and every
+     pixel beyond it goes to the monitor. */
+  grid-template-columns: 1fr minmax(340px, 400px);
   gap: 18px;
+
+  /* This one panel is wider than the page it sits in, on purpose.
+     `.page` caps everything at 1200 because the room's other panels are
+     READING surfaces — a script, a list of takes — and a 1400px line of text
+     is worse than a narrow one. This panel is the opposite: a picture to judge
+     and a contact sheet under it, both of which are strictly better with more
+     room, and the strip pays for width in rows it does not have to spend.
+     100vw includes the scrollbar, hence the 64px of slack rather than the
+     48 the gutters actually need. */
+  width: min(1440px, calc(100vw - 64px));
+  max-width: none;
+  position: relative;
+  left: 50%;
+  transform: translateX(-50%);
 }
 .monitor {
   background: var(--card);
@@ -1116,78 +1135,66 @@ body:has(.nb) .nav {
   background: var(--bg2);
   border-top: 1px solid var(--line);
 }
-.fsnav {
-  flex: none;
-  align-self: center;
-  width: 30px;
-  height: 58px;
-  border-radius: 8px;
-  border: 1px solid var(--line2);
-  background: var(--bg3, var(--bg2));
-  color: var(--ink);
-  font-size: 20px;
-  line-height: 1;
-  cursor: pointer;
-}
-.fsnav:hover:not(:disabled) {
-  border-color: var(--accent);
-}
-.fsnav:disabled {
-  opacity: 0.3;
-  cursor: default;
-}
-.fspage {
-  padding: 4px 14px 10px;
-  background: var(--bg2);
-  font-size: 11.5px;
-  color: var(--dim);
-  text-align: center;
-}
-/* Chapter tabs over the filmstrip. Built on the same segmented control the
-   rest of the app uses, with two additions: a count, because the question
-   asked of this row is "which chapter still needs me", and a `full` state so
-   a finished chapter reads as finished without opening it. Scrolls sideways
-   rather than wrapping — a film with many chapters must not push the strip
-   itself down the page. */
+/* Chapter tabs over the filmstrip. Two things beyond a plain tab row: a
+   count, because the question asked of this row is "which chapter still needs
+   me", and a `full` state so a finished chapter reads as finished without
+   opening it. They wrap rather than scrolling sideways — a chapter hidden off
+   the right edge of its own row is exactly the failure the strip's arrows
+   used to have. */
+/* Chapters. Each one is its own bubble — the same object rule the takes, the
+   scene cards and the thumbnails follow, so a chapter reads as a thing you
+   pick up rather than as a tab drawn on a strip. Only the selected one used
+   to have a surface at all, which left the others looking like plain text
+   next to a control. */
 .fschap {
   display: flex;
-  gap: 3px;
-  padding: 10px 14px 0;
-  background: var(--bg2);
-  overflow-x: auto;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 14px 2px 0;
+  background: none;
 }
 .fschap button {
   flex: none;
   display: inline-flex;
   align-items: baseline;
-  gap: 7px;
-  font-family: inherit;
-  font-size: 13px;
+  gap: 8px;
   cursor: pointer;
   border-radius: var(--r-pill);
-  padding: 7px 14px;
-  border: 1px solid transparent;
+  padding: 9px 16px;
+  border: none;
   transition: var(--tr);
-  color: var(--dim);
-  background: transparent;
+  color: var(--soft);
+  background: var(--card2);
+  box-shadow: 0 1px 3px rgba(24, 20, 40, 0.06), 0 6px 16px rgba(24, 20, 40, 0.1);
+  /* The panel titles' own type: 12px, tracked, uppercase, 650 — the same
+     treatment `.card h5` gives INSPECTOR, BULK REVIEW and SCENES. A chapter
+     name labels the strip below it exactly as those label their cards, and
+     two label styles a hand apart is what made this row read as foreign. */
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 .fschap button:hover {
   color: var(--ink);
+  transform: translateY(-2px);
+  box-shadow: 0 3px 7px rgba(24, 20, 40, 0.08), 0 12px 26px rgba(24, 20, 40, 0.15);
 }
 .fschap button.on {
   color: var(--ink);
-  background: var(--bg3, #fdfdfe);
-  border-color: var(--line2);
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 0 0 2px var(--accent), 0 8px 20px rgba(122, 79, 214, 0.24);
 }
 .fschap .cnt {
   font-family: var(--f-mono);
   font-size: 11px;
   color: var(--dim);
   font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  text-transform: none;
 }
 .fschap button.full .cnt {
-  color: var(--ok, #2e7d5b);
+  color: var(--green);
 }
 .fr {
   flex: none;
@@ -5022,16 +5029,56 @@ body:has(.mkt) .vignette {
 
 /* The strip below is part of the same bubble now, not a second panel bolted
    under it: no ground of its own and no hairline, so the card reads as one
-   surface holding a frame and its contact sheet. */
+   surface holding a frame and its contact sheet.
+
+   It WRAPS. A chapter is about eight scenes, which very nearly fits one row
+   and used to spill the last one or two behind a pair of arrows — a control
+   whose whole job was hiding work. Now it runs onto a second row, and a third
+   if the chapter is long, and only past three does it scroll. Three is where
+   a contact sheet stops being a glance and starts being a list: any deeper and
+   the frame above it is off screen, which is the one thing the strip exists to
+   sit under.
+
+   The row height is stated rather than measured because it is derived, not
+   chosen: .fr is a fixed 104px wide holding a 16/9 picture, so a row is
+   104 * 9/16 = 58.5px. Portrait frames are 72px at 9/16, hence 128px. Change
+   either width and this pair has to change with it. */
 .stage .filmstrip {
   background: none;
   border-top: 0;
   padding: 14px 0 2px;
   gap: 10px;
+  --fr-h: 58.5px;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  /* Three full rows, plus 18px so a fourth PEEKS when one exists. The peek is
+     the scroll cue and it costs nothing when there is nothing to cue: a
+     max-height does not stretch a shorter box, so a two-row chapter is two
+     rows tall with no gap. It is doing the job a scrollbar cannot — measured,
+     this Chromium draws an OVERLAY scrollbar (offsetWidth minus clientWidth
+     was 0, nothing painted until already scrolling), so a fourth row could
+     exist with nothing on screen saying so. Which is exactly the failure of
+     the arrows this replaced. */
+  max-height: calc(3 * var(--fr-h) + 2 * 10px + 16px + 18px);
+  overflow-x: hidden;
+  overflow-y: auto;
 }
-.stage .fspage {
-  background: none;
-  padding: 8px 0 0;
+.stage .monitor.portrait .filmstrip {
+  --fr-h: 128px;
+}
+/* Styled for the platforms that draw a classic scrollbar; the ones that draw
+   an overlay ignore it, which is why the peek above carries the cue instead of
+   the bar. */
+.stage .filmstrip {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line2) transparent;
+}
+.stage .filmstrip::-webkit-scrollbar {
+  width: 8px;
+}
+.stage .filmstrip::-webkit-scrollbar-thumb {
+  background: var(--line2);
+  border-radius: 999px;
 }
 /* Each thumbnail floats too — the same object rule, one size down. The
    selected one keeps its accent ring as a halo rather than a hard border, so
@@ -5047,19 +5094,6 @@ body:has(.mkt) .vignette {
 .stage .fr.sel,
 .stage .fr.act {
   box-shadow: 0 0 0 2px var(--accent), 0 8px 20px rgba(122, 79, 214, 0.26);
-}
-.stage .fsnav {
-  border: none;
-  border-radius: var(--r-pill);
-  width: 34px;
-  background: var(--card2);
-  box-shadow: var(--shadow-sm);
-  color: var(--soft);
-  transition: var(--tr);
-}
-.stage .fsnav:hover:not(:disabled) {
-  transform: translateY(-1px);
-  color: var(--accent);
 }
 
 /* The inspector's cards are the same object as the monitor, at rail width. */

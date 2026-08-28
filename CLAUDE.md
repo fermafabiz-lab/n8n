@@ -2928,6 +2928,38 @@ generated FROM it. The chain, and where each piece lives:
   the sound, and the two copies of `MODEL` must move together or a
   regenerated line comes back in a different voice character from its
   neighbours.
+- **Verified live end to end, 2026-08-28** — execution `7716`, a real
+  `scene-voice-regen` on scene `recR8blM6RLZ07vB6` (order 104 of the
+  disposable cutover test film "A race between a snail and a turtle"),
+  success in 15s. What makes it proof rather than a green tick is the
+  RESPONSE HEADERS on `VR Speak`, which are unmistakably ElevenLabs' own
+  API and could not come from ai33: `server: uvicorn`, `history-item-id`,
+  `character-cost: 51`, `tts-latency-ms: 1008`, `x-region: europe-west4`,
+  `current-concurrent-requests: 1 / maximum: 5`. `character-cost` also
+  proves the credential is bound and billing to our account.
+  The rest of the chain checked out in the same run: `VR Pick Voice`
+  stripped `elevenlabs_EXAVITQu4vr4xnSDxMaL` → `EXAVITQu4vr4xnSDxMaL`
+  (Sarah), the node emitted binary `data` / `audio/mp3` / 91,159 bytes,
+  Drive received a file of exactly 91,159 bytes, and `VR Write Voice` wrote
+  the new URL back through the `/api/at` shim and returned the scene in
+  Airtable's shape out of Postgres. Approval flags were restored afterwards
+  (`voice_approved`, `production_status`); the NEW take was deliberately
+  KEPT, so that scene is an A/B against its ai33 neighbours in the same
+  film, same voice, same model.
+- **A Claude Code web session has NO outbound HTTP at all** — every host
+  answers `000`, not just the house-of-videos ones, so `curl` cannot reach
+  the site, wf7, or `api.elevenlabs.io`. The MCP connectors are the only way
+  out. To run a query or fire a webhook, create a throwaway workflow
+  (manual trigger → Postgres, or → an HTTP node posting to
+  `http://localhost:5678/webhook/<path>`), `execute_workflow` it, read the
+  result, then `archive_workflow`. n8n can reach itself and the database
+  when you cannot.
+- **Manual executions DO persist their data** — `get_execution` with
+  `includeData: true` returns full `runData` for a `mode: manual` run. An
+  older note here said otherwise and prescribed writing probe results into
+  a table to read them back; that workaround is unnecessary. (The thing
+  that genuinely has no readable progress is a *running* execution — see
+  the `runData` entry above, which is unchanged.)
 - **`setNodeCredential` applies IN PLACE to the live version — it does not
   stage a draft**, which makes it the exception to the rule two bullets up.
   Verified on both workflows 2026-08-28: `versionId` and `activeVersionId`

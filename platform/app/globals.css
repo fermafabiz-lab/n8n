@@ -5078,11 +5078,24 @@ body:has(.mkt) .vignette {
 .stage .filmstrip {
   background: none;
   border-top: 0;
-  padding: 14px 0 2px;
+  /* 8px of side padding because this is a scroll container: overflow clips at
+     the PADDING box, so with none, the leftmost frame's accent ring and its
+     shadow were sliced off down the left edge — the frames looked cut. */
+  padding: 14px 8px 2px;
   gap: 10px;
   --fr-h: 58.5px;
-  flex-wrap: wrap;
-  align-content: flex-start;
+  /* A grid of fixed tracks, centred — not a wrapping flex row.
+     Both give the same six-across; the difference is where the slack goes. A
+     flex row left-aligns, so 750px of strip holding 674px of frames put all 76
+     leftover pixels in one lump on the right, under a picture that spans the
+     whole panel. `justify-content: center` on TRACKS splits it evenly and,
+     because the tracks stay put, a short last row still starts under the first
+     frame of the row above — which is what centring a flex row would have
+     broken, floating S8 and S9 out into the middle of a numbered sequence. */
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 104px);
+  justify-content: center;
+  align-content: start;
   /* Three full rows, plus 18px so a fourth PEEKS when one exists. The peek is
      the scroll cue and it costs nothing when there is nothing to cue: a
      max-height does not stretch a shorter box, so a two-row chapter is two
@@ -5097,6 +5110,7 @@ body:has(.mkt) .vignette {
 }
 .stage .monitor.portrait .filmstrip {
   --fr-h: 128px;
+  grid-template-columns: repeat(auto-fill, 72px);
 }
 /* Styled for the platforms that draw a classic scrollbar; the ones that draw
    an overlay ignore it, which is why the peek above carries the cue instead of

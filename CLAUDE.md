@@ -259,6 +259,30 @@ the workflows as they now actually run, verified against `activeVersionId`.
   `ELEVENLABS_API_KEY` (the deploy writes `platform.env`, used by
   `/api/voices`) and **Railway** as the same name. n8n uses its own typed
   `ElevenLabs account` credential (`VbtLxHjVO7QySxfz`) instead.
+- **That line described an intention, not the pipeline — the deploy did not
+  write the key, and the voice picker was dead because of it** (found
+  2026-08-28, from the producer's screenshot of `/new` reading
+  "ELEVENLABS_API_KEY is not set in the environment"). `platform.env` is
+  regenerated from scratch on every deploy by a heredoc in
+  `.github/workflows/deploy-platform.yml`, and `ELEVENLABS_API_KEY` was
+  simply not one of its lines — so no value in GitHub Secrets could ever
+  have reached the container. The migration changed the *reader*
+  (`/api/voices`) and never the *writer*. **Whenever a route starts reading a
+  new env var, grep that workflow in the same commit**: the heredoc is the
+  only path onto the box, and a missing line there fails at runtime, on one
+  screen, with no build error anywhere.
+- **`AI33_API_KEY` was removed from the workflow in the same pass**, and it
+  was worse than dead weight: nothing in the platform has read it since the
+  migration, yet it sat in the required-secrets gate — so revoking the ai33
+  key, which the note below says to do, would have failed every deploy for a
+  secret nobody uses.
+- **`ELEVENLABS_API_KEY` is deliberately a WARNING in that gate, not an
+  error.** Without it only the voice picker breaks (`/api/voices` answers 503
+  and the screen says exactly which variable is missing); the site and
+  production are unaffected, so it must not be able to block a deploy that
+  has nothing to do with voices. The warning in the run log is also the
+  cheapest way to find out whether the secret exists at all, since its value
+  can never be read back.
 - **Voices can finally be looked up by id.** ai33 had no such endpoint
   (`/v3/voices/<id>` answered 404), so `resolveNames` scanned eight pages and
   then abused the free-text search with the id as the needle — and a cast from

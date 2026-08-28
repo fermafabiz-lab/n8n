@@ -45,16 +45,21 @@ jobs:
           AIRTABLE_API_KEY: ${{ secrets.AIRTABLE_API_KEY }}
           AIRTABLE_BASE_ID: ${{ secrets.AIRTABLE_BASE_ID }}
           N8N_API_KEY: ${{ secrets.N8N_API_KEY }}
-          AI33_API_KEY: ${{ secrets.AI33_API_KEY }}
           SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_KEY: ${{ secrets.SSH_KEY }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
         run: |
           missing=""
           # SITE_PASSWORD gol nu e o valoare implicita blanda: middleware.ts
           # dezactiveaza poarta si site-ul devine public pe internet.
-          for v in AIRTABLE_API_KEY AIRTABLE_BASE_ID N8N_API_KEY AI33_API_KEY \
+          #
+          # AI33_API_KEY a fost scos din lista: nimic din platforma nu il mai
+          # citeste de la migrarea TTS pe ElevenLabs, si il lasa aici insemna
+          # ca revocarea cheii ai33 (care oricum trebuie revocata) ar pica
+          # fiecare deploy pentru un secret pe care nu-l foloseste nimeni.
+          for v in AIRTABLE_API_KEY AIRTABLE_BASE_ID N8N_API_KEY \
                    SITE_PASSWORD SSH_HOST SSH_USER SSH_KEY; do
             [ -n "${!v}" ] || missing="$missing $v"
           done
@@ -62,6 +67,13 @@ jobs:
             echo "::error::Secrete lipsa:$missing"
             echo "Adauga-le in Settings -> Secrets and variables -> Actions."
             exit 1
+          fi
+          # ElevenLabs e AVERTISMENT, nu eroare. Fara el cade doar selectorul
+          # de voci (/api/voices raspunde 503 si spune exact asta pe ecran);
+          # site-ul si productia merg mai departe, deci nu merita sa opreasca
+          # un deploy care nu are legatura cu vocile.
+          if [ -z "${ELEVENLABS_API_KEY}" ]; then
+            echo "::warning::ELEVENLABS_API_KEY nu e setat — selectorul de voci va da eroare pe /new si in panoul de audio. Adauga-l in Settings -> Secrets and variables -> Actions."
           fi
           echo "Toate secretele necesare sunt setate."
 
@@ -92,7 +104,7 @@ jobs:
           AIRTABLE_API_KEY: ${{ secrets.AIRTABLE_API_KEY }}
           AIRTABLE_BASE_ID: ${{ secrets.AIRTABLE_BASE_ID }}
           N8N_API_KEY: ${{ secrets.N8N_API_KEY }}
-          AI33_API_KEY: ${{ secrets.AI33_API_KEY }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
           SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
           AIRTABLE_PROJECTS_TABLE: ${{ vars.AIRTABLE_PROJECTS_TABLE || 'Proiecte' }}
           AIRTABLE_SCENES_TABLE: ${{ vars.AIRTABLE_SCENES_TABLE || 'Scene' }}
@@ -105,7 +117,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          envs: AIRTABLE_API_KEY,AIRTABLE_BASE_ID,N8N_API_KEY,AI33_API_KEY,SITE_PASSWORD,AIRTABLE_PROJECTS_TABLE,AIRTABLE_SCENES_TABLE,AIRTABLE_SCRIPTS_TABLE,N8N_API_URL,N8N_NEW_PROJECT_WEBHOOK_URL,REGISTRY_TOKEN,REGISTRY_USER
+          envs: AIRTABLE_API_KEY,AIRTABLE_BASE_ID,N8N_API_KEY,ELEVENLABS_API_KEY,SITE_PASSWORD,AIRTABLE_PROJECTS_TABLE,AIRTABLE_SCENES_TABLE,AIRTABLE_SCRIPTS_TABLE,N8N_API_URL,N8N_NEW_PROJECT_WEBHOOK_URL,REGISTRY_TOKEN,REGISTRY_USER
           script: |
             set -euo pipefail
             cd /opt/n8n
@@ -124,7 +136,7 @@ jobs:
             N8N_API_URL=${N8N_API_URL}
             N8N_NEW_PROJECT_WEBHOOK_URL=${N8N_NEW_PROJECT_WEBHOOK_URL}
             N8N_API_KEY=${N8N_API_KEY}
-            AI33_API_KEY=${AI33_API_KEY}
+            ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
             SITE_PASSWORD=${SITE_PASSWORD}
             ENVEOF
 

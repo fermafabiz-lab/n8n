@@ -77,7 +77,12 @@ export default function MediaPlayer({
         inset: 0,
         width: "100%",
         height: "100%",
-        background: "#000",
+        // No ground of its own. `contain` letterboxes a 16/9 clip inside the
+        // monitor's 16/8.6 frame, and a black background here painted those
+        // bars black over whatever the frame was set to — a heavy slab on a
+        // light page. Transparent lets .scr's own card ground show, which is
+        // the stepper card's ground, which is the point.
+        background: "transparent",
         border: "none",
         display: "block",
         objectFit: "contain",

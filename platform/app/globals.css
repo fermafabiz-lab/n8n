@@ -315,7 +315,11 @@ body:has(.nb) .navfade {
   position: sticky;
   top: 0;
   z-index: 100;
-  padding: 16px 20px 0;
+  /* 28px is .page's gutter, so the pill's own edge lands on the panels' edge
+     at every width down to the phone breakpoint — under 720 both shrink, and
+     the bar keeps the smaller one because its contents already fill it there
+     (measured at 390: content 368 in a 368 box, with nothing to give). */
+  padding: 16px 28px 0;
   background: transparent;
 }
 /* On the brief the bar SCROLLS AWAY — it is part of the page, like the header
@@ -371,8 +375,14 @@ body:has(.nb) .nav {
   flex: 1;
 }
 
+/* The column is 1200 of CONTENT, not 1200 including the gutter.
+   The nav pill is 1200 wide and draws its own edge; the page used to cap at
+   1200 and then spend 28px a side on padding, so every panel below sat 28px
+   inside the bar above it and the page read as narrower than its own header.
+   1256 = 1200 + the two gutters, so at any width past that the panels line up
+   with the pill exactly, and below it the gutter still does its job. */
 .page {
-  max-width: 1200px;
+  max-width: 1256px;
   margin: 0 auto;
   padding: 0 28px;
   position: relative;
@@ -4215,9 +4225,14 @@ body:has(.mkt) .vignette {
    restyled. Same shell language as the brief, so the two screens
    read as one app.
    ============================================================ */
+/* Same edge as the bar above it, like every other screen. This was 1400/20
+   — a 1360 content box against the pill's 1200 — so the library ran PAST the
+   bar on both sides where the room used to stop short of it. Both errors read
+   the same way from a distance: the page and its header do not share a line.
+   1256/28 is `.page`'s own pair, so the shell lands on the pill exactly. */
 .page.pj {
-  max-width: 1400px;
-  padding: 0 20px;
+  max-width: 1256px;
+  padding: 0 28px;
 }
 .pj-shell {
   position: relative;
@@ -4518,6 +4533,9 @@ body:has(.mkt) .vignette {
   margin-top: 18px;
   margin-bottom: 0;
   display: flex;
+  /* Always. See the note on the media query below: the row's width is a
+     function of the data, so it has to be able to fold at any screen size. */
+  flex-wrap: wrap;
   align-items: center;
   gap: 14px;
   padding: 12px 18px;
@@ -4829,10 +4847,14 @@ body:has(.mkt) .vignette {
   }
 }
 
+/* Only the search's full-width reorder is a width decision. The WRAP is not,
+   and it moved out of here into the base rule: how much room this row needs
+   depends on how many status tabs the data produces — a library with Failed
+   and Other in it has seven, not four — so no breakpoint can be the right
+   one. It used to be 1080, which left the Grid/Index pair and Select running
+   off the right edge anywhere between there and ~1270, and on a seven-tab
+   library past that too. */
 @media (max-width: 1080px) {
-  .page.pj .eyebrow.prow {
-    flex-wrap: wrap;
-  }
   .psearch {
     width: 100%;
     order: 9;

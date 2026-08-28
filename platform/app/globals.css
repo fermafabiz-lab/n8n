@@ -5012,11 +5012,26 @@ body:has(.mkt) .vignette {
 }
 /* The frame the asset sits in. overflow:hidden is what rounds the video's
    own corners — a <video> element cannot be given a radius that its native
-   controls respect, so the clip has to be masked by its holder. */
+   controls respect, so the clip has to be masked by its holder.
+
+   Its border is the STEPPER CARD's border, to the token: 1px of --line at
+   --r-md over --card-fill, the same three values `.ps` carries. A clip is
+   16/9 in a 16/8.6 frame, so it always letterboxes — and the bars used to be
+   a black slab, which on a light page reads as a heavy frame belonging to
+   some other design. The bars are now the same light card the Script button
+   is made of, so the panel is bounded like everything else on the page.
+   MediaPlayer's fill variant paints no ground of its own for the same reason;
+   the black there would have covered this one whatever it was set to. */
 .stage .monitor .scr {
-  border-radius: 16px;
+  border-radius: var(--r-md);
   overflow: hidden;
-  background: #0d0d10;
+  background: var(--card-fill);
+  border: 1px solid var(--line);
+}
+/* Portrait letterboxes too, in the other direction — same ground, or a 9:16
+   film would keep the black slab this just removed. */
+.stage .monitor.portrait .scr .art {
+  background-color: transparent;
 }
 /* The scene tag and the caption are positioned against .scr, so they follow
    the inset automatically; only the caption needs to come in off the rounded

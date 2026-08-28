@@ -1794,6 +1794,21 @@ the pipeline already produces.
   as they did pre-migration. Deleting them because "upstream already filtered"
   would also have made the picker's "N labelled with the language, the rest
   matched by name or description" line a lie.
+- **Using a shared voice COPIES it into the account, so the "English" list
+  grows a language every time the pipeline speaks a new one.** The baseline
+  list is `/v2/voices`, the account's own voices — and that set is not static.
+  Auditioning one Romanian voice took it from 21 English premades to 22, with
+  Mihai sorted to the TOP, which is how it was found: the producer went back to
+  English and a Romanian voice was sitting at the head of the list. One
+  Romanian film would do the same permanently, and a German one after it.
+  The picker now sends `lang` even for a baseline language, and the route drops
+  a voice only when it NAMES a different one — an unlabelled voice stays, which
+  is the safe direction and the original reason English was never narrowed on
+  metadata. `asked` is what that test reads, never `lang`: `lang` is null for a
+  baseline language BY DESIGN and null is also what "show me every language"
+  sends, so only `asked` tells those two apart. Verified on the real 22: an
+  English film keeps the premades and the unlabelled rows, drops Mihai, and
+  "Show every language" still filters nothing.
 - **A metadata-only filter is not the search a human does.** The first
   language filter scanned pages with an empty query and kept only voices whose
   `language`/`accent` named the language — it surfaced TWO Romanian voices on

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { narrowsUsefully, resolveLanguage } from "@/lib/languages";
+import { resolveLanguage } from "@/lib/languages";
 
 interface Voice {
   voice_id: string;
@@ -84,9 +84,16 @@ export default function VoicePicker({
   // it can be wrong on a perfectly good voice.
   const filmLang = resolveLanguage(language);
   const [wide, setWide] = useState(false);
-  // No filter for a baseline language — the plain listing already is it.
-  const lang =
-    wide || !filmLang || !narrowsUsefully(filmLang.code) ? "" : filmLang.code;
+  // Sent whenever the producer has NOT asked to see every language — including
+  // for English, which the route does not narrow on. It needs to know the film
+  // speaks English anyway, to keep a Romanian voice out of an English picker:
+  // using a shared voice copies it into the account, so the account's own list
+  // grows a language every time the pipeline speaks a new one. Empty means
+  // "widened on purpose", which is the one case that filters nothing.
+  //
+  // `narrowsUsefully` is not consulted here any more — the route applies it,
+  // and it is the route that has to tell the two cases apart.
+  const lang = wide || !filmLang ? "" : filmLang.code;
   const [langState, setLangState] = useState<{
     applied: boolean;
     label: string;

@@ -245,8 +245,33 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  /**
+   * Keep a voice unless it NAMES a different language.
+   *
+   * The baseline list is the account's own voices, and that set is not static:
+   * using a shared voice COPIES it into the account, so every language the
+   * pipeline has ever spoken accumulates there. One Romanian film puts its
+   * narrator into the English picker of every film after it — seen the moment
+   * a Romanian voice was auditioned, which added Mihai to a list of 21 English
+   * premades and sorted him to the top.
+   *
+   * Only an EXPLICIT mismatch is dropped. An unlabelled voice stays, which is
+   * the safe direction and the whole reason a baseline language was never
+   * narrowed on metadata: most of a library does not say what it speaks, and
+   * dropping the silent ones costs far more than it saves. Here the rows do
+   * say — the premades are all `en` and a copied voice carries its real
+   * label — so this removes exactly the intruders and nothing else.
+   *
+   * `asked` rather than `lang`: `lang` is null for a baseline language by
+   * design, and null is also what "show me every language" sends. Those two
+   * must not behave the same, and only `asked` tells them apart.
+   */
+  const sameLanguage = (v: VoiceRow) =>
+    !asked || !v.language || voiceMatchesLanguage(v, asked);
+
   try {
     const own = await listPage(Number(page) || 1, 24, q);
+    const mine = own.voices.filter(sameLanguage);
     // A SEARCH has to reach the library, not just the account's own voices.
     // Under ai33 typing "romanian" found Romanian voices; against the 21
     // premades alone it finds nothing at all. Own voices stay first because
@@ -255,17 +280,17 @@ export async function GET(req: NextRequest) {
     if (q) {
       const lib = await fetchShared({ search: q, size: PAGE }).catch(() => null);
       if (lib) {
-        const seen = new Set(own.voices.map((v) => v.voice_id));
-        const extra = lib.voices.filter((v) => !seen.has(v.voice_id));
+        const seen = new Set(mine.map((v) => v.voice_id));
+        const extra = lib.voices.filter((v) => !seen.has(v.voice_id) && sameLanguage(v));
         if (extra.length > 0) {
           return NextResponse.json({
-            voices: [...own.voices, ...extra].slice(0, MAX_RESULTS),
+            voices: [...mine, ...extra].slice(0, MAX_RESULTS),
             has_more: false,
           });
         }
       }
     }
-    return NextResponse.json(own);
+    return NextResponse.json({ ...own, voices: mine });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error).message) }, { status: 502 });
   }

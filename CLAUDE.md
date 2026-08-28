@@ -18,7 +18,7 @@ conversation. Keep it updated when a hard-won lesson is learned.
 | **Airtable** | base "Database Video" | The single source of truth for project + scene state |
 | **Render server** | `remotion/server/` on Railway | ffmpeg + Remotion: `/assemble`, `/tts-multi`, `/media`, `/transcript`, `/inspect` |
 
-External services: **ai33** (TTS), **fal.ai** (images), **Google Flow via
+External services: **ElevenLabs** (TTS), **fal.ai** (images), **Google Flow via
 useapi** (video clips, Veo 3.1), **OpenAI** (scripting), **Google Drive**
 (asset storage).
 
@@ -213,6 +213,56 @@ These each cost hours. Do not rediscover them.
   leaving them with no resolvable action rather than an error. Every upload
   node needed `resource: file` + `operation: upload` re-set by hand, and
   `VR Find Audio Folder` needed `operation: search`.
+
+### TTS: ElevenLabs direct, since 2026-08-27
+
+ai33 was an ElevenLabs **reseller** — same `xi-api-key` header, same voices,
+ids wearing an `elevenlabs_` prefix. Going direct was a change of endpoint and
+of FLOW, not of concepts, and it removed more than it added.
+
+- **The poll loops are gone.** ai33 worked on tasks: submit, wait, poll every
+  3s, guard against a runaway loop, then download a URL. ElevenLabs answers
+  with the mp3. Thirteen nodes across two workflows became three native
+  `@elevenlabs/n8n-nodes-elevenlabs` nodes (`AB Speak`, `Speak VR`,
+  `VR Speak`), and Media Generation went 162 → 148 nodes, Scripting 107 → 103.
+  Five of those deletions were a chain that had had **no input at all** for
+  months — the leftover CLAUDE.md used to say to ignore.
+- **Stored voice ids survive, and that was checked before anything moved.**
+  `hpp4J3VqNfWAUOO0d1Us` resolves at ElevenLabs to Bella, so no project lost
+  its narrator. The `elevenlabs_` prefix STAYS in the database and is stripped
+  at the call: it is also the validity test in five places
+  (`voice_id.includes('_')`), so removing it would make an empty id
+  indistinguishable from a missing one.
+- **The audio lands where the uploads already look.** The speech node writes
+  binary `data`, `audio/mp3` — verified on a real synthesis, 32 kB from one
+  Romanian line — which is the default the Google Drive upload nodes read, so
+  not one upload node changed.
+- **`VR Download Audio` / `AB Download Audio` stay.** They look like part of
+  the ai33 path and are not: the multi-voice path still fetches a URL from the
+  render server. Check inbound edges before deleting a node that "obviously"
+  belongs to the thing you are removing.
+- **Model is `eleven_multilingual_v2`** in all three nodes AND in
+  `server/tts.mjs`. ai33 never let us choose one, so this is the closest
+  equivalent — and the four must agree, or a regenerated line comes back in a
+  different voice character from the batch that made its neighbours.
+- **The key left the node bodies.** `/tts-multi` used to take the TTS key in
+  its JSON body, which meant a plaintext secret sat inside an n8n expression —
+  visible on opening the node, and carried into every export. The render
+  server now reads `ELEVENLABS_API_KEY` from its own environment. **The old
+  ai33 key was exposed in a transcript on 08-27 and must be revoked.**
+- Two environments need the key: **GitHub repo Secrets** as
+  `ELEVENLABS_API_KEY` (the deploy writes `platform.env`, used by
+  `/api/voices`) and **Railway** as the same name. n8n uses its own typed
+  `ElevenLabs account` credential (`VbtLxHjVO7QySxfz`) instead.
+- **Voices can finally be looked up by id.** ai33 had no such endpoint
+  (`/v3/voices/<id>` answered 404), so `resolveNames` scanned eight pages and
+  then abused the free-text search with the id as the needle — and a cast from
+  a large library sat past the scan, which is how a project printed
+  "elevenlabs · …oKomo" at the producer. `GET /v1/voices/{id}` answers
+  directly; a miss now means the voice is gone, not merely far down a list.
+- **Pagination changed shape**: `/v2/voices` is cursor-based
+  (`next_page_token` + `has_more`), not numbered. `/api/voices` still speaks
+  page numbers to the picker and walks tokens to reach the window.
 
 ### Content filters — deterministic, never blindly retry
 
@@ -650,8 +700,12 @@ is built only inside that guard (a `-1` input index would break the graph).
   were manual; they are not. So a change to `remotion/server/` is live once
   the branch is pushed and the build goes green, and the way to check which
   code is running is the deployment's commit hash, not a guess.
-- **Never push while a final render is running.** A Railway deploy replaces
-  the container, which kills a render in flight — and the producer sees a
+- **Never push while a final render is running — ANY push, not just one that
+  touches `remotion/`.** A commit changing only `db/` triggered a Railway
+  build on 2026-08-27 (deployment `bbf90578`, commit `cad28c1`), so the path
+  filter below cannot be relied on as a safety rule. Treat every push as a
+  container replacement. A Railway deploy replaces the container, which kills
+  a render in flight — and the producer sees a
   film that simply never arrives, with nothing in the site to explain it.
   Since 2026-08-14 Railway watches `["/remotion/**"]`, so commits touching
   only `platform/` or documentation no longer rebuild it; anything under
@@ -969,8 +1023,26 @@ and `SceneBoard` routes the active scene voice → image → clip.
   frames, so `shotAt` kept the old shot for frame 514 and switched at 515 — one
   lone frame showing the NEW scene at the PREVIOUS scene's framing, then a jump.
   Reported exactly as "one frame is zoomed compared to the rest of the scene".
-  `FinalVideo` now calls `shotAt(shots, seconds + 0.5 / fps)`, which lands a
-  boundary on the NEAREST frame rather than the next one. **The detector is how
+  `FinalVideo` now calls `shotAt(shots, seconds + 0.5 / fps + 1e-6)`, which
+  lands a boundary on the NEAREST frame rather than the next one. **The
+  epsilon is load-bearing, and it took a second sighting to find.** Both sides
+  reduce to the same inequality (`f >= cut * fps - 0.5`), so they can disagree
+  only on a tie — and a 24fps source in a 30fps composition produces ties by
+  construction: every cut lands on .0/.25/.5/.75 of a frame, and the .5 ones sit
+  exactly on the comparison. There the decoder's arithmetic and this
+  expression's break the tie differently whenever the cut's seconds value is not
+  representable in binary. On the tahiti film that was 3 of 13 cuts — 33.9167,
+  38.9167, 63.4167, all of the form k/24 with a repeating fraction — each
+  showing one frame of the NEW scene at the OLD scene's framing. **It had been
+  invisible because the scene dip was drawing 40% black over exactly that
+  frame**; removing the dip exposed it the same day, which is the "an opaque
+  overlay hides bugs underneath it" lesson a second time.
+  **How to measure it without eyes:** temporarily amplify the drift in the
+  intensity-0 shot (`driftX: 10`), render the frames either side of a boundary
+  as a PNG sequence, and read the black band down the left edge — the band IS
+  the framing, to the pixel, and it tells you which frame the transform
+  switched on while a coarse thumbnail diff tells you which frame the picture
+  switched on. Frame-accurate, and a still can never show it. **The detector is how
   you find this**: `ffmpeg scdet` reported two changes 0.04s apart at 17.13/17.17
   where the film has one, and narrowing the ladder alone did NOT remove the pair
   — only the half-frame lead did. Two adjacent detections where the edit has one
@@ -1074,6 +1146,21 @@ and `SceneBoard` routes the active scene voice → image → clip.
   that is what the `chapterCards` prop is for. With cards off, `Transitions`
   flares instead of dipping to black. Wire a second effect onto the same frame
   and you get a flash inside a dip.
+- **An ordinary scene boundary has an owner too, and it is the FOOTAGE.**
+  `Transitions` used to dip the luminance ~40% for a third of a second at every
+  scene cut when the montage was off (`sceneDips={intensity === 0}`) — a rule
+  written when the film was one unbroken clip and a scene boundary had no
+  picture change to announce it. The assembled montage is one clip per scene
+  concatenated, so the picture cuts there by itself at EVERY intensity, and the
+  dip had become a second transition over a real one: the outgoing scene faded
+  down, the incoming faded up, and the cut sat in the trough. Reported as "the
+  frames move badly at the transitions, it looks like an error", and measured on
+  a render as 39-56% of the frame's luminance at all thirteen cuts. The scene
+  dip is gone; `Transitions` now handles chapter boundaries only. **Verify this
+  class of bug numerically**: `ffmpeg signalstats` per frame over a low-res
+  render of the whole film shows a brightness trough sitting exactly on every
+  cut, which no still can, and `ffmpeg select='gt(scene,0.25)'` on the source
+  proves the picture really does change there.
 - **The card is revealed by light, not by movement.** It used to slide in on a
   linear `translateX`; now it swaps at the peak of a `LightLeak` flash
   (`FLASH_PEAK`), where the frame is blown out and the change cannot be seen.
@@ -1373,6 +1460,110 @@ the pipeline already produces.
   exists as the single owner.
 - An explicit `textCards` prop bypasses every gate above, same pattern as
   `hookTitle`. That is where Scripting-authored cards will land.
+- **Motif cards: a card may DRAW instead of setting type.** `route`
+  (`RouteCard`) unfolds a chart and traces the journey's stops; `schedule`
+  (`ScheduleCard`) flaps two times onto a departure board and states the gap
+  between them. The planner needed no change at all to gain either — it places
+  TIME and is written never to see what a card holds — so the only wiring is
+  the variant dispatch in `FinalVideo`'s `renderCard`. Three rules came out of
+  building the first two:
+  - **A motif must know something the footage cannot show.** The idea started
+    as "the narration says map, so unfold a map" — over Veo footage that was
+    already showing a man unfolding a map, under a caption already printing
+    the word. Three copies of one fact. What the picture cannot show is the
+    SHAPE of the journey and the SIZE of the gap between two times; that is
+    what the two cards draw, and it is the whole difference between a motif
+    and decoration.
+  - **The content is AUTHORED, never derived.** A distance and a margin are
+    nowhere in the script and no rule could compute them, so they live in the
+    explicit `textCards` prop for that film. Code that invented a figure here
+    would be inventing a fact — the one thing this pipeline is built not to do.
+  - **A progress-triggered reveal cannot reveal the endpoint.** `RouteCard`
+    first revealed each stop when the drawn fraction passed it, which is
+    unsatisfiable at the destination: it sits at 1, the draw clamps at 1, and
+    Tahiti never appeared on a card whose entire subject is Tahiti. The fix is
+    to invert the eased draw (`timeAtProgress`) and give every stop a clock of
+    its own. Any "reveal B once A has passed it" has this bug at the last B.
+    Anything with `Math.random()` has a worse one — the render must be
+    reproducible, so the split-flap's digit sequence is arithmetic.
+- **Who authors a motif: a model in Scripting, behind a code validator.**
+  `remotion/motif/` holds the prompt and `validate.mjs`; neither is wired into
+  n8n yet. It belongs in **Claude Scripting** — the only workflow that knows
+  the whole story and the only one that runs once per film (Media Generation
+  runs in batches of 8 and would ask three times for a 15-scene film; Final
+  Assembly is the render path and must not grow a model call). A card is
+  anchored on `sceneIndex`, never on seconds, so it needs no timings and can be
+  written long before `/assemble` invents them. Store it in-line like
+  `Save Evidence`, and have `Build Remotion Props` read it into `textCards`.
+  Not an "AI Agent" node: one structured call plus a Code node.
+  The validator is the whole point, and it is `Validate Evidence Refs`'s
+  pattern — **an invented value cannot survive code, and survives any second
+  model.** Every string on a card carries provenance: a `quote` that must be a
+  substring of a scene at or before the card's own (no card may print a word
+  the film has not spoken yet), `arithmetic` the code recomputes, or an
+  `evidence` ref that must exist and carry a source. Durations are computed
+  from the content, not taken from the model. Verdicts are ok / review /
+  rejected, where **review means the provenance is real but the transformation
+  is unprovable** — that is the set the producer should see in Final touches.
+  Proof it bites: run on the two cards written BY HAND for the tahiti film, it
+  rejected the route, because the card says "Feribot" at 23s and the film has
+  only said "ferry" by then. It also rejects the `≈ 16.700 km` on that card —
+  a distance is nowhere in the script, so its only honest door is the research
+  pack with a source.
+- **The n8n half is LIVE since 2026-08-27: `db/port/motif-cards/`.** Two
+  builders, two saved originals, one README with the window. Scripting gains
+  seven nodes between `Save scenes To Airtable1` and `Wait For Scene Approval`
+  (prep → gpt-5.4 + structured parser → the validator inlined from
+  `remotion/motif/validate.mjs` → a jsonb merge into `project.editing_options`
+  → a node that hands the scene stream back, exactly as `Evidence Done` does);
+  Final Assembly gains no model call at all, just `order` on `Prepare Clips`
+  and a lookup in `Build Remotion Props`. **A card is anchored on `Ordine
+  Scenă`, never on the array index the model was shown** — `Prepare Clips`
+  drops every scene without a final clip, so the authored index and the
+  rendered index part company the moment a clip is missing, and the card would
+  land on its neighbour. Two things are deliberately unfinished and written up
+  in that README: a `review` card has nowhere to be reviewed until Final
+  touches gets a panel, and explicit `textCards` still switch the derived
+  figure cards off for that film.
+- **Applied through the MCP connector, not the REST API — and the diff
+  afterwards is not optional.** No API key is involved (the connector is
+  already authorised), operations are atomic, and each step lands as its own
+  version entry. The trap is escaping: a `\uXXXX` written with one backslash
+  too few is decoded by JSON into the CHARACTER, so the validator's
+  combining-mark range arrived in the live node as two invisible combining
+  marks instead of an escape. It matched. It would have worked for months, and
+  broken the day an editor normalised the file. Caught only by fetching both
+  workflows back and diffing every touched node against the repo, which found
+  six identical and one twelve bytes short. **Always end an MCP apply with that
+  diff** — the failure mode is a node that works and is not what you wrote — and
+  prefer forms that cannot be mangled: the range is now `\p{M}`, ASCII all the
+  way down.
+- **Final touches now reviews the animations, and that is not a formality.**
+  `FinalSettings` lists every card the pipeline chose — what it will DRAW, not
+  what kind of object it is ("Digul → Ferry → Avion → Tahiti", not "route
+  card") — and any of them can be switched off before the render. A `review`
+  verdict is badged *worth a look*. The drops ride along with the existing
+  confirm rather than saving on each click, because this is a finishing screen
+  and a card removed here must not become a separate write someone has to
+  remember. `Project.motifCards` is parsed defensively in `derive.ts` (it comes
+  from a model, through a validator, through jsonb), so both backends get it
+  and a malformed card is dropped rather than drawn as an empty rectangle.
+  The panel is absent entirely when there are no cards: an empty "no
+  animations" box only invites adding some.
+  **Why a person still decides:** a motif is a decision of TASTE, and the one
+  expensive lesson this repo already paid for is a system making a taste
+  decision alone — the montage planner that passed every acceptance target
+  while producing what a viewer read as a rendering fault. The validator can
+  prove a card is truthful. Only a producer can say it is wanted.
+- **"An animation on every film" is answered by MORE MOTIFS, not a looser
+  rule.** The prompt aims for one to three per film and looks hard for them,
+  but it may not force one: with only `route` and `schedule` built, plenty of
+  films genuinely offer neither, and a card that repeats the narration ships
+  while an empty array only asks a question. So an empty answer must carry
+  `none_because` — one line naming what the film DID offer that no motif could
+  draw — and `Validate Motif Cards` logs it as `MOTIF NONE: …`. That log is the
+  backlog: it is how the third motif gets chosen, and it is also what stops "no
+  cards" and "the node is broken" from looking identical.
 
 ### The site
 
@@ -2318,6 +2509,35 @@ Thirteen `search` nodes, four distinct filters between them:
 | `{Status General}='Finalizat'` | `fields->>'Status General' = 'Finalizat'` |
 | `OR({Status Producție Scenă}='A', …='B')` | `fields->>'Status Producție Scenă' in ('A','B')` |
 
+### The second cutover held — 2026-08-16, ~15:20 UTC
+
+A full film ran end to end on Postgres with nothing left of Airtable in the
+path: Orchestrator → Scripting → Media Generation → Final Assembly, four
+executions, all green, twenty minutes. *A race between a snail and a turtle*,
+32s, 5 scenes, 2 chapters, `Finalizat`, final video written.
+
+What that actually proves, beyond "it works":
+
+- **`/api/media/ingest` carries real generated assets.** Five images and five
+  clips landed in the media store at content-addressed paths and serve over
+  HTTPS. That is the code replacing the one thing Airtable did that a database
+  cannot, and until this film it had only ever been tested by hand.
+- **The shim carries the twenty-one raw-HTTP nodes.** Scripting reads its
+  genre profile and style card through it, and writes evidence through it.
+- **Chapter zero survives.** `ordinal` 0 for HOOK, 1 for the real chapter, and
+  `scene_order` 1/101/102/103/104 — the chapter*100 + scene encoding intact.
+
+**Two bugs only a real film could find**, both mine, both now fixed: the
+twenty-one HTTP nodes the type-filtered port never saw, and a CHECK constraint
+that made chapter zero uncommittable while the import had already nulled 47
+hook markers and reported them as repairs.
+
+**Not yet exercised on Postgres** — these are where the next surprise lives:
+regenerations of image, voice, video and scene text (which is where three of
+the four ingest nodes are), saved drafts through the UI, Resume and
+restart-scripting, multi-voice and cast, a reference image on creation, and any
+film past the batch cap of 8 scenes.
+
 ### The cutover was rolled back — 2026-08-16, 14:40 UTC
 
 **Counting Airtable nodes undercounted the dependency, and the first test film
@@ -2707,7 +2927,10 @@ generated FROM it. The chain, and where each piece lives:
   a finished film on 08-13, 08-14 and 08-16, and both `recCoZWsZBOrIU69L` and
   `rec1GITgUCq4mEsUd` read `Finalizat` with a final video. The entry is kept for
   its map of which nodes share that account — still the fastest way to see the
-  blast radius of a billing failure. Original note: execution 1783 (2026-08-08,
+  blast radius of a billing failure. **Check the DATE on a note like this
+  before repeating it**: this one had been resolved for a fortnight and was
+  still told to the producer as a live blocker on 08-27, which cost a round
+  trip and some of their patience. Original note: execution 1783 (2026-08-08,
   project "Death cominig up to take someone into the underworld",
   `recCoZWsZBOrIU69L`) died at `Rebuild Story Bible` with *"You have no
   credits remaining"*, after the script had been written, edited and

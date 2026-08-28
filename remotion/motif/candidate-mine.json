@@ -1,0 +1,30 @@
+[
+  {
+    "sceneIndex": 3, "variant": "route", "priority": 1,
+    "why": "the shape of the journey, which the shot cannot hold at once",
+    "label": "Ruta",
+    "stops": ["Digul", "Feribot", "Avion", "Tahiti"],
+    "note": "≈ 16.700 km",
+    "sources": {
+      "stops[0]": {"kind": "quote", "sceneIndex": 1, "from": "Pe digul vechi"},
+      "stops[1]": {"kind": "quote", "sceneIndex": 1, "from": "un bilet de ferry"},
+      "stops[2]": {"kind": "quote", "sceneIndex": 3, "from": "După, avion."},
+      "stops[3]": {"kind": "quote", "sceneIndex": 3, "from": "După, Tahiti."},
+      "note": {"kind": "external"}
+    }
+  },
+  {
+    "sceneIndex": 6, "variant": "schedule", "priority": 2,
+    "why": "two times a listener cannot subtract while arguing",
+    "label": "Orar",
+    "rows": [{"label": "Feribot", "value": "05:20"}, {"label": "Zbor", "value": "08:00"}],
+    "note": "2 h 40 min marjă",
+    "sources": {
+      "rows[0].label": {"kind": "quote", "sceneIndex": 6, "from": "Feribot la cinci și douăzeci"},
+      "rows[0].value": {"kind": "quote", "sceneIndex": 6, "from": "Feribot la cinci și douăzeci"},
+      "rows[1].label": {"kind": "quote", "sceneIndex": 6, "from": "La opt avem zborul"},
+      "rows[1].value": {"kind": "quote", "sceneIndex": 6, "from": "La opt avem zborul"},
+      "note": {"kind": "arithmetic"}
+    }
+  }
+]

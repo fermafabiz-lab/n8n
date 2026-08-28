@@ -6,7 +6,7 @@ import { confirmFinalSettings, type ActionResult } from "@/app/actions";
 import Toggle from "@/components/Toggle";
 import SpeedPicker from "@/components/SpeedPicker";
 import { useSetPendingStage } from "@/components/StageNav";
-import type { EditingOptions } from "@/lib/data";
+import type { EditingOptions, MotifCard } from "@/lib/data";
 
 /**
  * The last gate: every clip is approved and the batch is holding just before
@@ -83,17 +83,54 @@ const OPTIONS: Array<{
   },
 ];
 
+/**
+ * What a drawn card will actually put on screen, in one line.
+ *
+ * The producer is deciding whether to keep a graphic they have never seen, so
+ * the row has to say what it DRAWS, not what kind of object it is. "Route
+ * chart" tells them nothing; "Digul → Ferry → Avion → Tahiti" is the decision.
+ */
+function describeMotif(card: MotifCard): { title: string; detail: string } {
+  if (card.variant === "route") {
+    return {
+      title: "Map with the route",
+      detail: [(card.stops ?? []).join(" → "), card.note].filter(Boolean).join("  ·  "),
+    };
+  }
+  if (card.variant === "schedule") {
+    return {
+      title: "Departure board",
+      detail: [
+        (card.rows ?? []).map((r) => `${r.label} ${r.value}`).join("  ·  "),
+        card.note,
+      ]
+        .filter(Boolean)
+        .join("  —  "),
+    };
+  }
+  return {
+    title: "Card",
+    detail: card.note ?? card.label ?? card.variant,
+  };
+}
+
 export default function FinalSettings({
   projectId,
   initial,
+  motifCards = [],
   silent = false,
 }: {
   projectId: string;
   initial: EditingOptions;
+  /** Drawn cards the pipeline chose from the script; the producer may drop any. */
+  motifCards?: MotifCard[];
   /** Cinematic: no narration is ever spoken, so some rows have no meaning. */
   silent?: boolean;
 }) {
   const [opts, setOpts] = useState<EditingOptions>(initial);
+  // Kept by index. A dropped card is removed from the project on render, not
+  // on the click — see the note on confirmFinalSettings.
+  const [dropped, setDropped] = useState<number[]>([]);
   const [msg, setMsg] = useState<ActionResult | null>(null);
   const [pending, startTransition] = useTransition();
   // Dropped rather than disabled, the same call the stepper makes about the
@@ -105,8 +142,11 @@ export default function FinalSettings({
   // is counted separately — but it must be counted, or "Apply 1 change" would
   // omit the one change that alters the film's whole length.
   const speedMoved = opts.speed !== initial.speed;
-  const changed = changedKeys.length > 0 || speedMoved;
-  const changeCount = changedKeys.length + (speedMoved ? 1 : 0);
+  // A dropped animation counts for the same reason speed does: it changes the
+  // film, and a button reading "Keep initial settings" after you switched one
+  // off would be telling you something untrue.
+  const changed = changedKeys.length > 0 || speedMoved || dropped.length > 0;
+  const changeCount = changedKeys.length + (speedMoved ? 1 : 0) + dropped.length;
   const done = msg?.ok === true;
   const router = useRouter();
   const setPendingStage = useSetPendingStage();
@@ -119,7 +159,12 @@ export default function FinalSettings({
    */
   const confirm = () =>
     startTransition(async () => {
-      const r = await confirmFinalSettings(projectId, changed ? opts : undefined);
+      const kept = motifCards.filter((_, i) => !dropped.includes(i));
+      const r = await confirmFinalSettings(
+        projectId,
+        changed ? opts : undefined,
+        dropped.length ? kept : undefined,
+      );
       setMsg(r);
       if (r.ok) {
         setPendingStage("assembly");
@@ -208,6 +253,66 @@ export default function FinalSettings({
         </div>
       </div>
 
+      {/* Drawn cards. Absent entirely when the pipeline chose none, which is
+          the common case and the correct one — most scenes deserve no graphic,
+          and an empty "no animations" panel would only invite adding some. */}
+      {motifCards.length > 0 && (
+        <div style={{ marginTop: 22, paddingTop: 18, borderTop: "1px solid var(--line)" }}>
+          <h3
+            style={{
+              margin: "0 0 4px",
+              fontSize: 13,
+              letterSpacing: 1.4,
+              textTransform: "uppercase",
+              color: "var(--soft)",
+            }}
+          >
+            Animations in this film
+          </h3>
+          <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--soft)" }}>
+            Chosen from your script: each one replaces the picture for about
+            three seconds with a drawing of something the voice says but the
+            camera cannot show. Every word on them is checked against the
+            script itself. Switch one off and it will not be drawn.
+          </p>
+
+          <div
+            className="swlist"
+            style={{ opacity: done ? 0.5 : 1, pointerEvents: done ? "none" : undefined }}
+          >
+            {motifCards.map((card, i) => {
+              const { title, detail } = describeMotif(card);
+              const keep = !dropped.includes(i);
+              return (
+                <div key={`${card.variant}-${card.sceneIndex}-${i}`} className={`swrow ${keep ? "on" : ""}`}>
+                  <span className="no">{String(i + 1).padStart(2, "0")}</span>
+                  <div>
+                    <h4>
+                      {title}
+                      <span style={{ color: "var(--dim)", fontWeight: 400 }}>
+                        {" "}· scene {card.sceneIndex + 1}
+                      </span>
+                      {/* The pipeline could prove this card is truthful but not
+                          that its phrasing follows from what it quoted. That is
+                          precisely the one worth a human glance. */}
+                      {card.verdict === "review" && <span className="chg">worth a look</span>}
+                    </h4>
+                    <p>{keep ? detail : "Will not be drawn"}</p>
+                  </div>
+                  <Toggle
+                    checked={keep}
+                    ariaLabel={`${title} on scene ${card.sceneIndex + 1}`}
+                    onChange={(v) =>
+                      setDropped((p) => (v ? p.filter((x) => x !== i) : [...p, i]))
+                    }
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div
         style={{
           display: "flex",
@@ -234,7 +339,14 @@ export default function FinalSettings({
                 : "Keep initial settings & render"}
         </button>
         {changed && !done && (
-          <button className="btn" disabled={pending} onClick={() => setOpts(initial)}>
+          <button
+            className="btn"
+            disabled={pending}
+            onClick={() => {
+              setOpts(initial);
+              setDropped([]);
+            }}
+          >
             Undo changes
           </button>
         )}

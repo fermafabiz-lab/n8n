@@ -1,0 +1,78 @@
+[
+  {
+    "sceneIndex": 6, "variant": "schedule", "priority": 1,
+    "why": "the gap between the two departures is the whole tension of the scene",
+    "label": "Orar",
+    "rows": [{"label": "Feribot", "value": "05:20"}, {"label": "Zbor", "value": "08:00"}],
+    "note": "2 h 40 min marjă",
+    "sources": {
+      "rows[0].label": {"kind": "quote", "sceneIndex": 6, "from": "Feribot la cinci și douăzeci"},
+      "rows[0].value": {"kind": "quote", "sceneIndex": 6, "from": "Feribot la cinci și douăzeci"},
+      "rows[1].label": {"kind": "quote", "sceneIndex": 6, "from": "La opt avem zborul"},
+      "rows[1].value": {"kind": "quote", "sceneIndex": 6, "from": "La opt avem zborul"},
+      "note": {"kind": "arithmetic"}
+    }
+  },
+  {
+    "sceneIndex": 3, "variant": "route", "priority": 2,
+    "why": "the legs of the trip, named across three scenes and never seen together",
+    "label": "Ruta",
+    "stops": ["Digul", "Ferry", "Avion", "Tahiti"],
+    "sources": {
+      "stops[0]": {"kind": "quote", "sceneIndex": 1, "from": "Pe digul vechi"},
+      "stops[1]": {"kind": "quote", "sceneIndex": 1, "from": "un bilet de ferry"},
+      "stops[2]": {"kind": "quote", "sceneIndex": 3, "from": "După, avion."},
+      "stops[3]": {"kind": "quote", "sceneIndex": 3, "from": "După, Tahiti."}
+    }
+  },
+  {
+    "sceneIndex": 11, "variant": "route", "priority": 3,
+    "why": "how far the island actually is",
+    "stops": ["Digul", "Tahiti"],
+    "note": "≈ 16.700 km",
+    "sources": {
+      "stops[0]": {"kind": "quote", "sceneIndex": 1, "from": "Pe digul vechi"},
+      "stops[1]": {"kind": "quote", "sceneIndex": 3, "from": "După, Tahiti."},
+      "note": {"kind": "evidence", "ref": "E1"}
+    }
+  },
+  {
+    "sceneIndex": 1, "variant": "schedule", "priority": 4,
+    "why": "opens the chapter with the clock",
+    "rows": [{"label": "Feribot", "value": "05:20"}, {"label": "Zbor", "value": "08:00"}],
+    "sources": {
+      "rows[0].label": {"kind": "quote", "sceneIndex": 6, "from": "Feribot la cinci și douăzeci"},
+      "rows[0].value": {"kind": "quote", "sceneIndex": 6, "from": "Feribot la cinci și douăzeci"},
+      "rows[1].label": {"kind": "quote", "sceneIndex": 6, "from": "La opt avem zborul"},
+      "rows[1].value": {"kind": "quote", "sceneIndex": 6, "from": "La opt avem zborul"}
+    }
+  },
+  {
+    "sceneIndex": 13, "variant": "route", "priority": 5,
+    "why": "closes the journey on the shore",
+    "stops": ["Feribotul", "Biletul"],
+    "sources": {
+      "stops[0]": {"kind": "quote", "sceneIndex": 13, "from": "iar feribotul apare departe"},
+      "stops[1]": {"kind": "quote", "sceneIndex": 14, "from": "Elena ia biletul"}
+    }
+  },
+  {
+    "sceneIndex": 9, "variant": "clock", "priority": 6,
+    "why": "a ticking clock over the argument",
+    "rows": [{"label": "Rămas", "value": "02:40"}],
+    "sources": {}
+  },
+  {
+    "sceneIndex": 7, "variant": "schedule", "priority": 7,
+    "why": "restates the timetable under the doubt",
+    "rows": [{"label": "Feribot", "value": "05:20"}, {"label": "Zbor", "value": "08:00"}],
+    "note": "3 h marjă",
+    "sources": {
+      "rows[0].label": {"kind": "quote", "sceneIndex": 6, "from": "Feribot la cinci și douăzeci"},
+      "rows[0].value": {"kind": "quote", "sceneIndex": 6, "from": "Feribot la cinci și douăzeci"},
+      "rows[1].label": {"kind": "quote", "sceneIndex": 6, "from": "La opt avem zborul"},
+      "rows[1].value": {"kind": "quote", "sceneIndex": 6, "from": "La opt avem zborul"},
+      "note": {"kind": "arithmetic"}
+    }
+  }
+]

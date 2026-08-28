@@ -35,6 +35,15 @@ import {execFile} from 'child_process';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SFX_DIR = path.join(__dirname, 'sfx');
 
+/**
+ * Output frame rate of the montage. Named because three things must agree on
+ * it: the fps filter in the video chain, the frame snapping that pins each
+ * scene to a whole frame, and the scene start times reported back to the
+ * graphics pass. When it was only a literal inside the filter string, the
+ * reported times were free to disagree with the encode, and they did.
+ */
+const OUT_FPS = 24;
+
 function run(cmd, args, timeoutMs = 10 * 60 * 1000) {
 	return new Promise((resolve, reject) => {
 		execFile(cmd, args, {timeout: timeoutMs, maxBuffer: 32 * 1024 * 1024}, (err, stdout, stderr) => {
@@ -210,7 +219,27 @@ export function registerAssemble(app, {jobs, outputDir}) {
 					// fallback below), and mixing it twice would just double it.
 					const nativeAudio =
 						nativeVolume > 0 && a !== null && (await hasAudioStream(v));
-					items.push({v, a, dur, voiceDur, eff, stretch, freeze, nativeAudio});
+					// Snap the scene to a whole number of OUTPUT frames, and keep the
+					// frame count rather than re-deriving it later.
+					//
+					// This is the difference between what the montage INTENDS and what
+					// it ENCODES. `eff` is a float driven by the narration, but the
+					// video chain below ends in fps=24, so every segment necessarily
+					// lands on a 24fps frame line — and the leftover fraction does not
+					// vanish, it accumulates down the concat. Measured on the tahiti
+					// montage before this: the reported scene starts drifted from the
+					// real picture cuts by -0.021s at the first boundary to +0.084s at
+					// the last, which at 30fps is up to three frames.
+					//
+					// Graphics are placed off those reported times, so the drift showed
+					// up as the montage framing changing one to three frames after the
+					// picture did — the producer's "a frame with zoom that looks wrong"
+					// at every scene change. Snapping here makes the two agree by
+					// construction: there is no longer an intended time that the
+					// encoder can round away from.
+					const effFrames = Math.max(1, Math.round(eff * OUT_FPS));
+					eff = effFrames / OUT_FPS;
+					items.push({v, a, dur, voiceDur, eff, effFrames, stretch, freeze, nativeAudio});
 					const job = jobs.get(jobId);
 					if (job) job.progress = 0.35 * ((i + 1) / scenes.length);
 				}
@@ -224,7 +253,10 @@ export function registerAssemble(app, {jobs, outputDir}) {
 				let t = 0;
 				const sceneStartsSeconds = [];
 				items.forEach((it) => {
-					sceneStartsSeconds.push(Number(t.toFixed(3)));
+					// Six decimals, not three: these are now exact multiples of
+					// 1/OUT_FPS, and 6.833333 rounded to 6.833 would put a rounding
+					// error back into the very number that exists to be exact.
+					sceneStartsSeconds.push(Number(t.toFixed(6)));
 					t += it.eff;
 				});
 				const totalDur = t;
@@ -258,7 +290,7 @@ export function registerAssemble(app, {jobs, outputDir}) {
 				const parts = [];
 				const labels = [];
 				items.forEach((it, i) => {
-					const d = it.eff.toFixed(3);
+					const d = it.eff.toFixed(6);
 					// Cover-fit to the target canvas: scale up to fill, center-crop
 					// the overflow. A 16:9 clip on a 9:16 canvas crops the sides.
 					const vchain =
@@ -267,9 +299,13 @@ export function registerAssemble(app, {jobs, outputDir}) {
 						// frames evenly, and the final trim pins the exact duration
 						// (it also cuts the leftover tail when the speed-up clamped).
 						`scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},` +
-						`trim=duration=${it.dur.toFixed(3)},setpts=${it.stretch.toFixed(5)}*(PTS-STARTPTS),fps=24` +
+						`trim=duration=${it.dur.toFixed(3)},setpts=${it.stretch.toFixed(5)}*(PTS-STARTPTS),fps=${OUT_FPS}` +
 						(it.freeze > 0.01 ? `,tpad=stop_mode=clone:stop_duration=${it.freeze.toFixed(3)}` : '') +
-						`,trim=duration=${d},setpts=PTS-STARTPTS`;
+						`,trim=end_frame=${it.effFrames},setpts=PTS-STARTPTS`;
+					// end_frame, not duration: after fps=${OUT_FPS} the segment is a
+					// COUNT of frames, and saying so leaves ffmpeg no rounding to do.
+					// `trim=duration=6.833333` sits a hair either side of frame 164
+					// depending on float luck; end_frame=164 is exactly 164 frames.
 					parts.push(`[${i * 2}:v]${vchain}[v${i}]`);
 					parts.push(`[${i * 2 + 1}:a]${MONO},atrim=duration=${d},asetpts=PTS-STARTPTS,apad=whole_dur=${d}[a${i}]`);
 					if (nativeOn) {

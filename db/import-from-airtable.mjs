@@ -109,12 +109,21 @@ const sel = (v) => (v && typeof v === "object" && !Array.isArray(v) ? str(v.name
 const multi = (v) =>
   Array.isArray(v) ? v.map((x) => (x && typeof x === "object" ? x.name : String(x))).filter(Boolean) : [];
 
-/** Positive number or null — see the note above about zeros. */
-function num(v, label, recId) {
+/**
+ * A number, with zero treated as damage only where it actually is.
+ *
+ * The zeroing bug is specific: `Ordine Scenă`, `Durată Scenă (secunde)` and
+ * `Lenght` were written as literal 0 by nodes that mapped them empty, and a
+ * scene with no order silently falls out of the batch. Chapters are different
+ * — scripting numbers the HOOK chapter **0** — and an earlier version of this
+ * helper applied the same guard everywhere, nulling 47 hook markers and
+ * reporting them as repairs. Pass `zeroOk` where zero is a value.
+ */
+function num(v, label, recId, zeroOk = false) {
   if (v === undefined || v === null || v === "") return null;
   const n = Number(v);
   if (!Number.isFinite(n)) return null;
-  if (n <= 0) {
+  if (zeroOk ? n < 0 : n <= 0) {
     stats.repaired.push(`${label} was ${n} on ${recId} → NULL`);
     return null;
   }
@@ -329,11 +338,11 @@ async function main() {
         title: str(r.fields["Titlu Capitol"]),
         main_ideas: str(r.fields["Idei Principale"]),
         chapter_script: str(r.fields["Script Capitol"]),
-        ordinal: num(r.fields["Ordine"], "chapter.ordinal", r.id),
+        ordinal: num(r.fields["Ordine"], "chapter.ordinal", r.id, true),
         approval_status: sel(r.fields["Status Aprobare Capitol"]),
         notes: str(r.fields["Observații Capitol"]),
         owner: str(r.fields["Responsabil Capitol"]),
-        duration_minutes: num(r.fields["Durată Capitol (minute)"], "chapter.duration_minutes", r.id),
+        duration_minutes: num(r.fields["Durată Capitol (minute)"], "chapter.duration_minutes", r.id, true),
         scene_note: str(r.fields["Scene"]),
         created_at: r.createdTime,
       }))
@@ -584,8 +593,11 @@ async function upsert2(client, table, rows) {
   if (!rows.length) return;
   const cols = Object.keys(rows[0]);
   const params = cols.map((_, i) => `$${i + 1}`).join(", ");
+  // (scene_id, field, path), not (path): a file may be both a scene's live
+  // asset and a saved draft of it, so path alone stopped being unique when
+  // drafts landed (db/003). The global unique this used to target is gone.
   const sql = `insert into hov.${table} (${cols.join(", ")}) values (${params})
-               on conflict (path) do nothing`;
+               on conflict (scene_id, field, path) do nothing`;
   for (const row of rows) await client.query(sql, cols.map((c) => row[c]));
   stats.written[table] = (stats.written[table] ?? 0) + rows.length;
 }

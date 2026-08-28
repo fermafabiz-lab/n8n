@@ -5,7 +5,7 @@
  *
  * - The /new form's Language field is free text with a datalist of ENDONYMS
  *   ("Română", "Deutsch"), and the producer also writes Romanian names.
- * - ai33 relays each provider's own labels, so a voice's `language` may read
+ * - ElevenLabs labels are the provider's own, so a voice's `language` may read
  *   "Romanian", "ro", "ro-RO" or "Romanian (Romania)", and the useful half is
  *   sometimes in `accent` instead.
  * - ElevenLabs itself thinks in ISO codes — `ro`, `it`, `en` — which is what
@@ -27,7 +27,7 @@ export function normLang(s: string): string {
 export interface Language {
   /** ISO code as ElevenLabs uses it — the value the picker selects. */
   code: string;
-  /** English name, also what ai33's own search is asked for. */
+  /** English name, also what the upstream search is asked for. */
   name: string;
   /** The language's own name, shown next to it in the list. */
   endonym: string;
@@ -155,7 +155,7 @@ export function voiceMatchesLanguage(
 /**
  * Does the voice mention the language anywhere a human would read?
  *
- * Weaker than the metadata test and used only to keep voices that ai33's OWN
+ * Weaker than the metadata test and used only to keep voices that the provider's OWN
  * search returned for this language — a name or description saying "Romanian"
  * is real evidence, and throwing those away is precisely why a filtered
  * search once showed two voices where the library held many.

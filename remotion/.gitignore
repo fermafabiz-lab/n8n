@@ -8,3 +8,4 @@ trigger/studio-props.local.json
 # Written by scripts/studio.mjs on every start: the chosen props with the
 # footage found in public/ filled in. Never edit — it is overwritten.
 trigger/.studio-props.resolved.json
+.DS_Store

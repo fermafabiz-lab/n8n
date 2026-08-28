@@ -15,6 +15,7 @@ import {registerInspect} from './inspect.mjs';
 import {registerTranscript} from './transcript.mjs';
 import {registerAnalyze} from './analyze.mjs';
 import {registerTts} from './tts.mjs';
+import {registerCaptionColor} from './captionColor.mjs';
 import {normalizeSpeed, applySpeed} from './speed.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -168,6 +169,7 @@ registerInspect(app);
 registerTranscript(app, {outputDir: OUTPUT_DIR});
 registerAnalyze(app, {outputDir: OUTPUT_DIR});
 registerTts(app, {jobs, outputDir: OUTPUT_DIR});
+registerCaptionColor(app);
 
 // Shared status endpoint for render and assemble jobs.
 app.get(['/render/:jobId/status', '/assemble/:jobId/status', '/tts-multi/:jobId/status'], (req, res) => {

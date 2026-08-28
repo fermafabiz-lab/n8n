@@ -836,6 +836,15 @@ export async function confirmFinalSettings(
     /** Playback rate of the finished film — see EditingOptions.speed. */
     speed: number;
   },
+  /**
+   * The drawn cards the producer KEPT, when they dropped any.
+   *
+   * Passed with the render rather than saved on each click on purpose: this is
+   * the last gate, the panel is a finishing screen, and a card removed here
+   * should not become a separate write the producer has to remember to make.
+   * Undefined means "leave them exactly as the pipeline chose them".
+   */
+  motifCards?: unknown[],
 ): Promise<ActionResult> {
   if (!isConfigured) {
     return { ok: true, message: "Demo mode — nothing was written." };
@@ -855,6 +864,12 @@ export async function confirmFinalSettings(
         music: settings.music,
         speed: normalizeSpeed(settings.speed),
       });
+    }
+    // Same merge, separate condition: the cards change even when no toggle
+    // did, and a producer who only dropped a card would otherwise press
+    // render and watch it appear anyway.
+    if (motifCards) {
+      await updateEditingOptions(projectId, { motifCards });
     }
     await writeProjectFields(projectId, { "Status General": "Asamblare" });
     // Start the render OURSELVES via the assemble webhook — the proven path

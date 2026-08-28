@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
  * ("elevenlabs_CwhRBWXzGAHq8TQ4Fs17"), so review screens used to print a
  * truncated code at the producer, who picked "Charlie" and has no idea which
  * code that was. The names come back from /api/voices, which reads the same
- * ai33 library the picker does.
+ * ElevenLabs library the picker does.
  *
  * The cache is module-level and shared by every component on the page: a
  * project's cast is the same handful of ids repeated across the chapter list,
@@ -17,7 +17,7 @@ import { useEffect, useState } from "react";
  * all of them.
  */
 const cache = new Map<string, string>();
-/** Gender per id, when ai33 reports one. Kept beside the name because it
+/** Gender per id, when ElevenLabs reports one. Kept beside the name because it
  *  is what makes a wrong cast pairing visible without listening. */
 const genders = new Map<string, string>();
 /** Ids already asked about, so a miss isn't re-requested on every render. */
@@ -47,7 +47,7 @@ async function fetchNames(ids: string[]): Promise<void> {
     }
     if (changed) for (const l of listeners) l();
   } catch {
-    // Offline or ai33 down — callers keep showing the short code.
+    // Offline or ElevenLabs down — callers keep showing the short code.
   }
 }
 
@@ -76,7 +76,7 @@ export function useVoiceNames(ids: Array<string | null | undefined>) {
 }
 
 /**
- * The same labeller, with the voice's gender appended when ai33 knows it:
+ * The same labeller, with the voice's gender appended when ElevenLabs knows it:
  * "ZaTurk — male". Use it wherever a voice is CHOSEN rather than merely
  * named — a cast list reads as correct until you notice the man is female,
  * and the name alone does not say.

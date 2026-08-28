@@ -62,6 +62,17 @@ export type Shot = {
 	/** Drift direction within the shot, so a held frame still breathes. */
 	driftX: number;
 	driftY: number;
+	/**
+	 * How much this shot creeps inward while it plays, as a scale delta.
+	 *
+	 * Carried on the shot rather than recomputed from its duration, because
+	 * intensity 0 has to be able to say ZERO. It could not before: the push was
+	 * derived from length alone, so "no montage" still reset the frame by 1.5%
+	 * at every cut — every scene drifted from 1.110 to 1.125 and the next one
+	 * snapped back. Small, but it is a zoom on a cut, which is the one thing
+	 * intensity 0 exists to not do.
+	 */
+	push: number;
 };
 
 /** Deterministic PRNG so a given project always renders the same edit. */
@@ -155,10 +166,8 @@ const pushFor = (durationSeconds: number) => (durationSeconds > 2 ? HELD_PUSH : 
  * The scale the footage has actually reached by the time a shot ends, or null
  * for a shot that is not footage at all.
  */
-const endScaleOf = (shot: {scale: number; durationSeconds: number; kind: ShotKind}): number | null =>
-	shot.kind === 'black' || shot.kind === 'card'
-		? null
-		: shot.scale + pushFor(shot.durationSeconds);
+const endScaleOf = (shot: {scale: number; push: number; kind: ShotKind}): number | null =>
+	shot.kind === 'black' || shot.kind === 'card' ? null : shot.scale + shot.push;
 
 /**
  * `black` and `card` are not framings — they are what the frame HOLDS, a
@@ -333,6 +342,7 @@ export function planMontage(scenes: SceneCaption[], opts: MontageOptions = {}): 
 		offsetYPct: 0,
 		driftX: 0,
 		driftY: 0,
+		push: 0,
 	});
 
 	if (intensity === 0) {
@@ -344,8 +354,11 @@ export function planMontage(scenes: SceneCaption[], opts: MontageOptions = {}): 
 			scale: FRAMINGS.medium.scale,
 			offsetXPct: 0,
 			offsetYPct: 0,
+			// Drift stays: it is a pan of one percent, which keeps a held frame
+			// from looking frozen and is not what anyone means by a zoom.
 			driftX: 1,
 			driftY: 0.5,
+			push: 0,
 		});
 		scenes.forEach((s, i) => {
 			const room = cardRoom(i, s.startSeconds, s.durationSeconds);
@@ -394,6 +407,7 @@ export function planMontage(scenes: SceneCaption[], opts: MontageOptions = {}): 
 				offsetYPct: 0,
 				driftX: 0,
 				driftY: 0,
+				push: 0,
 			});
 			cursor += blackLen;
 			remaining -= blackLen;
@@ -428,6 +442,7 @@ export function planMontage(scenes: SceneCaption[], opts: MontageOptions = {}): 
 				offsetYPct: (rand() < 0.5 ? -1 : 1) * spread * 0.45 * (0.4 + rand() * 0.6),
 				driftX: (rand() < 0.5 ? -1 : 1) * (0.6 + rand() * 0.9),
 				driftY: (rand() < 0.5 ? -1 : 1) * (0.4 + rand() * 0.7),
+				push: pushFor(length),
 			};
 			shots.push(shot);
 			cursor += length;
@@ -526,7 +541,7 @@ export function shotTransform(shot: Shot, seconds: number): string {
 	// Held shots earn a slow push; short inserts stay still (a zoom inside a
 	// half-second insert only reads as a wobble). The amount comes from the
 	// same `pushFor` the planner uses to size its cuts.
-	const scale = shot.scale + pushFor(shot.durationSeconds) * p;
+	const scale = shot.scale + shot.push * p;
 	const tx = shot.offsetXPct + shot.driftX * p;
 	const ty = shot.offsetYPct + shot.driftY * p;
 	return `scale(${scale.toFixed(4)}) translate(${tx.toFixed(2)}%, ${ty.toFixed(2)}%)`;

@@ -45,13 +45,39 @@ export type EvidenceClaim = {
 export type TextCardSpec = {
 	/** The scene whose narration this card belongs with. */
 	sceneIndex: number;
-	variant: 'claim' | 'figure';
-	/** The line the card is built around: the claim, or the figure itself. */
+	variant: 'claim' | 'figure' | 'route' | 'schedule';
+	/**
+	 * The line the card is built around: the claim, or the figure itself.
+	 * A route card draws its stops instead, so it may leave this empty.
+	 */
 	headline: string;
 	/** What a figure quantifies. Meaningless on a claim card. */
 	kicker?: string;
 	/** "SOURCE · 1923". The whole point of a claim card. */
 	attribution?: string;
+	/**
+	 * Route card: the stops along the line, in the order they are travelled.
+	 * Two is a journey; five is a timetable nobody reads in three seconds.
+	 */
+	stops?: string[];
+	/**
+	 * Schedule card: the lines of the timetable, in the order they happen.
+	 * Two or three; a fourth turns a beat into a document.
+	 */
+	rows?: {label: string; value: string}[];
+	/** Route and schedule cards: the small tracked label naming the graphic. */
+	label?: string;
+	/**
+	 * Route and schedule cards: the one thing the footage cannot say — a
+	 * distance, a margin between two times.
+	 *
+	 * Deliberately AUTHORED rather than derived. A distance is not in the
+	 * script and no rule could compute one, so the only honest place for it is
+	 * an explicit `textCards` prop written for this film. Code that invented a
+	 * figure here would be inventing a fact, which is the one thing the card
+	 * pipeline is built not to do.
+	 */
+	note?: string;
 	/** How long it needs to be read. */
 	seconds: number;
 	/**
@@ -98,6 +124,20 @@ export type FinalVideoProps = {
 	aspectRatio: string;
 	/** Master switch for karaoke captions. */
 	showCaptions: boolean;
+	/**
+	 * Caption accent colour.
+	 *
+	 * Omitted (or 'none') gives white captions with the spoken word marked by
+	 * brightness — the default, because it is the only choice that is right on
+	 * every kind of footage. Supply a hex ('#7FD1FF') to opt a project into a
+	 * colour, either one the producer picked or one derived from the montage
+	 * by `POST /caption-color` on the render server.
+	 *
+	 * Deliberately NOT `palette.primary`, which this used to be: that field is
+	 * also the outro's button and border colour, so tuning captions silently
+	 * restyled the end screen. See src/captionColor.ts.
+	 */
+	captionColor?: string;
 	/**
 	 * How hard the montage cuts: 0 leaves every scene whole (the pre-montage
 	 * behaviour), 1 is the default, 2 is aggressive. Omitted = derived from

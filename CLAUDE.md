@@ -2665,10 +2665,40 @@ generated FROM it. The chain, and where each piece lives:
 
 ## Open work
 
-- **Do not publish the Media Generation draft** parked since 2026-08-17 12:37 —
-  it has `resource`/`operation` stripped from all six Google Drive upload nodes.
-  Discard it back to `activeVersionId` `f7f59a08-05a5-4f73-81a4-742e46880544`, or
-  re-set them first. Full account under the n8n lessons.
+- ~~Do not publish the Media Generation draft parked since 2026-08-17~~ — that
+  draft is gone, superseded by later edits, and the six Google Drive upload
+  nodes carry `resource: file` + `operation: upload` again in everything now
+  parked. The *check* stays worth running after any UI visit; the specific
+  draft it warned about does not exist.
+- **The ElevenLabs TTS migration is written and NOT LIVE** (audited 2026-08-28).
+  Commit `8ffcf57` shipped the repo half — which deployed — while both n8n
+  halves sit as unpublished drafts, so **production still synthesizes through
+  ai33**. This is the `update_workflow`-does-not-publish trap, caught by
+  comparing `activeVersionId` rather than by reading `get_workflow_details`:
+
+  | Workflow | active | parked |
+  |---|---|---|
+  | Media Generation `yHG4DBCDjR3RJzav` | `97321056` (08-26, the audio-first reorder) | `5935ff37`, `c1cd26d0` (08-27) |
+  | Claude Scripting `gkEtGMecv4TC3ZHp` | `8211a0e5` (08-17) | six versions (08-27) |
+
+  Both drafts were diffed node-for-node against their active version and are
+  clean — no dangling `$('<deleted node>')` references, Drive uploads intact,
+  and on Media Generation the ONLY differences are the TTS nodes, so the
+  audio-first reorder is carried forward untouched.
+
+  Two things to know before publishing either. **Scripting's draft bundles two
+  unrelated features** — the ElevenLabs voice-regen swap *and* the whole
+  motif-card chain spliced in-line between `Save scenes To Airtable1` and
+  `Wait For Scene Approval` — so publishing it ships both; that is the
+  "whatever is parked goes live with your change" hazard in the concrete.
+  And **publishing does not change how the audio sounds**: the new nodes and
+  `remotion/server/tts.mjs` both pin `eleven_multilingual_v2`, deliberately,
+  which is the model ai33 was already choosing. The migration buys direct
+  billing, one call instead of a 3s poll loop, and *access* to the
+  `voice_settings` ai33 silently dropped — not a better take. Changing the
+  model or the settings is a separate decision, and the two copies of `MODEL`
+  must move together or a regenerated line comes back in a different voice
+  character from its neighbours.
 - **Confirm the hook chapter's ordinal survives Postgres.** `chapter_ordinal_check`
   rejected `Ordine: 0` on 2026-08-16 (execution 4225 → 4226). Later runs
   succeeded, but whether the constraint, the payload or the absence of a hook is

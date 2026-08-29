@@ -5183,3 +5183,27 @@ body:has(.mkt) .vignette {
 .stage > * {
   min-width: 0;
 }
+
+/* Chapter break in the voice review list.
+   A LABEL, never a control: the filmstrip's chapter row is made of buttons
+   because it navigates, and there is nothing to navigate to in a list you
+   simply scroll. It carries the panel titles' own type — 12px, tracked,
+   uppercase, 650, --soft, exactly what `.card h5` gives INSPECTOR and SCENES
+   — and declares no font-family of its own, so it inherits the app's. */
+.chdiv {
+  text-align: center;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 650;
+  color: var(--soft);
+  /* The list is a flex column with a 14px gap, so this adds to it: more air
+     above than below, which binds the heading to the chapter it opens rather
+     than leaving it floating between two. */
+  margin: 12px 0 0;
+}
+/* The first heading opens the list, which already has its own spacing above —
+   pushing it further down would read as detached from the panel. */
+.chdiv:first-child {
+  margin-top: 0;
+}

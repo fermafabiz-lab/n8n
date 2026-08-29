@@ -27,6 +27,16 @@ export const chapterLabel = (key: string): string =>
   key === "hook" ? "Hook" : `Ch. ${key}`;
 
 /**
+ * The long form, for a heading that stands on its own line.
+ *
+ * Same rule, two registers: `chapterLabel` is read inside a row of tabs where
+ * everything around it is already saying "chapter", so "Ch. 2" is enough; a
+ * heading with nothing beside it has to name itself in full.
+ */
+export const chapterTitle = (key: string): string =>
+  key === "hook" ? "Hook" : `Chapter ${key}`;
+
+/**
  * Every chapter present in a set of scene orders — the hook first when one
  * exists, then the numbered chapters in order.
  */

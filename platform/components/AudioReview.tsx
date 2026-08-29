@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
   approveVoices,
   changeProjectVoice,
@@ -18,7 +18,13 @@ import {
 import type { Scene } from "@/lib/data";
 import { useVoiceLabels, useVoiceNames } from "@/lib/voice-names";
 import { downloadSrc, mediaSrc } from "@/lib/media";
-import { chapterKeys as chapterKeysOf, chapterOf as chapterOfOrder } from "@/lib/chapters";
+import {
+  chapterKeys as chapterKeysOf,
+  chapterKeyOf as chapterKeyOfOrder,
+  chapterOf as chapterOfOrder,
+  chapterTitle,
+  groupsByChapter,
+} from "@/lib/chapters";
 import RegenBadge from "@/components/RegenBadge";
 import SpeedPicker from "@/components/SpeedPicker";
 import VoicePicker from "@/components/VoicePicker";
@@ -296,6 +302,20 @@ export default function AudioReview({
   const chapterOf = (s: Scene): number => chapterOfOrder(s.order);
   const chapterKeys = useMemo(
     () => chapterKeysOf(scenes.map((s) => s.order)),
+    [scenes],
+  );
+  /**
+   * Whether the take list gets chapter headings.
+   *
+   * Read off the WHOLE film, not the staged pass: production works in batches,
+   * so a pass can hold one chapter's scenes while the film has four, and
+   * "Chapter 3" over those takes is exactly the context the producer wants —
+   * it says where in the film they are. Judged on the pass instead, that
+   * heading would vanish precisely when it is most useful. A single-chapter
+   * film gets none, because one group is not a grouping.
+   */
+  const byChapter = useMemo(
+    () => groupsByChapter(scenes.map((s) => s.order)),
     [scenes],
   );
   /** What a chapter is read by today: an explicit pick, else the cast order. */
@@ -1029,10 +1049,19 @@ export default function AudioReview({
           const draft = drafts[s.id];
           const dirty = draft !== undefined && draft !== (s.narration ?? "");
           const audioIndex = withAudio.findIndex((w) => w.id === s.id);
+          // A chapter break: shown when this take opens a chapter the previous
+          // one did not belong to. A LABEL, never a control — the filmstrip's
+          // chapter row is buttons because it navigates, and there is nothing
+          // to navigate to in a list you simply scroll.
+          const chapterKey = chapterKeyOfOrder(s.order);
+          const opensChapter =
+            byChapter &&
+            (i === 0 || chapterKeyOfOrder(inPlay[i - 1].order) !== chapterKey);
           return (
+            <Fragment key={s.id}>
+              {opensChapter && <div className="chdiv">{chapterTitle(chapterKey)}</div>}
             <div
               className="card take"
-              key={s.id}
               style={{
                 padding: "12px 14px",
                 outline: isPlaying ? "2px solid var(--accent)" : undefined,
@@ -1247,6 +1276,7 @@ export default function AudioReview({
                 </div>
               </div>
             </div>
+            </Fragment>
           );
         })}
       </div>

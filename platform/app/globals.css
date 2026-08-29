@@ -5191,6 +5191,13 @@ body:has(.mkt) .vignette {
    uppercase, 650, --soft, exactly what `.card h5` gives INSPECTOR and SCENES
    — and declares no font-family of its own, so it inherits the app's. */
 .chdiv {
+  /* A row rather than a block, because the heading now carries its own play
+     control. The GROUP is centered, not the label — a label centered against
+     the panel with a button hanging off it reads as two separate things. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
   text-align: center;
   font-size: 12px;
   letter-spacing: 0.06em;
@@ -5206,4 +5213,33 @@ body:has(.mkt) .vignette {
    pushing it further down would read as detached from the panel. */
 .chdiv:first-child {
   margin-top: 0;
+}
+/* Play this chapter. Deliberately smaller than the 34px circle on a take: it
+   sits beside a 12px label rather than beside a line of narration, and at the
+   take's size the heading would read as another take instead of as the line
+   above one. The `.take` rules that shape that circle are scoped to the take,
+   so none of them reach here — this states the whole shape itself.
+
+   letter-spacing is reset because the heading tracks its caps at 0.06em, and
+   inherited tracking pushes a single glyph off the centre of its own circle. */
+.chdiv .chplay {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  padding: 0;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  letter-spacing: 0;
+  color: var(--ink);
+  background: var(--card2);
+  border: 1px solid rgba(24, 20, 40, 0.1);
+  box-shadow: var(--shadow-sm);
+  transition: var(--tr);
+}
+.chdiv .chplay:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
 }

@@ -252,7 +252,16 @@ export default function AudioReview({
   const [msg, setMsg] = useState<ActionResult | null>(null);
   const [pending, setPending] = useState(false);
   const [playingId, setPlayingId] = useState<string | null>(null);
-  const [playAll, setPlayAll] = useState(false);
+  /**
+   * The continuous run in progress, if any: `"all"` for the whole narration,
+   * a chapter key for one chapter, null for a single take.
+   *
+   * One value rather than a flag per button, because the runs are mutually
+   * exclusive by nature — pressing Chapter 2 while the film is playing means
+   * "play chapter 2 instead", and two booleans would let both read as running.
+   */
+  const [runKey, setRunKey] = useState<string | null>(null);
+  const playAll = runKey === "all";
   const [durations, setDurations] = useState<Record<string, number>>({});
   /** Where the speech sits inside each take — see speechBoundsOf. */
   const [bounds, setBounds] = useState<Record<string, { head: number; tail: number }>>({});
@@ -506,6 +515,51 @@ export default function AudioReview({
   }, [scenes]);
 
   const withAudio = useMemo(() => inPlay.filter((s) => s.voiceUrl), [inPlay]);
+  /**
+   * Read by playFrom, for the same reason the rate and the bounds are refs: a
+   * run schedules its next take from inside the current one's handler, so a
+   * list captured in that closure is whatever existed when the run started.
+   * This page re-renders every 10 seconds and the batch grows underneath it,
+   * so that list really does go stale — and for a chapter run it decides where
+   * the run ENDS, which is the difference between stopping on the chapter and
+   * running into the next one.
+   */
+  const withAudioRef = useRef(withAudio);
+  useEffect(() => {
+    withAudioRef.current = withAudio;
+  }, [withAudio]);
+  /**
+   * The half-open range of takes a run covers.
+   *
+   * Derived on demand rather than stored with the run: a chapter's block can
+   * grow while it is playing (a later take lands, the panel re-renders), and a
+   * range frozen at the first press would stop short of takes the producer can
+   * see on screen.
+   *
+   * The list is passed in rather than read from one place, because the two
+   * callers genuinely want different lists. What is being DRAWN has to measure
+   * the render's own `withAudio` — the ref is only synced in an effect, so
+   * during the render where a take arrives it still holds the previous list,
+   * and a heading would draw itself disabled over a chapter that now has
+   * takes. What is PLAYING has to measure the ref, because it is running from
+   * inside a closure that may be several renders old.
+   */
+  const rangeIn = (
+    list: Scene[],
+    key: string,
+  ): { from: number; to: number } => {
+    if (key === "all") return { from: 0, to: list.length };
+    let from = -1;
+    let to = 0;
+    list.forEach((s, i) => {
+      if (chapterKeyOfOrder(s.order) !== key) return;
+      if (from < 0) from = i;
+      to = i + 1;
+    });
+    return from < 0 ? { from: 0, to: 0 } : { from, to };
+  };
+  /** The run's range as playback sees it — see rangeIn. */
+  const runRange = (key: string) => rangeIn(withAudioRef.current, key);
   const unapproved = inPlay.filter((s) => !s.voiceApproved && s.voiceUrl);
   const missing = inPlay.filter((s) => !s.voiceUrl).length;
   const approved = inPlay.filter((s) => s.voiceApproved).length;
@@ -647,11 +701,21 @@ export default function AudioReview({
     audioRef.current?.pause();
     audioRef.current = null;
     setPlayingId(null);
-    setPlayAll(false);
+    setRunKey(null);
   };
 
-  const playFrom = (index: number, continuous: boolean) => {
-    const scene = withAudio[index];
+  /**
+   * Play one take, and carry on through `run` when there is one.
+   *
+   * `run` is the run's identity, not a boolean, so the take that finishes
+   * knows where its run ENDS: the film for "all", the chapter's own block for
+   * a chapter key. A chapter run therefore stops on the chapter rather than
+   * spilling into the next one, and it opens with that chapter's generated
+   * lead-in for free — the first take of a chapter is a chapter opener, which
+   * is already the one case that keeps its breath.
+   */
+  const playFrom = (index: number, run: string | null) => {
+    const scene = withAudioRef.current[index];
     if (!scene?.voiceUrl) return stop();
     clearStop();
     audioRef.current?.pause();
@@ -662,10 +726,10 @@ export default function AudioReview({
     setRate(a, rateRef.current);
     audioRef.current = a;
     setPlayingId(scene.id);
-    setPlayAll(continuous);
+    setRunKey(run);
     const next = () => {
       clearStop();
-      if (continuous && index + 1 < withAudio.length) playFrom(index + 1, true);
+      if (run && index + 1 < runRange(run).to) playFrom(index + 1, run);
       else stop();
     };
     // The film's own cut, previewed: skip the generated lead-in and stop at
@@ -714,9 +778,9 @@ export default function AudioReview({
     if (!a || stopTimer.current === null || !playingId) return;
     const tail = boundsRef.current[playingId]?.tail;
     if (tail === undefined) return;
-    const i = withAudio.findIndex((w) => w.id === playingId);
+    const i = withAudioRef.current.findIndex((w) => w.id === playingId);
     armStop(a, tail, () => {
-      if (playAll && i >= 0 && i + 1 < withAudio.length) playFrom(i + 1, true);
+      if (runKey && i >= 0 && i + 1 < runRange(runKey).to) playFrom(i + 1, runKey);
       else stop();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -761,7 +825,7 @@ export default function AudioReview({
           <button
             className="btn"
             disabled={withAudio.length === 0}
-            onClick={() => (playAll ? stop() : playFrom(0, true))}
+            onClick={() => (playAll ? stop() : playFrom(0, "all"))}
           >
             {playAll ? "■ Stop" : "▶ Play all"}
           </button>
@@ -1325,16 +1389,48 @@ export default function AudioReview({
           const dirty = draft !== undefined && draft !== (s.narration ?? "");
           const audioIndex = withAudio.findIndex((w) => w.id === s.id);
           // A chapter break: shown when this take opens a chapter the previous
-          // one did not belong to. A LABEL, never a control — the filmstrip's
-          // chapter row is buttons because it navigates, and there is nothing
-          // to navigate to in a list you simply scroll.
+          // one did not belong to.
+          //
+          // The heading itself is still a label — the play control beside it
+          // is the thing that acts, and it is here rather than in the header
+          // row because a chapter is not addressable from there: this is the
+          // one place on screen that says where a chapter begins. (The rule it
+          // looks like it breaks — "a label, never a control", written when
+          // the filmstrip's chapter tabs were the comparison — was about
+          // NAVIGATION: a button that scrolls you to a list you are already
+          // scrolling does nothing. Playing the chapter is not nothing.)
           const chapterKey = chapterKeyOfOrder(s.order);
           const opensChapter =
             byChapter &&
             (i === 0 || chapterKeyOfOrder(inPlay[i - 1].order) !== chapterKey);
+          // Measured against the list being drawn, not the playback ref.
+          const chapterRun = opensChapter ? rangeIn(withAudio, chapterKey) : null;
+          const chapterPlaying = runKey === chapterKey;
           return (
             <Fragment key={s.id}>
-              {opensChapter && <div className="chdiv">{chapterTitle(chapterKey)}</div>}
+              {opensChapter && (
+                <div className="chdiv">
+                  <button
+                    className="abtn playbtn chplay"
+                    disabled={!chapterRun || chapterRun.to === chapterRun.from}
+                    title={
+                      chapterPlaying
+                        ? "Stop"
+                        : `Play ${chapterTitle(chapterKey)} — ${
+                            (chapterRun?.to ?? 0) - (chapterRun?.from ?? 0)
+                          } take(s)`
+                    }
+                    onClick={() =>
+                      chapterPlaying
+                        ? stop()
+                        : playFrom(rangeIn(withAudio, chapterKey).from, chapterKey)
+                    }
+                  >
+                    {chapterPlaying ? "■" : "▶"}
+                  </button>
+                  <span>{chapterTitle(chapterKey)}</span>
+                </div>
+              )}
             <div
               className="card take"
               style={{
@@ -1346,7 +1442,7 @@ export default function AudioReview({
                 <button
                   className="abtn playbtn"
                   disabled={!s.voiceUrl}
-                  onClick={() => (isPlaying ? stop() : playFrom(audioIndex, false))}
+                  onClick={() => (isPlaying ? stop() : playFrom(audioIndex, null))}
                 >
                   {isPlaying ? "■" : "▶"}
                 </button>

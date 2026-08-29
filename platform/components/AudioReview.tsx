@@ -88,36 +88,42 @@ const BREATH_GUARD = 0.05;
 /**
  * Where the speech starts and ends in a decoded take.
  *
- * ffmpeg's `silencedetect` measures a moving RMS against the threshold; this
- * does the same over 20ms windows, which is close enough that the two agree
- * to well inside the guard either side. Only silence TOUCHING an end counts —
- * a pause mid-sentence is the performance, and neither side cuts it.
+ * Measured the way ffmpeg's `silencedetect` measures it: sample MAGNITUDE
+ * against the threshold, one sample at a time. That distinction is the whole
+ * of a regression worth remembering — this first averaged 20ms windows, and
+ * an RMS window sits roughly 15dB under the peak of the same speech, so
+ * "-45dB" meant something far stricter here than it did on the server. The
+ * preview cut the last words off every take while the render kept them.
+ * **Two numbers named the same thing are not the same threshold until they
+ * are measured the same way.**
+ *
+ * Only silence TOUCHING an end counts, so the scan runs inward from each end
+ * and stops at the first real sample — a pause mid-sentence is the
+ * performance, and neither side cuts it. That also makes it cheap: it reads
+ * the padding, never the speech.
  */
 function speechBoundsOf(buf: AudioBuffer): { head: number; tail: number } {
   const data = buf.getChannelData(0);
   const sr = buf.sampleRate;
   const total = buf.duration;
-  const win = Math.max(1, Math.round(sr * 0.02));
   const floor = Math.pow(10, BREATH_NOISE_DB / 20);
-  let first = -1;
-  let last = -1;
-  for (let i = 0; i < data.length; i += win) {
-    const end = Math.min(data.length, i + win);
-    let sum = 0;
-    for (let j = i; j < end; j++) sum += data[j] * data[j];
-    if (Math.sqrt(sum / (end - i)) > floor) {
-      if (first < 0) first = i / sr;
-      last = end / sr;
-    }
-  }
+  let first = 0;
+  while (first < data.length && Math.abs(data[first]) <= floor) first++;
   // Nothing above the floor: a take that reads as silent throughout is left
   // whole. Cutting it to nothing is the one outcome worse than not cutting.
-  if (first < 0) return { head: 0, tail: total };
+  if (first >= data.length) return { head: 0, tail: total };
+  let last = data.length - 1;
+  while (last > first && Math.abs(data[last]) <= floor) last--;
+  const speechFrom = first / sr;
+  const speechTo = (last + 1) / sr;
   // Below BREATH_MIN it is phrasing, not padding, and trimming it is what
   // makes speech sound clipped rather than tight.
-  const head = first >= BREATH_MIN ? Math.max(0, first - BREATH_GUARD) : 0;
+  const head =
+    speechFrom >= BREATH_MIN ? Math.max(0, speechFrom - BREATH_GUARD) : 0;
   const tail =
-    total - last >= BREATH_MIN ? Math.min(total, last + BREATH_GUARD) : total;
+    total - speechTo >= BREATH_MIN
+      ? Math.min(total, speechTo + BREATH_GUARD)
+      : total;
   return tail - head < 0.3 ? { head: 0, tail: total } : { head, tail };
 }
 
@@ -250,6 +256,33 @@ export default function AudioReview({
   const [durations, setDurations] = useState<Record<string, number>>({});
   /** Where the speech sits inside each take — see speechBoundsOf. */
   const [bounds, setBounds] = useState<Record<string, { head: number; tail: number }>>({});
+  /**
+   * The take, held locally, so playing it cannot stall.
+   *
+   * The panel already downloads every take to measure it, so this costs one
+   * `Blob` and nothing else — and it removes the one thing a cut timed in
+   * media seconds cannot survive. Streamed from Drive through /api/media
+   * (which answers `no-store`, so each play is a fresh fetch) a take can stop
+   * mid-line to rebuffer; wall-clock time keeps running through that and the
+   * cut arrives early, on every take, which is what "I can't hear the last
+   * words" was. A blob source is already in memory and never waits.
+   */
+  const [srcs, setSrcs] = useState<Record<string, string>>({});
+  const srcsRef = useRef(srcs);
+  useEffect(() => {
+    srcsRef.current = srcs;
+  }, [srcs]);
+  /** Revoked only on unmount: the measuring effect re-runs as the batch grows,
+   *  and freeing these in its cleanup would pull the source out of a take that
+   *  is playing. */
+  const blobUrls = useRef<string[]>([]);
+  useEffect(
+    () => () => {
+      for (const u of blobUrls.current) URL.revokeObjectURL(u);
+      blobUrls.current = [];
+    },
+    [],
+  );
   const [clipDurations, setClipDurations] = useState<Record<string, number>>({});
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [showVoice, setShowVoice] = useState(false);
@@ -498,6 +531,16 @@ export default function AudioReview({
           const res = await fetch(audioSrc(s.voiceUrl));
           if (!res.ok) throw new Error(String(res.status));
           const bytes = await res.arrayBuffer();
+          // Kept as a local source BEFORE decoding, because decodeAudioData
+          // detaches the buffer it is handed. The Blob copies the bytes, so
+          // the decode below still gets them.
+          const url = URL.createObjectURL(
+            new Blob([bytes], {
+              type: res.headers.get("content-type") || "audio/mpeg",
+            }),
+          );
+          blobUrls.current.push(url);
+          if (!cancelled) setSrcs((p) => ({ ...p, [s.id]: url }));
           // Created lazily and only once: an AudioContext per take would hit
           // the browser's cap on a long film. It stays suspended — nothing
           // here plays through it, it only decodes.
@@ -560,6 +603,16 @@ export default function AudioReview({
    * the file does. `timeupdate` fires only about four times a second, which
    * would overshoot the cut by up to a quarter of the very pause being
    * removed; a timer lands on it.
+   *
+   * But a timer counts WALL CLOCK while the cut lives in MEDIA time, and the
+   * two part company the instant the stream stalls to buffer. Every take here
+   * is a fresh fetch of a Drive file through /api/media, which answers
+   * `no-store`, so stalling is routine rather than rare — and a blind timer
+   * then cut short by however long the take had spent waiting, on every line.
+   * So the timer no longer decides anything: it re-reads `currentTime` and
+   * waits out whatever is genuinely left. It can only ever be late now, never
+   * early, which is the right direction for a control the producer is
+   * listening to.
    */
   const stopTimer = useRef<number | null>(null);
   const clearStop = () => {
@@ -570,9 +623,23 @@ export default function AudioReview({
   };
   const armStop = (a: HTMLAudioElement, tail: number, done: () => void) => {
     clearStop();
-    const left = (tail - a.currentTime) / (a.playbackRate || 1);
-    if (left <= 0) return done();
-    stopTimer.current = window.setTimeout(done, left * 1000);
+    // A frame either side of the cut is under the ear's resolution, and
+    // insisting on exactness here is what turns a stalled stream into a
+    // 50ms poll that can never satisfy itself.
+    const slack = 0.03;
+    const left = () => (tail - a.currentTime) / (a.playbackRate || 1);
+    // Waiting on the take is right; waiting on it forever is not. A stream
+    // that stalls and never recovers would otherwise leave "Play all" stopped
+    // on a line with no error to explain it, so the take gets its own length
+    // again plus ten seconds and then the run moves on.
+    const giveUpAt = Date.now() + left() * 1000 * 2 + 10_000;
+    const tick = () => {
+      stopTimer.current = null;
+      if (left() <= slack || a.ended || Date.now() > giveUpAt) return done();
+      stopTimer.current = window.setTimeout(tick, Math.max(50, left() * 1000));
+    };
+    if (left() <= slack) return done();
+    stopTimer.current = window.setTimeout(tick, left() * 1000);
   };
 
   const stop = () => {
@@ -588,7 +655,10 @@ export default function AudioReview({
     if (!scene?.voiceUrl) return stop();
     clearStop();
     audioRef.current?.pause();
-    const a = new Audio(audioSrc(scene.voiceUrl));
+    // The downloaded copy when there is one, so the take cannot stall; the
+    // stream only for a take whose fetch or decode failed, which is also the
+    // case that has no bounds and therefore no cut to miss.
+    const a = new Audio(srcsRef.current[scene.id] ?? audioSrc(scene.voiceUrl));
     setRate(a, rateRef.current);
     audioRef.current = a;
     setPlayingId(scene.id);
@@ -612,7 +682,19 @@ export default function AudioReview({
       if (a.readyState >= 1) a.currentTime = head;
       else a.addEventListener("loadedmetadata", () => (a.currentTime = head), {once: true});
     }
-    if (tail !== null) a.addEventListener("playing", () => armStop(a, tail, next), {once: true});
+    if (tail !== null) {
+      // Deliberately NOT `{once: true}`: `playing` fires again after every
+      // buffering stall, and re-reading the clock there is what keeps the cut
+      // measured in the take rather than on the wall. `waiting` re-arms for
+      // the same reason from the other side. Both check the element is still
+      // the current one — a paused predecessor that resumes must not re-arm
+      // the cut for a take the panel has already moved past.
+      const rearm = () => {
+        if (audioRef.current === a) armStop(a, tail, next);
+      };
+      a.addEventListener("playing", rearm);
+      a.addEventListener("waiting", rearm);
+    }
     a.onended = next;
     a.onerror = () => stop();
     void a.play().catch(() => stop());

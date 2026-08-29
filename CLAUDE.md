@@ -859,6 +859,43 @@ cuts that padding off both ends before anything measures the take.
   that makes a pure-frame mp3 concat gain ~36ms per join.
 - `verify.breathTrimmedSeconds` in the job result is the one number that says
   whether it did anything on a given film; each scene also logs what it cut.
+- **Proven on real takes**, not just on fixtures — job `d24c3e9e`, the
+  disposable cutover film, called straight at `/assemble` so nothing on the
+  project moved. `breathTrimmedSeconds: 1.6` over 36.75s, and the per-scene
+  log is the mechanism in the open: the two chapter openers cut **0.30s and
+  0.31s** (tail only, "kept the chapter lead-in") while the mid-chapter takes
+  cut **0.51s and 0.48s** (both ends). That ~0.2s difference IS the preserved
+  lead-in. The fifth take cut 0.00 — the only one in that film regenerated
+  through the new ElevenLabs-direct path, which is suggestive but one sample,
+  not a finding.
+
+**The audio panel previews the same cut**, so the producer hears the film's
+rhythm before a clip exists. `speechBoundsOf` in `AudioReview.tsx` decodes each
+take through Web Audio and measures 20ms RMS windows against the SERVER'S three
+constants — copied deliberately, because a preview trimmed to different
+thresholds would be a different cut confidently presented as the real one.
+
+- **The lengths on screen are the film's, not the file's.** `flagFor` judges
+  speech against word count, `fitProblem` against the shot, and the render's
+  scene length is `voiceDur + 0.35` off exactly this number — reporting the
+  raw container length would leave all three measuring silence.
+- **The take is stopped by a TIMER, not by `ended`**, because it now ends
+  before the file does. `timeupdate` fires about four times a second, which
+  would overshoot the cut by up to a quarter of the very pause being removed.
+- **That timer is re-armed when the pace changes mid-take.** It was measured
+  in real seconds against the old rate, so leaving it would cut early when
+  slowed and late when sped up — and late means playing the padding the
+  feature exists to remove. Verified in a browser: switching to 0.8× mid-take
+  still cut at media position 2.65s, the tail bound, where an un-rearmed timer
+  would have cut at ~2.2s and eaten half a second of speech.
+- **Chapter openers are derived from the WHOLE film**, never from the takes on
+  screen: judged on a partial pass, a scene in the middle of chapter 2 would
+  look like an opener merely by being first in the batch, and the preview
+  would put a pause where the film has none.
+- Verified against fixtures with known padding (0.6s lead + 2.0s tone + 0.5s
+  tail): lengths read 2.1s not 3.1s, an opener plays from 0, a mid-chapter
+  take seeks to 0.55, and "Play all" advances at 2.70 / 2.68 / 2.13s against
+  3.10s untrimmed.
 
 ### Playback speed — what PACE finally means
 

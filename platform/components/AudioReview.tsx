@@ -72,6 +72,56 @@ function setRate(el: HTMLMediaElement | null, rate: number) {
 const audioSrc = mediaSrc;
 
 /**
+ * The generated breath, previewed.
+ *
+ * ElevenLabs pads every take with near-silence at both ends, and the render
+ * cuts it (remotion/server/assemble.mjs) — so a panel that played the raw
+ * file would audition a rhythm the film does not have, which is the whole
+ * failure the pace preview exists to avoid. These three numbers are the
+ * SERVER'S, copied deliberately: a preview trimmed to different thresholds
+ * would be a different cut, confidently presented as the real one.
+ */
+const BREATH_NOISE_DB = -45;
+const BREATH_MIN = 0.18;
+const BREATH_GUARD = 0.05;
+
+/**
+ * Where the speech starts and ends in a decoded take.
+ *
+ * ffmpeg's `silencedetect` measures a moving RMS against the threshold; this
+ * does the same over 20ms windows, which is close enough that the two agree
+ * to well inside the guard either side. Only silence TOUCHING an end counts —
+ * a pause mid-sentence is the performance, and neither side cuts it.
+ */
+function speechBoundsOf(buf: AudioBuffer): { head: number; tail: number } {
+  const data = buf.getChannelData(0);
+  const sr = buf.sampleRate;
+  const total = buf.duration;
+  const win = Math.max(1, Math.round(sr * 0.02));
+  const floor = Math.pow(10, BREATH_NOISE_DB / 20);
+  let first = -1;
+  let last = -1;
+  for (let i = 0; i < data.length; i += win) {
+    const end = Math.min(data.length, i + win);
+    let sum = 0;
+    for (let j = i; j < end; j++) sum += data[j] * data[j];
+    if (Math.sqrt(sum / (end - i)) > floor) {
+      if (first < 0) first = i / sr;
+      last = end / sr;
+    }
+  }
+  // Nothing above the floor: a take that reads as silent throughout is left
+  // whole. Cutting it to nothing is the one outcome worse than not cutting.
+  if (first < 0) return { head: 0, tail: total };
+  // Below BREATH_MIN it is phrasing, not padding, and trimming it is what
+  // makes speech sound clipped rather than tight.
+  const head = first >= BREATH_MIN ? Math.max(0, first - BREATH_GUARD) : 0;
+  const tail =
+    total - last >= BREATH_MIN ? Math.min(total, last + BREATH_GUARD) : total;
+  return tail - head < 0.3 ? { head: 0, tail: total } : { head, tail };
+}
+
+/**
  * Narration is written to ~22 words per 8s scene, so a line's duration should
  * land near words / 2.6 seconds. A large miss means the take is clipped,
  * rushed, or the TTS swallowed a chunk — exactly what's worth listening to.
@@ -198,6 +248,8 @@ export default function AudioReview({
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [playAll, setPlayAll] = useState(false);
   const [durations, setDurations] = useState<Record<string, number>>({});
+  /** Where the speech sits inside each take — see speechBoundsOf. */
+  const [bounds, setBounds] = useState<Record<string, { head: number; tail: number }>>({});
   const [clipDurations, setClipDurations] = useState<Record<string, number>>({});
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [showVoice, setShowVoice] = useState(false);
@@ -293,6 +345,38 @@ export default function AudioReview({
     // line you are already listening to.
     setRate(audioRef.current, rate);
   }, [rate]);
+
+  /**
+   * Read by playFrom, which builds each element fresh — same reason the rate
+   * is a ref: "Play all" schedules the next take from inside the current one's
+   * handler, so a bounds map captured in that closure would be whatever had
+   * been decoded when the run started.
+   */
+  const boundsRef = useRef(bounds);
+  useEffect(() => {
+    boundsRef.current = bounds;
+  }, [bounds]);
+
+  /**
+   * The scenes that open a chapter, by id — the ones whose lead-in the render
+   * keeps.
+   *
+   * Derived from the WHOLE film in scene order, not from the takes on screen,
+   * because that is the list the render server is given: judged on a partial
+   * pass, a scene in the middle of chapter 2 would look like an opener simply
+   * because it happened to be first in the batch, and the preview would put a
+   * pause where the film has none.
+   */
+  const chapterOpeners = useMemo(() => {
+    const ordered = [...scenes].sort((a, b) => a.order - b.order);
+    const out = new Set<string>();
+    ordered.forEach((s, i) => {
+      if (i === 0 || chapterOfOrder(s.order) !== chapterOfOrder(ordered[i - 1].order)) {
+        out.add(s.id);
+      }
+    });
+    return out;
+  }, [scenes]);
 
   // ---- chapters mode -------------------------------------------------
   // The chapter rule itself lives in lib/chapters.ts — n8n's AB Pick Voice,
@@ -395,25 +479,57 @@ export default function AudioReview({
   /** Scenes beyond this batch — named so the panel can say so out loud. */
   const later = scenes.length - inPlay.length;
 
-  // Read every line's real duration once, off-screen, so the table can flag
-  // outliers without the reviewer opening a single player.
+  // Read every line's length once, off-screen, so the table can flag outliers
+  // without the reviewer opening a single player.
+  //
+  // The number kept is the length the FILM will use: the take decoded, its
+  // generated padding located, and the speech measured between. Every reader
+  // wants that one — `flagFor` judges speech against word count, `fitProblem`
+  // against the shot, and the render's scene length is `voiceDur + 0.35` off
+  // exactly this. Reporting the raw file length would leave all three
+  // measuring silence.
   useEffect(() => {
     let cancelled = false;
-    for (const s of withAudio) {
-      if (durations[s.id] !== undefined || !s.voiceUrl) continue;
-      const a = new Audio(audioSrc(s.voiceUrl));
-      a.preload = "metadata";
-      a.addEventListener("loadedmetadata", () => {
-        if (!cancelled && Number.isFinite(a.duration)) {
-          setDurations((d) => ({ ...d, [s.id]: a.duration }));
+    let ctx: AudioContext | null = null;
+    (async () => {
+      for (const s of withAudio) {
+        if (cancelled || durations[s.id] !== undefined || !s.voiceUrl) continue;
+        try {
+          const res = await fetch(audioSrc(s.voiceUrl));
+          if (!res.ok) throw new Error(String(res.status));
+          const bytes = await res.arrayBuffer();
+          // Created lazily and only once: an AudioContext per take would hit
+          // the browser's cap on a long film. It stays suspended — nothing
+          // here plays through it, it only decodes.
+          ctx =
+            ctx ??
+            new (window.AudioContext ||
+              (window as unknown as { webkitAudioContext: typeof AudioContext })
+                .webkitAudioContext)();
+          const buf = await ctx.decodeAudioData(bytes);
+          if (cancelled) return;
+          const b = speechBoundsOf(buf);
+          setBounds((p) => ({ ...p, [s.id]: b }));
+          setDurations((d) => ({ ...d, [s.id]: b.tail - b.head }));
+        } catch {
+          // Undecodable or unreachable: fall back to the container's own
+          // duration and no trimming, which is exactly the old behaviour.
+          const a = new Audio(audioSrc(s.voiceUrl));
+          a.preload = "metadata";
+          a.addEventListener("loadedmetadata", () => {
+            if (!cancelled && Number.isFinite(a.duration)) {
+              setDurations((d) => ({ ...d, [s.id]: a.duration }));
+            }
+          });
+          a.addEventListener("error", () => {
+            if (!cancelled) setDurations((d) => ({ ...d, [s.id]: 0 }));
+          });
         }
-      });
-      a.addEventListener("error", () => {
-        if (!cancelled) setDurations((d) => ({ ...d, [s.id]: 0 }));
-      });
-    }
+      }
+    })();
     return () => {
       cancelled = true;
+      void ctx?.close().catch(() => {});
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [withAudio.length]);
@@ -439,7 +555,28 @@ export default function AudioReview({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scenes.filter((s) => s.videoUrl).length]);
 
+  /**
+   * The take is stopped by a timer, not by `ended`, because it now ends before
+   * the file does. `timeupdate` fires only about four times a second, which
+   * would overshoot the cut by up to a quarter of the very pause being
+   * removed; a timer lands on it.
+   */
+  const stopTimer = useRef<number | null>(null);
+  const clearStop = () => {
+    if (stopTimer.current !== null) {
+      window.clearTimeout(stopTimer.current);
+      stopTimer.current = null;
+    }
+  };
+  const armStop = (a: HTMLAudioElement, tail: number, done: () => void) => {
+    clearStop();
+    const left = (tail - a.currentTime) / (a.playbackRate || 1);
+    if (left <= 0) return done();
+    stopTimer.current = window.setTimeout(done, left * 1000);
+  };
+
   const stop = () => {
+    clearStop();
     audioRef.current?.pause();
     audioRef.current = null;
     setPlayingId(null);
@@ -449,21 +586,65 @@ export default function AudioReview({
   const playFrom = (index: number, continuous: boolean) => {
     const scene = withAudio[index];
     if (!scene?.voiceUrl) return stop();
+    clearStop();
     audioRef.current?.pause();
     const a = new Audio(audioSrc(scene.voiceUrl));
     setRate(a, rateRef.current);
     audioRef.current = a;
     setPlayingId(scene.id);
     setPlayAll(continuous);
-    a.onended = () => {
+    const next = () => {
+      clearStop();
       if (continuous && index + 1 < withAudio.length) playFrom(index + 1, true);
       else stop();
     };
+    // The film's own cut, previewed: skip the generated lead-in and stop at
+    // the last word — except on a scene that OPENS A CHAPTER, which keeps its
+    // lead-in exactly as the render does, so the break between chapters is
+    // audible here too.
+    const b = boundsRef.current[scene.id];
+    const opener = chapterOpeners.has(scene.id);
+    const head = b && !opener ? b.head : 0;
+    const tail = b ? b.tail : null;
+    if (head > 0) {
+      // currentTime before metadata is loaded is ignored, so seek on the first
+      // moment the element knows how long it is.
+      if (a.readyState >= 1) a.currentTime = head;
+      else a.addEventListener("loadedmetadata", () => (a.currentTime = head), {once: true});
+    }
+    if (tail !== null) a.addEventListener("playing", () => armStop(a, tail, next), {once: true});
+    a.onended = next;
     a.onerror = () => stop();
     void a.play().catch(() => stop());
   };
 
-  useEffect(() => () => audioRef.current?.pause(), []);
+  /**
+   * Re-arm the cut when the pace changes mid-take.
+   *
+   * The timer was measured in real seconds against the rate in force when it
+   * was set, so leaving it alone would cut early on a slower pace and late on
+   * a faster one — and late means the padding this is removing gets played,
+   * which is exactly the thing the producer is listening for. Placed after
+   * playFrom so it can use armStop and stop without forward references.
+   */
+  useEffect(() => {
+    const a = audioRef.current;
+    if (!a || stopTimer.current === null || !playingId) return;
+    const tail = boundsRef.current[playingId]?.tail;
+    if (tail === undefined) return;
+    const i = withAudio.findIndex((w) => w.id === playingId);
+    armStop(a, tail, () => {
+      if (playAll && i >= 0 && i + 1 < withAudio.length) playFrom(i + 1, true);
+      else stop();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rate]);
+
+  useEffect(() => () => {
+    clearStop();
+    audioRef.current?.pause();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const run = async (fn: () => Promise<ActionResult>) => {
     setPending(true);
@@ -543,6 +724,18 @@ export default function AudioReview({
           </>
         )}
       </p>
+
+      {/* Said out loud, because the numbers above and the playback below are
+          both the FILM's, not the file's — and a length that quietly differs
+          from the mp3 you can download would read as a bug. */}
+      {Object.keys(bounds).length > 0 && (
+        <p style={{ margin: "-6px 0 12px", fontSize: 11.5, color: "var(--dim)" }}>
+          These are the film&apos;s own lengths: ElevenLabs leaves a beat of
+          silence at both ends of every take, and the render cuts it — except
+          where a chapter opens, which keeps its lead-in so the break between
+          chapters is audible. What you play here is cut the same way.
+        </p>
+      )}
 
       {/*
         Pace, decided here rather than at Final touches.

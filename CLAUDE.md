@@ -871,9 +871,47 @@ cuts that padding off both ends before anything measures the take.
 
 **The audio panel previews the same cut**, so the producer hears the film's
 rhythm before a clip exists. `speechBoundsOf` in `AudioReview.tsx` decodes each
-take through Web Audio and measures 20ms RMS windows against the SERVER'S three
+take through Web Audio and scans inward from each end against the SERVER'S three
 constants — copied deliberately, because a preview trimmed to different
 thresholds would be a different cut confidently presented as the real one.
+
+**It shipped cutting the last three words off every take, and the two causes are
+each worth knowing.** Reported the day after it landed, and neither cause was
+the one that looked obvious.
+
+- **The dominant one was the STOP TIMER, not the detection.** The cut is a
+  moment in MEDIA time; a timer counts WALL CLOCK; the two part company the
+  instant the stream stalls to buffer — and every take here is a fresh fetch of
+  a Drive file through `/api/media`, which answers `no-store`, so stalling is
+  routine rather than rare. Armed once at `playing` and left alone, the timer
+  fired however early the take had stalled, on every line. **Measured in a real
+  Chromium rather than argued**: an 0.8s stall mid-take cost 0.87s of speech,
+  which is exactly those three words. The timer now only ever *asks* — it
+  re-reads `currentTime` and waits out whatever is genuinely left, so it can be
+  late but never early — and `playing`/`waiting` re-arm it on the stall and the
+  recovery. It is bounded (the take's own length again plus 10s) or a stream
+  that stalls for good would leave "Play all" stopped on a line with no error
+  to explain it. **The generalisation: any deadline computed once from a rate
+  that can change is a bug waiting for the rate to change.** The `[rate]`
+  re-arm two bullets down is the same lesson, caught earlier and only half
+  learned — buffering is a rate change to zero.
+- **Better still, the take no longer streams.** The panel already downloads
+  every take to measure it, so it keeps the bytes as a blob and plays those:
+  one `Blob` per take, and the stall the cut cannot survive is simply gone.
+  Note the blob must be built BEFORE `decodeAudioData`, which detaches the
+  buffer it is handed, and the URLs are revoked only on unmount — freeing them
+  in the measuring effect's cleanup would pull the source out of a take that is
+  playing, because that effect re-runs as the batch grows.
+- **The detection was wrong too, just far less wrong than it looked.** It
+  measured RMS over 20ms windows while `silencedetect` measures sample
+  MAGNITUDE, so `-45dB` meant something stricter here than on the server.
+  **Two constants named the same thing are not the same threshold until they
+  are measured the same way.** Worth modelling before believing: the gap is
+  only about 3dB on a sustained vowel (an RMS window of a sine reads -3dB of
+  its peak), i.e. ~0.12s on a take that lands softly — real, and not three
+  words. Chasing it as the whole answer would have shipped a fix that changed
+  almost nothing. Now sample-by-sample inward from each end, which matches the
+  server and is *cheaper*: it reads the padding and never the speech.
 
 - **The lengths on screen are the film's, not the file's.** `flagFor` judges
   speech against word count, `fitProblem` against the shot, and the render's
@@ -882,6 +920,7 @@ thresholds would be a different cut confidently presented as the real one.
 - **The take is stopped by a TIMER, not by `ended`**, because it now ends
   before the file does. `timeupdate` fires about four times a second, which
   would overshoot the cut by up to a quarter of the very pause being removed.
+  The timer decides nothing on its own — see the stall entry above.
 - **That timer is re-armed when the pace changes mid-take.** It was measured
   in real seconds against the old rate, so leaving it would cut early when
   slowed and late when sped up — and late means playing the padding the

@@ -79,6 +79,109 @@ async function probeDuration(file, stream) {
 }
 
 /**
+ * The breath at the ends of a take.
+ *
+ * ElevenLabs pads what it generates: a take opens with a beat of near-silence
+ * and closes with another. Inside one line that is natural. Laid end to end
+ * down a film it is not — the scene length is `voiceDur + 0.35`, so every
+ * padded tail is added to a gap that already exists, and the narration comes
+ * out slower and more recited than the take sounds on its own.
+ *
+ * -45dB rather than a rounder number: the generated audio is clean, so the
+ * floor only has to clear encoder noise, and a threshold set too high eats the
+ * quiet end of a real word. 180ms is the shortest run treated as padding —
+ * below that it is phrasing, and cutting it is what makes speech sound
+ * clipped rather than tight.
+ */
+const BREATH_NOISE_DB = -45;
+const BREATH_MIN = 0.18;
+/** Kept either side, so no consonant is ever shaved off its own word. */
+const BREATH_GUARD = 0.05;
+
+/**
+ * Where the speech starts and ends, read out of silencedetect's report.
+ *
+ * Pure and exported so it can be tested without ffmpeg — this parser is the
+ * part with the edge cases, and the box a Claude Code session runs on has no
+ * ffmpeg to rehearse the filter against.
+ *
+ * The one that bites: silencedetect never emits a closing `silence_end` for a
+ * run that reaches the end of the file — the file just stops — so an unclosed
+ * run has to be closed by hand or a padded tail reads as no tail at all.
+ */
+export function parseSpeechBounds(stderr, total) {
+	const runs = [];
+	let open = null;
+	for (const m of String(stderr).matchAll(/silence_(start|end):\s*(-?[\d.]+)/g)) {
+		const at = parseFloat(m[2]);
+		if (!Number.isFinite(at)) continue;
+		if (m[1] === 'start') open = at;
+		else if (open !== null) {
+			runs.push([open, at]);
+			open = null;
+		}
+	}
+	if (open !== null) runs.push([open, total]);
+
+	let head = 0;
+	let tail = total;
+	// Only runs that TOUCH an end are padding. A pause in the middle of a
+	// sentence is the performance, and cutting it would be rewriting the read.
+	if (runs.length && runs[0][0] <= 0.05) head = runs[0][1];
+	const last = runs[runs.length - 1];
+	if (last && last[1] >= total - 0.05) tail = last[0];
+
+	head = Math.max(0, head - BREATH_GUARD);
+	tail = Math.min(total, tail + BREATH_GUARD);
+	// A detector that found silence everywhere would otherwise invert these.
+	if (tail <= head) return {head: 0, tail: total};
+	return {head, tail};
+}
+
+/** Where the speech actually starts and ends, in seconds. */
+async function speechBounds(file, total) {
+	const {stderr} = await run('ffmpeg', [
+		'-hide_banner', '-nostats',
+		'-i', file,
+		'-af', `silencedetect=noise=${BREATH_NOISE_DB}dB:d=${BREATH_MIN}`,
+		'-f', 'null', '-',
+	]);
+	return parseSpeechBounds(stderr, total);
+}
+
+/**
+ * Cut the padding off a take, keeping the opening beat when the scene starts a
+ * chapter.
+ *
+ * That exception is the point of the feature rather than a detail of it: with
+ * every take tightened the film runs on without a seam, and a chapter needs
+ * one. Keeping the natural lead-in on the scene that opens it puts the pause
+ * exactly where a reader would take one, and costs nothing to compute — it is
+ * simply the silence ElevenLabs already generated, left alone.
+ *
+ * Writes WAV, not mp3. Re-encoding to mp3 would hand back the encoder delay
+ * and padding this exists to remove — the same gapless-header problem that
+ * makes a pure-frame mp3 concat gain ~36ms per join.
+ */
+async function tightenTake(file, work, i, total, keepLeadIn) {
+	const {head, tail} = await speechBounds(file, total);
+	const start = keepLeadIn ? 0 : head;
+	// Nothing worth a re-encode, or the detector found almost no speech — a
+	// very quiet take would otherwise be cut down to nothing. Leaving the file
+	// alone is always safe; over-trimming is not.
+	if (tail - start < 0.3 || total - (tail - start) < 0.05) return null;
+	const out = path.join(work, `a${i}.trim.wav`);
+	await run('ffmpeg', [
+		'-y', '-i', file,
+		'-af', `atrim=start=${start.toFixed(3)}:end=${tail.toFixed(3)},asetpts=N/SR/TB`,
+		'-c:a', 'pcm_s16le',
+		out,
+	]);
+	const duration = await probeDuration(out, 'a:0');
+	return {file: out, duration, cut: total - duration, keptLeadIn: keepLeadIn && head > 0.05};
+}
+
+/**
  * Does this file carry an audio stream at all? Veo clips do, but a clip that
  * came back through a re-mux or a still-image fallback may not — and concat
  * needs every segment to expose the same streams, so a missing one has to be
@@ -174,6 +277,10 @@ export function registerAssemble(app, {jobs, outputDir}) {
 
 				// 1. Download everything and measure each clip's real video length.
 				const items = [];
+				/** How much generated padding came out of the narration, for the log
+				 *  and the job result — the one number that says whether this did
+				 *  anything on a given film. */
+				let trimmedTotal = 0;
 				for (let i = 0; i < scenes.length; i++) {
 					const v = path.join(work, `v${i}.mp4`);
 					await download(scenes[i].videoUrl, v);
@@ -186,6 +293,38 @@ export function registerAssemble(app, {jobs, outputDir}) {
 						// Real narration length — the graphics pass paces captions on
 						// this, not on the (silence-padded) scene length.
 						voiceDur = await probeDuration(a, 'a:0').catch(() => null);
+						// Cut the generated breath off the ends, EXCEPT the lead-in of
+						// a scene that opens a chapter — that pause is what a listener
+						// hears as the break between chapters.
+						//
+						// Done here, before anything reads `voiceDur`, so the whole
+						// pipeline follows on its own: the scene length, the stretch
+						// factor, the reported scene starts and every graphic placed
+						// off them all derive from this number. Trimming later would
+						// have meant rescaling each of them in lockstep.
+						//
+						// Failing is always survivable and never fatal: a take that
+						// cannot be analysed or re-encoded keeps its original file and
+						// its original length, which is exactly today's behaviour.
+						if (voiceDur) {
+							const opensChapter =
+								i === 0 || (sceneChapters[i] ?? 0) !== (sceneChapters[i - 1] ?? 0);
+							const tight = await tightenTake(a, work, i, voiceDur, opensChapter).catch(
+								(e) => {
+									console.warn(`scene ${i}: breath trim skipped — ${e.message}`);
+									return null;
+								},
+							);
+							if (tight) {
+								trimmedTotal += tight.cut;
+								console.log(
+									`scene ${i}: trimmed ${tight.cut.toFixed(2)}s of padding` +
+										(tight.keptLeadIn ? ' (kept the chapter lead-in)' : ''),
+								);
+								a = tight.file;
+								voiceDur = tight.duration;
+							}
+						}
 					}
 					// Elastic timing: every scene lasts exactly as long as its own
 					// narration (+ a small breath), and the clip is TIME-STRETCHED to
@@ -416,6 +555,10 @@ export function registerAssemble(app, {jobs, outputDir}) {
 						// Per-scene playback retime applied (1 = untouched) — lets the
 						// QC pass confirm the elastic timing stayed in the subtle range.
 						stretchFactors: items.map((it) => Number(it.stretch.toFixed(3))),
+						// Generated padding removed from the narration, in total. Zero
+						// means the trim ran and found nothing, or every take failed
+						// analysis and kept its original — the log line says which.
+						breathTrimmedSeconds: Number(trimmedTotal.toFixed(2)),
 					},
 				});
 			} catch (err) {

@@ -819,6 +819,47 @@ is built only inside that guard (a `-1` input index would break the graph).
   `--disable-everything` (pad/crop/scale, vp8, png; no `setpts`, no `atempo`,
   no x264). So a filter graph written here cannot be run here either way.
 
+### The breath at the ends of a take (2026-08-29)
+
+ElevenLabs pads what it generates: every take opens with a beat of
+near-silence and closes with another. Inside one line that is natural.
+Concatenated down a film it is not — the scene lasts `voiceDur + 0.35`, so a
+padded tail is added to a gap that already exists, and the narration comes out
+slower and more recited than the take sounds on its own. `assemble.mjs` now
+cuts that padding off both ends before anything measures the take.
+
+- **Trimmed BEFORE `voiceDur` is read, which is why nothing else changed.**
+  The scene length, the elastic stretch factor, the reported scene starts and
+  every graphic placed off them all derive from that one number, so cutting
+  first makes the whole pipeline follow on its own. Trimming later would have
+  meant rescaling captions, chapter cards and the end screen in lockstep —
+  exactly the reason the speed re-time has to happen after Remotion draws.
+- **A scene that OPENS A CHAPTER keeps its lead-in**, and that exception is
+  the point of the feature rather than a detail of it: with every take
+  tightened the film runs on without a seam, and a chapter needs one. The
+  pause is the silence ElevenLabs already generated, left alone. The test is
+  `sceneChapters[i] !== sceneChapters[i-1]`, the same one `chapterBoundaries`
+  already used — `Build Timeline` has always sent that array, so **no n8n
+  change was needed**. Verified against the ACTIVE version, not the parked
+  draft, which is the trap that entry two sections up describes.
+- **Only silence that TOUCHES an end is padding.** A pause in the middle of a
+  sentence is the performance, and cutting it would be rewriting the read.
+- **`silencedetect` never closes a run that reaches the end of the file** —
+  the file just stops, so no `silence_end` is printed. An unclosed run has to
+  be closed by hand or a padded tail reads as no tail at all. That is the one
+  edge case worth knowing, and `parseSpeechBounds` is exported and pure so it
+  can be tested without ffmpeg: this box has none, so the parser is covered by
+  fixtures (9 cases) and the filter itself is only provable on Railway.
+- **Failure is survivable by construction.** A take that cannot be analysed or
+  re-encoded keeps its original file and its original length, which is exactly
+  the old behaviour; the guard also refuses to trim when less than 0.3s would
+  survive, so a very quiet take is never cut down to nothing.
+- Output is **WAV, not mp3**. Re-encoding to mp3 would hand back the encoder
+  delay and padding this exists to remove — the same gapless-header problem
+  that makes a pure-frame mp3 concat gain ~36ms per join.
+- `verify.breathTrimmedSeconds` in the job result is the one number that says
+  whether it did anything on a given film; each scene also logs what it cut.
+
 ### Playback speed — what PACE finally means
 
 `Editing Options.speed` re-times the finished film, and it is the **first real

@@ -446,23 +446,49 @@ export default function NewVideo() {
                     ))}
                   </div>
                 </div>
-                <div className="field" style={{ marginTop: 18 }}>
-                  <label>Format</label>
+              </section>
+
+              {/* Format has a card of its own. It rode along at the bottom of
+                  "How long" as a 30px-tall segmented control, which is the
+                  wrong weight for it twice over: it is the one choice on this
+                  form that cannot be changed afterwards — every image, every
+                  clip and the render itself are made to it — and it has
+                  nothing to do with duration. The two options DRAW the frame
+                  they mean, at a shared height so the difference in width is
+                  the whole message; a word cannot say "this shape" as fast as
+                  the shape can. */}
+              <section className="fsec">
+                <header>
+                  <h2>Format</h2>
+                  <span className="fhint">fixed once production starts</span>
+                  <span className="no">05</span>
+                </header>
+                <div className="field">
                   <input type="hidden" name="aspect" value={aspect} />
-                  <div className="seg" role="group" aria-label="Format">
+                  <div className="optcards" role="group" aria-label="Format">
                     <button
                       type="button"
-                      className={aspect === "16:9" ? "on" : ""}
+                      className={`optcard ${aspect === "16:9" ? "on" : ""}`}
                       onClick={() => setAspect("16:9")}
+                      aria-pressed={aspect === "16:9"}
                     >
-                      16:9 horizontal
+                      <span className="fmtbox wide" />
+                      <b>16:9 horizontal</b>
+                      <span>
+                        YouTube and anything watched on a screen held sideways.
+                      </span>
                     </button>
                     <button
                       type="button"
-                      className={aspect === "9:16" ? "on" : ""}
+                      className={`optcard ${aspect === "9:16" ? "on" : ""}`}
                       onClick={() => setAspect("9:16")}
+                      aria-pressed={aspect === "9:16"}
                     >
-                      9:16 vertical
+                      <span className="fmtbox tall" />
+                      <b>9:16 vertical</b>
+                      <span>
+                        Shorts, Reels and TikTok — the phone held upright.
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -472,7 +498,7 @@ export default function NewVideo() {
                 <header>
                   <h2>Finishes</h2>
                   <span className="fhint">changeable until the final render</span>
-                  <span className="no">05</span>
+                  <span className="no">06</span>
                 </header>
                 <div className="swlist">
                   {FINISHES.map((f, i) => {
@@ -508,7 +534,7 @@ export default function NewVideo() {
                 <header>
                   <h2>Canon &amp; reference</h2>
                   <span className="fhint">optional</span>
-                  <span className="no">06</span>
+                  <span className="no">07</span>
                 </header>
                 <div className="field">
                   <label htmlFor="lore">Lore / canon context</label>

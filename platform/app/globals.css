@@ -4174,6 +4174,31 @@ body:has(.mkt) .vignette {
 .optcard.on span {
   color: var(--panel-body);
 }
+/* The format cards draw their own frame. Both boxes are the SAME HEIGHT, so
+   the only thing that differs is width — which is the entire point of the
+   choice and is read instantly, where "16:9" and "9:16" have to be decoded.
+   Sized off --fmt-h so the pair can never drift apart. */
+.fmtbox {
+  --fmt-h: 56px;
+  display: block;
+  height: var(--fmt-h);
+  border-radius: 7px;
+  border: 2px solid var(--accent-a28);
+  background: var(--accent-a08);
+  flex: none;
+}
+.fmtbox.wide {
+  width: calc(var(--fmt-h) * 16 / 9);
+}
+.fmtbox.tall {
+  width: calc(var(--fmt-h) * 9 / 16);
+}
+/* On the chosen card the ground goes near-black, so the frame has to light
+   up with it or it disappears into its own background. */
+.optcard.on .fmtbox {
+  border-color: var(--accent-lift);
+  background: rgba(178, 153, 231, 0.16);
+}
 .optcard:disabled {
   opacity: 0.5;
   cursor: default;

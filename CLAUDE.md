@@ -1836,6 +1836,21 @@ the pipeline already produces.
   the rule you just wrote — `getComputedStyle` plus a walk over
   `document.styleSheets` naming every rule that matches the element finds this
   in seconds, guessing does not.
+- **A panel-scoped button restyle must exclude the ACCENT variant, or state a
+  colour of its own.** `.btn.gold` and `.abtn.ok` carry the purple gradient
+  *and* a near-white label; a later rule like `.reviewpanel .btn` has the same
+  specificity and wins on `background` while never mentioning `color`, so the
+  ground goes back to `--card2` (#fdfdfe) and the label stays #f7f7f8. That is
+  a **1.05:1** button — a white word on a white pill. It has now happened three
+  times in `globals.css`; `.reviewpanel .take .abtn:not(.ok)` and
+  `.stage .insp .abtn:not(.ok)` are the two that were already guarded, and
+  `.reviewpanel .btn` was found on 2026-08-30 with "Approve all N" invisible on
+  BOTH review gates at once — the primary action of each. The producer's word
+  for it was "șters", which is exactly what it looks like: present, greyed,
+  apparently disabled. Grep for a button rule that sets `background` without
+  `color` — that pairing is the whole signature — and measure the contrast
+  rather than judging it by eye, since the failure looks like a legitimate
+  disabled state.
 - **Project titles wear the film's own typeface.** `platform/lib/tone-type.ts`
   mirrors `presetForTone()` from the render (Bodoni for dark, Anton for
   motivational, etc. — keep the two maps in lockstep) and dresses the project

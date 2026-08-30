@@ -4963,11 +4963,30 @@ body:has(.mkt) .vignette {
 }
 
 /* The download row's pills match every other pill on the site. */
-.reviewpanel .btn {
+/* `:not(.gold)` is load-bearing, not tidiness. This rule has the same
+   specificity as `.btn.gold` and simply comes later, so it was replacing the
+   accent gradient with a near-white card — while `color: #f7f7f8` survived,
+   because this rule never mentions color. Measured: "Approve all 6" rendered
+   at 1.05:1 inside a review panel against 5.01:1 outside one, i.e. a white
+   label on a white pill. The producer reported it as "șters", and it was the
+   primary action on both the voice and the script gates.
+
+   Third time in this file: `.reviewpanel .take .abtn` and `.stage .insp .abtn`
+   both carry the same guard for the same reason. THE RULE: a panel-scoped
+   restyle of a button must exclude the accent variant, or state a color of
+   its own — overriding the ground and inheriting the foreground is how a
+   label ends up on a surface it cannot be read against. */
+.reviewpanel .btn:not(.gold) {
   border-radius: var(--r-pill);
   background: var(--card2);
   border: 1px solid rgba(24, 20, 40, 0.09);
   box-shadow: var(--shadow-sm);
+  transition: var(--tr);
+}
+/* The accent button takes the panel's pill shape and easing, and keeps its
+   own gradient, border and glow. */
+.reviewpanel .btn.gold {
+  border-radius: var(--r-pill);
   transition: var(--tr);
 }
 .reviewpanel .btn:hover {

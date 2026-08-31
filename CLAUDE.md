@@ -2229,6 +2229,19 @@ the pipeline already produces.
   `/opt/pw-browsers`, installed with `--no-save`): Enter in the title, the
   language field and the voice search do nothing, while both clicking the
   button and pressing Enter on it still start the project.
+- **The subject field's cap was UI-only, and it contradicted the rest of the
+  stack.** It sat at 140 characters — a tweet — while `project.name` is `text`
+  in Postgres with no server-side cap, `createProject` passes the value through
+  untouched, and `ExpandableTitle` exists in so many words "because people
+  paste whole prompts into the Tema field". Every layer below the form already
+  handled long subjects; only the textarea refused them. Raised to
+  `SUBJECT_MAX` (1000) with a count that appears in the last 150 characters —
+  the complaint was not the limit itself but hitting it in silence, with the
+  field simply ceasing to accept letters. Still bounded, because this field is
+  also the project's NAME in every list; past 1000 it is a script, and Lore is
+  where a script belongs. Note a long subject is not a defect: `isTitleLike()`
+  in the render draws the opening title card only for something title-shaped
+  (≤7 words, ≤46 chars), so a brief simply opens the film clean.
 - **The /new form's field names are a frozen contract.** `createProject()`
   posts `name, category, cat_*, cast_voices, language, length, tone, pace,
   speed,

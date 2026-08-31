@@ -58,6 +58,20 @@ const LOOKS = [
   "Horror",
 ];
 
+/**
+ * How much the subject field takes.
+ *
+ * It was 140, which is a tweet — and wrong twice over: `project.name` is
+ * `text` in Postgres with no server-side cap, and `ExpandableTitle` exists
+ * precisely because "people paste whole prompts into the Tema field". The UI
+ * was the only thing refusing what the rest of the stack already handled.
+ *
+ * Still bounded, because this field is also the project's NAME and shows up
+ * in every list. 1000 is a real brief with room to spare; past that it is a
+ * script, and the Lore field is where a script belongs.
+ */
+const SUBJECT_MAX = 1000;
+
 /** Length presets, in seconds. The slider snaps to 8s — one scene. */
 const LENGTH_PRESETS = [
   { label: "32s", s: 32 },
@@ -312,14 +326,27 @@ export default function NewVideo() {
                     className="nb-ta"
                     rows={3}
                     placeholder="A documentary about the last lighthouse keepers — who they were, and what happened when the lamps went automatic."
-                    maxLength={140}
+                    maxLength={SUBJECT_MAX}
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                   />
                   <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--dim)" }}>
-                    Keep it short — it becomes the title shown in the video.
-                    Style details go in the Look field, not here.
+                    A short line becomes the film&apos;s opening title card; a
+                    longer brief is used as the subject and the film opens
+                    straight on the first scene. Style details go in the Look
+                    field, not here.
+                    {/* Silence is what made the old 140 a wall: the field
+                        simply stopped accepting letters. The count appears
+                        before the limit does, never after. */}
+                    {name.length > SUBJECT_MAX - 150 && (
+                      <>
+                        {" "}
+                        <b style={{ color: name.length >= SUBJECT_MAX ? "var(--accent)" : "var(--ink)" }}>
+                          {name.length}/{SUBJECT_MAX}
+                        </b>
+                      </>
+                    )}
                   </p>
                   <div className="sugrow" aria-label="Suggestions">
                     {SUGGESTIONS.map((sg) => (

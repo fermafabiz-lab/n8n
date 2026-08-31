@@ -31,6 +31,16 @@ export interface EditingOptions {
   /** Background music AND the synthesized boom/whoosh/riser accents. Both
    *  are composed here, not in the footage, so they ride one switch. */
   music: boolean;
+  /**
+   * Whether the pipeline may put drawn cards in this film at all.
+   *
+   * Separate from `motifCards`, which is the LIST it chose — this is the
+   * producer's permission for the feature, and it has to survive the list
+   * being empty. Off means Scripting does not spend a model call picking
+   * them and Final Assembly draws none even if some were already stored,
+   * which matters because a film can be switched off after its cards exist.
+   */
+  drawnCards: boolean;
   /** Playback rate of the finished film: 0.9 slow, 1 normal, 1.1 fast.
    *
    *  This is what the creation form's PACE control finally means. Before it
@@ -533,6 +543,9 @@ export function buildProject(r: RawProject): Project {
       sfx: opts.sfx !== false,
       sfxLevel: normalizeSfxLevel(opts.sfxLevel),
       music: opts.music === true,
+      // On unless refused, like the other overlays: a film the pipeline found
+      // nothing worth drawing in simply gets an empty list.
+      drawnCards: opts.drawnCards !== false,
       // Editing Options is the OVERRIDE, the project's PACE field the default.
       // Two sources on purpose: PACE is chosen on the brief and stored on the
       // project, so falling back to it means every film already in the

@@ -844,6 +844,7 @@ export async function confirmFinalSettings(
        those overwrites a choice made elsewhere. */
     sfxLevel: number;
     music: boolean;
+    drawnCards: boolean;
     /* NO `speed` here, on purpose. The pace is decided and signed off at the
        audio step, which is the only moment it is free to change, and this
        panel must not be able to move it — nor to reset it. Because
@@ -880,6 +881,7 @@ export async function confirmFinalSettings(
         sfx: settings.sfx,
         sfxLevel: normalizeSfxLevel(settings.sfxLevel),
         music: settings.music,
+        drawnCards: settings.drawnCards,
       });
     }
     // Same merge, separate condition: the cards change even when no toggle
@@ -1448,6 +1450,10 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     // slider's percentage so the pipeline carries one unit end to end: it is
     // `nativeAudio` in the assemble request, and the mixer takes a gain.
     sfx_level: normalizeSfxLevel(formData.get("sfx_level")),
+    // Permission for the pipeline to draw cards at all — separate from the
+    // LIST it later chooses, which has to be able to be empty without meaning
+    // "the producer said no".
+    drawn_cards: String(formData.get("drawn_cards") ?? "yes"),
     music: String(formData.get("music") ?? "no"),
     // How the narrator reads. OMITTED when the producer left it on "Voice
     // default", and that absence is the feature: every ElevenLabs voice has

@@ -69,13 +69,6 @@ const LENGTH_PRESETS = [
 ];
 
 /**
- * The slider's ends, and the number field's.
- *
- * One owner, because the range input, the number input and the fill
- * percentage all have to agree — they were three copies of `480`, and a
- * preset above a stale max is a chip that moves the slider nowhere.
- */
-/**
  * The SFX volume slider's ends, as percentages.
  *
  * The floor is 10 rather than 0 because silence is what the SFX toggle is
@@ -87,6 +80,13 @@ const LENGTH_PRESETS = [
 const SFX_LEVEL_PCT_MIN = 10;
 const SFX_LEVEL_PCT_DEFAULT = 35;
 
+/**
+ * The length slider's ends, and the number field's.
+ *
+ * One owner, because the range input, the number input and the fill
+ * percentage all have to agree — they were three copies of `480`, and a
+ * preset above a stale max is a chip that moves the slider nowhere.
+ */
 const LENGTH_MIN = 16;
 const LENGTH_MAX = LENGTH_PRESETS[LENGTH_PRESETS.length - 1].s;
 
@@ -96,7 +96,14 @@ const LENGTH_MAX = LENGTH_PRESETS[LENGTH_PRESETS.length - 1].s;
  * redesign must never change that contract.
  */
 const FINISHES: Array<{
-  name: "captions" | "hook_title" | "chapter_cards" | "end_screen" | "sfx" | "music";
+  name:
+    | "captions"
+    | "hook_title"
+    | "chapter_cards"
+    | "end_screen"
+    | "sfx"
+    | "drawn_cards"
+    | "music";
   label: string;
   sheet: string;
   on: string;
@@ -141,6 +148,14 @@ const FINISHES: Array<{
     sheet: "SFX",
     on: "Each scene's own ambience plays quietly under the narration",
     off: "The clips stay silent — narration only",
+    default: true,
+  },
+  {
+    name: "drawn_cards",
+    label: "Drawn cards",
+    sheet: "Cards",
+    on: "Where the voice names something the camera cannot show, the film draws it",
+    off: "No drawn cards — footage and text only",
     default: true,
   },
   {

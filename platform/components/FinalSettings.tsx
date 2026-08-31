@@ -76,6 +76,13 @@ const OPTIONS: Array<{
     icon: "🔊",
   },
   {
+    key: "drawnCards",
+    label: "Drawn cards",
+    on: "Where the voice names something the camera cannot show, the film draws it",
+    off: "No drawn cards — footage and text only",
+    icon: "✏️",
+  },
+  {
     key: "music",
     label: "Music",
     on: "A background track plus whoosh/boom accents at the cuts — composed here, unrelated to what the scenes show",
@@ -293,7 +300,13 @@ export default function FinalSettings({
       {/* Drawn cards. Absent entirely when the pipeline chose none, which is
           the common case and the correct one — most scenes deserve no graphic,
           and an empty "no animations" panel would only invite adding some. */}
-      {motifCards.length > 0 && (
+      {/* The chosen cards, listed under the switch that permits them. Hidden
+          rather than greyed when the switch is off: this is a finishing
+          screen, and a list of things that will not be drawn is not a
+          decision the producer still has to read. Switching back on brings
+          it back exactly as it was — nothing here is destroyed by the
+          switch, only by dropping a card. */}
+      {opts.drawnCards && motifCards.length > 0 && (
         <div style={{ marginTop: 22, paddingTop: 18, borderTop: "1px solid var(--line)" }}>
           <h3
             style={{

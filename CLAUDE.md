@@ -1195,6 +1195,46 @@ those two `jsonBody` strings, nothing else. Two things come with it:
   capacity is left over. Fine for a 6-scene film; it is the pacing risk on the
   10- and 12-minute lengths, where a batch is 90 scenes across 12 passes.
 
+### Switching the drawn cards off
+
+`Editing Options.drawnCards` (default true) is the producer's PERMISSION for
+motif cards. It is deliberately not the same key as `motifCards`, which is the
+LIST Scripting chose: an empty list means the model found nothing worth
+drawing, and that is a different fact from the producer saying no. Collapsing
+the two would have made "none were found" indistinguishable from "none are
+wanted", and the switch would flicker on by itself the moment a later film
+found one.
+
+The switch is offered twice, and both are needed for different reasons:
+
+- **The brief** (`drawn_cards`, in Finishes) is the one that saves money —
+  it reaches Scripting before any model call.
+- **Final touches** is the one that can change its mind. The card list sits
+  under that switch and is hidden when it is off; hidden rather than greyed,
+  because a finishing screen listing things that will not be drawn is not a
+  decision anyone still has to read. Nothing is destroyed by the switch —
+  only by dropping an individual card — so switching back on restores the
+  list exactly.
+
+Three gates, in the order a film meets them:
+
+| Where | What it does |
+|---|---|
+| Scripting → `Draw Cards?` | skips `Choose Motif Cards` entirely, routing `Prep Motif Input` straight to `Motif Done` |
+| Final Assembly → `Attach Motif Cards` | draws none even when cards are stored |
+| the site | shows the switch and the list it governs |
+
+**The render gate is the one that must exist**, and the reason is the order of
+events: Scripting stores its cards long before Final touches is reached, so a
+film switched off at the gate already HAS them. Skipping only in Scripting
+would have left those cards drawing themselves.
+
+`Draw Cards?` routes its false branch to `Motif Done`, which returns
+`$('Save scenes To Airtable1').all()` and reads nothing from the motif chain —
+that is what makes the bypass safe. This chain is IN-LINE (same reason as Save
+Evidence), so a branch that simply ended would strand `Wait For Scene
+Approval` and hang the whole scripting run.
+
 ### The SFX volume slider
 
 `Editing Options.sfxLevel` (0–1) is how loud the scenes' own ambience sits

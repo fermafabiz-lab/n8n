@@ -1143,6 +1143,33 @@ the point, and it is what the panel says out loud, because hearing the
 difference on the line already playing is the whole reason the control is
 there rather than two screens later.
 
+### Which Veo model the pipeline asks for
+
+`Submit Video` and `Submit Video Regen` (Media Generation) are the only two
+nodes that generate clips — no other workflow calls
+`api.useapi.net/v1/google-flow/videos`. The model is a plain string in each
+node's `jsonBody`, and the two must always agree, or a regenerated scene comes
+back from a different model than the batch gave it.
+
+**`veo-3.1-lite-low-priority` is the one that costs no credits**, and it is a
+distinct model id rather than a flag on `veo-3.1-lite` — there is no separate
+`priority` parameter to set. Set on both nodes and **published 2026-08-31**
+(active version `60fb17df`), when the account moved to Google AI Ultra. The
+draft was diffed against the active version first and differed in exactly
+those two `jsonBody` strings, nothing else. Two things come with it:
+
+- **It is Ultra-only.** useapi's docs put it on the $199 Ultra tier; the
+  cheaper Ultra plan does not include it. If the plan lapses or is the wrong
+  one, the API rejects the model — and **`Submit Video` is
+  `onError: stopWorkflow`**, so that rejection kills the whole batch mid-run
+  rather than skipping a scene. Deliberate: the alternative is a silent
+  fallback to a model that spends credits, which is worse than a loud stop.
+  It DOES have `retryOnFail`, so a wrong model id burns the retries first.
+- **Lower priority is a real queue, not a label.** Flow serves Quality, then
+  Fast, then Lite from the same account, so a Lite job only starts when
+  capacity is left over. Fine for a 6-scene film; it is the pacing risk on the
+  10- and 12-minute lengths, where a batch is 90 scenes across 12 passes.
+
 ### The Cinematic category (silent film)
 
 `category: 'cinematic'` in Editing Options = no spoken words anywhere. How

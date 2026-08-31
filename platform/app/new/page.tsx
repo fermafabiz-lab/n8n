@@ -72,10 +72,21 @@ const LOOKS = [
  */
 const SUBJECT_MAX = 1000;
 
-/** Length presets, in seconds. The slider snaps to 8s — one scene. */
+/**
+ * Length presets, in seconds — round numbers, not scene multiples.
+ *
+ * They used to be 32 and 64 because a scene is an 8-second clip, and the
+ * slider snapped to 8 for the same reason. But the number is only a TARGET:
+ * scripting turns it into a word budget and a chapter count, and the finished
+ * film's real length comes from the narration retime in /assemble — so
+ * nothing downstream needs a multiple of anything, and a chip reading
+ * "1 min" that actually set 1:04 was a machine's number wearing a human
+ * label. The slider now moves in 5s steps; the field next to the readout
+ * takes any exact second.
+ */
 const LENGTH_PRESETS = [
-  { label: "32s", s: 32 },
-  { label: "1 min", s: 64 },
+  { label: "30s", s: 30 },
+  { label: "1 min", s: 60 },
   { label: "2 min", s: 120 },
   { label: "4 min", s: 240 },
   { label: "8 min", s: 480 },
@@ -102,7 +113,11 @@ const SFX_LEVEL_PCT_DEFAULT = 35;
  * percentage all have to agree — they were three copies of `480`, and a
  * preset above a stale max is a chip that moves the slider nowhere.
  */
-const LENGTH_MIN = 16;
+// 15, not 16: a range input counts its steps FROM `min`, so with a 5s step a
+// floor of 16 would put every reachable value on 16, 21, 26… 716 — never a
+// round number, never a preset, and never the max. On the 15…720 grid every
+// drag position ends in 0 or 5 and the last one IS 720.
+const LENGTH_MIN = 15;
 const LENGTH_MAX = LENGTH_PRESETS[LENGTH_PRESETS.length - 1].s;
 
 /**
@@ -213,7 +228,7 @@ export default function NewVideo() {
   const [state, formAction, pending] = useActionState(submit, null);
   const [name, setName] = useState("");
   const [tone, setTone] = useState("Dark");
-  const [length, setLength] = useState(64);
+  const [length, setLength] = useState(60);
   const [aspect, setAspect] = useState<"16:9" | "9:16">("16:9");
   // The rate is the state; the WORD the webhook wants is derived from it.
   // SPEED_BY_PACE maps the words to the gentle defaults, so Normal posts 1
@@ -499,27 +514,33 @@ export default function NewVideo() {
                     <span className="m">
                       {length} seconds · {scenes} scene{scenes === 1 ? "" : "s"}
                     </span>
-                    {/* The named field. The slider drives it; this allows an
-                        exact number the slider's 8s snap cannot reach. */}
-                    <input
-                      id="length"
-                      name="length"
-                      type="number"
-                      min={LENGTH_MIN}
-                      max={LENGTH_MAX}
-                      step={1}
-                      value={length}
-                      onChange={(e) => setLength(Number(e.target.value) || 0)}
-                      required
-                      aria-label="Length in seconds"
-                    />
+                    {/* The named field. The slider drives it; this takes the
+                        exact second the slider's 5s step cannot reach. The
+                        "sec" beside it exists because without a unit the box
+                        read as a display, not an input — the producer asked
+                        for direct typing while already looking at it. */}
+                    <span className="lenexact">
+                      <input
+                        id="length"
+                        name="length"
+                        type="number"
+                        min={LENGTH_MIN}
+                        max={LENGTH_MAX}
+                        step={1}
+                        value={length}
+                        onChange={(e) => setLength(Number(e.target.value) || 0)}
+                        required
+                        aria-label="Length in seconds"
+                      />
+                      sec
+                    </span>
                   </div>
                   <input
                     type="range"
                     className="lenslider"
                     min={LENGTH_MIN}
                     max={LENGTH_MAX}
-                    step={8}
+                    step={5}
                     value={sliderPos}
                     onChange={(e) => setLength(Number(e.target.value))}
                     style={{ ["--fill" as string]: sliderFill }}

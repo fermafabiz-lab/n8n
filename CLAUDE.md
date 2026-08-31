@@ -1170,6 +1170,43 @@ those two `jsonBody` strings, nothing else. Two things come with it:
   capacity is left over. Fine for a 6-scene film; it is the pacing risk on the
   10- and 12-minute lengths, where a batch is 90 scenes across 12 passes.
 
+### The SFX volume slider
+
+`Editing Options.sfxLevel` (0–1) is how loud the scenes' own ambience sits
+under the narration. It is chosen on the brief, in the SFX row, and the slider
+only appears while the switch is on — a level for something switched off is a
+decision with no subject.
+
+The value travels as the GAIN, never as the percentage the slider shows: the
+form converts once, at the edge, so the orchestrator, the project record and
+`nativeAudio` in the assemble request all speak the same unit.
+
+**0.35 is the default, and that is deliberate continuity** — it is the number
+`Build Timeline` used to hard-code (raised from 0.25 in 2026-08-10 after a real
+SFX-only render came back audible only in headphones). An untouched slider
+therefore reproduces every film made before the control existed.
+
+**The floor is 0.05, not 0.** Silence is what the SFX switch is for; a slider
+that could reach zero would be a second, hidden off switch able to disagree
+with the visible one.
+
+The clamp is a refusal, not a correction — out of range or unparseable falls
+back to 0.35 rather than guessing — and it exists in **three copies, one per
+place the value passes through**:
+
+| Where | What |
+|---|---|
+| `platform/lib/data/derive.ts` | `normalizeSfxLevel()`, also used by `createProject` |
+| Orchestrator → `Normalize Webhook Input` | writes `sfxLevel` into Editing Options |
+| Final Assembly → `Build Timeline` | reads it back, falls back to `SFX_LEVEL` |
+
+Change one, change all three — the same rule `speed` already lives under.
+
+**Not yet on the after-the-fact panels.** `FinalSettings` and `SoundSettings`
+still carry only the on/off switch, so a finished film's level can be changed
+only by editing `Editing Options` directly. `updateEditingOptions` merges, so
+neither panel wipes the stored value.
+
 ### The Cinematic category (silent film)
 
 `category: 'cinematic'` in Editing Options = no spoken words anywhere. How

@@ -7,7 +7,9 @@ import {
   regenerateVoice,
   reopenStep,
   reopenPlaybackSpeed,
+  rerecordVoices,
   savePlaybackSpeed,
+  saveVoiceSettings,
   saveCastAssignments,
   saveChapterVoices,
   sceneAction,
@@ -27,6 +29,8 @@ import {
 } from "@/lib/chapters";
 import RegenBadge from "@/components/RegenBadge";
 import SpeedPicker from "@/components/SpeedPicker";
+import VoiceTonePicker from "@/components/VoiceTonePicker";
+import { normalizeVoiceTone, type VoiceTone } from "@/lib/data/derive";
 import VoicePicker from "@/components/VoicePicker";
 
 /**
@@ -212,9 +216,14 @@ export default function AudioReview({
   projectName = "",
   speed = 1,
   speedLocked = false,
+  voiceTone = null,
 }: {
   projectId: string;
   scenes: Scene[];
+  /** How the narrator reads, or null for each voice's own settings. Resolved
+   *  by buildProject, like the pace, so this panel and the synthesis can never
+   *  disagree about what the film is set to. */
+  voiceTone?: VoiceTone | null;
   /**
    * The film's playback rate, resolved by buildProject the same way every
    * other surface resolves it (Editing Options overrides, the brief's Pace
@@ -375,6 +384,47 @@ export default function AudioReview({
   /** What the panel plays at, and what Save would store. */
   const rate = draftRate ?? speed;
   const paceDirty = draftRate !== null && Math.abs(draftRate - speed) > 1e-9;
+
+  // ---- voice character -----------------------------------------------
+  /**
+   * The tone being edited, backed by sessionStorage for the same reason the
+   * pace draft is: the page reloads itself every 10 seconds and would
+   * otherwise throw the choice away mid-edit.
+   *
+   * The draft is a two-level value — "no draft" and "a draft that is null"
+   * are different things, because null is itself a valid tone ("leave every
+   * voice alone"). Held as `{ v: VoiceTone | null } | null` so those two
+   * cannot collapse into each other, which they would as a bare null.
+   */
+  const toneKey = `vf-tone:${projectId}`;
+  const [draftTone, setDraftTone] = useState<{ v: VoiceTone | null } | null>(null);
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(toneKey);
+      if (saved !== null) setDraftTone({ v: normalizeVoiceTone(JSON.parse(saved)) });
+    } catch {}
+  }, [toneKey]);
+  const pickTone = (v: VoiceTone | null) => {
+    setDraftTone({ v });
+    try {
+      sessionStorage.setItem(toneKey, JSON.stringify(v));
+    } catch {}
+  };
+  const clearToneDraft = () => {
+    setDraftTone(null);
+    try {
+      sessionStorage.removeItem(toneKey);
+    } catch {}
+  };
+  const tone = draftTone ? draftTone.v : voiceTone;
+  const toneDirty =
+    draftTone !== null && JSON.stringify(draftTone.v) !== JSON.stringify(voiceTone);
+  /** Named for the chip and the messages. Never the preset's name — the panel
+   *  stores numbers, and a label here would be a second table to keep in step
+   *  with the picker's. */
+  const toneLabel = tone
+    ? `stability ${Math.round(tone.stability * 100)} · style ${Math.round(tone.style * 100)}`
+    : "each voice's own";
 
   /** Read by playFrom, which builds each element fresh. A closure over `rate`
    *  would not do: "Play all" schedules the NEXT take from inside the current
@@ -1003,6 +1053,92 @@ export default function AudioReview({
           )}
         </div>
       )}
+
+      {/*
+        How the narrator READS — the same Editing Options.voice the brief sets,
+        so this is the second door onto one stored value rather than a second
+        setting. It sits under the pace because the two answer neighbouring
+        questions, and because both are decided here for the same reason: the
+        takes exist and no picture has been paid for yet.
+
+        The card is NOT gated on `withAudio.length` the way the pace card is.
+        The pace preview needs a take to retime; this one is a choice about
+        lines not yet recorded, and it is most useful precisely while the first
+        batch is still being synthesized.
+
+        No silent-film guard here, deliberately: a cinematic project never
+        renders this panel at all — the project page drops the whole Audio step
+        for it — so a second check would be dead code pretending to be a rule.
+      */}
+      {
+        <div className="card" style={{ padding: "14px 16px", marginBottom: 14 }}>
+          <div className="kv" style={{ borderBottom: "none", paddingBottom: 8 }}>
+            <h5 style={{ margin: 0 }}>Voice character — how the narrator reads</h5>
+            {/* The STORED tone, never the draft, for the same reason as the
+                pace chip: the picker below already shows the selection, and a
+                chip agreeing with it would leave nothing on screen saying the
+                choice has not been written. */}
+            <span className={toneDirty ? "chip wait" : voiceTone ? "chip ok" : "chip"}>
+              {voiceTone
+                ? `stability ${Math.round(voiceTone.stability * 100)} · style ${Math.round(voiceTone.style * 100)}`
+                : "voice default"}
+              {toneDirty ? " · not saved yet" : ""}
+            </span>
+          </div>
+
+          <VoiceTonePicker
+            value={tone}
+            disabled={pending}
+            onChange={pickTone}
+            footnote="Unlike the pace, this cannot be heard on the takes you already have — a generation setting only shows up in a fresh recording. Save it, then re-record a line (or all of them) to hear it."
+          />
+
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
+            <button
+              className="abtn ok"
+              disabled={pending || !toneDirty}
+              onClick={() =>
+                run(async () => {
+                  const r = await saveVoiceSettings(projectId, tone);
+                  // Only on success — a cleared draft after a failed write
+                  // would drop the choice back to the stored tone while the
+                  // message says it was not saved.
+                  if (r.ok) clearToneDraft();
+                  return r;
+                })
+              }
+            >
+              {pending ? "…" : toneDirty ? `✓ Save — ${toneLabel}` : "✓ Saved"}
+            </button>
+            {toneDirty && (
+              <button className="abtn" disabled={pending} onClick={clearToneDraft}>
+                Cancel
+              </button>
+            )}
+            {/* The only way to actually hear the setting. Offered once the
+                takes exist and the tone is stored — re-recording against an
+                unsaved draft would synthesize with the OLD tone and read as
+                the control doing nothing. */}
+            {withAudio.length > 0 && !toneDirty && (
+              <button
+                className="abtn"
+                disabled={pending}
+                title={`Re-synthesize all ${withAudio.length} takes with the saved voice character`}
+                onClick={() =>
+                  run(() =>
+                    rerecordVoices(
+                      projectId,
+                      withAudio.map((s) => ({ id: s.id, narration: s.narration ?? "" })),
+                    ),
+                  )
+                }
+              >
+                ↻ Re-record all {withAudio.length}
+              </button>
+            )}
+          </div>
+        </div>
+      }
 
       {/*
         The narration on its own. It exists nowhere else: the pipeline stores

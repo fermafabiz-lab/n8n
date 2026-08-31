@@ -654,6 +654,7 @@ export default async function ProductionRoom({
             chapterVoices={project.chapterVoices}
             speed={project.editing.speed}
             speedLocked={project.editing.speedLocked}
+            voiceTone={project.editing.voice}
           />
         )}
 

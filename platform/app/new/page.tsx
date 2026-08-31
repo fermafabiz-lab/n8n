@@ -9,6 +9,8 @@ import LanguagePicker from "@/components/LanguagePicker";
 import { languageByCode } from "@/lib/languages";
 import { toneType } from "@/lib/tone-type";
 import SpeedPicker from "@/components/SpeedPicker";
+import VoiceTonePicker from "@/components/VoiceTonePicker";
+import type { VoiceTone } from "@/lib/data/derive";
 import { SPEED_BY_PACE } from "@/lib/data/derive";
 
 async function submit(_prev: ActionResult | null, formData: FormData) {
@@ -187,6 +189,9 @@ export default function NewVideo() {
   // read it and they are rendered in different cards.
   const [category, setCategory] = useState(DEFAULT_CATEGORY);
   const [catValues, setCatValues] = useState<Record<string, string | boolean>>({});
+  /** How the narrator reads. `null` — the default — sends nothing and leaves
+   *  whatever voice is picked reading as it already does. */
+  const [voiceTone, setVoiceTone] = useState<VoiceTone | null>(null);
   const [catMeta, setCatMeta] = useState<CategoryMeta>({
     category: DEFAULT_CATEGORY,
     categoryLabel: getCategory(DEFAULT_CATEGORY).label,
@@ -394,6 +399,30 @@ export default function NewVideo() {
                     is what the voice pickers are narrowed to.
                   </p>
                 </div>
+                {/* Absent on a silent film, not disabled: there is no
+                    narration to give a character to, and a control that cannot
+                    change the outcome reads as a decision. */}
+                {!silent && (
+                  <div className="field" style={{ marginTop: 18 }}>
+                    <label>Voice character</label>
+                    {/* One field carrying the whole choice as JSON, and an
+                        EMPTY string when the producer left it alone. Every
+                        other option on this form is a scalar, but this one has
+                        a meaningful "unset" that four separate numbers cannot
+                        express — and unset is what keeps each voice's own
+                        tuning. */}
+                    <input
+                      type="hidden"
+                      name="voice_tone"
+                      value={voiceTone ? JSON.stringify(voiceTone) : ""}
+                    />
+                    <VoiceTonePicker
+                      value={voiceTone}
+                      onChange={setVoiceTone}
+                      footnote="Applies to every line this film records. You can change it at the audio step and re-record, once you have heard it."
+                    />
+                  </div>
+                )}
               </section>
 
               <section className="fsec">

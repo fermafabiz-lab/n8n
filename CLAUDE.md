@@ -819,6 +819,61 @@ is built only inside that guard (a `-1` input index would break the graph).
   `--disable-everything` (pad/crop/scale, vp8, png; no `setpts`, no `atempo`,
   no x264). So a filter graph written here cannot be run here either way.
 
+### Voice character — the ElevenLabs generation settings (2026-08-31)
+
+`Editing Options.voice` = `{stability, similarity, style, speakerBoost}`, chosen
+on the brief (section 03) and again at the audio step, and sent as
+`voice_settings` on every synthesis.
+
+- **There are FOUR synthesis paths and they must all agree**, or a re-recorded
+  line comes back reading differently from the neighbours it sits between:
+  `AB Speak` (batch) and `Speak VR` (regen at the video gate) in Media
+  Generation, `VR Speak` (the `scene-voice-regen` webhook) in Claude Scripting,
+  and `/tts-multi` on Railway for characters mode. The n8n three carry the same
+  one-line expression; `remotion/server/tts.mjs` carries `normalizeVoiceTone`;
+  `platform/lib/data/derive.ts` carries the write-side twin. Verified to agree
+  on 20 inputs and again end to end on 13.
+- **ABSENT means send nothing, and that is the feature.** Every voice has its
+  own settings stored at ElevenLabs — Bella's are 0.5 / 0.75 / 0, read off the
+  API — so an object we invent overrides each voice's own tuning on every line.
+  `null` is therefore a real, storable choice ("Voice default"), and it is the
+  default. Same shape as `confirmFinalSettings` omitting `speed`.
+- **`speed` is accepted and IGNORED on `eleven_multilingual_v2`**, which is the
+  model all four paths pin. Measured: the same sentence at 0.7, 1.0 and 1.2 all
+  came back ~4.2s, where 0.7 should be ~6s. It is deliberately not exposed —
+  the film's pace is `Editing Options.speed`, applied by `speed.mjs` to the
+  finished render, and a second speed control would be the false one.
+- **ElevenLabs TTS is NON-DETERMINISTIC, so you cannot prove a setting works by
+  comparing outputs.** The control in that experiment — the same request twice —
+  produced different bytes AND different fingerprints (67,335 vs 67,753). Which
+  means the method could not answer the question it was built for, and the only
+  judge of stability/style is the ear. It also means a regenerated take never
+  reproduces the one before it, whatever the settings.
+- **…which is why the audio panel offers "↻ Re-record all N".** The pace can be
+  auditioned for free because it retimes audio already on the page; a
+  generation setting only appears in a fresh synthesis. Without a way to spend
+  one, the control would be a promise the producer has to take on trust. The
+  button is offered only when the tone is SAVED — re-recording against an
+  unsaved draft would synthesize with the old tone and read as doing nothing.
+- **`VRB Load Project` exists because `AB Load Project` is not upstream of the
+  video gate's regen branch.** Checked on the connection graph rather than
+  assumed: `Speak VR` descends from `Evaluate Video Approval`, which never sees
+  the project record, so a by-name reference there would throw, be caught, and
+  silently synthesize with no settings — exactly the divergence this section
+  exists to prevent. The node is `continueRegularOutput` + `alwaysOutputData`,
+  so a failure degrades to the voice's own settings instead of breaking a
+  re-record.
+- The expression **refuses rather than clamps**: all three numbers present and
+  inside 0..1, or nothing is sent. A 422 from ElevenLabs would kill the whole
+  audio loop, and an out-of-range value can only come from a hand-edited row.
+  The site and `Normalize Webhook Input` clamp instead, because they are the
+  WRITE side and must not let a bad value reach the readers at all.
+- Round-tripped on the real stack (execution 8647/8648): written to
+  `hov.project.editing_options`, read back through `/api/at` as a STRING, and
+  the live expression produced `{stability: 0.15, similarity_boost: 0.8,
+  style: 0.7, use_speaker_boost: true}` — then removing the key produced
+  "nothing" again.
+
 ### The breath at the ends of a take (2026-08-29)
 
 ElevenLabs pads what it generates: every take opens with a beat of

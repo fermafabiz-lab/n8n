@@ -23,7 +23,7 @@ import {
   deleteProjectDeep,
   updateEditingOptions,
 } from "@/lib/data";
-import { normalizeSpeed } from "@/lib/data/derive";
+import { normalizeSpeed, normalizeVoiceTone, type VoiceTone } from "@/lib/data/derive";
 import {
   getAliveAssembly,
   getAliveProduction,
@@ -1144,6 +1144,86 @@ export async function savePlaybackSpeed(
 }
 
 /**
+ * Set how the narrator READS, from the audio step or the brief's stored value.
+ *
+ * `null` is a real choice and is stored as one: jsonb keeps an explicit null,
+ * which `normalizeVoiceTone` reads back as "send nothing", so "back to the
+ * voice's own settings" survives the merge. Writing `{}` instead would leave
+ * the previous tone in place, because `updateEditingOptions` MERGES — the same
+ * trap that made `confirmFinalSettings` overwrite the producer's pace.
+ *
+ * Unlike the pace, this changes NOTHING that already exists. Takes are
+ * synthesized once and never re-synthesized on their own (the batch refuses to
+ * overwrite a voiceover that is there), so a tone saved here reaches only the
+ * lines recorded after it. `rerecordVoices` is the other half.
+ */
+export async function saveVoiceSettings(
+  projectId: string,
+  tone: VoiceTone | null,
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  const clean = normalizeVoiceTone(tone);
+  try {
+    await updateEditingOptions(projectId, { voice: clean });
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message: clean
+        ? "Voice character saved. Lines recorded from now on use it — re-record the ones you already have to hear it."
+        : "Back to each voice's own settings. Lines recorded from now on use them.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/**
+ * Re-record a set of takes, so a new voice character can actually be heard.
+ *
+ * This exists because the tone cannot be auditioned any other way. The pace
+ * preview retimes audio that is already on the page; a generation setting only
+ * shows up in a fresh synthesis, so without this the control would be a
+ * promise the producer has to take on trust.
+ *
+ * Fired one at a time and awaited, NOT in parallel. Each call starts its own
+ * n8n execution and ElevenLabs allows five concurrent requests on this
+ * account — a fan-out of fifteen would have some of them fail, and a failed
+ * re-record leaves the scene holding its regen flag with the take unchanged,
+ * which the UI shows as a synthesis that never finishes.
+ */
+export async function rerecordVoices(
+  projectId: string,
+  scenes: { id: string; narration: string }[],
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  let queued = 0;
+  const failed: string[] = [];
+  for (const s of scenes) {
+    const r = await regenerateVoice(projectId, s.id, s.narration);
+    if (r.ok) queued++;
+    else failed.push(r.message);
+  }
+  revalidatePath(`/projects/${projectId}`);
+  if (queued === 0) {
+    return { ok: false, message: failed[0] ?? "Nothing was re-recorded." };
+  }
+  // Partial success is reported as success with the count, because the takes
+  // that DID queue are really being made and saying "failed" would send the
+  // producer looking for a problem with all of them.
+  return {
+    ok: true,
+    message:
+      failed.length === 0
+        ? `Re-recording ${queued} take${queued === 1 ? "" : "s"} — they arrive over the next minute or two (the page refreshes itself).`
+        : `Re-recording ${queued} of ${scenes.length} takes. ${failed.length} could not be queued: ${failed[0]}`,
+  };
+}
+
+/**
  * Reopen the pace after it was signed off.
  *
  * Deliberately clears the lock ONLY, leaving the stored rate alone: reopening
@@ -1302,6 +1382,17 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
       data: Buffer.from(await refFile.arrayBuffer()).toString("base64"),
     };
   }
+  // Posted as JSON by the brief's one voice-character control, or "" for the
+  // voice's own settings. Parsed defensively: a malformed value has to read as
+  // "leave the voice alone" rather than block the whole submission, because
+  // this field is the one thing on the form that a producer can safely ignore.
+  let voiceTone: VoiceTone | null = null;
+  try {
+    voiceTone = normalizeVoiceTone(JSON.parse(String(formData.get("voice_tone") || "null")));
+  } catch {
+    voiceTone = null;
+  }
+
   const payload = {
     "Nume Proiect": String(formData.get("name") ?? ""),
     category: String(formData.get("category") ?? "story"),
@@ -1330,6 +1421,12 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     end_screen: String(formData.get("end_screen") ?? "yes"),
     sfx: String(formData.get("sfx") ?? "yes"),
     music: String(formData.get("music") ?? "no"),
+    // How the narrator reads. OMITTED when the producer left it on "Voice
+    // default", and that absence is the feature: every ElevenLabs voice has
+    // its own stored settings, so sending an object we made up would override
+    // that voice's own tuning on every line of the film. `Normalize Webhook
+    // Input` copies it into Editing Options only when it is here.
+    ...(voiceTone ? { voice_tone: voiceTone } : {}),
     ...(reference_image ? { reference_image } : {}),
   };
   // A no-narration category has nothing to speak and nothing to caption —
@@ -1338,6 +1435,10 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     payload.voice_id = "";
     payload.cast_voices = [];
     payload.captions = "no";
+    // Nothing is spoken, so a voice character is a setting with no subject.
+    // Deleting rather than blanking, because the key's ABSENCE is what tells
+    // n8n not to write it at all.
+    delete (payload as { voice_tone?: VoiceTone }).voice_tone;
   }
   const projectName = payload["Nume Proiect"];
   let newProjectId: string | null = null;

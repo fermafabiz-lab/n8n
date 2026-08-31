@@ -51,12 +51,56 @@ function run(cmd, args, timeoutMs = 5 * 60 * 1000) {
  * also the validity test in five places (`voice_id.includes('_')`) — remove it
  * from storage and an empty id becomes indistinguishable from a missing one.
  */
-async function synthesize(text, voiceId, apiKey) {
+/**
+ * How the narrator reads, in ElevenLabs' own field names.
+ *
+ * Mirrors `normalizeVoiceTone()` in platform/lib/data/derive.ts and the
+ * expression in n8n's three speech nodes — the same three-way agreement the
+ * speed rule already carries, and for the same reason: a line made by the
+ * batch and the same line remade by a regeneration have to come out of
+ * identical settings, or one scene reads differently from its neighbours.
+ *
+ * NULL when nothing usable is given, and null means send no `voice_settings`
+ * at all. That is not the same as sending defaults: every voice has its own
+ * stored settings at ElevenLabs, so an invented object would override each
+ * voice's own tuning on every line.
+ *
+ * `speed` is deliberately absent. Measured on `eleven_multilingual_v2` — the
+ * model all four synthesis paths pin — the same sentence at 0.7, 1.0 and 1.2
+ * all came back ~4.2s, so the field is accepted and ignored. The film's pace
+ * is `Editing Options.speed`, applied by speed.mjs to the finished render,
+ * which demonstrably works.
+ */
+export function normalizeVoiceTone(value) {
+	if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+	const unit = (x, fallback) => {
+		const n = Number(x);
+		if (!Number.isFinite(n)) return fallback;
+		return Math.min(1, Math.max(0, n));
+	};
+	const named = ['stability', 'similarity', 'style'];
+	if (!named.some((k) => Number.isFinite(Number(value[k])))) return null;
+	return {
+		stability: unit(value.stability, 0.5),
+		similarity_boost: unit(value.similarity, 0.75),
+		style: unit(value.style, 0),
+		use_speaker_boost: value.speakerBoost !== false,
+	};
+}
+
+async function synthesize(text, voiceId, apiKey, voiceSettings) {
 	const id = String(voiceId).replace(/^elevenlabs_/, '');
 	const res = await fetch(`${ELEVEN}/text-to-speech/${encodeURIComponent(id)}`, {
 		method: 'POST',
 		headers: {'xi-api-key': apiKey, 'Content-Type': 'application/json'},
-		body: JSON.stringify({text, model_id: MODEL}),
+		// Spread rather than always set: the key must be ABSENT, not null, when
+		// there is no tone — ElevenLabs treats a present-but-null value as an
+		// override attempt and answers 422.
+		body: JSON.stringify({
+			text,
+			model_id: MODEL,
+			...(voiceSettings ? {voice_settings: voiceSettings} : {}),
+		}),
 	});
 	if (!res.ok) {
 		// The body carries ElevenLabs' own reason — a dead voice id, an
@@ -69,8 +113,13 @@ async function synthesize(text, voiceId, apiKey) {
 
 export function registerTts(app, {jobs, outputDir}) {
 	app.post('/tts-multi', (req, res) => {
-		const {segments, apiKey: bodyKey, gapMs} = req.body || {};
+		const {segments, apiKey: bodyKey, gapMs, voiceTone} = req.body || {};
 		const apiKey = process.env.ELEVENLABS_API_KEY || bodyKey;
+		// One tone for the whole request, not per segment. A characters-mode
+		// scene is one narration split across voices, and giving each turn its
+		// own reading style would make the scene sound like several recordings
+		// spliced together — which is exactly what it must not sound like.
+		const tone = normalizeVoiceTone(voiceTone);
 		if (!Array.isArray(segments) || segments.length === 0) {
 			return res.status(400).json({error: 'segments: [{text, voice_id}] is required'});
 		}
@@ -102,6 +151,7 @@ export function registerTts(app, {jobs, outputDir}) {
 						String(segments[i].text).trim(),
 						String(segments[i].voice_id),
 						String(apiKey),
+						tone,
 					);
 					const f = path.join(work, `seg${i}.mp3`);
 					fs.writeFileSync(f, buf);

@@ -49,6 +49,75 @@ export interface EditingOptions {
    * and leaves those films editable, the safe direction.
    */
   speedLocked: boolean;
+  /**
+   * How the narrator READS — ElevenLabs' generation settings for this film.
+   *
+   * NULL means "never chosen", and that is not the same as "chosen to be the
+   * defaults". Every voice carries its OWN stored settings at ElevenLabs
+   * (Bella's are 0.5 / 0.75 / 0), so sending an object we invented would
+   * overwrite each voice's own tuning with ours on every single line. Absent
+   * therefore means send no `voice_settings` at all, which is exactly what
+   * the pipeline did before this existed and what every film already in the
+   * database still wants. Same shape as `confirmFinalSettings` omitting
+   * `speed`: the field that destroys data is the one nobody meant to send.
+   */
+  voice: VoiceTone | null;
+}
+
+/**
+ * The four settings ElevenLabs actually acts on.
+ *
+ * Read off the API rather than assumed: a voice's stored settings come back as
+ * `{stability, similarity_boost, style, use_speaker_boost, speed}`. `speed` is
+ * deliberately NOT here — measured on `eleven_multilingual_v2`, the model this
+ * pipeline pins, the same sentence at 0.7, 1.0 and 1.2 all came back ~4.2s, so
+ * the field is accepted and ignored. Exposing it would have been a second
+ * pace control, and the false one: `Editing Options.speed` re-times the
+ * finished film with ffmpeg and demonstrably works.
+ */
+export interface VoiceTone {
+  /** 0–1. Low is varied and dramatic, high is flat and consistent. */
+  stability: number;
+  /** 0–1. How closely a take clings to the original voice. */
+  similarity: number;
+  /** 0–1. Exaggerates the voice's own manner; 0 is the plainest read. */
+  style: number;
+  /** Reinforces the resemblance to the speaker. */
+  speakerBoost: boolean;
+}
+
+/**
+ * Read stored voice settings, or null when there is nothing usable.
+ *
+ * Mirrored by `normalizeVoiceTone()` in remotion/server/tts.mjs and by the
+ * expression in n8n's three speech nodes — the same three-way agreement the
+ * speed rule already has, and for the same reason: a take synthesized by the
+ * batch and one synthesized by a regeneration must come out of the same
+ * settings, or one line sounds like a different reading of the same script.
+ *
+ * Every number is clamped rather than rejected. A value out of range is a
+ * slider that moved too far, not a reason to silently drop the producer's
+ * whole choice — and ElevenLabs answers 422 for out-of-range, which would
+ * turn a bad number into a dead batch.
+ */
+export function normalizeVoiceTone(value: unknown): VoiceTone | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const v = value as Record<string, unknown>;
+  const unit = (x: unknown, fallback: number): number => {
+    const n = Number(x);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.min(1, Math.max(0, n));
+  };
+  // At least one real number, or this is an empty object left behind by a
+  // merge rather than a choice anybody made.
+  const named = ["stability", "similarity", "style"];
+  if (!named.some((k) => Number.isFinite(Number(v[k])))) return null;
+  return {
+    stability: unit(v.stability, 0.5),
+    similarity: unit(v.similarity, 0.75),
+    style: unit(v.style, 0),
+    speakerBoost: v.speakerBoost !== false,
+  };
 }
 
 /** The three PACE values, as speeds. Mirrors SPEED_BY_PACE in speed.mjs. */
@@ -453,6 +522,11 @@ export function buildProject(r: RawProject): Project {
       // before the audio step could sign the pace off — reads as unlocked
       // and keeps its control rather than arriving frozen.
       speedLocked: opts.speedLocked === true,
+      // No fallback to a project field, unlike `speed`: there is no older
+      // column that ever meant this, so "never chosen" is the honest answer
+      // for every film made before today — and it is also the answer that
+      // leaves each voice reading exactly as it reads now.
+      voice: normalizeVoiceTone(opts.voice),
     },
     awaitingFinalSettings: /setari finale/.test(normalizeStatus(r.statusRaw)),
     category: typeof opts.category === "string" ? opts.category : null,

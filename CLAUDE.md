@@ -135,6 +135,19 @@ These each cost hours. Do not rediscover them.
   in `platform/lib/n8n.ts` threads this needle: `running` always counts;
   `waiting` counts only for worker workflows with a genuinely near wake-up.
 - **`execute_workflow` targets the first enabled webhook** in a workflow.
+- **Two branches out of one node do NOT run at the same time.** n8n's v1
+  execution order runs one branch to completion, then the other — measured,
+  not assumed: two branches each holding a 5-second Wait took **10.0s** in
+  total, the first finishing at +5.0s and the second at +10.0s. So "run the
+  audio loop and the image loop in parallel" cannot be done by forking the
+  canvas; inside one execution every arrangement is a different ORDER, never
+  an overlap. Real concurrency needs separate executions — an `Execute
+  Workflow` node with *wait for completion* switched off, or a webhook fired
+  at another workflow. Worth knowing what that buys before paying for it: the
+  audio stage is the cheap one (~1.2s of TTS per take plus its Drive upload),
+  so overlapping it with images saves roughly the audio stage and nothing
+  else, while the producer's first listenable take arrives at the same moment
+  either way.
 - **`runData` is EMPTY for the whole life of a healthy running execution**,
   and mistaking that for "it never started" cost a full day of the producer
   fighting the site. n8n does not persist node progress mid-run

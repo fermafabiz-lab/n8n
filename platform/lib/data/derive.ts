@@ -25,6 +25,9 @@ export interface EditingOptions {
   /** Scene sound effects in the final mix — the Veo clips' own ambience,
    *  ducked under the narration. Off = narration (+ music) only. */
   sfx: boolean;
+  /** How loud that ambience sits, 0–1, as `nativeAudio` in the assemble
+   *  request. Meaningless while `sfx` is off; the toggle owns silence. */
+  sfxLevel: number;
   /** Background music AND the synthesized boom/whoosh/riser accents. Both
    *  are composed here, not in the footage, so they ride one switch. */
   music: boolean;
@@ -146,6 +149,29 @@ export function normalizeSpeed(value: unknown): number {
   if (n < 0.5 || n > 2) return 1;
   if (Math.abs(n - 1) < 0.01) return 1;
   return n;
+}
+
+/**
+ * How loud the scenes' own ambience sits under the narration, 0–1.
+ *
+ * The default is the value `Build Timeline` used to hard-code: it started at
+ * 0.25, was judged too subtle on a real SFX-only render, and 0.35 is what
+ * replaced it. Making it a per-film setting does not change that judgement —
+ * it keeps it as the starting point and lets a film that needs more say so.
+ *
+ * Refuses rather than guesses, like normalizeSpeed: anything unparseable or
+ * out of range falls back to the default, so a bad value can never reach the
+ * mixer. The floor is 0.05 and not 0 on purpose — silence is what the SFX
+ * toggle is for, and a slider that can reach it would be a second, hidden
+ * off switch that disagrees with the visible one.
+ */
+export const SFX_LEVEL_DEFAULT = 0.35;
+
+export function normalizeSfxLevel(value: unknown): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return SFX_LEVEL_DEFAULT;
+  if (n < 0.05 || n > 1) return SFX_LEVEL_DEFAULT;
+  return Math.round(n * 100) / 100;
 }
 
 /**
@@ -505,6 +531,7 @@ export function buildProject(r: RawProject): Project {
       // opt-IN. Both were wrong the other way round once and the result
       // was unrelated stingers over stripped-out ambience.
       sfx: opts.sfx !== false,
+      sfxLevel: normalizeSfxLevel(opts.sfxLevel),
       music: opts.music === true,
       // Editing Options is the OVERRIDE, the project's PACE field the default.
       // Two sources on purpose: PACE is chosen on the brief and stored on the

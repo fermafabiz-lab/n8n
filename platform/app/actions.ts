@@ -23,7 +23,12 @@ import {
   deleteProjectDeep,
   updateEditingOptions,
 } from "@/lib/data";
-import { normalizeSpeed, normalizeVoiceTone, type VoiceTone } from "@/lib/data/derive";
+import {
+  normalizeSfxLevel,
+  normalizeSpeed,
+  normalizeVoiceTone,
+  type VoiceTone,
+} from "@/lib/data/derive";
 import {
   getAliveAssembly,
   getAliveProduction,
@@ -1420,6 +1425,10 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     chapter_cards: String(formData.get("chapter_cards") ?? "yes"),
     end_screen: String(formData.get("end_screen") ?? "yes"),
     sfx: String(formData.get("sfx") ?? "yes"),
+    // How loud that ambience sits, 0–1. Travels as a number rather than the
+    // slider's percentage so the pipeline carries one unit end to end: it is
+    // `nativeAudio` in the assemble request, and the mixer takes a gain.
+    sfx_level: normalizeSfxLevel(formData.get("sfx_level")),
     music: String(formData.get("music") ?? "no"),
     // How the narrator reads. OMITTED when the producer left it on "Voice
     // default", and that absence is the feature: every ElevenLabs voice has

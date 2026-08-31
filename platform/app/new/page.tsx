@@ -75,6 +75,18 @@ const LENGTH_PRESETS = [
  * percentage all have to agree — they were three copies of `480`, and a
  * preset above a stale max is a chip that moves the slider nowhere.
  */
+/**
+ * The SFX volume slider's ends, as percentages.
+ *
+ * The floor is 10 rather than 0 because silence is what the SFX toggle is
+ * for — a slider that could reach 0 would be a second off switch, one that
+ * disagrees with the one right next to it. The default matches the level the
+ * render hard-coded before this control existed (0.35), so an untouched
+ * slider is exactly today's sound.
+ */
+const SFX_LEVEL_PCT_MIN = 10;
+const SFX_LEVEL_PCT_DEFAULT = 35;
+
 const LENGTH_MIN = 16;
 const LENGTH_MAX = LENGTH_PRESETS[LENGTH_PRESETS.length - 1].s;
 
@@ -184,6 +196,11 @@ export default function NewVideo() {
   const [finishes, setFinishes] = useState<Record<string, boolean>>(
     Object.fromEntries(FINISHES.map((f) => [f.name, f.default])),
   );
+  // How loud the scenes' own ambience sits under the narration, as a
+  // percentage for the producer and 0–1 for the mixer. 35 is the level the
+  // render used to hard-code, so leaving the slider alone reproduces every
+  // film made before this control existed.
+  const [sfxLevel, setSfxLevel] = useState(SFX_LEVEL_PCT_DEFAULT);
   const [style, setStyle] = useState("");
   // The category selection lives here because BOTH halves of CategoryPicker
   // read it and they are rendered in different cards.
@@ -545,6 +562,51 @@ export default function NewVideo() {
                                 ? f.on
                                 : f.off}
                           </p>
+                          {/* Only under SFX, and only while it is on: a
+                              volume control for something that is switched
+                              off is a decision with no subject. The value is
+                              posted either way, so toggling off and back on
+                              keeps the level the producer chose. */}
+                          {f.name === "sfx" && on && (
+                            <div style={{ marginTop: 10 }}>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "baseline",
+                                  justifyContent: "space-between",
+                                  fontSize: 12,
+                                  color: "var(--dim)",
+                                }}
+                              >
+                                <label htmlFor="sfx_level_range">Effects volume</label>
+                                <b style={{ color: "var(--ink)", fontFamily: "var(--f-mono), ui-monospace, monospace" }}>
+                                  {sfxLevel}%
+                                </b>
+                              </div>
+                              <input
+                                id="sfx_level_range"
+                                type="range"
+                                className="lenslider"
+                                min={SFX_LEVEL_PCT_MIN}
+                                max={100}
+                                step={5}
+                                value={sfxLevel}
+                                onChange={(e) => setSfxLevel(Number(e.target.value))}
+                                style={{
+                                  margin: "8px 0 2px",
+                                  ["--fill" as string]: `${((sfxLevel - SFX_LEVEL_PCT_MIN) / (100 - SFX_LEVEL_PCT_MIN)) * 100}%`,
+                                }}
+                                aria-label="Effects volume"
+                              />
+                              <p style={{ margin: 0, fontSize: 11.5 }}>
+                                {sfxLevel <= 20
+                                  ? "Barely there — atmosphere you notice only in the gaps."
+                                  : sfxLevel <= 50
+                                    ? "Under the voice, clearly audible. The narration still leads."
+                                    : "Forward and loud. The mix ducks it whenever the narrator speaks."}
+                              </p>
+                            </div>
+                          )}
                         </div>
                         <input type="hidden" name={f.name} value={on ? "yes" : "no"} />
                         <Toggle
@@ -556,6 +618,14 @@ export default function NewVideo() {
                       </div>
                     );
                   })}
+                  {/* Posted as the 0–1 gain the mixer takes, not as the
+                      percentage the slider shows — one unit in the pipeline,
+                      converted once, here at the edge. */}
+                  <input
+                    type="hidden"
+                    name="sfx_level"
+                    value={(sfxLevel / 100).toFixed(2)}
+                  />
                 </div>
               </section>
 

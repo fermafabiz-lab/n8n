@@ -825,6 +825,31 @@ is built only inside that guard (a `-1` input index would break the graph).
 on the brief (section 03) and again at the audio step, and sent as
 `voice_settings` on every synthesis.
 
+- **`voiceSettings` on the ElevenLabs node must be a JSON STRING. Given an
+  OBJECT it is silently dropped** — the call succeeds, audio comes back, and
+  the settings never leave n8n. This shipped that way and the producer's
+  report was simply "I can't hear a difference"; they were right, and the
+  storage, the read and the resolved expression were all verifiably correct,
+  which is exactly what made it invisible.
+  **How to prove transmission when the effect is not measurable**: send a value
+  the API must reject. `stability: 99` answers 422 ("Input should be less than
+  or equal to 1") on a direct HTTP call, and answered **200 with audio**
+  through the node — so the field was not being sent. As a JSON string the same
+  value 422s through the node too, which is the proof it now travels. Do this
+  before believing any pass-through parameter works; a 200 proves the request
+  was accepted, never that your field was in it.
+  Corollary: `remotion/server/tts.mjs` builds its own JSON body and was always
+  correct, so the multi-voice path was the only one really applying the tone.
+- **A "Re-record all" is a fan-out, not a queue.** `regenerateVoice` awaits the
+  WEBHOOK, which returns once n8n has *started* an execution — the synthesis
+  then runs in parallel with every other one. Six scenes therefore hit the
+  account's five-concurrent limit and the sixth came back 429; `VR Write Voice`
+  never ran, so that scene's `Regenerează Voce` stayed set and the UI showed a
+  re-synthesis with nothing left alive to finish it (the stranded-flag shape
+  again, and voice regen still has no local exit). Fixed with `retryOnFail`
+  (5 tries, 5s apart) on `AB Speak`, `Speak VR` and `VR Speak`, which covers
+  every source of concurrency; the site's stagger past the fourth scene is
+  only a second line of defence.
 - **There are FOUR synthesis paths and they must all agree**, or a re-recorded
   line comes back reading differently from the neighbours it sits between:
   `AB Speak` (batch) and `Speak VR` (regen at the video gate) in Media

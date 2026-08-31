@@ -5,6 +5,7 @@ import { createProject, type ActionResult } from "@/app/actions";
 import CategoryPicker, { type CategoryMeta } from "@/components/CategoryPicker";
 import { DEFAULT_CATEGORY, getCategory } from "@/lib/categories";
 import Toggle from "@/components/Toggle";
+import CaptionColorPicker from "@/components/CaptionColorPicker";
 import LanguagePicker from "@/components/LanguagePicker";
 import { languageByCode } from "@/lib/languages";
 import { toneType } from "@/lib/tone-type";
@@ -216,6 +217,9 @@ export default function NewVideo() {
   // render used to hard-code, so leaving the slider alone reproduces every
   // film made before this control existed.
   const [sfxLevel, setSfxLevel] = useState(SFX_LEVEL_PCT_DEFAULT);
+  // Hex, or "" for the white default. Empty is not "unset" — it is the
+  // choice most films should keep, so it is what the control starts on.
+  const [captionColor, setCaptionColor] = useState("");
   const [style, setStyle] = useState("");
   // The category selection lives here because BOTH halves of CategoryPicker
   // read it and they are rendered in different cards.
@@ -582,6 +586,12 @@ export default function NewVideo() {
                               off is a decision with no subject. The value is
                               posted either way, so toggling off and back on
                               keeps the level the producer chose. */}
+                          {f.name === "captions" && on && (
+                            <CaptionColorPicker
+                              value={captionColor}
+                              onChange={setCaptionColor}
+                            />
+                          )}
                           {f.name === "sfx" && on && (
                             <div style={{ marginTop: 10 }}>
                               <div
@@ -641,6 +651,7 @@ export default function NewVideo() {
                     name="sfx_level"
                     value={(sfxLevel / 100).toFixed(2)}
                   />
+                  <input type="hidden" name="caption_color" value={captionColor} />
                 </div>
               </section>
 

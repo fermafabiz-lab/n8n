@@ -24,6 +24,7 @@ import {
   updateEditingOptions,
 } from "@/lib/data";
 import {
+  normalizeCaptionColor,
   normalizeSfxLevel,
   normalizeSpeed,
   normalizeVoiceTone,
@@ -845,6 +846,7 @@ export async function confirmFinalSettings(
     sfxLevel: number;
     music: boolean;
     drawnCards: boolean;
+    captionColor: string | null;
     /* NO `speed` here, on purpose. The pace is decided and signed off at the
        audio step, which is the only moment it is free to change, and this
        panel must not be able to move it — nor to reset it. Because
@@ -882,6 +884,7 @@ export async function confirmFinalSettings(
         sfxLevel: normalizeSfxLevel(settings.sfxLevel),
         music: settings.music,
         drawnCards: settings.drawnCards,
+        captionColor: normalizeCaptionColor(settings.captionColor),
       });
     }
     // Same merge, separate condition: the cards change even when no toggle
@@ -1441,6 +1444,9 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     voice_id: String(formData.get("voice_id") ?? "") || cast[0] || "",
     aspect: String(formData.get("aspect") ?? "16:9"),
     captions: String(formData.get("captions") ?? "yes"),
+    // Empty means the white default, which is what most films should keep —
+    // the render treats an absent or unrecognised value the same way.
+    caption_color: normalizeCaptionColor(formData.get("caption_color")) ?? "",
     lore: String(formData.get("lore") ?? ""),
     hook_title: String(formData.get("hook_title") ?? "yes"),
     chapter_cards: String(formData.get("chapter_cards") ?? "yes"),

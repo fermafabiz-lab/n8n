@@ -41,6 +41,20 @@ export interface EditingOptions {
    * which matters because a film can be switched off after its cards exist.
    */
   drawnCards: boolean;
+  /**
+   * The colour a spoken caption word is painted, or null for white.
+   *
+   * Null is the default and the right one: white with the spoken word marked
+   * by BRIGHTNESS is the only choice that reads on every kind of footage —
+   * an accent that sits well on a night dock is wrong on snow. A colour is
+   * something a film opts into.
+   *
+   * Stored as a hex; `resolveCaptionAccent()` in remotion/src/captionColor.ts
+   * is what finally applies it, and it lifts anything too dark toward white
+   * until it clears a luminance floor, because captions carry a heavy drop
+   * shadow and a deep accent vanishes into its own shadow.
+   */
+  captionColor: string | null;
   /** Playback rate of the finished film: 0.9 slow, 1 normal, 1.1 fast.
    *
    *  This is what the creation form's PACE control finally means. Before it
@@ -176,6 +190,29 @@ export function normalizeSpeed(value: unknown): number {
  * off switch that disagrees with the visible one.
  */
 export const SFX_LEVEL_DEFAULT = 0.35;
+
+/**
+ * A stored caption colour, or null for the white default.
+ *
+ * Mirrors `resolveCaptionAccent()` in remotion/src/captionColor.ts, which is
+ * the code that actually paints the word: a hex, the explicit opt-outs
+ * `none`/`white`/`off`, and nothing else. Anything unrecognised reads as
+ * null rather than throwing — a caption colour is not worth failing a render
+ * over, and white is always legible.
+ *
+ * The render normalizes AGAIN on its side, including the luminance lift, so
+ * this one only has to keep the stored value clean and the control honest.
+ */
+export function normalizeCaptionColor(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const raw = value.trim();
+  if (!raw || /^(none|white|off)$/i.test(raw)) return null;
+  const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(raw);
+  if (!m) return null;
+  let hex = m[1];
+  if (hex.length === 3) hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+  return `#${hex.toUpperCase()}`;
+}
 
 export function normalizeSfxLevel(value: unknown): number {
   const n = Number(value);
@@ -546,6 +583,7 @@ export function buildProject(r: RawProject): Project {
       // On unless refused, like the other overlays: a film the pipeline found
       // nothing worth drawing in simply gets an empty list.
       drawnCards: opts.drawnCards !== false,
+      captionColor: normalizeCaptionColor(opts.captionColor),
       // Editing Options is the OVERRIDE, the project's PACE field the default.
       // Two sources on purpose: PACE is chosen on the brief and stored on the
       // project, so falling back to it means every film already in the

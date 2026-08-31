@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { confirmFinalSettings, type ActionResult } from "@/app/actions";
 import Toggle from "@/components/Toggle";
+import CaptionColorPicker from "@/components/CaptionColorPicker";
 import { useSetPendingStage } from "@/components/StageNav";
 import type { EditingOptions, MotifCard } from "@/lib/data";
 
@@ -153,6 +154,12 @@ export default function FinalSettings({
   // The effects volume is a row's SETTING, not a row of its own, so it has to
   // be counted by hand — otherwise moving only the slider left `changed`
   // false and "Keep initial settings" would have quietly discarded it.
+  // Same shape as the effects volume: a row's setting, invisible to
+  // changedKeys, so it is counted by hand or "Keep initial settings" would
+  // discard a colour the producer had just chosen.
+  const captionColorMoved =
+    rows.some((o) => o.key === "captions") &&
+    (opts.captionColor ?? null) !== (initial.captionColor ?? null);
   const sfxLevelMoved =
     rows.some((o) => o.key === "sfx") && opts.sfxLevel !== initial.sfxLevel;
   // The pace is NOT here any more — it is decided and signed off at the audio
@@ -164,9 +171,13 @@ export default function FinalSettings({
   // A dropped animation still counts alongside the toggles: it changes the
   // film, and a button reading "Keep initial settings" after you switched one
   // off would be telling you something untrue.
-  const changed = changedKeys.length > 0 || dropped.length > 0 || sfxLevelMoved;
+  const changed =
+    changedKeys.length > 0 || dropped.length > 0 || sfxLevelMoved || captionColorMoved;
   const changeCount =
-    changedKeys.length + dropped.length + (sfxLevelMoved ? 1 : 0);
+    changedKeys.length +
+    dropped.length +
+    (sfxLevelMoved ? 1 : 0) +
+    (captionColorMoved ? 1 : 0);
   const done = msg?.ok === true;
   const router = useRouter();
   const setPendingStage = useSetPendingStage();
@@ -236,11 +247,21 @@ export default function FinalSettings({
               <div>
                 <h4>
                   {o.label}
-                  {(moved || (o.key === "sfx" && sfxLevelMoved)) && (
+                  {(moved ||
+                    (o.key === "sfx" && sfxLevelMoved) ||
+                    (o.key === "captions" && captionColorMoved)) && (
                     <span className="chg">changed</span>
                   )}
                 </h4>
                 <p>{on ? o.on : o.off}</p>
+                {o.key === "captions" && on && (
+                  <CaptionColorPicker
+                    value={opts.captionColor ?? ""}
+                    onChange={(v) =>
+                      setOpts((p) => ({ ...p, captionColor: v || null }))
+                    }
+                  />
+                )}
                 {/* Same rule as the brief: the level is only shown while the
                     effects are on, and only the switch can silence them. */}
                 {o.key === "sfx" && on && (

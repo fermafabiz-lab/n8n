@@ -1195,6 +1195,52 @@ those two `jsonBody` strings, nothing else. Two things come with it:
   capacity is left over. Fine for a 6-scene film; it is the pacing risk on the
   10- and 12-minute lengths, where a batch is 90 scenes across 12 passes.
 
+### Caption colour — per film, white by default
+
+**Every video used to come out amber**, and that was never a choice anyone
+made: the accent defaulted to `palette.primary`, which nothing upstream ever
+set, so every film got `#E8B84B`. Two things made it louder than a highlight
+should be — it painted the karaoke word AND every word the keyword rule
+matched, and that rule counted any capitalised word. Romanian capitalises the
+first word of every sentence, so on a dialogue script roughly half the words
+on screen were yellow.
+
+That default is gone (2026-08-27, `remotion/src/captionColor.ts`). **White,
+with the spoken word marked by BRIGHTNESS rather than hue, is now the
+default**, and it is the only choice that is right on every kind of footage —
+an accent that sits well on a night dock is wrong on snow.
+
+A colour is something a film opts INTO, chosen per project and stored as
+`Editing Options.captionColor`:
+
+| Where | What |
+|---|---|
+| the brief and Final touches | `CaptionColorPicker` — six swatches plus a native colour input, shown only while Captions are on |
+| Orchestrator → `Normalize Webhook Input` | stores it, and ONLY when it is a real hex |
+| Final Assembly → `Caption Colour` | copies it onto the render props |
+| `remotion/src/captionColor.ts` | `resolveCaptionAccent()` has the final say |
+
+Three things worth knowing:
+
+- **Absence is the meaningful value.** The key is written only when a real hex
+  was chosen, so a missing `captionColor` keeps meaning white — which is what
+  every film made before this control existed should stay.
+- **The render lifts a dark accent toward white** until it clears a luminance
+  floor (0.32), because captions carry a heavy drop shadow and a deep colour
+  disappears into its own shadow. So the picker cannot produce an illegible
+  caption, and the swatch a producer picked may render slightly lighter.
+- **`captionColor` is deliberately NOT `palette.primary`.** That field is also
+  the outro's button and border colour, so tuning captions through it silently
+  restyled the end screen — the original bug, and the reason for the separate
+  prop.
+
+**`POST /caption-color` on the render server derives an accent from the
+montage itself, and nothing calls it yet.** `resolveCaptionAccent` already
+anticipates it: a literal `auto` that nobody resolved to a hex falls back to
+white rather than throwing. Wiring it would mean one HTTP node in Final
+Assembly between the assemble and the graphics pass, and an "Auto from
+footage" swatch.
+
 ### Switching the drawn cards off
 
 `Editing Options.drawnCards` (default true) is the producer's PERMISSION for

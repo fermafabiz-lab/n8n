@@ -19,6 +19,7 @@ import FinishedFlash from "@/components/FinishedFlash";
 import OpsPanel from "@/components/OpsPanel";
 import AssemblyStatus from "@/components/AssemblyStatus";
 import SoundSettings from "@/components/SoundSettings";
+import AutoPilot from "@/components/AutoPilot";
 import ProductionActivity from "@/components/ProductionActivity";
 import { StageLink, StageNavProvider } from "@/components/StageNav";
 import {
@@ -372,6 +373,14 @@ export default async function ProductionRoom({
         projectId={id}
         finished={!!project.finalVideoUrl && project.finalVideoUrl.startsWith("http")}
       />
+      {/* Hands-off mode acts from here — the page IS the scheduler (it
+          remounts every 10s via AutoRefresh), which is also why the banner
+          says to keep a tab open. Hidden once the film is delivered or dead:
+          on a finished project the flag has nothing left to press, and on a
+          failed one auto-pressing anything would bury the error. */}
+      {project.editing.autoApprove &&
+        project.statusKind !== "done" &&
+        project.statusKind !== "err" && <AutoPilot projectId={id} />}
       {/* The stepper and the scene board share a guess about which step the
           producer just clicked, so the switch happens on the click rather
           than when the server round-trip lands. */}

@@ -250,6 +250,9 @@ export default function NewVideo() {
   // choice most films should keep, so it is what the control starts on.
   const [captionColor, setCaptionColor] = useState("");
   const [style, setStyle] = useState("");
+  // Hands-off mode: every gate signs itself off. Off by default — approving
+  // unseen is a real trade, and it must never be the accident.
+  const [autoApprove, setAutoApprove] = useState(false);
   // The category selection lives here because BOTH halves of CategoryPicker
   // read it and they are rendered in different cards.
   const [category, setCategory] = useState(DEFAULT_CATEGORY);
@@ -742,6 +745,33 @@ export default function NewVideo() {
                   </p>
                 </div>
               </section>
+
+              <section className="fsec">
+                <header>
+                  <h2>Hands-off</h2>
+                  <span className="fhint">optional — you can turn it off any time</span>
+                  <span className="no">08</span>
+                </header>
+                <input type="hidden" name="auto_approve" value={autoApprove ? "yes" : "no"} />
+                <div className="swlist">
+                  <div className={`swrow ${autoApprove ? "on" : ""}`}>
+                    <span className="no">01</span>
+                    <div>
+                      <h4>Auto-approve everything</h4>
+                      <p>
+                        {autoApprove
+                          ? "Every gate — script, scenes, takes, images, clips — signs itself off the moment its asset lands, and the final render starts by itself. Nothing waits for you, and nothing gets a look first. Works while the project page is open in a tab; regenerating anything still works as usual."
+                          : "The film stops at every gate and waits for your approval — the normal way."}
+                      </p>
+                    </div>
+                    <Toggle
+                      checked={autoApprove}
+                      ariaLabel="Auto-approve everything"
+                      onChange={setAutoApprove}
+                    />
+                  </div>
+                </div>
+              </section>
             </div>
 
             {/* The estimate. Inside the <form>, so its submit button submits;
@@ -797,7 +827,9 @@ export default function NewVideo() {
                   <div>
                     <dt>Approval gates</dt>
                     <dd>
-                      {gates} — script, images{silent ? "" : ", voices"}, clips
+                      {autoApprove
+                        ? "auto — signed off as they land"
+                        : `${gates} — script, images${silent ? "" : ", voices"}, clips`}
                     </dd>
                   </div>
                 </dl>

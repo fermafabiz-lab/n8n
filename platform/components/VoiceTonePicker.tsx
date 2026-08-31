@@ -23,7 +23,19 @@ import type { VoiceTone } from "@/lib/data/derive";
  * the four-copies problem the speed rule already carries.
  */
 
-/** Named starting points. `null` is its own choice — see LEAVE_ALONE. */
+/** Named starting points. `null` is its own choice — see LEAVE_ALONE.
+ *
+ * The row reads as a spectrum, flattest to biggest, so each preset sits where
+ * it sounds. Under the words there are really two knobs — stability and style
+ * — and the original four presets all sat on one diagonal (stability falling
+ * as style rises). The three later additions fill the empty corners of that
+ * square instead of crowding the diagonal, where a new preset would be
+ * inaudible next to its neighbours and the control would be lying:
+ * Calm is "more constant than Steady" (0.9/0), Broadcast is "constant AND
+ * coloured" (0.65/0.25 — off the diagonal on the high side), Conversational
+ * is "varied but never exaggerated" (0.25/0 — Expressive minus the style).
+ * Similarity stays ~0.75 everywhere on purpose: lowering it makes the voice
+ * resemble itself less, which is a degradation, not a character. */
 const PRESETS: { key: string; label: string; note: string; tone: VoiceTone | null }[] = [
   {
     key: "default",
@@ -32,16 +44,34 @@ const PRESETS: { key: string; label: string; note: string; tone: VoiceTone | nul
     tone: null,
   },
   {
+    key: "calm",
+    label: "Calm",
+    note: "nearly flat, hypnotic — made for sleep stories and meditation",
+    tone: { stability: 0.9, similarity: 0.75, style: 0, speakerBoost: true },
+  },
+  {
     key: "steady",
     label: "Steady",
     note: "even and unhurried; the safest read for long narration",
     tone: { stability: 0.75, similarity: 0.75, style: 0, speakerBoost: true },
   },
   {
+    key: "broadcast",
+    label: "Broadcast",
+    note: "disciplined, with weight on the words that matter — the classic documentary read",
+    tone: { stability: 0.65, similarity: 0.75, style: 0.25, speakerBoost: true },
+  },
+  {
     key: "natural",
     label: "Natural",
     note: "ElevenLabs' own middle — some variation line to line",
     tone: { stability: 0.5, similarity: 0.75, style: 0, speakerBoost: true },
+  },
+  {
+    key: "conversational",
+    label: "Conversational",
+    note: "loose and spontaneous, told rather than read — varies line to line",
+    tone: { stability: 0.25, similarity: 0.75, style: 0, speakerBoost: true },
   },
   {
     key: "expressive",

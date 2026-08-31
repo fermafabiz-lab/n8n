@@ -995,6 +995,20 @@ the one that looked obvious.
   buffer it is handed, and the URLs are revoked only on unmount — freeing them
   in the measuring effect's cleanup would pull the source out of a take that is
   playing, because that effect re-runs as the batch grows.
+- **That cache must be keyed on the TAKE, not on the scene — and keying it
+  wrong made every re-record inaudible.** A re-recorded take is a new Drive
+  file (`VR Upload Audio` names it `<scene>-v<timestamp>.mp3`), so `Voiceover
+  URL` changes every time; but the effect skipped on "does this scene have a
+  duration yet" and its dependency was `withAudio.length`, which a replacement
+  never moves. So the blob, the displayed length and the trim bounds all stayed
+  with the recording that had just been thrown away, and the panel played it
+  for the rest of the visit. **The symptom names the cause if you listen to
+  it**: the producer reported that the download sounded completely different
+  from the player, and the download link goes straight to the real URL without
+  touching this cache — a difference between two surfaces reading the same
+  record is a caching bug, not a generation one. The HTTP layer was never
+  involved (`/api/media` sends `public, max-age=3600` on a full response, but
+  the URL changes, so the browser cache is keyed past it).
 - **The detection was wrong too, just far less wrong than it looked.** It
   measured RMS over 20ms windows while `silencedetect` measures sample
   MAGNITUDE, so `-45dB` meant something stricter here than on the server.

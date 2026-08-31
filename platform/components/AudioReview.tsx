@@ -290,9 +290,20 @@ export default function AudioReview({
   useEffect(() => {
     srcsRef.current = srcs;
   }, [srcs]);
-  /** Revoked only on unmount: the measuring effect re-runs as the batch grows,
-   *  and freeing these in its cleanup would pull the source out of a take that
-   *  is playing. */
+  /**
+   * Which URL each cached take was fetched from.
+   *
+   * The cache has to be keyed on the take, not on the scene: a re-record is a
+   * new Drive file with a new URL, and a per-scene key made every re-recording
+   * invisible in this panel while the download button — which never reads the
+   * cache — handed back the new one.
+   */
+  const fetchedFrom = useRef<Record<string, string>>({});
+  /** Revoked only on unmount: the measuring effect re-runs as the batch grows
+   *  and as takes are replaced, and freeing these in its cleanup would pull
+   *  the source out of a take that is playing. A superseded blob is left for
+   *  the same reason — it may be the one currently sounding — and they are
+   *  bounded by how many re-records happen in one visit. */
   const blobUrls = useRef<string[]>([]);
   useEffect(
     () => () => {
@@ -630,7 +641,21 @@ export default function AudioReview({
     let ctx: AudioContext | null = null;
     (async () => {
       for (const s of withAudio) {
-        if (cancelled || durations[s.id] !== undefined || !s.voiceUrl) continue;
+        // Keyed on the URL, not on "have we measured this scene before".
+        //
+        // A re-recorded take is a NEW Drive file — `VR Upload Audio` names it
+        // `<scene>-v<timestamp>.mp3` and `VR Write Voice` stores the new id —
+        // so `voiceUrl` changes every time. Skipping on "this scene already
+        // has a duration" therefore kept the FIRST take forever: the blob,
+        // the length and the trim bounds all stayed with the recording that
+        // had been replaced, and the panel played it. Downloading the same
+        // scene gave the new take, because that link goes to the real URL and
+        // never touches this cache — which is exactly how it was spotted.
+        //
+        // Claimed BEFORE the await so a re-render arriving mid-fetch does not
+        // start the same download twice.
+        if (cancelled || !s.voiceUrl || fetchedFrom.current[s.id] === s.voiceUrl) continue;
+        fetchedFrom.current[s.id] = s.voiceUrl;
         try {
           const res = await fetch(audioSrc(s.voiceUrl));
           if (!res.ok) throw new Error(String(res.status));
@@ -679,7 +704,12 @@ export default function AudioReview({
       void ctx?.close().catch(() => {});
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [withAudio.length]);
+    // Keyed on every take's URL, not on how many there are. A re-record
+    // replaces a take without changing the count, so `withAudio.length` never
+    // moved and this effect never re-ran — the panel went on playing the
+    // recording the producer had just replaced.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [withAudio.map((s) => `${s.id}:${s.voiceUrl}`).join("|")]);
 
   // Shot lengths, for the same reason: knowing both sides is what tells us
   // whether a take still fits the picture it belongs to.

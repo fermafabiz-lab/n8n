@@ -1227,10 +1227,19 @@ place the value passes through**:
 
 Change one, change all three — the same rule `speed` already lives under.
 
-**Not yet on the after-the-fact panels.** `FinalSettings` and `SoundSettings`
-still carry only the on/off switch, so a finished film's level can be changed
-only by editing `Editing Options` directly. `updateEditingOptions` merges, so
-neither panel wipes the stored value.
+**Final touches carries it too**, initialised from the stored value so the
+slider shows what the film is actually set to. Two details there: the level is
+a row's SETTING rather than a row of its own, so `changedKeys` cannot see it —
+`sfxLevelMoved` is counted by hand, or moving only the slider would leave the
+button reading "Keep initial settings" and silently discard the change. And
+unlike `speed`, `sfxLevel` IS sent by `confirmFinalSettings`: the rule that
+panel's `speed` note states is about controls it does not DISPLAY, where a
+defaulted value would overwrite a choice made elsewhere.
+
+**`SoundSettings` (under the finished video) still has only the switch.** It
+writes `{sfx, music, speed}` and `updateEditingOptions` merges, so a stored
+level survives a post-render sound change untouched — it just cannot be
+changed from there.
 
 ### The Cinematic category (silent film)
 

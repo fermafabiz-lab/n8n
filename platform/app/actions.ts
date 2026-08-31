@@ -837,6 +837,12 @@ export async function confirmFinalSettings(
     chapterCards: boolean;
     endScreen: boolean;
     sfx: boolean;
+    /* Sent, unlike `speed`, because this panel now SHOWS the level: the
+       slider is initialised from the stored value, so writing it back is a
+       no-op unless the producer moved it. The rule the speed note states is
+       about controls the panel does not display — sending a defaulted one of
+       those overwrites a choice made elsewhere. */
+    sfxLevel: number;
     music: boolean;
     /* NO `speed` here, on purpose. The pace is decided and signed off at the
        audio step, which is the only moment it is free to change, and this
@@ -872,6 +878,7 @@ export async function confirmFinalSettings(
         chapterCards: settings.chapterCards,
         endScreen: settings.endScreen,
         sfx: settings.sfx,
+        sfxLevel: normalizeSfxLevel(settings.sfxLevel),
         music: settings.music,
       });
     }

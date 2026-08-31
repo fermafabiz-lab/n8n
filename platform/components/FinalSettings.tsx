@@ -115,6 +115,10 @@ function describeMotif(card: MotifCard): { title: string; detail: string } {
   };
 }
 
+/** The slider's floor, in percent. Mirrors the brief's control: the switch
+ *  above owns silence, so the level never reaches zero. */
+const SFX_PCT_MIN = 10;
+
 export default function FinalSettings({
   projectId,
   initial,
@@ -139,6 +143,11 @@ export default function FinalSettings({
   // is simply not there.
   const rows = OPTIONS.filter((o) => !(silent && o.spokenOnly));
   const changedKeys = rows.filter((o) => opts[o.key] !== initial[o.key]);
+  // The effects volume is a row's SETTING, not a row of its own, so it has to
+  // be counted by hand — otherwise moving only the slider left `changed`
+  // false and "Keep initial settings" would have quietly discarded it.
+  const sfxLevelMoved =
+    rows.some((o) => o.key === "sfx") && opts.sfxLevel !== initial.sfxLevel;
   // The pace is NOT here any more — it is decided and signed off at the audio
   // step, the one moment it costs nothing, and this panel neither shows it nor
   // writes it. (confirmFinalSettings therefore omits `speed` entirely rather
@@ -148,8 +157,9 @@ export default function FinalSettings({
   // A dropped animation still counts alongside the toggles: it changes the
   // film, and a button reading "Keep initial settings" after you switched one
   // off would be telling you something untrue.
-  const changed = changedKeys.length > 0 || dropped.length > 0;
-  const changeCount = changedKeys.length + dropped.length;
+  const changed = changedKeys.length > 0 || dropped.length > 0 || sfxLevelMoved;
+  const changeCount =
+    changedKeys.length + dropped.length + (sfxLevelMoved ? 1 : 0);
   const done = msg?.ok === true;
   const router = useRouter();
   const setPendingStage = useSetPendingStage();
@@ -219,9 +229,56 @@ export default function FinalSettings({
               <div>
                 <h4>
                   {o.label}
-                  {moved && <span className="chg">changed</span>}
+                  {(moved || (o.key === "sfx" && sfxLevelMoved)) && (
+                    <span className="chg">changed</span>
+                  )}
                 </h4>
                 <p>{on ? o.on : o.off}</p>
+                {/* Same rule as the brief: the level is only shown while the
+                    effects are on, and only the switch can silence them. */}
+                {o.key === "sfx" && on && (
+                  <div style={{ marginTop: 10 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "baseline",
+                        justifyContent: "space-between",
+                        fontSize: 12,
+                        color: "var(--dim)",
+                      }}
+                    >
+                      <label htmlFor="fs_sfx_level">Effects volume</label>
+                      <b
+                        style={{
+                          color: "var(--ink)",
+                          fontFamily: "var(--f-mono), ui-monospace, monospace",
+                        }}
+                      >
+                        {Math.round(opts.sfxLevel * 100)}%
+                      </b>
+                    </div>
+                    <input
+                      id="fs_sfx_level"
+                      type="range"
+                      className="lenslider"
+                      min={SFX_PCT_MIN}
+                      max={100}
+                      step={5}
+                      value={Math.round(opts.sfxLevel * 100)}
+                      onChange={(e) =>
+                        setOpts((p) => ({
+                          ...p,
+                          sfxLevel: Number(e.target.value) / 100,
+                        }))
+                      }
+                      style={{
+                        margin: "8px 0 2px",
+                        ["--fill" as string]: `${((Math.round(opts.sfxLevel * 100) - SFX_PCT_MIN) / (100 - SFX_PCT_MIN)) * 100}%`,
+                      }}
+                      aria-label="Effects volume"
+                    />
+                  </div>
+                )}
               </div>
               <Toggle
                 checked={on}

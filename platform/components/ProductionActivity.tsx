@@ -156,10 +156,28 @@ export default function ProductionActivity({
       )
     : 0;
   const FROZEN_MIN = 12;
-  const looksFrozen = aliveAny && oldestAliveMin >= FROZEN_MIN;
   const runsAfterThis = Math.max(0, Math.ceil(unfinished.length / cap) - 1);
   const showCapNote = scenes.length > cap && unfinished.length > 0;
   const showNextBatch = aliveKnown && !aliveAny && unfinished.length > 0;
+  /**
+   * When to offer the restart — and the point is that SOME door is always
+   * open while the film is unfinished.
+   *
+   * It used to require `aliveAny`, which quietly created a third state with
+   * no way out at all: if the n8n API does not answer, `alive` is null, so
+   * `aliveAny` is false AND `showNextBatch` is false (it needs `aliveKnown`),
+   * and the panel offers nothing while the film plainly is not done. That is
+   * exactly the shape this panel exists to prevent, and it is what the
+   * producer hit on a 71-scene film — a batch wedged between passes and not
+   * one button on screen.
+   *
+   * So: unfinished work plus either a stale-looking live execution or no
+   * answer from n8n at all. A short-running batch is still left alone, since
+   * restarting a healthy pass costs its in-flight work.
+   */
+  const looksFrozen =
+    unfinished.length > 0 &&
+    ((aliveAny && oldestAliveMin >= FROZEN_MIN) || !aliveKnown);
 
   const nothingToSay =
     !phase && !aliveAny && regens.length === 0 && refusals.length === 0 && unfinished.length === 0;
@@ -279,12 +297,26 @@ export default function ProductionActivity({
         // producer can — they are looking at whether anything appeared.
         <div style={{ marginTop: 12 }}>
           <p style={{ margin: "0 0 8px", fontSize: 13, color: "var(--soft)" }}>
-            This pass has been running for {oldestAliveMin} minutes.{" "}
-            <b style={{ color: "var(--ink)" }}>
-              If nothing new has appeared in that time, it is wedged
-            </b>{" "}
-            — n8n does sometimes open an execution and never actually run it,
-            and from the outside that looks exactly like work in progress.
+            {aliveAny ? (
+              <>
+                This pass has been running for {oldestAliveMin} minutes.{" "}
+                <b style={{ color: "var(--ink)" }}>
+                  If nothing new has appeared in that time, it is wedged
+                </b>{" "}
+                — n8n does sometimes open an execution and never actually run
+                it, and from the outside that looks exactly like work in
+                progress.
+              </>
+            ) : (
+              <>
+                <b style={{ color: "var(--ink)" }}>
+                  n8n isn&apos;t answering, so nothing here knows what is
+                  running
+                </b>{" "}
+                — but the film is not finished, so this restarts the pass
+                either way.
+              </>
+            )}
           </p>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <button className="btn" disabled={pending} onClick={restart}>

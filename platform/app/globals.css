@@ -3118,9 +3118,19 @@ body:has(.nb) .nav {
 }
 /* Exact seconds, kept as a real control beside the slider: the slider snaps
    to scene-sized steps, and some films want an exact number. */
+.lenhead .lenexact {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--f-mono), ui-monospace, monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
 .lenhead input[type='number'] {
   width: 86px;
-  margin-left: auto;
 }
 .lenslider {
   -webkit-appearance: none;

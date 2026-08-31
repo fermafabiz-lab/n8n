@@ -1192,11 +1192,18 @@ export async function saveVoiceSettings(
  * shows up in a fresh synthesis, so without this the control would be a
  * promise the producer has to take on trust.
  *
- * Fired one at a time and awaited, NOT in parallel. Each call starts its own
- * n8n execution and ElevenLabs allows five concurrent requests on this
- * account — a fan-out of fifteen would have some of them fail, and a failed
- * re-record leaves the scene holding its regen flag with the take unchanged,
- * which the UI shows as a synthesis that never finishes.
+ * Awaiting each call does NOT serialize the synthesis, and the first version
+ * of this comment claimed it did. `regenerateVoice` awaits the WEBHOOK POST,
+ * which returns as soon as n8n has started an execution — the synthesis then
+ * runs in its own execution, in parallel with all the others. Six scenes
+ * therefore hit ElevenLabs at once, and the account allows five: the sixth
+ * came back 429, and because `VR Write Voice` never ran to clear the flag,
+ * that scene sat showing "re-synthesizing" with nothing left to finish it.
+ *
+ * The real fix is `retryOnFail` on the three speech nodes in n8n, which
+ * covers every source of concurrency and not just this button. The small
+ * stagger here is second: it keeps a long film from opening with a burst that
+ * spends the retry budget before the queue has drained.
  */
 export async function rerecordVoices(
   projectId: string,
@@ -1207,7 +1214,12 @@ export async function rerecordVoices(
   }
   let queued = 0;
   const failed: string[] = [];
-  for (const s of scenes) {
+  for (const [i, s] of scenes.entries()) {
+    // Past the account's five concurrent syntheses, space the starts out. A
+    // take takes a second or two, so 1.2s keeps the queue near the limit
+    // instead of far above it, without making a fifteen-scene film feel like
+    // it has stalled before the first take arrives.
+    if (i >= 4) await new Promise((r) => setTimeout(r, 1200));
     const r = await regenerateVoice(projectId, s.id, s.narration);
     if (r.ok) queued++;
     else failed.push(r.message);

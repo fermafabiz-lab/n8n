@@ -1395,6 +1395,38 @@ each piece handles it:
   never moved again. `reopenStep` now reads the project's category and leaves
   the voice alone on a silent film. **Any new cascade must do the same.**
 
+### Hands-off mode (auto-approve) — the site's hand, not n8n's
+
+`Editing Options.autoApprove` (brief section 08, off by default and strictly
+`=== true`) makes the film run end to end with nobody clicking: script, scene
+texts, takes, images, clips, and the final render press. Three design points
+carry the whole feature:
+
+- **n8n is untouched.** The gates keep polling the same checkboxes; only WHO
+  ticks them changes. `Normalize Webhook Input` stores the flag and nothing
+  in any workflow reads it — which means every gate behaviour documented in
+  this file (batch scoping, asset-existence requirements, regen dispatch)
+  holds under hands-off exactly as under a human.
+- **The tick approves through the SAME server actions the buttons call**
+  (`autoApproveTick` in `actions.ts` → `approveScript`, `approveAllScenes`,
+  `approveVoices`, `approveAllOfKind`, `confirmFinalSettings`), never through
+  writes of its own. That is the safety argument: the stale-clip rule, the
+  regen-flag respect and the save-and-approve semantics ride along, and
+  anything those actions learn later, hands-off learns with them. It skips
+  scenes with a regen flag in flight and a rejected script (a rewrite is
+  coming; the thing to approve does not exist yet).
+- **The page IS the scheduler.** `AutoPilot` runs one tick per 10s refresh
+  (AutoRefresh remounts it; a sessionStorage gap guard stops overlapping
+  passes, which matters for the render press more than for the idempotent
+  checkboxes). So it works while a tab with the project page is open
+  SOMEWHERE, and pauses at the next gate when none is — said on the banner in
+  as many words. Nothing server-side schedules it; making it survive a closed
+  tab means teaching the n8n gates to self-approve, a different feature.
+
+The banner is always visible while the mode is on, because an automation that
+approves things unseen must never itself be invisible; Turn off is one click
+and every already-given approval stays.
+
 ### The stage chain in Media Generation — audio first, ONE asset gate (2026-08-18)
 
 Takes and images are independent — the image loop never reads a voice field,

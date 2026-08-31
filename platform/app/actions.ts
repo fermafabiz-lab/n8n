@@ -22,6 +22,8 @@ import {
   requestVoiceRegen,
   deleteProjectDeep,
   updateEditingOptions,
+  getScenes,
+  getProjectScriptInfo,
 } from "@/lib/data";
 import {
   normalizeCaptionColor,
@@ -1338,6 +1340,125 @@ export async function approveScript(
   }
 }
 
+/**
+ * Hands-off mode: flip the flag that AutoPilot and the tick below read.
+ * A merge write, so nothing else in Editing Options moves.
+ */
+export async function setAutoApprove(
+  projectId: string,
+  on: boolean,
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    await updateEditingOptions(projectId, { autoApprove: on });
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message: on
+        ? "Hands-off mode is on — every gate signs itself off while this page is open."
+        : "Hands-off mode is off — approvals are yours again from here on.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/**
+ * One pass of hands-off mode: approve everything currently waiting for a
+ * human, through the SAME actions the buttons call — never through fresh
+ * writes of its own. That is the whole safety argument: approveAllOfKind
+ * carries the stale-clip rule (a re-approved image flags the clip built from
+ * the old one), approveScript carries the save-and-approve semantics, and
+ * anything those actions learn later, this learns with them.
+ *
+ * Three deliberate refusals:
+ * - a scene with a regen flag in flight is SKIPPED — its asset is about to
+ *   be replaced, and approving the outgoing one would only race the writer;
+ * - a rejected script is left alone — a rewrite is being produced and the
+ *   thing to approve does not exist yet;
+ * - the final render is pressed only when the project is already AT the
+ *   final-settings gate, with the stored settings ("Keep initial settings"),
+ *   because hands-off means "use what I chose on the brief", not "invent".
+ *
+ * Called by AutoPilot on every 10s page refresh, so each tick approves what
+ * has landed since the last one. The tick is idempotent: everything it
+ * writes is a checkbox that is already true on the second pass.
+ */
+export async function autoApproveTick(projectId: string): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    const project = await getProject(projectId);
+    if (!project) return { ok: false, message: "Project not found." };
+    if (!project.editing.autoApprove) {
+      return { ok: true, message: "Hands-off mode is off." };
+    }
+    if (project.statusKind === "done" || project.statusKind === "err") {
+      return { ok: true, message: "Nothing left to approve." };
+    }
+    const did: string[] = [];
+
+    const script = await getProjectScriptInfo(projectId);
+    if (script && script.status === "awaiting_approval" && script.content) {
+      const r = await approveScript(projectId, script.id);
+      if (!r.ok) return r;
+      did.push("the script");
+    }
+
+    const scenes = await getScenes(projectId);
+    const texts = scenes.filter(
+      (s) => !s.sceneApproved && !s.rewriteRequested && (s.narration ?? "").trim(),
+    );
+    if (texts.length > 0) {
+      const r = await approveAllScenes(projectId, texts.map((s) => s.id));
+      if (!r.ok) return r;
+      did.push(`${texts.length} scene text${texts.length === 1 ? "" : "s"}`);
+    }
+
+    const voices = scenes.filter((s) => s.voiceUrl && !s.voiceApproved && !s.regenVoice);
+    if (voices.length > 0) {
+      const r = await approveVoices(projectId, voices.map((s) => s.id));
+      if (!r.ok) return r;
+      did.push(`${voices.length} take${voices.length === 1 ? "" : "s"}`);
+    }
+
+    const images = scenes.filter((s) => s.imageUrl && !s.imageApproved && !s.regenImage);
+    if (images.length > 0) {
+      const r = await approveAllOfKind(projectId, images.map((s) => s.id), "image");
+      if (!r.ok) return r;
+      did.push(`${images.length} image${images.length === 1 ? "" : "s"}`);
+    }
+
+    const clips = scenes.filter((s) => s.videoUrl && !s.videoApproved && !s.regenVideo);
+    if (clips.length > 0) {
+      const r = await approveAllOfKind(projectId, clips.map((s) => s.id), "video");
+      if (!r.ok) return r;
+      did.push(`${clips.length} clip${clips.length === 1 ? "" : "s"}`);
+    }
+
+    // The render press. `awaitingFinalSettings` comes from the status the
+    // batch set AFTER its own video gate passed, so by the time it is true
+    // every clip of the batch is approved — this is the same moment the
+    // human presses "Keep initial settings & render".
+    if (project.awaitingFinalSettings) {
+      const r = await confirmFinalSettings(projectId);
+      if (!r.ok) return r;
+      did.push("the final render");
+    }
+
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message: did.length > 0 ? `Auto-approved ${did.join(", ")}.` : "Nothing waiting.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
 export async function regenerateScript(
   projectId: string,
   scriptId: string,
@@ -1437,6 +1558,9 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     // rides alongside it and `Normalize Webhook Input` puts it in Editing
     // Options. Absent or unusable resolves to 1 on every reader.
     speed: normalizeSpeed(formData.get("speed")),
+    // Hands-off mode — stored in Editing Options by Normalize Webhook Input,
+    // read back by the project page's AutoPilot. yes|no like every finish.
+    auto_approve: String(formData.get("auto_approve") ?? "no"),
     Style: String(formData.get("style") ?? ""),
     // In chapters mode (and no-narrator characters mode) there is no
     // narrator picker; the first cast voice doubles as the project voice so

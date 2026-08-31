@@ -77,6 +77,21 @@ export interface EditingOptions {
    */
   speedLocked: boolean;
   /**
+   * Hands-off mode: the site signs off every gate by itself as the assets
+   * land — script, scene texts, takes, images, clips — and presses the final
+   * render with the stored settings. The film runs end to end with nobody
+   * clicking.
+   *
+   * The FLAG lives here; the HAND is the AutoPilot component on the project
+   * page, which runs `autoApproveTick()` on every 10s refresh. It approves
+   * through the same server actions the buttons use, so every side effect
+   * the manual path carries (a re-approved image flagging its stale clip,
+   * voice regen flags being respected) comes along for free. It is a real
+   * trade, said out loud in the UI: nothing gets a human look before it is
+   * in the film.
+   */
+  autoApprove: boolean;
+  /**
    * How the narrator READS — ElevenLabs' generation settings for this film.
    *
    * NULL means "never chosen", and that is not the same as "chosen to be the
@@ -600,6 +615,9 @@ export function buildProject(r: RawProject): Project {
       // before the audio step could sign the pace off — reads as unlocked
       // and keeps its control rather than arriving frozen.
       speedLocked: opts.speedLocked === true,
+      // Strictly opt-in, `=== true`: hands-off is a real trade (nothing gets
+      // a human look) and must never switch itself on by absence.
+      autoApprove: opts.autoApprove === true,
       // No fallback to a project field, unlike `speed`: there is no older
       // column that ever meant this, so "never chosen" is the honest answer
       // for every film made before today — and it is also the answer that

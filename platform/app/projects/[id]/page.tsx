@@ -1,4 +1,3 @@
-import { Fragment } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProject, getProjectScriptInfo, getScenes, type Scene } from "@/lib/data";
@@ -21,7 +20,7 @@ import AssemblyStatus from "@/components/AssemblyStatus";
 import SoundSettings from "@/components/SoundSettings";
 import AutoPilot from "@/components/AutoPilot";
 import ProductionActivity from "@/components/ProductionActivity";
-import { StageLink, StageNavProvider } from "@/components/StageNav";
+import { StepCard, StageNavProvider } from "@/components/StageNav";
 import {
   executionUrl,
   getAliveProduction,
@@ -503,50 +502,28 @@ export default async function ProductionRoom({
 
         {scenes.length > 0 && (
           <div className="pipe">
-            {steps.map((s, i) => {
-              // While a render is alive every step but Assembly stops being a
-              // link — see renderLocked. Assembly itself stays reachable so
-              // the producer can always get back to the panel that stops it.
-              const frozen = renderLocked && s.key !== "assembly";
-              const cls = `ps ${s.state}${viewing === s.key ? " sel" : ""}${frozen ? " frozen" : ""}`;
-              /* Each step is a link to itself: that is the whole way back to an
-                 earlier stage. The active one links to the bare page so
-                 clicking it again returns to "whatever is live now".
-
-                 The `display: contents` wrapper this used to need is gone with
-                 the .pl connector it existed to carry — the card IS the flex
-                 item now, so a wrapper would have to opt out of the layout to
-                 stay harmless. */
-              return (
-                <Fragment key={s.key}>
-                  {frozen ? (
-                    <span
-                      className={cls}
-                      aria-disabled="true"
-                      title="Locked while the final render is running — stop the render to go back"
-                    >
-                      <span className="ic">{s.state === "done" ? "✓" : i + 1}</span>
-                      <span className="ps-name">{s.name}</span>
-                      <span className="ps-note">{s.note}</span>
-                    </span>
-                  ) : (
-                    <StageLink
-                      stage={viewing === s.key ? null : s.key}
-                      href={
-                        viewing === s.key
-                          ? `/projects/${id}`
-                          : `/projects/${id}?stage=${s.key}`
-                      }
-                      className={cls}
-                    >
-                      <span className="ic">{s.state === "done" ? "✓" : i + 1}</span>
-                      <span className="ps-name">{s.name}</span>
-                      <span className="ps-note">{s.note}</span>
-                    </StageLink>
-                  )}
-                </Fragment>
-              );
-            })}
+            {steps.map((s, i) => (
+              /* Each step is a link to itself: that is the whole way back to
+                 an earlier stage. StepCard owns the highlight — the dark card
+                 follows the click instantly, from the same pending guess
+                 SceneBoard believes — and the class logic lives there so the
+                 marker cannot lag the server round-trip. While a render is
+                 alive every step but Assembly is frozen (see renderLocked);
+                 Assembly stays reachable so the producer can always get back
+                 to the panel that stops it. */
+              <StepCard
+                key={s.key}
+                stepKey={s.key}
+                live={s.state === "act"}
+                state={s.state}
+                frozen={renderLocked && s.key !== "assembly"}
+                projectId={id}
+              >
+                <span className="ic">{s.state === "done" ? "✓" : i + 1}</span>
+                <span className="ps-name">{s.name}</span>
+                <span className="ps-note">{s.note}</span>
+              </StepCard>
+            ))}
           </div>
         )}
 

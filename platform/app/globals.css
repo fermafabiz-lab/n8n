@@ -977,16 +977,6 @@ body:has(.nb) .nav {
   transform: none;
   box-shadow: var(--shadow-sm);
 }
-/* Currently being revisited: reads as "you are looking at this one", which
-   is deliberately distinct from .act ("the pipeline is here"). The ring used
-   to be rgba(120,170,255) — a blue left over from the dark system, and the
-   one thing on this screen that belonged to no palette. Daylight has exactly
-   one accent, so "selected" and "active" are told apart by SHAPE (a ring
-   versus a dark card), not by inventing a second hue. */
-.ps.sel {
-  border-color: var(--accent-a28);
-  box-shadow: 0 0 0 3px var(--accent-a12), var(--shadow-sm);
-}
 .ps .ic {
   width: 24px;
   height: 24px;
@@ -1004,28 +994,43 @@ body:has(.nb) .nav {
 .ps.done .ps-name {
   color: var(--soft);
 }
-/* The active step is the one dark card in the row: the design's way of saying
-   "the pipeline is HERE" without a second accent colour, and the same near-
-   black panel the gates use, so the two read as one family. */
-.ps.act {
+/* THE DARK CARD IS "WHERE YOU ARE", not where the pipeline is. It marked the
+   active step at first, with a thin accent ring for the clicked one — and the
+   ring did not register: clicking a step visibly changed nothing and the
+   black card stayed put, which the producer read, correctly, as not knowing
+   where they were. StepCard (StageNav.tsx) computes it: the selected step
+   when there is one, the live step otherwise, moving on the click itself. */
+.pipe .ps.dark {
   background: var(--panel);
   border-color: transparent;
   box-shadow: var(--shadow-lg);
 }
-.ps.act .ps-name {
+.pipe .ps.dark .ps-name {
   color: var(--panel-ink);
 }
-.ps.act .ps-note {
+.pipe .ps.dark .ps-note {
   color: var(--accent-lift);
 }
-.ps.act .ic {
+.pipe .ps.dark .ic {
   background: rgba(255, 255, 255, 0.12);
   color: var(--accent-lift);
 }
-/* Looking at the step the pipeline is also on: the ring has to survive on
-   the dark card, where --accent-a12 would be invisible. */
-.ps.act.sel {
-  box-shadow: 0 0 0 3px var(--accent-a28), var(--shadow-lg);
+/* Scoped under .pipe (0-3-0): a dark card can also be .done or .next, whose
+   own name/badge rules sit later in this file at 0-2-0 and were repainting a
+   grey label onto the near-black card. */
+/* Where the pipeline is working keeps its own signal — the pulsing accent
+   badge — so "where am I" (dark) and "where is the machine" (pulse) are two
+   answers with two marks, and stepping away from the live step does not
+   erase it. The pulse rides the same keyframes as every live dot on the
+   site; under prefers-reduced-motion the global rule strips it and the
+   accent tint alone carries the meaning. */
+.ps.act:not(.dark) .ic {
+  background: var(--accent-a16);
+  color: var(--accent);
+  animation: wkpulse 1.9s ease-in-out infinite;
+}
+.ps.act:not(.dark) .ps-note {
+  color: var(--accent);
 }
 .ps.next .ps-name {
   color: var(--soft);

@@ -508,6 +508,68 @@ This interacted viciously with the zeroing bug above: processed scenes lost
 their order to `0`, so the one *un*processed scene held the only non-zero
 order, sorted last, and fell off the end forever.
 
+**"Pending" is judged on the CLIP and the regen flags, never on the status
+text — and until 2026-09-01 it was the text, which is why some scenes of a
+long film were never made at all.** `Sort & Cap` read `Status Producție
+Scenă` and treated `Așteaptă Aprobare Video` / `Finalizat` as done. But `VP
+Apply` — the node that rewrites a motion prompt after the video filter
+refuses it — stamped exactly `Așteaptă Aprobare Video` on a scene that had
+NO clip, plus `Regenerează Video`. So a refused scene sorted as finished,
+fell behind the cap on any film longer than 8 scenes, and was never in a
+batch again; `More Batches?` kept counting it as remaining, so the passes
+spun until `MAX_PASSES` doing everything except that scene. On the 71-scene
+Vegas film (`recnyQ92QsXehZ98S`) scenes 117, 118, 203 and 204 sat like that
+for a day, each carrying an `AUTO-REWRITE-VIDEO` note promising "the clip
+regenerates on the next cycle". Now `pending = !hasClip || any regen flag`
+in `Sort & Cap Scenes`, `More Batches?` counts a `Regenerează Video` scene
+as remaining with the same rule, and `VP Apply` stamps `Generare Video` —
+the status the site's own video regen writes. Inside the batch the refused
+scene then takes the ordinary `Needs Clip?` path with its rewritten prompt,
+and `Update Scene Record` clears the flag. **Any new writer of the status
+text is not a gate input; the checkboxes, the assets and the flags are.**
+
+Three more things killed that film's batches, each found by reading the
+error of a dead execution rather than by watching the site, and each fixed
+in the same publish (active version `2dc53805`):
+
+- **`Check Job Status`'s `$runIndex` cap counts every poll in the EXECUTION,
+  across all 8 scenes — not per scene.** At 60 polls × 30s that was 30
+  minutes for the whole batch, which `veo-3.1-lite-low-priority` (a real
+  queue served after Quality and Fast) blew through: 8939 died with "Video
+  polling exceeded global safety limit (61 runs)" after eight clips' worth
+  of waiting. Now 480 (4 h a batch); `Check Video Regen` 90 → 240. The
+  interval on `Wait Video` and the cap are one setting in two places, the
+  same rule the Final Assembly guards already state.
+- **A Flow captcha used to kill the batch.** 8981 died at `Submit Video`
+  with `captcha_quality: PUBLIC_ERROR_UNUSUAL_ACTIVITY after 5 attempts` —
+  Google throttling the account, and useapi had already retried five times,
+  so n8n's own three quick retries could not help; the cure is time.
+  `Submit Video` and `Submit Video Regen` are now `continueErrorOutput`,
+  their error output goes `Submit Cooldown Guard → Wait Submit Cooldown
+  (120s) → Submit Video` (and the `Regen …` pair for the gate), at most 10
+  cooldowns per scene per run, then the run dies with the last reason as it
+  did before. The 120s Wait suspends the execution to `waiting` with a
+  `waitTill` two minutes out, which `getAliveProduction()` still counts as
+  alive (its window is 2 h), so the site does not offer a duplicate Resume
+  during the hold. `Sort & Cap` resets the counters each pass. The account's
+  health is readable: `GET api.useapi.net/v1/google-flow/accounts` with the
+  same Bearer header answers `health: OK` and the session expiry — do that
+  from a throwaway workflow before assuming the block has lifted.
+- **A site deploy restarts `web`, and the six shim nodes had no retry.**
+  8703 died at `AB Load Project` with "The service refused the connection"
+  — the container was being replaced under it. `AB Load Project`, `IMG Load
+  Project`, `Write Scene Image`, `Update Scene Record`, `Write Regen Image`
+  and `Write Regen Video` now retry 5×5s. That is the API's ceiling and it
+  covers a blip, not a full rebuild (a deploy gap measured ~77s), so **do not
+  push to `platform/**` while a batch is mid-generation** if you can help it
+  — the same rule Railway already imposes on `remotion/**`.
+
+What none of this changes: a pass still stops at its two gates for the
+producer, so a 71-scene film is nine rounds of approvals unless hands-off
+mode (`Editing Options.autoApprove`) is on. And an execution that never
+starts (the `runData: {}` zombie above) still needs the site's Restart
+door; nothing in n8n can detect it.
+
 **Every gate in the batch counts the BATCH's scenes; every gate on the site
 counted the PROJECT's — and that mismatch deadlocked any film bigger than 8
 scenes.** `Evaluate Image Approval` (since 2026-08-18 the one combined asset
@@ -1185,15 +1247,18 @@ those two `jsonBody` strings, nothing else. Two things come with it:
 
 - **It is Ultra-only.** useapi's docs put it on the $199 Ultra tier; the
   cheaper Ultra plan does not include it. If the plan lapses or is the wrong
-  one, the API rejects the model — and **`Submit Video` is
-  `onError: stopWorkflow`**, so that rejection kills the whole batch mid-run
-  rather than skipping a scene. Deliberate: the alternative is a silent
-  fallback to a model that spends credits, which is worse than a loud stop.
-  It DOES have `retryOnFail`, so a wrong model id burns the retries first.
+  one, the API rejects the model — and a rejection still ends the batch
+  loudly rather than falling back to a model that spends credits: since
+  2026-09-01 `Submit Video` is `continueErrorOutput` into a bounded 120s
+  cooldown loop (see "The batch cap"), so a wrong model id burns three quick
+  retries, then ten cooldowns (~20 min), then kills the run with the API's
+  reason. Slower to fail than the old `stopWorkflow`, never silent.
 - **Lower priority is a real queue, not a label.** Flow serves Quality, then
   Fast, then Lite from the same account, so a Lite job only starts when
   capacity is left over. Fine for a 6-scene film; it is the pacing risk on the
   10- and 12-minute lengths, where a batch is 90 scenes across 12 passes.
+  It already overran the video poll cap once (8939, see "The batch cap") —
+  the cap is now 480 polls of 30s per batch.
 
 ### Caption colour — per film, white by default
 

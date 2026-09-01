@@ -334,6 +334,31 @@ the workflows as they now actually run, verified against `activeVersionId`.
   frame until the regen loop fills it. Both are handled by the same chain
   because the cure is identical — rewrite, never resubmit — but do not read
   the empty frame as a second bug.
+- **An image refusal is retried in place, escalating, up to four times —
+  and the pipeline's own notes are never fed back as feedback** (2026-09-01,
+  active version `95f1a1f0`). The chain used to be one automatic rewrite,
+  then `Loop Images` moved on with the scene flagged; the gate's regen then
+  built its prompt from `Imagine First Frame` PLUS `Observații Scenă` as an
+  "ADJUSTMENT REQUEST" — and that field held the pipeline's own
+  `AUTO-REWRITE: fal.ai rejected the previous image…` note, so the second
+  attempt carried the refusal into the prompt and was refused again, after
+  which `Mark Image Regen Rejected` cleared the flag and the scene sat with
+  no image. The image gate cannot open while any scene has no picture, so
+  ten such scenes froze the whole 71-scene Vegas film at that gate.
+  Now `Prep Flow Reject` counts attempts per scene (`sd.imgRewrites`),
+  `IMG Give Up?` (was `Already Rewritten?`) tests `giveUp` after four,
+  `Rewrite Prompt AI` escalates from attempt 2 (no violence, weapons,
+  minors, real people, brands; faces out of frame) and from attempt 3
+  (no people at all), and `Apply Rewritten Prompt → IMG Reload Scene →
+  Needs Image?` re-enters the loop for the SAME scene — with no reference
+  image, because the previous picture may hold exactly what was refused.
+  `Prep Flow Reject` reads the prompt from `Build Image Request`'s latest
+  run, not from the `Loop Images` item, which still holds the original text
+  after a rewrite. `Evaluate Image Approval` drops any note that starts
+  with `AUTO-REWRITE` / `REJECTED` before appending it. A scene that
+  arrives with such a note from an earlier pass starts one rung up the
+  ladder. The give-up note now says what to do and clears the regen flag,
+  so the gate stops dispatching a regen that can only fail.
 - **On a scene flagged for regeneration, `Observații Scenă` is PROMPT, not a
   comment.** `Evaluate Image Approval` appends it as
   `ADJUSTMENT REQUEST — the new image MUST follow this: …` so reviewer

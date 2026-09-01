@@ -10,7 +10,7 @@ import AudioReview from "@/components/AudioReview";
 import FinalSettings from "@/components/FinalSettings";
 import AutoRefresh from "@/components/AutoRefresh";
 import MediaPlayer from "@/components/MediaPlayer";
-import StageChime from "@/components/StageChime";
+import StageChime, { NotifyChip } from "@/components/StageChime";
 import ResumeButton from "@/components/ResumeButton";
 import AutoResume from "@/components/AutoResume";
 import ExpandableTitle from "@/components/ExpandableTitle";
@@ -355,13 +355,49 @@ export default async function ProductionRoom({
   return (
     <main className="page">
       <AutoRefresh seconds={10} />
+      {/* `have:` items carry WHICH scenes have the asset, so the ding can say
+          what it means ("S7 finished · S8 in work") instead of leaving the
+          producer to hunt the page for what changed. `next` is the first
+          scene still missing the asset — an estimate by the same rule
+          ProductionActivity states out loud, because the batch reports no
+          per-scene progress. Takes are watched too; they never dinged before,
+          which was simply a gap. */}
       <StageChime
+        quietGates={project.editing.autoApprove}
         items={[
-          { key: id, stage },
-          // Count items ding on every newly landed asset.
-          { key: `${id}:scenes`, stage: `count:${scenes.length}` },
-          { key: `${id}:images`, stage: `count:${scenes.filter((s) => s.imageUrl).length}` },
-          { key: `${id}:clips`, stage: `count:${scenes.filter((s) => s.videoUrl).length}` },
+          { key: id, stage, label: project.name },
+          {
+            key: `${id}:scenes`,
+            stage: `have:${scenes.map((s) => s.label).join("|")}`,
+            label: "Scenes",
+            verb: "written",
+          },
+          ...(silent
+            ? []
+            : [
+                {
+                  key: `${id}:voices`,
+                  stage: `have:${scenes.filter((s) => s.voiceUrl).map((s) => s.label).join("|")}`,
+                  label: "Audio",
+                  total: scenes.length,
+                  next: scenes.find((s) => !s.voiceUrl)?.label ?? null,
+                  verb: "recorded",
+                },
+              ]),
+          {
+            key: `${id}:images`,
+            stage: `have:${scenes.filter((s) => s.imageUrl).map((s) => s.label).join("|")}`,
+            label: "Images",
+            total: scenes.length,
+            next: scenes.find((s) => !s.imageUrl)?.label ?? null,
+          },
+          {
+            key: `${id}:clips`,
+            stage: `have:${scenes.filter((s) => s.videoUrl).map((s) => s.label).join("|")}`,
+            label: "Video",
+            total: scenes.length,
+            next: scenes.find((s) => !s.videoUrl)?.label ?? null,
+          },
         ]}
       />
       <AutoResume projectId={id} stalled={stalled} />
@@ -425,6 +461,7 @@ export default async function ProductionRoom({
               </div>
             </div>
             <div className="wk-side">
+              <NotifyChip />
               {/* Counted off the same pipeline() states the stepper draws, so
                   the bar can never claim a stage the cards do not show as
                   done. Only shown once there are scenes: before that every

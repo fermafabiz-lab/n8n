@@ -25,6 +25,7 @@ import { explainRefusal } from "@/lib/refusals";
 import MediaPlayer from "@/components/MediaPlayer";
 import RegenBadge from "@/components/RegenBadge";
 import { usePendingStage } from "@/components/StageNav";
+import CinemaMode from "@/components/CinemaMode";
 
 /** The three steps this board can serve, in the pipeline's own order. */
 type Step = "images" | "audio" | "video";
@@ -387,7 +388,10 @@ export default function SceneBoard({
   return (
     <div className="stage">
       <div>
-        <div className={`monitor${portrait ? " portrait" : ""}`}>
+        {/* CinemaMode IS the monitor card — it takes the classes so every
+            `.monitor …` selector keeps its target, and adds the dim-the-room
+            button in the corner. */}
+        <CinemaMode className={`monitor${portrait ? " portrait" : ""}`}>
           <div className={`scr${(preview ? preview.kind === "video" : showClip) ? " video" : ""}`}>
             {preview?.url ? (
               // A draft under review takes the monitor, so it can be judged at
@@ -479,7 +483,7 @@ export default function SceneBoard({
               </div>
             ))}
           </div>
-        </div>
+        </CinemaMode>
       </div>
 
       <div className="insp">

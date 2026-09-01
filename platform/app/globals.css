@@ -5390,6 +5390,60 @@ body:has(.mkt) .vignette {
     font-size: 12.5px;
   }
 }
+/* Cinema mode — see components/CinemaMode.tsx for the why and the stacking
+   trick. The backdrop's resting opacity lives in the base rule: the global
+   reduced-motion rule strips the fade, and a backdrop revealed only BY its
+   animation would be invisible exactly when it was asked for. */
+.cine {
+  position: relative;
+}
+.cine-on {
+  /* Above the sticky nav pill (z 100) on purpose: a bright frosted bar
+     floating over the dark room would be the one lit thing that is not the
+     picture. Everything but the monitor goes dark, the nav included. */
+  z-index: 110;
+}
+.cine-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: rgba(8, 8, 11, 0.94);
+  opacity: 1;
+  animation: cinefade 0.38s var(--ease);
+  cursor: pointer;
+}
+@keyframes cinefade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.cine-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 5;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: rgba(252, 252, 253, 0.82);
+  backdrop-filter: blur(14px);
+  color: var(--soft);
+  font-family: var(--f-mono), ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 6px 11px;
+  cursor: pointer;
+  transition: var(--tr);
+}
+.cine-btn:hover {
+  color: var(--ink);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
 /* Toasts: the ding's words, bottom-right, gone in ~8s. The near-black panel
    ground on purpose — these appear over any step's content, and the one
    surface guaranteed to contrast with all of them is the same panel the
@@ -5400,7 +5454,9 @@ body:has(.mkt) .vignette {
   position: fixed;
   right: 18px;
   bottom: 18px;
-  z-index: 80;
+  /* Above cinema mode (z 110): a "S7 finished" landing mid-screening is
+     still worth seeing over the dark. */
+  z-index: 120;
   display: flex;
   flex-direction: column;
   gap: 10px;

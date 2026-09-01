@@ -19,6 +19,7 @@ import OpsPanel from "@/components/OpsPanel";
 import AssemblyStatus from "@/components/AssemblyStatus";
 import SoundSettings from "@/components/SoundSettings";
 import AutoPilot from "@/components/AutoPilot";
+import CinemaMode from "@/components/CinemaMode";
 import ProductionActivity from "@/components/ProductionActivity";
 import { StepCard, StageNavProvider } from "@/components/StageNav";
 import {
@@ -500,13 +501,17 @@ export default async function ProductionRoom({
           project.finalVideoUrl &&
           project.finalVideoUrl.startsWith("http") && (
           <div className="finalvideo">
-            <div className="vwrap">
-              <MediaPlayer
-                url={project.finalVideoUrl}
-                portrait={project.aspect === "9:16"}
-                maxHeight={560}
-              />
-            </div>
+            {/* The finished film gets the same dark room the monitor has —
+                watching the final cut is the moment cinema mode exists for. */}
+            <CinemaMode>
+              <div className="vwrap">
+                <MediaPlayer
+                  url={project.finalVideoUrl}
+                  portrait={project.aspect === "9:16"}
+                  maxHeight={560}
+                />
+              </div>
+            </CinemaMode>
             <div className="vbar">
               <span>Final video</span>
               <a

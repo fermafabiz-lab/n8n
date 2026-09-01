@@ -1583,6 +1583,30 @@ webhook, exactly as it covered the old separate voice gate. The old gate
 `If All Voices Approved`) was removed after a by-name audit found zero
 references.
 
+**Every take was synthesized N times, N = the number of scenes in the pass,
+and it was billed every time** (found 2026-09-01, active version `7f2c8353`).
+`Refetch Scenes For Audio` is a Postgres node whose query reads the batch
+from `$('Sort & Cap Scenes').all()` — but its INPUT is that same batch, N
+items, and a Postgres node runs its query once per input item. N queries,
+each returning all N scenes, gave `Sort Scenes For Audio` N copies of every
+scene; `Loop Audio` walked every copy; `AB Speak` synthesized each line N
+times in a row (a new Drive upload and a new `Voiceover URL` each time, the
+last one winning). Since the audio-first reorder that was 8× on every film —
+invisible, because the loop eventually moved on and the takes were right —
+and with the cap at 200 it became 71× on the Vegas film: one line took eight
+minutes, the producer read it as "blocked at voice on scene 32", and it
+would have burned ~460k ElevenLabs characters against a 131k quota.
+**How it was found**: `GET /v1/history` on ElevenLabs lists every request
+with its text and timestamp — 71 identical rows seven seconds apart — and
+execution 8981's `runData` showed `Loop Audio` emitting the same id eight
+times. `Sort Scenes For Video` had always deduped by id, which is why the
+video stage never showed it. Now `Refetch Scenes For Audio` is
+`executeOnce` and `Sort Scenes For Audio` dedupes as well. **Any Postgres
+node whose query ignores its input must be `executeOnce`**, or it runs once
+per item — the n8n rule that `Fetch Scenes After Batch` already obeys.
+When a stage is slow, check the provider's history before the workflow: a
+bill is the one log nobody can forget to write.
+
 **`Replay Scenes For Images` is load-bearing, not a formality.** Loop Audio's
 done output must never feed Loop Images directly: items that skip synthesis
 re-enter the audio loop carrying the PROJECT record (`Needs Voice?` → `AB

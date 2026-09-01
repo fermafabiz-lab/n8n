@@ -27,6 +27,7 @@ import {
  */
 const PendingStage = createContext<string | null>(null);
 const SetPendingStage = createContext<(s: string | null) => void>(() => {});
+const CurrentStage = createContext<string | null>(null);
 
 export function StageNavProvider({
   current,
@@ -41,7 +42,9 @@ export function StageNavProvider({
   useEffect(() => setPending(null), [current]);
   return (
     <SetPendingStage.Provider value={setPending}>
-      <PendingStage.Provider value={pending}>{children}</PendingStage.Provider>
+      <CurrentStage.Provider value={current}>
+        <PendingStage.Provider value={pending}>{children}</PendingStage.Provider>
+      </CurrentStage.Provider>
     </SetPendingStage.Provider>
   );
 }
@@ -58,6 +61,76 @@ export function usePendingStage(): string | null {
  */
 export function useSetPendingStage(): (s: string | null) => void {
   return useContext(SetPendingStage);
+}
+
+/**
+ * One card of the stage stepper, and the owner of the answer to "where am I".
+ *
+ * THE DARK CARD FOLLOWS THE PRODUCER, not the pipeline. It used to mark the
+ * active step, with a thin accent ring for the step you clicked — and the
+ * ring was too quiet to register, so clicking Images visibly changed nothing
+ * and the black card stayed on Video. The producer's words: "apeși și nu-ți
+ * dai seama unde ești". Now the card you are ON is the dark one; the step
+ * the pipeline is working stays marked by its pulsing accent badge, so the
+ * two answers ("where am I" / "where is the machine") each keep a signal
+ * instead of fighting over one.
+ *
+ * A client component so the dark card moves ON THE CLICK, from the same
+ * pending guess SceneBoard already believes — the `?stage=` navigation is a
+ * full server round-trip, and a highlight that arrives a second late reads
+ * as no highlight at all.
+ *
+ * One known lag, accepted: clicking the dark card again returns to the bare
+ * page (pending becomes null, which is also the "no guess" state), so the
+ * dark card slides back to the live step only when the server answers. That
+ * click means "take me back to whatever is live", so the destination is
+ * genuinely the server's to name.
+ */
+export function StepCard({
+  stepKey,
+  live,
+  state,
+  frozen,
+  projectId,
+  children,
+}: {
+  stepKey: string;
+  /** The pipeline's own position — where the dark card sits when nothing is selected. */
+  live: boolean;
+  state: string;
+  frozen: boolean;
+  projectId: string;
+  children: ReactNode;
+}) {
+  const pending = useContext(PendingStage);
+  const current = useContext(CurrentStage);
+  const setPending = useContext(SetPendingStage);
+  const selected = pending ?? current;
+  const dark = selected ? selected === stepKey : live;
+  const cls = `ps ${state}${dark ? " dark" : ""}${frozen ? " frozen" : ""}`;
+  if (frozen) {
+    return (
+      <span
+        className={cls}
+        aria-disabled="true"
+        title="Locked while the final render is running — stop the render to go back"
+      >
+        {children}
+      </span>
+    );
+  }
+  const isCurrent = current === stepKey;
+  return (
+    <Link
+      href={isCurrent ? `/projects/${projectId}` : `/projects/${projectId}?stage=${stepKey}`}
+      className={cls}
+      scroll={false}
+      aria-current={dark ? "true" : undefined}
+      onClick={() => setPending(isCurrent ? null : stepKey)}
+    >
+      {children}
+    </Link>
+  );
 }
 
 export function StageLink({

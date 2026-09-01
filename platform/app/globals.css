@@ -1031,7 +1031,41 @@ body:has(.nb) .nav {
 .pipe .ps.act .ic {
   background: var(--accent);
   color: #fff;
-  animation: psping 1.8s ease-out infinite;
+  animation: psping 2.2s ease-out infinite;
+}
+/* The card itself breathes a soft accent glow — the escalation chosen over
+   pulsing the whole card, which at ~150px in an infinite loop stops being a
+   signal and becomes the loudest thing on a screen someone stares at for
+   hours. Low amplitude, slow, and sharing the badge's 2.2s beat so the two
+   read as one heartbeat. The static border-color is the reduced-motion
+   resting state: the global rule strips the animation, and a tinted border
+   plus the solid badge still mark the step without any motion. The base
+   elevation shadow rides inside both keyframes, or the glow would replace
+   it and the card would flatten while glowing. */
+.pipe .ps.act {
+  border-color: var(--accent-a28);
+  animation: psglow 2.2s ease-in-out infinite;
+}
+.pipe .ps.dark.act {
+  animation-name: psglowdark;
+}
+@keyframes psglow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 1px var(--accent-a12), 0 0 12px 2px rgba(122, 79, 214, 0.12), var(--shadow-sm);
+  }
+  50% {
+    box-shadow: 0 0 0 1px var(--accent-a28), 0 0 22px 6px rgba(122, 79, 214, 0.28), var(--shadow-sm);
+  }
+}
+@keyframes psglowdark {
+  0%,
+  100% {
+    box-shadow: 0 0 0 1px rgba(178, 153, 231, 0.2), 0 0 14px 3px rgba(122, 79, 214, 0.22), var(--shadow-lg);
+  }
+  50% {
+    box-shadow: 0 0 0 1px rgba(178, 153, 231, 0.42), 0 0 26px 9px rgba(122, 79, 214, 0.42), var(--shadow-lg);
+  }
 }
 /* The ring reads against the card behind it, so the dark card gets the
    lifted accent — pure purple at 0.5 alpha sinks into near-black. */

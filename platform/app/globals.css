@@ -1018,16 +1018,47 @@ body:has(.nb) .nav {
 /* Scoped under .pipe (0-3-0): a dark card can also be .done or .next, whose
    own name/badge rules sit later in this file at 0-2-0 and were repainting a
    grey label onto the near-black card. */
-/* Where the pipeline is working keeps its own signal — the pulsing accent
-   badge — so "where am I" (dark) and "where is the machine" (pulse) are two
-   answers with two marks, and stepping away from the live step does not
-   erase it. The pulse rides the same keyframes as every live dot on the
-   site; under prefers-reduced-motion the global rule strips it and the
-   accent tint alone carries the meaning. */
-.ps.act:not(.dark) .ic {
-  background: var(--accent-a16);
-  color: var(--accent);
-  animation: wkpulse 1.9s ease-in-out infinite;
+/* Where the pipeline is working keeps its own signal on EVERY card,
+   including the dark one: a solid accent badge with an expanding ring, the
+   radar ping. It was a faint opacity flicker shown only off the live step,
+   and the producer's report was exact — a film generating in front of them
+   and no pulse anywhere, because the one card that had the right to pulse
+   was suppressing it. "Where am I" (dark card) and "where is the film"
+   (ping) are two marks that now simply coexist on one card when they
+   coincide. Under prefers-reduced-motion the global rule strips the ring
+   and the solid accent badge alone carries the meaning — the resting state
+   says it without the motion. */
+.pipe .ps.act .ic {
+  background: var(--accent);
+  color: #fff;
+  animation: psping 1.8s ease-out infinite;
+}
+/* The ring reads against the card behind it, so the dark card gets the
+   lifted accent — pure purple at 0.5 alpha sinks into near-black. */
+.pipe .ps.dark.act .ic {
+  animation-name: pspinglift;
+}
+@keyframes psping {
+  0% {
+    box-shadow: 0 0 0 0 rgba(122, 79, 214, 0.55);
+  }
+  75% {
+    box-shadow: 0 0 0 12px rgba(122, 79, 214, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(122, 79, 214, 0);
+  }
+}
+@keyframes pspinglift {
+  0% {
+    box-shadow: 0 0 0 0 rgba(178, 153, 231, 0.6);
+  }
+  75% {
+    box-shadow: 0 0 0 12px rgba(178, 153, 231, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(178, 153, 231, 0);
+  }
 }
 .ps.act:not(.dark) .ps-note {
   color: var(--accent);

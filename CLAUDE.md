@@ -1415,13 +1415,24 @@ carry the whole feature:
   anything those actions learn later, hands-off learns with them. It skips
   scenes with a regen flag in flight and a rejected script (a rewrite is
   coming; the thing to approve does not exist yet).
-- **The page IS the scheduler.** `AutoPilot` runs one tick per 10s refresh
-  (AutoRefresh remounts it; a sessionStorage gap guard stops overlapping
-  passes, which matters for the render press more than for the idempotent
-  checkboxes). So it works while a tab with the project page is open
-  SOMEWHERE, and pauses at the next gate when none is — said on the banner in
-  as many words. Nothing server-side schedules it; making it survive a closed
-  tab means teaching the n8n gates to self-approve, a different feature.
+- **The page IS the scheduler — via AutoPilot's OWN setInterval, never via
+  AutoRefresh.** `router.refresh()` re-renders server components and
+  RECONCILES client ones — it does not remount them — so the first version's
+  mount-only tick ran exactly once per real page load. Found on the first
+  live hands-off film (rec8K76f498HJ0GNr): the script approved on a reload,
+  then nine scene texts landed 45s later and sat unapproved for minutes with
+  the banner up. Any client component that must act every cycle needs its
+  own interval; a mount is not a schedule. (Note the same fact the other way
+  round: a comment claiming "AutoRefresh remounts this" is wrong — client
+  component state SURVIVES refresh; it is drafts fed from server-rendered
+  props that reset.) The gap guard is localStorage (shared across tabs, so
+  two open tabs alternate rather than race the render press); ticks continue
+  in a hidden tab on purpose — "open somewhere" includes a background tab,
+  which is exactly where a hands-off page lives. So it works while a tab
+  with the project page is open SOMEWHERE, and pauses at the next gate when
+  none is — said on the banner in as many words. Nothing server-side
+  schedules it; making it survive a closed tab means teaching the n8n gates
+  to self-approve, a different feature.
 
 The banner is always visible while the mode is on, because an automation that
 approves things unseen must never itself be invisible; Turn off is one click

@@ -476,8 +476,27 @@ valid.
 
 ### The batch cap
 
+**Since 2026-09-01 a pass is the WHOLE film: `CAP = 200`.** Every take, then
+every image, one combined gate, every clip, one video gate — two rounds of
+approvals for a film of any length, which is what the producer meant by "an
+automation". The cap was 8 for months, and on the 71-scene Vegas film that
+was nine rounds of approvals with a dead execution between most of them
+("mereu dă stop după 8"). 200 is a sanity bound (a 12-minute film is ~90
+scenes), not a chunk size; `MEDIA_BATCH_CAP` on the site mirrors it. Three
+things made the change possible, all in the same publish (active version
+`173ffffe` — history entry "One pass per film"): binary data is
+`binaryMode: separate`, so 71 clips do not sit in the execution's memory;
+every `$runIndex` guard inside the per-scene loops became a per-scene counter
+in static data (below); and a video-filter refusal now retries the SAME scene
+in place instead of moving on (below). Sequential cost is unchanged — clips
+are still made one after another, ~3–8 min each on the low-priority queue, so
+a 71-scene film is several hours of video generation with nobody to click.
+The history that follows is kept because the pending-first sort, the
+`More Batches?` loop and the counters all still exist and still matter for a
+repeat pass (refused scenes, regen flags).
+
 `Sort & Cap Scenes` in Media Generation ends with `items.slice(0, CAP)`,
-CAP = 8 — and the cap is applied **before** anything checks what is already
+and until 2026-09-01 CAP was 8 — applied **before** anything checks what is already
 done. A project with more approved scenes than the cap used to be unfixable:
 every run picked the same finished head, found nothing to do, and the tail
 stayed invisible rather than pending. Regenerating did nothing, because the
@@ -537,21 +556,29 @@ in the same publish (active version `2dc53805`):
   minutes for the whole batch, which `veo-3.1-lite-low-priority` (a real
   queue served after Quality and Fast) blew through: 8939 died with "Video
   polling exceeded global safety limit (61 runs)" after eight clips' worth
-  of waiting. Now 480 (4 h a batch); `Check Video Regen` 90 → 240. The
-  interval on `Wait Video` and the cap are one setting in two places, the
-  same rule the Final Assembly guards already state.
+  of waiting. **Every such guard is now a PER-SCENE counter in workflow
+  static data**, keyed by scene id and reset by `Sort & Cap Scenes` at the
+  start of each pass: `sd.polls` / `sd.resubmits` (`Check Job Status`,
+  `Resubmit Guard`), `sd.regenPolls` / `sd.regenResubmits` (the gate's
+  regen pair), `sd.multiPolls` (`AB Multi Guard`), `sd.rewrites` (`VP
+  Prep`), `sd.submitCooldowns` (the two cooldown guards). A clip gets 120
+  polls of 30s (one hour), and overrunning that counts as a FAILED job —
+  resubmitted through `Resubmit Guard` (5 per scene) — rather than killing
+  the film. **The counters only work because none of the Waits inside those
+  loops exceeds 65s**: under that n8n keeps the execution in memory and
+  static data with it; a longer Wait suspends the run to the database and
+  the in-memory counts are not what comes back. Any new Wait in a counted
+  loop must stay under that line.
 - **A Flow captcha used to kill the batch.** 8981 died at `Submit Video`
   with `captcha_quality: PUBLIC_ERROR_UNUSUAL_ACTIVITY after 5 attempts` —
   Google throttling the account, and useapi had already retried five times,
   so n8n's own three quick retries could not help; the cure is time.
   `Submit Video` and `Submit Video Regen` are now `continueErrorOutput`,
   their error output goes `Submit Cooldown Guard → Wait Submit Cooldown
-  (120s) → Submit Video` (and the `Regen …` pair for the gate), at most 10
+  (60s) → Submit Video` (and the `Regen …` pair for the gate), at most 20
   cooldowns per scene per run, then the run dies with the last reason as it
-  did before. The 120s Wait suspends the execution to `waiting` with a
-  `waitTill` two minutes out, which `getAliveProduction()` still counts as
-  alive (its window is 2 h), so the site does not offer a duplicate Resume
-  during the hold. `Sort & Cap` resets the counters each pass. The account's
+  did before. 60s, not longer, for the static-data reason above: the count
+  must survive the Wait. `Sort & Cap` resets the counters each pass. The account's
   health is readable: `GET api.useapi.net/v1/google-flow/accounts` with the
   same Bearer header answers `health: OK` and the session expiry — do that
   from a throwaway workflow before assuming the block has lifted.
@@ -564,11 +591,34 @@ in the same publish (active version `2dc53805`):
   push to `platform/**` while a batch is mid-generation** if you can help it
   — the same rule Railway already imposes on `remotion/**`.
 
-What none of this changes: a pass still stops at its two gates for the
-producer, so a 71-scene film is nine rounds of approvals unless hands-off
-mode (`Editing Options.autoApprove`) is on. And an execution that never
-starts (the `runData: {}` zombie above) still needs the site's Restart
-door; nothing in n8n can detect it.
+**A video-filter refusal rewrites the prompt and resubmits the SAME scene, in
+place, up to four times — it no longer moves on.** The chain used to be
+`Filter Failure? → VP Prep → VP Already? → VP Rewrite AI → VP Apply → Loop
+Scenes`: one rewrite, the scene flagged for "the next cycle", and the loop
+went to the next scene — which, combined with the sort bug above, is how a
+scene was never made. Now `VP Apply → VP Reload Scene → Current Scene`: the
+scene record is re-read with its rewritten prompt and re-enters the loop at
+`Current Scene`, so `Needs Clip?` → `Submit Video` runs again for it with
+the new text. That re-entry works because every node in the video loop reads
+the scene as `$('Current Scene').first()`, and `.first()` is the node's
+LATEST run — re-running `Current Scene` is enough to change what the whole
+loop sees. `VP Prep` counts the attempt (`sd.rewrites`), `VP Give Up?`
+(renamed from `VP Already?`) tests `giveUp`, and `VP Rewrite AI` escalates
+from attempt 2: every face and identifiable person out of frame, no
+violence, weapons, minors, real names or brands. After four refusals `Mark
+Video Prompt Rejected` writes a note saying the START IMAGE is the likely
+trigger and what to do, and only then does the loop move on. That scene then
+has no clip, so the video gate cannot open until the producer regenerates
+the image and presses Regenerate video — the same door as before, reached
+four rewrites later.
+
+What none of this changes: an execution that never starts (the
+`runData: {}` zombie above) still needs the site's Restart door; nothing in
+n8n can detect it. And the combined gate still asks for takes AND images
+together — the site shows Audio before Images, so the producer reviews in
+that order, but n8n does not wait for the takes to be approved before it
+starts on the pictures. Deliberate: the two are independent, and gating them
+separately only adds a wait.
 
 **Every gate in the batch counts the BATCH's scenes; every gate on the site
 counted the PROJECT's — and that mismatch deadlocked any film bigger than 8

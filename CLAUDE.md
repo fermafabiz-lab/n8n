@@ -3630,6 +3630,17 @@ generated FROM it. The chain, and where each piece lives:
 
 ## Open work
 
+- **Images on Google Flow instead of fal — designed, not applied.**
+  `db/port/flow-images/README.md` holds the whole port: the useapi
+  `POST /google-flow/images` contract (sync, `count` defaults to 4, the
+  response carries `fifeUrl` + `mediaGenerationId`), the node-by-node
+  replacement for the batch loop, the gate regen and Scripting's
+  `IR Generate Image`, and the anti-throttle rules (one request in flight,
+  an 8s pace, no n8n quick retries, 5-minute holds on `captcha_quality:`,
+  `captchaRetry: 1`). It removes the download → upload hop and the second
+  content filter at upload time; it costs Google credits where fal cost
+  fal's. The n8n connector dropped before it could be applied.
+
 - ~~Do not publish the Media Generation draft parked since 2026-08-17~~ — that
   draft is gone, superseded by later edits, and the six Google Drive upload
   nodes carry `resource: file` + `operation: upload` again in everything now

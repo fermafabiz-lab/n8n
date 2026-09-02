@@ -753,6 +753,46 @@ fewer scenes than were planned.
 Note the count can differ from the naive `ceil(words/22)` after runt
 folding (95 words → 4 scenes, not 5). That is intended.
 
+### The story layer — why films repeated themselves, and the fix (2026-09-02)
+
+The 71-scene Vegas film retold the same eight facts in every chapter ("1941,
+dealer" ×4, "Joe Crowley" ×5), 73 of its 185 sentences were under four words
+("Green felt. Brass ashtrays."), nothing happened in any scene, and the
+producer's fictional Bill had become Bill Boyd of Boyd Gaming. The producer's
+words: "fragmente aruncate random". Read `db/port/story-layer/README.md` for
+the full account; what bites is this:
+
+- **A chapter written by a call that cannot see the other chapters WILL
+  restate them.** `Write Chapter Narration` ran once per chapter with the
+  same bible and the same claims list; the only cross-chapter signal was
+  ENDS WITH / LEADS INTO. Now `Write Full Narration` writes the whole film
+  in ONE call, `Edit Full Narration` reads the whole draft once, and
+  `Narration Guard` (code) checks the `[CHAPTER n: title]` markers and the
+  length window and sends the draft back at most twice. A 12-minute film is
+  ~1,650 words — one call, always.
+- **"Word count is the most important rule" is an instruction to pad**, and
+  the prompt even said where from ("add detail from the Story Bible"). The
+  model recited the bible's visual inventories as narration. Length is a
+  window enforced by code now; the writer's top rule is the story.
+- **`Generate Outline` writes a STORY SPINE before the chapters** —
+  protagonist, want, obstacle, stakes, turning points that are EVENTS,
+  ending, throughline — and each chapter owns its turning points. The spine
+  rides on `output.story_spine` through `Combine Chapters` to the hook.
+- **The genre profile is a pipeline configuration, and Motivational's was an
+  essay.** "Name the moment of resistance … return to the opening moment,
+  changed" made four chapters return to the same moment. It is a narrative
+  arc now (row edited in `hov.genre_profile`, old values saved in the port
+  dir). When a film repeats itself, read the profile's `structure` before
+  the prompts.
+- **Research plus "use only real examples" replaced the Tema's protagonist.**
+  The Story Bible and the outline now say in words: if the Tema names or
+  describes its protagonist, that name and role are canonical; research
+  builds the world around them.
+- **How to judge a script without watching the film**: count facts per
+  chapter and sentences under four words (`db/port/story-layer/README.md`
+  shows the numbers). Both were measurable in the database in one query,
+  and both are what the producer saw.
+
 ### Evidence retrieval (Claude Scripting)
 
 Scripts on researched topics are written against a pack of sourced claims,

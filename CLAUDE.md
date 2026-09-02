@@ -3779,13 +3779,33 @@ generated FROM it. The chain, and where each piece lives:
   Scene Rewrite` sets `Regenerează Voce` when `Voiceover URL` is present.
   **Any fourth writer of `Script Scenă` must do the same** — grep for it
   before adding one.
-- **Auto-assembly has NEVER fired on wf7** — every Final Assembly execution
-  is `mode: webhook`. The batch's settings gate (15s Wait loop) dies rather
-  than release, proven again on the first cinematic project. **Bypassed, not
-  fixed**: `confirmFinalSettings` now fires the assemble webhook itself
-  right after flipping the status, so the manual Restart click became the
-  automatic path. The n8n gate still exists and still never fires — if it
-  is ever repaired, add dedup or the same project renders twice.
+- **The site is the ONLY thing that starts a render** (2026-09-02, orchestrator
+  version published that day). `confirmFinalSettings` writes `Asamblare` and
+  fires the assemble webhook; the orchestrator's three `Execute Final
+  Assembly*` nodes are disconnected and `Final Assembly`'s own `Update Project
+  Status` marks the project `Finalizat`. History, because it explains the
+  canvas: for months the batch's settings gate died rather than release, so
+  the webhook was added as a bypass with the note "if the gate is ever
+  repaired, add dedup or the same project renders twice". The one-pass
+  batch repaired the gate as a side effect, and the very next film rendered
+  twice — the webhook execution and, seven seconds later, the orchestrator's
+  `integrated` one, on the same confirmation. Two 71-scene assembles on one
+  box exhausted ffmpeg's decoder threads (below) and Drive answered 503 to
+  the second set of 142 downloads; both died, the site rewound to Final
+  touches, the producer confirmed again, and the pair ran again — four
+  times. **Recognise it by the pairs**: a `webhook` and an `integrated`
+  Final Assembly execution starting seconds apart.
+- **`Resource temporarily unavailable` from ffmpeg is a THREAD limit, not
+  memory.** "Error while opening decoder for input stream #118:0" — the 60th
+  h264 decoder of a 142-input assemble. Every decoder opens at start with
+  the default thread count (one per core), so 71 clips × 8 threads, twice,
+  ran into the container's `pthread_create` ceiling. `assemble.mjs` now
+  passes `-threads 1` as an INPUT option before every `-i`; libx264 keeps its
+  own pool, and eight-second clips do not need parallel decoding. Its
+  `download()` also retries 503/429/5xx with a short back-off. n8n's error
+  text shows only the command — the reason is in the `Check Render` output
+  (`error`, ~100 kB) or in the job's status on Railway, never in the deploy
+  log, which prints only the per-scene trim lines.
   The site half is fixed: `getAssemblyState()` now returns an explicit
   `stopped` verdict (true only when n8n answered and nothing is alive
   anywhere), and `page.tsx` shows the "render stopped" panel only on that

@@ -1,0 +1,137 @@
+[
+  {
+    "type": "updateNodeParameters",
+    "nodeName": "Regenerate Scene Image",
+    "replace": true,
+    "parameters": {
+      "method": "POST",
+      "url": "https://api.useapi.net/v1/google-flow/images",
+      "sendHeaders": true,
+      "headerParameters": {
+        "parameters": [
+          {
+            "name": "Authorization",
+            "value": "Bearer user:2923-RNCS1SSSMj5DqvdN7JUMo"
+          },
+          {
+            "name": "Content-Type",
+            "value": "application/json"
+          }
+        ]
+      },
+      "sendBody": true,
+      "specifyBody": "json",
+      "jsonBody": "={{ Object.assign({ email: 'fermafabiz@gmail.com', model: 'nano-banana-2', prompt: ($json.prevId ? 'Use the reference image ONLY for character identity, wardrobe, color palette and film look. Create a COMPLETELY NEW shot with a different composition, camera angle and framing — do NOT copy the reference layout: ' : '') + $json.prompt, aspectRatio: ($('Receive Batch Input').first().json.Aspect_Ratio === '9:16' ? '9:16' : '16:9'), count: 1, captchaRetry: 1 }, $json.prevId ? { reference_1: $json.prevId } : {}) }}",
+      "options": {
+        "batching": {
+          "batch": {
+            "batchSize": 1,
+            "batchInterval": 15000
+          }
+        },
+        "timeout": 180000
+      }
+    }
+  },
+  {
+    "type": "setNodeSettings",
+    "nodeName": "Regenerate Scene Image",
+    "settings": {
+      "retryOnFail": false,
+      "onError": "continueErrorOutput"
+    }
+  },
+  {
+    "type": "updateNodeParameters",
+    "nodeName": "Decode Regen Image",
+    "parameters": {
+      "jsCode": "const inputs = $('Split Regen List').all();\nconst resps = $input.all();\nif (resps.length !== inputs.length) throw new Error('Regen response count (' + resps.length + ') != request count (' + inputs.length + ')');\nreturn resps.map((r, i) => {\n  // Flow answers synchronously — see Decode Scene Image for the shape.\n  const m0 = (((r.json || {}).media || [])[0] || {});\n  const gi = (m0.image && m0.image.generatedImage) || {};\n  if (!gi.fifeUrl || !gi.mediaGenerationId) throw new Error('No image on regen (Google Flow) for scene ' + inputs[i].json.id + '. Payload head: ' + JSON.stringify(r.json).slice(0, 300));\n  return { json: { sceneId: inputs[i].json.id, url: gi.fifeUrl, mediaId: gi.mediaGenerationId } };\n});"
+    }
+  },
+  {
+    "type": "updateNodeParameters",
+    "nodeName": "Write Regen Image",
+    "parameters": {
+      "jsonBody": "={{ JSON.stringify({ sceneId: $json.sceneId, field: \"image\", url: $json.url, fields: { \"Image Media ID\": $json.mediaId, \"Aprobare Imagine\": false, \"Regenerează Imagine\": false } }) }}"
+    }
+  },
+  {
+    "type": "updateNodeParameters",
+    "nodeName": "Evaluate Image Approval",
+    "parameters": {
+      "jsCode": "const expected = $('Sort & Cap Scenes').all().map(s => s.json.id);\nconst order = {};\nexpected.forEach((id, i) => order[id] = i);\nconst seen = new Set();\nconst recs = $input.all()\n  .filter(r => order[r.json.id] !== undefined)\n  .filter(r => { if (seen.has(r.json.id)) return false; seen.add(r.json.id); return true; })\n  .slice()\n  .sort((a, b) => order[a.json.id] - order[b.json.id]);\nconst regen = [];\nrecs.forEach((r, i) => {\n  const f = r.json.fields || {};\n  if (f['Regenerează Imagine'] === true) {\n    // The previous scene's picture is the style reference, BY ITS FLOW MEDIA\n    // ID: images are generated on Flow now, so a reference is a\n    // mediaGenerationId (every scene made since the port carries a generated\n    // one; older scenes carry the id of their upload). No download, no upload.\n    const prevId = i > 0 ? String(((recs[i-1].json.fields || {})['Image Media ID']) || '') : '';\n    // Reviewer feedback (\"Observații Scenă\", written from the site) steers\n    // the regeneration instead of a blind re-roll.\n    // …but only a HUMAN's note. The pipeline writes its own refusal notes\n    // into the same field (AUTO-REWRITE / REJECTED …), and feeding those\n    // back would put the refused content into the prompt a second time —\n    // the trap CLAUDE.md describes under content filters.\n    let feedback = String(f['Observații Scenă'] || '').trim();\n    if (/^(AUTO-REWRITE|REJECTED|Image regeneration REJECTED)/i.test(feedback)) feedback = '';\n    let prompt = f['Imagine First Frame'] || f['Prompt Vizual'] || '';\n    if (feedback) prompt += '\\n\\nADJUSTMENT REQUEST — the new image MUST follow this: ' + feedback;\n    regen.push({ id: r.json.id, prompt, prevId });\n  }\n});\nconst total = recs.length;\n// This is the COMBINED asset gate. Takes and images are generated in one\n// uninterrupted pass (audio loop first, image loop second) and reviewed\n// together here, so the producer makes one visit instead of two before the\n// expensive video stage. Voice regeneration is NOT dispatched from here —\n// the standalone scene-voice-regen webhook covers it, exactly as it covered\n// the old separate voice gate. Image regeneration keeps its in-batch chain\n// (If Any Regen).\n//\n// A scene only counts as approved when its asset actually EXISTS — bulk\n// approving before generation finished must not open the gate.\nconst imagesApproved = recs.filter(r => {\n  const f = r.json.fields || {};\n  const att = f['Imagine Scenă'];\n  return f['Aprobare Imagine'] === true && Array.isArray(att) && att.length > 0;\n}).length;\n// Cinematic (silent) projects never synthesize: the pre-checked Aprobare\n// Voce alone passes. AB Load Project runs whenever any scene lacked audio\n// this pass; when it never ran (every scene already voiced) the catch\n// leaves noSpeech false, which is correct for a project that has takes.\nlet noSpeech = false;\ntry { noSpeech = JSON.parse((($('AB Load Project').first().json.fields || {})['Editing Options']) || '{}').category === 'cinematic'; } catch (e) {}\nconst voicesApproved = recs.filter(r => {\n  const f = r.json.fields || {};\n  return f['Aprobare Voce'] === true && (noSpeech || String(f['Voiceover URL'] || '') !== '');\n}).length;\nconst allApproved = total > 0 && imagesApproved === total && voicesApproved === total;\nreturn [{ json: { anyRegen: regen.length > 0, allApproved, regen, total, approved: imagesApproved, imagesApproved, voicesApproved } }];"
+    }
+  },
+  {
+    "type": "removeConnection",
+    "source": "Decode Regen Image",
+    "target": "Download Regen Image"
+  },
+  {
+    "type": "removeConnection",
+    "source": "Download Regen Image",
+    "target": "Upload Regen Asset To Flow"
+  },
+  {
+    "type": "removeConnection",
+    "source": "Upload Regen Asset To Flow",
+    "sourceIndex": 0,
+    "target": "Extract Regen Asset Id"
+  },
+  {
+    "type": "removeConnection",
+    "source": "Upload Regen Asset To Flow",
+    "sourceIndex": 1,
+    "target": "Mark Image Regen Rejected"
+  },
+  {
+    "type": "removeConnection",
+    "source": "Extract Regen Asset Id",
+    "target": "Write Regen Image"
+  },
+  {
+    "type": "removeNode",
+    "nodeName": "Download Regen Image"
+  },
+  {
+    "type": "removeNode",
+    "nodeName": "Upload Regen Asset To Flow"
+  },
+  {
+    "type": "removeNode",
+    "nodeName": "Extract Regen Asset Id"
+  },
+  {
+    "type": "addConnection",
+    "source": "Decode Regen Image",
+    "target": "Write Regen Image"
+  },
+  {
+    "type": "updateNodeParameters",
+    "nodeName": "Sort & Cap Scenes",
+    "parameters": {
+      "jsCode": "const sd = $getWorkflowStaticData('global');\nsd.prevImageUrl = '';\nsd.prevImageId = '';\nsd.anchorId = '';\n// Every per-scene counter in this workflow lives here and is reset per\n// pass: video polls / resubmits (batch loop), regen polls / resubmits (the\n// gate), multi-voice polls, motion-prompt rewrites, submit cooldowns.\n// They are keyed by scene id because $runIndex counts a node's runs across\n// the WHOLE execution — and a pass now covers the whole film.\nsd.polls = {};\nsd.resubmits = {};\nsd.regenPolls = {};\nsd.regenResubmits = {};\nsd.multiPolls = {};\nsd.rewrites = {};\nsd.submitCooldowns = {};\nsd.imgRewrites = {};\nsd.imgCooldowns = {};\nsd.muxPolls = {};\nconst items = $input.all().slice();\nconst ord = it => { const f = it.json.fields || {}; return (typeof f['Ordine Scenă'] === 'number') ? f['Ordine Scenă'] : null; };\n// \"Done\" is judged on the CLIP and the regen flags, never on the status\n// text. It used to be the text ('Așteaptă Aprobare Video' / 'Finalizat'),\n// and `VP Apply` stamped exactly that text on a scene whose clip had just\n// been REFUSED by the video filter — so a refused scene sorted as finished,\n// fell behind the cap on any film longer than 8 scenes, and was never\n// generated again (Vegas, 71 scenes: 117, 118, 203 and 204 sat like that).\nconst pending = it => {\n  const f = it.json.fields || {};\n  const hasClip = String(f['Scene Final URL'] || '').startsWith('http');\n  const flagged = f['Regenerează Video'] === true || f['Regenerează Imagine'] === true || f['Regenerează Voce'] === true;\n  return !hasClip || flagged;\n};\nitems.sort((a, b) => {\n  const pa = pending(a), pb = pending(b);\n  if (pa !== pb) return pa ? -1 : 1;\n  const oa = ord(a), ob = ord(b);\n  if (oa !== null && ob !== null && oa !== ob) return oa - ob;\n  const t = new Date(a.json.createdTime) - new Date(b.json.createdTime);\n  if (t) return t;\n  return a.json.id < b.json.id ? -1 : 1;\n});\nif (!items.length) throw new Error('No approved scenes found for this project.');\n// A pass covers the WHOLE film: every take, every image, one combined gate,\n// every clip, one video gate. The cap was 8 until 2026-09-01, which turned a\n// 71-scene film into nine rounds of approvals; the site mirrors this number\n// in MEDIA_BATCH_CAP. 200 is a sanity bound (a 12-minute film is ~90\n// scenes), not a chunk size. Pending-first sorting stays so a repeat pass\n// (refused scenes, regen flags) still converges.\nconst CAP = 200;\nif (items.length > CAP) {\n  console.log('Sort & Cap: ' + items.length + ' approved scenes, running ' + CAP + '; ' + (items.length - CAP) + ' left for the next run.');\n}\nreturn items.slice(0, CAP);"
+    }
+  },
+  {
+    "type": "updateNodeParameters",
+    "nodeName": "Prep Flow Reject",
+    "parameters": {
+      "jsCode": "// Context for the auto-rewrite: the scene, the prompt that was ACTUALLY\n// sent, and WHY the image was refused.\n//\n// Images are generated ON Google Flow (since 2026-09-02), so a refusal is\n// Flow's own content filter at GENERATION time — no image was made. The\n// upload-time refusals this chain was first built for (MINOR / prominent\n// people at Upload Asset To Flow) can now only come from the producer's\n// reference photo, which is uploaded once per pass and never lands here.\n// Either way the cure is the same: rewrite the prompt, never resubmit the\n// refused text. The scene id and note are read from Loop Images rather\n// than from the error, which is what lets one chain serve every entry.\n//\n// The rewrite is retried IN PLACE (Apply Rewritten Prompt → IMG Reload\n// Scene → Needs Image?), so this node runs once per attempt for the same\n// scene. Attempts are counted per scene per pass in static data (Sort & Cap\n// resets sd.imgRewrites); after MAX the scene is handed to a human.\nconst scene = $('Loop Images').first().json || {};\nconst f = scene.fields || {};\nconst errText = JSON.stringify($json).slice(0, 1500);\nconst service = 'Google Flow';\nlet reason = service + ' content policy';\nif (errText.includes('MINOR')) reason = 'the image appears to contain a child (Flow refuses images with minors)';\nelse if (errText.includes('PROMINENT') || errText.includes('FACE')) reason = 'the image appears to contain a recognizable real person';\n// After an in-place rewrite the Loop Images item still holds the ORIGINAL\n// text; the prompt that was sent is Build Image Request's latest run.\nlet prompt = '';\ntry { prompt = String($('Build Image Request').first().json.rawPrompt || ''); } catch (e) {}\nif (!prompt) prompt = String(f['Imagine First Frame'] || '');\nconst note = String(f['Observații Scenă'] || '');\nconst sd = $getWorkflowStaticData('global');\nsd.imgRewrites = sd.imgRewrites || {};\nconst n = (sd.imgRewrites[scene.id] || 0) + 1;\nsd.imgRewrites[scene.id] = n;\nconst MAX = 4;\n// A scene that arrives already carrying a refusal note from an earlier pass\n// starts one rung further up the escalation ladder.\nconst attempt = n + (/AUTO-REWRITE|REJECTED/.test(note) ? 1 : 0);\nconsole.log('Image refused for ' + scene.id + ' by ' + service + ' (attempt ' + n + '/' + MAX + ')');\nreturn [{ json: {\n  sceneId: scene.id,\n  prompt,\n  note,\n  service,\n  reason,\n  attempt,\n  giveUp: n > MAX,\n} }];"
+    }
+  },
+  {
+    "type": "updateNodeParameters",
+    "nodeName": "Submit Video",
+    "parameters": {
+      "jsonBody": "={{ { email: 'fermafabiz@gmail.com', model: 'veo-3.1-lite-low-priority', prompt: $('Current Scene').first().json.fields['Video Scenă URL'] + ' Audio: quiet natural ambient sound effects that match the scene only — no speech, no voices, no singing, no narration, no music, no soundtrack.', startImage: $('Current Scene').first().json.fields['Image Media ID'], aspectRatio: ($('Receive Batch Input').first().json.Aspect_Ratio === '9:16' ? 'portrait' : 'landscape'), async: true, captchaRetry: 1 } }}"
+    }
+  },
+  {
+    "type": "updateNodeParameters",
+    "nodeName": "Submit Video Regen",
+    "parameters": {
+      "jsonBody": "={{ { email: 'fermafabiz@gmail.com', model: 'veo-3.1-lite-low-priority', prompt: $json.motionPrompt + ' Audio: quiet natural ambient sound effects that match the scene only — no speech, no voices, no singing, no narration, no music, no soundtrack.', startImage: $json.imageId, aspectRatio: ($('Receive Batch Input').first().json.Aspect_Ratio === '9:16' ? 'portrait' : 'landscape'), async: true, captchaRetry: 1 } }}"
+    }
+  }
+]

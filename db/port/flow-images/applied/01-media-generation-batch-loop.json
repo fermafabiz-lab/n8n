@@ -1,0 +1,441 @@
+[
+  {
+    "type": "updateNodeParameters",
+    "nodeName": "Build Image Request",
+    "parameters": {
+      "jsCode": "const f = $json.fields || {};\nconst prompt = f['Imagine First Frame'] || f['Prompt Vizual'] || '';\nif (!prompt) throw new Error('Scene ' + $json.id + ' has no image prompt.');\nconst rb = $('Receive Batch Input').first().json;\nconst aspect = rb.Aspect_Ratio === '9:16' ? '9:16' : '16:9';\n\n// Images are generated ON Google Flow (useapi POST /google-flow/images):\n// the response carries the signed fifeUrl the ingest re-hosts AND the\n// mediaGenerationId Submit Video needs as startImage, so the picture is\n// born past Flow's upload filter with its id already in hand. No fal, no\n// download, no upload. One model string, here and in the gate's regen and\n// Claude Scripting's IR Build Request — the three must agree.\nconst MODEL = 'nano-banana-2';\n\n// The producer's reference photo, uploaded to Flow ONCE per film by the\n// user-ref chain at pass start (Download User Ref -> Upload Asset To Flow ->\n// Extract Asset Id -> Save User Ref Id) and stored as Editing Options\n// .refImageMediaId. GROUND TRUTH for scene 1 (the hook): wins over the n-1\n// chain and skips the similarity guard. IMG Load Project read the record\n// BEFORE the id was saved on the pass that uploads it, so the fresh id is\n// taken from Save User Ref Id when that node ran.\nlet userRefId = '';\ntry {\n  const opts = JSON.parse((($('IMG Load Project').first().json.fields || {})['Editing Options']) || '{}') || {};\n  userRefId = String(opts.refImageMediaId || '');\n} catch (e) {}\nif (!userRefId) {\n  try { if ($('Save User Ref Id').isExecuted) userRefId = String($('Save User Ref Id').first().json.media_id || ''); } catch (e) {}\n}\nconst isFirstScene = Number(f['Ordine Scenă']) === 1;\n\n// n-1 chain: the previous scene's generated image is the reference for\n// this one, BY ITS FLOW MEDIA ID — no download, no upload. Read from the\n// previous run of Decode Scene Image (run data survives Wait suspensions,\n// unlike static data in test executions — proven in execution 661).\nlet prevId = '';\nlet prevPrompt = '';\ntry {\n  if ($runIndex > 0) {\n    const prev = $('Decode Scene Image').all(0, $runIndex - 1);\n    if (prev && prev[0] && prev[0].json && prev[0].json.mediaId) prevId = prev[0].json.mediaId;\n    const prevReq = $('Build Image Request').all(0, $runIndex - 1);\n    if (prevReq && prevReq[0] && prevReq[0].json) prevPrompt = prevReq[0].json.rawPrompt || '';\n  }\n} catch (e) { prevId = ''; }\n\n// Reference guard, unchanged: chaining exists for CHARACTER/wardrobe\n// consistency. When consecutive prompts are largely the same words, text\n// alone keeps the subject consistent — drop the reference so the composition\n// can vary (the Porsche films collapsed into one repeated shot otherwise).\nconst wordSet = (s) => new Set(String(s || '').toLowerCase().replace(/[^\\p{L}\\p{N}\\s]/gu, ' ').split(/\\s+/).filter(w => w.length > 3));\nlet promptSim = 0;\nif (prevPrompt) {\n  const A = wordSet(prompt), B = wordSet(prevPrompt);\n  if (A.size && B.size) {\n    let hit = 0;\n    for (const w of A) if (B.has(w)) hit++;\n    promptSim = hit / Math.max(A.size, B.size);\n  }\n}\nif (promptSim > 0.55) prevId = '';\n// An in-place retry after a content refusal (the AUTO-REWRITE note is\n// written by Apply Rewritten Prompt just before the scene re-enters the\n// loop) gets NO reference image: the previous picture may carry exactly\n// the content that was refused.\nif (/AUTO-REWRITE/.test(String(f['Observații Scenă'] || ''))) prevId = '';\n\n// count: 1 is mandatory — the API DEFAULTS TO FOUR images. captchaRetry: 1\n// because useapi's five captcha retries per request are pure spend while\n// Google throttles the account; our own cooldown loop handles that.\nconst body = { email: rb.Flow_Email || 'fermafabiz@gmail.com', model: MODEL, prompt: prompt, aspectRatio: aspect, count: 1, captchaRetry: 1 };\nlet usedReference = null;\nif (isFirstScene && userRefId) {\n  body.prompt = 'The reference image is GROUND TRUTH for this film: recreate its subject faithfully — the same exact appearance, design details, materials, colors and overall look — while composing the shot described here: ' + prompt;\n  body.reference_1 = userRefId;\n  usedReference = userRefId;\n} else if (prevId) {\n  body.prompt = 'Use the reference image ONLY for character identity, wardrobe, color palette and film look — NOTHING else. The new shot must be a RADICALLY different composition: different camera angle, different distance, different part of the environment; the reference layout must NOT be recognizable in the result: ' + prompt;\n  body.reference_1 = prevId;\n  usedReference = prevId;\n}\nreturn [{ json: { sceneId: $json.id, requestBody: body, usedReference: usedReference, userRefApplied: !!(isFirstScene && userRefId), rawPrompt: prompt, promptSimilarityToPrev: Number(promptSim.toFixed(2)) } }];"
+    }
+  },
+  {
+    "type": "addNode",
+    "node": {
+      "name": "Flow Pace",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -800,
+        240
+      ],
+      "parameters": {
+        "amount": 8
+      },
+      "notes": "Pacing for Google Flow: one image request every ~8s plus generation time, so the account never sees a burst. Under 65s so the execution stays in memory and the static-data counters survive."
+    }
+  },
+  {
+    "type": "updateNodeParameters",
+    "nodeName": "Generate Scene Image",
+    "replace": true,
+    "parameters": {
+      "method": "POST",
+      "url": "https://api.useapi.net/v1/google-flow/images",
+      "sendHeaders": true,
+      "headerParameters": {
+        "parameters": [
+          {
+            "name": "Authorization",
+            "value": "Bearer user:2923-RNCS1SSSMj5DqvdN7JUMo"
+          },
+          {
+            "name": "Content-Type",
+            "value": "application/json"
+          }
+        ]
+      },
+      "sendBody": true,
+      "specifyBody": "json",
+      "jsonBody": "={{ $('Build Image Request').first().json.requestBody }}",
+      "options": {
+        "timeout": 180000
+      }
+    }
+  },
+  {
+    "type": "setNodeSettings",
+    "nodeName": "Generate Scene Image",
+    "settings": {
+      "retryOnFail": false,
+      "onError": "continueErrorOutput"
+    }
+  },
+  {
+    "type": "updateNodeParameters",
+    "nodeName": "Decode Scene Image",
+    "parameters": {
+      "jsCode": "// Flow answers synchronously: media[0].image.generatedImage carries the\n// signed fifeUrl (expires — Write Scene Image's ingest downloads it on the\n// spot and re-hosts the bytes) and the mediaGenerationId that Submit Video\n// uses as startImage. Same shape Extract Video URL reads for clips.\nconst resp = $json;\nconst m0 = ((resp.media || [])[0] || {});\nconst gi = (m0.image && m0.image.generatedImage) || {};\nconst url = gi.fifeUrl || '';\nconst mediaId = gi.mediaGenerationId || '';\nif (!url || !mediaId) throw new Error('No image in Flow response. Head: ' + JSON.stringify(resp).slice(0, 400));\nconst sceneId = $('Build Image Request').first().json.sceneId;\nreturn [{ json: { sceneId: sceneId, url: url, mediaId: mediaId } }];"
+    }
+  },
+  {
+    "type": "updateNodeParameters",
+    "nodeName": "Write Scene Image",
+    "parameters": {
+      "jsonBody": "={{ JSON.stringify({ sceneId: $json.sceneId, field: \"image\", url: $json.url, fields: { \"Image Media ID\": $json.mediaId, \"Aprobare Imagine\": false, \"Regenerează Imagine\": false, \"Status Producție Scenă\": \"Așteaptă Aprobare Imagine\" } }) }}"
+    }
+  },
+  {
+    "type": "addNode",
+    "node": {
+      "name": "IMG Error Router",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        600
+      ],
+      "parameters": {
+        "jsCode": "// Generate Scene Image failed (its quick retries are OFF on purpose: a burst\n// of identical requests is exactly what trips Flow's unusual-activity\n// filter). Sort the failure into the three things that can be done about it:\n//  - a content refusal  -> the rewrite-in-place ladder (Prep Flow Reject);\n//  - out of credits (402) -> fatal, the run dies loudly, never loops;\n//  - everything else (429, 503, captcha_quality, timeouts, 5xx)\n//                        -> IMG Cooldown Guard, i.e. time, then the same request.\nconst j = $input.first().json || {};\nconst text = JSON.stringify(j).slice(0, 2000);\nconst status = Number((j.error && (j.error.httpCode || j.error.statusCode)) || j.httpCode || j.statusCode || (/\"httpCode\":\"?(\\d{3})/.exec(text) || [])[1] || 0);\nif (status === 402 || /insufficient credits|out of credits|\"402\"/i.test(text)) throw new Error('Google Flow: out of credits — ' + text.slice(0, 300));\nconst throttled = /captcha_quality|UNUSUAL_ACTIVITY|TOO_MUCH_TRAFFIC/i.test(text);\nconst refusal = !throttled && /PROMINENT|MINOR|FILTER|SAFETY|content policy|content_policy|blocked/i.test(text);\nreturn [{ json: Object.assign({}, j, { imgRefusal: refusal, imgThrottled: throttled, imgStatus: status }) }];"
+      }
+    }
+  },
+  {
+    "type": "addNode",
+    "node": {
+      "name": "IMG Refusal?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -288,
+        700
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "img-refusal",
+              "leftValue": "={{ $json.imgRefusal }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    }
+  },
+  {
+    "type": "addNode",
+    "node": {
+      "name": "IMG Cooldown Guard",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        860
+      ],
+      "parameters": {
+        "jsCode": "// Flow image generation failed for a reason that is not a content refusal:\n// 429, 503, a captcha_quality throttle, a timeout. The cure is TIME, not a\n// fourth attempt one second later. Hold a minute and try again, at most\n// MAX times per scene per pass; then die with the last reason, exactly as\n// Submit Cooldown Guard does for videos. The Wait is 60s ON PURPOSE: under\n// 65s n8n keeps the execution in memory and this counter (static data)\n// survives; a longer Wait suspends the run to the database and the count\n// would not. Sort & Cap Scenes resets the counters at the start of every pass.\nconst sd = $getWorkflowStaticData('global');\nsd.imgCooldowns = sd.imgCooldowns || {};\nconst sceneId = $('Build Image Request').first().json.sceneId;\nconst key = sceneId;\nconst n = (sd.imgCooldowns[key] || 0) + 1;\nsd.imgCooldowns[key] = n;\nconst MAX = 20;\nconst j = $input.first().json || {};\nconst last = String(j.lastError || (j.error && (j.error.message || j.error.description)) || j.message || JSON.stringify(j)).slice(0, 300);\nif (n > MAX) throw new Error('Flow image generation kept failing after ' + MAX + ' cooldowns of 60s — last reason: ' + last);\n// A throttle needs TIME, not attempts: hold five cooldowns (5 min) per try.\nconst throttled = !!j.imgThrottled;\nconst holds = throttled ? 5 : 1;\nconst retryNow = n % holds === 0;\nconsole.log('Flow image ' + sceneId + ' failed (' + n + '/' + MAX + '), cooling down 60s' + (retryNow ? ', then retrying' : '') + ': ' + last);\nreturn [{ json: { cooldown: n, retryNow: retryNow, imgThrottled: throttled, lastError: last } }];"
+      }
+    }
+  },
+  {
+    "type": "addNode",
+    "node": {
+      "name": "Wait IMG Cooldown",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -700,
+        860
+      ],
+      "parameters": {
+        "amount": 60
+      },
+      "notes": "60s ON PURPOSE: under 65s the execution stays in memory and the cooldown counter in static data survives."
+    }
+  },
+  {
+    "type": "addNode",
+    "node": {
+      "name": "IMG Retry Now?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -920,
+        860
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "img-retry-now",
+              "leftValue": "={{ $json.retryNow }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    }
+  },
+  {
+    "type": "removeConnection",
+    "source": "Build Image Request",
+    "target": "Generate Scene Image"
+  },
+  {
+    "type": "removeConnection",
+    "source": "Generate Scene Image",
+    "sourceIndex": 1,
+    "target": "Prep Flow Reject"
+  },
+  {
+    "type": "removeConnection",
+    "source": "Decode Scene Image",
+    "target": "Download Scene Image"
+  },
+  {
+    "type": "removeConnection",
+    "source": "Download Scene Image",
+    "target": "Upload Asset To Flow"
+  },
+  {
+    "type": "removeConnection",
+    "source": "Upload Asset To Flow",
+    "sourceIndex": 1,
+    "target": "Prep Flow Reject"
+  },
+  {
+    "type": "removeConnection",
+    "source": "Extract Asset Id",
+    "target": "Write Scene Image"
+  },
+  {
+    "type": "removeNode",
+    "nodeName": "Download Scene Image"
+  },
+  {
+    "type": "addConnection",
+    "source": "Build Image Request",
+    "target": "Flow Pace"
+  },
+  {
+    "type": "addConnection",
+    "source": "Flow Pace",
+    "target": "Generate Scene Image"
+  },
+  {
+    "type": "addConnection",
+    "source": "Decode Scene Image",
+    "target": "Write Scene Image"
+  },
+  {
+    "type": "addConnection",
+    "source": "Generate Scene Image",
+    "sourceIndex": 1,
+    "target": "IMG Error Router"
+  },
+  {
+    "type": "addConnection",
+    "source": "IMG Error Router",
+    "target": "IMG Refusal?"
+  },
+  {
+    "type": "addConnection",
+    "source": "IMG Refusal?",
+    "sourceIndex": 0,
+    "target": "Prep Flow Reject"
+  },
+  {
+    "type": "addConnection",
+    "source": "IMG Refusal?",
+    "sourceIndex": 1,
+    "target": "IMG Cooldown Guard"
+  },
+  {
+    "type": "addConnection",
+    "source": "IMG Cooldown Guard",
+    "target": "Wait IMG Cooldown"
+  },
+  {
+    "type": "addConnection",
+    "source": "Wait IMG Cooldown",
+    "target": "IMG Retry Now?"
+  },
+  {
+    "type": "addConnection",
+    "source": "IMG Retry Now?",
+    "sourceIndex": 0,
+    "target": "Flow Pace"
+  },
+  {
+    "type": "addConnection",
+    "source": "IMG Retry Now?",
+    "sourceIndex": 1,
+    "target": "IMG Cooldown Guard"
+  },
+  {
+    "type": "addNode",
+    "node": {
+      "name": "User Ref?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1700,
+        400
+      ],
+      "notes": "The producer's reference photo (Editing Options.refImage, a Drive URL) has to be a Flow media id to serve as a reference. Upload it once and remember the id as refImageMediaId; later passes and restarts skip this.",
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "user-ref-needs-upload",
+              "leftValue": "={{ (() => { try { const o = JSON.parse((($json.fields || {})['Editing Options']) || '{}') || {}; return !!(o.refImage && String(o.refImage).startsWith('http') && !o.refImageMediaId); } catch (e) { return false; } })() }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    }
+  },
+  {
+    "type": "addNode",
+    "node": {
+      "name": "Download User Ref",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1700,
+        600
+      ],
+      "parameters": {
+        "url": "={{ JSON.parse($('IMG Load Project').first().json.fields['Editing Options']).refImage }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          },
+          "timeout": 120000
+        }
+      }
+    }
+  },
+  {
+    "type": "setNodeSettings",
+    "nodeName": "Download User Ref",
+    "settings": {
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    }
+  },
+  {
+    "type": "addNode",
+    "node": {
+      "name": "Save User Ref Id",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -2300,
+        600
+      ],
+      "notes": "A jsonb merge, not a read-modify-write of the whole Editing Options: the site merges the same way, so a concurrent write from the project page cannot be lost.",
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "update hov.project\n   set editing_options = coalesce(editing_options, '{}'::jsonb) || $hov${{ JSON.stringify({ refImageMediaId: $json.mediaId }) }}$hov$::jsonb\n where id = $hov${{ $('Receive Batch Input').first().json.Project_ID }}$hov$\nreturning id, editing_options->>'refImageMediaId' as media_id",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "eRjiNDQFuDSTJpGK",
+          "name": "HOV Postgres"
+        }
+      }
+    }
+  },
+  {
+    "type": "setNodePosition",
+    "nodeName": "Upload Asset To Flow",
+    "position": [
+      -1900,
+      600
+    ]
+  },
+  {
+    "type": "setNodePosition",
+    "nodeName": "Extract Asset Id",
+    "position": [
+      -2100,
+      600
+    ]
+  },
+  {
+    "type": "removeConnection",
+    "source": "IMG Load Project",
+    "target": "Find Audio Folder"
+  },
+  {
+    "type": "addConnection",
+    "source": "IMG Load Project",
+    "target": "User Ref?"
+  },
+  {
+    "type": "addConnection",
+    "source": "User Ref?",
+    "sourceIndex": 0,
+    "target": "Download User Ref"
+  },
+  {
+    "type": "addConnection",
+    "source": "User Ref?",
+    "sourceIndex": 1,
+    "target": "Find Audio Folder"
+  },
+  {
+    "type": "addConnection",
+    "source": "Download User Ref",
+    "target": "Upload Asset To Flow"
+  },
+  {
+    "type": "addConnection",
+    "source": "Upload Asset To Flow",
+    "sourceIndex": 1,
+    "target": "Find Audio Folder"
+  },
+  {
+    "type": "addConnection",
+    "source": "Extract Asset Id",
+    "target": "Save User Ref Id"
+  },
+  {
+    "type": "addConnection",
+    "source": "Save User Ref Id",
+    "target": "Find Audio Folder"
+  }
+]

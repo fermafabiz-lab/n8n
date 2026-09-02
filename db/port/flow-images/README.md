@@ -1,12 +1,71 @@
 # Images on Google Flow instead of fal.ai — the port
 
-Status: **designed and specified, NOT applied** (2026-09-02). The n8n MCP
-connector dropped mid-session and needs re-authorising before the operations
-below can be sent. Nothing in production has changed. When applying, do it
-exactly like every other MCP edit: `update_workflow` (stages a draft), fetch
-the draft back, diff it node-by-node against `activeVersionId`, confirm the
-Google Drive nodes still carry `resource`/`operation`, then
-`publish_workflow` with the draft's `versionId`.
+Status: **APPLIED and LIVE since 2026-09-02 ~11:33 UTC.**
+
+| Workflow | now active | was active (saved here as `*.original.json`) |
+|---|---|---|
+| 3. Media Generation `yHG4DBCDjR3RJzav` | `d88a638e` (two entries: `a53180c8` batch loop + user-ref upload, `d88a638e` gate regen + counters) | `95f1a1f0` |
+| Claude Scripting `gkEtGMecv4TC3ZHp` | `bafbe64d` | `6ebf3e18` |
+
+Applied exactly as every other MCP edit: `update_workflow` staged the drafts
+(`applied/01..03-*.json` are the operation lists, verbatim), both drafts were
+fetched back and diffed node-by-node against `activeVersionId` with
+`applied/diff-against-active.js` — every differing node was in the intended
+set, no `$('…')` reference to a removed node, no dangling edge, all twelve
+Google Drive nodes still carrying `resource`/`operation`, every Code body
+byte-identical to what was written — and only then `publish_workflow` with
+each draft's own `versionId`. Rollback is `restore_workflow_version` to the
+"was active" id, or a PUT of the saved original.
+
+**The API contract was verified live before a single node changed**: a
+throwaway workflow (execution 9241, archived) called `GET /accounts`
+(`health: OK`, session refresh 01:24 UTC — not the 04:38 the design guessed)
+and `POST /images` with `count: 1` — 23.6s for `nano-banana-2`, one item in
+`media[]`, `media[0].image.generatedImage.{fifeUrl, mediaGenerationId}`
+exactly as designed, the id of the form `…-image:<uuid>`, `modelNameType:
+NARWHAL`, plus a `captcha` block showing useapi solved one reCAPTCHA in 3.5s
+on the way. The `fifeUrl` is `flow-content.google/image/…?Expires=…`, which
+`/api/media/ingest` downloads like it already downloads Flow's clips.
+
+Four things differ from the design below, each on purpose:
+
+- **`Save User Ref Id` is a Postgres jsonb merge**
+  (`editing_options || '{"refImageMediaId": …}'`), not the HTTP PATCH of the
+  whole Editing Options the design proposed. A read-modify-write of that JSON
+  is the lost-update the site's own `updateEditingOptions` was rewritten to
+  avoid; the merge cannot lose a concurrent write. `Build Image Request`
+  reads the id from `IMG Load Project` and, on the pass that uploads it,
+  from `Save User Ref Id`'s `returning` — `IMG Load Project` read the record
+  before the id existed. Its credential (`HOV Postgres`) was passed on
+  `addNode` and then re-set in place with `setNodeCredential` because the
+  API redacts every binding and a control read on a working Postgres node
+  answers the same `undefined`.
+- **`IMG Error Router` treats a throttle as never a refusal** — `throttled`
+  is tested first and `refusal` requires `!throttled`, so a captcha error
+  whose text happens to contain "blocked" cannot enter the rewrite ladder
+  and burn a rewrite on a prompt that was never judged.
+- **The reference photo's own upload refusal goes to `Find Audio Folder`**,
+  i.e. the pass continues without the reference (scene 1 then chains like
+  any other), rather than into the rewrite ladder — the photo is not a
+  prompt and cannot be rewritten. It retries on every pass because no id is
+  stored; visible in the execution log, not on the site.
+- **Claude Scripting's `IR Build Request` needs `refImageMediaId`, not the
+  Drive URL**, and a project whose batch ran before this port has only the
+  URL. It logs `IR: scene 1 has a reference photo but no refImageMediaId
+  yet` and regenerates scene 1 without the reference; the next batch pass
+  (Resume, a regen through the gate) uploads it and stores the id, after
+  which the site's regen uses it. Kept simple on purpose: the case is one
+  regen on scene 1 of an old project.
+
+Also carried: `Upload Asset To Flow` and `Extract Asset Id` still exist,
+moved to the user-ref chain; `Generate Scene Image` keeps its now-unused
+FAL credential binding (redacted, harmless — `authentication` is gone from
+its parameters); the useapi Bearer stays a literal header like every other
+useapi node. `Regenerate Scene Image` keeps its 15s `batching` interval as
+the gate regen's pacing. Retries are OFF on all three generate nodes.
+
+The rest of this file is the design as written before the apply, kept
+because it explains the shape.
 
 ## Why
 

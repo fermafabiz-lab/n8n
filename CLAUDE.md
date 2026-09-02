@@ -1305,6 +1305,75 @@ the point, and it is what the panel says out loud, because hearing the
 difference on the line already playing is the whole reason the control is
 there rather than two screens later.
 
+### Images are made on Google Flow, not fal (2026-09-02)
+
+`Generate Scene Image` (batch loop), `Regenerate Scene Image` (the gate's
+regen) and `IR Generate Image` (Claude Scripting's `scene-image-regen`
+webhook) all POST to useapi `/v1/google-flow/images` with `model:
+nano-banana-2`, `count: 1`, `captchaRetry: 1`. The design and the apply record
+are `db/port/flow-images/README.md`; what belongs here is what bites.
+
+- **The picture and the clip come from one place, so one filter instead of
+  two.** fal made a picture, we downloaded it, uploaded it to Flow, and Flow's
+  UPLOAD filter refused what fal had happily made. Generated on Flow it is
+  born past that filter, and the response carries BOTH the signed `fifeUrl`
+  (which `/api/media/ingest` re-hosts, as it already did for Flow's clips)
+  and the `mediaGenerationId` that `Submit Video` needs as `startImage`.
+  `Download Scene Image`, `Extract Asset Id`-in-the-loop and the whole regen
+  download/upload trio are gone; `Decode → Write` is the chain now. The n-1
+  reference is the previous scene's media id, no bytes moved.
+- **`count` DEFAULTS TO FOUR.** Omit it and every scene costs four images and
+  returns four; `Decode Scene Image` reads `media[0]` and would silently keep
+  the first. Proven on the probe (execution 9241): `count: 1` → one item,
+  23.6s, `modelNameType: NARWHAL`, id of the form `…-image:<uuid>`.
+- **Retries are OFF on all three generate nodes, on purpose**, and every
+  failure that is not a content refusal goes through time, not attempts:
+  `IMG Error Router → IMG Refusal? → IMG Cooldown Guard → Wait IMG Cooldown
+  (60s) → IMG Retry Now? → Flow Pace (8s) → Generate Scene Image`. A
+  `captcha_quality` / `UNUSUAL_ACTIVITY` error holds FIVE cooldowns before
+  the next try; max 20 per scene per pass (`sd.imgCooldowns`, reset by `Sort
+  & Cap`); `402` throws at once. n8n's own quick retries are exactly the
+  burst that trips Google's unusual-activity filter, which is why `retryOnFail`
+  must stay false here even though every other HTTP node in the batch has
+  it. `Generate Scene Image` reads its body from `$('Build Image Request')`
+  BY NAME so the cooldown loop can re-enter it with a cooldown item.
+- **A refusal enters the SAME rewrite ladder** (`Prep Flow Reject → IMG Give
+  Up? → Rewrite Prompt AI → Apply Rewritten Prompt → IMG Reload Scene`),
+  which is why the router exists: the ladder rewrites a PROMPT, so it must
+  only ever see a judgement on one. A throttle is tested first and can never
+  be classed as a refusal.
+- **The producer's reference photo is uploaded to Flow ONCE per film**, at
+  pass start (`IMG Load Project → User Ref? → Download User Ref → Upload
+  Asset To Flow → Extract Asset Id → Save User Ref Id → Find Audio Folder`),
+  because a Flow reference must be a Flow media id and the photo is a Drive
+  URL. The id lands in `Editing Options.refImageMediaId` through a jsonb
+  MERGE, never a rewrite of the JSON — the lost-update the site's
+  `updateEditingOptions` exists to avoid. `Build Image Request` reads it from
+  `IMG Load Project` or, on the pass that uploads it, from `Save User Ref
+  Id`'s `returning` (the project was read before the id existed).
+  `IR Build Request` reads only the id: a project whose batch predates the
+  port regenerates scene 1 WITHOUT its reference until a batch pass stores
+  it, and says so in the log.
+- **`captchaRetry: 1` is now on `Submit Video` / `Submit Video Regen` too.**
+  useapi solves Flow's reCAPTCHA through a paid provider and retried five
+  times per request; under a throttle those five were pure spend, and the
+  cooldown loops on both sides already supply the waiting.
+- **The account's session refreshes at ~01:24 UTC**, read off
+  `GET /accounts` (`nextRefresh`), not the 04:38 the design guessed; a
+  request in that minute fails and the cooldown covers it. Same call answers
+  `health: OK` — run it from a throwaway workflow before assuming a block has
+  lifted, exactly as the video section says.
+- **How it was applied is the method to reuse**: probe the endpoint from a
+  throwaway workflow first (a manual execution keeps its `runData`), stage
+  with `update_workflow`, fetch the draft, diff it node-by-node against
+  `activeVersionId` (`db/port/flow-images/applied/diff-against-active.js`
+  prints added/removed/changed nodes, edge deltas, dangling `$('…')`
+  references, the Drive `resource`/`operation` check, and a byte comparison of
+  every Code body against the file it was written from), then
+  `publish_workflow` with that draft's `versionId`. The first draft went up
+  with one running execution (9067) still alive; that is fine — executions
+  are version-pinned — and the running one simply finished on fal.
+
 ### Which Veo model the pipeline asks for
 
 `Submit Video` and `Submit Video Regen` (Media Generation) are the only two
@@ -3607,10 +3676,13 @@ generated FROM it. The chain, and where each piece lives:
 - **Media Generation**: new `IMG Load Project` (one GET at batch start,
   in-line before `Find Audio Folder`) exposes Editing Options to the image
   loop. `Build Image Request`: scene with `Ordine Scenă === 1` + refImage
-  → `nano-banana/edit` with the photo as GROUND TRUTH ("recreate the
-  subject faithfully"), which is a deliberately different instruction from
-  the n-1 chain's "identity only, different composition". User ref wins
-  over chaining and skips the similarity guard.
+  → the photo as GROUND TRUTH ("recreate the subject faithfully"), which is
+  a deliberately different instruction from the n-1 chain's "identity only,
+  different composition". User ref wins over chaining and skips the
+  similarity guard. **Since 2026-09-02 the reference is a Flow media id**
+  (`refImageMediaId`, uploaded once per film by the user-ref chain after
+  `IMG Load Project`), not the Drive URL — see "Images are made on Google
+  Flow".
 - **Regen path** (`IR Build Request`/`IR Generate Image` in Scripting):
   same rule, keyed by `refIsUser`. Unlike the n-1 chain, the user ref
   survives a prior rejection — it is producer-approved content; the
@@ -3630,17 +3702,15 @@ generated FROM it. The chain, and where each piece lives:
 
 ## Open work
 
-- **Images on Google Flow instead of fal — designed, not applied.**
-  `db/port/flow-images/README.md` holds the whole port: the useapi
-  `POST /google-flow/images` contract (sync, `count` defaults to 4, the
-  response carries `fifeUrl` + `mediaGenerationId`), the node-by-node
-  replacement for the batch loop, the gate regen and Scripting's
-  `IR Generate Image`, and the anti-throttle rules (one request in flight,
-  an 8s pace, no n8n quick retries, 5-minute holds on `captcha_quality:`,
-  `captchaRetry: 1`). It removes the download → upload hop and the second
-  content filter at upload time; images on Flow spend no credits on the
-  Ultra plan (producer, 2026-09-02), same as Veo lite low-priority. The n8n
-  connector dropped before it could be applied.
+- ~~Images on Google Flow instead of fal — designed, not applied.~~ **Applied
+  and live 2026-09-02** (Media Generation `d88a638e`, Claude Scripting
+  `bafbe64d`); see "Images are made on Google Flow" under the hard-won
+  lessons and `db/port/flow-images/README.md` for the apply record, the
+  four deliberate deviations from the design and the rollback ids. What
+  remains is the first-film verification the README lists: `Image Media ID`
+  on a new scene of the form `…-image:<uuid>`, `Submit Video` accepting it
+  as `startImage`, and a refused prompt walking the rewrite ladder with no
+  30-second burst in the execution timeline.
 
 - ~~Do not publish the Media Generation draft parked since 2026-08-17~~ — that
   draft is gone, superseded by later edits, and the six Google Drive upload

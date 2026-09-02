@@ -54,8 +54,19 @@ function run(cmd, args, timeoutMs = 10 * 60 * 1000) {
 }
 
 async function download(url, dest) {
-	const res = await fetch(url, {redirect: 'follow'});
-	if (!res.ok) throw new Error(`download ${url}: HTTP ${res.status}`);
+	// Drive answers 503/429 when it is asked for many files at once — a
+	// 71-scene film is 142 downloads in a row, and two renders of the same
+	// film once did it together. A short back-off is all it wants.
+	const waits = [2000, 6000, 15000];
+	let res;
+	for (let attempt = 0; ; attempt++) {
+		res = await fetch(url, {redirect: 'follow'});
+		if (res.ok) break;
+		const transient = res.status === 503 || res.status === 429 || res.status === 500 || res.status === 502;
+		if (!transient || attempt >= waits.length) throw new Error(`download ${url}: HTTP ${res.status}`);
+		console.warn(`download ${url}: HTTP ${res.status}, retrying in ${waits[attempt] / 1000}s`);
+		await new Promise((r) => setTimeout(r, waits[attempt]));
+	}
 	const buf = Buffer.from(await res.arrayBuffer());
 	// Google Drive sometimes serves an HTML interstitial instead of the file;
 	// catch that early instead of feeding HTML to ffmpeg.
@@ -410,8 +421,16 @@ export function registerAssemble(app, {jobs, outputDir}) {
 				// to its scene's exact duration, concat, then layer music + SFX.
 				const args = ['-y'];
 				for (const it of items) {
-					args.push('-i', it.v);
-					args.push('-i', it.a ?? it.v); // fallback: reuse clip audio if no voice
+					// `-threads 1` is an INPUT option here: one decoder thread per
+					// clip. ffmpeg opens every decoder at start, and the default
+					// (auto = one thread per core, per decoder) put 71 h264 decoders
+					// times 8 threads on an 8-core box — the 60th failed to open with
+					// "Resource temporarily unavailable" (EAGAIN from pthread_create)
+					// and the whole 71-scene Vegas assemble died, four times in a
+					// row. Decoding 8-second clips single-threaded costs nothing the
+					// encoder does not dwarf; libx264 keeps its own thread pool.
+					args.push('-threads', '1', '-i', it.v);
+					args.push('-threads', '1', '-i', it.a ?? it.v); // fallback: reuse clip audio if no voice
 				}
 				let idx = items.length * 2;
 				const musicIdx = music ? idx++ : -1;

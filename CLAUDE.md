@@ -3746,11 +3746,11 @@ generated FROM it. The chain, and where each piece lives:
   and live 2026-09-02** (Media Generation `d88a638e`, Claude Scripting
   `bafbe64d`); see "Images are made on Google Flow" under the hard-won
   lessons and `db/port/flow-images/README.md` for the apply record, the
-  four deliberate deviations from the design and the rollback ids. What
-  remains is the first-film verification the README lists: `Image Media ID`
-  on a new scene of the form `…-image:<uuid>`, `Submit Video` accepting it
-  as `startImage`, and a refused prompt walking the rewrite ladder with no
-  30-second burst in the execution timeline.
+  four deliberate deviations from the design and the rollback ids.
+  **Verified end to end the same day** on the disposable test film
+  (execution 9361): four generated `…-image:<uuid>` ids, four clips made
+  from them as `startImage`, and one refusal walking the rewrite ladder to
+  a picture in 65 s. Details and timings at the end of that README.
 
 - ~~Do not publish the Media Generation draft parked since 2026-08-17~~ — that
   draft is gone, superseded by later edits, and the six Google Drive upload

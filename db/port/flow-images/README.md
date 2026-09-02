@@ -38,7 +38,7 @@ id (not `-asset:`), the picture re-hosted at
 `Așteaptă Aprobare Imagine`. Portrait film (`Format: 9:16`), so `aspectRatio:
 "9:16"` is exercised too. The takes and images were approved by SQL so the
 video stage would run `Submit Video` with that generated id as `startImage`
-— see the end of this file for what came back.
+— and it came back complete, see below.
 
 Four things differ from the design below, each on purpose:
 
@@ -373,3 +373,26 @@ body builder, same decode, `IR Write Image` keeps writing `Image Media ID`.
   credit counter are the logs; check both after ten images.
 - A deliberately refused prompt walks the rewrite ladder without a 30-second
   burst anywhere in n8n's execution timeline.
+
+## What came back — the first film, end to end (2026-09-02, execution 9361)
+
+| scene | image (generated id) landed | clip landed |
+|---|---|---|
+| 1 (hook) | 17:03:22 | 17:11:16 |
+| 101 | 17:04:14 | 17:12:35 |
+| 102 | 17:05:19, after ONE auto-rewrite | 17:14:11 |
+| 103 | 17:06:10 | 17:15:23 |
+
+Every `Image Media ID` is `…-image:<uuid>`; every clip was submitted with
+that generated id as `startImage` and came back from `veo-3.1-lite-low-
+priority` in 60–100 s each on a portrait film. Scene 102 (a snail half-sunk
+in a muddy rut beside a turtle) was REFUSED by Flow's generation filter,
+walked `IMG Error Router → IMG Refusal? → Prep Flow Reject → Rewrite Prompt
+AI → Apply Rewritten Prompt → IMG Reload Scene` and came back with a picture
+65 s later — the whole ladder exercised on the first film, with no burst
+anywhere. Note `Apply Rewritten Prompt` clears `Aprobare Imagine`, so an
+approval written BEFORE the rewrite (by SQL, or by a fast producer) is undone
+by it; the gate then waits for the scene to be approved again, which is the
+correct behaviour (the picture changed) and worth knowing when approving by
+hand. The batch is parked at the video gate of the test film, waiting for a
+human.

@@ -3795,6 +3795,21 @@ generated FROM it. The chain, and where each piece lives:
   touches, the producer confirmed again, and the pair ran again — four
   times. **Recognise it by the pairs**: a `webhook` and an `integrated`
   Final Assembly execution starting seconds apart.
+- **The poll ceilings were sized for 60-second films, and the site's
+  "taking much longer than usual" was too — together they turned the first
+  8-minute render into a restart loop** (2026-09-02, Final Assembly version
+  `4fcb507d`). At ~2 fps an 8-minute film is ~95 minutes of Remotion, so
+  `Graphics Guard`'s 360 polls × 5s (30 min) would have killed it as "timed
+  out", and `AssemblyStatus` called 15 minutes "much longer than usual" and
+  offered Restart — which `retryAssembly` honoured by firing a SECOND webhook
+  without stopping the first: two Remotion passes, CPU past 8 of 8, memory
+  6.6 of 8 GB. Now `Render Guard` is 720 polls (1 h), `Graphics Guard` 2160
+  (3 h — the 12-minute brief at 2 fps), `retryAssembly` stops what is alive
+  before it fires, and the panel takes `lengthSeconds` and judges "slow"
+  against `120 + 12 × length` seconds, saying the estimate out loud. Note a
+  restart stops only n8n: the Railway job it abandons keeps rendering to the
+  end and competes with the new one — there is no cancel endpoint, and
+  `restart-service` is the only way to clear it.
 - **`Resource temporarily unavailable` from ffmpeg is a THREAD limit, not
   memory.** "Error while opening decoder for input stream #118:0" — the 60th
   h264 decoder of a 142-input assemble. Every decoder opens at start with

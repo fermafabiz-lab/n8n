@@ -77,6 +77,27 @@ function useSettled(projectId: string, trouble: boolean): boolean {
 const mmss = (s: number) =>
   `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
 
+/**
+ * How long a render of a film this long is EXPECTED to take, in seconds.
+ *
+ * The Remotion pass is headless Chrome on software GL at concurrency 1,
+ * measured at ~2 frames a second (CLAUDE.md, "where a final assembly's
+ * minutes actually go"): 12 seconds of rendering per second of film, on top
+ * of a fixed floor for bundling and the ffmpeg assemble. A 60s film is ~14
+ * minutes; an 8-minute film is ~1h40. The old panel called anything past
+ * 15 minutes "much longer than usual" and offered a restart — on the first
+ * 8-minute film the producer took the offer, twice, and each click put a
+ * second full render beside a healthy one.
+ */
+const RENDER_SECONDS_PER_FILM_SECOND = 12;
+const RENDER_FLOOR_SECONDS = 120;
+function expectedRenderSeconds(lengthSeconds: number | null): number | null {
+  if (!lengthSeconds || lengthSeconds <= 0) return null;
+  return RENDER_FLOOR_SECONDS + lengthSeconds * RENDER_SECONDS_PER_FILM_SECOND;
+}
+
+const minutes = (s: number) => `${Math.max(1, Math.round(s / 60))} min`;
+
 export default function AssemblyStatus({
   projectId,
   startedAt,
@@ -84,14 +105,18 @@ export default function AssemblyStatus({
   n8nUrl,
   /** Assembly is the current status but n8n reports nothing running. */
   missing,
+  /** The film's length, so "slow" is judged against THIS film, not a 60s one. */
+  lengthSeconds = null,
 }: {
   projectId: string;
   startedAt: string | null;
   failure: { message: string; node: string | null } | null;
   n8nUrl: string | null;
   missing: boolean;
+  lengthSeconds?: number | null;
 }) {
   const elapsed = useElapsed(startedAt);
+  const expected = expectedRenderSeconds(lengthSeconds);
   const [msg, setMsg] = useState<ActionResult | null>(null);
   const [pending, setPending] = useState(false);
   const [confirmStop, setConfirmStop] = useState(false);
@@ -105,16 +130,26 @@ export default function AssemblyStatus({
     router.push(`/projects/${projectId}?stage=final`, { scroll: false });
   };
 
-  // A render is minutes, not tens of minutes. Past that something is wrong
-  // even though n8n still calls the execution "running".
-  const slow = elapsed !== null && elapsed > 15 * 60;
+  // "Slow" is relative to the film: half again past the estimate for its
+  // length, or 15 minutes when the length is unknown. Past that something
+  // may be wrong even though n8n still calls the execution "running".
+  const slowAfter = expected !== null ? expected * 1.5 : 15 * 60;
+  const slow = elapsed !== null && elapsed > slowAfter;
   // Only after the signal has held for the grace period — see useSettled.
   const broken = (!!failure || missing) && settled;
   // Which step it is plausibly on — honest pacing, not a fake progress bar:
   // the render reports no intermediate progress, so this is presented as an
-  // estimate, never as measured truth.
+  // estimate, never as measured truth. The first three steps are the ffmpeg
+  // assemble (downloads, trims, one encode), which grows with the film but
+  // stays a small share; the last one is the Remotion pass, which is most of
+  // the wait on any film longer than a minute.
+  const assembleSeconds = lengthSeconds ? 60 + lengthSeconds * 0.5 : 225;
   const stepIndex =
-    elapsed === null ? 0 : Math.min(STEPS.length - 1, Math.floor(elapsed / 75));
+    elapsed === null
+      ? 0
+      : elapsed >= assembleSeconds
+        ? STEPS.length - 1
+        : Math.min(STEPS.length - 2, Math.floor((elapsed / assembleSeconds) * (STEPS.length - 1)));
 
   const retry = async () => {
     setPending(true);
@@ -162,8 +197,11 @@ export default function AssemblyStatus({
         <>
           <p style={{ margin: "0 0 14px", fontSize: 13.5, color: "var(--soft)" }}>
             All the clips are approved and the final video is being put
-            together. This usually takes a few minutes; it appears at the top
-            of this page by itself when it&apos;s done.
+            together.{" "}
+            {expected !== null
+              ? `A film this long takes about ${minutes(expected)} to render — the captions and titles are drawn frame by frame, roughly two frames a second.`
+              : "This usually takes a few minutes."}{" "}
+            It appears at the top of this page by itself when it&apos;s done.
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
             {STEPS.map((s, i) => {
@@ -198,9 +236,12 @@ export default function AssemblyStatus({
           </p>
           {slow && (
             <p className="formmsg" style={{ marginTop: 12 }}>
-              This is taking much longer than usual ({mmss(elapsed!)}). It may
-              still finish, but if nothing changes in the next few minutes it
-              is worth restarting the render below.
+              This is taking longer than a film this length should
+              ({mmss(elapsed!)}
+              {expected !== null ? `, expected about ${minutes(expected)}` : ""}).
+              It may still finish, but if nothing changes in the next few
+              minutes it is worth restarting the render below. Restarting
+              stops this one first — a render is never run twice at once.
             </p>
           )}
           {/* The way out of the locked stepper. Rendering does not care what

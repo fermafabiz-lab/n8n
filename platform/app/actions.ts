@@ -976,6 +976,17 @@ export async function stopAssembly(projectId: string): Promise<ActionResult> {
 }
 
 export async function retryAssembly(projectId: string): Promise<ActionResult> {
+  // Stop what is running BEFORE firing again. This used to fire straight
+  // away, so "Restart the render" pressed on a slow-but-healthy render put a
+  // second Final Assembly beside the first: two Remotion passes on one box
+  // (CPU past 8 of 8, memory at 6.6 of 8 GB on the Vegas film), and both
+  // then die of the very slowness that prompted the click. n8n is stopped
+  // here; the Railway job it started keeps rendering until it finishes on
+  // its own, which is the cost of a restart and why the panel warns first.
+  if (isConfigured) {
+    const alive = await getAliveAssembly().catch(() => []);
+    for (const e of alive) await stopExecution(e.id).catch(() => {});
+  }
   const fired = await fireAssembleWebhook(projectId);
   if (!fired.ok) return fired;
   revalidatePath(`/projects/${projectId}`);

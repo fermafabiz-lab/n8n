@@ -623,6 +623,7 @@ export default async function ProductionRoom({
           !project.finalVideoUrl && (
           <AssemblyStatus
             projectId={id}
+            lengthSeconds={project.lengthSeconds}
             startedAt={assembly?.running?.startedAt ?? null}
             failure={
               assembly?.failed?.detail

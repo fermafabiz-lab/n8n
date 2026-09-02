@@ -25,11 +25,12 @@ Two reasons, and efficiency is the smaller one.
    and re-hosts, exactly as it does fal's URL today) **and** the
    `mediaGenerationId` that `Submit Video` needs as `startImage`.
 
-What it costs: **Flow images spend Google AI credits** — unlike
-`veo-3.1-lite-low-priority`, which is free on Ultra. Check the credit balance
-in the Flow UI after the first film; the useapi API answers `402` when the
-account is out of credits and the chain below treats that as fatal, not
-retryable.
+What it costs: **nothing on this plan** — the producer confirmed on
+2026-09-02 that Flow image generation on the Ultra account does not spend
+Google AI credits (Veo lite low-priority is free the same way). Keep the
+`402` handling anyway: the useapi API answers `402` when an account is out
+of credits, and the chain below treats that as fatal, not retryable, so a
+plan change fails loudly instead of looping.
 
 ## The API (from useapi's own examples — the docs host is blocked from here)
 

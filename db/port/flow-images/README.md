@@ -27,6 +27,19 @@ NARWHAL`, plus a `captcha` block showing useapi solved one reCAPTCHA in 3.5s
 on the way. The `fifeUrl` is `flow-content.google/image/…?Expires=…`, which
 `/api/media/ingest` downloads like it already downloads Flow's clips.
 
+**First film on the new chain — 2026-09-02 17:02 UTC, execution 9361** (the
+disposable test film *A race between a snail and a turtle*, restarted to test
+the story layer, so its batch was the first one to make images on Flow).
+Audio stage 17:02:16→17:02:44 for four takes; the first image landed at
+17:03:22 — 38 s after the audio stage: 8 s `Flow Pace`, ~23 s generation,
+ingest. `Image Media ID` = `user:2923-email:…-image:8c0f5914-…`, a GENERATED
+id (not `-asset:`), the picture re-hosted at
+`reczA9FG5FYtWsfFi/image/04f1fedad4c2e50cd61fe2eca2bddde4.jpg`, status
+`Așteaptă Aprobare Imagine`. Portrait film (`Format: 9:16`), so `aspectRatio:
+"9:16"` is exercised too. The takes and images were approved by SQL so the
+video stage would run `Submit Video` with that generated id as `startImage`
+— see the end of this file for what came back.
+
 Four things differ from the design below, each on purpose:
 
 - **`Save User Ref Id` is a Postgres jsonb merge**

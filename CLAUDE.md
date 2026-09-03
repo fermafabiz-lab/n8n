@@ -499,6 +499,67 @@ Three details are load-bearing:
 list. Anything inserted between those two nodes must keep that reference
 valid.
 
+### Character consistency: the cast sheet (2026-09-03)
+
+Three things carry a face across a film, and until now only two existed.
+
+1. **Text.** The segmenter is told to paste each character's full
+   `visual_description` from the Story Bible into every image prompt they
+   appear in, and it does.
+2. **The n-1 chain.** Each image is generated on Flow with the PREVIOUS
+   scene's picture as `reference_1`, prompted "use this ONLY for character
+   identity, wardrobe and film look". **Measured working**: the same man is
+   recognisably the same man in scenes 102, 203, 307 and 417 of the 71-scene
+   Boyd film, four chapters apart.
+3. **The clip.** Veo starts from the scene's own approved image, so a clip
+   cannot drift from its own frame.
+
+**What the chain cannot do is carry a CAST**, and the failure is structural:
+the reference is whoever was in the last frame, so a scene about Bill whose
+predecessor was a close-up of Sam tells the model to take Bill's identity from
+a picture of Sam. Names cannot rescue it either — the segmenter's
+output-hygiene rule strips them, so all 71 prompts of that film say "White
+American man" and not one says Bill or Sam.
+
+**The bible was also licensing the drift itself.** Sam was "late 40s to early
+60s *depending on scene era*", Bill "early 30s to early 50s depending on scene
+era" — pasted verbatim into every prompt. That is an instruction to draw a
+different man in every scene, and we wrote it. Rule 3 of BOTH bible prompts now
+demands one age and one outfit (both, in lockstep: a rewrite goes through
+`Rebuild Story Bible`).
+
+So: **one reference portrait per character, generated once per film** on Flow
+(free on the Ultra plan), stored on the project as `castRefs`
+{name: mediaGenerationId} — `Cast Sheet Prep → Cast Sheet? → Generate Cast
+Sheet → Collect Cast Refs → Save Cast Refs`, sitting between `IMG Load Project`
+and `User Ref?`. Three details are load-bearing:
+
+- **Who is in a scene comes from `Prompt Vizual`**, the segmenter's own
+  `visual_scene_description` — stored per scene, never sent to a model, and it
+  DOES name people ("Sam stands at the desk"). Bill in 27 scenes, Sam in 26,
+  Crowley in 3, of 71. That is why no new scene field and no migration were
+  needed, and why this works on films made before it existed. A shared surname
+  is not an identifier: "Boyd" matches Sam, Bill and the company, so a
+  character matches on its full name, or on the given name where that is unique
+  among the cast.
+- **`Cast Sheet Prep` never returns zero items.** Everything downstream of it
+  is the rest of the batch; an empty output would end the pass in silence. It
+  emits a `skip` flag instead and `Cast Sheet?` routes on it. Same trap as
+  `Replay Scenes For Images`.
+- **`User Ref?` now reads the project from `$('IMG Load Project')` by name**,
+  because the cast chain sits between them and `$json` is no longer the project
+  record. Anything else inserted there must do the same.
+
+Sheets become `reference_1..2` and the n-1 frame moves to LAST, for palette
+only; the prompt names those roles positionally, so the reference list is built
+rather than assumed. Two sheets is the cap — a third crowds the composition,
+and scene 116 ("the three men gather") is the case that loses one. With no
+sheet and no name match, behaviour is byte-for-byte what it was. After a
+content refusal nothing is attached at all: a face is the likeliest thing a
+people filter objected to.
+
+Rollback, measurements and the smoke test: `db/port/cast-sheet/`.
+
 ### The batch cap
 
 **Since 2026-09-01 a pass is the WHOLE film: `CAP = 200`.** Every take, then

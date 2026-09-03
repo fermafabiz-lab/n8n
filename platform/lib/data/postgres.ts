@@ -365,6 +365,10 @@ const SCENE_FIELDS: Record<string, string> = {
   "Voiceover URL": "voiceover_url",
   "Scene Final URL": "scene_final_url",
   "Image Media ID": "image_media_id",
+  // New here, with no Airtable original: the clip's own Flow
+  // mediaGenerationId, which POST /videos/upscale needs. See
+  // db/006_video_media_id.sql — the DB copy of this map has the same row.
+  "Video Media ID": "video_media_id",
   "Ordine Scenă": "scene_order",
   "Durată Scenă (secunde)": "duration_seconds",
   "Status Producție Scenă": "production_status",

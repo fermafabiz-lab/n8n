@@ -767,7 +767,45 @@ from: 18 scenes with a 34-word outlier become 19 with a maximum of 28, every
 other chunk byte-identical, and the chunker is still lossless. **The lesson
 generalises: a rule that only ever adds needs the rule that subtracts beside
 it**, and the place a missing bound shows up is rarely the place it was
-written.
+written. Rollback and the measurements: `db/port/scene-length-ceiling/`.
+
+### Repetition is COUNTED now, not asked for
+
+The writer's rule 2 is SAY EVERYTHING ONCE. The editor's rule 1 is REPETITION,
+"the single biggest defect". Both were already written, in capitals, and the
+71-scene Boyd film still shipped with 1941 told four times, and 1952, 1962,
+1966, 1975, 1977 and the $6,667 / $3,000 split twice each.
+
+The reason is the shape of the guard, not the wording of the prompts.
+`Narration Guard` enforced structure, empty chapters and **length** — and
+length is the one pressure that pushes the other way: a draft that runs out of
+story reaches its word count the only way left to it, by telling the same dates
+again a chapter later. So the one rule that was measured was the rule that
+caused the defect, and the two that mattered were only requested.
+
+The guard now counts what it was already asking for, in code, and feeds the
+result back through the existing `editorFeedback` path:
+
+- **facts** — years, sums, quantities, at **3+** occurrences, named with the
+  chapters they fall in. A NAME recurring is a protagonist; a NUMBER recurring
+  is the same fact stated twice, which is why the pattern is numeric only.
+- **phrasing** — an identical six-word run appearing twice. Overlapping windows
+  of one repeat are folded, so five offenders means five sentences rather than
+  five views of one.
+
+Same `MAX_RETRIES = 2`, same accept-anyway ending: a repetitive film still
+ships, it just costs at most two more editor passes and those passes are told
+exactly what to cut and to replace it with EVENTS from the spine. Thresholds
+were checked against real narration before shipping — the 44-scene Ploiești
+film raises nothing, a synthetic Boyd-style recycling raises `1941 (3 times,
+chapters 1, 2, 3)` plus four verbatim phrasings — because a guard that fires on
+a clean draft would cost two extra model passes on every film.
+Rollback: `db/port/chapter-titles-and-repetition/`.
+
+**The general shape is worth keeping: an instruction in a prompt is not a
+constraint.** If it matters, something after the model has to be able to say
+whether it happened — and if the only thing you measure is length, length is
+what you will get.
 
 ### Evidence retrieval (Claude Scripting)
 
@@ -886,7 +924,11 @@ is built only inside that guard (a `-1` input index would break the graph).
   touches `remotion/`.** A commit changing only `db/` triggered a Railway
   build on 2026-08-27 (deployment `bbf90578`, commit `cad28c1`), so the path
   filter below cannot be relied on as a safety rule. Treat every push as a
-  container replacement. A Railway deploy replaces the container, which kills
+  container replacement. (2026-09-03, for calibration: three consecutive
+  non-`remotion/` commits all showed `SKIPPED` in the deployment list and both
+  `remotion/` commits built, so the filter USUALLY holds — it is the exception
+  that costs a render, which is why the rule stays as stated. Builds took about
+  two minutes, not the forty the queue can make them look like.) A Railway deploy replaces the container, which kills
   a render in flight — and the producer sees a
   film that simply never arrives, with nothing in the site to explain it.
   Since 2026-08-14 Railway watches `["/remotion/**"]`, so commits touching
@@ -2013,10 +2055,36 @@ and `SceneBoard` routes the active scene voice → image → clip.
   inside the hold" rule carries over unchanged: the stagger compresses so the
   last word lands 0.35s before the exit flash (measured: lands at 0.99s, card
   gone at 2.40s).
+- **No film had a chapter title for three weeks, and nothing failed.**
+  `Build Remotion Props` parses the `[CHAPTER n: title]` markers out of the
+  linked script, and `Fetch Script Titles` fed it by taking the script id from
+  the project's `scripts` field — an Airtable REVERSE LINK that `hov.at_project`
+  never emitted (look at the view in `db/002_airtable_compat.sql`: the link is
+  stored the other way round, on the script, as `Associated Project`). So the
+  expression fell through to its own fallback and queried the literal id
+  `'missing'`, every query since the 15 Aug cutover returned no row, and
+  `chapterTitles` reached the render as `{}`.
+  Nothing errored, because `ImpactCard` has a fallback for exactly this: the
+  first eight words of the scene's own narration. That is the failure mode
+  worth remembering — **the card printed the opening words of the line the
+  voice says one beat later**, over a graphic whose whole job is to show what
+  is NOT being said. Four cards did it on the 71-scene Boyd film while the real
+  titles ("The Floor, the Clock, and the Decision", …) sat in the script the
+  whole time. The lookup now asks the script instead, filtering `at_script`'s
+  own `Associated Project`, newest first — **through the view, not the base
+  table**, because everything else in that workflow reads a `hov.at_*` view and
+  the render path should not be the first thing to discover a missing
+  base-table grant. Verified on a throwaway read-only workflow before
+  publishing. Rollback and the full account: `db/port/chapter-titles-and-repetition/`.
+  **Generalises to the whole migration: a link field that existed only in
+  Airtable does not raise, it resolves to nothing** — and a lookup with a
+  string fallback (`|| 'missing'`) turns that into a query that succeeds and
+  returns zero rows. Grep the ported workflows for reverse links before
+  trusting one.
 - **A card that holds a variable-length line cannot have a fixed type size.**
   `ImpactCard`'s title was a flat `px(52)`, picked for the long case — the
-  eight-word narration excerpt it falls back to on projects rendered before
-  chapter titles were passed in. A real chapter title is three words, so
+  eight-word narration excerpt it falls back to when no chapter title arrives
+  (which, until 2026-09-03, was every project — see the entry above). A real chapter title is three words, so
   "What Fairness Costs" sat tiny in the middle of a full-frame card and read
   as a mistake. It now fits itself with the same `fitTitleSize`, and the
   eyebrow, rule and margins are proportional to the result so the layout keeps
@@ -3922,6 +3990,14 @@ generated FROM it. The chain, and where each piece lives:
   restart stops only n8n: the Railway job it abandons keeps rendering to the
   end and competes with the new one — there is no cancel endpoint, and
   `restart-service` is the only way to clear it.
+
+  **Every per-second figure in this entry is ~20% pessimistic since
+  2026-09-03**, when the composition dropped from 30 fps to the 24 the
+  montage is encoded at: the same film is a quarter fewer frames to draw.
+  Nothing needs changing — the poll ceilings and the site's
+  `120 + 12 × length` estimate are both conservative in the safe
+  direction — but do not re-derive a budget from these numbers without
+  measuring first.
 - **`Resource temporarily unavailable` from ffmpeg is a THREAD limit, not
   memory.** "Error while opening decoder for input stream #118:0" — the 60th
   h264 decoder of a 142-input assemble. Every decoder opens at start with

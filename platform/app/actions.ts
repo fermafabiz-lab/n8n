@@ -1656,7 +1656,7 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
   return {
     ok: false,
     message:
-      `The project was NOT created — no record exists in Airtable. Nothing is running. ` +
+      `The project was NOT created — no record exists in the database. Nothing is running. ` +
       `n8n replied: ${webhookError ?? webhookReply ?? "no reply captured"}`,
   };
 }

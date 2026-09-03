@@ -3170,6 +3170,40 @@ place the old code wrote a lazy `0` or `null` is now a candidate abort**, and
 the two zeroing entries under Airtable are the map of where those are. The
 failure is at least loud, which is the improvement.
 
+### A cleared text field is an empty string, not NULL (2026-09-03)
+
+**Every cinematic film died at creation, and the site said "no record exists
+in Airtable" over a database that has no Airtable in it.** The producer
+tried twice in the morning and once in the evening (orchestrator executions
+9558, 9559, 9690), each dead in under 100 ms at `Create Project in Airtable`:
+
+    null value in column "voice_id" of relation "project" violates not-null constraint
+
+The chain: `createProject` clears `voice_id` to `''` for a silent film
+(nothing speaks — deliberate, see the Cinematic section); the orchestrator
+sends `"Voice ID": ""`; `at_assign` turned every scalar into
+`nullif($1 ->> k, '')::type` — a rule that exists so `''` never reaches
+`''::integer` — and `project.voice_id` is `text not null default ''`. The
+webhook then answered 200 with an EMPTY body (the Respond node never ran), so
+the site's honest fallback fired. Airtable had swallowed the same `''` for
+months; this is the constraint class the cutover section predicted, found on
+the one category the cutover film never exercised.
+
+`db/006_text_fields_keep_empty_string.sql`: for a TEXT column the value is
+written as-is (`''` stays `''`, a JSON null still becomes NULL); the numeric,
+boolean and date branch keeps the nullif. No reader can tell: the `at_*` views
+already `nullif(…, '')` on the way OUT, and 37 projects already stored `''`
+there. Applied live through a throwaway workflow (the n8n Postgres node
+passes a literal `$1` through untouched — probed before sending a function
+body full of them) and verified with a real `at_create` carrying
+`"Voice ID": ""`, then deleted. Note for that kind of probe: a data-modifying
+CTE cannot delete a row the same statement's function just inserted — same
+snapshot — so create and delete are two executions.
+
+The site's wording is fixed in `actions.ts` ("no record exists in the
+database") on this branch; it is not deployed until the branch reaches the
+trunk.
+
 ### The four nodes that need more than a query — solved
 
 `Write Scene Image`, `Write Regen Image`, `Write Regen Video` and

@@ -294,6 +294,45 @@ the workflows as they now actually run, verified against `activeVersionId`.
   (`next_page_token` + `has_more`), not numbered. `/api/voices` still speaks
   page numbers to the picker and walks tokens to reach the window.
 
+### Motion prompts must say WHICH WAY (2026-09-03)
+
+A race film came back with one car driving the wrong way down the track —
+unpostable, and nobody asked for it. The cause is in the prompt, not the model.
+
+`video_motion_prompt` names a camera move and an action and stops. From a real
+film in the database: *"Tracking shot as the BMW M8 lunges forward **from a low
+front three-quarter angle** … heat haze ripples above the highway and **towers
+streak past**."* The camera sees the car's front, the car moves forward, the
+towers stream by — and nothing in that sentence settles whether the world comes
+toward the lens or recedes from it. Veo starts from the still and invents
+whatever the words leave open, differently in different scenes. Another scene
+of the same film says "into **thicker boulevard traffic**" without saying which
+way the traffic goes.
+
+So rule 6 of the segmenter now makes direction mandatory and anchors it to the
+STILL rather than to taste: say which way relative to frame and camera, and
+agree with the composition the image prompt already fixed — **a car framed from
+behind drives away, a car framed head-on comes toward the camera** — and
+everything else that moves (traffic, competitors, crowds) travels the same way
+unless the narration says otherwise. The negative clause gained the same rule
+from the other side.
+
+**The half that matters for films already made is the SUBMIT-time clause.** The
+segmenter rule only reaches scripts written after it; `Submit Video` and
+`Submit Video Regen` now append the continuity sentence beside the audio one,
+so every existing film and every regeneration gets it. The two submit paths
+must keep agreeing — a re-rolled clip obeying a different rule from its
+neighbours is the same defect wearing a different hat.
+
+Two honest limits: a negative is a preference and not a constraint, so this
+reduces the failure rather than removing it (the producer's video gate is still
+the backstop); and **the model string is the bigger dial** —
+`veo-3.1-lite-low-priority` is the weakest on offer and is free on the Ultra
+plan, so anything better is a credit decision, not a code one. It lives in
+three places that must agree, exactly like the image model string.
+
+Full account and rollback: `db/port/motion-direction/`.
+
 ### Content filters — deterministic, never blindly retry
 
 - Google Flow / Veo rejects with `PUBLIC_ERROR_PROMINENT_PEOPLE_FILTER_FAILED`.

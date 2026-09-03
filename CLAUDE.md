@@ -15,7 +15,8 @@ conversation. Keep it updated when a hard-won lesson is learned.
 |---|---|---|
 | **Website** | `platform/` — Next.js on the Hetzner box, `house-of-videos.com` | The producer's whole interface: create projects, approve each stage, watch progress |
 | **n8n** | self-hosted at `wf7.house-of-videos.com` | All orchestration. 4 workflows, see below |
-| **Airtable** | base "Database Video" | The single source of truth for project + scene state |
+| **Postgres** | `hov` database on the Hetzner box, plus `/opt/n8n/media` for the files | The source of truth for project + scene state since the cutover on 2026-08-15 |
+| **Airtable** | base "Database Video" | **Read and written by nothing.** Frozen at the cutover and kept only as the rollback — do not cancel the plan yet |
 | **Render server** | `remotion/server/` on Railway | ffmpeg + Remotion: `/assemble`, `/tts-multi`, `/media`, `/transcript`, `/inspect` |
 
 External services: **ElevenLabs** (TTS), **fal.ai** (images), **Google Flow via
@@ -3038,11 +3039,15 @@ the pipeline already produces.
 
 ## The database that replaces Airtable
 
-Airtable costs 125 lei/month and is being retired. **It is still the source of
-truth today** — the site and every n8n workflow still read and write it. What
-exists so far is the substrate underneath: a populated Postgres database and a
-media store, running in parallel and used by nothing yet. Do not point anything
-at it without reading this section.
+Airtable cost 125 lei/month and has been retired. **This database is the source
+of truth** — since 2026-08-15, 22:46 UTC the site and all five workflows read
+and write it and nothing touches Airtable (see "The cutover happened" below).
+Airtable itself is intact and frozen at that moment, and is the only rollback
+there is; do not cancel the plan yet.
+
+The sections that follow are written in the order the migration happened, so
+several of them describe the parallel-run period rather than today. Where one
+says "still", read it as history.
 
 | Piece | Where |
 |---|---|
@@ -3197,9 +3202,11 @@ lives in compose rather than `platform.env` on purpose: that file is rewritten
 from GitHub Secrets on every deploy, and this connection string names a service
 on the compose network and never leaves the box.
 
-**Do not flip it while the workflows still write Airtable.** The site would
-render a frozen picture — the last import — while n8n updated rows nobody was
-reading.
+It is set to `postgres` on the box today. The rule that governed the flip —
+**never point the site at a backend the workflows are not writing**, or it
+renders a frozen picture while n8n updates rows nobody reads — still governs
+the way back: rolling the site to `airtable` means rolling the five workflows
+with it, in the same window.
 
 **The derivation is shared, and that is the point.** A scene's displayed status
 is not stored anywhere; it is reconstructed from checkboxes plus asset
@@ -3301,6 +3308,33 @@ written loses its opening card. Treat this as the first of a class: **every
 place the old code wrote a lazy `0` or `null` is now a candidate abort**, and
 the two zeroing entries under Airtable are the map of where those are. The
 failure is at least loud, which is the improvement.
+
+That refusal is also what makes the compat layer testable without the box, and
+it is worth re-running after any change to either side. On a throwaway
+Postgres 16, applying `001` + `002` + `003` and exercising the layer confirms
+the behaviour the old Airtable traps make necessary: a numeric field sent as
+`""` lands as **NULL, not 0** (the sixteen-node zeroing bug cannot reproduce
+here), an attachment write raises, an unknown field raises, a link sent as
+`[id]` becomes a real foreign key rather than JSON text in the column, and
+`Editing Options` reads back as JSON *text* so the workflows' `JSON.parse()`
+keeps working. Verified 2026-08-16.
+
+The cheap static half of that is worth more than it looks: extract every field
+name the ported nodes write and check it against `hov.airtable_field`. Because
+an unmapped name RAISES, one missing row would kill a workflow mid-run at
+cutover rather than degrade quietly. Measured across the five ported
+workflows — 23 `at_write`/`at_create` nodes, 49 distinct (entity, field) pairs,
+all mapped.
+
+**One asymmetry to know about:** a linked record reads back as an array where
+the column is a list (`"Capitol": ["rec…"]`) but as a bare string where it is a
+single id (`"Project_ID": "rec…"`). Airtable always sent an array. No
+expression indexes one today — checked — but `fields["Project_ID"][0]` would
+silently yield `"r"` rather than an id.
+
+The same throwaway-Postgres run is where a constraint like the one above gets
+caught before a film does: applying the schema and replaying a node's real
+payload is the only check that exercises the CHECKs, and it costs a minute.
 
 ### The four nodes that need more than a query — solved
 
@@ -3632,6 +3666,35 @@ full film early rather than waiting.
 **Do not cancel the Airtable plan yet.** It is the only rollback that exists.
 A full film and a week first.
 
+### Backups — and the part of them that lives outside this repo
+
+`infra/hov-backup.sh` dumps the three things that cannot be rebuilt from git:
+`hov` (the pipeline's state), the `n8n` database (workflows AND credentials —
+credentials are encrypted per-instance and cannot be exported any other way),
+and `/opt/n8n/media` (735 MB of images and clips that exist nowhere else — the
+fal and Flow links they came from are long dead). Execution history is excluded
+on purpose: 880 of that database's 894 MB, and it prunes itself after 14 days.
+The media mirror is hard-linked against the previous night, so keeping three
+days costs one copy.
+
+**The cutover made this load-bearing.** Before it, a lost `hov` was an
+inconvenience — Airtable held the truth and the import could be re-run. Now
+Airtable is frozen at 2026-08-15, so everything written since exists in exactly
+one place, and rolling back loses it (see "Rolling back"). The backup is the
+only thing between a mistake and that loss.
+
+**What is NOT in this repo is the schedule.** There is no cron entry, systemd
+timer or compose service here that runs the script — whatever runs it lives on
+the box. Two consequences: rebuilding the box from this repo silently produces
+a machine with no backups, and nobody can tell from the repo whether it is
+running at all. Before trusting it, check on the box:
+
+    crontab -l | grep hov-backup ; ls -la /opt/n8n/backups
+
+The script also protects against mistakes, not against the disk dying —
+everything it writes is on the same disk. Off-box is Hetzner's own backup,
+enabled in their console. Both, or neither is worth much.
+
 ### Looking at the data — /db
 
 Airtable's grid was also how the team *looked* at things, and losing it left the
@@ -3760,8 +3823,9 @@ now has a button on the site.
    direct `fetch` calls to `api.airtable.com` had to be pulled in first; on
    inspection all 11 were already *inside* `lib/data.ts`.)
 2. ~~The 48 Airtable nodes.~~ All 48 convert — `db/port/workflows/*.ported.json`,
-   regenerate with `db/port/port-airtable-nodes.mjs`. **Not applied**: a PUT is
-   live immediately, so they go in during the window.
+   regenerate with `db/port/port-airtable-nodes.mjs`. Applied in the cutover
+   window on 2026-08-15; a PUT is live immediately, which is why they went in
+   all at once rather than being parked as drafts.
 3. ~~Admin screens for the three hand-edited tables.~~ Done — `/admin`, on
    both backends.
 4. Saved drafts on Postgres — see "Known gaps, live right now".

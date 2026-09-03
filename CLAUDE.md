@@ -294,6 +294,31 @@ the workflows as they now actually run, verified against `activeVersionId`.
   (`next_page_token` + `has_more`), not numbered. `/api/voices` still speaks
   page numbers to the picker and walks tokens to reach the window.
 
+### Upscaling a finished film (2026-09-04)
+
+`6. Upscale Film` (`QBb1a3UpTyJi8ybk`) — one webhook, `upscale-film`, taking
+`{Project_ID, resolution, reassemble}`. It upscales every clip that has a Flow
+id, re-hosts each through `/api/media/ingest`, points `Scene Final URL` at the
+stored copy, and fires assemble unless `reassemble` is false. **The upscaled
+clip is a new generation with its own id and replaces the old one on the
+scene** — otherwise a second upscale re-does the first generation instead of
+the current picture. Three buttons on the project page, because there are three
+different answers with different costs: rebuild at 1080p (free, ~2x render),
+clips only (free and quick, film untouched), 4K (50 credits per clip, prints
+this film's own total and asks twice).
+
+Two traps worth keeping:
+
+- **A new webhook answers on the PLAIN path only.** n8n's trigger info prints
+  `…/webhook/<uuid>/upscale-film`, which **404s**; `…/webhook/upscale-film`
+  answers 200. The site derives its URLs by swapping the last segment, so the
+  plain form is the one that matters.
+- **`create_workflow_from_code` skips credential assignment on HTTP nodes.**
+  Both calls into the site came out with no credential and needed
+  `setNodeCredential` afterwards. Check credentials after any SDK create.
+
+Full account: `db/port/upscale/`.
+
 ### 1080p is a TIME problem, not a memory one — measured (2026-09-04)
 
 Four renders of the same 15-scene fixture over real footage, concurrency 1 and

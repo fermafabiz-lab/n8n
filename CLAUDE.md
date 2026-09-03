@@ -753,6 +753,22 @@ fewer scenes than were planned.
 Note the count can differ from the naive `ceil(words/22)` after runt
 folding (95 words → 4 scenes, not 5). That is intended.
 
+**The fold had no ceiling, and the bill arrived at the other end of the
+pipeline.** Merging a runt into a neighbour can only make a chunk BIGGER, and
+nothing checked how big — so on the 71-scene Boyd film one chunk came out at
+34 words, which ElevenLabs read as **16.7 seconds of narration over an
+8-second clip**. `/assemble` could cover that only by stretching the picture
+to its 1.5× limit and then freezing the last frame for five seconds, under a
+voice that keeps talking. `MAX_WORDS_PER_SCENE` (1.45 × the target) now splits
+anything over it back down, at a sentence boundary where there is one; the
+"cut this near its middle" rule the unit splitter already had is factored into
+`cutNear` and shared, so the two cannot drift. Verified on the chapter it came
+from: 18 scenes with a 34-word outlier become 19 with a maximum of 28, every
+other chunk byte-identical, and the chunker is still lossless. **The lesson
+generalises: a rule that only ever adds needs the rule that subtracts beside
+it**, and the place a missing bound shows up is rarely the place it was
+written.
+
 ### Evidence retrieval (Claude Scripting)
 
 Scripts on researched topics are written against a pack of sourced claims,
@@ -922,6 +938,13 @@ is built only inside that guard (a `-1` input index would break the graph).
   Railway) at `concurrency: 1`. A 60s film is ~1800 frames, which is why the
   15-scene Tahiti film took ~11m50s. What makes a short film FEEL flat is a
   fixed floor of about 45s that it pays in full.
+  **Measured again 2026-09-03, over 48 h that contained the 71-scene film:**
+  CPU peaked at **8.07 against a limit of 8** and memory at **6.63 GB of 8**.
+  So the box is genuinely saturated at the peak, not idle-waiting — more tabs
+  cannot help, and the memory headroom is thinner than the 2.48 GB recorded
+  after the cache cap. Beyond matching the composition to 24 fps (25% fewer
+  frames, see the montage lessons), the only remaining lever is more vCPU,
+  which is a Railway plan decision and therefore the producer's.
   **Do not reach for `concurrency` as the speed-up.** Memory is no longer the
   constraint — since the OffthreadVideo cap, peak is 2.48GB against 8 — but
   CPU peaked at 6.85 of 8 cores, so the headroom is about one core. More
@@ -1188,8 +1211,8 @@ composition receives are byte-identical to before.
 `assemble.mjs` every scene already lasts as long as its own narration
 (`eff = voiceDur + 0.35`) and the clip is time-stretched to fill it, so slowing
 the narration would stretch the picture for free. Three things kill it: that
-stretch is clamped to `[0.65, 1.5]` and spills into a **frozen tail** past the
-top, so "slow" would mean slower in some scenes and stuttering in others; it
+stretch is clamped to `[0.65, 1.5]` and spills into a **bounced tail** past the
+top (a frozen one until 2026-09-03, see below), so "slow" would mean slower in some scenes and stuttering in others; it
 moves only the picture, leaving the pauses, the music bed and the graphics on
 their old timing; and the scene times computed there feed the graphics pass, so
 captions, chapter cards and the end screen would all need rescaling in lockstep.
@@ -1691,7 +1714,9 @@ and `SceneBoard` routes the active scene voice → image → clip.
   reduce to the same inequality (`f >= cut * fps - 0.5`), so they can disagree
   only on a tie — and a 24fps source in a 30fps composition produces ties by
   construction: every cut lands on .0/.25/.5/.75 of a frame, and the .5 ones sit
-  exactly on the comparison. There the decoder's arithmetic and this
+  exactly on the comparison. (The composition is 24 since 2026-09-03, so that
+  mismatch is gone; the lead and the epsilon remain, because they are what puts
+  a boundary on the nearest frame rather than the next one.) There the decoder's arithmetic and this
   expression's break the tie differently whenever the cut's seconds value is not
   representable in binary. On the tahiti film that was 3 of 13 cuts — 33.9167,
   38.9167, 63.4167, all of the form k/24 with a repeating fraction — each
@@ -1746,6 +1771,28 @@ and `SceneBoard` routes the active scene voice → image → clip.
   one side. `wide` sat at 1.02 against offsets reaching 3.5%, so the calmest
   framing was the one that could tear. `framingOverscan()` states the rule and
   `check:montage` asserts it.
+- **A scene that outruns its clip BOUNCES now; it used to freeze.** Elastic
+  timing gives every scene the length of its own narration and stretches the
+  clip to fill it, clamped at 1.5×. Past that the remainder was
+  `tpad=stop_mode=clone` — the last frame held still — which on the Boyd film
+  meant five seconds of a frozen picture under a voice still talking. The tail
+  is now the END OF THE CLIP PLAYED BACKWARDS: nothing jumps, because the seam
+  is the same frame twice, and on ambient footage a bounce reads as continuous
+  motion rather than as a loop. Bounded at six seconds because `reverse`
+  buffers every frame it receives (~200 MB at 1280x720, and this box has lost
+  renders to memory before); anything past that still clones. Measured with
+  `freezedetect` on the exact worst case — 8s clip, 17.04s scene — the frozen
+  time went from 5.08s to zero, with the frame count unchanged at 409.
+- **The composition renders at 24, because the film underneath is 24.** It was
+  30 over a montage `/assemble` encodes at `OUT_FPS = 24`, which cost two
+  things. The frames: 25% more of them than the film contains, at roughly two
+  a second on a box with no GPU. And the ties: every scene cut then sat at
+  .0/.25/.5/.75 of a composition frame, and the .5 ones land exactly on the
+  comparison that decides which shot a frame belongs to — which is the whole
+  one-frame-pop saga below. The half-frame lead and the epsilon STAY (they are
+  general, and they are what makes a boundary land on the nearest frame), but
+  at 24 the tie cannot arise: every boundary the montage can produce is
+  already a whole frame here.
 - **Nothing that moves may be linear.** `remotion/src/easing.ts` holds the whole
   vocabulary — `outExpo` for entrances, `outQuart` for settles, `inOutCubic` for
   exits and sweeps — plus `eased()` (clamped + eased interpolate) and

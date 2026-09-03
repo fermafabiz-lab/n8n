@@ -453,18 +453,63 @@ export function registerAssemble(app, {jobs, outputDir}) {
 					// the overflow. A 16:9 clip on a 9:16 canvas crops the sides.
 					const vchain =
 						// Elastic retime: setpts stretches/compresses playback to the
-						// scene's narration-driven length, fps=24 AFTER it resamples
+						// scene's narration-driven length, fps=${OUT_FPS} AFTER it resamples
 						// frames evenly, and the final trim pins the exact duration
 						// (it also cuts the leftover tail when the speed-up clamped).
 						`scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},` +
-						`trim=duration=${it.dur.toFixed(3)},setpts=${it.stretch.toFixed(5)}*(PTS-STARTPTS),fps=${OUT_FPS}` +
-						(it.freeze > 0.01 ? `,tpad=stop_mode=clone:stop_duration=${it.freeze.toFixed(3)}` : '') +
-						`,trim=end_frame=${it.effFrames},setpts=PTS-STARTPTS`;
+						`trim=duration=${it.dur.toFixed(3)},setpts=${it.stretch.toFixed(5)}*(PTS-STARTPTS),fps=${OUT_FPS}`;
+					// What the clip covers once it is stretched as far as it may be.
+					const covered = it.dur * it.stretch;
+					// The tail the clip cannot reach, PLAYED BACKWARDS rather than
+					// frozen.
+					//
+					// A scene lasts as long as its narration, and when the voice runs
+					// past what 1.5x slow motion can cover the remainder used to be
+					// `tpad=stop_mode=clone` — the last frame held still. On the
+					// 71-scene Boyd film one scene carried 16.7s of narration over an
+					// 8s clip: twelve seconds of slow motion and then FIVE SECONDS OF
+					// A FROZEN FRAME, under a voice that keeps talking. Reported as
+					// the picture stopping.
+					//
+					// Reversing the tail keeps every frame moving, and on ambient
+					// footage a bounce reads as continuous motion rather than as a
+					// loop: nothing jumps, because the seam is the same frame twice.
+					// It is bounded because `reverse` buffers every frame it receives:
+					// six seconds at 1280x720 is about 200 MB, and this box has
+					// already lost renders to memory once. Six is not arbitrary — the
+					// worst scene of the Boyd film needed 5.04s, so the bound covers
+					// the worst case anyone has actually shipped and leaves a margin.
+					// Anything past it still clones, which is the old behaviour for
+					// the part no reasonable scene should reach.
+					const REVERSE_MAX = 6;
+					const bounce = Math.min(it.freeze, REVERSE_MAX, covered);
 					// end_frame, not duration: after fps=${OUT_FPS} the segment is a
 					// COUNT of frames, and saying so leaves ffmpeg no rounding to do.
 					// `trim=duration=6.833333` sits a hair either side of frame 164
 					// depending on float luck; end_frame=164 is exactly 164 frames.
-					parts.push(`[${i * 2}:v]${vchain}[v${i}]`);
+					if (bounce > 0.04) {
+						parts.push(`[${i * 2}:v]${vchain},split=2[vf${i}][vb${i}]`);
+						parts.push(
+							`[vb${i}]trim=start=${(covered - bounce).toFixed(3)},setpts=PTS-STARTPTS,reverse[vr${i}]`,
+						);
+						parts.push(
+							`[vf${i}][vr${i}]concat=n=2:v=1` +
+								// Still clamped by the trim below; this only catches the
+								// case the bounce could not cover on its own.
+								(it.freeze > bounce + 0.04
+									? `,tpad=stop_mode=clone:stop_duration=${(it.freeze - bounce).toFixed(3)}`
+									: '') +
+								`,trim=end_frame=${it.effFrames},setpts=PTS-STARTPTS[v${i}]`,
+						);
+					} else {
+						parts.push(
+							`[${i * 2}:v]${vchain}` +
+								(it.freeze > 0.01
+									? `,tpad=stop_mode=clone:stop_duration=${it.freeze.toFixed(3)}`
+									: '') +
+								`,trim=end_frame=${it.effFrames},setpts=PTS-STARTPTS[v${i}]`,
+						);
+					}
 					parts.push(`[${i * 2 + 1}:a]${MONO},atrim=duration=${d},asetpts=PTS-STARTPTS,apad=whole_dur=${d}[a${i}]`);
 					if (nativeOn) {
 						// The clip's own ambience has to follow the same elastic retime

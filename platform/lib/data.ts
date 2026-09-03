@@ -48,6 +48,7 @@ export type {
   StatusKind,
   EditingOptions,
   MotifCard,
+  Publishing,
   Project,
   Scene,
   SceneVersion,
@@ -58,6 +59,8 @@ export type {
 } from "./data/derive";
 export {
   MAX_VERSIONS_PER_KIND,
+  PUBLISHING_STATES,
+  normalizePublishing,
   GENRE_EDITABLE,
   LIBRARY_EDITABLE,
   EXAMPLE_EDITABLE,
@@ -457,6 +460,7 @@ const DEMO_PROJECTS: Project[] = [
     castAssign: {},
     chapterVoices: {},
     motifCards: [],
+    publishing: { state: "review", ytTitle: "", notes: "", ytUrl: "" },
   },
   {
     id: "demo-2",
@@ -479,6 +483,7 @@ const DEMO_PROJECTS: Project[] = [
     castAssign: {},
     chapterVoices: {},
     motifCards: [],
+    publishing: { state: "review", ytTitle: "", notes: "", ytUrl: "" },
   },
   {
     id: "demo-3",
@@ -501,6 +506,7 @@ const DEMO_PROJECTS: Project[] = [
     castAssign: {},
     chapterVoices: {},
     motifCards: [],
+    publishing: { state: "review", ytTitle: "", notes: "", ytUrl: "" },
   },
   {
     id: "demo-4",
@@ -523,6 +529,7 @@ const DEMO_PROJECTS: Project[] = [
     castAssign: {},
     chapterVoices: {},
     motifCards: [],
+    publishing: { state: "review", ytTitle: "", notes: "", ytUrl: "" },
   },
 ];
 

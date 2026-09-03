@@ -290,6 +290,8 @@ export interface Project {
   editing: EditingOptions;
   /** Drawn cards chosen by the pipeline, droppable in Final touches. */
   motifCards: MotifCard[];
+  /** Post-delivery state: review status, YouTube title, notes, link. */
+  publishing: Publishing;
   /** The batch is holding, waiting for those options to be confirmed. */
   awaitingFinalSettings: boolean;
   /** Video category id (lib/categories.ts); older projects have none. */
@@ -530,6 +532,47 @@ function parseEditing(raw: unknown): Record<string, unknown> {
 }
 
 /**
+ * What happens to a film AFTER the pipeline delivers it. The pipeline ends at
+ * "Finalizat"; the film's real life continues — reviewed, titled for YouTube,
+ * posted — and none of that state had anywhere to live. It rides in Editing
+ * Options like `motifCards` does (merge-written, no schema change, nothing in
+ * n8n reads it), but it is exposed as its own Project field because it is not
+ * an editing option: nothing about the render changes with it.
+ */
+export interface Publishing {
+  /** Where the finished film stands with the producer, not the pipeline. */
+  state: "review" | "ready" | "posted";
+  /** The title the film will wear on YouTube (which cuts at 100 chars). */
+  ytTitle: string;
+  /** Free notes — what to fix, what to remember at upload time. */
+  notes: string;
+  /** The YouTube link, once posted. */
+  ytUrl: string;
+}
+
+export const PUBLISHING_STATES = ["review", "ready", "posted"] as const;
+
+/**
+ * Defensive like every Editing Options reader: the value round-trips through
+ * jsonb and two backends. Absent or malformed reads as "review" with empty
+ * fields — the state every finished film was silently in before this existed.
+ */
+export function normalizePublishing(raw: unknown): Publishing {
+  const r = asRecord(raw);
+  const state = PUBLISHING_STATES.includes(r.state as Publishing["state"])
+    ? (r.state as Publishing["state"])
+    : "review";
+  const str = (v: unknown, cap: number) =>
+    typeof v === "string" ? v.slice(0, cap) : "";
+  return {
+    state,
+    ytTitle: str(r.ytTitle, 200),
+    notes: str(r.notes, 4000),
+    ytUrl: str(r.ytUrl, 500),
+  };
+}
+
+/**
  * Motif cards come from a MODEL, through a validator, through jsonb — so this
  * reads defensively and keeps only what can actually be drawn. A malformed
  * card is dropped here rather than rendered as an empty rectangle.
@@ -633,6 +676,7 @@ export function buildProject(r: RawProject): Project {
       ? (opts.cast as unknown[]).filter((v): v is string => typeof v === "string" && v.includes("_"))
       : [],
     motifCards: parseMotifCards(opts.motifCards),
+    publishing: normalizePublishing(opts.publishing),
     castAssign: asRecord(opts.castAssign) as Record<string, string>,
     chapterVoices: asRecord(opts.chapterVoices) as Record<string, string>,
   };

@@ -2610,6 +2610,18 @@ the pipeline already produces.
   page — the strategy was right, one call was outside it. The path is not
   rare: it runs on every render whenever any execution failed in the last 24h,
   and four had. **When a display-path fetch can throw, the page must not.**
+- **A film's life continues after "Finalizat", and `Publishing` is where that
+  state lives** (2026-09-03): review state (review/ready/posted), the YouTube
+  title (counter warns past YouTube's 100-char cut), free notes, and the
+  posted link. `PublishingPanel` renders under the finished film's player;
+  the state ALSO takes over the library card's badge on finished films
+  ("Ready to post" amber, "Posted") and feeds the "To post" filter tab —
+  the library is where it earns its keep. Stored as a `publishing` key in
+  Editing Options (merge-written like `motifCards`, nothing in n8n reads
+  it), exposed as `Project.publishing`, normalized by `normalizePublishing`
+  in derive.ts — absent reads as `review` with empty fields. The draft is
+  sessionStorage-backed (`vf-pub:<id>`), the house rule for anything typed
+  on a page that re-renders every 10s.
 - Transient states need a grace period. The render-error panel fires on healthy
   gaps between executions; `AssemblyStatus` uses a 75s sessionStorage-backed
   grace before crying failure.

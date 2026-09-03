@@ -570,6 +570,14 @@ body:has(.nb) .nav {
   color: var(--red);
   box-shadow: inset 0 0 0 1px rgba(216, 72, 61, 0.28);
 }
+/* "Ready to post" — a finished film waiting on an upload, not on the
+   pipeline. Amber: actionable, distinct from the green of merely-finished
+   and the purple of the pipeline's own "needs you". */
+.badge.ready {
+  background: rgba(176, 118, 20, 0.13);
+  color: #8a5c0d;
+  box-shadow: inset 0 0 0 1px rgba(176, 118, 20, 0.3);
+}
 .proj:hover .cover {
   border-color: var(--line2);
   box-shadow: var(--shadow);
@@ -1868,6 +1876,7 @@ body:has(.nb) .nav {
 .plrow .st.run { color: var(--blue); }
 .plrow .st.done { color: var(--green); }
 .plrow .st.err { color: var(--red); }
+.plrow .st.ready { color: #8a5c0d; }
 .plrow .st.idle { color: var(--dim); }
 
 /* --- collapsed error line --- */
@@ -4749,6 +4758,11 @@ body:has(.mkt) .vignette {
   color: #a03c33;
   box-shadow: none;
 }
+.page.pj .proj .badge.ready {
+  background: rgba(250, 238, 214, 0.94);
+  color: #8a5c0d;
+  box-shadow: none;
+}
 .page.pj .proj .rt {
   position: absolute;
   z-index: 2;
@@ -5587,4 +5601,59 @@ body:has(.mkt) .vignette {
   margin: 10px 0 0;
   font-size: 11.5px;
   color: var(--dim);
+}
+
+/* ── Publishing panel (under the finished film) ─────────────────────────── */
+.pubpanel .pubfield {
+  display: block;
+  margin-top: 12px;
+}
+.pubpanel .pubhead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--soft);
+  margin-bottom: 6px;
+  letter-spacing: 0.02em;
+}
+.pubpanel .pubcount {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+.pubpanel .pubcount.over {
+  color: var(--red);
+  font-weight: 700;
+}
+.pubpanel input,
+.pubpanel textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--card);
+  border: 1px solid var(--line2);
+  border-radius: 12px;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  padding: 10px 13px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.pubpanel textarea {
+  resize: vertical;
+  min-height: 64px;
+}
+.pubpanel input:focus,
+.pubpanel textarea:focus {
+  border-color: var(--accent-a28);
+  box-shadow: 0 0 0 3px rgba(122, 79, 214, 0.12);
+}
+.pubpanel .pubwarn {
+  display: block;
+  margin-top: 5px;
+  font-size: 12px;
+  color: var(--red);
 }

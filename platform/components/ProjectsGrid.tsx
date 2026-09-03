@@ -14,7 +14,14 @@ function badgeLabel(p: Project): string {
     case "run":
       return "Rendering";
     case "done":
-      return "Finished";
+      // On a delivered film, the interesting state is no longer the
+      // pipeline's — it is the film's own way to YouTube. One badge slot,
+      // so the publishing state takes it over once it says something.
+      return p.publishing.state === "posted"
+        ? "Posted"
+        : p.publishing.state === "ready"
+          ? "Ready to post"
+          : "Finished";
     case "err":
       return "Needs a fix";
     default:
@@ -22,11 +29,24 @@ function badgeLabel(p: Project): string {
   }
 }
 
-const FILTERS: Array<{ key: "all" | StatusKind; label: string }> = [
+/** The badge's colour class — publishing gets its own on finished films. */
+function badgeClass(p: Project): string {
+  if (p.statusKind === "idle") return "run";
+  if (p.statusKind === "done" && p.publishing.state === "ready") return "ready";
+  return p.statusKind;
+}
+
+type FilterKey = "all" | StatusKind | "topost";
+
+const FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: "all", label: "All" },
   { key: "wait", label: "Needs you" },
   { key: "run", label: "Rendering" },
   { key: "done", label: "Finished" },
+  // Finished films marked "Ready to post" in the Publishing panel — the tab
+  // that answers "what is left to upload". Appears only when non-empty, like
+  // every other tab.
+  { key: "topost", label: "To post" },
   { key: "err", label: "Failed" },
   // Anything whose status the map does not recognise. Without this tab those
   // projects were counted in "All" and reachable from no tab at all, so the
@@ -35,6 +55,9 @@ const FILTERS: Array<{ key: "all" | StatusKind; label: string }> = [
   // because the bucket is: every card in it shows its own status text.
   { key: "idle", label: "Other" },
 ];
+
+const isToPost = (p: Project) =>
+  p.statusKind === "done" && p.publishing.state === "ready";
 
 const short = (s: string, n: number) =>
   s.length > n ? s.slice(0, n).trimEnd() + "…" : s;
@@ -108,7 +131,7 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
   const [armed, setArmed] = useState(false);
   const [msg, setMsg] = useState<ActionResult | null>(null);
   const [pending, startTransition] = useTransition();
-  const [filter, setFilter] = useState<"all" | StatusKind>("all");
+  const [filter, setFilter] = useState<FilterKey>("all");
   const [view, setView] = useState<"grid" | "list">("grid");
   /** Filters title and category live, exactly as the design's search does. */
   const [query, setQuery] = useState("");
@@ -156,8 +179,13 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
 
   const counts = new Map<string, number>([["all", projects.length]]);
   for (const p of projects) counts.set(p.statusKind, (counts.get(p.statusKind) ?? 0) + 1);
+  counts.set("topost", projects.filter(isToPost).length);
   const q = query.trim().toLowerCase();
-  const matched = (filter === "all" ? projects : projects.filter((p) => p.statusKind === filter))
+  const matched = (filter === "all"
+    ? projects
+    : filter === "topost"
+      ? projects.filter(isToPost)
+      : projects.filter((p) => p.statusKind === filter))
     // Title AND category, because a producer looking for "the nature one" is
     // as likely to remember the kind of film as its name.
     .filter(
@@ -378,7 +406,7 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
                     autoPlay
                   />
                 )}
-                <span className={`badge ${p.statusKind === "idle" ? "run" : p.statusKind}`}>
+                <span className={`badge ${badgeClass(p)}`}>
                   {badgeLabel(p)}
                 </span>
                 {manage && (
@@ -481,7 +509,7 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
                   {p.tone ? ` · ${p.tone}` : ""}
                 </span>
               </span>
-              <span className={`st ${p.statusKind}`}>{badgeLabel(p)}</span>
+              <span className={`st ${badgeClass(p)}`}>{badgeLabel(p)}</span>
             </Link>
           ))}
         </div>

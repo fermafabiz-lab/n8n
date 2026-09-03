@@ -24,6 +24,7 @@ import {
   updateEditingOptions,
   getScenes,
   getProjectScriptInfo,
+  normalizePublishing,
 } from "@/lib/data";
 import {
   normalizeCaptionColor,
@@ -1355,6 +1356,32 @@ export async function approveScript(
  * Hands-off mode: flip the flag that AutoPilot and the tick below read.
  * A merge write, so nothing else in Editing Options moves.
  */
+/**
+ * The publishing card under the finished film: review state, the YouTube
+ * title, notes, the posted link. Normalized through the same reader the page
+ * uses (`normalizePublishing`), so a value that cannot be stored cannot be
+ * displayed either, and written as one `publishing` key into Editing Options
+ * — `updateEditingOptions` merges top-level keys, so this never touches the
+ * render settings living beside it.
+ */
+export async function savePublishing(
+  projectId: string,
+  pub: { state: string; ytTitle: string; notes: string; ytUrl: string },
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    const clean = normalizePublishing(pub);
+    await updateEditingOptions(projectId, { publishing: clean });
+    revalidatePath(`/projects/${projectId}`);
+    revalidatePath("/projects");
+    return { ok: true, message: "Saved." };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
 export async function setAutoApprove(
   projectId: string,
   on: boolean,

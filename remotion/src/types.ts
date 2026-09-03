@@ -45,7 +45,7 @@ export type EvidenceClaim = {
 export type TextCardSpec = {
 	/** The scene whose narration this card belongs with. */
 	sceneIndex: number;
-	variant: 'claim' | 'figure' | 'route' | 'schedule';
+	variant: 'claim' | 'figure' | 'route' | 'schedule' | 'timeline';
 	/**
 	 * The line the card is built around: the claim, or the figure itself.
 	 * A route card draws its stops instead, so it may leave this empty.
@@ -65,11 +65,20 @@ export type TextCardSpec = {
 	 * Two or three; a fourth turns a beat into a document.
 	 */
 	rows?: {label: string; value: string}[];
-	/** Route and schedule cards: the small tracked label naming the graphic. */
+	/**
+	 * Timeline card: the years the span is measured between, in order, each
+	 * with the two-to-four words that say what happened there.
+	 *
+	 * `at` is written as the film speaks it ("1941"); the card reads a number
+	 * out of it to place the mark, because the POSITION is the fact — the gaps
+	 * between the marks are what the narration can never say.
+	 */
+	marks?: {at: string; label: string}[];
+	/** Route, schedule and timeline cards: the small tracked label naming the graphic. */
 	label?: string;
 	/**
-	 * Route and schedule cards: the one thing the footage cannot say — a
-	 * distance, a margin between two times.
+	 * Route, schedule and timeline cards: the one thing the footage cannot say
+	 * — a distance, a margin between two times, the length of a span.
 	 *
 	 * Deliberately AUTHORED rather than derived. A distance is not in the
 	 * script and no rule could compute one, so the only honest place for it is

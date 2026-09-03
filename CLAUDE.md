@@ -2064,11 +2064,29 @@ follows is only what remains true after that correction.
   as a freeze.
 - **A text card is the one mid-scene cut the planner may invent**, and it
   passes the rule rather than dodging it: the frame is replaced outright, so
-  nothing about the two pictures either side matches. The framing DOES change
-  across a card, and that is not a punch-in through the back door — the two
-  footage shots never touch on screen, so there is no zoom jump to see.
-  Returning on the SAME framing is what would look wrong: it makes the card
-  read as a splice into one static shot rather than as a cutaway.
+  nothing about the two pictures either side matches.
+- **A card is a CUTAWAY, so the footage RESUMES across it — this entry used to
+  say the opposite, and the opposite was reported as a bug.** The planner
+  crossed the framing over a card on the reasoning that "the two footage shots
+  never touch on screen, so there is no zoom jump to see". They are the same
+  clip two or three seconds apart, and the eye holds a picture that long: the
+  producer saw the zoom jump at the card and said so (2026-09-03), which is the
+  same defect the whole "a cut is a change of picture" rule exists to prevent,
+  arriving through the one door left open to it. A real cutaway returns to the
+  shot it left. The tail now picks up the head's framing INCLUDING where its
+  push and drift had carried it — re-entering on the head's base framing would
+  step back by that much — and `check:montage` asserts it with a synthetic card
+  on every fixture ("cutaway resume"). Intensity 0 carries the same
+  continuation for its 1% pan, for the same reason.
+- **Both of a card's cuts are flared** (`CutFlash` in `Transitions.tsx`,
+  rendered after the card sequences so the light burns over the card too). A
+  card replaces the picture when it arrives and again when it leaves; the
+  chapter card has owned its own light leak since the slide was removed, and
+  the motif cards were left with a 0.22s opacity fade — which is a dissolve
+  between two unrelated pictures, the one thing a cut must not look like. Same
+  envelope and the same peak-on-the-cut placement as everything else here, at a
+  shorter `half` (0.3) because a card only runs two and a half to four seconds.
+  The exit sweeps the other way, exactly as `ImpactCard`'s does.
 - **Cards are placed by the planner, not at fixed points.** Dropped at "always
   the chapter start" they land next to the rhythm instead of in it. It respects
   `CARD_MIN_GAP` (9s), `CARD_MAX_SHARE` (16% of runtime) and a `CARD_LEAD` of
@@ -2111,9 +2129,11 @@ the pipeline already produces.
   chars), or they pick up the start of a different phrase.
 - The kicker is bounded by **width, not word count**: a fixed six-word cap cut
   one phrase mid-clause while truncating a good six-word label on another.
-- The card is ink with the accent, revealed by a fast settle — **not** the
-  light leak, which belongs to the chapter boundary. Two full-frame light cards
-  would be confusable, and reusing the leak blurs which element owns a frame.
+- The card is ink with the accent, revealed by a fast settle. **Its own body
+  still uses no light leak** — that would make two full-frame light cards
+  confusable — but since 2026-09-03 the CUTS either side of it are flared by
+  `CutFlash`, which is a different job: the leak there hides a change of
+  picture, it does not decorate the card.
 - The planner may **squeeze** a card to fit its scene, so `TextCard` takes its
   duration from the SHOT, not from the spec. Without a `minSeconds` floor to
   shrink to, every claim card — long by nature — was silently dropped on 4-5s
@@ -2125,10 +2145,12 @@ the pipeline already produces.
 - **Motif cards: a card may DRAW instead of setting type.** `route`
   (`RouteCard`) unfolds a chart and traces the journey's stops; `schedule`
   (`ScheduleCard`) flaps two times onto a departure board and states the gap
-  between them. The planner needed no change at all to gain either — it places
-  TIME and is written never to see what a card holds — so the only wiring is
-  the variant dispatch in `FinalVideo`'s `renderCard`. Three rules came out of
-  building the first two:
+  between them; `timeline` (`TimelineCard`, 2026-09-03) measures a dimension
+  line out across a span of years and marks each date at its REAL distance from
+  the others, so what it shows is the shape of the span. The planner needed no
+  change at all to gain any of them — it places TIME and is written never to see
+  what a card holds — so the only wiring is the variant dispatch in
+  `FinalVideo`'s `renderCard`. Four rules came out of building them:
   - **A motif must know something the footage cannot show.** The idea started
     as "the narration says map, so unfold a map" — over Veo footage that was
     already showing a man unfolding a map, under a caption already printing
@@ -2148,6 +2170,16 @@ the pipeline already produces.
     its own. Any "reveal B once A has passed it" has this bug at the last B.
     Anything with `Math.random()` has a worse one — the render must be
     reproducible, so the split-flap's digit sequence is arithmetic.
+  - **The motif a film needs is the one you have not built, and the model will
+    try to fake it with what exists.** The first real film to reach the chain
+    was a life told in dates. `route` wants a journey, `schedule` wants clock
+    times, so the model rendered the years 1893 and 1896 as `18:93` and
+    `18:96` — the validator rejected them and the film shipped with nothing.
+    That is not a prompt failure to be scolded out; it is a missing motif, and
+    the empty answer's `none_because` line exists precisely to name it.
+    `timeline` is the answer to that specific report, and its proportional
+    spacing is the reason it is a motif rather than a list: a list of years
+    typeset down the frame would be the script again.
 - **Who authors a motif: a model in Scripting, behind a code validator.**
   `remotion/motif/` holds the prompt and `validate.mjs`; neither is wired into
   n8n yet. It belongs in **Claude Scripting** — the only workflow that knows
@@ -2187,6 +2219,24 @@ the pipeline already produces.
   in that README: a `review` card has nowhere to be reviewed until Final
   touches gets a panel, and explicit `textCards` still switch the derived
   figure cards off for that film.
+
+  **Updated 2026-09-03, after the first film that actually reached it.** Two
+  truthful cards were proposed and none shipped. Provenance is no longer a map
+  keyed by path (`stops[2]`, `rows[1].value`): every stop, row and mark carries
+  its own `source` and a note carries `noteSource`, because the route card's
+  only source arrived filed under `rows[0].value` — a key belonging to a
+  different motif — and a card whose strings were all true was dropped for
+  having none. The old map is still read as a fallback. The parser's example
+  now shows one card per VARIANT instead of one card wearing two motifs'
+  fields, which is what invited the mis-keying. Three nodes changed
+  (`Choose Motif Cards`, `Motif Parser`, `Validate Motif Cards`), all three
+  diffed byte-for-byte against `db/port/motif-cards/paste/` after publishing.
+
+  **And `Attach Motif Cards` was saved into Final Assembly on 08-27 but never
+  published** — the render path ran without it until 09-02, while this file and
+  that README both said it was live. The 08-27 diff had been run against the
+  DRAFT. `versionId` is what you edited; `activeVersionId` is what production
+  executes, and only the second one is evidence.
 - **Applied through the MCP connector, not the REST API — and the diff
   afterwards is not optional.** No API key is involved (the connector is
   already authorised), operations are atomic, and each step lands as its own
@@ -2219,9 +2269,12 @@ the pipeline already produces.
   prove a card is truthful. Only a producer can say it is wanted.
 - **"An animation on every film" is answered by MORE MOTIFS, not a looser
   rule.** The prompt aims for one to three per film and looks hard for them,
-  but it may not force one: with only `route` and `schedule` built, plenty of
-  films genuinely offer neither, and a card that repeats the narration ships
-  while an empty array only asks a question. So an empty answer must carry
+  but it may not force one: a card that repeats the narration ships while an
+  empty array only asks a question. **The backlog worked as designed once:**
+  the 71-scene Boyd film offered dates and sums, `route` and `schedule` could
+  take neither, and `timeline` was built from that (2026-09-03). Expect the
+  next one to arrive the same way — from a film that got nothing, not from a
+  brainstorm. So an empty answer must carry
   `none_because` — one line naming what the film DID offer that no motif could
   draw — and `Validate Motif Cards` logs it as `MOTIF NONE: …`. That log is the
   backlog: it is how the third motif gets chosen, and it is also what stops "no

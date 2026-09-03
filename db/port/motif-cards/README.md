@@ -1,7 +1,14 @@
 # Motif cards — the n8n half
 
-**APPLIED 2026-08-27.** Both workflows are live and verified; what follows
+**APPLIED 2026-08-27. REVISED 2026-09-03** — see "What the first real film
+changed" at the end. Both workflows are live and verified; what follows
 describes what went in, and how to take it back off.
+
+One correction to the table below while you are reading it: `Attach Motif
+Cards` was saved into Final Assembly on 08-27 but **left unpublished**, so the
+render path ran without it until 09-02. The diff that proved the node
+"byte-identical to the repo" was run against the DRAFT. When this file says a
+node is live, check `activeVersionId`, not `versionId`.
 
 It went in through the **n8n MCP connector**, not the REST API — atomic
 operations, one version entry per step, and no API key anywhere. The builders
@@ -148,3 +155,36 @@ ninety seconds the last time it was needed.
   card would have rendered as a blank ink rectangle). Site deploy green, render
   server `/health` ok, so the whole path is live: choose → validate → store →
   review in Final touches → draw.
+
+---
+
+## What the first real film changed — 2026-09-03
+
+The chain ran on a real script (execution 7974) and produced **nothing**, in
+the most useful way it could: two cards proposed, both truthful, both dropped.
+
+- **The route card's only source was filed under `rows[0].value`** — a key
+  belonging to a different motif — so `stops[0] has no source` and the card
+  died with every string in it correct. Provenance now travels WITH the thing
+  it proves: each stop, row and mark carries its own `source`, and a note is
+  justified by `noteSource` beside it. The path-keyed `sources` map is still
+  read as a fallback, so a card written the old way still validates. A shape
+  that cannot express the mistake beats an instruction not to make it.
+- **The parser's example was half the invitation.** It showed one card holding
+  a route's `stops` next to a schedule's `rows`, justified by a single
+  `sources` map containing exactly one `rows[0].value` entry. It now shows one
+  card per variant, each carrying only its own motif's fields.
+- **The schedule card tried to render the years 1893 and 1896 as `18:93` and
+  `18:96`.** That is not a model being careless: the film was a life told in
+  dates, and neither built motif could take a date. `timeline` exists because
+  of it — a dimension line whose marks sit at their real distance apart, 3 to 5
+  of them, ascending, each label at most four words lifted from its own quote,
+  and an optional note whose span the code recomputes in years.
+
+Applied through the MCP connector as three `setNodeParameter` operations, then
+published, then diffed: all three nodes byte-identical to `paste/`, and no other
+node in the workflow touched. `paste/` is refreshed from the live values, and
+`Claude Scripting.motif.json` is regenerated — note that file is still built
+from the 08-27 `.original.json` snapshot, so it is a shape reference now rather
+than a PUT-ready body.
+

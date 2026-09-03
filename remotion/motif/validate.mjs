@@ -27,7 +27,7 @@
 /** No film gets more than this, whatever the model proposes. */
 export const MAX_CARDS = 3;
 /** The motifs that exist. A variant not on this list cannot be drawn. */
-export const VARIANTS = ['route', 'schedule'];
+export const VARIANTS = ['route', 'schedule', 'timeline'];
 
 /**
  * Case, diacritics and punctuation are noise for a provenance test; words are
@@ -132,20 +132,67 @@ const sceneTextOf = (scene) =>
 const sceneOrderOf = (scene) =>
 	scene?.sceneOrder ?? scene?.scene_order ?? scene?.fields?.['Ordine Scenă'] ?? null;
 
-/** Every on-screen string a card holds, keyed exactly as `sources` keys it. */
-const stringsOf = (card) => {
+/** A stop written either way: "Mannheim", or {name, source}. */
+const stopText = (s) => (typeof s === 'string' ? s : (s?.name ?? s?.text ?? s?.value));
+
+/**
+ * Every on-screen string a card holds, with the provenance that justifies it.
+ *
+ * Provenance is read from the ITEM first and from the old `sources` map only
+ * as a fallback, and that order is the fix for the way this failed in
+ * production. The map was keyed by path — `stops[0]`, `rows[1].value` — and
+ * the first real film came back with a route card whose only source sat under
+ * `rows[0].value`: a key belonging to a different motif entirely. Every string
+ * was true and the card was dropped for having no source, which is the
+ * bookkeeping failing, not the model lying. An item that carries its own
+ * source cannot be filed under the wrong key, so the class of error is gone
+ * rather than warned about.
+ *
+ * One source per ROW or MARK, not per string: a row's label and its value come
+ * out of the same spoken line, and asking for that line twice only creates a
+ * second chance to mis-key it.
+ */
+const fieldsOf = (card) => {
+	const map = card.sources ?? {};
 	const out = [];
+	const at = (key, value, inline) => out.push({key, value, source: inline ?? map[key]});
 	if (card.variant === 'route') {
-		(card.stops ?? []).forEach((s, i) => out.push([`stops[${i}]`, s]));
+		(card.stops ?? []).forEach((s, i) => at(`stops[${i}]`, stopText(s), s?.source));
 	}
 	if (card.variant === 'schedule') {
 		(card.rows ?? []).forEach((r, i) => {
-			out.push([`rows[${i}].label`, r?.label]);
-			out.push([`rows[${i}].value`, r?.value]);
+			at(`rows[${i}].label`, r?.label, r?.source);
+			at(`rows[${i}].value`, r?.value, r?.source);
 		});
 	}
-	if (card.note) out.push(['note', card.note]);
+	if (card.variant === 'timeline') {
+		(card.marks ?? []).forEach((m, i) => {
+			at(`marks[${i}].at`, m?.at, m?.source);
+			at(`marks[${i}].label`, m?.label, m?.source);
+		});
+	}
+	if (card.note) at('note', card.note, card.noteSource);
 	return out;
+};
+
+/** The year a timeline mark is pinned at — the same read the card draws with. */
+const yearOf = (at) => {
+	const m = /-?\d+/.exec(String(at ?? ''));
+	if (!m) return null;
+	const n = Number(m[0]);
+	return Number.isFinite(n) ? n : null;
+};
+
+/**
+ * Does this quoted line state this number? A year on a card is not a
+ * transformation of anything — the film either says 1941 or it does not — so
+ * it can be PROVED rather than waved through as unverifiable, which is what
+ * the generic "contains a digit" branch would do with it.
+ */
+const quoteStatesNumber = (quote, value) => {
+	const n = Number(String(value).replace(/[^\d-]/g, ''));
+	if (!Number.isFinite(n)) return false;
+	return numbersIn(quote).includes(n);
 };
 
 /**
@@ -158,10 +205,17 @@ const stringsOf = (card) => {
  * model's own `seconds` is discarded.
  */
 const durationFor = (card) => {
-	const n = card.variant === 'route' ? (card.stops?.length ?? 0) : (card.rows?.length ?? 0);
-	const wanted = card.variant === 'route' ? 2.5 + 0.3 * n : 2.6 + 0.4 * n;
-	const seconds = Math.min(4, Math.round(wanted * 10) / 10);
-	return {seconds, minSeconds: Math.min(seconds, card.variant === 'route' ? 2.6 : 2.8)};
+	const n =
+		card.variant === 'route'
+			? (card.stops?.length ?? 0)
+			: card.variant === 'timeline'
+				? (card.marks?.length ?? 0)
+				: (card.rows?.length ?? 0);
+	const per = card.variant === 'route' ? 0.3 : card.variant === 'timeline' ? 0.32 : 0.4;
+	const base = card.variant === 'route' ? 2.5 : 2.6;
+	const seconds = Math.min(4, Math.round((base + per * n) * 10) / 10);
+	const floor = card.variant === 'route' ? 2.6 : card.variant === 'timeline' ? 2.8 : 2.8;
+	return {seconds, minSeconds: Math.min(seconds, floor)};
 };
 
 /**
@@ -215,6 +269,32 @@ export function validateMotifCards(o) {
 			drop('a route needs 2 to 4 stops');
 			continue;
 		}
+		if (card.variant === 'timeline') {
+			const marks = card.marks ?? [];
+			if (marks.length < 3 || marks.length > 5) {
+				// Two dates are a gap, and a gap is what a schedule draws. Three is
+				// the fewest that has a SHAPE — which is the only thing this motif
+				// shows that the narration cannot say.
+				drop('a timeline needs 3 to 5 marks');
+				continue;
+			}
+			const years = marks.map((m) => yearOf(m?.at));
+			if (years.some((y) => y === null)) {
+				drop('every timeline mark needs a year in its `at`');
+				continue;
+			}
+			if (years.some((y, k) => k > 0 && y <= years[k - 1])) {
+				// The card places marks by their real distance apart. Out of order,
+				// that drawing is a lie about the film.
+				drop('timeline marks must run forwards in time, each year after the last');
+				continue;
+			}
+			const wordy = marks.find((m) => String(m?.label ?? '').trim().split(/\s+/).length > 4);
+			if (wordy) {
+				drop(`a timeline label is at most 4 words: "${wordy.label}"`);
+				continue;
+			}
+		}
 		if (card.variant === 'schedule') {
 			const rows = card.rows ?? [];
 			if (rows.length < 2 || rows.length > 3) {
@@ -234,17 +314,15 @@ export function validateMotifCards(o) {
 			continue;
 		}
 
-		const sources = card.sources ?? {};
 		const notes = [];
 		let verdict = 'ok';
 		let failed = null;
 
-		for (const [key, value] of stringsOf(card)) {
+		for (const {key, value, source: src} of fieldsOf(card)) {
 			if (!value || !String(value).trim()) {
 				failed = `${key} is empty`;
 				break;
 			}
-			const src = sources[key];
 			if (!src?.kind) {
 				failed = `${key} has no source`;
 				break;
@@ -268,13 +346,25 @@ export function validateMotifCards(o) {
 			}
 
 			if (src.kind === 'arithmetic') {
-				if (card.variant !== 'schedule' || key !== 'note') {
-					failed = `${key} claims arithmetic, which only a schedule note may do`;
+				if (key !== 'note' || (card.variant !== 'schedule' && card.variant !== 'timeline')) {
+					failed = `${key} claims arithmetic, which only a schedule or timeline note may do`;
 					break;
+				}
+				const stated = numbersIn(value);
+				if (card.variant === 'timeline') {
+					// The span, in years: the one number on the card that nobody in
+					// the film ever says, and the reason the note is allowed at all.
+					const ys = card.marks.map((m) => yearOf(m.at));
+					const span = Math.max(...ys) - Math.min(...ys);
+					if (!stated.includes(span)) {
+						failed = `${key} says "${value}", but ${Math.min(...ys)}–${Math.max(...ys)} is ${span} years`;
+						break;
+					}
+					notes.push(`${key}: recomputed, ${span} years`);
+					continue;
 				}
 				const mins = card.rows.map((r) => asMinutes(r.value));
 				const gap = Math.abs(Math.max(...mins) - Math.min(...mins));
-				const stated = numbersIn(value);
 				const h = Math.floor(gap / 60);
 				const m = gap % 60;
 				// The note may phrase it however it likes, but the numbers in it
@@ -311,6 +401,16 @@ export function validateMotifCards(o) {
 			if (/\d/.test(String(value))) {
 				if (asMinutes(value) !== null && quoteStatesTime(from, value)) {
 					notes.push(`${key}: ${value} read out of "${from}"`);
+				} else if (quoteStatesNumber(from, value)) {
+					// A number the quote actually states is not a rendering of
+					// anything: it is proved, not reviewed.
+					notes.push(`${key}: ${value} stated in "${from}"`);
+				} else if (key.endsWith('.at')) {
+					// A timeline mark is a bare year by construction, so `review`
+					// would be a euphemism here: either the film says it or the card
+					// is about to put a date on screen that the film never spoke.
+					failed = `${key} is ${value}, which its own quote does not state: "${from}"`;
+					break;
 				} else {
 					verdict = 'review';
 					notes.push(`${key}: "${value}" is a rendering of "${from}" the code cannot check`);
@@ -345,8 +445,16 @@ export function validateMotifCards(o) {
 			variant: card.variant,
 			headline: '',
 			...(card.label ? {label: card.label} : {}),
-			...(card.variant === 'route' ? {stops: card.stops} : {}),
-			...(card.variant === 'schedule' ? {rows: card.rows} : {}),
+			// The RENDER shape, not the authoring shape: whatever provenance the
+			// model attached to a stop, a row or a mark stays in the report and
+			// never reaches the card components, which draw strings.
+			...(card.variant === 'route' ? {stops: card.stops.map(stopText)} : {}),
+			...(card.variant === 'schedule'
+				? {rows: card.rows.map((r) => ({label: r.label, value: r.value}))}
+				: {}),
+			...(card.variant === 'timeline'
+				? {marks: card.marks.map((m) => ({at: m.at, label: m.label}))}
+				: {}),
 			...(card.note ? {note: card.note} : {}),
 			seconds,
 			minSeconds,

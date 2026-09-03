@@ -1,0 +1,64 @@
+{
+	"projectTitle": "Boyd — the dates, trimmed",
+	"tone": "Motivational",
+	"showChapterCards": true,
+	"showHookTitle": false,
+	"hookTitleDurationInSeconds": 0,
+	"evidence": [],
+	"scenes": [
+		{
+			"narratorText": "You say you’ll wait for a better time. Really? That’s how you want this story to start?",
+			"startSeconds": 0,
+			"durationSeconds": 4.8,
+			"chapter": 0
+		},
+		{
+			"narratorText": "Green felt. Brass ashtrays. A wall clock. Downtown Las Vegas moves under cigarette haze, and Sam Boyd works inside that haze with a dealer’s sharp, economical rhythm.",
+			"startSeconds": 4.8,
+			"durationSeconds": 11,
+			"chapter": 1
+		},
+		{
+			"narratorText": "He arrives in Las Vegas in 1941 as a dealer, takes a job at the Jackpot Casino, and learns to read pressure by hands.",
+			"startSeconds": 15.8,
+			"durationSeconds": 7.5,
+			"chapter": 1
+		},
+		{
+			"narratorText": "Sam already knows what a gamble with family savings looks like. In 1952, he puts in all the savings and gets a bank loan to become an owner-partner at the Sahara Hotel and Casino.",
+			"startSeconds": 23.3,
+			"durationSeconds": 11.4,
+			"chapter": 1
+		},
+		{
+			"narratorText": "Or do you take the reachable thing and work it? In 1962, they choose the hard yes.",
+			"startSeconds": 34.7,
+			"durationSeconds": 5.8,
+			"chapter": 1
+		},
+		{
+			"narratorText": "More attention. The market does not clap yet. The place just keeps getting better under steady hands. In 1966, the Boyd family buys out the other Eldorado partners.",
+			"startSeconds": 40.5,
+			"durationSeconds": 11.5,
+			"chapter": 2
+		},
+		{
+			"narratorText": "Control tightens. Responsibility tightens with it. Now the results, good or bad, sit fully in family hands. This is how power actually starts.",
+			"startSeconds": 52,
+			"durationSeconds": 9.8,
+			"chapter": 2
+		},
+		{
+			"narratorText": "By 1975, Sam Boyd and Bill Boyd co-found Boyd Gaming Corporation, and the California Hotel opens in downtown Las Vegas.",
+			"startSeconds": 61.8,
+			"durationSeconds": 8.6,
+			"chapter": 2
+		},
+		{
+			"narratorText": "In 1977, a $1.5 million renovation expands the Eldorado to 30,000 square feet, proof that small does not mean fixed.",
+			"startSeconds": 70.4,
+			"durationSeconds": 11.3,
+			"chapter": 2
+		}
+	]
+}

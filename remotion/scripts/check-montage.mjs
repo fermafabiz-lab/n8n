@@ -111,6 +111,47 @@ for (const intensity of intensities) {
 	console.log();
 }
 
+// A card is a CUTAWAY, and a cutaway returns to the shot it left. The planner
+// used to cross the framing across a card on the reasoning that the two
+// footage shots never touch on screen — but they are the same clip two or
+// three seconds apart, and the eye holds a picture that long. Reported from a
+// finished film as a zoom jump at the card, which is the same defect this
+// whole checker exists to catch, arriving through the one door left open.
+//
+// Probed with a synthetic card rather than a derived one, so the assertion
+// runs on every fixture including the ones that happen to have no cards.
+for (const intensity of intensities) {
+	const probe = planMontage(scenes, {
+		intensity,
+		seed: props.projectTitle ?? 'house-of-videos',
+		cards: [{sceneIndex: Math.min(1, scenes.length - 1), seconds: 2.6, minSeconds: 2.4}],
+	});
+	const ci = probe.findIndex((sh) => sh.kind === 'card');
+	if (ci <= 0 || ci + 1 >= probe.length) {
+		console.log(`cutaway resume (i${intensity})   no card placed in this fixture — not checked`);
+		continue;
+	}
+	const head = probe[ci - 1];
+	const tail = probe[ci + 1];
+	// Where the head actually left the frame, which is what the card covered.
+	const at = {
+		scale: head.scale + head.push,
+		x: head.offsetXPct + head.driftX,
+		y: head.offsetYPct + head.driftY,
+	};
+	const near = (a, b) => Math.abs(a - b) < 1e-6;
+	const resumed = near(tail.scale, at.scale) && near(tail.offsetXPct, at.x) && near(tail.offsetYPct, at.y);
+	console.log(`cutaway resume (i${intensity})   the frame the card uncovers is the frame it covered   ${check(resumed)}`);
+	if (!resumed) {
+		failed = true;
+		console.log(
+			`    covered  scale ${at.scale.toFixed(4)} at ${at.x.toFixed(2)}%, ${at.y.toFixed(2)}%\n` +
+				`    uncovered scale ${tail.scale.toFixed(4)} at ${tail.offsetXPct.toFixed(2)}%, ${tail.offsetYPct.toFixed(2)}%`,
+		);
+	}
+}
+console.log();
+
 // Independent of any props: a framing whose offsets outrun its overscan drags
 // the picture off its own edge and shows a black band.
 const overscan = framingOverscan();

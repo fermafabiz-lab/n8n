@@ -7,7 +7,8 @@ import {FLASH_LEAD} from './components/LightLeak';
 import {OutroCard} from './components/OutroCard';
 import {Captions} from './components/Captions';
 import {FilmLayer, gradeForTone} from './components/FilmLayer';
-import {Transitions, kenBurnsTransform} from './components/Transitions';
+import {CutFlash, Transitions, kenBurnsTransform} from './components/Transitions';
+import {TimelineCard} from './components/TimelineCard';
 import {planMontage, shotAt, shotTransform} from './montage';
 import {TextCard} from './components/TextCard';
 import {RouteCard} from './components/RouteCard';
@@ -238,6 +239,8 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 		if (card.variant === 'route') return <RouteCard card={card} seconds={seconds} preset={preset} />;
 		if (card.variant === 'schedule')
 			return <ScheduleCard card={card} seconds={seconds} preset={preset} />;
+		if (card.variant === 'timeline')
+			return <TimelineCard card={card} seconds={seconds} preset={preset} />;
 		return <TextCard card={card} seconds={seconds} preset={preset} />;
 	};
 
@@ -301,6 +304,21 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 								cs.durationSeconds,
 							)}
 						</Sequence>
+					))}
+					{/* Both of a card's cuts, flared. A card replaces the picture
+					    outright when it arrives and again when it leaves, and until
+					    now neither cut had an owner — the chapter card has carried its
+					    own light leak since the slide was removed, and the motif cards
+					    were left with a plain opacity fade, which is a dissolve
+					    between two unrelated pictures rather than a cut.
+					    Rendered AFTER the card sequences so the flare burns over the
+					    card as well as over the footage: the swap has to happen inside
+					    the light, not next to it. */}
+					{cardShots.map((cs) => (
+						<React.Fragment key={`cf-${cs.startSeconds}`}>
+							<CutFlash at={cs.startSeconds} tone={tone} />
+							<CutFlash at={cs.startSeconds + cs.durationSeconds} tone={tone} outgoing />
+						</React.Fragment>
 					))}
 					{showChapterCards &&
 						chapterStarts.map((s) => (

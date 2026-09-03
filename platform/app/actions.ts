@@ -943,6 +943,57 @@ async function fireAssembleWebhook(projectId: string): Promise<ActionResult> {
   }
 }
 
+/**
+ * Upscale every clip of a finished film through Flow, and optionally rebuild
+ * the film from them.
+ *
+ * Three things are worth knowing before pressing any of these, and the UI says
+ * all three because they are the difference between a good idea and a wasted
+ * afternoon:
+ *
+ * - **Only clips generated after 2026-09-04 can be upscaled.** The upscale API
+ *   takes a Flow `mediaGenerationId`, and until db/006 we extracted that id and
+ *   threw it away. An older film reports what it cannot do rather than failing.
+ * - **1080p is free, 4K is 50 credits PER CLIP** — an eighty-scene film is
+ *   4,000 of the 25,050 a month.
+ * - **Re-assembling costs about twice the render time**, measured: 0.107 s per
+ *   frame at 720p against 0.224 s at 1080p. Upscaling the clips WITHOUT
+ *   rebuilding is free in both credits and minutes and still improves the
+ *   picture, because the canvas has less scaling to do — which is why
+ *   `reassemble` is a choice and not an implementation detail.
+ */
+export async function upscaleFilm(
+  projectId: string,
+  resolution: "1080p" | "4K",
+  reassemble: boolean,
+): Promise<ActionResult> {
+  const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
+  const webhook =
+    process.env.N8N_UPSCALE_WEBHOOK_URL ??
+    newProject?.replace(/new-project\/?$/, "upscale-film");
+  if (!webhook?.includes("upscale-film")) {
+    return { ok: false, message: "The upscale webhook URL is not configured." };
+  }
+  try {
+    const res = await fetch(webhook, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ Project_ID: projectId, resolution, reassemble }),
+      signal: AbortSignal.timeout(20000),
+    });
+    if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message: reassemble
+        ? `Upscaling every clip to ${resolution}, then rebuilding the film — allow a couple of hours.`
+        : `Upscaling every clip to ${resolution}. The film is left as it is; rebuild it when you want the sharper source in the cut.`,
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
 /** Re-trigger the final render after it died, without redoing production. */
 /**
  * Call off a render in progress and hand the project back to Final touches.

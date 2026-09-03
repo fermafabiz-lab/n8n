@@ -18,6 +18,7 @@ import FinishedFlash from "@/components/FinishedFlash";
 import OpsPanel from "@/components/OpsPanel";
 import AssemblyStatus from "@/components/AssemblyStatus";
 import SoundSettings from "@/components/SoundSettings";
+import UpscaleFilm from "@/components/UpscaleFilm";
 import PublishingPanel from "@/components/PublishingPanel";
 import AutoPilot from "@/components/AutoPilot";
 import CinemaMode from "@/components/CinemaMode";
@@ -547,6 +548,7 @@ export default async function ProductionRoom({
               initialMusic={project.editing.music}
               initialSpeed={project.editing.speed}
             />
+            <UpscaleFilm projectId={id} sceneCount={scenes.length} />
             <PublishingPanel projectId={id} initial={project.publishing} />
           </div>
         )}

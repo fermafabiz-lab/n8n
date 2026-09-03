@@ -294,6 +294,48 @@ the workflows as they now actually run, verified against `activeVersionId`.
   (`next_page_token` + `has_more`), not numbered. `/api/voices` still speaks
   page numbers to the picker and walks tokens to reach the window.
 
+### 1080p is a TIME problem, not a memory one — measured (2026-09-04)
+
+Four renders of the same 15-scene fixture over real footage, concurrency 1 and
+`gl: swangle` to match Railway, two frame counts per resolution so the fixed
+Chrome start-up falls out of the arithmetic:
+
+| | 72 frames | 216 frames | per frame | start-up |
+|---|---|---|---|---|
+| 720p | 10.7 s | 26.1 s | **0.107 s** | 3.0 s |
+| 1080p | 18.7 s | 50.9 s | **0.224 s** | 2.6 s |
+
+**2.09×**, which is the pixel ratio (2.25) almost exactly — so it is real
+rendering work, not overhead. Peak RSS across node + Chrome went **2.19 GB →
+2.31 GB, +5%**, because `offthreadVideoCacheSizeInBytes` is capped in BYTES:
+at 1080p the cache simply holds fewer frames.
+
+**So the reason 720p is documented above — "the box has 8GB" — stopped being
+the binding constraint when that cap was added.** What binds now is the clock:
+the Boyd film's ~50-minute render becomes ~105 minutes, and an eight-minute
+film's ~95 minutes becomes ~3.3 h, which is **past the 3-hour graphics poll
+ceiling raised on 2 September**. Anything that renders at 1080p has to raise
+that ceiling in the same change.
+
+Worth separating: **upscaling the CLIPS helps even at a 720p output** — a
+sharper source means less scale-and-crop damage on the canvas — and that half
+is free in both credits and time. Only the 1080p OUTPUT costs 2.1×.
+
+### The clip's Flow identity is stored now (2026-09-04)
+
+`Extract Video URL` has always pulled `mediaGenerationId` out of the Flow
+response as `Video_Media_Id`, and nothing ever stored it: the moment the clip
+reached Drive, its identity at Google was gone. `POST /videos/upscale` takes a
+mediaGenerationId, so **no film made before 2026-09-04 can ever be upscaled** —
+the bytes are on Drive and Flow cannot say which generation they came from.
+
+`db/006_video_media_id.sql` adds the nullable column plus its row in
+`hov.airtable_field`. Note the ordering it forces: **the site's copy of the
+field map (`SCENE_FIELDS` in platform/lib/data/postgres.ts) must deploy BEFORE
+n8n starts sending the field**, because both clip writes go through
+`/api/media/ingest` and an unmapped name throws there rather than being
+dropped — sending it early would break every clip write in production.
+
 ### The credit strategy: free is the default, forever (2026-09-03)
 
 Measured on the account itself (`GET /accounts/{email}` returns `credits` and a

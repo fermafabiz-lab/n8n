@@ -294,6 +294,53 @@ the workflows as they now actually run, verified against `activeVersionId`.
   (`next_page_token` + `has_more`), not numbered. `/api/voices` still speaks
   page numbers to the picker and walks tokens to reach the window.
 
+### The credit strategy: free is the default, forever (2026-09-03)
+
+Measured on the account itself (`GET /accounts/{email}` returns `credits` and a
+per-model `creditCost`), not quoted from anywhere: the allowance is **25,050
+credits a month**, and an 8-second clip costs **0** on
+`veo-3.1-lite-low-priority`, **5** on `veo-3.1-lite`, **10** on
+`veo-3.1-fast`, **100** on `veo-3.1-quality`. Credits refresh monthly and do
+not roll over.
+
+The target volume is three films a day of eighty scenes — **7,200 clips a
+month**. That is 72,000 credits on Fast and 720,000 on Quality. **No paid tier
+can be the default**, which is the whole reason the Ultra $199 plan exists: the
+lower-priority tier is free at any volume. So quality comes from the INPUTS,
+and credits buy only the exceptions that do not grow with scene count.
+
+What that looks like in the pipeline:
+
+- **The model is chosen per scene in `Current Scene`** — free by default,
+  `Editing Options.videoModel` overrides, the HOOK gets Quality (one clip per
+  film, the one that decides whether it is watched), and a shot refused twice
+  is rescued on Quality. Chosen there because three edges reach `Submit Video`
+  and all three read `$('Current Scene')`.
+- **The rescue fires in `Prep Video Regen`, not on the main path**, because the
+  main path only submits scenes with NO clip — a third attempt can only arrive
+  through the regen. **The take counter is the scene's own draft list**
+  (`Versiuni Media`): every regeneration files the outgoing clip there, so its
+  length is the number of takes already tried. No new field.
+- **Seeds are derived, not stored**: `hash(sceneId + ':' + takes)`. A re-roll
+  is a different take by construction; a first take is reproducible.
+- **Two takes per submission (`count: 2`) is free and deliberately OFF.** At
+  this volume the scarce resource is QUEUE TIME, not credits — a second take of
+  every scene halves the throughput ceiling to save a click on the tenth that
+  needs it — and take B has nowhere to live until it goes through the same
+  Drive re-host as the live clip (a Flow URL dies in ~6 h).
+- **Throughput, not credits, is the wall at three films a day.** 240 clips a
+  day at 60-180 s each on a lower-priority queue is most of a day of wall
+  clock. useapi load-balances across MULTIPLE Google accounts when `email` is
+  omitted, so the scaling lever is another Ultra account — which also brings
+  another 25,050 credits — not a better model.
+- **An upscale cannot be applied to a finished film.** `POST /videos/upscale`
+  takes a Flow `mediaGenerationId`; our final film is ffmpeg-assembled from the
+  clips and has no such id. Upscaling means upscaling every CLIP and
+  re-assembling: 1080p is free per clip, 4K is 50 (an eighty-scene film =
+  4,000).
+
+Rollback and the full account: `db/port/free-tier-quality/`.
+
 ### Motion prompts must say WHICH WAY (2026-09-03)
 
 A race film came back with one car driving the wrong way down the track —

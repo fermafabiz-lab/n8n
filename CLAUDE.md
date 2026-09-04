@@ -3249,6 +3249,31 @@ the pipeline already produces.
   full-resolution still (already generated, already approved — zero new
   cost); its styles live in `PublishingPanel.module.css` per the
   own-stylesheet rule.
+- **On a short film the chapter list is per SCENE, and the labels come from a
+  model behind a strict validator** (2026-09-04). Chapter count is
+  `ceil(length/120)`, so every film under ~4 minutes is hook + one chapter —
+  a two-line list under a nine-scene film read as the feature not working.
+  Under 3 real chapters, yt-kit lists every scene; labels are 3-6-word key
+  points from the **`YT Scene Titles` workflow (`Il5pFIbVwFwxHsIM`, webhook
+  `yt-scene-titles`)** — one OpenAI call, because the model keys live in n8n,
+  not on the site. Its parser refuses anything that is not a JSON array of
+  exactly N non-empty strings, and every failure degrades to first-words
+  labels: a wrong label is worse than a plain one. Same trap as upscale-film:
+  `create_workflow_from_code` skipped the HTTP node's credential and it
+  needed `setNodeCredential` after.
+- **Every researched film since the cutover silently lost its research pack,
+  and the producer's "why no sources?" found it** (2026-09-04, `db/007`).
+  `Save Evidence` posts records carrying BOTH `Project_ID` (Airtable's text
+  field) and `Proiect` (its linked twin); both map to the one `project_id`
+  column, `at_assign` emitted it twice, INSERT died with `specified more
+  than once` — and because Save Evidence is `onError: continueRegularOutput`
+  BY DESIGN, the death was swallowed and the film shipped written against
+  research nobody could see. `at_assign` now dedupes by column (first field
+  wins); proven by replaying the exact failing payload through `at_create`.
+  The Aston Martin film's 20 claims were recovered from execution 8970's
+  persisted `Prep Evidence Rows` output and backfilled. **The general shape:
+  a write that must never kill its caller is also a write whose failures
+  nobody sees — grep its error path a day after shipping, not never.**
 - Transient states need a grace period. The render-error panel fires on healthy
   gaps between executions; `AssemblyStatus` uses a 75s sessionStorage-backed
   grace before crying failure.

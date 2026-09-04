@@ -129,9 +129,40 @@ export async function GET(req: Request) {
     // No script reachable — chapters fall back to numbered names.
   }
 
+  /**
+   * 3-6 word labels naming each scene's KEY POINT, from the `yt-scene-titles`
+   * n8n webhook (one OpenAI call — the model keys live in n8n, not here).
+   * Null on any failure or malformed answer: the first-words fallback below
+   * is plain but never wrong, and a wrong label is worse than a plain one.
+   */
+  async function modelLabels(): Promise<string[] | null> {
+    const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
+    const webhook = newProject?.replace(/new-project\/?$/, "yt-scene-titles");
+    if (!webhook?.includes("yt-scene-titles")) return null;
+    try {
+      const res = await fetch(webhook, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          language: project?.language ?? "English",
+          scenes: scenes.map((s) => ({ order: s.order, text: s.narration ?? "" })),
+        }),
+        signal: AbortSignal.timeout(90_000),
+        cache: "no-store",
+      });
+      if (!res.ok) return null;
+      const body = (await res.json()) as { titles?: unknown };
+      if (!Array.isArray(body.titles) || body.titles.length !== scenes.length) return null;
+      const titles = body.titles.map((t) => String(t).trim());
+      return titles.every(Boolean) ? titles : null;
+    } catch {
+      return null;
+    }
+  }
+
   /** "Why does a car company need to keep…" — a scene's own opening words,
-   *  sized for a timestamp label. Used when the film is too short to have
-   *  real chapters. */
+   *  sized for a timestamp label. The fallback when the model labels above
+   *  are unavailable. */
   const sceneLabel = (s: (typeof scenes)[number], i: number): string => {
     const clean = (s.narration ?? "")
       .replace(/\[[^\]]*\]/g, "")
@@ -153,6 +184,7 @@ export async function GET(req: Request) {
   const distinctChapters = new Set(scenes.map((s) => chapterOf(s.order ?? 0))).size;
   const perScene = distinctChapters < 3;
 
+  const labels = perScene && hasVoices ? await modelLabels() : null;
   const chapterLines: string[] = [];
   if (hasVoices) {
     let t = 0;
@@ -163,7 +195,9 @@ export async function GET(req: Request) {
         // YouTube requires the first entry to sit at exactly 0:00. Entries
         // shorter than 10s keep their line — the bar may decline to segment,
         // but a timestamp in a description is a clickable jump link always.
-        chapterLines.push(`${i === 0 ? "0:00" : stamp(t / speed)} ${sceneLabel(s, i)}`);
+        chapterLines.push(
+          `${i === 0 ? "0:00" : stamp(t / speed)} ${labels?.[i] ?? sceneLabel(s, i)}`,
+        );
       } else if (ch !== lastChapter) {
         const name =
           ch === 0

@@ -317,6 +317,17 @@ Two traps worth keeping:
   Both calls into the site came out with no credential and needed
   `setNodeCredential` afterwards. Check credentials after any SDK create.
 
+**And 1080p really means 1080p since the same day**: `Editing Options.resolution`
+reaches `/assemble` (canvas 1920x1080) and `/render` (a Remotion **scale of
+1.5**, composition untouched at 1280x720 — so type stays vector and footage is
+read at its own resolution rather than upscaled from a 720p raster).
+`Submit Graphics` and `Graphics Guard` both read the value off `Build Timeline`
+instead of deriving it again, because the montage and the graphics over it must
+agree on the canvas. **The guard's ceiling doubles for 1080p** (2160 → 4320
+polls): at 2.09x an eight-minute film is ~3.3 h and would fail AT the
+three-hour cap, which reads as a hang. 4K CLIPS still render to a 1080p film —
+a 4K canvas is scale 3, nine times the pixels.
+
 Full account: `db/port/upscale/`.
 
 ### 1080p is a TIME problem, not a memory one — measured (2026-09-04)

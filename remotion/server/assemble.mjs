@@ -268,8 +268,18 @@ export function registerAssemble(app, {jobs, outputDir}) {
 				: typeof rawNative === 'number' && rawNative > 0
 					? Math.min(1, rawNative)
 					: 0.22;
-		const W = portrait ? 720 : 1280;
-		const H = portrait ? 1280 : 720;
+		// The canvas. 720p by default and 1080p on request — the request comes
+		// from the project, not from here, because the clips have to be worth
+		// it: building a 1080p montage out of 720p clips buys nothing but
+		// bytes. `/upscale-film` sets both together for exactly that reason.
+		//
+		// The cost is downstream, not here: ffmpeg scales either way, but the
+		// Remotion pass that draws over this montage is 2.09x slower per frame
+		// at 1080p (measured, 0.107s against 0.224s), which is what pushes a
+		// long film past the graphics poll ceiling.
+		const hd = String((req.body && req.body.resolution) || '720p').toLowerCase() === '1080p';
+		const W = portrait ? (hd ? 1080 : 720) : (hd ? 1920 : 1280);
+		const H = portrait ? (hd ? 1920 : 1280) : (hd ? 1080 : 720);
 		if (!Array.isArray(scenes) || scenes.length === 0) {
 			return res.status(400).json({error: 'scenes: [{videoUrl, audioUrl}] is required'});
 		}

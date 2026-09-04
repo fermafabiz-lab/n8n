@@ -56,3 +56,38 @@ better source, same output size. A true 1080p output needs `resolution` plumbed
 through `/assemble` (W/H) and `/render` (Remotion `scale`), **and the graphics
 poll ceiling raised**: at 2.09x, an eight-minute film lands past the three-hour
 cap raised on 2 September.
+
+## The real 1080p output — added the same day
+
+The first version upscaled the clips and rebuilt the film on the same
+1280x720 canvas: better source, same size. `resolution` now runs the whole
+way through.
+
+| piece | change |
+|---|---|
+| `remotion/server/assemble.mjs` | canvas from `resolution`: 1920x1080 / 1080x1920, else the old 1280x720 / 720x1280 |
+| `remotion/server/index.mjs` | `/render` strips `resolution` like it strips `speed` and turns it into a Remotion **scale of 1.5** |
+| `Build Timeline` | reads `Editing Options.resolution`, sends it to `/assemble`, **and emits it at the top level** |
+| `Submit Graphics` | takes that same top-level value rather than deriving its own |
+| `Graphics Guard` | `MAX_POLLS` 2160 → **4320 when 1080p** |
+| `Set Output Resolution` (upscale job) | writes `resolution: 1080p` before re-assembling |
+
+Three decisions worth keeping:
+
+- **Scale, not a bigger composition.** The composition stays 1280x720 and
+  Remotion draws it at 1.5x device pixels, so type stays vector-crisp and the
+  footage is read at its own resolution instead of being upscaled from a 720p
+  raster. That is also why upscaling the clips and rendering at 1080p belong
+  together: at 1.5x over 720p clips there is no extra detail to draw.
+- **One value, read twice, never derived twice.** The montage and the graphics
+  drawn over it must agree on the canvas, so `Submit Graphics` and
+  `Graphics Guard` both read `Build Timeline`'s output rather than re-reading
+  the project.
+- **The ceiling had to move with it.** At 2.09x an eight-minute film is ~3.3
+  hours, past the three-hour cap raised on 2 September — it would have failed
+  AT the ceiling, which reads as a hang, the exact failure that cap exists to
+  prevent.
+
+**4K clips still render to a 1080p film.** A 4K canvas is a Remotion scale of
+3 — nine times the pixels, most of a day for a ten-minute film on this box.
+What 4K buys is more detail for the 1080p canvas to draw from.

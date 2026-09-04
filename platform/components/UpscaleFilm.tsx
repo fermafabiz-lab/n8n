@@ -52,8 +52,8 @@ export default function UpscaleFilm({
         {pending ? "…" : "Upscale film to 1080p"}
       </button>
       <p style={{ margin: "4px 0 10px", fontSize: 11.5, color: "var(--dim)" }}>
-        Free. Every clip goes up, then the film is rebuilt from them — the
-        rebuild takes about twice as long as a normal render.
+        Free. Every clip goes up and the film is rebuilt at 1920×1080 — the
+        rebuild takes about twice as long as a normal render, measured.
       </p>
 
       <button
@@ -84,8 +84,10 @@ export default function UpscaleFilm({
           <p style={{ margin: "4px 0 10px", fontSize: 11.5, color: "var(--dim)" }}>
             4K costs 50 credits per clip
             {credits4k ? `, so ${sceneCount} scenes is ${credits4k.toLocaleString()}` : ""} of
-            the 25,050 this account gets each month. They do not roll over, and
-            the rebuild still takes about twice a normal render.{" "}
+            the 25,050 this account gets each month. They do not roll over. The
+            film itself is rebuilt at 1080p — a 4K canvas is nine times the
+            pixels and would take most of a day — so what you buy is more
+            detail for it to draw from.{" "}
             <button
               type="button"
               className="linkish"

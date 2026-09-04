@@ -3233,6 +3233,22 @@ the pipeline already produces.
   in derive.ts — absent reads as `review` with empty fields. The draft is
   sessionStorage-backed (`vf-pub:<id>`), the house rule for anything typed
   on a page that re-renders every 10s.
+- **The YouTube description is DERIVED, never invented** (2026-09-04,
+  `GET /api/yt-kit?project=…`): hook = the film's own opening narration;
+  chapters = the script's `[CHAPTER n: title]` markers with timestamps
+  summed from the real takes (`mp3DurationSeconds` in lib/mp3.ts walks
+  frames in pure Node — no ffmpeg — approximating the breath trim at 0.1s
+  net per scene and dividing by playback speed; first line pinned to 0:00,
+  which YouTube requires); sources = the Evidence rows with a URL, the one
+  part of the research pack a viewer gets to see. Takes are fetched
+  straight from Drive like audio-bundle does — NOT through `/api/media`,
+  which sits behind the site password and bounces a cookie-less server
+  fetch to /login. `getProjectEvidence` is Postgres-only; on the frozen
+  Airtable backend it answers empty and the description ships without a
+  sources block. The panel's thumbnail picker lists every scene's
+  full-resolution still (already generated, already approved — zero new
+  cost); its styles live in `PublishingPanel.module.css` per the
+  own-stylesheet rule.
 - Transient states need a grace period. The render-error panel fires on healthy
   gaps between executions; `AssemblyStatus` uses a 75s sessionStorage-backed
   grace before crying failure.

@@ -460,7 +460,7 @@ const DEMO_PROJECTS: Project[] = [
     castAssign: {},
     chapterVoices: {},
     motifCards: [],
-    publishing: { state: "review", ytTitle: "", notes: "", ytUrl: "" },
+    publishing: { state: "review", ytTitle: "", description: "", notes: "", ytUrl: "" },
   },
   {
     id: "demo-2",
@@ -483,7 +483,7 @@ const DEMO_PROJECTS: Project[] = [
     castAssign: {},
     chapterVoices: {},
     motifCards: [],
-    publishing: { state: "review", ytTitle: "", notes: "", ytUrl: "" },
+    publishing: { state: "review", ytTitle: "", description: "", notes: "", ytUrl: "" },
   },
   {
     id: "demo-3",
@@ -506,7 +506,7 @@ const DEMO_PROJECTS: Project[] = [
     castAssign: {},
     chapterVoices: {},
     motifCards: [],
-    publishing: { state: "review", ytTitle: "", notes: "", ytUrl: "" },
+    publishing: { state: "review", ytTitle: "", description: "", notes: "", ytUrl: "" },
   },
   {
     id: "demo-4",
@@ -529,7 +529,7 @@ const DEMO_PROJECTS: Project[] = [
     castAssign: {},
     chapterVoices: {},
     motifCards: [],
-    publishing: { state: "review", ytTitle: "", notes: "", ytUrl: "" },
+    publishing: { state: "review", ytTitle: "", description: "", notes: "", ytUrl: "" },
   },
 ];
 
@@ -813,6 +813,22 @@ export async function readSceneVideoInputs(sceneId: string): Promise<{
 // Scene-script review: edits land in the same fields n8n reads after the
 // "Aprobare Scenă" gate, so approved text/prompts flow straight to TTS and
 // image generation.
+export type { EvidenceRow } from "./data/postgres";
+
+/**
+ * The film's research pack — the sourced claims its script was written
+ * against. Postgres only: the Airtable backend is frozen at the cutover and
+ * nothing runs on it, so growing it a new reader would be code for a museum.
+ * On that backend this answers empty, which degrades the YouTube description
+ * to one without a sources section rather than failing it.
+ */
+export async function getProjectEvidence(
+  projectId: string,
+): Promise<import("./data/postgres").EvidenceRow[]> {
+  if (USE_PG) return pgBackend.getProjectEvidence(projectId);
+  return [];
+}
+
 export async function writeSceneScript(
   sceneId: string,
   fields: { narration?: string; imagePrompt?: string; approve?: boolean },

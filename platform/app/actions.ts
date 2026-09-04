@@ -1472,7 +1472,7 @@ export async function approveScript(
  */
 export async function savePublishing(
   projectId: string,
-  pub: { state: string; ytTitle: string; notes: string; ytUrl: string },
+  pub: { state: string; ytTitle: string; description: string; notes: string; ytUrl: string },
 ): Promise<ActionResult> {
   if (!isConfigured) {
     return { ok: true, message: "Demo mode — nothing was written." };

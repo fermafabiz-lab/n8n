@@ -549,7 +549,15 @@ export default async function ProductionRoom({
               initialSpeed={project.editing.speed}
             />
             <UpscaleFilm projectId={id} sceneCount={scenes.length} />
-            <PublishingPanel projectId={id} initial={project.publishing} />
+            <PublishingPanel
+              projectId={id}
+              initial={project.publishing}
+              /* Thumbnail candidates: every scene's approved still, full
+                 resolution, already ours in the media store. */
+              stills={scenes
+                .filter((s) => s.imageUrl)
+                .map((s) => ({ label: s.label, url: s.imageUrl! }))}
+            />
           </div>
         )}
 

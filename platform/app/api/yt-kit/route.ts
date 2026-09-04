@@ -129,18 +129,46 @@ export async function GET(req: Request) {
     // No script reachable — chapters fall back to numbered names.
   }
 
+  /** "Why does a car company need to keep…" — a scene's own opening words,
+   *  sized for a timestamp label. Used when the film is too short to have
+   *  real chapters. */
+  const sceneLabel = (s: (typeof scenes)[number], i: number): string => {
+    const clean = (s.narration ?? "")
+      .replace(/\[[^\]]*\]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!clean) return `${ro ? "Scena" : "Scene"} ${i + 1}`;
+    if (clean.length <= 48) return clean.replace(/[.!?]+$/, "");
+    const head = clean.slice(0, 48);
+    return head.slice(0, head.lastIndexOf(" ")).replace(/[,;:.!?]+$/, "") + "…";
+  };
+
+  // Two granularities, picked by what the film actually has. Chapter count
+  // is ceil(length/120), so every film under ~4 minutes is hook + one
+  // chapter — and a two-line list under a nine-scene film reads as the
+  // feature not working (it was reported as exactly that). Under 3 real
+  // chapters the list is per SCENE, labelled by each scene's own opening
+  // words; at 3+ the chapter titles win, because a 90-scene film listed
+  // per scene is noise nobody scrolls.
+  const distinctChapters = new Set(scenes.map((s) => chapterOf(s.order ?? 0))).size;
+  const perScene = distinctChapters < 3;
+
   const chapterLines: string[] = [];
   if (hasVoices) {
     let t = 0;
     let lastChapter: number | null = null;
     scenes.forEach((s, i) => {
       const ch = chapterOf(s.order ?? 0);
-      if (ch !== lastChapter) {
+      if (perScene) {
+        // YouTube requires the first entry to sit at exactly 0:00. Entries
+        // shorter than 10s keep their line — the bar may decline to segment,
+        // but a timestamp in a description is a clickable jump link always.
+        chapterLines.push(`${i === 0 ? "0:00" : stamp(t / speed)} ${sceneLabel(s, i)}`);
+      } else if (ch !== lastChapter) {
         const name =
           ch === 0
             ? "Intro"
             : (titles.get(ch) ?? (ro ? `Capitolul ${ch}` : `Chapter ${ch}`));
-        // YouTube requires the first chapter to start at exactly 0:00.
         chapterLines.push(`${chapterLines.length === 0 ? "0:00" : stamp(t / speed)} ${name}`);
         lastChapter = ch;
       }

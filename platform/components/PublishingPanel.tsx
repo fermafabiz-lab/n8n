@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { savePublishing, type ActionResult } from "@/app/actions";
 import type { Publishing } from "@/lib/data";
+import styles from "./PublishingPanel.module.css";
 
 /**
  * The film's life AFTER the pipeline: where it stands (in review / ready to
@@ -23,6 +24,8 @@ import type { Publishing } from "@/lib/data";
 
 /** YouTube truncates titles at 100 characters; the counter warns past it. */
 const YT_TITLE_LIMIT = 100;
+/** …and descriptions at 5000. */
+const YT_DESC_LIMIT = 5000;
 
 const STATES: Array<{ key: Publishing["state"]; label: string }> = [
   { key: "review", label: "In review" },
@@ -35,13 +38,21 @@ const draftKey = (id: string) => `vf-pub:${id}`;
 export default function PublishingPanel({
   projectId,
   initial,
+  stills = [],
 }: {
   projectId: string;
   initial: Publishing;
+  /** Scene stills, in film order — the thumbnail candidates. Every one was
+   *  already generated and approved; picking a YouTube thumbnail from them
+   *  costs nothing and needs no new generation. */
+  stills?: Array<{ label: string; url: string }>;
 }) {
   const [pub, setPub] = useState<Publishing>(initial);
   const [msg, setMsg] = useState<ActionResult | null>(null);
   const [pending, startTransition] = useTransition();
+  const [building, setBuilding] = useState(false);
+  const [copied, setCopied] = useState<"title" | "desc" | null>(null);
+  const [showThumbs, setShowThumbs] = useState(false);
 
   useEffect(() => {
     try {
@@ -55,6 +66,7 @@ export default function PublishingPanel({
   const dirty =
     pub.state !== initial.state ||
     pub.ytTitle !== initial.ytTitle ||
+    pub.description !== initial.description ||
     pub.notes !== initial.notes ||
     pub.ytUrl !== initial.ytUrl;
 
@@ -79,9 +91,55 @@ export default function PublishingPanel({
     });
 
   const over = pub.ytTitle.length > YT_TITLE_LIMIT;
+  const descOver = pub.description.length > YT_DESC_LIMIT;
+
+  /**
+   * Ask /api/yt-kit for the derived description — the film's own opening
+   * narration, its chapter markers with timestamps summed from the real
+   * takes, and the research pack's sources. Fills the draft; nothing is
+   * stored until Save, so a bad generation costs one click to discard.
+   */
+  const generate = async () => {
+    setBuilding(true);
+    setMsg(null);
+    try {
+      const res = await fetch(`/api/yt-kit?project=${projectId}`, { cache: "no-store" });
+      const body = (await res.json()) as {
+        description?: string;
+        measured?: boolean;
+        chapters?: number;
+        sources?: number;
+        error?: string;
+      };
+      if (!res.ok || !body.description) {
+        setMsg({ ok: false, message: body.error ?? "Could not build the description." });
+        return;
+      }
+      set({ description: body.description.slice(0, YT_DESC_LIMIT + 500) });
+      const bits = [
+        `${body.chapters ?? 0} chapters${body.measured ? "" : " (timestamps estimated)"}`,
+        `${body.sources ?? 0} sources`,
+      ];
+      setMsg({ ok: true, message: `Description built — ${bits.join(", ")}. Edit freely, then save.` });
+    } catch {
+      setMsg({ ok: false, message: "Could not build the description." });
+    } finally {
+      setBuilding(false);
+    }
+  };
+
+  const copy = async (which: "title" | "desc") => {
+    try {
+      await navigator.clipboard.writeText(which === "title" ? pub.ytTitle : pub.description);
+      setCopied(which);
+      setTimeout(() => setCopied(null), 1800);
+    } catch {
+      setMsg({ ok: false, message: "Clipboard unavailable — select and copy by hand." });
+    }
+  };
 
   return (
-    <div className="card pubpanel" style={{ marginTop: 12 }}>
+    <div className="card" style={{ marginTop: 12 }}>
       <h5>Publishing</h5>
       <div className="kv" style={{ alignItems: "center" }}>
         <span>
@@ -105,11 +163,18 @@ export default function PublishingPanel({
         </div>
       </div>
 
-      <label className="pubfield">
-        <span className="pubhead">
+      <label className={styles.field}>
+        <span className={styles.head}>
           <span>YouTube title</span>
-          <span className={`pubcount${over ? " over" : ""}`}>
-            {pub.ytTitle.length}/{YT_TITLE_LIMIT}
+          <span className={styles.tools}>
+            {pub.ytTitle && (
+              <button type="button" className={styles.copybtn} onClick={() => copy("title")}>
+                {copied === "title" ? "✓ Copied" : "⧉ Copy"}
+              </button>
+            )}
+            <span className={`${styles.count}${over ? ` ${styles.over}` : ""}`}>
+              {pub.ytTitle.length}/{YT_TITLE_LIMIT}
+            </span>
           </span>
         </span>
         <input
@@ -120,15 +185,86 @@ export default function PublishingPanel({
           onChange={(e) => set({ ytTitle: e.target.value })}
         />
         {over && (
-          <span className="pubwarn">
+          <span className={styles.warn}>
             YouTube cuts titles at {YT_TITLE_LIMIT} characters — the rest will
             not be shown.
           </span>
         )}
       </label>
 
-      <label className="pubfield">
-        <span className="pubhead">
+      <label className={styles.field}>
+        <span className={styles.head}>
+          <span>YouTube description</span>
+          <span className={styles.tools}>
+            <button type="button" className={styles.copybtn} disabled={building} onClick={generate}>
+              {building ? "Building…" : "⚙ Build from the film"}
+            </button>
+            {pub.description && (
+              <button type="button" className={styles.copybtn} onClick={() => copy("desc")}>
+                {copied === "desc" ? "✓ Copied" : "⧉ Copy"}
+              </button>
+            )}
+            <span className={`${styles.count}${descOver ? ` ${styles.over}` : ""}`}>
+              {pub.description.length}/{YT_DESC_LIMIT}
+            </span>
+          </span>
+        </span>
+        <textarea
+          value={pub.description}
+          rows={pub.description ? 8 : 3}
+          maxLength={YT_DESC_LIMIT + 500}
+          placeholder="Build it from the film — opening line, chapter timestamps, the research sources — then edit freely."
+          onChange={(e) => set({ description: e.target.value })}
+        />
+        {descOver && (
+          <span className={styles.warn}>
+            YouTube cuts descriptions at {YT_DESC_LIMIT} characters.
+          </span>
+        )}
+      </label>
+
+      {stills.length > 0 && (
+        <div className={styles.field}>
+          <span className={styles.head}>
+            <span>Thumbnail</span>
+            <button
+              type="button"
+              className={styles.copybtn}
+              onClick={() => setShowThumbs((v) => !v)}
+            >
+              {showThumbs ? "Hide stills" : `Pick from ${stills.length} stills`}
+            </button>
+          </span>
+          {showThumbs && (
+            <>
+              <div className={styles.thumbs}>
+                {stills.map((s) => (
+                  <a
+                    key={s.label}
+                    href={s.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    download={`thumbnail-${s.label}.jpg`}
+                    title={`${s.label} — open full size / download`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={s.url} alt={`Scene ${s.label} still`} loading="lazy" />
+                    <span>{s.label}</span>
+                  </a>
+                ))}
+              </div>
+              <span className={styles.hint}>
+                Every still is the full-resolution image its scene was generated
+                from — click one to open or save it, then upload it as the
+                thumbnail on YouTube.
+              </span>
+            </>
+          )}
+        </div>
+      )}
+
+      <label className={styles.field}>
+        <span className={styles.head}>
           <span>Notes</span>
         </span>
         <textarea
@@ -141,8 +277,8 @@ export default function PublishingPanel({
       </label>
 
       {pub.state === "posted" && (
-        <label className="pubfield">
-          <span className="pubhead">
+        <label className={styles.field}>
+          <span className={styles.head}>
             <span>YouTube link</span>
           </span>
           <input

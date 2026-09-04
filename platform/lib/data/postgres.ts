@@ -256,6 +256,23 @@ export async function getScenes(projectId: string): Promise<Scene[]> {
   return ordered.map((r, i) => buildScene(r, i));
 }
 
+/** One sourced claim from the research pack — see the yt-kit route. */
+export interface EvidenceRow {
+  ref: string;
+  claim: string | null;
+  source: string | null;
+  url: string | null;
+  date: string | null;
+}
+
+export async function getProjectEvidence(projectId: string): Promise<EvidenceRow[]> {
+  return query<EvidenceRow>(
+    `select ref, claim, source_name as source, source_url as url, source_date as date
+       from hov.evidence where project_id = $1 order by ref`,
+    [projectId],
+  );
+}
+
 export async function findRecentProjectByName(
   name: string,
   withinMs = 5 * 60 * 1000,

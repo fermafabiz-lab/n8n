@@ -37,7 +37,14 @@ const RATES_V1 = [44100, 48000, 32000, 0];
 const RATES_V2 = [22050, 24000, 16000, 0];
 const RATES_V25 = [11025, 12000, 8000, 0];
 
-type Frame = { length: number; mpeg1: boolean; mono: boolean };
+type Frame = {
+	length: number;
+	mpeg1: boolean;
+	mono: boolean;
+	/** Audio samples this frame decodes to, and their rate — what duration is. */
+	samples: number;
+	rate: number;
+};
 
 /** Reads a frame header at `i`, or null if there is not a valid one there. */
 function frameAt(buf: Buffer, i: number): Frame | null {
@@ -61,7 +68,7 @@ function frameAt(buf: Buffer, i: number): Frame | null {
 	const samples = mpeg1 ? 1152 : 576;
 	const length = Math.floor((samples / 8) * ((kbps * 1000) / rate)) + padding;
 	if (length < 4) return null;
-	return { length, mpeg1, mono: ((buf[i + 3] >> 6) & 0x03) === 3 };
+	return { length, mpeg1, mono: ((buf[i + 3] >> 6) & 0x03) === 3, samples, rate };
 }
 
 /** Drop ID3v2 at the head and ID3v1 at the tail. */
@@ -122,4 +129,36 @@ export function concatMp3(parts: Buffer[]): Buffer {
 		return body;
 	});
 	return Buffer.concat(clean);
+}
+
+/**
+ * A take's duration, by walking its frames — no ffmpeg, exact for the CBR
+ * mp3s the TTS provider returns (each frame's own sample count over its own
+ * rate, summed; the Xing frame is skipped so it cannot double-count).
+ *
+ * Built for the YouTube-chapter timestamps: a chapter's start is the sum of
+ * the scene durations before it, and the container's declared length cannot
+ * be trusted (see the header comment on why Xing lies after a concat).
+ * Returns 0 for anything that is not a readable mp3 — the caller treats a
+ * zero as "no timestamp for this scene", never as an error.
+ */
+export function mp3DurationSeconds(raw: Buffer): number {
+	const buf = dropVbrHeader(firstFrame(stripTags(raw)));
+	let i = 0;
+	let seconds = 0;
+	// Bounded resync: a corrupt byte run of more than 4KB means the rest is
+	// not audio, and scanning megabytes for a false sync word helps nobody.
+	let junk = 0;
+	while (i + 4 <= buf.length && junk < 4096) {
+		const f = frameAt(buf, i);
+		if (!f) {
+			i++;
+			junk++;
+			continue;
+		}
+		junk = 0;
+		seconds += f.samples / f.rate;
+		i += f.length;
+	}
+	return seconds;
 }

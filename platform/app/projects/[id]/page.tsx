@@ -23,6 +23,8 @@ import PublishingPanel from "@/components/PublishingPanel";
 import AutoPilot from "@/components/AutoPilot";
 import CinemaMode from "@/components/CinemaMode";
 import ProductionActivity from "@/components/ProductionActivity";
+import RoughCutButton from "@/components/RoughCutButton";
+import FilmCost from "@/components/FilmCost";
 import { StepCard, StageNavProvider } from "@/components/StageNav";
 import {
   executionUrl,
@@ -456,6 +458,10 @@ export default async function ProductionRoom({
               </div>
             </div>
             <div className="wk-side">
+              {/* Highest up the page on purpose: the whole point is that the
+                  film can be watched at any moment, not only after the render
+                  at the very bottom. */}
+              <RoughCutButton scenes={scenes} portrait={project.aspect === "9:16"} />
               <NotifyChip />
               {/* Counted off the same pipeline() states the stepper draws, so
                   the bar can never claim a stage the cards do not show as
@@ -684,6 +690,16 @@ export default async function ProductionRoom({
               silent={silent}
             />
           )}
+
+        {/* What the film has consumed. Below the activity because it answers a
+            different question — not "what is happening" but "what has this
+            cost me" — and it is the one number a client paying for an ad asks
+            for. Pure arithmetic over rows the page already has. */}
+        <FilmCost
+          scenes={scenes}
+          videoModel={project.editing.videoModel}
+          lengthSeconds={project.lengthSeconds}
+        />
 
         {/* Voice gate: images are signed off, so synthesis is the current
             step — the panel appears as soon as the pipeline reaches it, even

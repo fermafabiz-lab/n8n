@@ -1,0 +1,98 @@
+/* "What this film has used". Scoped per the module rule — `card`, `head`,
+   `rows` and `bar` are all taken several times over in globals.css. */
+
+.card {
+  padding: 18px 20px 16px;
+  border-radius: 22px;
+  background: var(--card2);
+  border: 1px solid var(--line);
+  box-shadow: 0 10px 26px rgba(24, 20, 40, 0.05);
+}
+
+.head {
+  margin: 0 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.credits {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: 0 10px;
+}
+.credits strong {
+  font-family: var(--f-title, inherit);
+  font-size: 30px;
+  line-height: 1;
+  color: var(--ink);
+}
+.credits > span:not(.bar) {
+  font-size: 12px;
+  color: var(--faint);
+}
+.bar {
+  grid-column: 1 / -1;
+  margin-top: 10px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+.bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.rows {
+  margin: 16px 0 0;
+  display: grid;
+  gap: 8px;
+}
+.rows > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.rows dt {
+  font-size: 12.5px;
+  color: var(--soft);
+}
+.rows dd {
+  margin: 0;
+  font-family: var(--f-mono, ui-monospace, Menlo, monospace);
+  font-size: 12.5px;
+  color: var(--ink);
+}
+
+/* A re-roll is the one line here the producer can act on: it is the part a
+   tighter first pass removes, so it is called out rather than folded in. */
+.retry {
+  margin-left: 8px;
+  font-style: normal;
+  font-size: 11px;
+  color: var(--accent-deep);
+}
+
+.basis {
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--faint);
+}
+.basis code {
+  font-family: var(--f-mono, ui-monospace, Menlo, monospace);
+  font-size: 10.5px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--card);
+  color: var(--soft);
+}

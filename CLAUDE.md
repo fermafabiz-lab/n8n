@@ -3152,6 +3152,34 @@ the pipeline already produces.
   a tab instead of saving. `downloadSrc()` in `lib/media.ts` adds `?dl=<name>`
   for proxied assets and returns CDN URLs untouched, since the attribute is
   ignored there either way.
+- **The rough cut: the film, watchable at any point.** The producer used to
+  give 213 approvals one asset at a time and see the result exactly once — at
+  the end, after a ~95-minute render. Every part was reviewed; the film never
+  was. `RoughCut` only puts what already exists in order and plays it, because
+  `MediaPlayer` already lays a voice over a silent clip. **It works before any
+  clip exists** — a scene with a picture and a take plays as a still under its
+  narration, which is an animatic, and that is the most valuable moment to
+  watch: finding out the order is wrong before sixty clips are generated
+  against it. It is deliberately NOT the render (no montage framing, captions,
+  chapter cards, music or breath trim, and scene length is the take's own
+  rather than `voiceDur + 0.35`) and the panel says so, or someone will chase
+  differences that are supposed to be there. While it is up it sets
+  `document.body.dataset.overlay`, which `useReviewKeys` checks — otherwise `A`
+  behind the panel approves a scene nobody is looking at.
+- **`FilmCost` reports units, never money.** A price per credit or per
+  character is a commercial fact this repo does not hold, and a dollar figure
+  invented from a guess is worse than none. Credits are the binding constraint
+  anyway: 25,050 a month, no roll-over, against a target of 7,200 clips.
+  `lib/cost.ts` prices the hook on quality and the body on
+  `Editing Options.videoModel` (default free), counts a re-roll as a full
+  generation via the draft list — the same signal `Prep Video Regen` uses as
+  its take counter — and every figure is a FLOOR: per-scene model choices are
+  not recorded and takes are not versioned, so a line re-recorded three times
+  counts once. The panel states that basis rather than presenting the numbers
+  as fact. `npm run check:cost` pins the arithmetic (11 cases).
+  Note this added `videoModel` to `EditingOptions`: the key has always existed
+  in the stored JSON — `Current Scene` in Media Generation reads it — and the
+  site simply never declared it, so a paid film would have been priced as free.
 - **A press has to show on screen before the server answers.** The action
   writes the row and revalidates, so the truth lands a second or several
   later — up to ten if the write just missed a refresh tick — and until then

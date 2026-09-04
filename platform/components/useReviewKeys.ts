@@ -89,6 +89,10 @@ export function useReviewKeys(h: ReviewKeyHandlers) {
       // Never steal a browser or OS shortcut, and never fire mid-sentence.
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (isTyping(document.activeElement)) return;
+      // An overlay owns the keyboard while it is up. Without this, `A` behind
+      // the rough-cut panel would approve the scene the producer is no longer
+      // looking at — a decision taken on the wrong thing entirely.
+      if (document.body.dataset.overlay) return;
 
       switch (e.key) {
         case "a":

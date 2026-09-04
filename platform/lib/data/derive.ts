@@ -55,6 +55,16 @@ export interface EditingOptions {
    * shadow and a deep accent vanishes into its own shadow.
    */
   captionColor: string | null;
+  /**
+   * Which Veo model the clips are generated on.
+   *
+   * Read by `Current Scene` in Media Generation, which is why this key has
+   * always existed in the stored JSON while the site never declared it. The
+   * site does not WRITE it — the default (`veo-3.1-lite-low-priority`) is free
+   * at any volume and is the whole reason the Ultra plan exists — but it has
+   * to read it, or the cost panel prices a paid film as a free one.
+   */
+  videoModel: string | null;
   /** Playback rate of the finished film: 0.9 slow, 1 normal, 1.1 fast.
    *
    *  This is what the creation form's PACE control finally means. Before it
@@ -647,6 +657,8 @@ export function buildProject(r: RawProject): Project {
       // nothing worth drawing in simply gets an empty list.
       drawnCards: opts.drawnCards !== false,
       captionColor: normalizeCaptionColor(opts.captionColor),
+      videoModel:
+        typeof opts.videoModel === "string" && opts.videoModel ? opts.videoModel : null,
       // Editing Options is the OVERRIDE, the project's PACE field the default.
       // Two sources on purpose: PACE is chosen on the brief and stored on the
       // project, so falling back to it means every film already in the

@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "check:review": "node --experimental-strip-types scripts/check-review.mjs"
+    "check:review": "node --experimental-strip-types scripts/check-review.mjs",
+    "check:cost": "node --experimental-strip-types scripts/check-cost.mjs"
   },
   "dependencies": {
     "next": "^15.3.0",

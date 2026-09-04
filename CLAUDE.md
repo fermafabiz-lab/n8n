@@ -458,6 +458,28 @@ three places that must agree, exactly like the image model string.
 
 Full account and rollback: `db/port/motion-direction/`.
 
+### Video quality is a per-film choice now, and the prompts carry a physics clause (2026-09-04)
+
+Two answers to the producer's "ghost cars driving through each other, a man
+buried to his hips in mud, a car starting without a driver — we pay €300-400
+a month for this":
+
+- **The brief has a "Video quality" picker** (Free / Better 5cr / Fast 10cr /
+  Cinema 100cr per 8s clip), priced with the film's own arithmetic before the
+  choice is bought. It writes `Editing Options.videoModel` through
+  `Normalize Webhook Input` — the key `Current Scene` has READ since 09-03
+  with nothing ever writing it, so every film ran on the weakest (free)
+  model. The id list is whitelisted in THREE places that must agree
+  (`VIDEO_MODELS` in derive.ts, the form's `VIDEO_TIERS`, Normalize's
+  whitelist): the string reaches the Flow API verbatim and an unknown id
+  kills a batch slowly. Absence = free default, like captionColor's white.
+- **Both submit paths append a Physics clause** beside the continuity one
+  (`Current Scene`'s videoRequest and `Submit Video Regen`): solid objects
+  never pass through each other or sink into the ground, moving vehicles
+  have drivers, nothing floats/melts/morphs. Submit-time, so existing films
+  and regenerations get it too. A negative is a preference, not a constraint
+  — the model TIER is the bigger dial, which is what the picker is for.
+
 ### Content filters — deterministic, never blindly retry
 
 - Google Flow / Veo rejects with `PUBLIC_ERROR_PROMINENT_PEOPLE_FILTER_FAILED`.

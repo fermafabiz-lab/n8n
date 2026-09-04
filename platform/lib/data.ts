@@ -61,6 +61,8 @@ export {
   MAX_VERSIONS_PER_KIND,
   PUBLISHING_STATES,
   normalizePublishing,
+  VIDEO_MODELS,
+  normalizeVideoModel,
   GENRE_EDITABLE,
   LIBRARY_EDITABLE,
   EXAMPLE_EDITABLE,

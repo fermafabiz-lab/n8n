@@ -567,6 +567,30 @@ export interface Publishing {
 export const PUBLISHING_STATES = ["review", "ready", "posted"] as const;
 
 /**
+ * The Veo tiers a film may choose, with what each 8s clip costs in useapi
+ * credits — measured on the account (25,050/month, no rollover), not quoted.
+ * The model string reaches `Current Scene` in Media Generation verbatim, so
+ * this list must only ever hold ids useapi actually accepts: a wrong id
+ * burns three retries plus ~20 min of cooldowns before killing the batch.
+ */
+export const VIDEO_MODELS = [
+  { id: "veo-3.1-lite-low-priority", credits: 0 },
+  { id: "veo-3.1-lite", credits: 5 },
+  { id: "veo-3.1-fast", credits: 10 },
+  { id: "veo-3.1-quality", credits: 100 },
+] as const;
+
+/** A known model id, or null — absent means the free default, and stays so. */
+export function normalizeVideoModel(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const v = raw.trim();
+  if (!VIDEO_MODELS.some((m) => m.id === v)) return null;
+  // Storing the free default explicitly would be harmless today, but absence
+  // is the shape every reader already handles; keep one spelling of it.
+  return v === "veo-3.1-lite-low-priority" ? null : v;
+}
+
+/**
  * Defensive like every Editing Options reader: the value round-trips through
  * jsonb and two backends. Absent or malformed reads as "review" with empty
  * fields — the state every finished film was silently in before this existed.
@@ -657,8 +681,10 @@ export function buildProject(r: RawProject): Project {
       // nothing worth drawing in simply gets an empty list.
       drawnCards: opts.drawnCards !== false,
       captionColor: normalizeCaptionColor(opts.captionColor),
-      videoModel:
-        typeof opts.videoModel === "string" && opts.videoModel ? opts.videoModel : null,
+      // Whitelisted, not merely a string: the id reaches the Flow API
+      // verbatim from Current Scene, and the brief's picker is the writer —
+      // an unknown value must read as the free default everywhere.
+      videoModel: normalizeVideoModel(opts.videoModel),
       // Editing Options is the OVERRIDE, the project's PACE field the default.
       // Two sources on purpose: PACE is chosen on the brief and stored on the
       // project, so falling back to it means every film already in the

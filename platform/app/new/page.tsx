@@ -107,6 +107,34 @@ const SFX_LEVEL_PCT_MIN = 10;
 const SFX_LEVEL_PCT_DEFAULT = 35;
 
 /**
+ * The Veo tiers, priced per 8s clip in useapi credits (measured on the
+ * account — 25,050/month). Ids must stay in lockstep with VIDEO_MODELS in
+ * lib/data/derive.ts and with what `Current Scene` in n8n accepts: the
+ * string reaches the Flow API verbatim.
+ */
+const VIDEO_TIERS = [
+  { id: "veo-3.1-lite-low-priority", label: "Free", credits: 0, note: "" },
+  {
+    id: "veo-3.1-lite",
+    label: "Better",
+    credits: 5,
+    note: "Same model, real queue priority — clips arrive much faster and slightly cleaner.",
+  },
+  {
+    id: "veo-3.1-fast",
+    label: "Fast",
+    credits: 10,
+    note: "A stronger model — noticeably fewer physics glitches, good default for films worth posting.",
+  },
+  {
+    id: "veo-3.1-quality",
+    label: "Cinema",
+    credits: 100,
+    note: "The best Veo on offer — for films where every shot has to hold up.",
+  },
+] as const;
+
+/**
  * The length slider's ends, and the number field's.
  *
  * One owner, because the range input, the number input and the fill
@@ -253,6 +281,9 @@ export default function NewVideo() {
   // Hands-off mode: every gate signs itself off. Off by default — approving
   // unseen is a real trade, and it must never be the accident.
   const [autoApprove, setAutoApprove] = useState(false);
+  // Which Veo tier generates the clips. Free is the default and the business
+  // model; a paid tier is a per-film decision, priced on the spot.
+  const [videoModel, setVideoModel] = useState("veo-3.1-lite-low-priority");
   // The category selection lives here because BOTH halves of CategoryPicker
   // read it and they are rendered in different cards.
   const [category, setCategory] = useState(DEFAULT_CATEGORY);
@@ -450,6 +481,40 @@ export default function NewVideo() {
                   <input type="hidden" name="pace" value={pace} />
                   <input type="hidden" name="speed" value={speed} />
                   <SpeedPicker value={speed} onChange={setSpeed} />
+                </div>
+                <div className="frow">
+                  <label>Video quality</label>
+                  {/* Which Veo tier generates the clips. The pipeline has read
+                      this override since 2026-09-03; the form is the first
+                      thing to actually write it — until now every film ran on
+                      the weakest (free) model, which is where the ghost cars
+                      and driverless starts came from. The cost line is this
+                      film's own arithmetic, so the trade is priced before it
+                      is bought. */}
+                  <input type="hidden" name="video_model" value={videoModel} />
+                  <div className="seg" role="group" aria-label="Video quality">
+                    {VIDEO_TIERS.map((t) => (
+                      <button
+                        type="button"
+                        key={t.id}
+                        className={videoModel === t.id ? "on" : ""}
+                        onClick={() => setVideoModel(t.id)}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="fnote">
+                    {(() => {
+                      const t = VIDEO_TIERS.find((x) => x.id === videoModel)!;
+                      const clips = Math.max(1, Math.round(length / 8));
+                      const hookExtra = t.credits === 0 ? 100 : 0;
+                      const total = clips * t.credits + hookExtra;
+                      return t.credits === 0
+                        ? `Free tier — clips cost no credits (the opening hook still renders on Cinema, ~100 credits). Fine for scenery and slow shots; complex motion (races, crowds, physical contact) is where it glitches.`
+                        : `${t.note} ≈ ${total.toLocaleString("en-US")} credits for this film (${clips} clips × ${t.credits}), out of 25,050/month.`;
+                    })()}
+                  </p>
                 </div>
               </section>
 

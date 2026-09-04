@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "check:review": "node --experimental-strip-types scripts/check-review.mjs"
   },
   "dependencies": {
     "next": "^15.3.0",

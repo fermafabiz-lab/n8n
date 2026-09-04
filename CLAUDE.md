@@ -3141,6 +3141,33 @@ the pipeline already produces.
   a tab instead of saving. `downloadSrc()` in `lib/media.ts` adds `?dl=<name>`
   for proxied assets and returns CDN URLs untouched, since the attribute is
   ignored there either way.
+- **A press has to show on screen before the server answers.** The action
+  writes the row and revalidates, so the truth lands a second or several
+  later — up to ten if the write just missed a refresh tick — and until then
+  nothing moved, which reads as a click that did not register. On a film where
+  213 decisions are made one at a time that pause IS the work.
+  `useOptimisticApprovals` applies the press immediately and drops the guess
+  when the server answers — **whichever way it answers**, so a refused write
+  returns to the truth instead of leaving a green dot the database never
+  accepted. Both the buttons and the keyboard go through it, or the two paths
+  drift.
+- **Keyboard review, because the board offered only two bad options.** Either
+  "Approve all 71" — approving without looking — or click the scene, click
+  Approve, then hunt the strip for the next one that owes something: over 400
+  clicks for a 71-scene film, most of them navigation rather than judgement.
+  So in practice the bulk button wins and nobody reviews anything. `A`
+  approves and advances, `J`/`K` move, `R` puts the cursor in the note box,
+  `Space` drives the monitor (`useReviewKeys`).
+  Three things are load-bearing. **The typing guard**: `a` inside a textarea
+  must type an `a`, not approve — the note field sits next to the approve
+  button and is exactly where someone writes prose. **The advance rule** is a
+  pure exported function (`pickNextOwing`) with its own check
+  (`npm run check:review`), because its two edges are invisible when broken —
+  it must never re-select the scene just approved (the key looks dead) and
+  running out must END the pass rather than loop on the last scene.
+  **The hint is rendered under the filmstrip**: a shortcut nobody can see is a
+  shortcut nobody uses, and it carries the remaining count, which is the only
+  place a long pass can be watched shrinking.
 - Count **approvals**, not asset existence, for pipeline progress. Counting
   clips that merely exist made "Video" tick green before review.
 - **…but scope that count to the scenes the pass staged, not to the film.**

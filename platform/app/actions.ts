@@ -30,6 +30,7 @@ import {
   normalizeCaptionColor,
   normalizeSfxLevel,
   normalizeSpeed,
+  normalizeVideoModel,
   normalizeVoiceTone,
   type VoiceTone,
 } from "@/lib/data/derive";
@@ -1705,6 +1706,10 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     // Hands-off mode — stored in Editing Options by Normalize Webhook Input,
     // read back by the project page's AutoPilot. yes|no like every finish.
     auto_approve: String(formData.get("auto_approve") ?? "no"),
+    // Which Veo tier generates the clips. Normalized here AND in n8n; an
+    // unknown id must never travel, because Current Scene sends the string
+    // to the Flow API verbatim. Absent/free posts "" and stores nothing.
+    video_model: normalizeVideoModel(formData.get("video_model")) ?? "",
     Style: String(formData.get("style") ?? ""),
     // In chapters mode (and no-narrator characters mode) there is no
     // narrator picker; the first cast voice doubles as the project voice so

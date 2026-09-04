@@ -92,6 +92,19 @@ export interface EditingOptions {
    */
   autoApprove: boolean;
   /**
+   * Which Veo model generates this film's clips, or null for the free
+   * default (`veo-3.1-lite-low-priority`, 0 credits on the Ultra plan).
+   *
+   * The pipeline has read `Editing Options.videoModel` since 2026-09-03
+   * (`Current Scene` in Media Generation chooses per scene: this override,
+   * else free, with the hook on Quality either way) — but nothing ever WROTE
+   * it, so every film ran on the weakest model on offer and the producer's
+   * "it doesn't use 30% of its power" was numerically about right. Absence
+   * stays meaningful (free default, like `captionColor`'s white); a value is
+   * only stored when a paid tier was deliberately chosen.
+   */
+  videoModel: string | null;
+  /**
    * How the narrator READS — ElevenLabs' generation settings for this film.
    *
    * NULL means "never chosen", and that is not the same as "chosen to be the
@@ -557,6 +570,30 @@ export interface Publishing {
 export const PUBLISHING_STATES = ["review", "ready", "posted"] as const;
 
 /**
+ * The Veo tiers a film may choose, with what each 8s clip costs in useapi
+ * credits — measured on the account (25,050/month, no rollover), not quoted.
+ * The model string reaches `Current Scene` in Media Generation verbatim, so
+ * this list must only ever hold ids useapi actually accepts: a wrong id
+ * burns three retries plus ~20 min of cooldowns before killing the batch.
+ */
+export const VIDEO_MODELS = [
+  { id: "veo-3.1-lite-low-priority", credits: 0 },
+  { id: "veo-3.1-lite", credits: 5 },
+  { id: "veo-3.1-fast", credits: 10 },
+  { id: "veo-3.1-quality", credits: 100 },
+] as const;
+
+/** A known model id, or null — absent means the free default, and stays so. */
+export function normalizeVideoModel(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const v = raw.trim();
+  if (!VIDEO_MODELS.some((m) => m.id === v)) return null;
+  // Storing the free default explicitly would be harmless today, but absence
+  // is the shape every reader already handles; keep one spelling of it.
+  return v === "veo-3.1-lite-low-priority" ? null : v;
+}
+
+/**
  * Defensive like every Editing Options reader: the value round-trips through
  * jsonb and two backends. Absent or malformed reads as "review" with empty
  * fields — the state every finished film was silently in before this existed.
@@ -666,6 +703,7 @@ export function buildProject(r: RawProject): Project {
       // Strictly opt-in, `=== true`: hands-off is a real trade (nothing gets
       // a human look) and must never switch itself on by absence.
       autoApprove: opts.autoApprove === true,
+      videoModel: normalizeVideoModel(opts.videoModel),
       // No fallback to a project field, unlike `speed`: there is no older
       // column that ever meant this, so "never chosen" is the honest answer
       // for every film made before today — and it is also the answer that

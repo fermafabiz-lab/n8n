@@ -2072,6 +2072,14 @@ body:has(.nb) .nav {
   font-weight: 600;
   letter-spacing: -0.015em;
 }
+/* The one-line consequence under a control — the video-quality cost line. */
+.fsec .fnote {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--dim);
+  max-width: 56ch;
+}
 .fsec .fhint {
   margin-left: auto;
   font-family: var(--f-mono), ui-monospace, Menlo, monospace;

@@ -275,6 +275,61 @@ export async function regenerateVoice(
   }
 }
 
+/**
+ * Take back the approvals just given, and nothing else.
+ *
+ * Approving is the one action on this page that is both irreversible and easy
+ * to fire by accident — "Approve all 71" is a single click, and `A` on the
+ * keyboard is one keystroke that also advances, so a double-press signs off a
+ * scene nobody looked at. Until now the only way back was `reopenStep`, one
+ * scene at a time, or SQL in /db.
+ *
+ * It clears the checkbox and DOES NOT set a regeneration flag. That
+ * distinction is the whole design: `writeSceneApproval(…, "regenerate")` would
+ * queue new work at fal or Flow, so an undo that used it would spend money to
+ * reverse a mistake. Undoing leaves the asset exactly where it was, merely
+ * unsigned, which is the state it was in a moment ago.
+ *
+ * It also does not cascade the way `reopenStep` does. Reopening a step means
+ * "this needs another look" and rightly invalidates what was derived from it;
+ * undo means "that click was a mistake", and taking a clip's approval away
+ * because the picture's approval was withdrawn would punish the producer for
+ * the misclick a second time.
+ *
+ * The one thing it cannot take back: if approving a picture already queued a
+ * fresh clip (`flagStaleClip`), that regeneration is dispatched and the caller
+ * is told so rather than being left to discover it.
+ */
+export async function undoApprovals(
+  projectId: string,
+  sceneIds: string[],
+  kind: "image" | "video",
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  if (!sceneIds.length) return { ok: true, message: "Nothing to undo." };
+  const field = kind === "image" ? "Aprobare Imagine" : "Aprobare Video";
+  try {
+    for (const id of sceneIds) {
+      await writeSceneFields(id, { [field]: false });
+      // Airtable rate limit is 5 req/s per base; n8n polls concurrently.
+      if (sceneIds.length > 1) await new Promise((r) => setTimeout(r, 250));
+    }
+    revalidatePath(`/projects/${projectId}`);
+    const n = sceneIds.length;
+    return {
+      ok: true,
+      message:
+        n === 1
+          ? `Approval taken back. The ${kind === "image" ? "picture" : "clip"} is unchanged.`
+          : `Took back ${n} approvals. Nothing was regenerated.`,
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
 export async function approveAllOfKind(
   projectId: string,
   sceneIds: string[],

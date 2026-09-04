@@ -51,6 +51,13 @@ export type ReviewKeyHandlers = {
   reject?: () => void;
   /** Play or pause whatever the monitor is showing. */
   togglePlay?: () => void;
+  /**
+   * Take back the last approval. On the keyboard because that is where the
+   * mistake happens: `A` advances, so a double-press signs off the next scene
+   * before it has been looked at, and reaching for the mouse to fix it breaks
+   * the rhythm the keys exist to create.
+   */
+  undo?: () => void;
   /** Off while a dialog owns the keyboard, or the board is not on screen. */
   enabled?: boolean;
 };
@@ -74,7 +81,7 @@ const isTyping = (el: Element | null): boolean => {
 };
 
 export function useReviewKeys(h: ReviewKeyHandlers) {
-  const { approve, next, prev, reject, togglePlay, enabled = true } = h;
+  const { approve, next, prev, reject, togglePlay, undo, enabled = true } = h;
 
   useEffect(() => {
     if (!enabled) return;
@@ -104,6 +111,12 @@ export function useReviewKeys(h: ReviewKeyHandlers) {
           e.preventDefault();
           prev();
           return;
+        case "u":
+        case "U":
+          if (!undo) return;
+          e.preventDefault();
+          undo();
+          return;
         case "r":
         case "R":
           if (!reject) return;
@@ -122,5 +135,5 @@ export function useReviewKeys(h: ReviewKeyHandlers) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [approve, next, prev, reject, togglePlay, enabled]);
+  }, [approve, next, prev, reject, togglePlay, undo, enabled]);
 }

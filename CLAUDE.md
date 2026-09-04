@@ -2667,6 +2667,17 @@ the pipeline already produces.
   "inherit Fraunces". It inherits **Outfit** now. The behaviour is correct —
   an empty class means "inherit the display face" — only the name in the
   comment is stale.
+- **New components carry their own stylesheet; `globals.css` is closed to
+  them.** It is 5659 lines with no scoping, and the collision it caused is on
+  record two bullets down — a modifier named `empty` inheriting an app-wide
+  `.empty { padding: 80px 0 }`. Every generic word is already taken (card,
+  field, chip, empty, left, on, full) and nothing tells you which. A
+  `*.module.css` beside the component gets its names hashed at build
+  (`ReviewKeys_hint__tZCK8`), so it can neither reach anything nor be reached.
+  **The token layer stays global on purpose** — colours and spacing SHOULD be
+  shared, and that is the part of globals.css doing its job. This is a rule
+  going forward, not a migration: move a block only when you are editing it
+  anyway. `SceneBoard.module.css` is the first one and the pattern to copy.
 - **Generic class names are already taken.** `globals.css` has app-wide
   blocks like `.empty` (an empty-state with `padding: 80px 0`), `.card`,
   `.field`, `.chip`. Using one as a local modifier silently inherits it: the
@@ -3168,6 +3179,21 @@ the pipeline already produces.
   **The hint is rendered under the filmstrip**: a shortcut nobody can see is a
   shortcut nobody uses, and it carries the remaining count, which is the only
   place a long pass can be watched shrinking.
+- **Undo, on the one action that is irreversible and easy to fire by
+  accident.** "Approve all 71" is a single click and `A` also advances, so a
+  double-press signs off a scene nobody looked at; the only way back was
+  `reopenStep`, one scene at a time, or SQL in /db. `undoApprovals` clears the
+  checkbox and **does not set a regeneration flag** — that distinction is the
+  whole design, because `writeSceneApproval(…, "regenerate")` queues work at
+  fal or Flow, so an undo built on it would spend money to reverse a mistake.
+  It also does not cascade the way `reopenStep` does: reopening means "this
+  needs another look" and rightly invalidates what was derived from it, undo
+  means "that click was a mistake". One step of history only — a stack on a
+  page that re-reads the server every ten seconds is a promise about state we
+  do not control. Verified against a real Postgres: after approve-then-undo,
+  `image_approved` is back to false with `regen_image` and `regen_image_at`
+  untouched. What it cannot take back is a clip already queued by
+  `flagStaleClip`, and the message says so.
 - Count **approvals**, not asset existence, for pipeline progress. Counting
   clips that merely exist made "Video" tick green before review.
 - **…but scope that count to the scenes the pass staged, not to the film.**

@@ -11,11 +11,13 @@ import {
   saveSceneVersion,
   saveVideoPrompt,
   sceneAction,
+  undoApprovals,
   type ActionResult,
 } from "@/app/actions";
 import type { Scene, StatusKind } from "@/lib/data";
 import { useOptimisticApprovals } from "./useOptimisticApprovals";
 import { pickNextOwing, useReviewKeys } from "./useReviewKeys";
+import styles from "./SceneBoard.module.css";
 import { mediaSrc } from "@/lib/media";
 import {
   chapterKeyOf,
@@ -198,6 +200,19 @@ export default function SceneBoard({
   const running = scenes.find((s) => s.statusKind === "run");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [msg, setMsg] = useState<ActionResult | null>(null);
+  /**
+   * What the last approval signed off, so it can be taken back.
+   *
+   * Only ONE step of history, and deliberately: a stack of undos on a page
+   * that also refreshes itself from the server every ten seconds is a promise
+   * about state we do not control. One step covers what actually goes wrong —
+   * the double-press of `A`, and the "Approve all 71" that was meant for a
+   * different step.
+   */
+  const [lastApproval, setLastApproval] = useState<{
+    kind: "image" | "video";
+    ids: string[];
+  } | null>(null);
   const [feedback, setFeedback] = useState("");
   // Shot-direction drafts: the stored text until edited.
   const [videoDrafts, setVideoDrafts] = useState<Record<string, string>>({});
@@ -448,6 +463,7 @@ export default function SceneBoard({
     if (!owes(active)) return;
 
     guess(active.id, kind);
+    setLastApproval({ kind, ids: [active.id] });
     run(() => sceneAction(projectId, active.id, kind, "approve"));
 
     const nextScene = pickNextOwing(ordered, idx, owes);
@@ -456,6 +472,15 @@ export default function SceneBoard({
       setPreviewId(null);
     }
   }, [active, idx, step, owes, ordered, projectId, guess]);
+
+  /** Take back the last approval — the key and the link call this same one. */
+  const undoLast = useCallback(() => {
+    if (!lastApproval) return;
+    const { kind, ids } = lastApproval;
+    guess(ids, kind, false);
+    setLastApproval(null);
+    run(() => undoApprovals(projectId, ids, kind));
+  }, [lastApproval, guess, projectId]);
 
   /** `R` puts the cursor where the producer says what should change. */
   const focusNote = useCallback(() => {
@@ -481,6 +506,7 @@ export default function SceneBoard({
     prev: () => moveBy(-1),
     reject: focusNote,
     togglePlay,
+    undo: lastApproval ? undoLast : undefined,
     enabled: !pending,
   });
 
@@ -590,11 +616,11 @@ export default function SceneBoard({
               shows only on the steps that can act on a key, and carries the
               count so the producer can see the pass shrinking. */}
           {step !== "audio" && (
-            <p className="keyhint">
+            <p className={styles.hint}>
               <kbd>A</kbd> approve · <kbd>J</kbd>/<kbd>K</kbd> move ·{" "}
-              <kbd>R</kbd> note · <kbd>Space</kbd> play
+              <kbd>R</kbd> note · <kbd>U</kbd> undo · <kbd>Space</kbd> play
               {owing > 0 && (
-                <span className="left">
+                <span className={styles.left}>
                   {owing} still to review on this step
                 </span>
               )}
@@ -605,7 +631,23 @@ export default function SceneBoard({
 
       <div className="insp">
         {msg && (
-          <p className={`formmsg ${msg.ok ? "ok" : "err"}`}>{msg.message}</p>
+          <p className={`formmsg ${msg.ok ? "ok" : "err"}`}>
+            {msg.message}
+            {/* Undo rides on the confirmation rather than sitting in the
+                toolbar: it is only meaningful for a few seconds after the
+                press, and a permanent button would invite using it as a
+                general "un-approve", which is what `Make changes` is for. */}
+            {msg.ok && lastApproval && (
+              <button
+                type="button"
+                className={styles.undo}
+                disabled={pending}
+                onClick={undoLast}
+              >
+                Undo
+              </button>
+            )}
+          </p>
         )}
 
         {active && (
@@ -1152,6 +1194,7 @@ export default function SceneBoard({
               onClick={() =>
                 {
                   guess(unapprovedImages, "image");
+                  setLastApproval({ kind: "image", ids: unapprovedImages });
                   run(() => approveAllOfKind(projectId, unapprovedImages, "image"));
                 }
               }
@@ -1183,6 +1226,7 @@ export default function SceneBoard({
               onClick={() =>
                 {
                   guess(unapprovedVideos, "video");
+                  setLastApproval({ kind: "video", ids: unapprovedVideos });
                   run(() => approveAllOfKind(projectId, unapprovedVideos, "video"));
                 }
               }

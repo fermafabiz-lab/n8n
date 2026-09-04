@@ -1,0 +1,72 @@
+/* Keyboard review hint, under the filmstrip.
+ *
+ * The first component to carry its own stylesheet. `globals.css` is 5659 lines
+ * with no scoping, and the collision it has already caused is on record: a
+ * modifier named `empty` inherited the app-wide `.empty { padding: 80px 0 }`
+ * and dropped a title into the middle of a hole. Every generic word — card,
+ * field, chip, empty, left — is taken, and nothing tells you which.
+ *
+ * A module gets its class names hashed at build time, so `.left` here cannot
+ * reach anything else and nothing else can reach it. The token layer stays
+ * global on purpose: colours and spacing SHOULD be shared, and that is the one
+ * part of globals.css that is doing its job.
+ */
+
+.hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 8px 0;
+  padding: 8px 2px 2px;
+  font-size: 11.5px;
+  color: var(--faint);
+  border-top: 1px solid var(--line-soft);
+}
+
+.hint kbd {
+  font-family: var(--f-mono, ui-monospace, Menlo, monospace);
+  font-size: 10.5px;
+  line-height: 1;
+  padding: 3px 5px;
+  border-radius: 5px;
+  color: var(--soft);
+  background: var(--card2);
+  border: 1px solid var(--line2);
+  /* The one-pixel lip is what makes it read as a key rather than a chip. */
+  box-shadow: 0 1px 0 var(--line2);
+}
+
+/* Pushed to the far end because it is the only part that changes as the pass
+   runs — the producer watches this number, not the key list. */
+.left {
+  margin-left: auto;
+  color: var(--accent-deep);
+  font-weight: 600;
+}
+
+/* "Undo", inside the confirmation line.
+ *
+ * A link, not a button shape: it must be reachable without being the thing the
+ * eye lands on — the message it sits in is usually good news, and an undo that
+ * competes with it for attention reads as a warning. */
+.undo {
+  margin-left: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--accent-deep);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.undo:hover:not(:disabled) {
+  color: var(--accent);
+}
+.undo:disabled {
+  color: var(--disabled);
+  cursor: default;
+  text-decoration: none;
+}

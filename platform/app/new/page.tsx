@@ -281,6 +281,13 @@ export default function NewVideo() {
   // Hands-off mode: every gate signs itself off. Off by default — approving
   // unseen is a real trade, and it must never be the accident.
   const [autoApprove, setAutoApprove] = useState(false);
+  // The producer's direction: the film's angle in their own words, and up to
+  // three mandatory beats (one per line). Both optional, both steer the
+  // writer; the must-includes are verified by the Narration Guard.
+  const [brief, setBrief] = useState("");
+  const [mustHaves, setMustHaves] = useState("");
+  const [expanding, setExpanding] = useState(false);
+  const [expandNote, setExpandNote] = useState("");
   // Which Veo tier generates the clips. Free is the default and the business
   // model; a paid tier is a per-film decision, priced on the spot.
   const [videoModel, setVideoModel] = useState("veo-3.1-lite-low-priority");
@@ -300,6 +307,33 @@ export default function NewVideo() {
 
   const lang = languageByCode(language);
   const languageName = lang?.name ?? "English";
+
+  /** "✨ Develop my idea" — n8n's expand-brief webhook (the model keys live
+   *  there) turns the subject + rough draft into 2-4 sharper sentences, in
+   *  the film's language. Fills the textarea, stays fully editable; any
+   *  failure leaves whatever was typed untouched. */
+  const expandIdea = async () => {
+    setExpanding(true);
+    setExpandNote("");
+    try {
+      const res = await fetch("/api/expand-brief", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tema: name, brief, tone, language: languageName }),
+      });
+      const out = (await res.json()) as { brief?: string | null };
+      if (out.brief) {
+        setBrief(out.brief);
+        setExpandNote("Developed — edit it freely, it's your text now.");
+      } else {
+        setExpandNote("Couldn't develop it right now — your text is untouched.");
+      }
+    } catch {
+      setExpandNote("Couldn't develop it right now — your text is untouched.");
+    } finally {
+      setExpanding(false);
+    }
+  };
   const scenes = Math.max(1, Math.round(length / 8));
   const words = scenes * 22;
   const chapters = Math.max(1, Math.ceil(length / 120));
@@ -404,6 +438,58 @@ export default function NewVideo() {
                       </button>
                     ))}
                   </div>
+                </div>
+                {/* The producer's direction — the cheapest quality lever there
+                    is. A five-word title under-specifies a whole film; these
+                    two optional fields carry the angle and the mandatory
+                    beats. Both are STORED on the project (unlike Lore, which
+                    a restart loses), read by the Story Bible, the outline and
+                    the narration prompts — and the must-includes are VERIFIED
+                    by the Narration Guard after writing, because an
+                    instruction in a prompt is not a constraint. */}
+                <div className="field" style={{ marginTop: 22 }}>
+                  <label>
+                    What the film should really be about{" "}
+                    <span className="fhint">optional — the angle, in your own words</span>
+                  </label>
+                  <textarea
+                    name="brief"
+                    className="nb-ta"
+                    rows={3}
+                    maxLength={2000}
+                    value={brief}
+                    onChange={(e) => setBrief(e.target.value)}
+                    placeholder="The point of view, what to focus on, what to leave out — e.g. 'Not the whole biography: only the night of the crime and the investigation, told through the witnesses.'"
+                  />
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
+                    <button
+                      type="button"
+                      className="btn"
+                      disabled={expanding || !name.trim()}
+                      title={name.trim() ? "Let AI develop your idea into a sharper brief — editable after" : "Write the subject above first"}
+                      onClick={expandIdea}
+                    >
+                      {expanding ? "Developing…" : "✨ Develop my idea"}
+                    </button>
+                    {expandNote && (
+                      <span style={{ fontSize: 12, color: "var(--dim)" }}>{expandNote}</span>
+                    )}
+                  </div>
+                </div>
+                <div className="field" style={{ marginTop: 22 }}>
+                  <label>
+                    Must appear in the film{" "}
+                    <span className="fhint">optional — up to 3, one per line; the writer is checked on each</span>
+                  </label>
+                  <textarea
+                    name="must_haves"
+                    className="nb-ta"
+                    rows={3}
+                    maxLength={650}
+                    value={mustHaves}
+                    onChange={(e) => setMustHaves(e.target.value)}
+                    placeholder={"The moment the deal collapses\nWhy the case stayed unsolved for 27 years"}
+                  />
                 </div>
                 <div className="field" style={{ marginTop: 22 }}>
                   <label>What kind of film</label>

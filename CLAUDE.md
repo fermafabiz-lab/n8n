@@ -480,6 +480,37 @@ a month for this":
   and regenerations get it too. A negative is a preference, not a constraint
   — the model TIER is the bigger dial, which is what the picker is for.
 
+### The producer's direction: brief + must-includes, verified (2026-09-06)
+
+The cheapest quality lever left: the writer used to receive a five-word
+title and guess the rest. Two optional fields on `/new` now carry the
+producer's intent, and the mandatory half is CHECKED, not requested:
+
+- **"What the film should really be about"** (`brief`, ≤2000 chars) — the
+  angle in the producer's own words. Injected as PRODUCER'S DIRECTION into
+  `Generate Story Bible` and `Generate Outline` ("where this differs from
+  your own reading of the Tema, THIS wins").
+- **"Must appear in the film"** (`must_haves`, ≤3 lines) — injected into the
+  outline and `Write Full Narration` as MUST APPEAR, and **verified by
+  `Narration Guard`**: a point counts as present when at least half of its
+  meaningful terms (4+ letters, diacritics folded) appear in the narration;
+  a miss goes back to the editor through the existing `editorFeedback` path
+  (same MAX_RETRIES=2, same accept-anyway ending). An instruction in a
+  prompt is not a constraint; this is.
+- **"✨ Develop my idea"** — `/api/expand-brief` → n8n workflow `Expand
+  Brief` (`NPES1DrI2d3lifQp`, webhook `expand-brief`, one OpenAI call, keys
+  stay in n8n): 2-4 sentences developing the producer's OWN idea, in the
+  film's language, filled into the editable textarea. Any failure leaves the
+  typed text untouched.
+
+Both are stored in Editing Options (`producerBrief`, `mustInclude`) —
+**unlike Lore, which is never stored and dies on restart-scripting** — and
+all four prompt/guard injections read them via
+`$('Fetch Project Record')`, wrapped in try/catch IIFEs that return `''`
+when absent, so classic projects render byte-identical prompts. The four
+touched Scripting nodes were byte-diffed against the active version before
+publish (only they differed; connections untouched).
+
 ### Content filters — deterministic, never blindly retry
 
 - Google Flow / Veo rejects with `PUBLIC_ERROR_PROMINENT_PEOPLE_FILTER_FAILED`.

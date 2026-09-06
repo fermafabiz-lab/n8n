@@ -1710,6 +1710,17 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     // unknown id must never travel, because Current Scene sends the string
     // to the Flow API verbatim. Absent/free posts "" and stores nothing.
     video_model: normalizeVideoModel(formData.get("video_model")) ?? "",
+    // The producer's direction: the film's angle in their own words, plus up
+    // to three mandatory beats. Normalize stores both in Editing Options
+    // (producerBrief / mustInclude) so a script restart keeps them — the gap
+    // that makes Lore unrecoverable.
+    brief: String(formData.get("brief") ?? "").trim().slice(0, 2000),
+    must_haves: String(formData.get("must_haves") ?? "")
+      .split(/\r?\n/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .slice(0, 3)
+      .map((s) => s.slice(0, 200)),
     Style: String(formData.get("style") ?? ""),
     // In chapters mode (and no-narrator characters mode) there is no
     // narrator picker; the first cast voice doubles as the project voice so

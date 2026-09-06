@@ -48,6 +48,8 @@ export type {
   StatusKind,
   EditingOptions,
   MotifCard,
+  MusicTrack,
+  Publishing,
   Project,
   Scene,
   SceneVersion,
@@ -58,6 +60,11 @@ export type {
 } from "./data/derive";
 export {
   MAX_VERSIONS_PER_KIND,
+  PUBLISHING_STATES,
+  normalizePublishing,
+  VIDEO_MODELS,
+  normalizeVideoModel,
+  normalizeMusicTrack,
   GENRE_EDITABLE,
   LIBRARY_EDITABLE,
   EXAMPLE_EDITABLE,
@@ -447,7 +454,7 @@ const DEMO_PROJECTS: Project[] = [
     finalVideoUrl: null,
     aspect: "16:9" as const,
     updatedAt: null,
-    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: true, sfxLevel: 0.35, music: false, drawnCards: true, captionColor: null, speed: 1, speedLocked: false, voice: null, autoApprove: false },
+    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: true, sfxLevel: 0.35, music: false, musicTrack: null, drawnCards: true, captionColor: null, videoModel: null, speed: 1, speedLocked: false, voice: null, autoApprove: false },
     awaitingFinalSettings: false,
     category: "story",
     language: "English",
@@ -457,6 +464,7 @@ const DEMO_PROJECTS: Project[] = [
     castAssign: {},
     chapterVoices: {},
     motifCards: [],
+    publishing: { state: "review", ytTitle: "", description: "", notes: "", ytUrl: "" },
   },
   {
     id: "demo-2",
@@ -469,7 +477,7 @@ const DEMO_PROJECTS: Project[] = [
     finalVideoUrl: null,
     aspect: "16:9" as const,
     updatedAt: null,
-    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: true, sfxLevel: 0.35, music: false, drawnCards: true, captionColor: null, speed: 1, speedLocked: false, voice: null, autoApprove: false },
+    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: true, sfxLevel: 0.35, music: false, musicTrack: null, drawnCards: true, captionColor: null, videoModel: null, speed: 1, speedLocked: false, voice: null, autoApprove: false },
     awaitingFinalSettings: false,
     category: "story",
     language: "English",
@@ -479,6 +487,7 @@ const DEMO_PROJECTS: Project[] = [
     castAssign: {},
     chapterVoices: {},
     motifCards: [],
+    publishing: { state: "review", ytTitle: "", description: "", notes: "", ytUrl: "" },
   },
   {
     id: "demo-3",
@@ -491,7 +500,7 @@ const DEMO_PROJECTS: Project[] = [
     finalVideoUrl: null,
     aspect: "16:9" as const,
     updatedAt: null,
-    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: true, sfxLevel: 0.35, music: false, drawnCards: true, captionColor: null, speed: 1, speedLocked: false, voice: null, autoApprove: false },
+    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: true, sfxLevel: 0.35, music: false, musicTrack: null, drawnCards: true, captionColor: null, videoModel: null, speed: 1, speedLocked: false, voice: null, autoApprove: false },
     awaitingFinalSettings: false,
     category: "story",
     language: "English",
@@ -501,6 +510,7 @@ const DEMO_PROJECTS: Project[] = [
     castAssign: {},
     chapterVoices: {},
     motifCards: [],
+    publishing: { state: "review", ytTitle: "", description: "", notes: "", ytUrl: "" },
   },
   {
     id: "demo-4",
@@ -513,7 +523,7 @@ const DEMO_PROJECTS: Project[] = [
     finalVideoUrl: "#",
     aspect: "16:9" as const,
     updatedAt: null,
-    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: true, sfxLevel: 0.35, music: false, drawnCards: true, captionColor: null, speed: 1, speedLocked: false, voice: null, autoApprove: false },
+    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: true, sfxLevel: 0.35, music: false, musicTrack: null, drawnCards: true, captionColor: null, videoModel: null, speed: 1, speedLocked: false, voice: null, autoApprove: false },
     awaitingFinalSettings: false,
     category: "story",
     language: "English",
@@ -523,6 +533,7 @@ const DEMO_PROJECTS: Project[] = [
     castAssign: {},
     chapterVoices: {},
     motifCards: [],
+    publishing: { state: "review", ytTitle: "", description: "", notes: "", ytUrl: "" },
   },
 ];
 
@@ -806,6 +817,22 @@ export async function readSceneVideoInputs(sceneId: string): Promise<{
 // Scene-script review: edits land in the same fields n8n reads after the
 // "Aprobare Scenă" gate, so approved text/prompts flow straight to TTS and
 // image generation.
+export type { EvidenceRow } from "./data/postgres";
+
+/**
+ * The film's research pack — the sourced claims its script was written
+ * against. Postgres only: the Airtable backend is frozen at the cutover and
+ * nothing runs on it, so growing it a new reader would be code for a museum.
+ * On that backend this answers empty, which degrades the YouTube description
+ * to one without a sources section rather than failing it.
+ */
+export async function getProjectEvidence(
+  projectId: string,
+): Promise<import("./data/postgres").EvidenceRow[]> {
+  if (USE_PG) return pgBackend.getProjectEvidence(projectId);
+  return [];
+}
+
 export async function writeSceneScript(
   sceneId: string,
   fields: { narration?: string; imagePrompt?: string; approve?: boolean },

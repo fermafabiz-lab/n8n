@@ -347,13 +347,19 @@ export function planMontage(scenes: SceneCaption[], opts: MontageOptions = {}): 
 
 	if (intensity === 0) {
 		const out: Shot[] = [];
-		const plain = (startSeconds: number, durationSeconds: number): Shot => ({
+		//
+		// `after` is the shot this one picks up from, set only for the footage on
+		// the far side of a card. Even here, where the framing never changes, the
+		// pan has to carry on: the head drifts a percent across its lead and a
+		// tail starting at zero snaps it back the moment the card lifts. Small,
+		// and on the same frame as a cut the viewer is already watching closely.
+		const plain = (startSeconds: number, durationSeconds: number, after?: Shot): Shot => ({
 			startSeconds,
 			durationSeconds,
 			kind: 'medium',
 			scale: FRAMINGS.medium.scale,
-			offsetXPct: 0,
-			offsetYPct: 0,
+			offsetXPct: after ? after.offsetXPct + after.driftX : 0,
+			offsetYPct: after ? after.offsetYPct + after.driftY : 0,
 			// Drift stays: it is a pan of one percent, which keeps a held frame
 			// from looking frozen and is not what anyone means by a zoom.
 			driftX: 1,
@@ -366,10 +372,11 @@ export function planMontage(scenes: SceneCaption[], opts: MontageOptions = {}): 
 				out.push(plain(s.startSeconds, s.durationSeconds));
 				return;
 			}
-			out.push(plain(s.startSeconds, CARD_LEAD));
+			const head = plain(s.startSeconds, CARD_LEAD);
+			out.push(head);
 			out.push(cardShot(s.startSeconds + CARD_LEAD, room.ci, room.secs));
 			const tail = s.durationSeconds - CARD_LEAD - room.secs;
-			if (tail > 0.35) out.push(plain(s.startSeconds + CARD_LEAD + room.secs, tail));
+			if (tail > 0.35) out.push(plain(s.startSeconds + CARD_LEAD + room.secs, tail, head));
 			cardSecondsUsed += room.secs;
 			lastCardEnd = s.startSeconds + CARD_LEAD + room.secs;
 		});
@@ -450,19 +457,56 @@ export function planMontage(scenes: SceneCaption[], opts: MontageOptions = {}): 
 			prevEndScale = endScaleOf(shot);
 		};
 
+		/**
+		 * The footage AFTER a mid-scene card: the same clip the card
+		 * interrupted, picked up where it was put down.
+		 *
+		 * Not `footage()` with the previous framing forced in — the head's push
+		 * and drift have moved the frame by the time the card takes over, so
+		 * re-entering on the head's BASE framing would step back by that much.
+		 * Starting from where the head actually ended is what makes the return
+		 * invisible; the drift direction carries on for the same reason.
+		 */
+		const resume = (head: Shot, length: number) => {
+			const shot: Shot = {
+				startSeconds: cursor,
+				durationSeconds: length,
+				kind: head.kind,
+				scale: head.scale + head.push,
+				offsetXPct: head.offsetXPct + head.driftX,
+				offsetYPct: head.offsetYPct + head.driftY,
+				driftX: head.driftX,
+				driftY: head.driftY,
+				push: pushFor(length),
+			};
+			shots.push(shot);
+			cursor += length;
+			remaining -= length;
+			prevEndScale = endScaleOf(shot);
+		};
+
 		// A card splits the scene into footage / card / footage. This is the one
 		// mid-scene cut the planner is allowed to invent, and it does not break
 		// the rule above: the picture is genuinely replaced, so nothing about the
 		// frames either side matches.
 		//
-		// Note the framing DOES change across it, and that is not a punch-in
-		// through the back door: the two footage shots never touch on screen, so
-		// there is no zoom jump to see. Coming back on the same framing is what
-		// would look wrong — it would make the card read as a splice dropped into
-		// one static shot instead of a cutaway.
+		// The framing used to CROSS the card, on the reasoning that the two
+		// footage shots never touch on screen so there is no jump to see. That
+		// reasoning is wrong, and it was reported from a finished film: the two
+		// shots are the SAME CLIP, three seconds apart. The eye holds a picture
+		// across a two-second cutaway and measures the return against it — which
+		// is precisely the zoom-jump complaint this planner exists to prevent,
+		// arriving through the one door left open to it. A real cutaway returns
+		// to the shot it left; that is what makes it a cutaway rather than two
+		// shots with a graphic between them.
+		//
+		// So the tail RESUMES the head: same framing, and starting exactly where
+		// the head's push and drift had carried it, so the frame the card
+		// uncovers is the frame it covered.
 		const room = cardRoom(i, cursor, remaining);
 		if (room) {
 			footage(CARD_LEAD);
+			const head = shots[shots.length - 1];
 			shots.push(cardShot(cursor, room.ci, room.secs));
 			cursor += room.secs;
 			remaining -= room.secs;
@@ -470,7 +514,7 @@ export function planMontage(scenes: SceneCaption[], opts: MontageOptions = {}): 
 			lastCardEnd = cursor;
 			// A card that runs to the scene boundary leaves no tail, and a
 			// sub-frame orphan shot would be worse than none.
-			if (remaining > 0.35) footage(remaining);
+			if (remaining > 0.35) resume(head, remaining);
 			continue;
 		}
 

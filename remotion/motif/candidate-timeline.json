@@ -1,0 +1,221 @@
+[
+	{
+		"sceneIndex": 7,
+		"variant": "timeline",
+		"priority": 1,
+		"why": "the film says four dates minutes apart; the shape of them — twenty-one years, then ten, then nine — is the thing a listener cannot hold",
+		"label": "Anii",
+		"marks": [
+			{
+				"at": "1941",
+				"label": "as a dealer",
+				"source": {
+					"kind": "quote",
+					"sceneIndex": 2,
+					"from": "He arrives in Las Vegas in 1941 as a dealer"
+				}
+			},
+			{
+				"at": "1952",
+				"label": "all the savings",
+				"source": {
+					"kind": "quote",
+					"sceneIndex": 3,
+					"from": "In 1952, he puts in all the savings and gets a bank loan to become an owner-partner at the Sahara Hotel and Casino"
+				}
+			},
+			{
+				"at": "1966",
+				"label": "family buys out",
+				"source": {
+					"kind": "quote",
+					"sceneIndex": 5,
+					"from": "In 1966, the Boyd family buys out the other Eldorado partners"
+				}
+			},
+			{
+				"at": "1975",
+				"label": "co-found Boyd Gaming",
+				"source": {
+					"kind": "quote",
+					"sceneIndex": 7,
+					"from": "By 1975, Sam Boyd and Bill Boyd co-found Boyd Gaming Corporation"
+				}
+			}
+		],
+		"note": "34 de ani",
+		"noteSource": {
+			"kind": "arithmetic"
+		}
+	},
+	{
+		"sceneIndex": 4,
+		"variant": "timeline",
+		"priority": 2,
+		"why": "the same span, with the years out of order",
+		"marks": [
+			{
+				"at": "1952",
+				"label": "all the savings",
+				"source": {
+					"kind": "quote",
+					"sceneIndex": 3,
+					"from": "In 1952, he puts in all the savings"
+				}
+			},
+			{
+				"at": "1941",
+				"label": "as a dealer",
+				"source": {
+					"kind": "quote",
+					"sceneIndex": 2,
+					"from": "He arrives in Las Vegas in 1941 as a dealer"
+				}
+			},
+			{
+				"at": "1966",
+				"label": "family buys out",
+				"source": {
+					"kind": "quote",
+					"sceneIndex": 5,
+					"from": "In 1966, the Boyd family buys out the other Eldorado partners"
+				}
+			}
+		]
+	},
+	{
+		"sceneIndex": 6,
+		"variant": "timeline",
+		"priority": 3,
+		"why": "a year the film has not said by this point",
+		"marks": [
+			{
+				"at": "1941",
+				"label": "as a dealer",
+				"source": {
+					"kind": "quote",
+					"sceneIndex": 2,
+					"from": "He arrives in Las Vegas in 1941 as a dealer"
+				}
+			},
+			{
+				"at": "1952",
+				"label": "all the savings",
+				"source": {
+					"kind": "quote",
+					"sceneIndex": 3,
+					"from": "In 1952, he puts in all the savings"
+				}
+			},
+			{
+				"at": "1975",
+				"label": "co-found Boyd Gaming",
+				"source": {
+					"kind": "quote",
+					"sceneIndex": 7,
+					"from": "By 1975, Sam Boyd and Bill Boyd co-found Boyd Gaming Corporation"
+				}
+			}
+		]
+	},
+	{
+		"sceneIndex": 3,
+		"variant": "timeline",
+		"priority": 4,
+		"why": "a mark whose year is nowhere in its own quote",
+		"marks": [
+			{
+				"at": "1941",
+				"label": "as a dealer",
+				"source": {
+					"kind": "quote",
+					"sceneIndex": 2,
+					"from": "He arrives in Las Vegas in 1941 as a dealer"
+				}
+			},
+			{
+				"at": "1948",
+				"label": "all the savings",
+				"source": {
+					"kind": "quote",
+					"sceneIndex": 3,
+					"from": "In 1952, he puts in all the savings"
+				}
+			},
+			{
+				"at": "1952",
+				"label": "a bank loan",
+				"source": {
+					"kind": "quote",
+					"sceneIndex": 3,
+					"from": "gets a bank loan"
+				}
+			}
+		]
+	},
+	{
+		"sceneIndex": 8,
+		"variant": "timeline",
+		"priority": 5,
+		"why": "a span the subtraction does not support",
+		"marks": [
+			{
+				"at": "1941",
+				"label": "as a dealer",
+				"source": {
+					"kind": "quote",
+					"sceneIndex": 2,
+					"from": "He arrives in Las Vegas in 1941 as a dealer"
+				}
+			},
+			{
+				"at": "1952",
+				"label": "all the savings",
+				"source": {
+					"kind": "quote",
+					"sceneIndex": 3,
+					"from": "In 1952, he puts in all the savings"
+				}
+			},
+			{
+				"at": "1962",
+				"label": "the hard yes",
+				"source": {
+					"kind": "quote",
+					"sceneIndex": 4,
+					"from": "In 1962, they choose the hard yes"
+				}
+			}
+		],
+		"note": "40 de ani",
+		"noteSource": {
+			"kind": "arithmetic"
+		}
+	},
+	{
+		"sceneIndex": 2,
+		"variant": "timeline",
+		"priority": 6,
+		"why": "two marks is a gap, and a gap is a schedule",
+		"marks": [
+			{
+				"at": "1941",
+				"label": "as a dealer",
+				"source": {
+					"kind": "quote",
+					"sceneIndex": 2,
+					"from": "He arrives in Las Vegas in 1941 as a dealer"
+				}
+			},
+			{
+				"at": "1952",
+				"label": "all the savings",
+				"source": {
+					"kind": "quote",
+					"sceneIndex": 3,
+					"from": "In 1952, he puts in all the savings"
+				}
+			}
+		]
+	}
+]

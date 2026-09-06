@@ -69,8 +69,22 @@ app.post('/render', async (req, res) => {
 	// existed. The film is re-timed after it is drawn — see speed.mjs for why
 	// that is the only place it can happen without three surfaces drifting
 	// apart. An unrecognised value normalizes to 1, i.e. leaves the film alone.
-	const {speed: rawSpeed, ...inputProps} = req.body ?? {};
+	const {speed: rawSpeed, resolution: rawResolution, ...inputProps} = req.body ?? {};
 	const speed = normalizeSpeed(rawSpeed);
+	// `resolution` is ours too, and stripped for the same reason: the props the
+	// composition receives must stay byte-identical to what they were before it
+	// existed. It is not a prop, it is a SCALE — the composition stays
+	// 1280x720 and Remotion draws it at 1.5x device pixels, so type stays
+	// vector-crisp and the footage is read at its own resolution rather than
+	// being upscaled from a 720p raster. Which is why upscaling the clips and
+	// rendering at 1080p belong together: at 1.5x over 720p clips there is no
+	// extra detail to draw.
+	//
+	// It costs 2.09x the render time per frame — measured on this composition,
+	// 0.107s at 720p against 0.224s at 1080p, which is the pixel ratio almost
+	// exactly. Memory is unchanged (+5%), because the OffthreadVideo cache is
+	// capped in bytes and simply holds fewer frames.
+	const scale = String(rawResolution || '720p').toLowerCase() === '1080p' ? 1.5 : 1;
 	if (!inputProps || !inputProps.finalVideoUrl) {
 		return res.status(400).json({error: 'finalVideoUrl is required in the request body'});
 	}
@@ -89,6 +103,9 @@ app.post('/render', async (req, res) => {
 				composition,
 				serveUrl,
 				codec: 'h264',
+				// 1 or 1.5 — see the note where it is computed. The composition
+				// dimensions are untouched; this multiplies the output.
+				scale,
 				outputLocation,
 				inputProps,
 				// The container has 8GB. Parallel Chrome tabs (Remotion's default

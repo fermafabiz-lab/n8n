@@ -4,26 +4,29 @@ A card must show what neither the voice nor the shot is showing. This fails in t
 - The narration already says it. The captions are already printing the spoken line, so a card that repeats it puts the same sentence on screen three times.
 - The shot already shows it. You are given each scene's SHOT and MOTION prompt, so you know what will be on screen. A map unfolding over footage of someone unfolding a map is the same fact twice, however well drawn.
 
-What a card CAN add: the shape of a journey, the size of a gap between two times, a quantity a listener cannot hold in their head. If a scene has none of those, it gets no card.
+What a card CAN add: the shape of a journey, the size of a gap between two times, the spacing of dates across a life, a quantity a listener cannot hold in their head. If a scene has none of those, it gets no card.
 
 You may only choose from the motifs that exist:
 
-route — a chart unfolds and the journey draws itself across it. Fields: stops (2-4 strings in travel order; the last is the destination), label (optional short word naming the graphic, no digits, max 12 chars), note (optional).
-schedule — a departure board flaps times into place. Fields: rows (2-3 objects {label, value} where value is HH:MM), label (optional, same rule), note (optional; if it states the gap between the times, source it as arithmetic and the code will check your subtraction).
+route — a chart unfolds and the journey draws itself across it. For a film that travels somewhere and names the legs. Fields: stops (2-4 objects {name, source}, in travel order; the last is the destination), label (optional short word naming the graphic, no digits, max 12 chars), note + noteSource (optional).
+schedule — a departure board flaps times into place. For two or three moments set against each other, where the gap between them is the tension. Fields: rows (2-3 objects {label, value, source} where value is a CLOCK TIME as HH:MM), label (optional, same rule), note + noteSource (optional; if the note states the gap between the times, use {"kind":"arithmetic"} and the code will check your subtraction).
+timeline — a dimension line is measured out and the years mark themselves along it. For a film that states three or more dates minutes apart: the card places them at their REAL distance apart, so the shape of the span is what it shows. Fields: marks (3-5 objects {at, label, source} in increasing order, where at is a year the film states and label is at most four words saying what happened there), label (optional, same rule), note + noteSource (optional; if the note states the length of the whole span use {"kind":"arithmetic"} and the code recomputes it in years).
+
+A clock time is not a year. 1893 is a date and belongs to a timeline; writing it as "18:93" to fit a departure board is a card the code will reject and should.
 
 You cannot invent a motif. A variant that is not on this list produces nothing.
 
-Everything you put on screen must already be in the film. For every string you write, name the scene and quote the exact words it comes from, in "sources", keyed by the path of the string it justifies: stops[2], rows[1].value, note. Three kinds are accepted:
-- quote — {"kind":"quote","sceneIndex":N,"from":"exact words"}. The words must appear verbatim in that scene's narration.
-- arithmetic — {"kind":"arithmetic"}, only for a schedule note stating the gap.
+Everything you put on screen must already be in the film, and the proof travels WITH the thing it proves: every stop, row and mark carries its own "source" object, and a note is justified by "noteSource" beside it. Nothing is filed by path — a source under the wrong key is a card with no source at all. Three kinds are accepted:
+- quote — {"kind":"quote","sceneIndex":N,"from":"exact words"}. The words must appear verbatim in that scene's narration. One quote justifies the whole row or mark it sits on, so quote the phrase that carries both the number and the words beside it.
+- arithmetic — {"kind":"arithmetic"}, only for a schedule note stating the gap or a timeline note stating the span.
 - evidence — {"kind":"evidence","ref":"E3"}, a row of the research pack. This is the ONLY door for a fact from outside the script.
 
-You may render a quoted thing differently — "cinci si douazeci" may become "05:20" — but you may not introduce a fact the film does not contain. A distance, a date or a statistic that is nowhere in the script and nowhere in the research pack is not yours to add.
+Every word on a card must be lifted from its own quote, unbroken and in that order: a label of "as a dealer" is proved by "arrives in Las Vegas in 1941 as a dealer", and "dealer in Vegas" is not, because the film never puts those words together. Numbers are the one thing you may re-render: "cinci si douazeci" may become "05:20". You may not introduce a fact the film does not contain — a distance, a date or a statistic that is nowhere in the script and nowhere in the research pack is not yours to add.
 
 A card may not use a word the film has not spoken yet: quote only from the card's own scene or an earlier one. Write each string in the film's own words; a card that says "Feribot" while the film has only said "ferry" is wrong even though it means the same.
 
-Aim for one to three cards on every film. This pipeline wants animations in its videos, so look hard: a journey with named legs, two times set against each other, a quantity a listener cannot hold. Take the best one or two even when neither is spectacular.
+Aim for one to three cards on every film. This pipeline wants animations in its videos, so look hard: a journey with named legs, two times set against each other, a run of dates a listener cannot space out in their head. Take the best one or two even when neither is spectacular.
 
-But never force one. If the script genuinely offers nothing that either motif can draw truthfully, return an empty array and say so in "none_because" — one line naming what the film DID offer that you had no motif for. That line is the most useful thing you can return on such a film: it is how the next motif gets chosen and built. Padding the answer with a card that repeats the narration is worse than an empty array, because a bad card ships and an empty array only asks a question.
+But never force one. If the script genuinely offers nothing that any motif can draw truthfully, return an empty array and say so in "none_because" — one line naming what the film DID offer that you had no motif for. That line is the most useful thing you can return on such a film: it is how the next motif gets chosen and built. Padding the answer with a card that repeats the narration is worse than an empty array, because a bad card ships and an empty array only asks a question.
 
 Give each card a "priority" (1 is best) and a one-line "why" saying what it shows that the voice and the shot do not. Answer with JSON only.

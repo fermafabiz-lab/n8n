@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   approveAllOfKind,
   cancelVideoRegen,
@@ -11,9 +11,13 @@ import {
   saveSceneVersion,
   saveVideoPrompt,
   sceneAction,
+  undoApprovals,
   type ActionResult,
 } from "@/app/actions";
 import type { Scene, StatusKind } from "@/lib/data";
+import { useOptimisticApprovals } from "./useOptimisticApprovals";
+import { pickNextOwing, useReviewKeys } from "./useReviewKeys";
+import styles from "./SceneBoard.module.css";
 import { mediaSrc } from "@/lib/media";
 import {
   chapterKeyOf,
@@ -155,7 +159,7 @@ function chipClass(kind: StatusKind): string {
 export default function SceneBoard({
   projectId,
   projectName = "project",
-  scenes,
+  scenes: scenesFromServer,
   portrait = false,
   focus = null,
   audioPanel = false,
@@ -185,9 +189,30 @@ export default function SceneBoard({
    */
   audioPanel?: boolean;
 }) {
+  /**
+   * `scenes` below is the server's rows with the presses that have not come
+   * back yet already applied. Everything downstream — the active scene, the
+   * filmstrip dots, the "N left" counts, the bulk lists — reads this rather
+   * than the raw prop, so one press moves every one of them at once.
+   */
+  const { view: scenes, guess } = useOptimisticApprovals(scenesFromServer);
+
   const running = scenes.find((s) => s.statusKind === "run");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [msg, setMsg] = useState<ActionResult | null>(null);
+  /**
+   * What the last approval signed off, so it can be taken back.
+   *
+   * Only ONE step of history, and deliberately: a stack of undos on a page
+   * that also refreshes itself from the server every ten seconds is a promise
+   * about state we do not control. One step covers what actually goes wrong —
+   * the double-press of `A`, and the "Approve all 71" that was meant for a
+   * different step.
+   */
+  const [lastApproval, setLastApproval] = useState<{
+    kind: "image" | "video";
+    ids: string[];
+  } | null>(null);
   const [feedback, setFeedback] = useState("");
   // Shot-direction drafts: the stored text until edited.
   const [videoDrafts, setVideoDrafts] = useState<Record<string, string>>({});
@@ -223,6 +248,10 @@ export default function SceneBoard({
       return next;
     });
   const [pending, startTransition] = useTransition();
+  // Scoped lookups for the keyboard handlers: the note field and the monitor's
+  // video element. Querying the document instead would reach another panel's
+  // textarea on a page that renders more than one.
+  const boardRef = useRef<HTMLDivElement>(null);
 
   const active =
     scenes.find((s) => s.id === selectedId) ?? running ?? scenes[0] ?? null;
@@ -385,8 +414,107 @@ export default function SceneBoard({
   const run = (fn: () => Promise<ActionResult>) =>
     startTransition(async () => setMsg(await fn()));
 
+  /**
+   * Keyboard review.
+   *
+   * The scenes are walked in the order the filmstrip shows them, across
+   * chapters rather than inside one: the chapter tab is derived from the
+   * selection, so crossing a boundary simply moves the tab and needs no
+   * special case here.
+   */
+  const ordered = scenes;
+  const idx = active ? ordered.findIndex((s) => s.id === active.id) : -1;
+
+  /** Does this scene still owe a decision on the step being reviewed? */
+  const owes = useCallback(
+    (s: Scene) =>
+      step === "images"
+        ? Boolean(s.imageUrl) && !s.imageApproved
+        : step === "video"
+          ? Boolean(s.videoUrl) && !s.videoApproved
+          : false,
+    [step],
+  );
+
+  const moveBy = useCallback(
+    (delta: number) => {
+      if (idx === -1 || !ordered.length) return;
+      const at = Math.min(ordered.length - 1, Math.max(0, idx + delta));
+      setSelectedId(ordered[at].id);
+      setPreviewId(null);
+    },
+    [idx, ordered],
+  );
+
+  /**
+   * Approve what this step is deciding on, then jump to the next scene that
+   * still owes one — searching FORWARD first and only then wrapping, so the
+   * pass runs in the film's own order instead of bouncing around it.
+   *
+   * The guess goes in before the action is awaited: that is the whole point,
+   * and it is also why the advance can be immediate. `owes` is evaluated
+   * against the scene rows as they were, so the scene just approved is
+   * skipped by position rather than by its (not yet updated) flag.
+   */
+  const approveAndAdvance = useCallback(() => {
+    if (!active || idx === -1) return;
+    const kind = step === "images" ? "image" : step === "video" ? "video" : null;
+    if (!kind) return;
+    if (!owes(active)) return;
+
+    guess(active.id, kind);
+    setLastApproval({ kind, ids: [active.id] });
+    run(() => sceneAction(projectId, active.id, kind, "approve"));
+
+    const nextScene = pickNextOwing(ordered, idx, owes);
+    if (nextScene) {
+      setSelectedId(nextScene.id);
+      setPreviewId(null);
+    }
+  }, [active, idx, step, owes, ordered, projectId, guess]);
+
+  /** Take back the last approval — the key and the link call this same one. */
+  const undoLast = useCallback(() => {
+    if (!lastApproval) return;
+    const { kind, ids } = lastApproval;
+    guess(ids, kind, false);
+    setLastApproval(null);
+    run(() => undoApprovals(projectId, ids, kind));
+  }, [lastApproval, guess, projectId]);
+
+  /** `R` puts the cursor where the producer says what should change. */
+  const focusNote = useCallback(() => {
+    const el = boardRef.current?.querySelector<HTMLTextAreaElement>(
+      "textarea.notefield, textarea",
+    );
+    el?.focus();
+    el?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, []);
+
+  /** `Space` drives whatever the monitor is currently showing. */
+  const togglePlay = useCallback(() => {
+    const v = boardRef.current?.querySelector<HTMLVideoElement>(".scr video");
+    if (!v) return;
+    if (v.paused) void v.play().catch(() => {});
+    else v.pause();
+  }, []);
+
+  const canApprove = step !== "audio" && Boolean(active && owes(active));
+  useReviewKeys({
+    approve: canApprove ? approveAndAdvance : undefined,
+    next: () => moveBy(1),
+    prev: () => moveBy(-1),
+    reject: focusNote,
+    togglePlay,
+    undo: lastApproval ? undoLast : undefined,
+    enabled: !pending,
+  });
+
+  /** How many decisions this step still holds — the producer's progress bar. */
+  const owing = ordered.filter(owes).length;
+
   return (
-    <div className="stage">
+    <div className="stage" ref={boardRef}>
       <div>
         {/* CinemaMode IS the monitor card — it takes the classes so every
             `.monitor …` selector keeps its target, and adds the dim-the-room
@@ -483,12 +611,43 @@ export default function SceneBoard({
               </div>
             ))}
           </div>
+          {/* The shortcuts have to be visible or they do not exist: a keyboard
+              review nobody knows about is the same as no keyboard review. It
+              shows only on the steps that can act on a key, and carries the
+              count so the producer can see the pass shrinking. */}
+          {step !== "audio" && (
+            <p className={styles.hint}>
+              <kbd>A</kbd> approve · <kbd>J</kbd>/<kbd>K</kbd> move ·{" "}
+              <kbd>R</kbd> note · <kbd>U</kbd> undo · <kbd>Space</kbd> play
+              {owing > 0 && (
+                <span className={styles.left}>
+                  {owing} still to review on this step
+                </span>
+              )}
+            </p>
+          )}
         </CinemaMode>
       </div>
 
       <div className="insp">
         {msg && (
-          <p className={`formmsg ${msg.ok ? "ok" : "err"}`}>{msg.message}</p>
+          <p className={`formmsg ${msg.ok ? "ok" : "err"}`}>
+            {msg.message}
+            {/* Undo rides on the confirmation rather than sitting in the
+                toolbar: it is only meaningful for a few seconds after the
+                press, and a permanent button would invite using it as a
+                general "un-approve", which is what `Make changes` is for. */}
+            {msg.ok && lastApproval && (
+              <button
+                type="button"
+                className={styles.undo}
+                disabled={pending}
+                onClick={undoLast}
+              >
+                Undo
+              </button>
+            )}
+          </p>
         )}
 
         {active && (
@@ -643,7 +802,7 @@ export default function SceneBoard({
                     className="abtn ok"
                     disabled={pending}
                     onClick={() =>
-                      run(() => sceneAction(projectId, active.id, "image", "approve"))
+                      approveAndAdvance()
                     }
                   >
                     Approve image
@@ -935,7 +1094,7 @@ export default function SceneBoard({
                   className="abtn ok"
                   disabled={pending}
                   onClick={() =>
-                    run(() => sceneAction(projectId, active.id, "video", "approve"))
+                    approveAndAdvance()
                   }
                 >
                   Approve video
@@ -1033,7 +1192,11 @@ export default function SceneBoard({
               style={{ width: "100%" }}
               disabled={pending}
               onClick={() =>
-                run(() => approveAllOfKind(projectId, unapprovedImages, "image"))
+                {
+                  guess(unapprovedImages, "image");
+                  setLastApproval({ kind: "image", ids: unapprovedImages });
+                  run(() => approveAllOfKind(projectId, unapprovedImages, "image"));
+                }
               }
             >
               Approve all {unapprovedImages.length} images
@@ -1061,7 +1224,11 @@ export default function SceneBoard({
               style={{ width: "100%" }}
               disabled={pending}
               onClick={() =>
-                run(() => approveAllOfKind(projectId, unapprovedVideos, "video"))
+                {
+                  guess(unapprovedVideos, "video");
+                  setLastApproval({ kind: "video", ids: unapprovedVideos });
+                  run(() => approveAllOfKind(projectId, unapprovedVideos, "video"));
+                }
               }
             >
               Approve all {unapprovedVideos.length} videos

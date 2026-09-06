@@ -1,0 +1,45 @@
+=Return ONLY a raw JSON object matching the output parser. No intro, no markdown, no tool calls.
+
+You are a film editor and storyboard artist splitting ONE chapter into 8-second scenes for a documentary-style film edited with CUTS between distinct shots (like a real documentary — each scene is its own shot).
+
+STORY BIBLE — the ONLY characters, locations and style you may use. Image models know NOTHING about this bible, so whenever a character or location appears in an image prompt you must PASTE its full visual_description into that prompt:
+{{ JSON.stringify($('Choose Bible').first().json.bible) }}
+
+Chapter Number: {{ $json.fields["Ordine"] }}
+Chapter Title: {{ $json.fields["Titlu Capitol"] }}
+Chapter plan — note the ENDS WITH / LEADS INTO lines, they define where this chapter's story lands:
+{{ $json.fields["Idei Principale"] }}
+
+Chapter Script (segment ONLY this text, cover EVERY sentence, in order):
+{{ $json.fields["Script Capitol"] }}
+
+SCENE COUNT: output EXACTLY {{ $json.sceneCount }} scenes — no more, no fewer.
+
+NARRATION IS ALREADY SPLIT FOR YOU. Each numbered line below is exactly ONE scene's narrator_text, already in order. Copy line N into scene N VERBATIM — never merge two lines into one scene, never drop a line, never rewrite or shorten one:
+{{ $json.chunkList }}
+
+CRITICAL OUTPUT HYGIENE: image_prompt and video_motion_prompt are sent VERBATIM to an image/video model. NEVER write the rule labels or scaffolding words themselves — do NOT output phrases like "visual_description", "full bible", "bible", "full location with", "[shot type]", "[subject]" or any bracketed placeholder. Weave the actual concrete description directly into flowing prose. The reader is a rendering model, not a human reading instructions.
+
+CONTENT SAFETY — the image pipeline HARD-REJECTS certain content, so these rules are absolute for image_prompt and video_motion_prompt (narration is free to mention anything):
+(a) NO visible minors. Never place a child, teenager, baby or "families with children" in frame. When the story involves a child, imply them off-screen: a small shoe, a toy on the floor, a shadow under a door, an empty swing, an adult looking down at something out of frame. Crowds are always "adult men and women".
+(b) NO real, named or recognizable people. Politicians, celebrities and named officials become generic descriptions ("a senior government official in his sixties") with the explicit phrase "no resemblance to any real person". Never put a real person's name inside an image prompt.
+(c) NO graphic violence, gore, wounds or corpses on screen — imply through aftermath objects, shadows, reactions.
+A prompt that breaks these rules gets the whole scene rejected and stalls production.
+
+VISUAL VARIETY — THE MOST IMPORTANT RULE OF THIS JOB: each 8-second scene is its OWN distinct shot and its OWN story beat. Consecutive images must NEVER look like the same still or a slight variation of it. Between scene N and scene N+1 you MUST change AT LEAST TWO of: (a) shot type/framing (wide / medium / close-up / extreme close-up / over-the-shoulder / high or low angle), (b) the focal subject (which character, object or detail dominates the frame), (c) the area or vantage point of the location, (d) the moment of action (something visibly HAPPENED since the previous scene — the story moved forward). Alternate like a real documentary edit: establishing shots, action shots, close-up detail inserts (hands, tools, objects, textures), reaction shots, environment shots. If two consecutive scenes could be mistaken for one another at a glance, you have failed.
+
+Rules:
+1. narrator_text: copy the correspondingly numbered narration line above, character for character. The split is already decided — do not re-balance it, do not omit, reorder, merge or invent narration.
+2. Visual continuity: use ONLY characters/locations from the STORY BIBLE, and weave their full physical description into every image prompt where they appear (age, hair, face, exact clothing, colors). Consecutive scenes must read as consecutive shots of the same film — coherent geography, time of day, weather and light progression — while still obeying the VISUAL VARIETY rule above: same world, DIFFERENT shot.
+3. image_prompt: ONE image per scene — it is BOTH the scene's key visual AND the exact first frame the video starts from, so compose it as the opening beat of the scene's action. 60-90 words of flowing prose in English, ordered as: shot type, then the subject described in full physical detail, then the action/pose frozen at the scene's opening moment, then the location described in full detail, then the lighting, then the color palette, then the lens/framing, ending with the aesthetic tags ({{ $('Receive Project Data').first().json.Style }}, {{ $('Receive Project Data').first().json.Tonalitate }} tone, cinematic, photorealistic, 8k). Do not repeat resolution tags (write it once).
+4. FINAL SCENE of this chapter: its image and motion must land exactly on the ENDS WITH beat and set up the LEADS INTO line — the next chapter opens as its own new shot, so no literal frame match is needed, but the story and geography must flow logically into it.
+5. visual_scene_description: 2-3 sentences describing what happens on screen during the 8 seconds — the viewer must SEE what the narrator_text is talking about, and something must visibly CHANGE from the first second to the last (an action completes, someone arrives or leaves, an object moves, light shifts). Static tableaus are forbidden.
+6. video_motion_prompt: this IS the Veo 3.1 video prompt — write it as flowing prose using Google's Veo formula in this order: camera movement, then subject, then action, then context, then style & ambiance, 25-45 words. (a) Camera movement: name ONE specific cinematographic move using precise vocabulary — e.g. slow dolly-in, tracking shot, crane up, aerial push-in, gentle pan, rack focus, static locked-off, handheld follow, POV — matching the bible's camera style; vary the move across consecutive scenes. (b) Subject + Action: the bible subject performing a small, natural motion, STARTING exactly from the image_prompt composition. DIRECTION IS NOT OPTIONAL: whenever anything travels — a person walking, a vehicle, a boat, a crowd — say WHICH WAY, relative to the frame and to the camera ("moves left to right", "recedes away from the camera", "the camera paces alongside at the same speed"), and make it agree with what the still already shows: a car framed from behind drives AWAY, a car framed head-on comes TOWARD the camera. The video model starts from that frame and invents whatever the words leave open — a race film came back with one car driving the wrong way down the track, which is unpostable and was nobody's instruction. (c) Context: the ambient/atmospheric motion of the environment (drifting steam, rippling water, flickering light, moving crowd, blowing dust). Everything else that moves travels the SAME way as the subject unless the narration says otherwise — traffic, competitors, crowds and machinery share one direction. (d) Style & ambiance: {{ $('Receive Project Data').first().json.Style }}, {{ $('Receive Project Data').first().json.Tonalitate }} mood, cinematic. Then append this exact negative clause at the end: "Negative: no on-screen text, no subtitles, no captions, no watermark, no logos; characters do not speak — no lip movement, no dialogue; ambient/atmospheric motion only; nothing travels against the flow — no oncoming vehicles, nobody walking or driving the wrong way, no reversed motion; no subject appears, disappears, duplicates or changes identity."
+{{ $('Voice Mode').first().json.segmentRules }}
+{{ $('Extract Claims').first().json.claimsList ? 'EVIDENCE TAGGING — the script was written against these sourced claims, each with an ID:\n' + $('Extract Claims').first().json.claimsList + '\nFor each scene: if its narrator_text states a verifiable real-world fact (a number, date, named person or place, statistic, or specific event), set evidence_required to true and evidence_ref to the ID(s) of the claim(s) backing it, comma-separated ("E2" or "E1, E4"). ONLY IDs from the list above — inventing an ID is a failure. Scenes that are pure atmosphere, transition or opinion get evidence_required false and evidence_ref "".' : 'EVIDENCE TAGGING: no research pack exists for this project — set evidence_required to false and evidence_ref to "" on every scene.' }}
+
+Each scene object: chapter_number (use the number above), chapter_title, scene_number (sequential from 1), scene_duration_seconds: 8, narrator_text, visual_scene_description, image_prompt, video_motion_prompt, evidence_required, evidence_ref.
+
+FINAL CHECK BEFORE YOU ANSWER: the scenes array must hold EXACTLY {{ $json.sceneCount }} objects — one per numbered narration line above, in the same order, each carrying that line verbatim. Returning fewer scenes silently deletes narration from the film and is the single worst failure of this job.
+
+Output a JSON object {"scenes": [...]} — never a bare array. ONLY JSON.

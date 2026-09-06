@@ -15,7 +15,8 @@ conversation. Keep it updated when a hard-won lesson is learned.
 |---|---|---|
 | **Website** | `platform/` — Next.js on the Hetzner box, `house-of-videos.com` | The producer's whole interface: create projects, approve each stage, watch progress |
 | **n8n** | self-hosted at `wf7.house-of-videos.com` | All orchestration. 4 workflows, see below |
-| **Airtable** | base "Database Video" | The single source of truth for project + scene state |
+| **Postgres** | `hov` database on the Hetzner box, plus `/opt/n8n/media` for the files | The source of truth for project + scene state since the cutover on 2026-08-15 |
+| **Airtable** | base "Database Video" | **Read and written by nothing.** Frozen at the cutover and kept only as the rollback — do not cancel the plan yet |
 | **Render server** | `remotion/server/` on Railway | ffmpeg + Remotion: `/assemble`, `/tts-multi`, `/media`, `/transcript`, `/inspect` |
 
 External services: **ElevenLabs** (TTS), **fal.ai** (images), **Google Flow via
@@ -293,6 +294,223 @@ the workflows as they now actually run, verified against `activeVersionId`.
   (`next_page_token` + `has_more`), not numbered. `/api/voices` still speaks
   page numbers to the picker and walks tokens to reach the window.
 
+### Upscaling a finished film (2026-09-04)
+
+`6. Upscale Film` (`QBb1a3UpTyJi8ybk`) — one webhook, `upscale-film`, taking
+`{Project_ID, resolution, reassemble}`. It upscales every clip that has a Flow
+id, re-hosts each through `/api/media/ingest`, points `Scene Final URL` at the
+stored copy, and fires assemble unless `reassemble` is false. **The upscaled
+clip is a new generation with its own id and replaces the old one on the
+scene** — otherwise a second upscale re-does the first generation instead of
+the current picture. Three buttons on the project page, because there are three
+different answers with different costs: rebuild at 1080p (free, ~2x render),
+clips only (free and quick, film untouched), 4K (50 credits per clip, prints
+this film's own total and asks twice).
+
+Two traps worth keeping:
+
+- **A new webhook answers on the PLAIN path only.** n8n's trigger info prints
+  `…/webhook/<uuid>/upscale-film`, which **404s**; `…/webhook/upscale-film`
+  answers 200. The site derives its URLs by swapping the last segment, so the
+  plain form is the one that matters.
+- **`create_workflow_from_code` skips credential assignment on HTTP nodes.**
+  Both calls into the site came out with no credential and needed
+  `setNodeCredential` afterwards. Check credentials after any SDK create.
+
+**And 1080p really means 1080p since the same day**: `Editing Options.resolution`
+reaches `/assemble` (canvas 1920x1080) and `/render` (a Remotion **scale of
+1.5**, composition untouched at 1280x720 — so type stays vector and footage is
+read at its own resolution rather than upscaled from a 720p raster).
+`Submit Graphics` and `Graphics Guard` both read the value off `Build Timeline`
+instead of deriving it again, because the montage and the graphics over it must
+agree on the canvas. **The guard's ceiling doubles for 1080p** (2160 → 4320
+polls): at 2.09x an eight-minute film is ~3.3 h and would fail AT the
+three-hour cap, which reads as a hang. 4K CLIPS still render to a 1080p film —
+a 4K canvas is scale 3, nine times the pixels.
+
+Full account: `db/port/upscale/`.
+
+### 1080p is a TIME problem, not a memory one — measured (2026-09-04)
+
+Four renders of the same 15-scene fixture over real footage, concurrency 1 and
+`gl: swangle` to match Railway, two frame counts per resolution so the fixed
+Chrome start-up falls out of the arithmetic:
+
+| | 72 frames | 216 frames | per frame | start-up |
+|---|---|---|---|---|
+| 720p | 10.7 s | 26.1 s | **0.107 s** | 3.0 s |
+| 1080p | 18.7 s | 50.9 s | **0.224 s** | 2.6 s |
+
+**2.09×**, which is the pixel ratio (2.25) almost exactly — so it is real
+rendering work, not overhead. Peak RSS across node + Chrome went **2.19 GB →
+2.31 GB, +5%**, because `offthreadVideoCacheSizeInBytes` is capped in BYTES:
+at 1080p the cache simply holds fewer frames.
+
+**So the reason 720p is documented above — "the box has 8GB" — stopped being
+the binding constraint when that cap was added.** What binds now is the clock:
+the Boyd film's ~50-minute render becomes ~105 minutes, and an eight-minute
+film's ~95 minutes becomes ~3.3 h, which is **past the 3-hour graphics poll
+ceiling raised on 2 September**. Anything that renders at 1080p has to raise
+that ceiling in the same change.
+
+Worth separating: **upscaling the CLIPS helps even at a 720p output** — a
+sharper source means less scale-and-crop damage on the canvas — and that half
+is free in both credits and time. Only the 1080p OUTPUT costs 2.1×.
+
+### The clip's Flow identity is stored now (2026-09-04)
+
+`Extract Video URL` has always pulled `mediaGenerationId` out of the Flow
+response as `Video_Media_Id`, and nothing ever stored it: the moment the clip
+reached Drive, its identity at Google was gone. `POST /videos/upscale` takes a
+mediaGenerationId, so **no film made before 2026-09-04 can ever be upscaled** —
+the bytes are on Drive and Flow cannot say which generation they came from.
+
+`db/006_video_media_id.sql` adds the nullable column plus its row in
+`hov.airtable_field`. Note the ordering it forces: **the site's copy of the
+field map (`SCENE_FIELDS` in platform/lib/data/postgres.ts) must deploy BEFORE
+n8n starts sending the field**, because both clip writes go through
+`/api/media/ingest` and an unmapped name throws there rather than being
+dropped — sending it early would break every clip write in production.
+
+### The credit strategy: free is the default, forever (2026-09-03)
+
+Measured on the account itself (`GET /accounts/{email}` returns `credits` and a
+per-model `creditCost`), not quoted from anywhere: the allowance is **25,050
+credits a month**, and an 8-second clip costs **0** on
+`veo-3.1-lite-low-priority`, **5** on `veo-3.1-lite`, **10** on
+`veo-3.1-fast`, **100** on `veo-3.1-quality`. Credits refresh monthly and do
+not roll over.
+
+The target volume is three films a day of eighty scenes — **7,200 clips a
+month**. That is 72,000 credits on Fast and 720,000 on Quality. **No paid tier
+can be the default**, which is the whole reason the Ultra $199 plan exists: the
+lower-priority tier is free at any volume. So quality comes from the INPUTS,
+and credits buy only the exceptions that do not grow with scene count.
+
+What that looks like in the pipeline:
+
+- **The model is chosen per scene in `Current Scene`** — free by default,
+  `Editing Options.videoModel` overrides, the HOOK gets Quality (one clip per
+  film, the one that decides whether it is watched), and a shot refused twice
+  is rescued on Quality. Chosen there because three edges reach `Submit Video`
+  and all three read `$('Current Scene')`.
+- **The rescue fires in `Prep Video Regen`, not on the main path**, because the
+  main path only submits scenes with NO clip — a third attempt can only arrive
+  through the regen. **The take counter is the scene's own draft list**
+  (`Versiuni Media`): every regeneration files the outgoing clip there, so its
+  length is the number of takes already tried. No new field.
+- **Seeds are derived, not stored**: `hash(sceneId + ':' + takes)`. A re-roll
+  is a different take by construction; a first take is reproducible.
+- **Two takes per submission (`count: 2`) is free and deliberately OFF.** At
+  this volume the scarce resource is QUEUE TIME, not credits — a second take of
+  every scene halves the throughput ceiling to save a click on the tenth that
+  needs it — and take B has nowhere to live until it goes through the same
+  Drive re-host as the live clip (a Flow URL dies in ~6 h).
+- **Throughput, not credits, is the wall at three films a day.** 240 clips a
+  day at 60-180 s each on a lower-priority queue is most of a day of wall
+  clock. useapi load-balances across MULTIPLE Google accounts when `email` is
+  omitted, so the scaling lever is another Ultra account — which also brings
+  another 25,050 credits — not a better model.
+- **An upscale cannot be applied to a finished film.** `POST /videos/upscale`
+  takes a Flow `mediaGenerationId`; our final film is ffmpeg-assembled from the
+  clips and has no such id. Upscaling means upscaling every CLIP and
+  re-assembling: 1080p is free per clip, 4K is 50 (an eighty-scene film =
+  4,000).
+
+Rollback and the full account: `db/port/free-tier-quality/`.
+
+### Motion prompts must say WHICH WAY (2026-09-03)
+
+A race film came back with one car driving the wrong way down the track —
+unpostable, and nobody asked for it. The cause is in the prompt, not the model.
+
+`video_motion_prompt` names a camera move and an action and stops. From a real
+film in the database: *"Tracking shot as the BMW M8 lunges forward **from a low
+front three-quarter angle** … heat haze ripples above the highway and **towers
+streak past**."* The camera sees the car's front, the car moves forward, the
+towers stream by — and nothing in that sentence settles whether the world comes
+toward the lens or recedes from it. Veo starts from the still and invents
+whatever the words leave open, differently in different scenes. Another scene
+of the same film says "into **thicker boulevard traffic**" without saying which
+way the traffic goes.
+
+So rule 6 of the segmenter now makes direction mandatory and anchors it to the
+STILL rather than to taste: say which way relative to frame and camera, and
+agree with the composition the image prompt already fixed — **a car framed from
+behind drives away, a car framed head-on comes toward the camera** — and
+everything else that moves (traffic, competitors, crowds) travels the same way
+unless the narration says otherwise. The negative clause gained the same rule
+from the other side.
+
+**The half that matters for films already made is the SUBMIT-time clause.** The
+segmenter rule only reaches scripts written after it; `Submit Video` and
+`Submit Video Regen` now append the continuity sentence beside the audio one,
+so every existing film and every regeneration gets it. The two submit paths
+must keep agreeing — a re-rolled clip obeying a different rule from its
+neighbours is the same defect wearing a different hat.
+
+Two honest limits: a negative is a preference and not a constraint, so this
+reduces the failure rather than removing it (the producer's video gate is still
+the backstop); and **the model string is the bigger dial** —
+`veo-3.1-lite-low-priority` is the weakest on offer and is free on the Ultra
+plan, so anything better is a credit decision, not a code one. It lives in
+three places that must agree, exactly like the image model string.
+
+Full account and rollback: `db/port/motion-direction/`.
+
+### Video quality is a per-film choice now, and the prompts carry a physics clause (2026-09-04)
+
+Two answers to the producer's "ghost cars driving through each other, a man
+buried to his hips in mud, a car starting without a driver — we pay €300-400
+a month for this":
+
+- **The brief has a "Video quality" picker** (Free / Better 5cr / Fast 10cr /
+  Cinema 100cr per 8s clip), priced with the film's own arithmetic before the
+  choice is bought. It writes `Editing Options.videoModel` through
+  `Normalize Webhook Input` — the key `Current Scene` has READ since 09-03
+  with nothing ever writing it, so every film ran on the weakest (free)
+  model. The id list is whitelisted in THREE places that must agree
+  (`VIDEO_MODELS` in derive.ts, the form's `VIDEO_TIERS`, Normalize's
+  whitelist): the string reaches the Flow API verbatim and an unknown id
+  kills a batch slowly. Absence = free default, like captionColor's white.
+- **Both submit paths append a Physics clause** beside the continuity one
+  (`Current Scene`'s videoRequest and `Submit Video Regen`): solid objects
+  never pass through each other or sink into the ground, moving vehicles
+  have drivers, nothing floats/melts/morphs. Submit-time, so existing films
+  and regenerations get it too. A negative is a preference, not a constraint
+  — the model TIER is the bigger dial, which is what the picker is for.
+
+### The producer's direction: brief + must-includes, verified (2026-09-06)
+
+The cheapest quality lever left: the writer used to receive a five-word
+title and guess the rest. Two optional fields on `/new` now carry the
+producer's intent, and the mandatory half is CHECKED, not requested:
+
+- **"What the film should really be about"** (`brief`, ≤2000 chars) — the
+  angle in the producer's own words. Injected as PRODUCER'S DIRECTION into
+  `Generate Story Bible` and `Generate Outline` ("where this differs from
+  your own reading of the Tema, THIS wins").
+- **"Must appear in the film"** (`must_haves`, ≤3 lines) — injected into the
+  outline and `Write Full Narration` as MUST APPEAR, and **verified by
+  `Narration Guard`**: a point counts as present when at least half of its
+  meaningful terms (4+ letters, diacritics folded) appear in the narration;
+  a miss goes back to the editor through the existing `editorFeedback` path
+  (same MAX_RETRIES=2, same accept-anyway ending). An instruction in a
+  prompt is not a constraint; this is.
+- **"✨ Develop my idea"** — `/api/expand-brief` → n8n workflow `Expand
+  Brief` (`NPES1DrI2d3lifQp`, webhook `expand-brief`, one OpenAI call, keys
+  stay in n8n): 2-4 sentences developing the producer's OWN idea, in the
+  film's language, filled into the editable textarea. Any failure leaves the
+  typed text untouched.
+
+Both are stored in Editing Options (`producerBrief`, `mustInclude`) —
+**unlike Lore, which is never stored and dies on restart-scripting** — and
+all four prompt/guard injections read them via
+`$('Fetch Project Record')`, wrapped in try/catch IIFEs that return `''`
+when absent, so classic projects render byte-identical prompts. The four
+touched Scripting nodes were byte-diffed against the active version before
+publish (only they differed; connections untouched).
+
 ### Content filters — deterministic, never blindly retry
 
 - Google Flow / Veo rejects with `PUBLIC_ERROR_PROMINENT_PEOPLE_FILTER_FAILED`.
@@ -498,6 +716,67 @@ Three details are load-bearing:
 `$('Fetch Final Settings')` **by name**, because its `$input` is the scene
 list. Anything inserted between those two nodes must keep that reference
 valid.
+
+### Character consistency: the cast sheet (2026-09-03)
+
+Three things carry a face across a film, and until now only two existed.
+
+1. **Text.** The segmenter is told to paste each character's full
+   `visual_description` from the Story Bible into every image prompt they
+   appear in, and it does.
+2. **The n-1 chain.** Each image is generated on Flow with the PREVIOUS
+   scene's picture as `reference_1`, prompted "use this ONLY for character
+   identity, wardrobe and film look". **Measured working**: the same man is
+   recognisably the same man in scenes 102, 203, 307 and 417 of the 71-scene
+   Boyd film, four chapters apart.
+3. **The clip.** Veo starts from the scene's own approved image, so a clip
+   cannot drift from its own frame.
+
+**What the chain cannot do is carry a CAST**, and the failure is structural:
+the reference is whoever was in the last frame, so a scene about Bill whose
+predecessor was a close-up of Sam tells the model to take Bill's identity from
+a picture of Sam. Names cannot rescue it either — the segmenter's
+output-hygiene rule strips them, so all 71 prompts of that film say "White
+American man" and not one says Bill or Sam.
+
+**The bible was also licensing the drift itself.** Sam was "late 40s to early
+60s *depending on scene era*", Bill "early 30s to early 50s depending on scene
+era" — pasted verbatim into every prompt. That is an instruction to draw a
+different man in every scene, and we wrote it. Rule 3 of BOTH bible prompts now
+demands one age and one outfit (both, in lockstep: a rewrite goes through
+`Rebuild Story Bible`).
+
+So: **one reference portrait per character, generated once per film** on Flow
+(free on the Ultra plan), stored on the project as `castRefs`
+{name: mediaGenerationId} — `Cast Sheet Prep → Cast Sheet? → Generate Cast
+Sheet → Collect Cast Refs → Save Cast Refs`, sitting between `IMG Load Project`
+and `User Ref?`. Three details are load-bearing:
+
+- **Who is in a scene comes from `Prompt Vizual`**, the segmenter's own
+  `visual_scene_description` — stored per scene, never sent to a model, and it
+  DOES name people ("Sam stands at the desk"). Bill in 27 scenes, Sam in 26,
+  Crowley in 3, of 71. That is why no new scene field and no migration were
+  needed, and why this works on films made before it existed. A shared surname
+  is not an identifier: "Boyd" matches Sam, Bill and the company, so a
+  character matches on its full name, or on the given name where that is unique
+  among the cast.
+- **`Cast Sheet Prep` never returns zero items.** Everything downstream of it
+  is the rest of the batch; an empty output would end the pass in silence. It
+  emits a `skip` flag instead and `Cast Sheet?` routes on it. Same trap as
+  `Replay Scenes For Images`.
+- **`User Ref?` now reads the project from `$('IMG Load Project')` by name**,
+  because the cast chain sits between them and `$json` is no longer the project
+  record. Anything else inserted there must do the same.
+
+Sheets become `reference_1..2` and the n-1 frame moves to LAST, for palette
+only; the prompt names those roles positionally, so the reference list is built
+rather than assumed. Two sheets is the cap — a third crowds the composition,
+and scene 116 ("the three men gather") is the case that loses one. With no
+sheet and no name match, behaviour is byte-for-byte what it was. After a
+content refusal nothing is attached at all: a face is the likeliest thing a
+people filter objected to.
+
+Rollback, measurements and the smoke test: `db/port/cast-sheet/`.
 
 ### The batch cap
 
@@ -793,6 +1072,60 @@ the full account; what bites is this:
   shows the numbers). Both were measurable in the database in one query,
   and both are what the producer saw.
 
+**The fold had no ceiling, and the bill arrived at the other end of the
+pipeline.** Merging a runt into a neighbour can only make a chunk BIGGER, and
+nothing checked how big — so on the 71-scene Boyd film one chunk came out at
+34 words, which ElevenLabs read as **16.7 seconds of narration over an
+8-second clip**. `/assemble` could cover that only by stretching the picture
+to its 1.5× limit and then freezing the last frame for five seconds, under a
+voice that keeps talking. `MAX_WORDS_PER_SCENE` (1.45 × the target) now splits
+anything over it back down, at a sentence boundary where there is one; the
+"cut this near its middle" rule the unit splitter already had is factored into
+`cutNear` and shared, so the two cannot drift. Verified on the chapter it came
+from: 18 scenes with a 34-word outlier become 19 with a maximum of 28, every
+other chunk byte-identical, and the chunker is still lossless. **The lesson
+generalises: a rule that only ever adds needs the rule that subtracts beside
+it**, and the place a missing bound shows up is rarely the place it was
+written. Rollback and the measurements: `db/port/scene-length-ceiling/`.
+
+### Repetition is COUNTED now, not asked for
+
+The writer's rule 2 is SAY EVERYTHING ONCE. The editor's rule 1 is REPETITION,
+"the single biggest defect". Both were already written, in capitals, and the
+71-scene Boyd film still shipped with 1941 told four times, and 1952, 1962,
+1966, 1975, 1977 and the $6,667 / $3,000 split twice each.
+
+The reason is the shape of the guard, not the wording of the prompts.
+`Narration Guard` enforced structure, empty chapters and **length** — and
+length is the one pressure that pushes the other way: a draft that runs out of
+story reaches its word count the only way left to it, by telling the same dates
+again a chapter later. So the one rule that was measured was the rule that
+caused the defect, and the two that mattered were only requested.
+
+The guard now counts what it was already asking for, in code, and feeds the
+result back through the existing `editorFeedback` path:
+
+- **facts** — years, sums, quantities, at **3+** occurrences, named with the
+  chapters they fall in. A NAME recurring is a protagonist; a NUMBER recurring
+  is the same fact stated twice, which is why the pattern is numeric only.
+- **phrasing** — an identical six-word run appearing twice. Overlapping windows
+  of one repeat are folded, so five offenders means five sentences rather than
+  five views of one.
+
+Same `MAX_RETRIES = 2`, same accept-anyway ending: a repetitive film still
+ships, it just costs at most two more editor passes and those passes are told
+exactly what to cut and to replace it with EVENTS from the spine. Thresholds
+were checked against real narration before shipping — the 44-scene Ploiești
+film raises nothing, a synthetic Boyd-style recycling raises `1941 (3 times,
+chapters 1, 2, 3)` plus four verbatim phrasings — because a guard that fires on
+a clean draft would cost two extra model passes on every film.
+Rollback: `db/port/chapter-titles-and-repetition/`.
+
+**The general shape is worth keeping: an instruction in a prompt is not a
+constraint.** If it matters, something after the model has to be able to say
+whether it happened — and if the only thing you measure is length, length is
+what you will get.
+
 ### Evidence retrieval (Claude Scripting)
 
 Scripts on researched topics are written against a pack of sourced claims,
@@ -910,7 +1243,11 @@ is built only inside that guard (a `-1` input index would break the graph).
   touches `remotion/`.** A commit changing only `db/` triggered a Railway
   build on 2026-08-27 (deployment `bbf90578`, commit `cad28c1`), so the path
   filter below cannot be relied on as a safety rule. Treat every push as a
-  container replacement. A Railway deploy replaces the container, which kills
+  container replacement. (2026-09-03, for calibration: three consecutive
+  non-`remotion/` commits all showed `SKIPPED` in the deployment list and both
+  `remotion/` commits built, so the filter USUALLY holds — it is the exception
+  that costs a render, which is why the rule stays as stated. Builds took about
+  two minutes, not the forty the queue can make them look like.) A Railway deploy replaces the container, which kills
   a render in flight — and the producer sees a
   film that simply never arrives, with nothing in the site to explain it.
   Since 2026-08-14 Railway watches `["/remotion/**"]`, so commits touching
@@ -962,6 +1299,13 @@ is built only inside that guard (a `-1` input index would break the graph).
   Railway) at `concurrency: 1`. A 60s film is ~1800 frames, which is why the
   15-scene Tahiti film took ~11m50s. What makes a short film FEEL flat is a
   fixed floor of about 45s that it pays in full.
+  **Measured again 2026-09-03, over 48 h that contained the 71-scene film:**
+  CPU peaked at **8.07 against a limit of 8** and memory at **6.63 GB of 8**.
+  So the box is genuinely saturated at the peak, not idle-waiting — more tabs
+  cannot help, and the memory headroom is thinner than the 2.48 GB recorded
+  after the cache cap. Beyond matching the composition to 24 fps (25% fewer
+  frames, see the montage lessons), the only remaining lever is more vCPU,
+  which is a Railway plan decision and therefore the producer's.
   **Do not reach for `concurrency` as the speed-up.** Memory is no longer the
   constraint — since the OffthreadVideo cap, peak is 2.48GB against 8 — but
   CPU peaked at 6.85 of 8 cores, so the headroom is about one core. More
@@ -1228,8 +1572,8 @@ composition receives are byte-identical to before.
 `assemble.mjs` every scene already lasts as long as its own narration
 (`eff = voiceDur + 0.35`) and the clip is time-stretched to fill it, so slowing
 the narration would stretch the picture for free. Three things kill it: that
-stretch is clamped to `[0.65, 1.5]` and spills into a **frozen tail** past the
-top, so "slow" would mean slower in some scenes and stuttering in others; it
+stretch is clamped to `[0.65, 1.5]` and spills into a **bounced tail** past the
+top (a frozen one until 2026-09-03, see below), so "slow" would mean slower in some scenes and stuttering in others; it
 moves only the picture, leaving the pauses, the music bed and the graphics on
 their old timing; and the scene times computed there feed the graphics pass, so
 captions, chapter cards and the end screen would all need rescaling in lockstep.
@@ -1576,6 +1920,38 @@ writes `{sfx, music, speed}` and `updateEditingOptions` merges, so a stored
 level survives a post-render sound change untouched — it just cannot be
 changed from there.
 
+### The background track is choosable now (2026-09-06)
+
+The producer asked whether the Drive music is used at all; the honest answer
+was "yes, but you find out WHICH track by watching the finished film". Now:
+
+- **`Editing Options.musicTrack` = `{id, name}` or null (auto).** The pin says
+  WHICH track; `music` still says WHETHER there is one — same split as
+  sfx/sfxLevel. `normalizeMusicTrack` in derive.ts refuses anything without a
+  usable Drive id, because a malformed pin that still looked pinned would make
+  the render build a proxy URL for a file that does not exist.
+- **`Pick Music Track` (Final Assembly, active `7d92a519`) checks the pin
+  FIRST** and returns it with `matched: 'pinned'`; absent, the old order runs
+  untouched (tone subfolder → tone-in-name → default* → any, random in pool).
+- **Workflow `Music Library` (`xBRdtrArbbi89yvX`)**: `list-music` walks the
+  Drive `Muzica` folder + subfolders → `{tracks:[{id,name,group}]}` (47 tracks
+  in 8 tone folders at build time); `share-music {id}` makes one file
+  anyone-with-link (idempotent) and answers its `uc?export=download` URL.
+  `create_workflow_from_code` skipped the credential on all three raw Drive
+  HTTP nodes again — third occurrence of that trap — fixed with
+  `setNodeCredential` before publish.
+- **The preview must SHARE before it plays.** `/api/media` fetches Drive with
+  no session, so an unshared file answers HTML and the `<audio>` refuses it.
+  `MusicPicker` POSTs `/api/music {id}` once per track, then plays
+  `/api/media?id=…`. `/api/music` GET caches the list 10 min per instance.
+- **`MusicPicker` is a standalone self-saving card BESIDE `FinalSettings`,
+  not a row inside it**: that panel batches its choices into one confirm that
+  also STARTS the render, and a music audition must be free to happen without
+  arming that button. Saves via `saveMusicTrack` (merge-write of the one key).
+  Own `MusicPicker.module.css` per the CSS-modules rule. The assembly panel
+  prints which track the running render mixes ("aleasă automat după ton" when
+  no pin), because that used to be invisible until the film arrived.
+
 ### The Cinematic category (silent film)
 
 `category: 'cinematic'` in Editing Options = no spoken words anywhere. How
@@ -1800,7 +2176,9 @@ and `SceneBoard` routes the active scene voice → image → clip.
   reduce to the same inequality (`f >= cut * fps - 0.5`), so they can disagree
   only on a tie — and a 24fps source in a 30fps composition produces ties by
   construction: every cut lands on .0/.25/.5/.75 of a frame, and the .5 ones sit
-  exactly on the comparison. There the decoder's arithmetic and this
+  exactly on the comparison. (The composition is 24 since 2026-09-03, so that
+  mismatch is gone; the lead and the epsilon remain, because they are what puts
+  a boundary on the nearest frame rather than the next one.) There the decoder's arithmetic and this
   expression's break the tie differently whenever the cut's seconds value is not
   representable in binary. On the tahiti film that was 3 of 13 cuts — 33.9167,
   38.9167, 63.4167, all of the form k/24 with a repeating fraction — each
@@ -1855,6 +2233,28 @@ and `SceneBoard` routes the active scene voice → image → clip.
   one side. `wide` sat at 1.02 against offsets reaching 3.5%, so the calmest
   framing was the one that could tear. `framingOverscan()` states the rule and
   `check:montage` asserts it.
+- **A scene that outruns its clip BOUNCES now; it used to freeze.** Elastic
+  timing gives every scene the length of its own narration and stretches the
+  clip to fill it, clamped at 1.5×. Past that the remainder was
+  `tpad=stop_mode=clone` — the last frame held still — which on the Boyd film
+  meant five seconds of a frozen picture under a voice still talking. The tail
+  is now the END OF THE CLIP PLAYED BACKWARDS: nothing jumps, because the seam
+  is the same frame twice, and on ambient footage a bounce reads as continuous
+  motion rather than as a loop. Bounded at six seconds because `reverse`
+  buffers every frame it receives (~200 MB at 1280x720, and this box has lost
+  renders to memory before); anything past that still clones. Measured with
+  `freezedetect` on the exact worst case — 8s clip, 17.04s scene — the frozen
+  time went from 5.08s to zero, with the frame count unchanged at 409.
+- **The composition renders at 24, because the film underneath is 24.** It was
+  30 over a montage `/assemble` encodes at `OUT_FPS = 24`, which cost two
+  things. The frames: 25% more of them than the film contains, at roughly two
+  a second on a box with no GPU. And the ties: every scene cut then sat at
+  .0/.25/.5/.75 of a composition frame, and the .5 ones land exactly on the
+  comparison that decides which shot a frame belongs to — which is the whole
+  one-frame-pop saga below. The half-frame lead and the epsilon STAY (they are
+  general, and they are what makes a boundary land on the nearest frame), but
+  at 24 the tie cannot arise: every boundary the montage can produce is
+  already a whole frame here.
 - **Nothing that moves may be linear.** `remotion/src/easing.ts` holds the whole
   vocabulary — `outExpo` for entrances, `outQuart` for settles, `inOutCubic` for
   exits and sweeps — plus `eased()` (clamped + eased interpolate) and
@@ -2075,10 +2475,36 @@ and `SceneBoard` routes the active scene voice → image → clip.
   inside the hold" rule carries over unchanged: the stagger compresses so the
   last word lands 0.35s before the exit flash (measured: lands at 0.99s, card
   gone at 2.40s).
+- **No film had a chapter title for three weeks, and nothing failed.**
+  `Build Remotion Props` parses the `[CHAPTER n: title]` markers out of the
+  linked script, and `Fetch Script Titles` fed it by taking the script id from
+  the project's `scripts` field — an Airtable REVERSE LINK that `hov.at_project`
+  never emitted (look at the view in `db/002_airtable_compat.sql`: the link is
+  stored the other way round, on the script, as `Associated Project`). So the
+  expression fell through to its own fallback and queried the literal id
+  `'missing'`, every query since the 15 Aug cutover returned no row, and
+  `chapterTitles` reached the render as `{}`.
+  Nothing errored, because `ImpactCard` has a fallback for exactly this: the
+  first eight words of the scene's own narration. That is the failure mode
+  worth remembering — **the card printed the opening words of the line the
+  voice says one beat later**, over a graphic whose whole job is to show what
+  is NOT being said. Four cards did it on the 71-scene Boyd film while the real
+  titles ("The Floor, the Clock, and the Decision", …) sat in the script the
+  whole time. The lookup now asks the script instead, filtering `at_script`'s
+  own `Associated Project`, newest first — **through the view, not the base
+  table**, because everything else in that workflow reads a `hov.at_*` view and
+  the render path should not be the first thing to discover a missing
+  base-table grant. Verified on a throwaway read-only workflow before
+  publishing. Rollback and the full account: `db/port/chapter-titles-and-repetition/`.
+  **Generalises to the whole migration: a link field that existed only in
+  Airtable does not raise, it resolves to nothing** — and a lookup with a
+  string fallback (`|| 'missing'`) turns that into a query that succeeds and
+  returns zero rows. Grep the ported workflows for reverse links before
+  trusting one.
 - **A card that holds a variable-length line cannot have a fixed type size.**
   `ImpactCard`'s title was a flat `px(52)`, picked for the long case — the
-  eight-word narration excerpt it falls back to on projects rendered before
-  chapter titles were passed in. A real chapter title is three words, so
+  eight-word narration excerpt it falls back to when no chapter title arrives
+  (which, until 2026-09-03, was every project — see the entry above). A real chapter title is three words, so
   "What Fairness Costs" sat tiny in the middle of a full-frame card and read
   as a mistake. It now fits itself with the same `fitTitleSize`, and the
   eyebrow, rule and margins are proportional to the result so the layout keeps
@@ -2173,11 +2599,29 @@ follows is only what remains true after that correction.
   as a freeze.
 - **A text card is the one mid-scene cut the planner may invent**, and it
   passes the rule rather than dodging it: the frame is replaced outright, so
-  nothing about the two pictures either side matches. The framing DOES change
-  across a card, and that is not a punch-in through the back door — the two
-  footage shots never touch on screen, so there is no zoom jump to see.
-  Returning on the SAME framing is what would look wrong: it makes the card
-  read as a splice into one static shot rather than as a cutaway.
+  nothing about the two pictures either side matches.
+- **A card is a CUTAWAY, so the footage RESUMES across it — this entry used to
+  say the opposite, and the opposite was reported as a bug.** The planner
+  crossed the framing over a card on the reasoning that "the two footage shots
+  never touch on screen, so there is no zoom jump to see". They are the same
+  clip two or three seconds apart, and the eye holds a picture that long: the
+  producer saw the zoom jump at the card and said so (2026-09-03), which is the
+  same defect the whole "a cut is a change of picture" rule exists to prevent,
+  arriving through the one door left open to it. A real cutaway returns to the
+  shot it left. The tail now picks up the head's framing INCLUDING where its
+  push and drift had carried it — re-entering on the head's base framing would
+  step back by that much — and `check:montage` asserts it with a synthetic card
+  on every fixture ("cutaway resume"). Intensity 0 carries the same
+  continuation for its 1% pan, for the same reason.
+- **Both of a card's cuts are flared** (`CutFlash` in `Transitions.tsx`,
+  rendered after the card sequences so the light burns over the card too). A
+  card replaces the picture when it arrives and again when it leaves; the
+  chapter card has owned its own light leak since the slide was removed, and
+  the motif cards were left with a 0.22s opacity fade — which is a dissolve
+  between two unrelated pictures, the one thing a cut must not look like. Same
+  envelope and the same peak-on-the-cut placement as everything else here, at a
+  shorter `half` (0.3) because a card only runs two and a half to four seconds.
+  The exit sweeps the other way, exactly as `ImpactCard`'s does.
 - **Cards are placed by the planner, not at fixed points.** Dropped at "always
   the chapter start" they land next to the rhythm instead of in it. It respects
   `CARD_MIN_GAP` (9s), `CARD_MAX_SHARE` (16% of runtime) and a `CARD_LEAD` of
@@ -2220,9 +2664,11 @@ the pipeline already produces.
   chars), or they pick up the start of a different phrase.
 - The kicker is bounded by **width, not word count**: a fixed six-word cap cut
   one phrase mid-clause while truncating a good six-word label on another.
-- The card is ink with the accent, revealed by a fast settle — **not** the
-  light leak, which belongs to the chapter boundary. Two full-frame light cards
-  would be confusable, and reusing the leak blurs which element owns a frame.
+- The card is ink with the accent, revealed by a fast settle. **Its own body
+  still uses no light leak** — that would make two full-frame light cards
+  confusable — but since 2026-09-03 the CUTS either side of it are flared by
+  `CutFlash`, which is a different job: the leak there hides a change of
+  picture, it does not decorate the card.
 - The planner may **squeeze** a card to fit its scene, so `TextCard` takes its
   duration from the SHOT, not from the spec. Without a `minSeconds` floor to
   shrink to, every claim card — long by nature — was silently dropped on 4-5s
@@ -2234,10 +2680,12 @@ the pipeline already produces.
 - **Motif cards: a card may DRAW instead of setting type.** `route`
   (`RouteCard`) unfolds a chart and traces the journey's stops; `schedule`
   (`ScheduleCard`) flaps two times onto a departure board and states the gap
-  between them. The planner needed no change at all to gain either — it places
-  TIME and is written never to see what a card holds — so the only wiring is
-  the variant dispatch in `FinalVideo`'s `renderCard`. Three rules came out of
-  building the first two:
+  between them; `timeline` (`TimelineCard`, 2026-09-03) measures a dimension
+  line out across a span of years and marks each date at its REAL distance from
+  the others, so what it shows is the shape of the span. The planner needed no
+  change at all to gain any of them — it places TIME and is written never to see
+  what a card holds — so the only wiring is the variant dispatch in
+  `FinalVideo`'s `renderCard`. Four rules came out of building them:
   - **A motif must know something the footage cannot show.** The idea started
     as "the narration says map, so unfold a map" — over Veo footage that was
     already showing a man unfolding a map, under a caption already printing
@@ -2257,6 +2705,16 @@ the pipeline already produces.
     its own. Any "reveal B once A has passed it" has this bug at the last B.
     Anything with `Math.random()` has a worse one — the render must be
     reproducible, so the split-flap's digit sequence is arithmetic.
+  - **The motif a film needs is the one you have not built, and the model will
+    try to fake it with what exists.** The first real film to reach the chain
+    was a life told in dates. `route` wants a journey, `schedule` wants clock
+    times, so the model rendered the years 1893 and 1896 as `18:93` and
+    `18:96` — the validator rejected them and the film shipped with nothing.
+    That is not a prompt failure to be scolded out; it is a missing motif, and
+    the empty answer's `none_because` line exists precisely to name it.
+    `timeline` is the answer to that specific report, and its proportional
+    spacing is the reason it is a motif rather than a list: a list of years
+    typeset down the frame would be the script again.
 - **Who authors a motif: a model in Scripting, behind a code validator.**
   `remotion/motif/` holds the prompt and `validate.mjs`; neither is wired into
   n8n yet. It belongs in **Claude Scripting** — the only workflow that knows
@@ -2296,6 +2754,24 @@ the pipeline already produces.
   in that README: a `review` card has nowhere to be reviewed until Final
   touches gets a panel, and explicit `textCards` still switch the derived
   figure cards off for that film.
+
+  **Updated 2026-09-03, after the first film that actually reached it.** Two
+  truthful cards were proposed and none shipped. Provenance is no longer a map
+  keyed by path (`stops[2]`, `rows[1].value`): every stop, row and mark carries
+  its own `source` and a note carries `noteSource`, because the route card's
+  only source arrived filed under `rows[0].value` — a key belonging to a
+  different motif — and a card whose strings were all true was dropped for
+  having none. The old map is still read as a fallback. The parser's example
+  now shows one card per VARIANT instead of one card wearing two motifs'
+  fields, which is what invited the mis-keying. Three nodes changed
+  (`Choose Motif Cards`, `Motif Parser`, `Validate Motif Cards`), all three
+  diffed byte-for-byte against `db/port/motif-cards/paste/` after publishing.
+
+  **And `Attach Motif Cards` was saved into Final Assembly on 08-27 but never
+  published** — the render path ran without it until 09-02, while this file and
+  that README both said it was live. The 08-27 diff had been run against the
+  DRAFT. `versionId` is what you edited; `activeVersionId` is what production
+  executes, and only the second one is evidence.
 - **Applied through the MCP connector, not the REST API — and the diff
   afterwards is not optional.** No API key is involved (the connector is
   already authorised), operations are atomic, and each step lands as its own
@@ -2328,9 +2804,12 @@ the pipeline already produces.
   prove a card is truthful. Only a producer can say it is wanted.
 - **"An animation on every film" is answered by MORE MOTIFS, not a looser
   rule.** The prompt aims for one to three per film and looks hard for them,
-  but it may not force one: with only `route` and `schedule` built, plenty of
-  films genuinely offer neither, and a card that repeats the narration ships
-  while an empty array only asks a question. So an empty answer must carry
+  but it may not force one: a card that repeats the narration ships while an
+  empty array only asks a question. **The backlog worked as designed once:**
+  the 71-scene Boyd film offered dates and sums, `route` and `schedule` could
+  take neither, and `timeline` was built from that (2026-09-03). Expect the
+  next one to arrive the same way — from a film that got nothing, not from a
+  brainstorm. So an empty answer must carry
   `none_because` — one line naming what the film DID offer that no motif could
   draw — and `Validate Motif Cards` logs it as `MOTIF NONE: …`. That log is the
   backlog: it is how the third motif gets chosen, and it is also what stops "no
@@ -2382,6 +2861,17 @@ the pipeline already produces.
   "inherit Fraunces". It inherits **Outfit** now. The behaviour is correct —
   an empty class means "inherit the display face" — only the name in the
   comment is stale.
+- **New components carry their own stylesheet; `globals.css` is closed to
+  them.** It is 5659 lines with no scoping, and the collision it caused is on
+  record two bullets down — a modifier named `empty` inheriting an app-wide
+  `.empty { padding: 80px 0 }`. Every generic word is already taken (card,
+  field, chip, empty, left, on, full) and nothing tells you which. A
+  `*.module.css` beside the component gets its names hashed at build
+  (`ReviewKeys_hint__tZCK8`), so it can neither reach anything nor be reached.
+  **The token layer stays global on purpose** — colours and spacing SHOULD be
+  shared, and that is the part of globals.css doing its job. This is a rule
+  going forward, not a migration: move a block only when you are editing it
+  anyway. `SceneBoard.module.css` is the first one and the pattern to copy.
 - **Generic class names are already taken.** `globals.css` has app-wide
   blocks like `.empty` (an empty-state with `padding: 80px 0`), `.card`,
   `.field`, `.chip`. Using one as a local modifier silently inherits it: the
@@ -2856,6 +3346,76 @@ the pipeline already produces.
   a tab instead of saving. `downloadSrc()` in `lib/media.ts` adds `?dl=<name>`
   for proxied assets and returns CDN URLs untouched, since the attribute is
   ignored there either way.
+- **The rough cut: the film, watchable at any point.** The producer used to
+  give 213 approvals one asset at a time and see the result exactly once — at
+  the end, after a ~95-minute render. Every part was reviewed; the film never
+  was. `RoughCut` only puts what already exists in order and plays it, because
+  `MediaPlayer` already lays a voice over a silent clip. **It works before any
+  clip exists** — a scene with a picture and a take plays as a still under its
+  narration, which is an animatic, and that is the most valuable moment to
+  watch: finding out the order is wrong before sixty clips are generated
+  against it. It is deliberately NOT the render (no montage framing, captions,
+  chapter cards, music or breath trim, and scene length is the take's own
+  rather than `voiceDur + 0.35`) and the panel says so, or someone will chase
+  differences that are supposed to be there. While it is up it sets
+  `document.body.dataset.overlay`, which `useReviewKeys` checks — otherwise `A`
+  behind the panel approves a scene nobody is looking at.
+- **`FilmCost` reports units, never money.** A price per credit or per
+  character is a commercial fact this repo does not hold, and a dollar figure
+  invented from a guess is worse than none. Credits are the binding constraint
+  anyway: 25,050 a month, no roll-over, against a target of 7,200 clips.
+  `lib/cost.ts` prices the hook on quality and the body on
+  `Editing Options.videoModel` (default free), counts a re-roll as a full
+  generation via the draft list — the same signal `Prep Video Regen` uses as
+  its take counter — and every figure is a FLOOR: per-scene model choices are
+  not recorded and takes are not versioned, so a line re-recorded three times
+  counts once. The panel states that basis rather than presenting the numbers
+  as fact. `npm run check:cost` pins the arithmetic (11 cases).
+  Note this added `videoModel` to `EditingOptions`: the key has always existed
+  in the stored JSON — `Current Scene` in Media Generation reads it — and the
+  site simply never declared it, so a paid film would have been priced as free.
+- **A press has to show on screen before the server answers.** The action
+  writes the row and revalidates, so the truth lands a second or several
+  later — up to ten if the write just missed a refresh tick — and until then
+  nothing moved, which reads as a click that did not register. On a film where
+  213 decisions are made one at a time that pause IS the work.
+  `useOptimisticApprovals` applies the press immediately and drops the guess
+  when the server answers — **whichever way it answers**, so a refused write
+  returns to the truth instead of leaving a green dot the database never
+  accepted. Both the buttons and the keyboard go through it, or the two paths
+  drift.
+- **Keyboard review, because the board offered only two bad options.** Either
+  "Approve all 71" — approving without looking — or click the scene, click
+  Approve, then hunt the strip for the next one that owes something: over 400
+  clicks for a 71-scene film, most of them navigation rather than judgement.
+  So in practice the bulk button wins and nobody reviews anything. `A`
+  approves and advances, `J`/`K` move, `R` puts the cursor in the note box,
+  `Space` drives the monitor (`useReviewKeys`).
+  Three things are load-bearing. **The typing guard**: `a` inside a textarea
+  must type an `a`, not approve — the note field sits next to the approve
+  button and is exactly where someone writes prose. **The advance rule** is a
+  pure exported function (`pickNextOwing`) with its own check
+  (`npm run check:review`), because its two edges are invisible when broken —
+  it must never re-select the scene just approved (the key looks dead) and
+  running out must END the pass rather than loop on the last scene.
+  **The hint is rendered under the filmstrip**: a shortcut nobody can see is a
+  shortcut nobody uses, and it carries the remaining count, which is the only
+  place a long pass can be watched shrinking.
+- **Undo, on the one action that is irreversible and easy to fire by
+  accident.** "Approve all 71" is a single click and `A` also advances, so a
+  double-press signs off a scene nobody looked at; the only way back was
+  `reopenStep`, one scene at a time, or SQL in /db. `undoApprovals` clears the
+  checkbox and **does not set a regeneration flag** — that distinction is the
+  whole design, because `writeSceneApproval(…, "regenerate")` queues work at
+  fal or Flow, so an undo built on it would spend money to reverse a mistake.
+  It also does not cascade the way `reopenStep` does: reopening means "this
+  needs another look" and rightly invalidates what was derived from it, undo
+  means "that click was a mistake". One step of history only — a stack on a
+  page that re-reads the server every ten seconds is a promise about state we
+  do not control. Verified against a real Postgres: after approve-then-undo,
+  `image_approved` is back to false with `regen_image` and `regen_image_at`
+  untouched. What it cannot take back is a clip already queued by
+  `flagStaleClip`, and the message says so.
 - Count **approvals**, not asset existence, for pipeline progress. Counting
   clips that merely exist made "Video" tick green before review.
 - **…but scope that count to the scenes the pass staged, not to the film.**
@@ -2883,6 +3443,59 @@ the pipeline already produces.
   page — the strategy was right, one call was outside it. The path is not
   rare: it runs on every render whenever any execution failed in the last 24h,
   and four had. **When a display-path fetch can throw, the page must not.**
+- **A film's life continues after "Finalizat", and `Publishing` is where that
+  state lives** (2026-09-03): review state (review/ready/posted), the YouTube
+  title (counter warns past YouTube's 100-char cut), free notes, and the
+  posted link. `PublishingPanel` renders under the finished film's player;
+  the state ALSO takes over the library card's badge on finished films
+  ("Ready to post" amber, "Posted") and feeds the "To post" filter tab —
+  the library is where it earns its keep. Stored as a `publishing` key in
+  Editing Options (merge-written like `motifCards`, nothing in n8n reads
+  it), exposed as `Project.publishing`, normalized by `normalizePublishing`
+  in derive.ts — absent reads as `review` with empty fields. The draft is
+  sessionStorage-backed (`vf-pub:<id>`), the house rule for anything typed
+  on a page that re-renders every 10s.
+- **The YouTube description is DERIVED, never invented** (2026-09-04,
+  `GET /api/yt-kit?project=…`): hook = the film's own opening narration;
+  chapters = the script's `[CHAPTER n: title]` markers with timestamps
+  summed from the real takes (`mp3DurationSeconds` in lib/mp3.ts walks
+  frames in pure Node — no ffmpeg — approximating the breath trim at 0.1s
+  net per scene and dividing by playback speed; first line pinned to 0:00,
+  which YouTube requires); sources = the Evidence rows with a URL, the one
+  part of the research pack a viewer gets to see. Takes are fetched
+  straight from Drive like audio-bundle does — NOT through `/api/media`,
+  which sits behind the site password and bounces a cookie-less server
+  fetch to /login. `getProjectEvidence` is Postgres-only; on the frozen
+  Airtable backend it answers empty and the description ships without a
+  sources block. The panel's thumbnail picker lists every scene's
+  full-resolution still (already generated, already approved — zero new
+  cost); its styles live in `PublishingPanel.module.css` per the
+  own-stylesheet rule.
+- **On a short film the chapter list is per SCENE, and the labels come from a
+  model behind a strict validator** (2026-09-04). Chapter count is
+  `ceil(length/120)`, so every film under ~4 minutes is hook + one chapter —
+  a two-line list under a nine-scene film read as the feature not working.
+  Under 3 real chapters, yt-kit lists every scene; labels are 3-6-word key
+  points from the **`YT Scene Titles` workflow (`Il5pFIbVwFwxHsIM`, webhook
+  `yt-scene-titles`)** — one OpenAI call, because the model keys live in n8n,
+  not on the site. Its parser refuses anything that is not a JSON array of
+  exactly N non-empty strings, and every failure degrades to first-words
+  labels: a wrong label is worse than a plain one. Same trap as upscale-film:
+  `create_workflow_from_code` skipped the HTTP node's credential and it
+  needed `setNodeCredential` after.
+- **Every researched film since the cutover silently lost its research pack,
+  and the producer's "why no sources?" found it** (2026-09-04, `db/007`).
+  `Save Evidence` posts records carrying BOTH `Project_ID` (Airtable's text
+  field) and `Proiect` (its linked twin); both map to the one `project_id`
+  column, `at_assign` emitted it twice, INSERT died with `specified more
+  than once` — and because Save Evidence is `onError: continueRegularOutput`
+  BY DESIGN, the death was swallowed and the film shipped written against
+  research nobody could see. `at_assign` now dedupes by column (first field
+  wins); proven by replaying the exact failing payload through `at_create`.
+  The Aston Martin film's 20 claims were recovered from execution 8970's
+  persisted `Prep Evidence Rows` output and backfilled. **The general shape:
+  a write that must never kill its caller is also a write whose failures
+  nobody sees — grep its error path a day after shipping, not never.**
 - Transient states need a grace period. The render-error panel fires on healthy
   gaps between executions; `AssemblyStatus` uses a 75s sessionStorage-backed
   grace before crying failure.
@@ -2906,11 +3519,15 @@ the pipeline already produces.
 
 ## The database that replaces Airtable
 
-Airtable costs 125 lei/month and is being retired. **It is still the source of
-truth today** — the site and every n8n workflow still read and write it. What
-exists so far is the substrate underneath: a populated Postgres database and a
-media store, running in parallel and used by nothing yet. Do not point anything
-at it without reading this section.
+Airtable cost 125 lei/month and has been retired. **This database is the source
+of truth** — since 2026-08-15, 22:46 UTC the site and all five workflows read
+and write it and nothing touches Airtable (see "The cutover happened" below).
+Airtable itself is intact and frozen at that moment, and is the only rollback
+there is; do not cancel the plan yet.
+
+The sections that follow are written in the order the migration happened, so
+several of them describe the parallel-run period rather than today. Where one
+says "still", read it as history.
 
 | Piece | Where |
 |---|---|
@@ -3065,9 +3682,11 @@ lives in compose rather than `platform.env` on purpose: that file is rewritten
 from GitHub Secrets on every deploy, and this connection string names a service
 on the compose network and never leaves the box.
 
-**Do not flip it while the workflows still write Airtable.** The site would
-render a frozen picture — the last import — while n8n updated rows nobody was
-reading.
+It is set to `postgres` on the box today. The rule that governed the flip —
+**never point the site at a backend the workflows are not writing**, or it
+renders a frozen picture while n8n updates rows nobody reads — still governs
+the way back: rolling the site to `airtable` means rolling the five workflows
+with it, in the same window.
 
 **The derivation is shared, and that is the point.** A scene's displayed status
 is not stored anywhere; it is reconstructed from checkboxes plus asset
@@ -3189,7 +3808,12 @@ the site's honest fallback fired. Airtable had swallowed the same `''` for
 months; this is the constraint class the cutover section predicted, found on
 the one category the cutover film never exercised.
 
-`db/006_text_fields_keep_empty_string.sql`: for a TEXT column the value is
+`db/008_text_fields_keep_empty_string.sql` (first landed as `006` on 09-03,
+then **overwritten on 09-04 by the trunk's `007_dedupe_at_assign.sql`**, which
+redefined the same function from the pre-fix body — the producer hit the
+identical error again on 09-06; `008` carries BOTH changes, and the lesson is
+that two branches editing one function each re-apply the whole body, so the
+later apply wins): for a TEXT column the value is
 written as-is (`''` stays `''`, a JSON null still becomes NULL); the numeric,
 boolean and date branch keeps the nullif. No reader can tell: the `at_*` views
 already `nullif(…, '')` on the way OUT, and 37 projects already stored `''`
@@ -3203,6 +3827,33 @@ snapshot — so create and delete are two executions.
 The site's wording is fixed in `actions.ts` ("no record exists in the
 database") on this branch; it is not deployed until the branch reaches the
 trunk.
+
+That refusal is also what makes the compat layer testable without the box, and
+it is worth re-running after any change to either side. On a throwaway
+Postgres 16, applying `001` + `002` + `003` and exercising the layer confirms
+the behaviour the old Airtable traps make necessary: a numeric field sent as
+`""` lands as **NULL, not 0** (the sixteen-node zeroing bug cannot reproduce
+here), an attachment write raises, an unknown field raises, a link sent as
+`[id]` becomes a real foreign key rather than JSON text in the column, and
+`Editing Options` reads back as JSON *text* so the workflows' `JSON.parse()`
+keeps working. Verified 2026-08-16.
+
+The cheap static half of that is worth more than it looks: extract every field
+name the ported nodes write and check it against `hov.airtable_field`. Because
+an unmapped name RAISES, one missing row would kill a workflow mid-run at
+cutover rather than degrade quietly. Measured across the five ported
+workflows — 23 `at_write`/`at_create` nodes, 49 distinct (entity, field) pairs,
+all mapped.
+
+**One asymmetry to know about:** a linked record reads back as an array where
+the column is a list (`"Capitol": ["rec…"]`) but as a bare string where it is a
+single id (`"Project_ID": "rec…"`). Airtable always sent an array. No
+expression indexes one today — checked — but `fields["Project_ID"][0]` would
+silently yield `"r"` rather than an id.
+
+The same throwaway-Postgres run is where a constraint like the one above gets
+caught before a film does: applying the schema and replaying a node's real
+payload is the only check that exercises the CHECKs, and it costs a minute.
 
 ### The four nodes that need more than a query — solved
 
@@ -3534,6 +4185,35 @@ full film early rather than waiting.
 **Do not cancel the Airtable plan yet.** It is the only rollback that exists.
 A full film and a week first.
 
+### Backups — and the part of them that lives outside this repo
+
+`infra/hov-backup.sh` dumps the three things that cannot be rebuilt from git:
+`hov` (the pipeline's state), the `n8n` database (workflows AND credentials —
+credentials are encrypted per-instance and cannot be exported any other way),
+and `/opt/n8n/media` (735 MB of images and clips that exist nowhere else — the
+fal and Flow links they came from are long dead). Execution history is excluded
+on purpose: 880 of that database's 894 MB, and it prunes itself after 14 days.
+The media mirror is hard-linked against the previous night, so keeping three
+days costs one copy.
+
+**The cutover made this load-bearing.** Before it, a lost `hov` was an
+inconvenience — Airtable held the truth and the import could be re-run. Now
+Airtable is frozen at 2026-08-15, so everything written since exists in exactly
+one place, and rolling back loses it (see "Rolling back"). The backup is the
+only thing between a mistake and that loss.
+
+**What is NOT in this repo is the schedule.** There is no cron entry, systemd
+timer or compose service here that runs the script — whatever runs it lives on
+the box. Two consequences: rebuilding the box from this repo silently produces
+a machine with no backups, and nobody can tell from the repo whether it is
+running at all. Before trusting it, check on the box:
+
+    crontab -l | grep hov-backup ; ls -la /opt/n8n/backups
+
+The script also protects against mistakes, not against the disk dying —
+everything it writes is on the same disk. Off-box is Hetzner's own backup,
+enabled in their console. Both, or neither is worth much.
+
 ### Looking at the data — /db
 
 Airtable's grid was also how the team *looked* at things, and losing it left the
@@ -3662,8 +4342,9 @@ now has a button on the site.
    direct `fetch` calls to `api.airtable.com` had to be pulled in first; on
    inspection all 11 were already *inside* `lib/data.ts`.)
 2. ~~The 48 Airtable nodes.~~ All 48 convert — `db/port/workflows/*.ported.json`,
-   regenerate with `db/port/port-airtable-nodes.mjs`. **Not applied**: a PUT is
-   live immediately, so they go in during the window.
+   regenerate with `db/port/port-airtable-nodes.mjs`. Applied in the cutover
+   window on 2026-08-15; a PUT is live immediately, which is why they went in
+   all at once rather than being parked as drafts.
 3. ~~Admin screens for the three hand-edited tables.~~ Done — `/admin`, on
    both backends.
 4. Saved drafts on Postgres — see "Known gaps, live right now".
@@ -3923,13 +4604,56 @@ generated FROM it. The chain, and where each piece lives:
   Scene Rewrite` sets `Regenerează Voce` when `Voiceover URL` is present.
   **Any fourth writer of `Script Scenă` must do the same** — grep for it
   before adding one.
-- **Auto-assembly has NEVER fired on wf7** — every Final Assembly execution
-  is `mode: webhook`. The batch's settings gate (15s Wait loop) dies rather
-  than release, proven again on the first cinematic project. **Bypassed, not
-  fixed**: `confirmFinalSettings` now fires the assemble webhook itself
-  right after flipping the status, so the manual Restart click became the
-  automatic path. The n8n gate still exists and still never fires — if it
-  is ever repaired, add dedup or the same project renders twice.
+- **The site is the ONLY thing that starts a render** (2026-09-02, orchestrator
+  version published that day). `confirmFinalSettings` writes `Asamblare` and
+  fires the assemble webhook; the orchestrator's three `Execute Final
+  Assembly*` nodes are disconnected and `Final Assembly`'s own `Update Project
+  Status` marks the project `Finalizat`. History, because it explains the
+  canvas: for months the batch's settings gate died rather than release, so
+  the webhook was added as a bypass with the note "if the gate is ever
+  repaired, add dedup or the same project renders twice". The one-pass
+  batch repaired the gate as a side effect, and the very next film rendered
+  twice — the webhook execution and, seven seconds later, the orchestrator's
+  `integrated` one, on the same confirmation. Two 71-scene assembles on one
+  box exhausted ffmpeg's decoder threads (below) and Drive answered 503 to
+  the second set of 142 downloads; both died, the site rewound to Final
+  touches, the producer confirmed again, and the pair ran again — four
+  times. **Recognise it by the pairs**: a `webhook` and an `integrated`
+  Final Assembly execution starting seconds apart.
+- **The poll ceilings were sized for 60-second films, and the site's
+  "taking much longer than usual" was too — together they turned the first
+  8-minute render into a restart loop** (2026-09-02, Final Assembly version
+  `4fcb507d`). At ~2 fps an 8-minute film is ~95 minutes of Remotion, so
+  `Graphics Guard`'s 360 polls × 5s (30 min) would have killed it as "timed
+  out", and `AssemblyStatus` called 15 minutes "much longer than usual" and
+  offered Restart — which `retryAssembly` honoured by firing a SECOND webhook
+  without stopping the first: two Remotion passes, CPU past 8 of 8, memory
+  6.6 of 8 GB. Now `Render Guard` is 720 polls (1 h), `Graphics Guard` 2160
+  (3 h — the 12-minute brief at 2 fps), `retryAssembly` stops what is alive
+  before it fires, and the panel takes `lengthSeconds` and judges "slow"
+  against `120 + 12 × length` seconds, saying the estimate out loud. Note a
+  restart stops only n8n: the Railway job it abandons keeps rendering to the
+  end and competes with the new one — there is no cancel endpoint, and
+  `restart-service` is the only way to clear it.
+
+  **Every per-second figure in this entry is ~20% pessimistic since
+  2026-09-03**, when the composition dropped from 30 fps to the 24 the
+  montage is encoded at: the same film is a quarter fewer frames to draw.
+  Nothing needs changing — the poll ceilings and the site's
+  `120 + 12 × length` estimate are both conservative in the safe
+  direction — but do not re-derive a budget from these numbers without
+  measuring first.
+- **`Resource temporarily unavailable` from ffmpeg is a THREAD limit, not
+  memory.** "Error while opening decoder for input stream #118:0" — the 60th
+  h264 decoder of a 142-input assemble. Every decoder opens at start with
+  the default thread count (one per core), so 71 clips × 8 threads, twice,
+  ran into the container's `pthread_create` ceiling. `assemble.mjs` now
+  passes `-threads 1` as an INPUT option before every `-i`; libx264 keeps its
+  own pool, and eight-second clips do not need parallel decoding. Its
+  `download()` also retries 503/429/5xx with a short back-off. n8n's error
+  text shows only the command — the reason is in the `Check Render` output
+  (`error`, ~100 kB) or in the job's status on Railway, never in the deploy
+  log, which prints only the per-scene trim lines.
   The site half is fixed: `getAssemblyState()` now returns an explicit
   `stopped` verdict (true only when n8n answered and nothing is alive
   anywhere), and `page.tsx` shows the "render stopped" panel only on that

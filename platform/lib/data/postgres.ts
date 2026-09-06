@@ -256,6 +256,23 @@ export async function getScenes(projectId: string): Promise<Scene[]> {
   return ordered.map((r, i) => buildScene(r, i));
 }
 
+/** One sourced claim from the research pack — see the yt-kit route. */
+export interface EvidenceRow {
+  ref: string;
+  claim: string | null;
+  source: string | null;
+  url: string | null;
+  date: string | null;
+}
+
+export async function getProjectEvidence(projectId: string): Promise<EvidenceRow[]> {
+  return query<EvidenceRow>(
+    `select ref, claim, source_name as source, source_url as url, source_date as date
+       from hov.evidence where project_id = $1 order by ref`,
+    [projectId],
+  );
+}
+
 export async function findRecentProjectByName(
   name: string,
   withinMs = 5 * 60 * 1000,
@@ -365,6 +382,10 @@ const SCENE_FIELDS: Record<string, string> = {
   "Voiceover URL": "voiceover_url",
   "Scene Final URL": "scene_final_url",
   "Image Media ID": "image_media_id",
+  // New here, with no Airtable original: the clip's own Flow
+  // mediaGenerationId, which POST /videos/upscale needs. See
+  // db/006_video_media_id.sql — the DB copy of this map has the same row.
+  "Video Media ID": "video_media_id",
   "Ordine Scenă": "scene_order",
   "Durată Scenă (secunde)": "duration_seconds",
   "Status Producție Scenă": "production_status",

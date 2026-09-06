@@ -6,6 +6,7 @@ import {AbsoluteFill, Composition, registerRoot} from 'remotion';
 import {Captions} from './components/Captions';
 import {HookTitle} from './components/HookTitle';
 import {ImpactCard} from './components/ImpactCard';
+import {TimelineCard} from './components/TimelineCard';
 import {DEFAULT_PALETTE, type SceneCaption} from './types';
 import {presetForTone} from './style';
 
@@ -59,6 +60,39 @@ const CardProbe: React.FC<{keyLine: string}> = ({keyLine}) => (
 	</AbsoluteFill>
 );
 
+/**
+ * The timeline motif over the bands, so the proportional spacing and the two
+ * rows of type can be looked at without a film. The years are the Boyd film's
+ * own, which is the case the motif was built for: 1941 to 1975 with the two
+ * late marks close together, so the legibility concession is exercised rather
+ * than assumed.
+ */
+const TimelineProbe: React.FC = () => (
+	<AbsoluteFill>
+		<Backdrop />
+		<TimelineCard
+			card={{
+				sceneIndex: 7,
+				variant: 'timeline',
+				headline: '',
+				label: 'Anii',
+				marks: [
+					{at: '1941', label: 'as a dealer'},
+					{at: '1952', label: 'all the savings'},
+					{at: '1962', label: 'the hard yes'},
+					{at: '1966', label: 'family buys out'},
+					{at: '1975', label: 'co-found Boyd Gaming'},
+				],
+				note: '34 de ani',
+				seconds: 4,
+				minSeconds: 2.8,
+			}}
+			seconds={4}
+			preset={presetForTone('Documentary')}
+		/>
+	</AbsoluteFill>
+);
+
 export const ProbeRoot: React.FC = () => (
 	<>
 		<Composition
@@ -99,6 +133,22 @@ export const ProbeRoot: React.FC = () => (
 			width={720}
 			height={1280}
 			defaultProps={{keyLine: 'What Fairness Costs'}}
+		/>
+		<Composition
+			id="TimelineLandscape"
+			component={TimelineProbe}
+			durationInFrames={120}
+			fps={30}
+			width={1280}
+			height={720}
+		/>
+		<Composition
+			id="TimelinePortrait"
+			component={TimelineProbe}
+			durationInFrames={120}
+			fps={30}
+			width={720}
+			height={1280}
 		/>
 		<Composition
 			id="CardLandscape"

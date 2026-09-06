@@ -1,0 +1,211 @@
+/* The rough-cut overlay. Scoped, per the rule in CLAUDE.md — every word here
+   (panel, head, bar, line, tick, here) is already taken in globals.css. */
+
+.shade {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  /* Near-black rather than a light scrim: the point is to watch the film, and
+     a bright surround changes how the footage reads. */
+  background: rgba(12, 10, 18, 0.82);
+  backdrop-filter: blur(3px);
+}
+
+.panel {
+  width: min(980px, 100%);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 20px 16px;
+  border-radius: 26px;
+  background: var(--card2);
+  box-shadow: 0 30px 80px rgba(12, 10, 25, 0.45);
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.head h3 {
+  margin: 0;
+  font-family: var(--f-title, inherit);
+  font-size: 19px;
+  color: var(--ink);
+}
+.caveat {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--faint);
+  max-width: 62ch;
+}
+
+.close {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid var(--line2);
+  background: var(--card);
+  color: var(--soft);
+  cursor: pointer;
+}
+.close:hover {
+  background: var(--bg2);
+}
+
+.screen {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #0c0a12;
+  aspect-ratio: 16 / 9;
+  /* The film must fit the window without the panel scrolling: a rough cut you
+     have to scroll to see is not a viewing. */
+  max-height: min(58vh, 520px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.portrait {
+  aspect-ratio: 9 / 16;
+  max-height: min(64vh, 620px);
+  margin: 0 auto;
+}
+
+.media {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.blank {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 13px;
+}
+.blank em {
+  font-style: normal;
+  font-size: 11.5px;
+  opacity: 0.7;
+}
+
+/* The line is shown as information, not as a caption: it sits on the ground
+   below rather than over the picture, because a rough cut is judged on pace
+   and the real captions are a different shape entirely. */
+.line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: 0;
+  padding: 26px 18px 12px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: #f2f0ea;
+  text-align: center;
+  background: linear-gradient(transparent, rgba(8, 6, 14, 0.85));
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.play {
+  padding: 7px 18px;
+  border-radius: 999px;
+  border: 0;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+.play:hover {
+  background: var(--accent-deep);
+}
+
+.pos {
+  font-family: var(--f-mono, ui-monospace, Menlo, monospace);
+  font-size: 11.5px;
+  color: var(--faint);
+}
+
+.ticks {
+  display: flex;
+  gap: 3px;
+  margin-left: auto;
+  flex-wrap: wrap;
+  max-width: 60%;
+  justify-content: flex-end;
+}
+
+.tick {
+  width: 14px;
+  height: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  cursor: pointer;
+  background: var(--line2);
+}
+/* Three states, because "what is missing" is the question this row answers.
+   Named `none` rather than `blank`: `.blank` is already the empty-screen box
+   above, and in a module the same name is the same class — the ticks would
+   have inherited its column layout. */
+.clip {
+  background: var(--accent);
+}
+.still {
+  background: var(--accent-lift);
+}
+.none {
+  background: var(--line2);
+}
+.here {
+  outline: 2px solid var(--accent-deep);
+  outline-offset: 1px;
+}
+
+/* The trigger, in the workspace header beside Resume production. */
+.open {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--line2);
+  background: var(--card2);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.open:hover {
+  background: var(--bg2);
+}
+/* How many scenes have anything to show — the honest promise of the button,
+   so nobody opens it expecting a finished film and finds three stills. */
+.count {
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-family: var(--f-mono, ui-monospace, Menlo, monospace);
+  font-size: 10.5px;
+  color: var(--accent-deep);
+  background: var(--accent-a12);
+}

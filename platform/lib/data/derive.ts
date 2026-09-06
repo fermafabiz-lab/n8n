@@ -32,6 +32,16 @@ export interface EditingOptions {
    *  are composed here, not in the footage, so they ride one switch. */
   music: boolean;
   /**
+   * A specific track from the Drive `Muzica` folder, pinned by the producer,
+   * or null for "auto by tone" — the selection Final Assembly has always
+   * made on its own (tone subfolder → tone-in-name → default* → any, random
+   * within the pool). `Pick Music Track` in n8n checks this key FIRST, so a
+   * pinned id wins outright; the name rides along only so the site can say
+   * which track is pinned without asking Drive again. Meaningless while
+   * `music` is off — the switch owns silence, exactly like sfx/sfxLevel.
+   */
+  musicTrack: MusicTrack | null;
+  /**
    * Whether the pipeline may put drawn cards in this film at all.
    *
    * Separate from `motifCards`, which is the LIST it chose — this is the
@@ -580,6 +590,31 @@ export const VIDEO_MODELS = [
   { id: "veo-3.1-quality", credits: 100 },
 ] as const;
 
+/** A Drive file the producer pinned as this film's background track. */
+export interface MusicTrack {
+  /** Drive file id — what `Pick Music Track` builds the proxy URL from. */
+  id: string;
+  /** The file's name, kept so the UI can display the pin without Drive. */
+  name: string;
+}
+
+/**
+ * A pinned track, or null for "auto by tone". Defensive like every Editing
+ * Options reader: the value round-trips through jsonb and a merge-write, and
+ * anything without a usable id must read as auto — a malformed pin that
+ * still LOOKED pinned would make `Pick Music Track` emit a proxy URL for a
+ * file that does not exist, which kills the music silently on the render.
+ */
+export function normalizeMusicTrack(raw: unknown): MusicTrack | null {
+  const r = asRecord(raw);
+  const id = typeof r.id === "string" ? r.id.trim() : "";
+  // Drive ids are opaque but never contain whitespace or quotes; refuse
+  // anything shaped like markup so a bad value cannot reach the render.
+  if (!id || id.length > 200 || /[\s"'<>]/.test(id)) return null;
+  const name = typeof r.name === "string" && r.name.trim() ? r.name.trim().slice(0, 200) : id;
+  return { id, name };
+}
+
 /** A known model id, or null — absent means the free default, and stays so. */
 export function normalizeVideoModel(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
@@ -677,6 +712,7 @@ export function buildProject(r: RawProject): Project {
       sfx: opts.sfx !== false,
       sfxLevel: normalizeSfxLevel(opts.sfxLevel),
       music: opts.music === true,
+      musicTrack: normalizeMusicTrack(opts.musicTrack),
       // On unless refused, like the other overlays: a film the pipeline found
       // nothing worth drawing in simply gets an empty list.
       drawnCards: opts.drawnCards !== false,

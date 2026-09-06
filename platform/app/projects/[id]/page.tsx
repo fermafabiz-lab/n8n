@@ -17,6 +17,7 @@ import ExpandableTitle from "@/components/ExpandableTitle";
 import FinishedFlash from "@/components/FinishedFlash";
 import OpsPanel from "@/components/OpsPanel";
 import AssemblyStatus from "@/components/AssemblyStatus";
+import MusicPicker from "@/components/MusicPicker";
 import SoundSettings from "@/components/SoundSettings";
 import UpscaleFilm from "@/components/UpscaleFilm";
 import PublishingPanel from "@/components/PublishingPanel";
@@ -629,12 +630,22 @@ export default async function ProductionRoom({
         )}
 
         {showing("final", project.awaitingFinalSettings) && (
-          <FinalSettings
-            projectId={id}
-            initial={project.editing}
-            motifCards={project.motifCards}
-            silent={silent}
-          />
+          <>
+            <FinalSettings
+              projectId={id}
+              initial={project.editing}
+              motifCards={project.motifCards}
+              silent={silent}
+            />
+            {/* Deliberately beside FinalSettings, not a row inside it: that
+                panel batches choices into one confirm that also STARTS the
+                render, while pinning a track is a self-saving audition. */}
+            <MusicPicker
+              projectId={id}
+              current={project.editing.musicTrack}
+              musicOn={project.editing.music}
+            />
+          </>
         )}
 
         {showing("assembly", assembling && !project.finalVideoUrl) &&
@@ -666,6 +677,19 @@ export default async function ProductionRoom({
             }
           />
         )}
+        {/* Which track this render mixes under the film — the choice used to
+            be visible only by watching the finished cut. Auto = the pipeline's
+            own tone-matched pick from the Drive `Muzica` folder. */}
+        {showing("assembly", assembling && !project.finalVideoUrl) &&
+          !project.finalVideoUrl &&
+          project.editing.music && (
+            <div className="setupnote" style={{ marginTop: 10 }}>
+              🎵 Muzica acestui render:{" "}
+              {project.editing.musicTrack
+                ? project.editing.musicTrack.name.replace(/\.[a-z0-9]{2,4}$/i, "").replace(/[-_]+/g, " ")
+                : "aleasă automat după ton, din folderul Drive „Muzica”"}
+            </div>
+          )}
 
         {/* Live production activity: shown once media generation is the
             phase (every scene approved) and until production hands over to

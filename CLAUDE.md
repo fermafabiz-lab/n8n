@@ -1811,6 +1811,38 @@ writes `{sfx, music, speed}` and `updateEditingOptions` merges, so a stored
 level survives a post-render sound change untouched — it just cannot be
 changed from there.
 
+### The background track is choosable now (2026-09-06)
+
+The producer asked whether the Drive music is used at all; the honest answer
+was "yes, but you find out WHICH track by watching the finished film". Now:
+
+- **`Editing Options.musicTrack` = `{id, name}` or null (auto).** The pin says
+  WHICH track; `music` still says WHETHER there is one — same split as
+  sfx/sfxLevel. `normalizeMusicTrack` in derive.ts refuses anything without a
+  usable Drive id, because a malformed pin that still looked pinned would make
+  the render build a proxy URL for a file that does not exist.
+- **`Pick Music Track` (Final Assembly, active `7d92a519`) checks the pin
+  FIRST** and returns it with `matched: 'pinned'`; absent, the old order runs
+  untouched (tone subfolder → tone-in-name → default* → any, random in pool).
+- **Workflow `Music Library` (`xBRdtrArbbi89yvX`)**: `list-music` walks the
+  Drive `Muzica` folder + subfolders → `{tracks:[{id,name,group}]}` (47 tracks
+  in 8 tone folders at build time); `share-music {id}` makes one file
+  anyone-with-link (idempotent) and answers its `uc?export=download` URL.
+  `create_workflow_from_code` skipped the credential on all three raw Drive
+  HTTP nodes again — third occurrence of that trap — fixed with
+  `setNodeCredential` before publish.
+- **The preview must SHARE before it plays.** `/api/media` fetches Drive with
+  no session, so an unshared file answers HTML and the `<audio>` refuses it.
+  `MusicPicker` POSTs `/api/music {id}` once per track, then plays
+  `/api/media?id=…`. `/api/music` GET caches the list 10 min per instance.
+- **`MusicPicker` is a standalone self-saving card BESIDE `FinalSettings`,
+  not a row inside it**: that panel batches its choices into one confirm that
+  also STARTS the render, and a music audition must be free to happen without
+  arming that button. Saves via `saveMusicTrack` (merge-write of the one key).
+  Own `MusicPicker.module.css` per the CSS-modules rule. The assembly panel
+  prints which track the running render mixes ("aleasă automat după ton" when
+  no pin), because that used to be invisible until the film arrived.
+
 ### The Cinematic category (silent film)
 
 `category: 'cinematic'` in Editing Options = no spoken words anywhere. How

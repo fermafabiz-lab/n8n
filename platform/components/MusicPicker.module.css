@@ -1,0 +1,152 @@
+/* MusicPicker — its own stylesheet per the house rule: globals.css is closed
+   to new components; only the token layer is shared. */
+
+.card {
+  background: var(--card, #fdfdfe);
+  border: 1px solid var(--line, #e2e2e6);
+  border-radius: 20px;
+  padding: 18px 20px;
+  margin-top: 14px;
+  box-shadow: 0 8px 24px rgba(20, 18, 28, 0.05);
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.title {
+  font-family: var(--f-title, inherit);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.01em;
+}
+
+.sub {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--muted, #6b6b76);
+  max-width: 46ch;
+}
+
+.offNote {
+  color: #8a5c0d;
+}
+
+.toggle {
+  flex: none;
+  border: 1px solid var(--line, #e2e2e6);
+  background: var(--card2, #f6f6f8);
+  color: inherit;
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.38s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.toggle:hover {
+  background: #efeef4;
+}
+
+.body {
+  margin-top: 14px;
+  max-height: 340px;
+  overflow-y: auto;
+  border-top: 1px solid var(--line, #e2e2e6);
+  padding-top: 10px;
+}
+
+.hint {
+  font-size: 13px;
+  color: var(--muted, #6b6b76);
+  padding: 8px 0;
+}
+
+.group {
+  margin-top: 10px;
+}
+
+.groupName {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted, #6b6b76);
+  padding: 4px 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  min-width: 0;
+}
+
+.play {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid var(--line, #e2e2e6);
+  background: var(--card2, #f6f6f8);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.play:hover {
+  background: #efeef4;
+}
+
+.name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.autoLabel {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pick {
+  flex: none;
+  border: 1px solid var(--accent, #7a4fd6);
+  color: var(--accent, #7a4fd6);
+  background: transparent;
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pick:hover {
+  background: rgba(122, 79, 214, 0.08);
+}
+.pick:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.chosen {
+  flex: none;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent, #7a4fd6);
+}
+
+.note {
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--muted, #6b6b76);
+}

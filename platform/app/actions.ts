@@ -28,6 +28,7 @@ import {
 } from "@/lib/data";
 import {
   normalizeCaptionColor,
+  normalizeMusicTrack,
   normalizeSfxLevel,
   normalizeSpeed,
   normalizeVideoModel,
@@ -1484,6 +1485,35 @@ export async function savePublishing(
     revalidatePath(`/projects/${projectId}`);
     revalidatePath("/projects");
     return { ok: true, message: "Saved." };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/**
+ * Pin one background track from the Drive `Muzica` folder, or clear the pin
+ * (null) to go back to the auto-by-tone pick Final Assembly has always made.
+ * A merge write of one key, so the music SWITCH beside it is untouched: the
+ * pin says WHICH track, `music` still says WHETHER there is one.
+ */
+export async function saveMusicTrack(
+  projectId: string,
+  track: { id: string; name: string } | null,
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    const clean = track === null ? null : normalizeMusicTrack(track);
+    if (track !== null && clean === null) {
+      return { ok: false, message: "That track id doesn't look usable — pick it from the list." };
+    }
+    await updateEditingOptions(projectId, { musicTrack: clean });
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message: clean ? `Melodia „${clean.name}" e aleasă pentru acest film.` : "Înapoi la alegerea automată după ton.",
+    };
   } catch (e) {
     return { ok: false, message: friendlyError(e) };
   }

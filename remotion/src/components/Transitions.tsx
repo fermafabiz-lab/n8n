@@ -76,6 +76,54 @@ export const Transitions: React.FC<{
 };
 
 /**
+ * The flare that owns ONE cut, given the second it lands on.
+ *
+ * The chapter card carries its own entrance and exit leak inside ImpactCard,
+ * and a chapter boundary with cards off is covered by the component above.
+ * The third kind of cut had nothing: a motif or text card replaces the picture
+ * outright, twice — once when it takes the frame and once when it gives it
+ * back — and both cuts played naked, which is what the producer saw and called
+ * a missing transition. The card's own 0.22s opacity fade is not a transition;
+ * it is a dissolve between two unrelated pictures, which is the one thing a
+ * cut should never look like.
+ *
+ * `half` is deliberately shorter than the chapter boundary's 0.38-0.42: a card
+ * runs two and a half to four seconds, and a flare that burns for three
+ * quarters of a second at each end would be lit for half of it.
+ */
+export const CutFlash: React.FC<{
+	/** The second the picture is replaced. The envelope PEAKS here. */
+	at: number;
+	tone: string;
+	/** The cut back OUT of the card; sweeps the other way so the two flares do
+	 *  not read as one object passing twice — same rule as ImpactCard. */
+	outgoing?: boolean;
+	half?: number;
+}> = ({at, tone, outgoing = false, half = 0.3}) => {
+	const frame = useCurrentFrame();
+	const {fps} = useVideoConfig();
+	const t = frame / fps;
+	const span = 2 * half;
+	// Placed so the PEAK lands on `at`, not so the window is centred on it —
+	// the attack is 28% of the envelope, so a centred window would flash
+	// brightest well before the frame it exists to hide.
+	const p = (t - (at - FLASH_PEAK * span)) / span;
+	if (p <= 0 || p >= 1) return null;
+	const amount = flashEnvelope(p);
+	if (amount <= 0.001) return null;
+	const dark = /dark|horror|conspiracy|mystery/.test(toneKey(tone));
+	return (
+		<AbsoluteFill style={{pointerEvents: 'none'}}>
+			<LightLeak
+				amount={amount}
+				sweep={outgoing ? 1 - flashSweep(p) : flashSweep(p)}
+				hue={dark ? 'cool' : 'warm'}
+			/>
+		</AbsoluteFill>
+	);
+};
+
+/**
  * Ken Burns on the continuous footage: slow push-in with alternating drift
  * per scene. The transform snaps at scene boundaries, and the snap is hidden
  * by the boundary itself: the footage cuts to a different picture on the same

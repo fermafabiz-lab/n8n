@@ -64,6 +64,7 @@ export default async function Dashboard() {
       <StageChime
         items={projects.map((p) => ({
           key: p.id,
+          label: p.name,
           stage:
             p.statusKind === "done"
               ? "finished"

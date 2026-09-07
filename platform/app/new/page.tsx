@@ -5,6 +5,7 @@ import { createProject, type ActionResult } from "@/app/actions";
 import CategoryPicker, { type CategoryMeta } from "@/components/CategoryPicker";
 import { DEFAULT_CATEGORY, getCategory } from "@/lib/categories";
 import Toggle from "@/components/Toggle";
+import CaptionColorPicker from "@/components/CaptionColorPicker";
 import LanguagePicker from "@/components/LanguagePicker";
 import { languageByCode } from "@/lib/languages";
 import { toneType } from "@/lib/tone-type";
@@ -57,10 +58,35 @@ const LOOKS = [
   "Horror",
 ];
 
-/** Length presets, in seconds. The slider snaps to 8s — one scene. */
+/**
+ * How much the subject field takes.
+ *
+ * It was 140, which is a tweet — and wrong twice over: `project.name` is
+ * `text` in Postgres with no server-side cap, and `ExpandableTitle` exists
+ * precisely because "people paste whole prompts into the Tema field". The UI
+ * was the only thing refusing what the rest of the stack already handled.
+ *
+ * Still bounded, because this field is also the project's NAME and shows up
+ * in every list. 1000 is a real brief with room to spare; past that it is a
+ * script, and the Lore field is where a script belongs.
+ */
+const SUBJECT_MAX = 1000;
+
+/**
+ * Length presets, in seconds — round numbers, not scene multiples.
+ *
+ * They used to be 32 and 64 because a scene is an 8-second clip, and the
+ * slider snapped to 8 for the same reason. But the number is only a TARGET:
+ * scripting turns it into a word budget and a chapter count, and the finished
+ * film's real length comes from the narration retime in /assemble — so
+ * nothing downstream needs a multiple of anything, and a chip reading
+ * "1 min" that actually set 1:04 was a machine's number wearing a human
+ * label. The slider now moves in 5s steps; the field next to the readout
+ * takes any exact second.
+ */
 const LENGTH_PRESETS = [
-  { label: "32s", s: 32 },
-  { label: "1 min", s: 64 },
+  { label: "30s", s: 30 },
+  { label: "1 min", s: 60 },
   { label: "2 min", s: 120 },
   { label: "4 min", s: 240 },
   { label: "8 min", s: 480 },
@@ -68,13 +94,6 @@ const LENGTH_PRESETS = [
   { label: "12 min", s: 720 },
 ];
 
-/**
- * The slider's ends, and the number field's.
- *
- * One owner, because the range input, the number input and the fill
- * percentage all have to agree — they were three copies of `480`, and a
- * preset above a stale max is a chip that moves the slider nowhere.
- */
 /**
  * The SFX volume slider's ends, as percentages.
  *
@@ -87,7 +106,46 @@ const LENGTH_PRESETS = [
 const SFX_LEVEL_PCT_MIN = 10;
 const SFX_LEVEL_PCT_DEFAULT = 35;
 
-const LENGTH_MIN = 16;
+/**
+ * The Veo tiers, priced per 8s clip in useapi credits (measured on the
+ * account — 25,050/month). Ids must stay in lockstep with VIDEO_MODELS in
+ * lib/data/derive.ts and with what `Current Scene` in n8n accepts: the
+ * string reaches the Flow API verbatim.
+ */
+const VIDEO_TIERS = [
+  { id: "veo-3.1-lite-low-priority", label: "Free", credits: 0, note: "" },
+  {
+    id: "veo-3.1-lite",
+    label: "Better",
+    credits: 5,
+    note: "Same model, real queue priority — clips arrive much faster and slightly cleaner.",
+  },
+  {
+    id: "veo-3.1-fast",
+    label: "Fast",
+    credits: 10,
+    note: "A stronger model — noticeably fewer physics glitches, good default for films worth posting.",
+  },
+  {
+    id: "veo-3.1-quality",
+    label: "Cinema",
+    credits: 100,
+    note: "The best Veo on offer — for films where every shot has to hold up.",
+  },
+] as const;
+
+/**
+ * The length slider's ends, and the number field's.
+ *
+ * One owner, because the range input, the number input and the fill
+ * percentage all have to agree — they were three copies of `480`, and a
+ * preset above a stale max is a chip that moves the slider nowhere.
+ */
+// 15, not 16: a range input counts its steps FROM `min`, so with a 5s step a
+// floor of 16 would put every reachable value on 16, 21, 26… 716 — never a
+// round number, never a preset, and never the max. On the 15…720 grid every
+// drag position ends in 0 or 5 and the last one IS 720.
+const LENGTH_MIN = 15;
 const LENGTH_MAX = LENGTH_PRESETS[LENGTH_PRESETS.length - 1].s;
 
 /**
@@ -96,7 +154,14 @@ const LENGTH_MAX = LENGTH_PRESETS[LENGTH_PRESETS.length - 1].s;
  * redesign must never change that contract.
  */
 const FINISHES: Array<{
-  name: "captions" | "hook_title" | "chapter_cards" | "end_screen" | "sfx" | "music";
+  name:
+    | "captions"
+    | "hook_title"
+    | "chapter_cards"
+    | "end_screen"
+    | "sfx"
+    | "drawn_cards"
+    | "music";
   label: string;
   sheet: string;
   on: string;
@@ -144,6 +209,14 @@ const FINISHES: Array<{
     default: true,
   },
   {
+    name: "drawn_cards",
+    label: "Drawn cards",
+    sheet: "Cards",
+    on: "Where the voice names something the camera cannot show, the film draws it",
+    off: "No drawn cards — footage and text only",
+    default: true,
+  },
+  {
     name: "music",
     label: "Music",
     sheet: "Music",
@@ -183,7 +256,7 @@ export default function NewVideo() {
   const [state, formAction, pending] = useActionState(submit, null);
   const [name, setName] = useState("");
   const [tone, setTone] = useState("Dark");
-  const [length, setLength] = useState(64);
+  const [length, setLength] = useState(60);
   const [aspect, setAspect] = useState<"16:9" | "9:16">("16:9");
   // The rate is the state; the WORD the webhook wants is derived from it.
   // SPEED_BY_PACE maps the words to the gentle defaults, so Normal posts 1
@@ -201,7 +274,23 @@ export default function NewVideo() {
   // render used to hard-code, so leaving the slider alone reproduces every
   // film made before this control existed.
   const [sfxLevel, setSfxLevel] = useState(SFX_LEVEL_PCT_DEFAULT);
+  // Hex, or "" for the white default. Empty is not "unset" — it is the
+  // choice most films should keep, so it is what the control starts on.
+  const [captionColor, setCaptionColor] = useState("");
   const [style, setStyle] = useState("");
+  // Hands-off mode: every gate signs itself off. Off by default — approving
+  // unseen is a real trade, and it must never be the accident.
+  const [autoApprove, setAutoApprove] = useState(false);
+  // The producer's direction: the film's angle in their own words, and up to
+  // three mandatory beats (one per line). Both optional, both steer the
+  // writer; the must-includes are verified by the Narration Guard.
+  const [brief, setBrief] = useState("");
+  const [mustHaves, setMustHaves] = useState("");
+  const [expanding, setExpanding] = useState(false);
+  const [expandNote, setExpandNote] = useState("");
+  // Which Veo tier generates the clips. Free is the default and the business
+  // model; a paid tier is a per-film decision, priced on the spot.
+  const [videoModel, setVideoModel] = useState("veo-3.1-lite-low-priority");
   // The category selection lives here because BOTH halves of CategoryPicker
   // read it and they are rendered in different cards.
   const [category, setCategory] = useState(DEFAULT_CATEGORY);
@@ -218,6 +307,33 @@ export default function NewVideo() {
 
   const lang = languageByCode(language);
   const languageName = lang?.name ?? "English";
+
+  /** "✨ Develop my idea" — n8n's expand-brief webhook (the model keys live
+   *  there) turns the subject + rough draft into 2-4 sharper sentences, in
+   *  the film's language. Fills the textarea, stays fully editable; any
+   *  failure leaves whatever was typed untouched. */
+  const expandIdea = async () => {
+    setExpanding(true);
+    setExpandNote("");
+    try {
+      const res = await fetch("/api/expand-brief", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tema: name, brief, tone, language: languageName }),
+      });
+      const out = (await res.json()) as { brief?: string | null };
+      if (out.brief) {
+        setBrief(out.brief);
+        setExpandNote("Developed — edit it freely, it's your text now.");
+      } else {
+        setExpandNote("Couldn't develop it right now — your text is untouched.");
+      }
+    } catch {
+      setExpandNote("Couldn't develop it right now — your text is untouched.");
+    } finally {
+      setExpanding(false);
+    }
+  };
   const scenes = Math.max(1, Math.round(length / 8));
   const words = scenes * 22;
   const chapters = Math.max(1, Math.ceil(length / 120));
@@ -293,14 +409,27 @@ export default function NewVideo() {
                     className="nb-ta"
                     rows={3}
                     placeholder="A documentary about the last lighthouse keepers — who they were, and what happened when the lamps went automatic."
-                    maxLength={140}
+                    maxLength={SUBJECT_MAX}
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                   />
                   <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--dim)" }}>
-                    Keep it short — it becomes the title shown in the video.
-                    Style details go in the Look field, not here.
+                    A short line becomes the film&apos;s opening title card; a
+                    longer brief is used as the subject and the film opens
+                    straight on the first scene. Style details go in the Look
+                    field, not here.
+                    {/* Silence is what made the old 140 a wall: the field
+                        simply stopped accepting letters. The count appears
+                        before the limit does, never after. */}
+                    {name.length > SUBJECT_MAX - 150 && (
+                      <>
+                        {" "}
+                        <b style={{ color: name.length >= SUBJECT_MAX ? "var(--accent)" : "var(--ink)" }}>
+                          {name.length}/{SUBJECT_MAX}
+                        </b>
+                      </>
+                    )}
                   </p>
                   <div className="sugrow" aria-label="Suggestions">
                     {SUGGESTIONS.map((sg) => (
@@ -309,6 +438,58 @@ export default function NewVideo() {
                       </button>
                     ))}
                   </div>
+                </div>
+                {/* The producer's direction — the cheapest quality lever there
+                    is. A five-word title under-specifies a whole film; these
+                    two optional fields carry the angle and the mandatory
+                    beats. Both are STORED on the project (unlike Lore, which
+                    a restart loses), read by the Story Bible, the outline and
+                    the narration prompts — and the must-includes are VERIFIED
+                    by the Narration Guard after writing, because an
+                    instruction in a prompt is not a constraint. */}
+                <div className="field" style={{ marginTop: 22 }}>
+                  <label>
+                    What the film should really be about{" "}
+                    <span className="fhint">optional — the angle, in your own words</span>
+                  </label>
+                  <textarea
+                    name="brief"
+                    className="nb-ta"
+                    rows={3}
+                    maxLength={2000}
+                    value={brief}
+                    onChange={(e) => setBrief(e.target.value)}
+                    placeholder="The point of view, what to focus on, what to leave out — e.g. 'Not the whole biography: only the night of the crime and the investigation, told through the witnesses.'"
+                  />
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
+                    <button
+                      type="button"
+                      className="btn"
+                      disabled={expanding || !name.trim()}
+                      title={name.trim() ? "Let AI develop your idea into a sharper brief — editable after" : "Write the subject above first"}
+                      onClick={expandIdea}
+                    >
+                      {expanding ? "Developing…" : "✨ Develop my idea"}
+                    </button>
+                    {expandNote && (
+                      <span style={{ fontSize: 12, color: "var(--dim)" }}>{expandNote}</span>
+                    )}
+                  </div>
+                </div>
+                <div className="field" style={{ marginTop: 22 }}>
+                  <label>
+                    Must appear in the film{" "}
+                    <span className="fhint">optional — up to 3, one per line; the writer is checked on each</span>
+                  </label>
+                  <textarea
+                    name="must_haves"
+                    className="nb-ta"
+                    rows={3}
+                    maxLength={650}
+                    value={mustHaves}
+                    onChange={(e) => setMustHaves(e.target.value)}
+                    placeholder={"The moment the deal collapses\nWhy the case stayed unsolved for 27 years"}
+                  />
                 </div>
                 <div className="field" style={{ marginTop: 22 }}>
                   <label>What kind of film</label>
@@ -387,6 +568,40 @@ export default function NewVideo() {
                   <input type="hidden" name="speed" value={speed} />
                   <SpeedPicker value={speed} onChange={setSpeed} />
                 </div>
+                <div className="frow">
+                  <label>Video quality</label>
+                  {/* Which Veo tier generates the clips. The pipeline has read
+                      this override since 2026-09-03; the form is the first
+                      thing to actually write it — until now every film ran on
+                      the weakest (free) model, which is where the ghost cars
+                      and driverless starts came from. The cost line is this
+                      film's own arithmetic, so the trade is priced before it
+                      is bought. */}
+                  <input type="hidden" name="video_model" value={videoModel} />
+                  <div className="seg" role="group" aria-label="Video quality">
+                    {VIDEO_TIERS.map((t) => (
+                      <button
+                        type="button"
+                        key={t.id}
+                        className={videoModel === t.id ? "on" : ""}
+                        onClick={() => setVideoModel(t.id)}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="fnote">
+                    {(() => {
+                      const t = VIDEO_TIERS.find((x) => x.id === videoModel)!;
+                      const clips = Math.max(1, Math.round(length / 8));
+                      const hookExtra = t.credits === 0 ? 100 : 0;
+                      const total = clips * t.credits + hookExtra;
+                      return t.credits === 0
+                        ? `Free tier — clips cost no credits (the opening hook still renders on Cinema, ~100 credits). Fine for scenery and slow shots; complex motion (races, crowds, physical contact) is where it glitches.`
+                        : `${t.note} ≈ ${total.toLocaleString("en-US")} credits for this film (${clips} clips × ${t.credits}), out of 25,050/month.`;
+                    })()}
+                  </p>
+                </div>
               </section>
 
               <section className="fsec">
@@ -453,27 +668,33 @@ export default function NewVideo() {
                     <span className="m">
                       {length} seconds · {scenes} scene{scenes === 1 ? "" : "s"}
                     </span>
-                    {/* The named field. The slider drives it; this allows an
-                        exact number the slider's 8s snap cannot reach. */}
-                    <input
-                      id="length"
-                      name="length"
-                      type="number"
-                      min={LENGTH_MIN}
-                      max={LENGTH_MAX}
-                      step={1}
-                      value={length}
-                      onChange={(e) => setLength(Number(e.target.value) || 0)}
-                      required
-                      aria-label="Length in seconds"
-                    />
+                    {/* The named field. The slider drives it; this takes the
+                        exact second the slider's 5s step cannot reach. The
+                        "sec" beside it exists because without a unit the box
+                        read as a display, not an input — the producer asked
+                        for direct typing while already looking at it. */}
+                    <span className="lenexact">
+                      <input
+                        id="length"
+                        name="length"
+                        type="number"
+                        min={LENGTH_MIN}
+                        max={LENGTH_MAX}
+                        step={1}
+                        value={length}
+                        onChange={(e) => setLength(Number(e.target.value) || 0)}
+                        required
+                        aria-label="Length in seconds"
+                      />
+                      sec
+                    </span>
                   </div>
                   <input
                     type="range"
                     className="lenslider"
                     min={LENGTH_MIN}
                     max={LENGTH_MAX}
-                    step={8}
+                    step={5}
                     value={sliderPos}
                     onChange={(e) => setLength(Number(e.target.value))}
                     style={{ ["--fill" as string]: sliderFill }}
@@ -567,6 +788,12 @@ export default function NewVideo() {
                               off is a decision with no subject. The value is
                               posted either way, so toggling off and back on
                               keeps the level the producer chose. */}
+                          {f.name === "captions" && on && (
+                            <CaptionColorPicker
+                              value={captionColor}
+                              onChange={setCaptionColor}
+                            />
+                          )}
                           {f.name === "sfx" && on && (
                             <div style={{ marginTop: 10 }}>
                               <div
@@ -626,6 +853,7 @@ export default function NewVideo() {
                     name="sfx_level"
                     value={(sfxLevel / 100).toFixed(2)}
                   />
+                  <input type="hidden" name="caption_color" value={captionColor} />
                 </div>
               </section>
 
@@ -666,6 +894,33 @@ export default function NewVideo() {
                     place). The rest of the film chains off that first frame.
                     JPG/PNG/WebP, max 6&nbsp;MB.
                   </p>
+                </div>
+              </section>
+
+              <section className="fsec">
+                <header>
+                  <h2>Hands-off</h2>
+                  <span className="fhint">optional — you can turn it off any time</span>
+                  <span className="no">08</span>
+                </header>
+                <input type="hidden" name="auto_approve" value={autoApprove ? "yes" : "no"} />
+                <div className="swlist">
+                  <div className={`swrow ${autoApprove ? "on" : ""}`}>
+                    <span className="no">01</span>
+                    <div>
+                      <h4>Auto-approve everything</h4>
+                      <p>
+                        {autoApprove
+                          ? "Every gate — script, scenes, takes, images, clips — signs itself off the moment its asset lands, and the final render starts by itself. Nothing waits for you, and nothing gets a look first. Works while the project page is open in a tab; regenerating anything still works as usual."
+                          : "The film stops at every gate and waits for your approval — the normal way."}
+                      </p>
+                    </div>
+                    <Toggle
+                      checked={autoApprove}
+                      ariaLabel="Auto-approve everything"
+                      onChange={setAutoApprove}
+                    />
+                  </div>
                 </div>
               </section>
             </div>
@@ -723,7 +978,9 @@ export default function NewVideo() {
                   <div>
                     <dt>Approval gates</dt>
                     <dd>
-                      {gates} — script, images{silent ? "" : ", voices"}, clips
+                      {autoApprove
+                        ? "auto — signed off as they land"
+                        : `${gates} — script, images${silent ? "" : ", voices"}, clips`}
                     </dd>
                   </div>
                 </dl>

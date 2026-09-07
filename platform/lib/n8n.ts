@@ -125,8 +125,12 @@ export const FINAL_ASSEMBLY_WORKFLOW_ID = "BY22Vlhh20Xdkr5Z";
  * ahead of finished ones, so repeated runs converge). The real cap lives in
  * the n8n workflow — changing it there without updating this constant only
  * makes the "N more runs needed" hint wrong, nothing worse.
+ *
+ * 200 since 2026-09-01: a pass covers the WHOLE film (every take, every
+ * image, one combined gate, every clip, one video gate). It was 8 for a
+ * long time, which turned a 71-scene film into nine rounds of approvals.
  */
-export const MEDIA_BATCH_CAP = 8;
+export const MEDIA_BATCH_CAP = 200;
 
 /**
  * Executions doing actual production work right now.

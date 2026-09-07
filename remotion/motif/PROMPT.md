@@ -81,9 +81,9 @@ trip but can never show the whole shape of it at once.
 
 | field | rule |
 |---|---|
-| `stops` | 2–4 strings, in travel order. The last one is the destination and is drawn larger. |
+| `stops` | 2–4 `{name, source}`, in travel order. The last one is the destination and is drawn larger. |
 | `label` | optional; the small tracked word naming the graphic ("Ruta"). Furniture, not a claim: no digits, ≤ 12 characters. |
-| `note` | optional; the one line the picture cannot say. Needs provenance like everything else. |
+| `note` / `noteSource` | optional; the one line the picture cannot say. Needs provenance like everything else. |
 
 ### `schedule` — a departure board flaps two times into place
 
@@ -93,43 +93,89 @@ you never write it yourself unless you want it phrased.
 
 | field | rule |
 |---|---|
-| `rows` | 2–3 `{label, value}`. `value` is a time as `HH:MM`. |
+| `rows` | 2–3 `{label, value, source}`. `value` is a CLOCK TIME as `HH:MM`. |
 | `label` | optional; same rule as above ("Orar"). |
-| `note` | optional; if it states the gap, mark its source as `arithmetic` and the code will check your subtraction. |
+| `note` / `noteSource` | optional; if it states the gap, mark the source `arithmetic` and the code will check your subtraction. |
+
+**A year is not a time.** The first film to reach this node had no journey and
+no timetable — it had a life, told in dates — and what came back was a schedule
+card rendering 1893 and 1896 as `18:93` and `18:96`. The validator rejected it,
+correctly, and there was nothing left to draw. That film is why the third motif
+exists.
+
+### `timeline` — a dimension line is measured out and the years mark themselves along it
+
+For a film that states three or more dates minutes apart. The card places each
+mark at its REAL distance from the others, so what it shows is the SHAPE of the
+span — that 1941 and 1962 are twenty-one years apart while 1975 and 1977 are
+two. A listener cannot hold four dates, and nobody can hear a proportion.
+
+| field | rule |
+|---|---|
+| `marks` | 3–5 `{at, label, source}`, in increasing order. `at` is a year the film states; `label` is at most four words saying what happened there. Two marks would be a gap, and a gap is a schedule. |
+| `label` | optional; same rule as above ("Anii"). |
+| `note` / `noteSource` | optional; if it states the length of the whole span, mark the source `arithmetic` and the code recomputes it in years. |
+
+Marks are drawn proportionally, so the card concedes toward even spacing by the
+SMALLEST amount that keeps two labels from touching — proportion is the point,
+so it is given up by the minimum rather than abandoned at the first collision.
 
 ## Output schema
 
 ```json
 [
   {
-    "sceneIndex": 6,
-    "variant": "schedule",
+    "sceneIndex": 7,
+    "variant": "timeline",
     "priority": 1,
     "why": "one line: what this shows that the voice and the shot do not",
-    "label": "Orar",
-    "rows": [
-      {"label": "Feribot", "value": "05:20"},
-      {"label": "Zbor", "value": "08:00"}
+    "label": "Anii",
+    "marks": [
+      {
+        "at": "1941",
+        "label": "as a dealer",
+        "source": {"kind": "quote", "sceneIndex": 2, "from": "He arrives in Las Vegas in 1941 as a dealer"}
+      },
+      {
+        "at": "1952",
+        "label": "all the savings",
+        "source": {"kind": "quote", "sceneIndex": 3, "from": "In 1952, he puts in all the savings"}
+      },
+      {
+        "at": "1975",
+        "label": "co-found Boyd Gaming",
+        "source": {"kind": "quote", "sceneIndex": 7, "from": "By 1975, Sam Boyd and Bill Boyd co-found Boyd Gaming Corporation"}
+      }
     ],
-    "note": "2 h 40 min marjă",
-    "sources": {
-      "rows[0].label": {"kind": "quote", "sceneIndex": 6, "from": "Feribot la cinci și douăzeci"},
-      "rows[0].value": {"kind": "quote", "sceneIndex": 6, "from": "Feribot la cinci și douăzeci"},
-      "rows[1].label": {"kind": "quote", "sceneIndex": 6, "from": "La opt avem zborul"},
-      "rows[1].value": {"kind": "quote", "sceneIndex": 6, "from": "La opt avem zborul"},
-      "note": {"kind": "arithmetic"}
-    }
+    "note": "34 de ani",
+    "noteSource": {"kind": "arithmetic"}
   }
 ]
 ```
 
-`sources` is keyed by the path of the string it justifies — `stops[2]`,
-`rows[1].value`, `note`. Three kinds are accepted:
+**Provenance travels with the thing it proves.** Every stop, row and mark
+carries its own `source`; a note is justified by `noteSource` beside it. It was
+a map keyed by path — `stops[2]`, `rows[1].value`, `note` — until the first real
+film came back with a route card whose only source sat under `rows[0].value`, a
+key belonging to a different motif. Every string on that card was true and the
+card was dropped for having no source: the bookkeeping failed, not the model. An
+item that carries its own source cannot be filed under the wrong key, so the
+class of error is gone rather than warned about. The old map is still READ, as a
+fallback, so a card written the old way still validates.
+
+One source justifies a whole row or mark. A row's label and its value come out
+of the same spoken line; asking for that line twice only creates a second chance
+to mis-key it.
+
+Three kinds are accepted:
 
 - `quote` — `from` must appear verbatim in that scene's narration. Diacritics,
-  case and punctuation are ignored when checking; the words are not.
-- `arithmetic` — only for a `schedule` note stating the gap. The code
-  recomputes it from the rows and checks your number.
+  case and punctuation are ignored when checking; the words are not, and neither
+  is their order: `"as a dealer"` is proved by "arrives in Las Vegas in 1941 as
+  a dealer" and `"dealer in Vegas"` is not, because the film never puts those
+  words together.
+- `arithmetic` — a `schedule` note stating the gap, or a `timeline` note stating
+  the span. The code recomputes it and checks your number.
 - `evidence` — `ref` must name a row in the research pack (`E1`, `E2`, …), and
   that row must carry a source. This is the only door for a fact from outside
   the script, and it is the same door the claim cards use.
@@ -171,7 +217,7 @@ touches panel before a render rather than going straight to screen.
 npm run check:motif -- trigger/studio-props.local.json motif/candidate-model.json
 ```
 
-Two fixtures sit beside this file, both against the Tahiti film:
+Three fixtures sit beside this file. Two are against the Tahiti film:
 
 - `candidate-mine.json` — the two cards I authored by hand before any of this
   existed. The schedule passes with every value proved; **the route is
@@ -187,3 +233,16 @@ Two fixtures sit beside this file, both against the Tahiti film:
 
 Run them before changing any rule in `validate.mjs`; both are cheap, and the
 second one is the regression test.
+
+- `candidate-timeline.json`, against `boyd-props.json` — nine scenes trimmed
+  from the 71-scene Boyd film, which is the film that had no motif. One card
+  passes with all four years proved and its span recomputed; five fail, one per
+  rule the new motif adds: marks out of order, a quote from a later scene, a
+  year its own quote does not state, a span the subtraction does not support,
+  and two marks where three is the minimum.
+
+Run all three after changing any rule in `validate.mjs`. And note the label
+rule bites here exactly as "Feribot" did on the Tahiti film: the first draft of
+this fixture labelled 1941 "dealer in Vegas", which the film never says as a
+phrase, and every card was rejected until the labels were lifted from their own
+quotes.

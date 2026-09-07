@@ -31,6 +31,50 @@ export interface EditingOptions {
   /** Background music AND the synthesized boom/whoosh/riser accents. Both
    *  are composed here, not in the footage, so they ride one switch. */
   music: boolean;
+  /**
+   * A specific track from the Drive `Muzica` folder, pinned by the producer,
+   * or null for "auto by tone" — the selection Final Assembly has always
+   * made on its own (tone subfolder → tone-in-name → default* → any, random
+   * within the pool). `Pick Music Track` in n8n checks this key FIRST, so a
+   * pinned id wins outright; the name rides along only so the site can say
+   * which track is pinned without asking Drive again. Meaningless while
+   * `music` is off — the switch owns silence, exactly like sfx/sfxLevel.
+   */
+  musicTrack: MusicTrack | null;
+  /**
+   * Whether the pipeline may put drawn cards in this film at all.
+   *
+   * Separate from `motifCards`, which is the LIST it chose — this is the
+   * producer's permission for the feature, and it has to survive the list
+   * being empty. Off means Scripting does not spend a model call picking
+   * them and Final Assembly draws none even if some were already stored,
+   * which matters because a film can be switched off after its cards exist.
+   */
+  drawnCards: boolean;
+  /**
+   * The colour a spoken caption word is painted, or null for white.
+   *
+   * Null is the default and the right one: white with the spoken word marked
+   * by BRIGHTNESS is the only choice that reads on every kind of footage —
+   * an accent that sits well on a night dock is wrong on snow. A colour is
+   * something a film opts into.
+   *
+   * Stored as a hex; `resolveCaptionAccent()` in remotion/src/captionColor.ts
+   * is what finally applies it, and it lifts anything too dark toward white
+   * until it clears a luminance floor, because captions carry a heavy drop
+   * shadow and a deep accent vanishes into its own shadow.
+   */
+  captionColor: string | null;
+  /**
+   * Which Veo model the clips are generated on.
+   *
+   * Read by `Current Scene` in Media Generation, which is why this key has
+   * always existed in the stored JSON while the site never declared it. The
+   * site does not WRITE it — the default (`veo-3.1-lite-low-priority`) is free
+   * at any volume and is the whole reason the Ultra plan exists — but it has
+   * to read it, or the cost panel prices a paid film as a free one.
+   */
+  videoModel: string | null;
   /** Playback rate of the finished film: 0.9 slow, 1 normal, 1.1 fast.
    *
    *  This is what the creation form's PACE control finally means. Before it
@@ -52,6 +96,21 @@ export interface EditingOptions {
    * and leaves those films editable, the safe direction.
    */
   speedLocked: boolean;
+  /**
+   * Hands-off mode: the site signs off every gate by itself as the assets
+   * land — script, scene texts, takes, images, clips — and presses the final
+   * render with the stored settings. The film runs end to end with nobody
+   * clicking.
+   *
+   * The FLAG lives here; the HAND is the AutoPilot component on the project
+   * page, which runs `autoApproveTick()` on every 10s refresh. It approves
+   * through the same server actions the buttons use, so every side effect
+   * the manual path carries (a re-approved image flagging its stale clip,
+   * voice regen flags being respected) comes along for free. It is a real
+   * trade, said out loud in the UI: nothing gets a human look before it is
+   * in the film.
+   */
+  autoApprove: boolean;
   /**
    * How the narrator READS — ElevenLabs' generation settings for this film.
    *
@@ -167,6 +226,29 @@ export function normalizeSpeed(value: unknown): number {
  */
 export const SFX_LEVEL_DEFAULT = 0.35;
 
+/**
+ * A stored caption colour, or null for the white default.
+ *
+ * Mirrors `resolveCaptionAccent()` in remotion/src/captionColor.ts, which is
+ * the code that actually paints the word: a hex, the explicit opt-outs
+ * `none`/`white`/`off`, and nothing else. Anything unrecognised reads as
+ * null rather than throwing — a caption colour is not worth failing a render
+ * over, and white is always legible.
+ *
+ * The render normalizes AGAIN on its side, including the luminance lift, so
+ * this one only has to keep the stored value clean and the control honest.
+ */
+export function normalizeCaptionColor(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const raw = value.trim();
+  if (!raw || /^(none|white|off)$/i.test(raw)) return null;
+  const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(raw);
+  if (!m) return null;
+  let hex = m[1];
+  if (hex.length === 3) hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+  return `#${hex.toUpperCase()}`;
+}
+
 export function normalizeSfxLevel(value: unknown): number {
   const n = Number(value);
   if (!Number.isFinite(n)) return SFX_LEVEL_DEFAULT;
@@ -228,6 +310,8 @@ export interface Project {
   editing: EditingOptions;
   /** Drawn cards chosen by the pipeline, droppable in Final touches. */
   motifCards: MotifCard[];
+  /** Post-delivery state: review status, YouTube title, notes, link. */
+  publishing: Publishing;
   /** The batch is holding, waiting for those options to be confirmed. */
   awaitingFinalSettings: boolean;
   /** Video category id (lib/categories.ts); older projects have none. */
@@ -468,6 +552,101 @@ function parseEditing(raw: unknown): Record<string, unknown> {
 }
 
 /**
+ * What happens to a film AFTER the pipeline delivers it. The pipeline ends at
+ * "Finalizat"; the film's real life continues — reviewed, titled for YouTube,
+ * posted — and none of that state had anywhere to live. It rides in Editing
+ * Options like `motifCards` does (merge-written, no schema change, nothing in
+ * n8n reads it), but it is exposed as its own Project field because it is not
+ * an editing option: nothing about the render changes with it.
+ */
+export interface Publishing {
+  /** Where the finished film stands with the producer, not the pipeline. */
+  state: "review" | "ready" | "posted";
+  /** The title the film will wear on YouTube (which cuts at 100 chars). */
+  ytTitle: string;
+  /** The YouTube description — generated by /api/yt-kit, then hand-edited.
+   *  YouTube's own cap is 5000 chars; the store allows a little slack so an
+   *  over-long draft survives the round-trip and the counter can say so. */
+  description: string;
+  /** Free notes — what to fix, what to remember at upload time. */
+  notes: string;
+  /** The YouTube link, once posted. */
+  ytUrl: string;
+}
+
+export const PUBLISHING_STATES = ["review", "ready", "posted"] as const;
+
+/**
+ * The Veo tiers a film may choose, with what each 8s clip costs in useapi
+ * credits — measured on the account (25,050/month, no rollover), not quoted.
+ * The model string reaches `Current Scene` in Media Generation verbatim, so
+ * this list must only ever hold ids useapi actually accepts: a wrong id
+ * burns three retries plus ~20 min of cooldowns before killing the batch.
+ */
+export const VIDEO_MODELS = [
+  { id: "veo-3.1-lite-low-priority", credits: 0 },
+  { id: "veo-3.1-lite", credits: 5 },
+  { id: "veo-3.1-fast", credits: 10 },
+  { id: "veo-3.1-quality", credits: 100 },
+] as const;
+
+/** A Drive file the producer pinned as this film's background track. */
+export interface MusicTrack {
+  /** Drive file id — what `Pick Music Track` builds the proxy URL from. */
+  id: string;
+  /** The file's name, kept so the UI can display the pin without Drive. */
+  name: string;
+}
+
+/**
+ * A pinned track, or null for "auto by tone". Defensive like every Editing
+ * Options reader: the value round-trips through jsonb and a merge-write, and
+ * anything without a usable id must read as auto — a malformed pin that
+ * still LOOKED pinned would make `Pick Music Track` emit a proxy URL for a
+ * file that does not exist, which kills the music silently on the render.
+ */
+export function normalizeMusicTrack(raw: unknown): MusicTrack | null {
+  const r = asRecord(raw);
+  const id = typeof r.id === "string" ? r.id.trim() : "";
+  // Drive ids are opaque but never contain whitespace or quotes; refuse
+  // anything shaped like markup so a bad value cannot reach the render.
+  if (!id || id.length > 200 || /[\s"'<>]/.test(id)) return null;
+  const name = typeof r.name === "string" && r.name.trim() ? r.name.trim().slice(0, 200) : id;
+  return { id, name };
+}
+
+/** A known model id, or null — absent means the free default, and stays so. */
+export function normalizeVideoModel(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const v = raw.trim();
+  if (!VIDEO_MODELS.some((m) => m.id === v)) return null;
+  // Storing the free default explicitly would be harmless today, but absence
+  // is the shape every reader already handles; keep one spelling of it.
+  return v === "veo-3.1-lite-low-priority" ? null : v;
+}
+
+/**
+ * Defensive like every Editing Options reader: the value round-trips through
+ * jsonb and two backends. Absent or malformed reads as "review" with empty
+ * fields — the state every finished film was silently in before this existed.
+ */
+export function normalizePublishing(raw: unknown): Publishing {
+  const r = asRecord(raw);
+  const state = PUBLISHING_STATES.includes(r.state as Publishing["state"])
+    ? (r.state as Publishing["state"])
+    : "review";
+  const str = (v: unknown, cap: number) =>
+    typeof v === "string" ? v.slice(0, cap) : "";
+  return {
+    state,
+    ytTitle: str(r.ytTitle, 200),
+    description: str(r.description, 5500),
+    notes: str(r.notes, 4000),
+    ytUrl: str(r.ytUrl, 500),
+  };
+}
+
+/**
  * Motif cards come from a MODEL, through a validator, through jsonb — so this
  * reads defensively and keeps only what can actually be drawn. A malformed
  * card is dropped here rather than rendered as an empty rectangle.
@@ -533,6 +712,15 @@ export function buildProject(r: RawProject): Project {
       sfx: opts.sfx !== false,
       sfxLevel: normalizeSfxLevel(opts.sfxLevel),
       music: opts.music === true,
+      musicTrack: normalizeMusicTrack(opts.musicTrack),
+      // On unless refused, like the other overlays: a film the pipeline found
+      // nothing worth drawing in simply gets an empty list.
+      drawnCards: opts.drawnCards !== false,
+      captionColor: normalizeCaptionColor(opts.captionColor),
+      // Whitelisted, not merely a string: the id reaches the Flow API
+      // verbatim from Current Scene, and the brief's picker is the writer —
+      // an unknown value must read as the free default everywhere.
+      videoModel: normalizeVideoModel(opts.videoModel),
       // Editing Options is the OVERRIDE, the project's PACE field the default.
       // Two sources on purpose: PACE is chosen on the brief and stored on the
       // project, so falling back to it means every film already in the
@@ -549,6 +737,9 @@ export function buildProject(r: RawProject): Project {
       // before the audio step could sign the pace off — reads as unlocked
       // and keeps its control rather than arriving frozen.
       speedLocked: opts.speedLocked === true,
+      // Strictly opt-in, `=== true`: hands-off is a real trade (nothing gets
+      // a human look) and must never switch itself on by absence.
+      autoApprove: opts.autoApprove === true,
       // No fallback to a project field, unlike `speed`: there is no older
       // column that ever meant this, so "never chosen" is the honest answer
       // for every film made before today — and it is also the answer that
@@ -564,6 +755,7 @@ export function buildProject(r: RawProject): Project {
       ? (opts.cast as unknown[]).filter((v): v is string => typeof v === "string" && v.includes("_"))
       : [],
     motifCards: parseMotifCards(opts.motifCards),
+    publishing: normalizePublishing(opts.publishing),
     castAssign: asRecord(opts.castAssign) as Record<string, string>,
     chapterVoices: asRecord(opts.chapterVoices) as Record<string, string>,
   };

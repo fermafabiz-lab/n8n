@@ -54,8 +54,19 @@ function run(cmd, args, timeoutMs = 10 * 60 * 1000) {
 }
 
 async function download(url, dest) {
-	const res = await fetch(url, {redirect: 'follow'});
-	if (!res.ok) throw new Error(`download ${url}: HTTP ${res.status}`);
+	// Drive answers 503/429 when it is asked for many files at once — a
+	// 71-scene film is 142 downloads in a row, and two renders of the same
+	// film once did it together. A short back-off is all it wants.
+	const waits = [2000, 6000, 15000];
+	let res;
+	for (let attempt = 0; ; attempt++) {
+		res = await fetch(url, {redirect: 'follow'});
+		if (res.ok) break;
+		const transient = res.status === 503 || res.status === 429 || res.status === 500 || res.status === 502;
+		if (!transient || attempt >= waits.length) throw new Error(`download ${url}: HTTP ${res.status}`);
+		console.warn(`download ${url}: HTTP ${res.status}, retrying in ${waits[attempt] / 1000}s`);
+		await new Promise((r) => setTimeout(r, waits[attempt]));
+	}
 	const buf = Buffer.from(await res.arrayBuffer());
 	// Google Drive sometimes serves an HTML interstitial instead of the file;
 	// catch that early instead of feeding HTML to ffmpeg.
@@ -257,8 +268,18 @@ export function registerAssemble(app, {jobs, outputDir}) {
 				: typeof rawNative === 'number' && rawNative > 0
 					? Math.min(1, rawNative)
 					: 0.22;
-		const W = portrait ? 720 : 1280;
-		const H = portrait ? 1280 : 720;
+		// The canvas. 720p by default and 1080p on request — the request comes
+		// from the project, not from here, because the clips have to be worth
+		// it: building a 1080p montage out of 720p clips buys nothing but
+		// bytes. `/upscale-film` sets both together for exactly that reason.
+		//
+		// The cost is downstream, not here: ffmpeg scales either way, but the
+		// Remotion pass that draws over this montage is 2.09x slower per frame
+		// at 1080p (measured, 0.107s against 0.224s), which is what pushes a
+		// long film past the graphics poll ceiling.
+		const hd = String((req.body && req.body.resolution) || '720p').toLowerCase() === '1080p';
+		const W = portrait ? (hd ? 1080 : 720) : (hd ? 1920 : 1280);
+		const H = portrait ? (hd ? 1920 : 1280) : (hd ? 1080 : 720);
 		if (!Array.isArray(scenes) || scenes.length === 0) {
 			return res.status(400).json({error: 'scenes: [{videoUrl, audioUrl}] is required'});
 		}
@@ -410,8 +431,16 @@ export function registerAssemble(app, {jobs, outputDir}) {
 				// to its scene's exact duration, concat, then layer music + SFX.
 				const args = ['-y'];
 				for (const it of items) {
-					args.push('-i', it.v);
-					args.push('-i', it.a ?? it.v); // fallback: reuse clip audio if no voice
+					// `-threads 1` is an INPUT option here: one decoder thread per
+					// clip. ffmpeg opens every decoder at start, and the default
+					// (auto = one thread per core, per decoder) put 71 h264 decoders
+					// times 8 threads on an 8-core box — the 60th failed to open with
+					// "Resource temporarily unavailable" (EAGAIN from pthread_create)
+					// and the whole 71-scene Vegas assemble died, four times in a
+					// row. Decoding 8-second clips single-threaded costs nothing the
+					// encoder does not dwarf; libx264 keeps its own thread pool.
+					args.push('-threads', '1', '-i', it.v);
+					args.push('-threads', '1', '-i', it.a ?? it.v); // fallback: reuse clip audio if no voice
 				}
 				let idx = items.length * 2;
 				const musicIdx = music ? idx++ : -1;
@@ -434,18 +463,63 @@ export function registerAssemble(app, {jobs, outputDir}) {
 					// the overflow. A 16:9 clip on a 9:16 canvas crops the sides.
 					const vchain =
 						// Elastic retime: setpts stretches/compresses playback to the
-						// scene's narration-driven length, fps=24 AFTER it resamples
+						// scene's narration-driven length, fps=${OUT_FPS} AFTER it resamples
 						// frames evenly, and the final trim pins the exact duration
 						// (it also cuts the leftover tail when the speed-up clamped).
 						`scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},` +
-						`trim=duration=${it.dur.toFixed(3)},setpts=${it.stretch.toFixed(5)}*(PTS-STARTPTS),fps=${OUT_FPS}` +
-						(it.freeze > 0.01 ? `,tpad=stop_mode=clone:stop_duration=${it.freeze.toFixed(3)}` : '') +
-						`,trim=end_frame=${it.effFrames},setpts=PTS-STARTPTS`;
+						`trim=duration=${it.dur.toFixed(3)},setpts=${it.stretch.toFixed(5)}*(PTS-STARTPTS),fps=${OUT_FPS}`;
+					// What the clip covers once it is stretched as far as it may be.
+					const covered = it.dur * it.stretch;
+					// The tail the clip cannot reach, PLAYED BACKWARDS rather than
+					// frozen.
+					//
+					// A scene lasts as long as its narration, and when the voice runs
+					// past what 1.5x slow motion can cover the remainder used to be
+					// `tpad=stop_mode=clone` — the last frame held still. On the
+					// 71-scene Boyd film one scene carried 16.7s of narration over an
+					// 8s clip: twelve seconds of slow motion and then FIVE SECONDS OF
+					// A FROZEN FRAME, under a voice that keeps talking. Reported as
+					// the picture stopping.
+					//
+					// Reversing the tail keeps every frame moving, and on ambient
+					// footage a bounce reads as continuous motion rather than as a
+					// loop: nothing jumps, because the seam is the same frame twice.
+					// It is bounded because `reverse` buffers every frame it receives:
+					// six seconds at 1280x720 is about 200 MB, and this box has
+					// already lost renders to memory once. Six is not arbitrary — the
+					// worst scene of the Boyd film needed 5.04s, so the bound covers
+					// the worst case anyone has actually shipped and leaves a margin.
+					// Anything past it still clones, which is the old behaviour for
+					// the part no reasonable scene should reach.
+					const REVERSE_MAX = 6;
+					const bounce = Math.min(it.freeze, REVERSE_MAX, covered);
 					// end_frame, not duration: after fps=${OUT_FPS} the segment is a
 					// COUNT of frames, and saying so leaves ffmpeg no rounding to do.
 					// `trim=duration=6.833333` sits a hair either side of frame 164
 					// depending on float luck; end_frame=164 is exactly 164 frames.
-					parts.push(`[${i * 2}:v]${vchain}[v${i}]`);
+					if (bounce > 0.04) {
+						parts.push(`[${i * 2}:v]${vchain},split=2[vf${i}][vb${i}]`);
+						parts.push(
+							`[vb${i}]trim=start=${(covered - bounce).toFixed(3)},setpts=PTS-STARTPTS,reverse[vr${i}]`,
+						);
+						parts.push(
+							`[vf${i}][vr${i}]concat=n=2:v=1` +
+								// Still clamped by the trim below; this only catches the
+								// case the bounce could not cover on its own.
+								(it.freeze > bounce + 0.04
+									? `,tpad=stop_mode=clone:stop_duration=${(it.freeze - bounce).toFixed(3)}`
+									: '') +
+								`,trim=end_frame=${it.effFrames},setpts=PTS-STARTPTS[v${i}]`,
+						);
+					} else {
+						parts.push(
+							`[${i * 2}:v]${vchain}` +
+								(it.freeze > 0.01
+									? `,tpad=stop_mode=clone:stop_duration=${it.freeze.toFixed(3)}`
+									: '') +
+								`,trim=end_frame=${it.effFrames},setpts=PTS-STARTPTS[v${i}]`,
+						);
+					}
 					parts.push(`[${i * 2 + 1}:a]${MONO},atrim=duration=${d},asetpts=PTS-STARTPTS,apad=whole_dur=${d}[a${i}]`);
 					if (nativeOn) {
 						// The clip's own ambience has to follow the same elastic retime

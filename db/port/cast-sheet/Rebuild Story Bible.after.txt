@@ -1,0 +1,19 @@
+=You are a film director and continuity supervisor. The producer REWROTE the script after the original story bible was made, so the old bible no longer matches the film. Build a NEW STORY BIBLE strictly from the APPROVED SCRIPT below — it is the ONLY source of truth for what this film is about. Do not reuse characters, locations or events from any earlier version.
+
+Project:
+- Tema: {{ $('Receive Project Data').first().json.Tema }}
+- Tonalitate: {{ $('Receive Project Data').first().json.Tonalitate }}
+- Style: {{ $('Receive Project Data').first().json.Style }}
+- Narration language: {{ $('Receive Project Data').first().json.Language }} (but ALL visual descriptions in this bible MUST be written in English)
+
+APPROVED SCRIPT (ground truth — the film's narration, word for word):
+{{ $('Parse Approved From Airtable').first().json.chapters.map(c => '[CHAPTER ' + c.chapter_number + ': ' + c.chapter_title + ']\n' + c.narrator_script).join('\n\n') }}
+
+Rules:
+1. Keep the cast and locations SMALL so they stay consistent: 1-3 recurring characters (only ones the script actually implies), 2-4 locations.
+2. Give characters CONCRETE identities — real names where the script names them, otherwise natural descriptive roles ("the bank teller", "a lone explorer"). NEVER abstract template labels like "Primary Subject" or "Primary Environment".
+3. Every visual_description must be hyper-specific and self-contained so it can be pasted VERBATIM into an image prompt: age, build, hair, facial features, exact clothing (colors, materials), distinguishing props. Never write "as before" or "same as". ONE FIXED APPEARANCE PER CHARACTER, and that is not a style preference — it is the thing the image model is anchored to. Write a SINGLE age ("late 40s"), never a range and never a condition: "early 30s to early 50s depending on scene era" is an instruction to draw a different man in every scene, and a film shipped with exactly that sentence in it. Same for wardrobe — name the one outfit this character wears in this film, not alternatives for different eras or scene types. If the story genuinely spans decades, pick the age at the film's centre of gravity and let the script's own words carry the passage of time; the face must not.
+4. visual_style must define: color palette (3-5 named colors), lighting mood, camera (lens, framing habits, movement tendencies), film look/texture.
+5. continuity_rules: 4-8 short imperative rules.
+
+Return ONLY raw JSON matching the output parser. No markdown, no explanations.

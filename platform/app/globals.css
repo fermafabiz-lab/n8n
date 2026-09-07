@@ -570,6 +570,14 @@ body:has(.nb) .nav {
   color: var(--red);
   box-shadow: inset 0 0 0 1px rgba(216, 72, 61, 0.28);
 }
+/* "Ready to post" — a finished film waiting on an upload, not on the
+   pipeline. Amber: actionable, distinct from the green of merely-finished
+   and the purple of the pipeline's own "needs you". */
+.badge.ready {
+  background: rgba(176, 118, 20, 0.13);
+  color: #8a5c0d;
+  box-shadow: inset 0 0 0 1px rgba(176, 118, 20, 0.3);
+}
 .proj:hover .cover {
   border-color: var(--line2);
   box-shadow: var(--shadow);
@@ -977,16 +985,6 @@ body:has(.nb) .nav {
   transform: none;
   box-shadow: var(--shadow-sm);
 }
-/* Currently being revisited: reads as "you are looking at this one", which
-   is deliberately distinct from .act ("the pipeline is here"). The ring used
-   to be rgba(120,170,255) — a blue left over from the dark system, and the
-   one thing on this screen that belonged to no palette. Daylight has exactly
-   one accent, so "selected" and "active" are told apart by SHAPE (a ring
-   versus a dark card), not by inventing a second hue. */
-.ps.sel {
-  border-color: var(--accent-a28);
-  box-shadow: 0 0 0 3px var(--accent-a12), var(--shadow-sm);
-}
 .ps .ic {
   width: 24px;
   height: 24px;
@@ -1004,28 +1002,108 @@ body:has(.nb) .nav {
 .ps.done .ps-name {
   color: var(--soft);
 }
-/* The active step is the one dark card in the row: the design's way of saying
-   "the pipeline is HERE" without a second accent colour, and the same near-
-   black panel the gates use, so the two read as one family. */
-.ps.act {
+/* THE DARK CARD IS "WHERE YOU ARE", not where the pipeline is. It marked the
+   active step at first, with a thin accent ring for the clicked one — and the
+   ring did not register: clicking a step visibly changed nothing and the
+   black card stayed put, which the producer read, correctly, as not knowing
+   where they were. StepCard (StageNav.tsx) computes it: the selected step
+   when there is one, the live step otherwise, moving on the click itself. */
+.pipe .ps.dark {
   background: var(--panel);
   border-color: transparent;
   box-shadow: var(--shadow-lg);
 }
-.ps.act .ps-name {
+.pipe .ps.dark .ps-name {
   color: var(--panel-ink);
 }
-.ps.act .ps-note {
+.pipe .ps.dark .ps-note {
   color: var(--accent-lift);
 }
-.ps.act .ic {
+.pipe .ps.dark .ic {
   background: rgba(255, 255, 255, 0.12);
   color: var(--accent-lift);
 }
-/* Looking at the step the pipeline is also on: the ring has to survive on
-   the dark card, where --accent-a12 would be invisible. */
-.ps.act.sel {
-  box-shadow: 0 0 0 3px var(--accent-a28), var(--shadow-lg);
+/* Scoped under .pipe (0-3-0): a dark card can also be .done or .next, whose
+   own name/badge rules sit later in this file at 0-2-0 and were repainting a
+   grey label onto the near-black card. */
+/* Where the pipeline is working keeps its own signal on EVERY card,
+   including the dark one: a solid accent badge with an expanding ring, the
+   radar ping. It was a faint opacity flicker shown only off the live step,
+   and the producer's report was exact — a film generating in front of them
+   and no pulse anywhere, because the one card that had the right to pulse
+   was suppressing it. "Where am I" (dark card) and "where is the film"
+   (ping) are two marks that now simply coexist on one card when they
+   coincide. Under prefers-reduced-motion the global rule strips the ring
+   and the solid accent badge alone carries the meaning — the resting state
+   says it without the motion. */
+.pipe .ps.act .ic {
+  background: var(--accent);
+  color: #fff;
+  animation: psping 2.2s ease-out infinite;
+}
+/* The card itself breathes a soft accent glow — the escalation chosen over
+   pulsing the whole card, which at ~150px in an infinite loop stops being a
+   signal and becomes the loudest thing on a screen someone stares at for
+   hours. Low amplitude, slow, and sharing the badge's 2.2s beat so the two
+   read as one heartbeat. The static border-color is the reduced-motion
+   resting state: the global rule strips the animation, and a tinted border
+   plus the solid badge still mark the step without any motion. The base
+   elevation shadow rides inside both keyframes, or the glow would replace
+   it and the card would flatten while glowing. */
+.pipe .ps.act {
+  border-color: var(--accent-a28);
+  animation: psglow 2.2s ease-in-out infinite;
+}
+.pipe .ps.dark.act {
+  animation-name: psglowdark;
+}
+@keyframes psglow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 1px var(--accent-a12), 0 0 12px 2px rgba(122, 79, 214, 0.12), var(--shadow-sm);
+  }
+  50% {
+    box-shadow: 0 0 0 1px var(--accent-a28), 0 0 22px 6px rgba(122, 79, 214, 0.28), var(--shadow-sm);
+  }
+}
+@keyframes psglowdark {
+  0%,
+  100% {
+    box-shadow: 0 0 0 1px rgba(178, 153, 231, 0.2), 0 0 14px 3px rgba(122, 79, 214, 0.22), var(--shadow-lg);
+  }
+  50% {
+    box-shadow: 0 0 0 1px rgba(178, 153, 231, 0.42), 0 0 26px 9px rgba(122, 79, 214, 0.42), var(--shadow-lg);
+  }
+}
+/* The ring reads against the card behind it, so the dark card gets the
+   lifted accent — pure purple at 0.5 alpha sinks into near-black. */
+.pipe .ps.dark.act .ic {
+  animation-name: pspinglift;
+}
+@keyframes psping {
+  0% {
+    box-shadow: 0 0 0 0 rgba(122, 79, 214, 0.55);
+  }
+  75% {
+    box-shadow: 0 0 0 12px rgba(122, 79, 214, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(122, 79, 214, 0);
+  }
+}
+@keyframes pspinglift {
+  0% {
+    box-shadow: 0 0 0 0 rgba(178, 153, 231, 0.6);
+  }
+  75% {
+    box-shadow: 0 0 0 12px rgba(178, 153, 231, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(178, 153, 231, 0);
+  }
+}
+.ps.act:not(.dark) .ps-note {
+  color: var(--accent);
 }
 .ps.next .ps-name {
   color: var(--soft);
@@ -1798,6 +1876,7 @@ body:has(.nb) .nav {
 .plrow .st.run { color: var(--blue); }
 .plrow .st.done { color: var(--green); }
 .plrow .st.err { color: var(--red); }
+.plrow .st.ready { color: #8a5c0d; }
 .plrow .st.idle { color: var(--dim); }
 
 /* --- collapsed error line --- */
@@ -1992,6 +2071,14 @@ body:has(.nb) .nav {
   font-size: 21px;
   font-weight: 600;
   letter-spacing: -0.015em;
+}
+/* The one-line consequence under a control — the video-quality cost line. */
+.fsec .fnote {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--dim);
+  max-width: 56ch;
 }
 .fsec .fhint {
   margin-left: auto;
@@ -3118,9 +3205,19 @@ body:has(.nb) .nav {
 }
 /* Exact seconds, kept as a real control beside the slider: the slider snaps
    to scene-sized steps, and some films want an exact number. */
+.lenhead .lenexact {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--f-mono), ui-monospace, monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
 .lenhead input[type='number'] {
   width: 86px;
-  margin-left: auto;
 }
 .lenslider {
   -webkit-appearance: none;
@@ -4669,6 +4766,11 @@ body:has(.mkt) .vignette {
   color: #a03c33;
   box-shadow: none;
 }
+.page.pj .proj .badge.ready {
+  background: rgba(250, 238, 214, 0.94);
+  color: #8a5c0d;
+  box-shadow: none;
+}
 .page.pj .proj .rt {
   position: absolute;
   z-index: 2;
@@ -5310,6 +5412,145 @@ body:has(.mkt) .vignette {
     font-size: 12.5px;
   }
 }
+/* Cinema mode — see components/CinemaMode.tsx for the why and the stacking
+   trick. The backdrop's resting opacity lives in the base rule: the global
+   reduced-motion rule strips the fade, and a backdrop revealed only BY its
+   animation would be invisible exactly when it was asked for. */
+.cine {
+  position: relative;
+}
+.cine-on {
+  /* Above the sticky nav pill (z 100) on purpose: a bright frosted bar
+     floating over the dark room would be the one lit thing that is not the
+     picture. Everything but the monitor goes dark, the nav included. */
+  z-index: 110;
+}
+.cine-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: rgba(8, 8, 11, 0.94);
+  opacity: 1;
+  animation: cinefade 0.38s var(--ease);
+  cursor: pointer;
+}
+@keyframes cinefade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.cine-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 5;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: rgba(252, 252, 253, 0.82);
+  backdrop-filter: blur(14px);
+  color: var(--soft);
+  font-family: var(--f-mono), ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 6px 11px;
+  cursor: pointer;
+  transition: var(--tr);
+}
+.cine-btn:hover {
+  color: var(--ink);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Toasts: the ding's words, bottom-right, gone in ~8s. The near-black panel
+   ground on purpose — these appear over any step's content, and the one
+   surface guaranteed to contrast with all of them is the same panel the
+   gates use. The entrance sets its resting state in the base rule (opacity
+   1), so reduced-motion users get the toast without the slide, never a
+   permanently invisible one — the * rule strips animations globally. */
+.toaststack {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  /* Above cinema mode (z 110): a "S7 finished" landing mid-screening is
+     still worth seeing over the dark. */
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: min(360px, calc(100vw - 36px));
+}
+.toast {
+  background: var(--panel);
+  color: var(--panel-body);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+  padding: 12px 16px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  opacity: 1;
+  animation: toastin 0.38s var(--ease);
+}
+.toast b {
+  display: block;
+  color: var(--panel-ink);
+  font-size: 13px;
+  margin-bottom: 2px;
+}
+@keyframes toastin {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* The hands-off banner: one quiet strip, always visible while the mode is on,
+   because an automation that approves things unseen must never be invisible
+   itself. The dot pulses like the status pill's — this is a live process. */
+.autopilot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border-radius: var(--r-md);
+  background: var(--accent-a08);
+  border: 1px solid var(--accent-a28);
+  font-size: 12.5px;
+  color: var(--soft);
+}
+.autopilot .ap-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--accent);
+  animation: wkpulse 1.9s ease-in-out infinite;
+}
+.autopilot .ap-text {
+  flex: 1;
+  min-width: 0;
+}
+.autopilot .ap-text b {
+  color: var(--ink);
+}
+.autopilot .ap-err {
+  display: block;
+  font-style: normal;
+  color: var(--red);
+}
+.autopilot .btn {
+  flex: none;
+}
+
 .vtnote {
   margin-top: 6px;
   font-size: 11.5px;

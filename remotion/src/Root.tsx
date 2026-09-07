@@ -3,7 +3,26 @@ import {Composition} from 'remotion';
 import {FinalVideo} from './FinalVideo';
 import {defaultFinalVideoProps, type FinalVideoProps} from './types';
 
-const FPS = 30;
+/**
+ * 24, because that is what the film underneath is.
+ *
+ * `/assemble` encodes the montage at `OUT_FPS = 24` (server/assemble.mjs) and
+ * the graphics pass used to draw over it at 30. Two costs came out of that
+ * mismatch, and the smaller one is the money: a 24fps source in a 30fps
+ * composition is 25% more frames to render than the film contains, at roughly
+ * two frames a second on a box with no GPU — a ten-minute film paid about
+ * twenty minutes for frames that only duplicate their neighbours.
+ *
+ * The larger cost was correctness. Every scene cut then sat at .0/.25/.5/.75
+ * of a composition frame, and the .5 ones land exactly on the comparison that
+ * decides which shot a frame belongs to — where the decoder's arithmetic and
+ * `shotAt`'s broke the tie differently, so three cuts of the tahiti film
+ * showed one frame of the NEW scene wearing the OLD scene's framing. The
+ * half-frame lead and the epsilon in FinalVideo were the fix for that, and
+ * they stay: they are general. But at 24 the ties cannot arise at all, because
+ * every boundary the montage can produce is already a whole frame here.
+ */
+const FPS = 24;
 
 export const RemotionRoot: React.FC = () => {
 	return (

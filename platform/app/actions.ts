@@ -22,10 +22,16 @@ import {
   requestVoiceRegen,
   deleteProjectDeep,
   updateEditingOptions,
+  getScenes,
+  getProjectScriptInfo,
+  normalizePublishing,
 } from "@/lib/data";
 import {
+  normalizeCaptionColor,
+  normalizeMusicTrack,
   normalizeSfxLevel,
   normalizeSpeed,
+  normalizeVideoModel,
   normalizeVoiceTone,
   type VoiceTone,
 } from "@/lib/data/derive";
@@ -268,6 +274,61 @@ export async function regenerateVoice(
       };
     }
     return { ok: false, message: msg };
+  }
+}
+
+/**
+ * Take back the approvals just given, and nothing else.
+ *
+ * Approving is the one action on this page that is both irreversible and easy
+ * to fire by accident — "Approve all 71" is a single click, and `A` on the
+ * keyboard is one keystroke that also advances, so a double-press signs off a
+ * scene nobody looked at. Until now the only way back was `reopenStep`, one
+ * scene at a time, or SQL in /db.
+ *
+ * It clears the checkbox and DOES NOT set a regeneration flag. That
+ * distinction is the whole design: `writeSceneApproval(…, "regenerate")` would
+ * queue new work at fal or Flow, so an undo that used it would spend money to
+ * reverse a mistake. Undoing leaves the asset exactly where it was, merely
+ * unsigned, which is the state it was in a moment ago.
+ *
+ * It also does not cascade the way `reopenStep` does. Reopening a step means
+ * "this needs another look" and rightly invalidates what was derived from it;
+ * undo means "that click was a mistake", and taking a clip's approval away
+ * because the picture's approval was withdrawn would punish the producer for
+ * the misclick a second time.
+ *
+ * The one thing it cannot take back: if approving a picture already queued a
+ * fresh clip (`flagStaleClip`), that regeneration is dispatched and the caller
+ * is told so rather than being left to discover it.
+ */
+export async function undoApprovals(
+  projectId: string,
+  sceneIds: string[],
+  kind: "image" | "video",
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  if (!sceneIds.length) return { ok: true, message: "Nothing to undo." };
+  const field = kind === "image" ? "Aprobare Imagine" : "Aprobare Video";
+  try {
+    for (const id of sceneIds) {
+      await writeSceneFields(id, { [field]: false });
+      // Airtable rate limit is 5 req/s per base; n8n polls concurrently.
+      if (sceneIds.length > 1) await new Promise((r) => setTimeout(r, 250));
+    }
+    revalidatePath(`/projects/${projectId}`);
+    const n = sceneIds.length;
+    return {
+      ok: true,
+      message:
+        n === 1
+          ? `Approval taken back. The ${kind === "image" ? "picture" : "clip"} is unchanged.`
+          : `Took back ${n} approvals. Nothing was regenerated.`,
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
   }
 }
 
@@ -837,7 +898,15 @@ export async function confirmFinalSettings(
     chapterCards: boolean;
     endScreen: boolean;
     sfx: boolean;
+    /* Sent, unlike `speed`, because this panel now SHOWS the level: the
+       slider is initialised from the stored value, so writing it back is a
+       no-op unless the producer moved it. The rule the speed note states is
+       about controls the panel does not display — sending a defaulted one of
+       those overwrites a choice made elsewhere. */
+    sfxLevel: number;
     music: boolean;
+    drawnCards: boolean;
+    captionColor: string | null;
     /* NO `speed` here, on purpose. The pace is decided and signed off at the
        audio step, which is the only moment it is free to change, and this
        panel must not be able to move it — nor to reset it. Because
@@ -872,7 +941,10 @@ export async function confirmFinalSettings(
         chapterCards: settings.chapterCards,
         endScreen: settings.endScreen,
         sfx: settings.sfx,
+        sfxLevel: normalizeSfxLevel(settings.sfxLevel),
         music: settings.music,
+        drawnCards: settings.drawnCards,
+        captionColor: normalizeCaptionColor(settings.captionColor),
       });
     }
     // Same merge, separate condition: the cards change even when no toggle
@@ -928,6 +1000,57 @@ async function fireAssembleWebhook(projectId: string): Promise<ActionResult> {
   }
 }
 
+/**
+ * Upscale every clip of a finished film through Flow, and optionally rebuild
+ * the film from them.
+ *
+ * Three things are worth knowing before pressing any of these, and the UI says
+ * all three because they are the difference between a good idea and a wasted
+ * afternoon:
+ *
+ * - **Only clips generated after 2026-09-04 can be upscaled.** The upscale API
+ *   takes a Flow `mediaGenerationId`, and until db/006 we extracted that id and
+ *   threw it away. An older film reports what it cannot do rather than failing.
+ * - **1080p is free, 4K is 50 credits PER CLIP** — an eighty-scene film is
+ *   4,000 of the 25,050 a month.
+ * - **Re-assembling costs about twice the render time**, measured: 0.107 s per
+ *   frame at 720p against 0.224 s at 1080p. Upscaling the clips WITHOUT
+ *   rebuilding is free in both credits and minutes and still improves the
+ *   picture, because the canvas has less scaling to do — which is why
+ *   `reassemble` is a choice and not an implementation detail.
+ */
+export async function upscaleFilm(
+  projectId: string,
+  resolution: "1080p" | "4K",
+  reassemble: boolean,
+): Promise<ActionResult> {
+  const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
+  const webhook =
+    process.env.N8N_UPSCALE_WEBHOOK_URL ??
+    newProject?.replace(/new-project\/?$/, "upscale-film");
+  if (!webhook?.includes("upscale-film")) {
+    return { ok: false, message: "The upscale webhook URL is not configured." };
+  }
+  try {
+    const res = await fetch(webhook, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ Project_ID: projectId, resolution, reassemble }),
+      signal: AbortSignal.timeout(20000),
+    });
+    if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message: reassemble
+        ? `Upscaling every clip to ${resolution}, then rebuilding the film — allow a couple of hours.`
+        : `Upscaling every clip to ${resolution}. The film is left as it is; rebuild it when you want the sharper source in the cut.`,
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
 /** Re-trigger the final render after it died, without redoing production. */
 /**
  * Call off a render in progress and hand the project back to Final touches.
@@ -962,6 +1085,17 @@ export async function stopAssembly(projectId: string): Promise<ActionResult> {
 }
 
 export async function retryAssembly(projectId: string): Promise<ActionResult> {
+  // Stop what is running BEFORE firing again. This used to fire straight
+  // away, so "Restart the render" pressed on a slow-but-healthy render put a
+  // second Final Assembly beside the first: two Remotion passes on one box
+  // (CPU past 8 of 8, memory at 6.6 of 8 GB on the Vegas film), and both
+  // then die of the very slowness that prompted the click. n8n is stopped
+  // here; the Railway job it started keeps rendering until it finishes on
+  // its own, which is the cost of a restart and why the panel warns first.
+  if (isConfigured) {
+    const alive = await getAliveAssembly().catch(() => []);
+    for (const e of alive) await stopExecution(e.id).catch(() => {});
+  }
   const fired = await fireAssembleWebhook(projectId);
   if (!fired.ok) return fired;
   revalidatePath(`/projects/${projectId}`);
@@ -1326,6 +1460,180 @@ export async function approveScript(
   }
 }
 
+/**
+ * Hands-off mode: flip the flag that AutoPilot and the tick below read.
+ * A merge write, so nothing else in Editing Options moves.
+ */
+/**
+ * The publishing card under the finished film: review state, the YouTube
+ * title, notes, the posted link. Normalized through the same reader the page
+ * uses (`normalizePublishing`), so a value that cannot be stored cannot be
+ * displayed either, and written as one `publishing` key into Editing Options
+ * — `updateEditingOptions` merges top-level keys, so this never touches the
+ * render settings living beside it.
+ */
+export async function savePublishing(
+  projectId: string,
+  pub: { state: string; ytTitle: string; description: string; notes: string; ytUrl: string },
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    const clean = normalizePublishing(pub);
+    await updateEditingOptions(projectId, { publishing: clean });
+    revalidatePath(`/projects/${projectId}`);
+    revalidatePath("/projects");
+    return { ok: true, message: "Saved." };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/**
+ * Pin one background track from the Drive `Muzica` folder, or clear the pin
+ * (null) to go back to the auto-by-tone pick Final Assembly has always made.
+ * A merge write of one key, so the music SWITCH beside it is untouched: the
+ * pin says WHICH track, `music` still says WHETHER there is one.
+ */
+export async function saveMusicTrack(
+  projectId: string,
+  track: { id: string; name: string } | null,
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    const clean = track === null ? null : normalizeMusicTrack(track);
+    if (track !== null && clean === null) {
+      return { ok: false, message: "That track id doesn't look usable — pick it from the list." };
+    }
+    await updateEditingOptions(projectId, { musicTrack: clean });
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message: clean ? `Melodia „${clean.name}" e aleasă pentru acest film.` : "Înapoi la alegerea automată după ton.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+export async function setAutoApprove(
+  projectId: string,
+  on: boolean,
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    await updateEditingOptions(projectId, { autoApprove: on });
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message: on
+        ? "Hands-off mode is on — every gate signs itself off while this page is open."
+        : "Hands-off mode is off — approvals are yours again from here on.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/**
+ * One pass of hands-off mode: approve everything currently waiting for a
+ * human, through the SAME actions the buttons call — never through fresh
+ * writes of its own. That is the whole safety argument: approveAllOfKind
+ * carries the stale-clip rule (a re-approved image flags the clip built from
+ * the old one), approveScript carries the save-and-approve semantics, and
+ * anything those actions learn later, this learns with them.
+ *
+ * Three deliberate refusals:
+ * - a scene with a regen flag in flight is SKIPPED — its asset is about to
+ *   be replaced, and approving the outgoing one would only race the writer;
+ * - a rejected script is left alone — a rewrite is being produced and the
+ *   thing to approve does not exist yet;
+ * - the final render is pressed only when the project is already AT the
+ *   final-settings gate, with the stored settings ("Keep initial settings"),
+ *   because hands-off means "use what I chose on the brief", not "invent".
+ *
+ * Called by AutoPilot on every 10s page refresh, so each tick approves what
+ * has landed since the last one. The tick is idempotent: everything it
+ * writes is a checkbox that is already true on the second pass.
+ */
+export async function autoApproveTick(projectId: string): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    const project = await getProject(projectId);
+    if (!project) return { ok: false, message: "Project not found." };
+    if (!project.editing.autoApprove) {
+      return { ok: true, message: "Hands-off mode is off." };
+    }
+    if (project.statusKind === "done" || project.statusKind === "err") {
+      return { ok: true, message: "Nothing left to approve." };
+    }
+    const did: string[] = [];
+
+    const script = await getProjectScriptInfo(projectId);
+    if (script && script.status === "awaiting_approval" && script.content) {
+      const r = await approveScript(projectId, script.id);
+      if (!r.ok) return r;
+      did.push("the script");
+    }
+
+    const scenes = await getScenes(projectId);
+    const texts = scenes.filter(
+      (s) => !s.sceneApproved && !s.rewriteRequested && (s.narration ?? "").trim(),
+    );
+    if (texts.length > 0) {
+      const r = await approveAllScenes(projectId, texts.map((s) => s.id));
+      if (!r.ok) return r;
+      did.push(`${texts.length} scene text${texts.length === 1 ? "" : "s"}`);
+    }
+
+    const voices = scenes.filter((s) => s.voiceUrl && !s.voiceApproved && !s.regenVoice);
+    if (voices.length > 0) {
+      const r = await approveVoices(projectId, voices.map((s) => s.id));
+      if (!r.ok) return r;
+      did.push(`${voices.length} take${voices.length === 1 ? "" : "s"}`);
+    }
+
+    const images = scenes.filter((s) => s.imageUrl && !s.imageApproved && !s.regenImage);
+    if (images.length > 0) {
+      const r = await approveAllOfKind(projectId, images.map((s) => s.id), "image");
+      if (!r.ok) return r;
+      did.push(`${images.length} image${images.length === 1 ? "" : "s"}`);
+    }
+
+    const clips = scenes.filter((s) => s.videoUrl && !s.videoApproved && !s.regenVideo);
+    if (clips.length > 0) {
+      const r = await approveAllOfKind(projectId, clips.map((s) => s.id), "video");
+      if (!r.ok) return r;
+      did.push(`${clips.length} clip${clips.length === 1 ? "" : "s"}`);
+    }
+
+    // The render press. `awaitingFinalSettings` comes from the status the
+    // batch set AFTER its own video gate passed, so by the time it is true
+    // every clip of the batch is approved — this is the same moment the
+    // human presses "Keep initial settings & render".
+    if (project.awaitingFinalSettings) {
+      const r = await confirmFinalSettings(projectId);
+      if (!r.ok) return r;
+      did.push("the final render");
+    }
+
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message: did.length > 0 ? `Auto-approved ${did.join(", ")}.` : "Nothing waiting.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
 export async function regenerateScript(
   projectId: string,
   scriptId: string,
@@ -1425,6 +1733,24 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     // rides alongside it and `Normalize Webhook Input` puts it in Editing
     // Options. Absent or unusable resolves to 1 on every reader.
     speed: normalizeSpeed(formData.get("speed")),
+    // Hands-off mode — stored in Editing Options by Normalize Webhook Input,
+    // read back by the project page's AutoPilot. yes|no like every finish.
+    auto_approve: String(formData.get("auto_approve") ?? "no"),
+    // Which Veo tier generates the clips. Normalized here AND in n8n; an
+    // unknown id must never travel, because Current Scene sends the string
+    // to the Flow API verbatim. Absent/free posts "" and stores nothing.
+    video_model: normalizeVideoModel(formData.get("video_model")) ?? "",
+    // The producer's direction: the film's angle in their own words, plus up
+    // to three mandatory beats. Normalize stores both in Editing Options
+    // (producerBrief / mustInclude) so a script restart keeps them — the gap
+    // that makes Lore unrecoverable.
+    brief: String(formData.get("brief") ?? "").trim().slice(0, 2000),
+    must_haves: String(formData.get("must_haves") ?? "")
+      .split(/\r?\n/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .slice(0, 3)
+      .map((s) => s.slice(0, 200)),
     Style: String(formData.get("style") ?? ""),
     // In chapters mode (and no-narrator characters mode) there is no
     // narrator picker; the first cast voice doubles as the project voice so
@@ -1432,6 +1758,9 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     voice_id: String(formData.get("voice_id") ?? "") || cast[0] || "",
     aspect: String(formData.get("aspect") ?? "16:9"),
     captions: String(formData.get("captions") ?? "yes"),
+    // Empty means the white default, which is what most films should keep —
+    // the render treats an absent or unrecognised value the same way.
+    caption_color: normalizeCaptionColor(formData.get("caption_color")) ?? "",
     lore: String(formData.get("lore") ?? ""),
     hook_title: String(formData.get("hook_title") ?? "yes"),
     chapter_cards: String(formData.get("chapter_cards") ?? "yes"),
@@ -1441,6 +1770,10 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     // slider's percentage so the pipeline carries one unit end to end: it is
     // `nativeAudio` in the assemble request, and the mixer takes a gain.
     sfx_level: normalizeSfxLevel(formData.get("sfx_level")),
+    // Permission for the pipeline to draw cards at all — separate from the
+    // LIST it later chooses, which has to be able to be empty without meaning
+    // "the producer said no".
+    drawn_cards: String(formData.get("drawn_cards") ?? "yes"),
     music: String(formData.get("music") ?? "no"),
     // How the narrator reads. OMITTED when the producer left it on "Voice
     // default", and that absence is the feature: every ElevenLabs voice has

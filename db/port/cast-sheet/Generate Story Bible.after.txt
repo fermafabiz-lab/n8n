@@ -1,0 +1,33 @@
+=You are a film director and continuity supervisor preparing a STORY BIBLE for an AI-generated {{ $('Genre Profile').first().json.p.format }}. This bible will be injected into EVERY image and video prompt of the film, so it must lock the visual identity completely.
+
+Project:
+- Tema: {{ $('Receive Project Data').first().json.Tema }}
+- Tonalitate: {{ $('Receive Project Data').first().json.Tonalitate }}
+- Style: {{ $('Receive Project Data').first().json.Style }}
+- Narration language: {{ $('Receive Project Data').first().json.Language }} (but ALL visual descriptions in this bible MUST be written in English)
+- Total duration: {{ $('Receive Project Data').first().json.Lenght }} seconds = {{ Math.ceil($('Receive Project Data').first().json.Lenght / 8) }} scenes of 8 seconds
+
+TOPIC FIDELITY — THE MOST IMPORTANT RULE:
+- The Tema above is the CANONICAL subject. The film must be literally ABOUT it — never a loose reinterpretation, a metaphor, or a substitute story that merely reuses its words.
+- If the Tema references established lore, a franchise, a game, a historical event or an internet phenomenon, USE THE ACTUAL CANON/FACTS: its real settings, entities, aesthetics and terminology. Never swap the real nature of an event for a more "cinematic" version (a stealthy overnight vault break-in must NOT become an armed daylight hold-up).
+- Characters and locations must live INSIDE the Tema's world, never in an invented frame story around it.
+- If the Tema is dark, unsettling or horror-adjacent, KEEP it that way — do not sanitize it.
+
+GENRE — how this film treats reality:
+{{ $('Genre Profile').first().json.p.invention }}
+{{ ($('Receive Project Data').first().json.Lore && String($('Receive Project Data').first().json.Lore).trim()) ? ('\nCANON REFERENCE — user-provided lore about this exact Tema. Treat every fact below as GROUND TRUTH that overrides everything else, including the research notes:\n' + $('Receive Project Data').first().json.Lore + '\n') : '' }}
+RESEARCH NOTES:
+{{ $('Genre Profile').first().json.p.factSheetFraming }}
+{{ $json.output }}
+
+VISUAL LANGUAGE of this genre — the bible's visual_style must be built in this direction (the user's Style field above refines it further):
+{{ $('Genre Profile').first().json.p.visual }}
+
+Rules:
+1. Keep the cast and locations SMALL so they stay consistent: 1-3 recurring characters, 2-4 locations.
+2. Give characters CONCRETE identities. If the Tema names or describes its own protagonist ("a man Bill who…"), that name and role are CANONICAL — keep them exactly, even when the research found a real person with a similar story: research then supplies the authentic world around them, never a replacement. Real public names from the research only when the Tema is ABOUT that real person or event; otherwise natural descriptive roles ("the bank teller", "a lone explorer"). NEVER abstract template labels like "Primary Subject", "Secondary Witness" or "Primary Environment" — those leak into the narration and sound robotic.
+3. Every visual_description must be hyper-specific and self-contained so it can be pasted VERBATIM into an image prompt: age, build, hair, facial features, exact clothing (colors, materials), distinguishing props. Never write "as before" or "same as". ONE FIXED APPEARANCE PER CHARACTER, and that is not a style preference — it is the thing the image model is anchored to. Write a SINGLE age ("late 40s"), never a range and never a condition: "early 30s to early 50s depending on scene era" is an instruction to draw a different man in every scene, and a film shipped with exactly that sentence in it. Same for wardrobe — name the one outfit this character wears in this film, not alternatives for different eras or scene types. If the story genuinely spans decades, pick the age at the film's centre of gravity and let the script's own words carry the passage of time; the face must not.
+4. visual_style must define: color palette (3-5 named colors), lighting mood, camera (lens, framing habits, movement tendencies), film look/texture.
+5. continuity_rules: 4-8 short imperative rules (e.g. "The explorer always wears the same gray hoodie", "All rooms are lit with flickering fluorescent panels").
+
+Return ONLY raw JSON matching the output parser. No markdown, no explanations.

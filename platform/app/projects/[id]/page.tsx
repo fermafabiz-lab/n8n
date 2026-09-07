@@ -1,4 +1,3 @@
-import { Fragment } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProject, getProjectScriptInfo, getScenes, type Scene } from "@/lib/data";
@@ -11,16 +10,23 @@ import AudioReview from "@/components/AudioReview";
 import FinalSettings from "@/components/FinalSettings";
 import AutoRefresh from "@/components/AutoRefresh";
 import MediaPlayer from "@/components/MediaPlayer";
-import StageChime from "@/components/StageChime";
+import StageChime, { NotifyChip } from "@/components/StageChime";
 import ResumeButton from "@/components/ResumeButton";
 import AutoResume from "@/components/AutoResume";
 import ExpandableTitle from "@/components/ExpandableTitle";
 import FinishedFlash from "@/components/FinishedFlash";
 import OpsPanel from "@/components/OpsPanel";
 import AssemblyStatus from "@/components/AssemblyStatus";
+import MusicPicker from "@/components/MusicPicker";
 import SoundSettings from "@/components/SoundSettings";
+import UpscaleFilm from "@/components/UpscaleFilm";
+import PublishingPanel from "@/components/PublishingPanel";
+import AutoPilot from "@/components/AutoPilot";
+import CinemaMode from "@/components/CinemaMode";
 import ProductionActivity from "@/components/ProductionActivity";
-import { StageLink, StageNavProvider } from "@/components/StageNav";
+import RoughCutButton from "@/components/RoughCutButton";
+import FilmCost from "@/components/FilmCost";
+import { StepCard, StageNavProvider } from "@/components/StageNav";
 import {
   executionUrl,
   getAliveProduction,
@@ -364,13 +370,49 @@ export default async function ProductionRoom({
   return (
     <main className="page">
       <AutoRefresh seconds={10} />
+      {/* `have:` items carry WHICH scenes have the asset, so the ding can say
+          what it means ("S7 finished · S8 in work") instead of leaving the
+          producer to hunt the page for what changed. `next` is the first
+          scene still missing the asset — an estimate by the same rule
+          ProductionActivity states out loud, because the batch reports no
+          per-scene progress. Takes are watched too; they never dinged before,
+          which was simply a gap. */}
       <StageChime
+        quietGates={project.editing.autoApprove}
         items={[
-          { key: id, stage },
-          // Count items ding on every newly landed asset.
-          { key: `${id}:scenes`, stage: `count:${scenes.length}` },
-          { key: `${id}:images`, stage: `count:${scenes.filter((s) => s.imageUrl).length}` },
-          { key: `${id}:clips`, stage: `count:${scenes.filter((s) => s.videoUrl).length}` },
+          { key: id, stage, label: project.name },
+          {
+            key: `${id}:scenes`,
+            stage: `have:${scenes.map((s) => s.label).join("|")}`,
+            label: "Scenes",
+            verb: "written",
+          },
+          ...(silent
+            ? []
+            : [
+                {
+                  key: `${id}:voices`,
+                  stage: `have:${scenes.filter((s) => s.voiceUrl).map((s) => s.label).join("|")}`,
+                  label: "Audio",
+                  total: scenes.length,
+                  next: scenes.find((s) => !s.voiceUrl)?.label ?? null,
+                  verb: "recorded",
+                },
+              ]),
+          {
+            key: `${id}:images`,
+            stage: `have:${scenes.filter((s) => s.imageUrl).map((s) => s.label).join("|")}`,
+            label: "Images",
+            total: scenes.length,
+            next: scenes.find((s) => !s.imageUrl)?.label ?? null,
+          },
+          {
+            key: `${id}:clips`,
+            stage: `have:${scenes.filter((s) => s.videoUrl).map((s) => s.label).join("|")}`,
+            label: "Video",
+            total: scenes.length,
+            next: scenes.find((s) => !s.videoUrl)?.label ?? null,
+          },
         ]}
       />
       <AutoResume projectId={id} stalled={stalled} />
@@ -426,6 +468,11 @@ export default async function ProductionRoom({
               </div>
             </div>
             <div className="wk-side">
+              {/* Highest up the page on purpose: the whole point is that the
+                  film can be watched at any moment, not only after the render
+                  at the very bottom. */}
+              <RoughCutButton scenes={scenes} portrait={project.aspect === "9:16"} />
+              <NotifyChip />
               {/* Counted off the same pipeline() states the stepper draws, so
                   the bar can never claim a stage the cards do not show as
                   done. Only shown once there are scenes: before that every
@@ -453,6 +500,21 @@ export default async function ProductionRoom({
           </div>
         </div>
 
+        {/* Hands-off mode acts from here — the page IS the scheduler (it
+            remounts every 10s via AutoRefresh), which is also why the banner
+            says to keep a tab open. It sits INSIDE the page flow, right under
+            the header: the first mount put it above the header at the very
+            top of <main>, where the sticky nav pill covered its first line
+            and nothing could scroll it into view — an automation that
+            approves things unseen was itself half-unreadable, which is the
+            exact opposite of its one design rule. Hidden once the film is
+            delivered or dead: on a finished project the flag has nothing
+            left to press, and on a failed one auto-pressing anything would
+            bury the error. */}
+        {project.editing.autoApprove &&
+          project.statusKind !== "done" &&
+          project.statusKind !== "err" && <AutoPilot projectId={id} />}
+
         {/* The finished film belongs to Assembly, not to every step. It used
             to render on all of them — the player, its sound settings and the
             download sat above the Script panel, above Voice review, above the
@@ -464,13 +526,17 @@ export default async function ProductionRoom({
           project.finalVideoUrl &&
           project.finalVideoUrl.startsWith("http") && (
           <div className="finalvideo">
-            <div className="vwrap">
-              <MediaPlayer
-                url={project.finalVideoUrl}
-                portrait={project.aspect === "9:16"}
-                maxHeight={560}
-              />
-            </div>
+            {/* The finished film gets the same dark room the monitor has —
+                watching the final cut is the moment cinema mode exists for. */}
+            <CinemaMode>
+              <div className="vwrap">
+                <MediaPlayer
+                  url={project.finalVideoUrl}
+                  portrait={project.aspect === "9:16"}
+                  maxHeight={560}
+                />
+              </div>
+            </CinemaMode>
             <div className="vbar">
               <span>Final video</span>
               <a
@@ -498,55 +564,43 @@ export default async function ProductionRoom({
               initialMusic={project.editing.music}
               initialSpeed={project.editing.speed}
             />
+            <UpscaleFilm projectId={id} sceneCount={scenes.length} />
+            <PublishingPanel
+              projectId={id}
+              initial={project.publishing}
+              /* Thumbnail candidates: every scene's approved still, full
+                 resolution, already ours in the media store. */
+              stills={scenes
+                .filter((s) => s.imageUrl)
+                .map((s) => ({ label: s.label, url: s.imageUrl! }))}
+            />
           </div>
         )}
 
         {scenes.length > 0 && (
           <div className="pipe">
-            {steps.map((s, i) => {
-              // While a render is alive every step but Assembly stops being a
-              // link — see renderLocked. Assembly itself stays reachable so
-              // the producer can always get back to the panel that stops it.
-              const frozen = renderLocked && s.key !== "assembly";
-              const cls = `ps ${s.state}${viewing === s.key ? " sel" : ""}${frozen ? " frozen" : ""}`;
-              /* Each step is a link to itself: that is the whole way back to an
-                 earlier stage. The active one links to the bare page so
-                 clicking it again returns to "whatever is live now".
-
-                 The `display: contents` wrapper this used to need is gone with
-                 the .pl connector it existed to carry — the card IS the flex
-                 item now, so a wrapper would have to opt out of the layout to
-                 stay harmless. */
-              return (
-                <Fragment key={s.key}>
-                  {frozen ? (
-                    <span
-                      className={cls}
-                      aria-disabled="true"
-                      title="Locked while the final render is running — stop the render to go back"
-                    >
-                      <span className="ic">{s.state === "done" ? "✓" : i + 1}</span>
-                      <span className="ps-name">{s.name}</span>
-                      <span className="ps-note">{s.note}</span>
-                    </span>
-                  ) : (
-                    <StageLink
-                      stage={viewing === s.key ? null : s.key}
-                      href={
-                        viewing === s.key
-                          ? `/projects/${id}`
-                          : `/projects/${id}?stage=${s.key}`
-                      }
-                      className={cls}
-                    >
-                      <span className="ic">{s.state === "done" ? "✓" : i + 1}</span>
-                      <span className="ps-name">{s.name}</span>
-                      <span className="ps-note">{s.note}</span>
-                    </StageLink>
-                  )}
-                </Fragment>
-              );
-            })}
+            {steps.map((s, i) => (
+              /* Each step is a link to itself: that is the whole way back to
+                 an earlier stage. StepCard owns the highlight — the dark card
+                 follows the click instantly, from the same pending guess
+                 SceneBoard believes — and the class logic lives there so the
+                 marker cannot lag the server round-trip. While a render is
+                 alive every step but Assembly is frozen (see renderLocked);
+                 Assembly stays reachable so the producer can always get back
+                 to the panel that stops it. */
+              <StepCard
+                key={s.key}
+                stepKey={s.key}
+                live={s.state === "act"}
+                state={s.state}
+                frozen={renderLocked && s.key !== "assembly"}
+                projectId={id}
+              >
+                <span className="ic">{s.state === "done" ? "✓" : i + 1}</span>
+                <span className="ps-name">{s.name}</span>
+                <span className="ps-note">{s.note}</span>
+              </StepCard>
+            ))}
           </div>
         )}
 
@@ -585,18 +639,29 @@ export default async function ProductionRoom({
         )}
 
         {showing("final", project.awaitingFinalSettings) && (
-          <FinalSettings
-            projectId={id}
-            initial={project.editing}
-            motifCards={project.motifCards}
-            silent={silent}
-          />
+          <>
+            <FinalSettings
+              projectId={id}
+              initial={project.editing}
+              motifCards={project.motifCards}
+              silent={silent}
+            />
+            {/* Deliberately beside FinalSettings, not a row inside it: that
+                panel batches choices into one confirm that also STARTS the
+                render, while pinning a track is a self-saving audition. */}
+            <MusicPicker
+              projectId={id}
+              current={project.editing.musicTrack}
+              musicOn={project.editing.music}
+            />
+          </>
         )}
 
         {showing("assembly", assembling && !project.finalVideoUrl) &&
           !project.finalVideoUrl && (
           <AssemblyStatus
             projectId={id}
+            lengthSeconds={project.lengthSeconds}
             startedAt={assembly?.running?.startedAt ?? null}
             failure={
               assembly?.failed?.detail
@@ -621,6 +686,19 @@ export default async function ProductionRoom({
             }
           />
         )}
+        {/* Which track this render mixes under the film — the choice used to
+            be visible only by watching the finished cut. Auto = the pipeline's
+            own tone-matched pick from the Drive `Muzica` folder. */}
+        {showing("assembly", assembling && !project.finalVideoUrl) &&
+          !project.finalVideoUrl &&
+          project.editing.music && (
+            <div className="setupnote" style={{ marginTop: 10 }}>
+              🎵 Muzica acestui render:{" "}
+              {project.editing.musicTrack
+                ? project.editing.musicTrack.name.replace(/\.[a-z0-9]{2,4}$/i, "").replace(/[-_]+/g, " ")
+                : "aleasă automat după ton, din folderul Drive „Muzica”"}
+            </div>
+          )}
 
         {/* Live production activity: shown once media generation is the
             phase (every scene approved) and until production hands over to
@@ -645,6 +723,16 @@ export default async function ProductionRoom({
               silent={silent}
             />
           )}
+
+        {/* What the film has consumed. Below the activity because it answers a
+            different question — not "what is happening" but "what has this
+            cost me" — and it is the one number a client paying for an ad asks
+            for. Pure arithmetic over rows the page already has. */}
+        <FilmCost
+          scenes={scenes}
+          videoModel={project.editing.videoModel}
+          lengthSeconds={project.lengthSeconds}
+        />
 
         {/* Voice gate: images are signed off, so synthesis is the current
             step — the panel appears as soon as the pipeline reaches it, even

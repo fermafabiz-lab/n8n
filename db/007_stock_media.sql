@@ -19,6 +19,10 @@
 -- would let a re-search un-reject an asset the producer had thrown out.
 --
 --   docker exec -i n8n-postgres-1 psql -U hov -d hov -f - < db/007_stock_media.sql
+--
+-- Applied 2026-09-07 — through an n8n Postgres node on the HOV Postgres
+-- credential (the role owns the schema), the session having no SSH. Every
+-- statement is re-runnable, so applying it twice is harmless.
 
 set search_path to hov, public;
 

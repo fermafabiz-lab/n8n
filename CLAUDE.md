@@ -3510,13 +3510,27 @@ picked the asset, not signed it off. Final Assembly receives an ordinary mp4.
   `postgres.ts` asks `to_regclass` (cached 60s) and the scene select drops
   the archive columns until the table exists. Apply with
   `docker exec -i n8n-postgres-1 psql -U hov -d hov -f - < db/007_stock_media.sql`.
-- **Not yet run anywhere:** the two ffmpeg recipes in `attach.ts`. This box
-  has no ffmpeg, so the first real "Use for this scene" on the site is the
-  test — the zoompan `on` counter is clamped precisely so an off-by-one in
-  its origin cannot matter. And **credits are owed**: `attribution_required`
-  is stored and shown on the Inspector, but nothing yet prints the source on
-  the end screen — that is a Remotion change (a Railway push) and the one
-  legal obligation of a CC BY asset.
+- **Both ffmpeg recipes are proven on the live site** (2026-09-07, execution
+  10907 on the disposable film `recaW2aLFFD06FpoN`): a 2400×3000 NASA still
+  became a Ken Burns clip on the 9:16 canvas in **2.6s**, and the 20s Jack
+  King webm was cut from second 5 into an 8s mp4 plus poster in **4.3s**,
+  neither touching n8n. Verified by EYE, not by status code: the render
+  server's `/inspect?mode=sheet` answers a contact-sheet JPEG, which an n8n
+  HTTP node (response format `file`) plus a Code node
+  (`getBinaryDataBuffer` → base64) carries into execution data, and
+  `get_execution` then saves to a file this box can decode and view. The
+  four tiles show the push-in and the real cut. That is the way to LOOK at
+  any media from a session with no outbound HTTP.
+  **How to exercise it without the UI:** `POST /api/archive/use` with the
+  ingest key from an n8n HTTP node at `web:3000` — the route exists for
+  exactly this. The scene rows read as designed afterwards: `visual_source`,
+  `stock_media_id`, `scene_final_url` on the media store, both attachment
+  rows replaced, approvals reset, one auto-kept draft per kind, and the
+  library row marked `used`.
+  **Credits are still owed**: `attribution_required` is stored and shown on
+  the Inspector, but nothing yet prints the source on the end screen — that
+  is a Remotion change (a Railway push) and the one legal obligation of a
+  CC BY asset.
 
 ## Conventions
 
@@ -4426,14 +4440,15 @@ generated FROM it. The chain, and where each piece lives:
 
 ## Open work
 
-- **Documentary mode, what is still owed** (see the section above): apply
-  `db/007_stock_media.sql` on the box; run one real "Use for this scene" on a
-  still AND on a video and watch the ffmpeg log, since neither recipe has run
-  anywhere yet; print archive credits on the end screen (Remotion, i.e. a
-  Railway push); get `NARA_API_KEY` / `SMITHSONIAN_API_KEY` and build those
-  two adapters against real responses; have Claude Scripting propose
-  `visual_source` per scene so the picker opens with a query instead of an
-  empty box.
+- **Documentary mode, what is still owed** (see the section above): the
+  picker itself has only been exercised through its HTTP twin, so click
+  through it once on a real documentary project; print archive credits on
+  the end screen (Remotion, i.e. a Railway push); get `NARA_API_KEY` /
+  `SMITHSONIAN_API_KEY` and build those two adapters against real
+  responses; have Claude Scripting propose `visual_source` per scene so the
+  picker opens with a query instead of an empty box. Scenes 102 and 103 of
+  the disposable film `recaW2aLFFD06FpoN` carry archive assets from the
+  verification run and can stay as the demonstration.
 - **Images on Google Flow instead of fal — designed, not applied.**
   `db/port/flow-images/README.md` holds the whole port: the useapi
   `POST /google-flow/images` contract (sync, `count` defaults to 4, the

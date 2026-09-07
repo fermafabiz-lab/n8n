@@ -102,8 +102,9 @@ Leave it alone or archive it; do not repoint anything at it.
 
 Webhooks the site calls: `new-project`, `resume-project`, `restart-scripting`
 (all three on the Master Orchestrator), `scene-text-regen`,
-`scene-image-regen`, `scene-voice-regen` (all three on Claude Scripting) and
-`assemble`. The site derives all of them from `N8N_NEW_PROJECT_WEBHOOK_URL`
+`scene-image-regen`, `scene-voice-regen` (all three on Claude Scripting),
+`assemble`, and the single-purpose ones — `expand-brief`, `yt-scene-titles`,
+`upscale-film`, `list-music`/`share-music`, `archive-suggest`. The site derives all of them from `N8N_NEW_PROJECT_WEBHOOK_URL`
 by string-replacing the last path segment, so they must live on the same host
 — and each new one must be a plain `path` with no path parameters, or the
 derived URL will not resolve.
@@ -3532,6 +3533,53 @@ picked the asset, not signed it off. Final Assembly receives an ordinary mp4.
   is a Remotion change (a Railway push) and the one legal obligation of a
   CC BY asset.
 
+**AI-suggested footage, since 2026-09-07 (slice 3).** The producer's ask:
+"when I approve the scenes, an AI should already have looked for real
+footage for the scenes where it makes sense and offer me three or four
+options in a bar — the rest get generated." Workflow **`Archive
+Suggestions`** (`Lo78uXXCFYoIH73r`, webhook `archive-suggest`, POST
+`{project_id}`, answers on receipt) holds the two model calls — the OpenAI
+key lives in n8n, like `YT Scene Titles` and `Expand Brief` — and the site
+holds everything else in `/api/archive/suggest`:
+
+```
+Fetch Scenes (GET, claims) → Build Query Prompt → Query Model → Parse Queries
+  → Search Archives (POST stage=search) → Build Rank Prompts (batches of 8)
+  → Rank Model → Parse Ranks → Store Suggestions (POST stage=store)
+```
+
+- **Fired by the site on scene-text approval** (`saveSceneScript` with
+  approve, `approveAllScenes`), documentary films only, fire-and-forget.
+  The run picks scenes that are approved, still `ai`, without a clip and
+  not yet looked at, and **claims them for ten minutes**
+  (`archive_suggest_claimed_at`), because every approval fires a run and two
+  overlapping runs would spend the same model calls twice.
+- **Two stamps, told apart on purpose.** `archive_suggested_at` says the
+  scene was LOOKED AT, picks or not; without it "nothing relevant found" and
+  "nobody looked yet" read identically and would send the producer searching
+  by hand for a scene the AI had already cleared. The bar has three states —
+  offers, cleared ("will be generated"), not yet (with the manual door
+  "✨ Look for archive footage", which resets the stamps and fires again) —
+  because the run dies silently and something on screen must say so.
+- **Every Code node emits at least one item**, including a trivial model
+  payload when there is nothing to ask, so `Store Suggestions` runs on every
+  path and stamps what was processed. An IF-branched canvas would have been
+  cleaner and was not worth learning the SDK's branch syntax for.
+- **A pick must name a candidate the batch actually offered** (`Parse
+  Ranks` checks against `Build Rank Prompts`' candidate ids) and the store
+  drops any id the library does not hold — the same "an invented value
+  cannot survive code" rule as `Validate Evidence Refs`. `rejected`
+  licences are never offered at all. The rank prompt is told the catalogue
+  date is usually the upload date, since that is the trap measured above.
+- **Second search door for n8n**: the search stage runs up to two queries
+  per scene, `mediaType: any`, with a 300ms breath between requests — a
+  90-scene film can be a couple of hundred Commons calls, and the archive
+  asks clients to be polite. Videos are listed before stills for the ranker.
+- The bar's "Use" is `useArchiveAsset`, the same attach path as the
+  hand-searched picker; `ArchiveCard` is shared by both so a licence reads
+  the same wherever it appears. The filmstrip shows `🎞 N` on scenes with
+  offers that are still undecided.
+
 ## Conventions
 
 - Standalone webhooks over long-lived executions — they don't depend on a
@@ -4445,8 +4493,8 @@ generated FROM it. The chain, and where each piece lives:
   through it once on a real documentary project; print archive credits on
   the end screen (Remotion, i.e. a Railway push); get `NARA_API_KEY` /
   `SMITHSONIAN_API_KEY` and build those two adapters against real
-  responses; have Claude Scripting propose `visual_source` per scene so the
-  picker opens with a query instead of an empty box. Scenes 102 and 103 of
+  responses. (The "scripting proposes archive shots" half exists since the
+  same day as the `Archive Suggestions` run, above.) Scenes 102 and 103 of
   the disposable film `recaW2aLFFD06FpoN` carry archive assets from the
   verification run and can stay as the demonstration.
 - **Images on Google Flow instead of fal — designed, not applied.**

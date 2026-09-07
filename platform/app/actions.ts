@@ -44,7 +44,59 @@ import {
 } from "@/lib/n8n";
 import { getCategory } from "@/lib/categories";
 import { attachArchiveAsset, DEFAULT_SECONDS } from "@/lib/archive/attach";
-import { detachStockFromScene } from "@/lib/data/stock";
+import { detachStockFromScene, resetArchiveSuggestions } from "@/lib/data/stock";
+
+/**
+ * Ask n8n to look for archive footage for this film's newly approved scenes.
+ *
+ * Fire-and-forget: the `archive-suggest` webhook answers as soon as it has
+ * the request and the run takes a minute or more, so nothing here waits on
+ * it, and a failure costs the suggestions and never the approval that
+ * triggered it. Only documentary films get one — every other category has
+ * no archive step at all.
+ */
+async function fireArchiveSuggest(projectId: string): Promise<void> {
+  try {
+    if (process.env.DATA_BACKEND !== "postgres") return;
+    const project = await getProject(projectId);
+    if (project?.category !== "documentary") return;
+    const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
+    const webhook = newProject?.replace(/new-project\/?$/, "archive-suggest");
+    if (!webhook?.includes("archive-suggest")) return;
+    await fetch(webhook, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project_id: projectId }),
+      signal: AbortSignal.timeout(8000),
+    });
+  } catch (e) {
+    console.warn(`archive-suggest webhook: ${(e as Error).message}`);
+  }
+}
+
+/**
+ * The manual door: look again, for every AI scene of the film that has no
+ * clip yet. Existing picks stay until the run replaces them.
+ */
+export async function requestArchiveSuggestions(projectId: string): Promise<ActionResult> {
+  if (!isConfigured) return { ok: true, message: "Demo mode — nothing was written." };
+  if (process.env.DATA_BACKEND !== "postgres") {
+    return { ok: false, message: "Archive suggestions need the Postgres backend." };
+  }
+  try {
+    const n = await resetArchiveSuggestions(projectId);
+    await fireArchiveSuggest(projectId);
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message: n
+        ? `Looking for archive footage for ${n} scene${n === 1 ? "" : "s"} — suggestions land on the Images step within a minute or two (the page refreshes itself).`
+        : "Every scene already has a clip or uses archive footage — nothing left to look for.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
 
 export interface ActionResult {
   ok: boolean;
@@ -441,6 +493,10 @@ export async function saveSceneScript(
       // Same door the audio panel uses — saves the line and re-reads it.
       await regenerateVoice(projectId, sceneId, narration);
     }
+    // A documentary scene just approved is one the archive run should look
+    // at; the run itself picks only scenes not yet looked at, so firing per
+    // approval is cheap and the lease keeps overlapping runs apart.
+    if (approve) await fireArchiveSuggest(projectId);
 
     revalidatePath(`/projects/${projectId}`);
     const suffix =
@@ -1509,6 +1565,8 @@ export async function approveAllScenes(
       // Airtable rate limit is 5 req/s per base.
       await new Promise((r) => setTimeout(r, 250));
     }
+    // One run for the whole batch — see saveSceneScript.
+    await fireArchiveSuggest(projectId);
     revalidatePath(`/projects/${projectId}`);
     return { ok: true, message: `Approved ${sceneIds.length} scenes — production continues.` };
   } catch (e) {

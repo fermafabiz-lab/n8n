@@ -192,6 +192,24 @@ interface SceneRow {
     attribution_required: boolean;
     review_status: string;
   } | null;
+  /** db/008: what the suggestion run proposed, ranked. */
+  archive_suggested_at?: Date | null;
+  archive_suggestions?: Array<{
+    stock_id: string;
+    title: string;
+    media_type: string;
+    thumbnail_url: string | null;
+    source_url: string;
+    creator: string | null;
+    license_original: string | null;
+    review_status: string;
+    duration_seconds: string | number | null;
+    date_original: string | null;
+    years_mentioned: number[] | null;
+    relevance: number | null;
+    reason: string | null;
+    rank: number;
+  }> | null;
 }
 
 /**
@@ -224,35 +242,54 @@ const STOCK_SUBSELECT = `,
        from hov.stock_media m
       where m.id = s.stock_media_id) as stock`;
 
+/** db/008: the ranked offers, with the library fields the card needs. */
+const SUGGEST_SUBSELECT = `,
+    (select jsonb_agg(jsonb_build_object(
+              'stock_id', m.id, 'title', m.title, 'media_type', m.media_type,
+              'thumbnail_url', m.thumbnail_url, 'source_url', m.source_url,
+              'creator', m.creator, 'license_original', m.license_original,
+              'review_status', m.review_status, 'duration_seconds', m.duration_seconds,
+              'date_original', m.date_original, 'years_mentioned', m.years_mentioned,
+              'relevance', g.relevance, 'reason', g.reason, 'rank', g.rank)
+            order by g.rank)
+       from hov.scene_archive_suggestion g
+       join hov.stock_media m on m.id = g.stock_media_id
+      where g.scene_id = s.id) as archive_suggestions`;
+
 /**
- * Has db/007 been applied?
+ * Has a migration been applied?
  *
- * A push to the trunk deploys by itself; a migration is run by hand over
- * SSH. Between the two, a query that names `hov.stock_media` would fail on
+ * A push to the trunk deploys by itself; a migration is run by hand. Between
+ * the two, a query that names a table which does not exist yet would fail on
  * every scene read and take every project page down with it. So the scene
- * query asks first, and answers without the archive columns until the table
+ * query asks first, and answers without those columns until the table
  * exists. Cached briefly rather than forever, so applying the migration takes
  * effect without a restart.
  */
-let stockReadyAt = 0;
-let stockReadyValue = false;
-async function stockReady(): Promise<boolean> {
+const readyCache = new Map<string, { at: number; ok: boolean }>();
+async function tableReady(table: string): Promise<boolean> {
   const now = Date.now();
-  if (now - stockReadyAt < 60_000) return stockReadyValue;
+  const hit = readyCache.get(table);
+  if (hit && now - hit.at < 60_000) return hit.ok;
+  let ok = false;
   try {
-    const rows = await query<{ ok: boolean }>(
-      `select to_regclass('hov.stock_media') is not null as ok`,
-    );
-    stockReadyValue = Boolean(rows[0]?.ok);
+    const rows = await query<{ ok: boolean }>(`select to_regclass($1) is not null as ok`, [table]);
+    ok = Boolean(rows[0]?.ok);
   } catch {
-    stockReadyValue = false;
+    ok = false;
   }
-  stockReadyAt = now;
-  return stockReadyValue;
+  readyCache.set(table, { at: now, ok });
+  return ok;
 }
+const stockReady = () => tableReady("hov.stock_media");
+const suggestReady = () => tableReady("hov.scene_archive_suggestion");
 
 async function sceneSelect(): Promise<string> {
-  return SCENE_SELECT.replace("__STOCK__", (await stockReady()) ? STOCK_SUBSELECT : "");
+  const [stock, suggest] = await Promise.all([stockReady(), suggestReady()]);
+  return SCENE_SELECT.replace(
+    "__STOCK__",
+    (stock ? STOCK_SUBSELECT : "") + (stock && suggest ? SUGGEST_SUBSELECT : ""),
+  );
 }
 
 function toRawScene(r: SceneRow): RawScene & { createdAt: string | null } {
@@ -305,6 +342,26 @@ function toRawScene(r: SceneRow): RawScene & { createdAt: string | null } {
           offsetSeconds: num(r.stock_offset_seconds ?? null),
         }
       : null,
+    archiveSuggestedAt: r.archive_suggested_at ? r.archive_suggested_at.toISOString() : null,
+    archiveSuggestions: (r.archive_suggestions ?? []).map((g) => ({
+      stockId: g.stock_id,
+      title: g.title,
+      mediaType: g.media_type === "video" ? "video" : "image",
+      thumbnailUrl: g.thumbnail_url,
+      sourceUrl: g.source_url,
+      creator: g.creator,
+      license: g.license_original,
+      reviewStatus:
+        g.review_status === "rejected" || g.review_status === "manual_review"
+          ? g.review_status
+          : "auto_approved",
+      durationSeconds: num(g.duration_seconds),
+      dateOriginal: g.date_original,
+      yearsMentioned: g.years_mentioned ?? [],
+      relevance: g.relevance,
+      reason: g.reason,
+      rank: g.rank,
+    })),
   };
 }
 

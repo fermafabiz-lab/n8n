@@ -570,6 +570,8 @@ const DEMO_SCENES: Scene[] = Array.from({ length: 8 }, (_, i) => {
     versions: [],
     visualSource: "ai" as const,
     stock: null,
+    archiveSuggestions: [],
+    archiveSuggestedAt: null,
     voiceApproved: i < 3,
     imageApproved: i < 4,
     videoApproved: i < 2,

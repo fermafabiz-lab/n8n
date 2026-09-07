@@ -40,6 +40,29 @@ export interface SceneStock {
   offsetSeconds: number | null;
 }
 
+/**
+ * An archive asset a model proposed for a scene. An OFFER, ranked with a
+ * reason; using one goes through the same attach path as a hand-searched
+ * asset, so nothing here is ever a decision.
+ */
+export interface SceneArchiveSuggestion {
+  stockId: string;
+  title: string;
+  mediaType: "video" | "image";
+  thumbnailUrl: string | null;
+  sourceUrl: string;
+  creator: string | null;
+  license: string | null;
+  reviewStatus: "auto_approved" | "manual_review" | "rejected";
+  durationSeconds: number | null;
+  dateOriginal: string | null;
+  yearsMentioned: number[];
+  /** 0..1 as the model judged it; null when the run did not score. */
+  relevance: number | null;
+  reason: string | null;
+  rank: number;
+}
+
 export interface EditingOptions {
   captions: boolean;
   hookTitle: boolean;
@@ -426,6 +449,10 @@ export interface Scene {
   visualSource: DocumentaryVisualSource;
   /** The archive asset behind a stock scene; null for `ai`. */
   stock: SceneStock | null;
+  /** What the suggestion run proposed for this scene, best first. */
+  archiveSuggestions: SceneArchiveSuggestion[];
+  /** When a run last looked at the scene; null = not yet. Tells "none found" from "not looked". */
+  archiveSuggestedAt: string | null;
   status: string;
   statusKind: StatusKind;
 }
@@ -490,6 +517,9 @@ export interface RawScene {
   /** Postgres only (db/007). The Airtable adapter never sets these: `ai`, null. */
   visualSource?: DocumentaryVisualSource;
   stock?: SceneStock | null;
+  /** Postgres only (db/008). */
+  archiveSuggestions?: SceneArchiveSuggestion[];
+  archiveSuggestedAt?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -896,6 +926,8 @@ export function buildScene(r: RawScene, index: number): Scene {
     versions: r.versions,
     visualSource: r.visualSource ?? "ai",
     stock: r.stock ?? null,
+    archiveSuggestions: r.archiveSuggestions ?? [],
+    archiveSuggestedAt: r.archiveSuggestedAt ?? null,
     status: displayStatus(status),
     statusKind: kind,
   };

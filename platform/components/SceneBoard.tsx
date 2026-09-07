@@ -32,6 +32,7 @@ import RegenBadge from "@/components/RegenBadge";
 import { usePendingStage } from "@/components/StageNav";
 import CinemaMode from "@/components/CinemaMode";
 import ArchivePicker from "@/components/ArchivePicker";
+import ArchiveSuggestions from "@/components/ArchiveSuggestions";
 
 /** The three steps this board can serve, in the pipeline's own order. */
 type Step = "images" | "audio" | "video";
@@ -619,6 +620,17 @@ export default function SceneBoard({
                   }
                 />
                 <span className="n">{s.label}</span>
+                {archive &&
+                  s.visualSource === "ai" &&
+                  !s.imageApproved &&
+                  s.archiveSuggestions.length > 0 && (
+                    <span
+                      className={styles.sug}
+                      title={`AI found ${s.archiveSuggestions.length} archive option${s.archiveSuggestions.length === 1 ? "" : "s"} for this scene`}
+                    >
+                      🎞 {s.archiveSuggestions.length}
+                    </span>
+                  )}
                 <span className="dot" />
               </div>
             ))}
@@ -782,6 +794,17 @@ export default function SceneBoard({
 
             {imageControls && (
               <>
+                {/* What the AI run found for this scene, before the AI prompt:
+                    the offer comes first, the fallback (generate it) second. */}
+                {archive && active.visualSource === "ai" && (
+                  <ArchiveSuggestions
+                    key={`sug-${active.id}`}
+                    projectId={projectId}
+                    scene={active}
+                    run={run}
+                    pending={pending}
+                  />
+                )}
                 <label
                   style={{ display: "block", fontSize: 12, color: "var(--dim)", margin: "14px 0 6px" }}
                 >

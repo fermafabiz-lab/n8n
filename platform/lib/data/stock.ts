@@ -316,6 +316,150 @@ export async function attachStockToScene(o: {
   });
 }
 
+// ---------------------------------------------------------------------------
+// AI-proposed archive footage (db/008)
+// ---------------------------------------------------------------------------
+
+export interface SuggestScene {
+  id: string;
+  order: number;
+  narration: string;
+  visual: string | null;
+  imagePrompt: string | null;
+}
+
+/**
+ * The scenes a suggestion run should look at, CLAIMED for ten minutes.
+ *
+ * Approved text, still on the AI path, no clip yet, never looked at. The
+ * claim exists because every scene approval fires the webhook, so two runs
+ * can overlap on the same film; without it both would spend the same model
+ * calls on the same scenes. A run that dies leaves the lease to expire.
+ */
+export async function claimScenesForSuggestion(projectId: string): Promise<{
+  project: { id: string; name: string; language: string; brief: string | null } | null;
+  scenes: SuggestScene[];
+}> {
+  const proj = await atQuery<{
+    id: string;
+    name: string;
+    language: string | null;
+    editing_options: unknown;
+  }>(`select id, name, language, editing_options from hov.project where id = $1`, [projectId]);
+  if (!proj[0]) return { project: null, scenes: [] };
+  let brief: string | null = null;
+  try {
+    const raw = proj[0].editing_options;
+    const opts = (typeof raw === "string" ? JSON.parse(raw) : raw) as Record<string, unknown> | null;
+    brief = typeof opts?.producerBrief === "string" && opts.producerBrief.trim() ? opts.producerBrief.trim() : null;
+  } catch {
+    brief = null;
+  }
+  const rows = await atQuery<{
+    id: string;
+    scene_order: number;
+    narration: string | null;
+    visual_prompt: string | null;
+    image_prompt: string | null;
+  }>(
+    `with picked as (
+       select s.id from hov.scene s
+        where s.project_id = $1
+          and s.scene_approved
+          and s.visual_source = 'ai'
+          and coalesce(s.scene_final_url, '') = ''
+          and s.archive_suggested_at is null
+          and (s.archive_suggest_claimed_at is null
+               or s.archive_suggest_claimed_at < now() - interval '10 minutes')
+        order by s.scene_order
+        limit 120)
+     update hov.scene s set archive_suggest_claimed_at = now()
+       from picked where s.id = picked.id
+     returning s.id, s.scene_order, s.narration, s.visual_prompt, s.image_prompt`,
+    [projectId],
+  );
+  const scenes = rows
+    .map((r) => ({
+      id: r.id,
+      order: r.scene_order,
+      narration: (r.narration ?? "").replace(/\[[^\]]{0,60}\]\s*/g, " ").replace(/\s+/g, " ").trim(),
+      visual: r.visual_prompt,
+      imagePrompt: r.image_prompt,
+    }))
+    .sort((a, b) => a.order - b.order);
+  return {
+    project: { id: proj[0].id, name: proj[0].name, language: proj[0].language ?? "English", brief },
+    scenes,
+  };
+}
+
+/**
+ * Write a run's verdict: the picks for the scenes that got some, and the
+ * "looked at" stamp for EVERY scene the run processed — the ones with no
+ * picks included, or the site could not tell "nothing relevant" from "not
+ * yet". Picks naming an asset the library does not hold are dropped rather
+ * than failing the whole write; a model can misquote an id.
+ */
+export async function storeArchiveSuggestions(o: {
+  processed: string[];
+  scenes: Array<{
+    id: string;
+    picks: Array<{ stockId: string; relevance: number | null; reason: string | null; query?: string | null }>;
+  }>;
+}): Promise<{ scenes: number; picks: number }> {
+  const processed = [...new Set([...o.processed, ...o.scenes.map((s) => s.id)])];
+  if (!processed.length) return { scenes: 0, picks: 0 };
+  const wanted = [...new Set(o.scenes.flatMap((s) => s.picks.map((p) => p.stockId)))];
+  const known = new Set(
+    wanted.length
+      ? (await atQuery<{ id: string }>(`select id from hov.stock_media where id = any($1)`, [wanted])).map((r) => r.id)
+      : [],
+  );
+  let picks = 0;
+  await withTransaction(async (q) => {
+    await q(`delete from hov.scene_archive_suggestion where scene_id = any($1)`, [processed]);
+    for (const s of o.scenes) {
+      let rank = 0;
+      for (const p of s.picks) {
+        if (!known.has(p.stockId)) continue;
+        rank += 1;
+        await q(
+          `insert into hov.scene_archive_suggestion (scene_id, stock_media_id, rank, relevance, reason, query)
+           values ($1, $2, $3, $4, $5, $6)
+           on conflict (scene_id, stock_media_id) do update set
+             rank = excluded.rank, relevance = excluded.relevance, reason = excluded.reason, query = excluded.query`,
+          [
+            s.id,
+            p.stockId,
+            rank,
+            p.relevance === null || p.relevance === undefined ? null : Math.max(0, Math.min(1, Number(p.relevance))),
+            p.reason ? String(p.reason).slice(0, 300) : null,
+            p.query ? String(p.query).slice(0, 200) : null,
+          ],
+        );
+        picks += 1;
+      }
+    }
+    await q(
+      `update hov.scene set archive_suggested_at = now(), archive_suggest_claimed_at = null
+        where id = any($1)`,
+      [processed],
+    );
+  });
+  return { scenes: processed.length, picks };
+}
+
+/** Forget the "looked at" stamps so a run looks again. Existing picks stay until replaced. */
+export async function resetArchiveSuggestions(projectId: string): Promise<number> {
+  const rows = await atQuery<{ id: string }>(
+    `update hov.scene set archive_suggested_at = null, archive_suggest_claimed_at = null
+      where project_id = $1 and visual_source = 'ai' and coalesce(scene_final_url, '') = ''
+      returning id`,
+    [projectId],
+  );
+  return rows.length;
+}
+
 /**
  * Send a scene back to the AI pipeline: the archive link, the clip and the
  * clip URL go, so `Needs Clip?` generates again once a new image is approved.

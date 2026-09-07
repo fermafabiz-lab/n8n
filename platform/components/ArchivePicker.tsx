@@ -9,43 +9,22 @@
  * `useArchiveAsset` server action, which downloads or cuts the asset, makes
  * the clip, and writes the scene in one transaction.
  *
- * What the card shows is chosen for the decision the producer is making:
- * the licence verdict as a coloured chip WITH its reason (a share-alike
- * obligation is an obligation), the provider's date string exactly as given
- * (it lies — see NormalizedArchiveAsset.dateOriginal — so it is labelled
- * "dated", not "from"), and the years the description mentions, which are
- * the nearest thing to a period the metadata offers. Relevance is the
- * producer's call, and the picker does not pretend otherwise.
+ * The card itself is `ArchiveCard`, shared with the AI suggestions bar, so
+ * a licence reads the same wherever it appears. Relevance is the producer's
+ * call, and the picker does not pretend otherwise.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useArchiveAsset, type ActionResult } from "@/app/actions";
 import type { NormalizedArchiveAsset } from "@/lib/archive/types";
 import type { ProviderReport } from "@/lib/archive";
+import ArchiveCard, { ArchiveUseOptions, actionsClass, licenceChip } from "./ArchiveCard";
 import styles from "./ArchivePicker.module.css";
 
 type Hit = NormalizedArchiveAsset & { id: string | null; status: string | null };
 type Kind = "any" | "video" | "image";
 
 const DEFAULT_SECONDS = 8;
-
-function licenceChip(a: Hit): { cls: string; text: string; title: string } {
-  const lic = a.licenseOriginal ?? a.rightsStatus.replace(/_/g, " ");
-  if (a.reviewStatus === "rejected")
-    return { cls: "bad", text: `✕ ${lic}`, title: a.reviewReason ?? "Licence forbids this use" };
-  if (a.reviewStatus === "manual_review")
-    return { cls: "warn", text: `? ${lic}`, title: a.reviewReason ?? "Check the licence before use" };
-  const sa = a.modifications === "share_alike" ? " · share-alike" : "";
-  const credit = a.attributionRequired ? " · credit" : "";
-  return { cls: "ok", text: `✓ ${lic}${sa}${credit}`, title: "Auto-approved by the licence rules" };
-}
-
-const fmtDur = (s: number | null) => {
-  if (s === null) return null;
-  const m = Math.floor(s / 60);
-  const r = Math.round(s % 60);
-  return m ? `${m}:${String(r).padStart(2, "0")}` : `${r}s`;
-};
 
 export default function ArchivePicker({
   projectId,
@@ -82,41 +61,38 @@ export default function ArchivePicker({
     return () => abortRef.current?.abort();
   }, []);
 
-  const search = useCallback(
-    async (query: string, k: Kind) => {
-      const text = query.trim();
-      if (text.length < 2) return;
-      abortRef.current?.abort();
-      const ctl = new AbortController();
-      abortRef.current = ctl;
-      setLoading(true);
-      setErr(null);
-      try {
-        const res = await fetch(
-          `/api/archive/search?q=${encodeURIComponent(text)}&type=${k}&limit=12`,
-          { signal: ctl.signal },
-        );
-        const body = (await res.json()) as {
-          ok: boolean;
-          error?: string;
-          results?: Hit[];
-          providers?: ProviderReport[];
-          filingError?: string;
-        };
-        if (!res.ok || !body.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
-        setHits(body.results ?? []);
-        setProviders(body.providers ?? []);
-        setSearched(true);
-        if (body.filingError) setErr(`Found, but not filed in the library: ${body.filingError}`);
-      } catch (e) {
-        if ((e as Error).name === "AbortError") return;
-        setErr((e as Error).message);
-      } finally {
-        if (abortRef.current === ctl) setLoading(false);
-      }
-    },
-    [],
-  );
+  const search = useCallback(async (query: string, k: Kind) => {
+    const text = query.trim();
+    if (text.length < 2) return;
+    abortRef.current?.abort();
+    const ctl = new AbortController();
+    abortRef.current = ctl;
+    setLoading(true);
+    setErr(null);
+    try {
+      const res = await fetch(
+        `/api/archive/search?q=${encodeURIComponent(text)}&type=${k}&limit=12`,
+        { signal: ctl.signal },
+      );
+      const body = (await res.json()) as {
+        ok: boolean;
+        error?: string;
+        results?: Hit[];
+        providers?: ProviderReport[];
+        filingError?: string;
+      };
+      if (!res.ok || !body.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
+      setHits(body.results ?? []);
+      setProviders(body.providers ?? []);
+      setSearched(true);
+      if (body.filingError) setErr(`Found, but not filed in the library: ${body.filingError}`);
+    } catch (e) {
+      if ((e as Error).name === "AbortError") return;
+      setErr((e as Error).message);
+    } finally {
+      if (abortRef.current === ctl) setLoading(false);
+    }
+  }, []);
 
   const key = (a: Hit) => `${a.provider}:${a.providerAssetId}`;
 
@@ -181,110 +157,72 @@ export default function ArchivePicker({
         <div className={styles.grid}>
           {hits.map((a) => {
             const k = key(a);
-            const chip = licenceChip(a);
+            const asset = {
+              title: a.title,
+              mediaType: a.mediaType,
+              thumbnailUrl: a.thumbnailUrl,
+              sourceUrl: a.sourceUrl,
+              creator: a.creator,
+              license: a.licenseOriginal,
+              reviewStatus: a.reviewStatus,
+              reviewReason: a.reviewReason,
+              shareAlike: a.modifications === "share_alike",
+              attributionRequired: a.attributionRequired,
+              durationSeconds: a.durationSeconds,
+              dateOriginal: a.dateOriginal,
+              yearsMentioned: a.yearsMentioned,
+              width: a.width,
+              height: a.height,
+            };
+            const chip = licenceChip(asset);
             const usable = a.reviewStatus !== "rejected";
             const isSel = selected === k;
             const secs = seconds[k] ?? String(DEFAULT_SECONDS);
             const off = offset[k] ?? "0";
             return (
-              <div
-                key={k}
-                className={`${styles.card}${isSel ? ` ${styles.sel}` : ""}`}
-                onClick={() => setSelected(k)}
-              >
-                <div className={styles.thumb}>
-                  {a.thumbnailUrl ? (
-                    // Served straight from the archive: a search result is a
-                    // preview, and only the chosen one is ever copied here.
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={a.thumbnailUrl} alt="" loading="lazy" />
-                  ) : null}
-                  <span className={styles.kind}>{a.mediaType === "video" ? "video" : "photo"}</span>
-                  {a.durationSeconds !== null && (
-                    <span className={styles.dur}>{fmtDur(a.durationSeconds)}</span>
-                  )}
-                </div>
-                <div className={styles.body}>
-                  <div className={styles.title} title={a.title}>
-                    {a.title}
-                  </div>
-                  <div className={styles.meta}>
-                    {a.creator ? `${a.creator} · ` : ""}
-                    {a.width && a.height ? `${a.width}×${a.height}` : ""}
-                    {a.dateOriginal ? ` · dated ${a.dateOriginal}` : ""}
-                    {a.yearsMentioned.length
-                      ? ` · mentions ${a.yearsMentioned.slice(0, 3).join(", ")}`
-                      : ""}
-                  </div>
-                  <span className={`${styles.lic} ${styles[chip.cls]}`} title={chip.title}>
-                    {chip.text}
-                  </span>
-                  {a.reviewStatus === "manual_review" && a.reviewReason && (
-                    <div className={styles.meta}>{a.reviewReason}</div>
-                  )}
-                  {isSel && usable && (
-                    <div className={styles.opts} onClick={(e) => e.stopPropagation()}>
-                      {a.mediaType === "video" && (
-                        <label>
-                          start at
-                          <input
-                            type="number"
-                            min={0}
-                            step={1}
-                            value={off}
-                            onChange={(e) => setOffset((p) => ({ ...p, [k]: e.target.value }))}
-                          />
-                          s
-                        </label>
-                      )}
-                      <label>
-                        length
-                        <input
-                          type="number"
-                          min={3}
-                          max={20}
-                          step={1}
-                          value={secs}
-                          onChange={(e) => setSeconds((p) => ({ ...p, [k]: e.target.value }))}
-                        />
-                        s
-                      </label>
-                    </div>
-                  )}
-                  <div className={styles.row}>
-                    <button
-                      type="button"
-                      className="abtn ok"
-                      disabled={pending || !usable || !a.id}
-                      title={
-                        !a.id
-                          ? "Not filed in the library — the search could not save it, so it cannot be used yet"
-                          : usable
-                            ? "Download the asset, make the scene's clip, and put both on this scene"
-                            : chip.title
-                      }
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (!a.id) return;
-                        const id = a.id;
-                        run(async () => {
-                          const r = await useArchiveAsset(projectId, sceneId, id, {
-                            offsetSeconds: Number(off) || 0,
-                            seconds: Number(secs) || DEFAULT_SECONDS,
-                          });
-                          if (r.ok) onClose();
-                          return r;
+              <ArchiveCard key={k} asset={asset} selected={isSel} onSelect={() => setSelected(k)}>
+                {isSel && usable && (
+                  <ArchiveUseOptions
+                    isVideo={a.mediaType === "video"}
+                    offset={off}
+                    seconds={secs}
+                    onOffset={(v) => setOffset((p) => ({ ...p, [k]: v }))}
+                    onSeconds={(v) => setSeconds((p) => ({ ...p, [k]: v }))}
+                  />
+                )}
+                <div className={actionsClass}>
+                  <button
+                    type="button"
+                    className="abtn ok"
+                    disabled={pending || !usable || !a.id}
+                    title={
+                      !a.id
+                        ? "Not filed in the library — the search could not save it, so it cannot be used yet"
+                        : usable
+                          ? "Download the asset, make the scene's clip, and put both on this scene"
+                          : chip.title
+                    }
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!a.id) return;
+                      const id = a.id;
+                      run(async () => {
+                        const r = await useArchiveAsset(projectId, sceneId, id, {
+                          offsetSeconds: Number(off) || 0,
+                          seconds: Number(secs) || DEFAULT_SECONDS,
                         });
-                      }}
-                    >
-                      Use for this scene
-                    </button>
-                    <a href={a.sourceUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
-                      source ↗
-                    </a>
-                  </div>
+                        if (r.ok) onClose();
+                        return r;
+                      });
+                    }}
+                  >
+                    Use for this scene
+                  </button>
+                  <a href={a.sourceUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
+                    source ↗
+                  </a>
                 </div>
-              </div>
+              </ArchiveCard>
             );
           })}
         </div>

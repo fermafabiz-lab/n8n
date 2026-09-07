@@ -3579,6 +3579,16 @@ Fetch Scenes (GET, claims) → Build Query Prompt → Query Model → Parse Quer
   hand-searched picker; `ArchiveCard` is shared by both so a licence reads
   the same wherever it appears. The filmstrip shows `🎞 N` on scenes with
   offers that are still undecided.
+- **First live run, measured** (execution 10942 on "How ww2 started",
+  `recjhLgA7KpmQ3WpZ`, 16 scenes, fired while the film sat at its image
+  gate): **42 seconds** end to end, 16 scenes looked at, 13 judged worth
+  real footage, 2 of those found nothing usable (the House of Commons in
+  1939), 29 picks stored. The picks read right — Molotov signing on
+  23 August 1939, German soldiers at the Polish border barrier on
+  1 September, the Brest-Litovsk parade, the Warsaw siege film — and the
+  ranker demoted the generic "1939 Poland map" to 0.55 with a reason that
+  says so. A film that already had its AI images when the run fired keeps
+  them; the offers sit beside them and replace one only on Use.
 
 ## Conventions
 

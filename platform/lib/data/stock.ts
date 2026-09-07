@@ -6,7 +6,7 @@
  * Everything a scene needs from an asset is read back through here.
  */
 
-import { atQuery } from "./postgres";
+import { atQuery, withTransaction } from "./postgres";
 import type {
   ArchiveMediaType,
   ArchiveProvider,
@@ -203,6 +203,20 @@ export async function saveStockCandidates(
   return out;
 }
 
+/** What attaching needs to know about the scene: whose film, which order, which canvas. */
+export async function getSceneCanvas(
+  sceneId: string,
+): Promise<{ projectId: string; order: number; portrait: boolean } | null> {
+  const rows = await atQuery<{ project_id: string; scene_order: number; aspect: string | null }>(
+    `select s.project_id, s.scene_order, p.aspect
+       from hov.scene s join hov.project p on p.id = s.project_id
+      where s.id = $1`,
+    [sceneId],
+  );
+  const r = rows[0];
+  return r ? { projectId: r.project_id, order: r.scene_order, portrait: r.aspect === "9:16" } : null;
+}
+
 export async function getStockMedia(id: string): Promise<StockMedia | null> {
   const rows = await atQuery<Row>(`select ${COLS} from hov.stock_media where id = $1`, [id]);
   return rows[0] ? toStock(rows[0]) : null;
@@ -239,4 +253,84 @@ export async function searchStockLibrary(
 
 export async function setStockStatus(id: string, status: StockStatus): Promise<void> {
   await atQuery(`update hov.stock_media set status = $2 where id = $1`, [id, status]);
+}
+
+interface StoredAsset {
+  path: string;
+  filename: string;
+  contentType: string | null;
+  sizeBytes: number;
+  sourceUrl: string;
+}
+
+/**
+ * Point a scene at an archive asset — both attachment rows, the scene's own
+ * columns, and the library's `used` mark, in ONE transaction.
+ *
+ * The scene fields go through `hov.at_write` under their Airtable names, the
+ * same door n8n uses, so the approval resets and the status stamp are written
+ * by the one function that knows the column map. `Așteaptă Aprobare Video`
+ * is deliberate: `Sort & Cap Scenes` counts that stamp as done work, so the
+ * scene stops eating a slot in the batch's cap of 8 the moment its clip
+ * exists. The approvals are reset because the producer picked the asset, not
+ * signed it off — the gates n8n polls are the same checkboxes as ever.
+ */
+export async function attachStockToScene(o: {
+  sceneId: string;
+  stockId: string;
+  mediaType: ArchiveMediaType;
+  offsetSeconds: number | null;
+  image: StoredAsset;
+  video: StoredAsset;
+  videoUrl: string;
+}): Promise<void> {
+  await withTransaction(async (q) => {
+    for (const [field, a] of [["image", o.image], ["video", o.video]] as const) {
+      await q(`delete from hov.attachment where scene_id = $1 and field = $2`, [o.sceneId, field]);
+      await q(
+        `insert into hov.attachment (scene_id, field, path, filename, content_type, size_bytes, source_url)
+         values ($1, $2, $3, $4, $5, $6, $7)
+         on conflict (scene_id, field, path) do update set
+           filename = excluded.filename, size_bytes = excluded.size_bytes, source_url = excluded.source_url`,
+        [o.sceneId, field, a.path, a.filename, a.contentType, a.sizeBytes, a.sourceUrl],
+      );
+    }
+    await q(`select hov.at_write('scene', $1, $2::jsonb)`, [
+      o.sceneId,
+      JSON.stringify({
+        "Scene Final URL": o.videoUrl,
+        "Aprobare Imagine": false,
+        "Aprobare Video": false,
+        "Regenerează Imagine": false,
+        "Regenerează Video": false,
+        "Status Producție Scenă": "Așteaptă Aprobare Video",
+      }),
+    ]);
+    await q(
+      `update hov.scene
+          set visual_source = $2, stock_media_id = $3, stock_offset_seconds = $4
+        where id = $1`,
+      [o.sceneId, o.mediaType === "video" ? "stock_video" : "stock_image", o.stockId, o.offsetSeconds],
+    );
+    await q(`update hov.stock_media set status = 'used' where id = $1`, [o.stockId]);
+  });
+}
+
+/**
+ * Send a scene back to the AI pipeline: the archive link, the clip and the
+ * clip URL go, so `Needs Clip?` generates again once a new image is approved.
+ * The image row is left for the caller — it flags an image regeneration,
+ * and `IR Write Image` replaces the row when the new picture lands.
+ */
+export async function detachStockFromScene(sceneId: string): Promise<void> {
+  await withTransaction(async (q) => {
+    await q(`delete from hov.attachment where scene_id = $1 and field = 'video'`, [sceneId]);
+    await q(
+      `update hov.scene
+          set visual_source = 'ai', stock_media_id = null, stock_offset_seconds = null,
+              scene_final_url = null
+        where id = $1`,
+      [sceneId],
+    );
+  });
 }

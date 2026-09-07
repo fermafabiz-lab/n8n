@@ -64,8 +64,8 @@ export const CATEGORIES: Category[] = [
     label: "Documentary",
     icon: "🎥",
     description:
-      "Fact-driven storytelling: researched narration built like a real documentary, with room for real footage between generated scenes.",
-    ready: false,
+      "Fact-driven storytelling: researched narration built like a real documentary. Any scene can use real archive footage or photos (Wikimedia Commons) instead of a generated picture — chosen scene by scene on the Images step.",
+    ready: true,
     options: [
       {
         name: "multi_voice",
@@ -79,14 +79,10 @@ export const CATEGORIES: Category[] = [
         default: "off",
         reveals: "cast",
       },
-      {
-        name: "real_footage",
-        label: "Real images between scenes",
-        hint: "Interleave real photos/archive stills (uploaded by you) as B-roll over the narration.",
-        type: "toggle",
-        default: false,
-        comingSoon: true,
-      },
+      // `real_footage` used to sit here as a coming-soon toggle. Archive
+      // footage is a per-SCENE decision made on the Images step, not a
+      // project switch — a toggle here would have been a control that
+      // changes nothing, which reads as a decision (the Captions rule).
       {
         name: "source_rigor",
         label: "Research depth",

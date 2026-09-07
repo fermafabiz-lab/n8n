@@ -43,6 +43,8 @@ import {
   stopExecution,
 } from "@/lib/n8n";
 import { getCategory } from "@/lib/categories";
+import { attachArchiveAsset, DEFAULT_SECONDS } from "@/lib/archive/attach";
+import { detachStockFromScene } from "@/lib/data/stock";
 
 export interface ActionResult {
   ok: boolean;
@@ -119,6 +121,11 @@ async function flagStaleClip(
 ): Promise<"none" | "flagged" | "blocked"> {
   const inputs = await readSceneVideoInputs(sceneId).catch(() => null);
   if (!inputs?.hasClip) return "none";
+  // An archive scene's clip was cut from the archive, not made from the
+  // picture — approving the picture makes nothing stale. And a video regen
+  // flag on such a scene is worse than useless: Prep Video Regen throws
+  // without a Flow asset id, and a throw there kills the whole batch.
+  if (inputs.visualSource && inputs.visualSource !== "ai") return "none";
   if (!inputs.hasImageMediaId || !inputs.hasMotionPrompt) return "blocked";
   // This path replaces a clip the producer never asked to lose — it fires
   // when an approved image made the existing clip stale — so it is the one
@@ -171,6 +178,18 @@ export async function sceneAction(
     return { ok: true, message: "Demo mode — nothing was written. Connect Airtable to make this real." };
   }
   try {
+    if (kind === "video" && action === "regenerate") {
+      // Same reason as in flagStaleClip: a stock scene must never carry the
+      // video-regen flag, and it has nothing for Veo to redo anyway.
+      const inputs = await readSceneVideoInputs(sceneId).catch(() => null);
+      if (inputs?.visualSource && inputs.visualSource !== "ai") {
+        return {
+          ok: false,
+          message:
+            "This scene uses archive footage, so there is nothing for Veo to regenerate — pick another archive asset, or send the scene back to AI from the Images step.",
+        };
+      }
+    }
     if (action === "regenerate" && feedback?.trim()) {
       // n8n appends this to the generation prompt, then clears it.
       await writeSceneFeedback(sceneId, feedback.trim());
@@ -522,6 +541,84 @@ export async function saveVideoPrompt(
       ok: true,
       message:
         "Shot direction saved — the clip is back for review. Press Regenerate video to shoot it again.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/**
+ * Documentary mode: put an archive asset on a scene.
+ *
+ * The site makes BOTH assets itself — the still (or the clip's first frame)
+ * as the scene image, and an mp4 clip cut or Ken-Burnsed to length — so the
+ * batch's `Needs Image?` / `Needs Clip?` find nothing to do and the scene
+ * flows through the same approval gates as a generated one. No n8n change.
+ *
+ * The outgoing image and clip are filed as drafts first, exactly like every
+ * other replacing path: the moment you want the AI picture back is the moment
+ * you did not think to save it.
+ */
+export async function useArchiveAsset(
+  projectId: string,
+  sceneId: string,
+  stockId: string,
+  opts: { offsetSeconds?: number; seconds?: number } = {},
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  if (process.env.DATA_BACKEND !== "postgres") {
+    return { ok: false, message: "Archive footage needs the Postgres backend — the library lives there." };
+  }
+  try {
+    const [project, scenes] = await Promise.all([getProject(projectId), getScenes(projectId)]);
+    if (!project) return { ok: false, message: "Project not found." };
+    const scene = scenes.find((s) => s.id === sceneId);
+    if (!scene) return { ok: false, message: "Scene not found." };
+
+    await autoKeep(sceneId, "image");
+    await autoKeep(sceneId, "video");
+    const r = await attachArchiveAsset({
+      sceneId,
+      stockId,
+      portrait: project.aspect === "9:16",
+      offsetSeconds: opts.offsetSeconds ?? 0,
+      seconds: opts.seconds ?? DEFAULT_SECONDS,
+      sceneOrder: scene.order,
+    });
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message: `Archive ${r.mediaType === "video" ? "clip" : "still"} in place — “${r.title}”, ${r.seconds}s. Approve the image, then the clip on the Video step; the batch skips this scene's generation.`,
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/**
+ * The way back: drop the archive link and the clip, then ask for an AI
+ * picture through the ordinary image-regen webhook. `Scene Final URL` is
+ * cleared with it, so once the new picture is approved `Needs Clip?` sees a
+ * scene that owes a clip and Veo makes one.
+ */
+export async function backToAiImage(projectId: string, sceneId: string): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  if (process.env.DATA_BACKEND !== "postgres") {
+    return { ok: false, message: "Archive footage needs the Postgres backend." };
+  }
+  try {
+    await autoKeep(sceneId, "video");
+    await detachStockFromScene(sceneId);
+    const r = await sceneAction(projectId, sceneId, "image", "regenerate");
+    if (!r.ok) return r;
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message: "Back to AI — a new picture is being generated; approve it and the clip follows.",
     };
   } catch (e) {
     return { ok: false, message: friendlyError(e) };

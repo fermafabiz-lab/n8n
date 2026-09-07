@@ -775,6 +775,10 @@ export default async function ProductionRoom({
             // On the live page the board picks the step itself, and it may
             // only pick "audio" when the panel that serves it is rendered.
             audioPanel={audioPanel}
+            // Documentary films may swap any scene's picture for archive
+            // footage; the picker is the board's, the permission is the
+            // category's.
+            archive={project.category === "documentary"}
           />
         ) : null}
 

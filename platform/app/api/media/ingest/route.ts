@@ -18,15 +18,12 @@
  * browser session — and authenticates with a shared secret instead.
  */
 
-import { createHash } from "node:crypto";
-import { mkdir, stat, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
 import { attachMedia } from "@/lib/data/postgres";
+import { storeMediaBytes } from "@/lib/media-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MEDIA_ROOT = process.env.MEDIA_ROOT || "/media";
 const INGEST_KEY = process.env.MEDIA_INGEST_KEY;
 
 const FIELDS = ["image", "video", "image_version"] as const;
@@ -79,26 +76,15 @@ export async function POST(req: Request) {
 
   // Content-addressed, exactly like the import: the same bytes always land at
   // the same path, so a retry overwrites nothing and Caddy's immutable cache
-  // header stays true.
-  const hash = createHash("sha256").update(buf).digest("hex").slice(0, 32);
-  const ext = extensionFor(url, contentType);
-  const path = `${sceneId}/${field}/${hash}.${ext}`;
-  const abs = join(MEDIA_ROOT, path);
-
+  // header stays true. The convention lives in lib/media-store.ts, shared
+  // with the archive path that writes files of its own.
+  let stored: Awaited<ReturnType<typeof storeMediaBytes>>;
   try {
-    let exists = false;
-    try {
-      exists = (await stat(abs)).size === buf.length;
-    } catch {
-      /* not there yet */
-    }
-    if (!exists) {
-      await mkdir(dirname(abs), { recursive: true });
-      await writeFile(abs, buf);
-    }
+    stored = await storeMediaBytes(sceneId, field, buf, { url, contentType });
   } catch (e) {
-    return bad(500, `could not write ${path}: ${(e as Error).message}`);
+    return bad(500, `could not write the file: ${(e as Error).message}`);
   }
+  const path = stored.path;
 
   let scene: Awaited<ReturnType<typeof attachMedia>>;
   try {
@@ -106,7 +92,7 @@ export async function POST(req: Request) {
       sceneId,
       field,
       path,
-      filename: filenameFor(url, hash, ext),
+      filename: stored.filename,
       contentType,
       sizeBytes: buf.length,
       sourceUrl: url,
@@ -128,27 +114,4 @@ export async function POST(req: Request) {
     ok: true,
     media: { path, url: `${base}/${path}`, bytes: buf.length },
   });
-}
-
-/** Extension from the URL's own filename, falling back to the MIME type. */
-function extensionFor(url: string, contentType: string | null): string {
-  const fromUrl = new URL(url).pathname.split("/").pop() ?? "";
-  if (fromUrl.includes(".")) {
-    const e = fromUrl.split(".").pop()!.toLowerCase();
-    if (/^[a-z0-9]{2,5}$/.test(e)) return e;
-  }
-  const mime = (contentType ?? "").split(";")[0].trim().split("/").pop() ?? "";
-  return (mime.replace("jpeg", "jpg") || "bin").toLowerCase();
-}
-
-/**
- * A human-readable name for the file.
- *
- * It matters more than it looks: saved image drafts are matched to their
- * metadata BY FILENAME (see buildVersions), so this is the join key, not
- * decoration.
- */
-function filenameFor(url: string, hash: string, ext: string): string {
-  const fromUrl = new URL(url).pathname.split("/").pop() ?? "";
-  return fromUrl && fromUrl.includes(".") ? fromUrl : `${hash}.${ext}`;
 }

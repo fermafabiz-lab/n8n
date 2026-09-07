@@ -65,6 +65,8 @@ create table if not exists stock_media (
   unique (provider, provider_asset_id)
 );
 
+-- Re-runnable, like the table above: a trigger has no IF NOT EXISTS.
+drop trigger if exists stock_media_touch on stock_media;
 create trigger stock_media_touch before update on stock_media
   for each row execute function touch_updated_at();
 

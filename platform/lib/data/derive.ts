@@ -15,7 +15,30 @@
  * once.
  */
 
+import type { DocumentaryVisualSource } from "@/lib/archive/types";
+
 export type StatusKind = "wait" | "run" | "done" | "err" | "idle";
+
+/**
+ * The archive asset behind a Documentary scene — enough for the Inspector to
+ * say where the picture came from and what it owes (a credit, share-alike),
+ * and for the picker to know it is replacing an archive choice rather than
+ * an AI one. The full row lives in hov.stock_media.
+ */
+export interface SceneStock {
+  id: string;
+  provider: string;
+  mediaType: "video" | "image";
+  title: string;
+  sourceUrl: string;
+  creator: string | null;
+  license: string | null;
+  attributionRequired: boolean;
+  /** The licence could not be auto-approved; the producer is the reviewer. */
+  needsReview: boolean;
+  /** Where in the source the segment starts (stock video only). */
+  offsetSeconds: number | null;
+}
 
 export interface EditingOptions {
   captions: boolean;
@@ -399,6 +422,10 @@ export interface Scene {
   videoPrompt: string | null;
   /** Kept drafts, newest last. */
   versions: SceneVersion[];
+  /** Documentary mode: where the picture comes from. `ai` for every scene made before it existed. */
+  visualSource: DocumentaryVisualSource;
+  /** The archive asset behind a stock scene; null for `ai`. */
+  stock: SceneStock | null;
   status: string;
   statusKind: StatusKind;
 }
@@ -460,6 +487,9 @@ export interface RawScene {
   /** Already joined by the adapter — see buildVersions(). */
   versions: SceneVersion[];
   statusRaw: string;
+  /** Postgres only (db/007). The Airtable adapter never sets these: `ai`, null. */
+  visualSource?: DocumentaryVisualSource;
+  stock?: SceneStock | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -864,6 +894,8 @@ export function buildScene(r: RawScene, index: number): Scene {
     needsFactCheck: r.needsFactCheck,
     videoPrompt: r.videoPrompt,
     versions: r.versions,
+    visualSource: r.visualSource ?? "ai",
+    stock: r.stock ?? null,
     status: displayStatus(status),
     statusKind: kind,
   };

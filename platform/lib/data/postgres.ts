@@ -71,6 +71,30 @@ async function query<T = Record<string, unknown>>(
   return res.rows as T[];
 }
 
+/**
+ * Several statements, one transaction, one connection — for writers outside
+ * this file (the archive library) that must land all-or-nothing. The callback
+ * gets a query function bound to the checked-out client; a throw rolls back.
+ */
+export async function withTransaction<T>(
+  fn: (q: <R = Record<string, unknown>>(sql: string, params?: unknown[]) => Promise<R[]>) => Promise<T>,
+): Promise<T> {
+  const client = await pool().connect();
+  try {
+    await client.query("begin");
+    const q = async <R,>(sql: string, params: unknown[] = []) =>
+      (await client.query(sql, params)).rows as R[];
+    const out = await fn(q);
+    await client.query("commit");
+    return out;
+  } catch (e) {
+    await client.query("rollback").catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
 export const isConfigured = Boolean(process.env.DATABASE_URL);
 
 /**
@@ -152,6 +176,22 @@ interface SceneRow {
   video_path: string | null;
   /** [{filename, path}] for field='image_version' — joined by buildVersions. */
   version_files: Array<{ filename: string | null; path: string }> | null;
+  /** Documentary mode: where the picture comes from (db/007). */
+  visual_source?: string | null;
+  stock_media_id?: string | null;
+  stock_offset_seconds?: string | number | null;
+  /** The library row behind a stock scene, as one JSON object; null for `ai`. */
+  stock?: {
+    id: string;
+    provider: string;
+    media_type: string;
+    title: string;
+    source_url: string;
+    creator: string | null;
+    license_original: string | null;
+    attribution_required: boolean;
+    review_status: string;
+  } | null;
 }
 
 /**
@@ -170,7 +210,50 @@ const SCENE_SELECT = `
               order by a.created_at)
        from hov.attachment a
       where a.scene_id = s.id and a.field = 'image_version') as version_files
+    __STOCK__
   from hov.scene s`;
+
+/** The archive library behind a Documentary scene — see db/007. */
+const STOCK_SUBSELECT = `,
+    (select jsonb_build_object(
+              'id', m.id, 'provider', m.provider, 'media_type', m.media_type,
+              'title', m.title, 'source_url', m.source_url, 'creator', m.creator,
+              'license_original', m.license_original,
+              'attribution_required', m.attribution_required,
+              'review_status', m.review_status)
+       from hov.stock_media m
+      where m.id = s.stock_media_id) as stock`;
+
+/**
+ * Has db/007 been applied?
+ *
+ * A push to the trunk deploys by itself; a migration is run by hand over
+ * SSH. Between the two, a query that names `hov.stock_media` would fail on
+ * every scene read and take every project page down with it. So the scene
+ * query asks first, and answers without the archive columns until the table
+ * exists. Cached briefly rather than forever, so applying the migration takes
+ * effect without a restart.
+ */
+let stockReadyAt = 0;
+let stockReadyValue = false;
+async function stockReady(): Promise<boolean> {
+  const now = Date.now();
+  if (now - stockReadyAt < 60_000) return stockReadyValue;
+  try {
+    const rows = await query<{ ok: boolean }>(
+      `select to_regclass('hov.stock_media') is not null as ok`,
+    );
+    stockReadyValue = Boolean(rows[0]?.ok);
+  } catch {
+    stockReadyValue = false;
+  }
+  stockReadyAt = now;
+  return stockReadyValue;
+}
+
+async function sceneSelect(): Promise<string> {
+  return SCENE_SELECT.replace("__STOCK__", (await stockReady()) ? STOCK_SUBSELECT : "");
+}
 
 function toRawScene(r: SceneRow): RawScene & { createdAt: string | null } {
   return {
@@ -204,6 +287,24 @@ function toRawScene(r: SceneRow): RawScene & { createdAt: string | null } {
     ),
     statusRaw: r.production_status ?? "—",
     createdAt: r.created_at ? r.created_at.toISOString() : null,
+    visualSource:
+      r.visual_source === "stock_video" || r.visual_source === "stock_image"
+        ? r.visual_source
+        : "ai",
+    stock: r.stock
+      ? {
+          id: r.stock.id,
+          provider: r.stock.provider,
+          mediaType: r.stock.media_type === "video" ? "video" : "image",
+          title: r.stock.title,
+          sourceUrl: r.stock.source_url,
+          creator: r.stock.creator,
+          license: r.stock.license_original,
+          attributionRequired: r.stock.attribution_required,
+          needsReview: r.stock.review_status === "manual_review",
+          offsetSeconds: num(r.stock_offset_seconds ?? null),
+        }
+      : null,
   };
 }
 
@@ -249,7 +350,7 @@ export async function getStatusCounts(): Promise<{ run: number; wait: number; er
 
 export async function getScenes(projectId: string): Promise<Scene[]> {
   const rows = await query<SceneRow>(
-    `${SCENE_SELECT} where s.project_id = $1`,
+    `${await sceneSelect()} where s.project_id = $1`,
     [projectId],
   );
   const ordered = orderScenes(rows.map(toRawScene));
@@ -339,21 +440,27 @@ export async function readSceneVideoInputs(sceneId: string): Promise<{
   hasClip: boolean;
   hasImageMediaId: boolean;
   hasMotionPrompt: boolean;
+  visualSource: string;
 }> {
+  const withStock = await stockReady();
   const rows = await query<{
     scene_final_url: string | null;
     image_media_id: string | null;
     motion_prompt: string | null;
+    visual_source: string | null;
   }>(
-    `select scene_final_url, image_media_id, motion_prompt from hov.scene where id = $1`,
+    `select scene_final_url, image_media_id, motion_prompt,
+            ${withStock ? "visual_source" : "'ai' as visual_source"}
+       from hov.scene where id = $1`,
     [sceneId],
   );
   const r = rows[0];
-  if (!r) return { hasClip: false, hasImageMediaId: false, hasMotionPrompt: false };
+  if (!r) return { hasClip: false, hasImageMediaId: false, hasMotionPrompt: false, visualSource: "ai" };
   return {
     hasClip: String(r.scene_final_url ?? "").startsWith("http"),
     hasImageMediaId: String(r.image_media_id ?? "").trim() !== "",
     hasMotionPrompt: String(r.motion_prompt ?? "").trim() !== "",
+    visualSource: r.visual_source ?? "ai",
   };
 }
 

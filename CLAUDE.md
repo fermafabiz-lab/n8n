@@ -3425,6 +3425,99 @@ the pipeline already produces.
   "likely on scene X" line is an estimate from landed assets and is labeled
   as such; the batch reports no per-scene progress.
 
+### Documentary mode — archive footage (2026-09-07)
+
+Any scene of a `documentary` project can take a real still or clip from a
+free archive instead of a generated picture. It is a **per-scene** decision on
+the Images step (`ArchivePicker` inside `SceneBoard`, offered when the
+project's category is `documentary`), never a project switch — the old
+`real_footage` toggle was removed for the Captions-rule reason: a control
+that changes nothing reads as a decision. The brief this came from (a
+ChatGPT spec) was right about the shape and wrong about two facts: it named
+Airtable as the database and Vercel as the host. The library is
+`hov.stock_media` (db/007) and the site runs on Hetzner.
+
+**It needs no change in n8n, and that is the whole design.** `Needs Image?`
+skips a scene that already holds `Imagine Scenă`, `Needs Clip?` skips one
+that already holds `Scene Final URL`, and every gate keys off the same
+checkboxes as ever. So `attachArchiveAsset` (`platform/lib/archive/attach.ts`)
+makes BOTH assets itself and writes them in one transaction
+(`attachStockToScene`) with `Status Producție Scenă: 'Așteaptă Aprobare
+Video'` — the stamp `Sort & Cap Scenes` counts as done, so the scene stops
+eating a slot in the cap of 8 — and the approvals reset, because the producer
+picked the asset, not signed it off. Final Assembly receives an ordinary mp4.
+
+- **A still** becomes the scene image (full quality) and an 8s Ken Burns clip:
+  constant-velocity push of 12%, direction alternating by scene order, made
+  by the ffmpeg that has been in the site's own image since the narration
+  bundle. **A video** becomes an 8s segment cut STRAIGHT FROM THE URL
+  (`-ss` before `-i`, so a 46-minute 553 MB NASA reel costs the bytes of its
+  eight seconds plus the index) and its first frame becomes the scene image
+  — the same role Veo's start frame plays. Both are h264 mp4 at 24 fps on the
+  project's canvas; Commons hands out VP9/Opus webm and Theora ogv, which
+  nothing downstream plays as-is. `seconds` is clamped 3..20 and `offset`
+  never starts past the end.
+- **The video-regen trap, and three guards for it.** A stock scene has no
+  Flow asset to regenerate from, and `Prep Video Regen` THROWS without an
+  `Image Media ID` — a throw that kills the whole batch, not the scene. So
+  `Regenerează Video` must never be set on a scene whose `visual_source` is
+  not `ai`: `flagStaleClip` answers `none` for it (approving the picture makes
+  nothing stale — the clip was cut from the archive, not made from the
+  picture), `sceneAction(video, regenerate)` refuses with a message, and the
+  board hides the button in favour of "Another archive clip…". **Any new
+  writer of that flag must check `visual_source` first.** Image regen is the
+  door back: `backToAiImage` drops the link, the clip and `Scene Final URL`,
+  then flags an ordinary image regeneration; once the new picture is
+  approved, `Needs Clip?` sees a scene owing a clip.
+- **Wikimedia is the only keyless archive, and the only one built.** Read off
+  real responses (executions 10893/10895/10898): `filetype:video` finds both
+  webm and ogv (`filemime:video/ogg` finds nothing — the ogv's MIME is
+  `application/ogg`); `filetype:bitmap` also returns animated GIFs, skipped;
+  `formatversion=2` makes `query.pages` an array; a public-domain template can
+  carry no `License` code at all (`Copyrighted: "False"` is the fallback).
+  NARA and Smithsonian are declared as DISABLED adapters that name the key
+  they need (`NARA_API_KEY` from catalog.archives.gov, `SMITHSONIAN_API_KEY`
+  from api.data.gov) — listed so the gap is visible, not pretended into
+  existence, because neither can be tested from here without a key.
+- **The date field lies, so it is shown and never trusted.** Commons dated a
+  1969 NASA clip `2015-06-12` (its YouTube upload) and answered "Benz
+  Patent-Motorwagen 1886" with 2013 and 2021 photos of museum REPLICAS. The
+  provider's string is stored verbatim as `date_original` and labelled
+  "dated", the years the title and description MENTION ride alongside as
+  `years_mentioned`, and relevance stays a human's call (or a model's, in a
+  later slice). Do not derive a period from either field.
+- **Rights are decided by code, from an allowlist** (`lib/archive/rights.ts`,
+  13 fixture cases). NC and ND are rejected outright — no review can change
+  what a licence says, so offering one would only invite the wrong answer.
+  `ARCHIVE_AUTO_LICENSES` defaults to the brief's four (public domain, CC0,
+  CC BY, CC BY-SA); share-alike is admitted but STATED on the asset and in
+  the picker's chip. FAL, GFDL and anything unrecognised → `manual_review`,
+  which the picker shows with its reason and still lets the producer use —
+  they are the reviewer. `rejected` cannot be used.
+- **Two status columns, on purpose.** `stock_media.review_status` is the
+  rights verdict, refreshed on every sighting; `stock_media.status` is the
+  producer's decision (candidate / approved / rejected / used) and a refresh
+  never touches it. Conflated, a re-search would un-reject an asset.
+- **`/api/archive/search`** serves the browser with the site cookie and n8n
+  with the `x-hov-key` it already uses; `middleware.ts` opens the door only
+  for the key, and the route checks both again. Every result is filed into
+  the library best-effort (a filing failure costs the `id`, and the picker's
+  "Use" stays disabled with the reason, never the search). `library=1`
+  answers from what has already been seen.
+- **The site tolerates db/007 not being applied.** A push deploys by itself,
+  a migration runs by hand, and in between a scene query naming
+  `hov.stock_media` would take down every project page. `stockReady()` in
+  `postgres.ts` asks `to_regclass` (cached 60s) and the scene select drops
+  the archive columns until the table exists. Apply with
+  `docker exec -i n8n-postgres-1 psql -U hov -d hov -f - < db/007_stock_media.sql`.
+- **Not yet run anywhere:** the two ffmpeg recipes in `attach.ts`. This box
+  has no ffmpeg, so the first real "Use for this scene" on the site is the
+  test — the zoompan `on` counter is clamped precisely so an off-by-one in
+  its origin cannot matter. And **credits are owed**: `attribution_required`
+  is stored and shown on the Inspector, but nothing yet prints the source on
+  the end screen — that is a Remotion change (a Railway push) and the one
+  legal obligation of a CC BY asset.
+
 ## Conventions
 
 - Standalone webhooks over long-lived executions — they don't depend on a
@@ -4333,6 +4426,14 @@ generated FROM it. The chain, and where each piece lives:
 
 ## Open work
 
+- **Documentary mode, what is still owed** (see the section above): apply
+  `db/007_stock_media.sql` on the box; run one real "Use for this scene" on a
+  still AND on a video and watch the ffmpeg log, since neither recipe has run
+  anywhere yet; print archive credits on the end screen (Remotion, i.e. a
+  Railway push); get `NARA_API_KEY` / `SMITHSONIAN_API_KEY` and build those
+  two adapters against real responses; have Claude Scripting propose
+  `visual_source` per scene so the picker opens with a query instead of an
+  empty box.
 - **Images on Google Flow instead of fal — designed, not applied.**
   `db/port/flow-images/README.md` holds the whole port: the useapi
   `POST /google-flow/images` contract (sync, `count` defaults to 4, the

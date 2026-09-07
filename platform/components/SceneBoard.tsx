@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   approveAllOfKind,
+  backToAiImage,
   cancelVideoRegen,
   reopenStep,
   restartVideoRegen,
@@ -30,6 +31,7 @@ import MediaPlayer from "@/components/MediaPlayer";
 import RegenBadge from "@/components/RegenBadge";
 import { usePendingStage } from "@/components/StageNav";
 import CinemaMode from "@/components/CinemaMode";
+import ArchivePicker from "@/components/ArchivePicker";
 
 /** The three steps this board can serve, in the pipeline's own order. */
 type Step = "images" | "audio" | "video";
@@ -163,6 +165,7 @@ export default function SceneBoard({
   portrait = false,
   focus = null,
   audioPanel = false,
+  archive = false,
 }: {
   projectId: string;
   /** Only used to name downloaded clips, so files from different films
@@ -188,6 +191,12 @@ export default function SceneBoard({
    * controls at all.
    */
   audioPanel?: boolean;
+  /**
+   * Documentary mode: any scene may take real archive footage instead of a
+   * generated picture. The picker is offered on the Images step (and, for a
+   * scene already on archive footage, on the Video step to swap the clip).
+   */
+  archive?: boolean;
 }) {
   /**
    * `scenes` below is the server's rows with the presses that have not come
@@ -220,6 +229,9 @@ export default function SceneBoard({
   // the live one is the whole point of keeping drafts, and that cannot be
   // done in a 128px card — so the preview borrows the player above.
   const [previewId, setPreviewId] = useState<string | null>(null);
+  // The archive search, open or closed. Per board, not per scene: opening it
+  // is a mode the producer is in, and it follows them down the filmstrip.
+  const [archiveOpen, setArchiveOpen] = useState(false);
   // Image-prompt drafts, kept in sessionStorage so the 10s auto-refresh
   // can't quietly reset a rewritten prompt to the stored one.
   const promptKey = `vf-imgprompt-drafts:${projectId}`;
@@ -727,6 +739,32 @@ export default function SceneBoard({
               <span>Status</span>
               <b>{active.status}</b>
             </div>
+            {active.stock && (
+              <div className="kv">
+                <span>Source</span>
+                <span style={{ fontSize: 12, lineHeight: 1.45 }}>
+                  <a href={active.stock.sourceUrl} target="_blank" rel="noreferrer">
+                    {active.stock.title}
+                  </a>
+                  {" — "}
+                  {active.stock.creator ? `${active.stock.creator}, ` : ""}
+                  {active.stock.license ?? "licence unknown"}
+                  {active.stock.mediaType === "video" && active.stock.offsetSeconds !== null
+                    ? ` · from ${active.stock.offsetSeconds}s`
+                    : ""}
+                  {active.stock.attributionRequired && (
+                    <span className="chip wait" style={{ marginLeft: 6 }} title="The licence requires credit — the source above must appear in the film's credits">
+                      credit required
+                    </span>
+                  )}
+                  {active.stock.needsReview && (
+                    <span className="chip wait" style={{ marginLeft: 6 }} title="The licence could not be auto-approved; you are the reviewer">
+                      check licence
+                    </span>
+                  )}
+                </span>
+              </div>
+            )}
             {active.evidenceRef && (
               <div className="kv">
                 <span>Evidence</span>
@@ -819,35 +857,71 @@ export default function SceneBoard({
                   >
                     ⤓ Save draft
                   </button>
-                  <button
-                    className="abtn"
-                    disabled={pending}
-                    onClick={() =>
-                      run(async () => {
-                        // Save the rewritten prompt FIRST — n8n reads
-                        // "Imagine First Frame" when it regenerates, so the
-                        // edit has to be in Airtable before the flag flips.
-                        const draft = promptDrafts[active.id];
-                        if (draft !== undefined && draft !== (active.imagePrompt ?? "")) {
-                          const s = await saveImagePrompt(projectId, active.id, draft);
-                          if (!s.ok) return s;
-                          dropPromptDraft(active.id);
-                        }
-                        const r = await sceneAction(
-                          projectId,
-                          active.id,
-                          "image",
-                          "regenerate",
-                          feedback,
-                        );
-                        if (r.ok) setFeedback("");
-                        return r;
-                      })
-                    }
-                  >
-                    Regenerate
-                  </button>
+                  {active.visualSource === "ai" ? (
+                    <button
+                      className="abtn"
+                      disabled={pending}
+                      onClick={() =>
+                        run(async () => {
+                          // Save the rewritten prompt FIRST — n8n reads
+                          // "Imagine First Frame" when it regenerates, so the
+                          // edit has to be in Airtable before the flag flips.
+                          const draft = promptDrafts[active.id];
+                          if (draft !== undefined && draft !== (active.imagePrompt ?? "")) {
+                            const s = await saveImagePrompt(projectId, active.id, draft);
+                            if (!s.ok) return s;
+                            dropPromptDraft(active.id);
+                          }
+                          const r = await sceneAction(
+                            projectId,
+                            active.id,
+                            "image",
+                            "regenerate",
+                            feedback,
+                          );
+                          if (r.ok) setFeedback("");
+                          return r;
+                        })
+                      }
+                    >
+                      Regenerate
+                    </button>
+                  ) : (
+                    // An archive scene has nothing for the image model to
+                    // redo; the way back to AI is a different door, and it
+                    // says so.
+                    <button
+                      className="abtn"
+                      disabled={pending}
+                      title="Drop the archive asset and generate an AI picture from the prompt above"
+                      onClick={() => run(() => backToAiImage(projectId, active.id))}
+                    >
+                      ↩ Back to AI image
+                    </button>
+                  )}
+                  {archive && (
+                    <button
+                      className="abtn"
+                      disabled={pending}
+                      aria-pressed={archiveOpen}
+                      title="Search Wikimedia Commons for real footage or a photo to use instead of a generated picture"
+                      onClick={() => setArchiveOpen((v) => !v)}
+                    >
+                      🎞 {active.visualSource === "ai" ? "Archive footage…" : "Another archive asset…"}
+                    </button>
+                  )}
                 </div>
+                )}
+                {archive && archiveOpen && !active.regenImage && (
+                  <ArchivePicker
+                    key={active.id}
+                    projectId={projectId}
+                    sceneId={active.id}
+                    hint={active.narration}
+                    run={run}
+                    pending={pending}
+                    onClose={() => setArchiveOpen(false)}
+                  />
                 )}
               </>
             )}
@@ -994,7 +1068,7 @@ export default function SceneBoard({
               block that had escaped the step scoping, so the Images page
               offered a field about the CLIP under a heading about pictures.
             */}
-            {step === "video" && !active.videoApproved && active.videoPrompt !== null && (
+            {step === "video" && !active.videoApproved && active.videoPrompt !== null && active.visualSource === "ai" && (
               <div style={{ marginTop: 16, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
                 <label
                   style={{ display: "block", fontSize: 12, color: "var(--dim)", marginBottom: 6 }}
@@ -1109,25 +1183,38 @@ export default function SceneBoard({
                 >
                   ⤓ Save draft
                 </button>
-                <button
-                  className="abtn"
-                  disabled={pending}
-                  onClick={() =>
-                    run(async () => {
-                      const r = await sceneAction(
-                        projectId,
-                        active.id,
-                        "video",
-                        "regenerate",
-                        feedback,
-                      );
-                      if (r.ok) setFeedback("");
-                      return r;
-                    })
-                  }
-                >
-                  Regenerate video
-                </button>
+                {active.visualSource === "ai" ? (
+                  <button
+                    className="abtn"
+                    disabled={pending}
+                    onClick={() =>
+                      run(async () => {
+                        const r = await sceneAction(
+                          projectId,
+                          active.id,
+                          "video",
+                          "regenerate",
+                          feedback,
+                        );
+                        if (r.ok) setFeedback("");
+                        return r;
+                      })
+                    }
+                  >
+                    Regenerate video
+                  </button>
+                ) : (
+                  // The clip was cut from an archive, not made by Veo — a
+                  // different segment or a different asset is the redo.
+                  <button
+                    className="abtn"
+                    disabled={pending}
+                    aria-pressed={archiveOpen}
+                    onClick={() => setArchiveOpen((v) => !v)}
+                  >
+                    🎞 Another archive clip…
+                  </button>
+                )}
                 {/* Same-origin through /api/media, which is what makes the
                     filename stick — see clipDownload. */}
                 <a
@@ -1140,6 +1227,17 @@ export default function SceneBoard({
                 </a>
               </div>
               )
+            )}
+            {videoControls && active.visualSource !== "ai" && archiveOpen && (
+              <ArchivePicker
+                key={`v-${active.id}`}
+                projectId={projectId}
+                sceneId={active.id}
+                hint={active.narration}
+                run={run}
+                pending={pending}
+                onClose={() => setArchiveOpen(false)}
+              />
             )}
             {(imageControls || videoControls) && (
               <textarea

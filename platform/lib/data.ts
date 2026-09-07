@@ -568,6 +568,8 @@ const DEMO_SCENES: Scene[] = Array.from({ length: 8 }, (_, i) => {
     evidenceRef: i === 1 ? "E1, E2" : null,
     needsFactCheck: false,
     versions: [],
+    visualSource: "ai" as const,
+    stock: null,
     voiceApproved: i < 3,
     imageApproved: i < 4,
     videoApproved: i < 2,
@@ -795,6 +797,8 @@ export async function readSceneVideoInputs(sceneId: string): Promise<{
   hasClip: boolean;
   hasImageMediaId: boolean;
   hasMotionPrompt: boolean;
+  /** Documentary mode (Postgres only): "ai" | "stock_video" | "stock_image". */
+  visualSource?: string;
 }> {
   if (USE_PG) return pgBackend.readSceneVideoInputs(sceneId);
   if (!isConfigured)

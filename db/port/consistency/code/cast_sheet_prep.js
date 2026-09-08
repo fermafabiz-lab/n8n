@@ -79,13 +79,13 @@ chars.forEach((c, i) => {
   if (work.length >= 6) return;
   const isProt = norm(name) === norm(protagonist) && !!userRefId;
   const base = kind === 'turnaround'
-    ? 'Character reference sheet of ONE person on a plain neutral grey studio backdrop: four full-body views standing side by side in one row — front view, left profile, back view, right profile — identical outfit, hair and build in all four, relaxed natural standing pose, even soft studio lighting, no text, no labels, no grid lines, no props, nothing else in frame: '
-    : 'Character reference portrait of ONE person, centred, front three-quarter view, plain neutral studio backdrop, even soft lighting, no props, no text, no collage: ';
+    ? 'Character reference sheet of ONE character (a person, an animal or a creature, exactly as described) on a plain neutral grey studio backdrop: four full-body views side by side in one row — front view, left profile, back view, right profile — identical outfit, features, markings, colours and build in all four, relaxed natural standing pose, even soft studio lighting, no text, no labels, no grid lines, no props, nothing else in frame: '
+    : 'Character reference portrait of ONE character (a person, an animal or a creature, exactly as described), centred, front three-quarter view, plain neutral studio backdrop, even soft lighting, no props, no text, no collage: ';
   const body = {
     email: rb.Flow_Email || 'fermafabiz@gmail.com',
     model: MODEL,
-    prompt: (isProt ? 'The reference image is the producer\'s own photo of this person and is GROUND TRUTH: build the sheet FROM it — exactly that face, hair, body and outfit, in every view. ' : '') +
-      base + desc + ' If the description offers alternatives for different eras or scenes, use the FIRST one only — one person, one outfit, one age. Photorealistic, natural skin texture, sharp focus.',
+    prompt: (isProt ? 'The reference image is the producer\'s own photo of this character and is GROUND TRUTH: build the sheet FROM it — exactly that face, hair, body and outfit, in every view. ' : '') +
+      base + desc + ' If the description offers alternatives for different eras or scenes, use the FIRST one only — one character, one outfit, one age. Photorealistic, natural skin or surface texture, sharp focus.',
     aspectRatio: kind === 'turnaround' ? '16:9' : aspect,
     count: 1,
     captchaRetry: 1,

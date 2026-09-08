@@ -76,8 +76,8 @@ const CONS = (function () {
     const parts = [];
     refs.forEach((r, i) => {
       const k = i + 1;
-      if (r.role === 'user') parts.push('Reference image ' + k + ' is the producer\'s own photo and is GROUND TRUTH for that person: exactly the same face, hair, body and outfit.');
-      else if (r.role === 'cast') parts.push('Reference image ' + k + ' is a character sheet of ' + r.name + ' shown from several angles: this person in the shot has EXACTLY that face, hair, build and wardrobe. Render ONE view of them inside the scene — never the sheet layout, never several copies, never the neutral backdrop.');
+      if (r.role === 'user') parts.push('Reference image ' + k + ' is the producer\'s own photo and is GROUND TRUTH for that character: exactly the same face, hair, body and outfit.');
+      else if (r.role === 'cast') parts.push('Reference image ' + k + ' is a character sheet of ' + r.name + ' shown from several angles: this character (a person, an animal or a creature, whatever the sheet shows) in the shot has EXACTLY that face or head, hair or markings, colours, build and wardrobe. Render ONE view of them inside the scene — never the sheet layout, never several copies, never the neutral backdrop.');
       else if (r.role === 'object') parts.push('Reference image ' + k + ' is a reference sheet of ' + r.name + ': the same object in the shot has exactly that design, colours, markings and materials — one instance, placed in the scene.');
       else if (r.role === 'place') parts.push('Reference image ' + k + ' is the PLACE (' + r.name + '): the same architecture, layout, landmarks, materials and the same arrangement of what stands where. Light, weather and time of day follow the text, not the plate; the plate is empty of people and its framing is not this shot\'s framing.');
       else if (r.role === 'palette') parts.push('The LAST reference image is only for colour palette and film look, never for layout and never for who or where anyone is.');

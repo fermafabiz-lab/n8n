@@ -785,7 +785,7 @@ The cast sheet above carried a FACE across a film and nothing else. The long
 film still showed the same man with a different coat from behind, and the same
 building rebuilt differently every time the story returned to it — because a
 portrait has no back, and a location existed only as prose. Live since
-2026-09-08 (Media Generation `260e9e25`, Claude Scripting `e5837f7d`; full
+2026-09-08 (Media Generation `3fd53a5f`, Claude Scripting `5ab94af7`; full
 account, originals and rollback ids in `db/port/consistency/`). Six pieces,
 in the order a film meets them:
 
@@ -836,6 +836,17 @@ in the order a film meets them:
    counter). The drifted frame is never written. The judge is 3 retries then
    `continueRegularOutput`, and an unreadable answer is a pass — the producer's
    image gate is the backstop, as it is for refusals.
+
+**Verified on the disposable film the same day** (executions 11332/11339):
+turnarounds for both characters and three set plates within 100 s of the
+batch, exact `loc:`/`char:`/`tod:` tags on every new scene, `reference_1..4`
+per scene exactly as planned, four images and four clips, and the judge
+scoring identity 0.8–0.9 with place 1.0 on every frame, no re-roll needed.
+It also showed the sheet, assembler and judge wording assumed a HUMAN ("ONE
+person", "face, hair", "skin texture") — fixed the same evening to "ONE
+character (a person, an animal or a creature)" in all three copies (Media
+Generation `3fd53a5f`, Claude Scripting `5ab94af7`). Full record in
+`db/port/consistency/README.md`.
 
 Two limits worth knowing. **A sheet's `fifeUrl` dies in ~6 h**; the Flow id
 lives on, so GENERATION is unaffected, but the judge needs a URL to show, so

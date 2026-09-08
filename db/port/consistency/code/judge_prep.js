@@ -44,12 +44,12 @@ compare.forEach((r, i) => {
 });
 const hasPerson = compare.some((r) => r.role !== 'place'), hasPlace = compare.some((r) => r.role === 'place');
 const ask = 'Judge whether the FRAME is consistent with the references. Score 0 to 1, where 1 is unmistakably the same and 0.5 is doubtful.' +
-  (hasPerson ? ' "identity": does the person in the frame have the same face, hair, age and build as their reference (a different angle, distance or expression is fine)? "wardrobe": is it the same outfit — same garments, colours, materials? If the person is not visible in the frame at all (from behind at distance, hands only), answer 0.8 for both and say so in problems.' : '') +
+  (hasPerson ? ' "identity": does the character in the frame (a person, an animal or a creature) have the same face or head, hair or markings, colours, age and build as their reference (a different angle, distance or expression is fine)? "wardrobe": is it the same outfit — same garments, colours, materials? If the character is not visible in the frame at all (from behind at distance, hands only), answer 0.8 for both and say so in problems.' : '') +
   (hasPlace ? ' "place": is the frame the same location as the PLACE reference — same architecture, layout, landmarks, materials — allowing for a different framing, hour, weather and light?' : '') +
-  ' Also check "sheet_leak": did the frame render the reference sheet itself (several copies of one person side by side, a neutral studio backdrop, a grid)? true/false. Answer ONLY JSON: {"identity": number|null, "wardrobe": number|null, "place": number|null, "sheet_leak": boolean, "problems": ["short concrete reason", ...]}';
+  ' Also check "sheet_leak": did the frame render the reference sheet itself (several copies of one character side by side, a neutral studio backdrop, a grid)? true/false. Answer ONLY JSON: {"identity": number|null, "wardrobe": number|null, "place": number|null, "sheet_leak": boolean, "problems": ["short concrete reason", ...]}';
 content.push({ type: 'text', text: ask });
 const body = { model: 'gpt-4o', temperature: 0, response_format: { type: 'json_object' }, messages: [
-  { role: 'system', content: 'You are a film continuity supervisor comparing a generated frame with reference sheets. Be strict about faces, hair, garments and architecture; be lenient about angle, distance, expression, pose, light and weather. Answer only the JSON object requested.' },
+  { role: 'system', content: 'You are a film continuity supervisor comparing a generated frame with reference sheets. Be strict about faces or heads, hair or markings, colours, garments and architecture; be lenient about angle, distance, expression, pose, light and weather. Answer only the JSON object requested.' },
   { role: 'user', content: content },
 ] };
 return [{ json: Object.assign({}, dec, { skip: false, body: body, compared: lines }) }];

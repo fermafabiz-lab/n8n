@@ -4,8 +4,8 @@ Status: **APPLIED and LIVE since 2026-09-08 ~18:40 UTC.**
 
 | Workflow | now active | was active (saved here as `*.original.json`) |
 |---|---|---|
-| 3. Media Generation `yHG4DBCDjR3RJzav` | `260e9e25` (chain of eight entries "Consistency 1/6 … 6/6", then the hardening entry) | `9a6f2842` |
-| Claude Scripting `gkEtGMecv4TC3ZHp` | `e5837f7d` (three entries "Consistency 1/3 … 3/3") | `0a162e0d` |
+| 3. Media Generation `yHG4DBCDjR3RJzav` | `3fd53a5f` (chain of eight entries "Consistency 1/6 … 6/6", the hardening entry `260e9e25`, then the wording entry) | `9a6f2842` |
+| Claude Scripting `gkEtGMecv4TC3ZHp` | `5ab94af7` (three entries "Consistency 1/3 … 3/3" = `e5837f7d`, then the wording entry) | `0a162e0d` |
 
 Applied like every other MCP edit: `update_workflow` staged the drafts
 (`applied/01-*.json` and `applied/02-*.json` are the operation lists,
@@ -99,8 +99,47 @@ is not a constraint"):
   `Generate Cast Sheet` and the three image generators — same rotation cost,
   same export leak, listed in the CLAUDE.md key-rotation note.
 
-## Verification on the disposable film
+## Verification on the disposable film — 2026-09-08 18:41–19:02 UTC
 
-See the end of this file once the run on `recaW2aLFFD06FpoN` ("A race between
-a snail and a turtle") has finished; the run was started right after publish
-through `restart-scripting`.
+`restart-scripting` on `recaW2aLFFD06FpoN` ("A race between a snail and a
+turtle", 32 s, 9:16), scripting execution 11332, batch execution 11339, every
+approval given by SQL through a throwaway workflow (archived afterwards).
+
+- **Scripting.** The rebuilt bible carries location GEOMETRY ("a small oval
+  clearing … about six meters across, with a flat dirt path running through
+  the center from foreground to background; on the left … on the right … in
+  the background …"); `objects` came back empty, which is right for a snail
+  race. The four new scenes carry exact tags:
+  `["loc:Forest Start Clearing","char:Milo the Snail","char:Tara the Turtle","tod:morning"]`,
+  `[loc:Fern-Lined Race Path, char:Milo the Snail, tod:morning]`, …
+- **Sheets and plates, within 100 s of batch start.** `SHEET PLAN` made a
+  TURNAROUND for both characters (Milo in 4 of 4 scenes, Tara in 3 — both over
+  the lead threshold of 3) and three set plates, one per bible location, all
+  stored on the project as `castRefs` / `castSheets{kind:'turnaround'}` /
+  `locationRefs` / `locationPlates`. All four takes were synthesized in the same
+  window.
+- **References per scene, as `Build Image Request` planned them:** scene 1
+  `cast=Milo, cast=Tara, place=Forest Start Clearing` (3 refs, no palette on
+  the first scene); 101 the same; 102 `cast=Milo, place=Fern-Lined Race Path,
+  palette` ; 103 `cast=Milo, cast=Tara, place=Sunlit Finish Patch, palette`
+  (4 refs). `reference_1..4` in the request bodies matched the plan exactly.
+  Four images in ~5 minutes, one attachment each, media ids stored.
+- **The judge ran on all four** (gpt-4o, ~970 tokens a call, ~$0.003):
+  identity 0.8 / 0.8 / 0.8 / 0.9, wardrobe the same, place **1.0 on every
+  scene**, `sheet_leak: false` on every scene, no re-roll needed. Its
+  "problems" on three scenes were "characters visible from behind at a
+  distance" — the 0.8 the prompt asks for when the face is hidden, which is
+  what the people-filter rule wants anyway.
+- **Clips.** Four clips from the four new images in ~10 minutes; video gate,
+  Finalizat stamps, final-settings gate released by flipping the project
+  status; the run ended `success` at 19:02:17 with every node's data
+  readable.
+
+**One thing the run showed and the fix that followed** (Media Generation
+`3fd53a5f`, Claude Scripting `5ab94af7`, `applied/03-*` and `04-*`): the
+sheet prompt, the assembler's cast sentence and the judge's questions all said
+"ONE person", "face, hair", "natural skin texture" — written for humans and
+wrong for a snail and a turtle, or any non-human cast. Now "ONE character (a
+person, an animal or a creature, exactly as described)", "face or head, hair
+or markings, colours", "skin or surface texture". Same assembler in all three
+places, re-diffed and republished.

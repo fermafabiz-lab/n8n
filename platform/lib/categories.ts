@@ -112,20 +112,30 @@ export const CATEGORIES: Category[] = [
     label: "Kids story",
     icon: "🧸",
     description:
-      "Gentle pacing for young listeners: slower narration, longer pauses between scenes, softer scene transitions.",
-    ready: false,
+      "A story written and drawn for young children: picture-book visuals, a warm storyteller voice, slower narration with longer breaths between scenes.",
+    ready: true,
     options: [
       {
         name: "narration_pace",
         label: "Narration pace",
-        hint: "Slower speech and longer breaths between scenes, so children can follow along.",
+        hint: "Slower speech and longer breaths between scenes, so children can follow along. Relaxed is a gentle 0.9×; Very slow is 0.8× with real pauses for read-along.",
         type: "select",
         choices: [
           { value: "relaxed", label: "Relaxed" },
           { value: "very_slow", label: "Very slow — read-along" },
         ],
         default: "relaxed",
-        comingSoon: true,
+      },
+      {
+        name: "visual_style",
+        label: "Visual style",
+        hint: "Storybook is soft watercolor illustration, like a picture book. 3D animation is the rounder, more realistic look of modern animated films for kids — realistic visually, never in the story.",
+        type: "select",
+        choices: [
+          { value: "illustrated", label: "Storybook — illustrated" },
+          { value: "cartoon3d", label: "3D animation — more realistic" },
+        ],
+        default: "illustrated",
       },
     ],
   },

@@ -1938,6 +1938,29 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     ...(voiceTone ? { voice_tone: voiceTone } : {}),
     ...(reference_image ? { reference_image } : {}),
   };
+  // Kids story: the category's pace select IS the speed decision, expressed
+  // in the machinery that already works — the whole-film retime. Relaxed is
+  // a gentle 0.9×, read-along a clear 0.8×. Only when the brief's own speed
+  // control was left untouched (=1): an explicit choice there still wins,
+  // because two controls that silently fight is how PACE was inert for
+  // months. The word rides along for the two writing prompts that read it.
+  if (payload.category === "kids") {
+    if (payload.speed === 1) {
+      payload.speed = categoryOptions.narration_pace === "very_slow" ? 0.8 : 0.9;
+      payload.Pace = "Slow";
+    }
+    // A warm storyteller default for the voice, only when the producer left
+    // the tone on "Voice default" — visible and changeable at the audio step
+    // like any chosen tone, unlike the silent absence it replaces.
+    if (!voiceTone) {
+      (payload as { voice_tone?: VoiceTone }).voice_tone = {
+        stability: 0.35,
+        similarity: 0.75,
+        style: 0.4,
+        speakerBoost: true,
+      };
+    }
+  }
   // A no-narration category has nothing to speak and nothing to caption —
   // enforce that server-side no matter what the form controls held.
   if (payload.category === "cinematic") {

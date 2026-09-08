@@ -206,7 +206,8 @@ These each cost hours. Do not rediscover them.
   conclude from an empty read that credentials are missing.
 - **ai33 / useapi / Railway keys are hardcoded into node headers**, not
   credentials — `Submit Render`, `Check Render`, `Submit Mux*`, `Poll Mux*`,
-  `Upload*To Flow`, `Submit Video*`, `AB Submit Multi`, `VR Submit Multi` and
+  `Upload*To Flow`, `Submit Video*`, `AB Submit Multi`, `VR Submit Multi`,
+  `Generate Scene Image`, `Generate Cast Sheet`, `Generate Set Plate` and
   friends carry a literal `x-api-key` / `Authorization`. They work, but they
   live in the workflow JSON, so a rotation means editing nodes and any export
   leaks them.
@@ -777,6 +778,71 @@ content refusal nothing is attached at all: a face is the likeliest thing a
 people filter objected to.
 
 Rollback, measurements and the smoke test: `db/port/cast-sheet/`.
+
+### Consistency, taken further: turnarounds, set plates, tags and a judge (2026-09-08)
+
+The cast sheet above carried a FACE across a film and nothing else. The long
+film still showed the same man with a different coat from behind, and the same
+building rebuilt differently every time the story returned to it — because a
+portrait has no back, and a location existed only as prose. Live since
+2026-09-08 (Media Generation `260e9e25`, Claude Scripting `e5837f7d`; full
+account, originals and rollback ids in `db/port/consistency/`). Six pieces,
+in the order a film meets them:
+
+1. **The bible describes GEOMETRY and lists OBJECTS.** Rule 3 of both bible
+   prompts now demands each location's layout (what stands where, materials,
+   colours), and a new rule 6 lists hero objects (`bible.objects`: a car, a
+   machine, a boat). Both prompts moved in lockstep, as always.
+2. **The segmenter names who and where, in CODE-readable fields.** Each scene
+   carries `location`, `characters[]`, `objects[]`, `time_of_day` as EXACT
+   bible names; `Validate Evidence Refs` canonicalises them against the bible
+   (diacritic-insensitive) and drops anything not in it; `Save scenes To
+   Airtable1` stores them as `Tag-uri Scenă` — `loc:`, `char:`, `obj:`,
+   `tod:` — so no column was added. A film made before the tags falls back to
+   name-matching on `Prompt Vizual`, exactly as the cast sheet did.
+3. **Sheets by tier, once per film**, planned from the WHOLE film (`Load Scene
+   Cast` reads every approved scene before `Cast Sheet Prep`): a lead (in
+   ≥ max(3, 10%) of scenes, or the protagonist with ≥ 2) gets a four-view
+   TURNAROUND — front, both profiles, back — a recurring character (≥ 2) the
+   old single portrait, a one-scene extra nothing. A portrait is upgraded to a
+   turnaround when a character qualifies later. The producer's photo, when
+   there is one, is the protagonist's sheet (drawn FROM it, ground truth), so
+   the real face reaches every scene rather than only the hook. Hero objects
+   in ≥ 2 scenes get a three-view product sheet. Stored as `castRefs` /
+   `castSheets {name:{id,url,kind}}` / `objectRefs`, jsonb-merged.
+4. **Set plates**: one wide, EMPTY, neutral-overcast plate per bible location
+   (`Set Plate Prep → … → Save Set Plates`, stored as `locationRefs` /
+   `locationPlates`). The plate fixes what stands where; light and time follow
+   the text. `Generate Set Plate` is `continueRegularOutput` + `alwaysOutputData`
+   like `Generate Cast Sheet`: a failed plate logs `SET PLATE FAILED` and that
+   location runs on text, never a dead batch.
+5. **One reference assembler, inlined word for word in THREE places** —
+   `Build Image Request` (batch), `Evaluate Image Approval` (the gate's regen)
+   and `IR Build Request` (the site's regen). Order: producer photo (scene 1) →
+   up to two cast sheets (turnarounds first; the protagonist's sheet is skipped
+   when the photo is attached) → one object sheet → one set plate → the previous
+   frame LAST, palette only, and only if a slot is left. The prompt names each
+   reference BY POSITION. After a refusal nothing is attached. **Change one
+   copy, change all three** (`db/port/consistency/code/assembler.js` is the
+   source): a re-rolled picture anchored to different references than its
+   neighbours is the drift this exists to stop.
+6. **A judge, because a reference is still only an instruction.** Every new
+   frame is shown to gpt-4o beside the very sheets and plate it was anchored to
+   (`Judge Prep → Judge? → Consistency Judge → Judge Verdict → If Reroll?`);
+   identity/wardrobe under 0.6, place under 0.55, or the sheet leaking into the
+   frame, sends the SAME scene back through `CONS Reload Scene → Needs Image?`
+   in STRICT MATCH mode, at most twice per scene per pass
+   (`sd.consistencyRerolls`, reset by `Sort & Cap Scenes` like every other
+   counter). The drifted frame is never written. The judge is 3 retries then
+   `continueRegularOutput`, and an unreadable answer is a pass — the producer's
+   image gate is the backstop, as it is for refusals.
+
+Two limits worth knowing. **A sheet's `fifeUrl` dies in ~6 h**; the Flow id
+lives on, so GENERATION is unaffected, but the judge needs a URL to show, so
+a pass starting hours after the sheets were made runs unjudged (`JUDGE
+skipped` in the log). Re-hosting sheets through the media store is the fix
+when it matters. And **two sheets per shot is the cap**, the photo counting as
+one; the previous frame is the first thing dropped when slots run out.
 
 ### The batch cap
 

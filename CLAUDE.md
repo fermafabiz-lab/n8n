@@ -1939,6 +1939,45 @@ each piece handles it:
   never moved again. `reopenStep` now reads the project's category and leaves
   the voice alone on a silent film. **Any new cascade must do the same.**
 
+### Kids story is a real category now (2026-09-07)
+
+`category: 'kids'` — `ready: true`, built as variant B of the plan agreed with
+the producer: picture-book pacing + writing + look, with read-along extras
+(big karaoke captions, kids music folder, book-style chapter cards) deferred
+until a first test film is judged. How each piece works:
+
+- **Both category options are live** (`categories.ts`): `narration_pace`
+  (relaxed / very_slow) and `visual_style` (illustrated default / `cartoon3d`
+  — the producer asked for a "more realistic" Paw-Patrol-ish choice, which is
+  3D-animation realism, never photorealism; the option deliberately never
+  names brands). They ride `category_options` → Normalize stores them in
+  `categoryOptions` untouched — no orchestrator change was needed.
+- **Pace = the retime that already works.** `createProject` maps relaxed→0.9,
+  very_slow→0.8 into the existing `speed` payload (+ `Pace: "Slow"` for the
+  two prompts that read the word) — but ONLY when the brief's own speed
+  control was left at 1, so an explicit choice there still wins. Two controls
+  that silently fight is how PACE was inert for months.
+- **Longer breaths between scenes**: `/assemble` takes `sceneGap` (clamp
+  0.2–2, default 0.35 — the constant that was hard-coded in `eff = voiceDur +
+  0.35`). `Build Timeline` (Final Assembly, active `270dc41c`) derives it:
+  kids relaxed 0.8s, very_slow 1.2s, everyone else 0.35s. Film-time — the
+  retime stretches the gaps too, which is the point.
+- **Writing + look are ONE Voice Mode edit** (Claude Scripting, active
+  `0a162e0d`). The kids block is ADDITIVE — it appends to narrationRules /
+  segmentRules / hookRules instead of replacing them, so kids composes with
+  cinematic (silent kids film keeps silence) and dialogue (keeps tags), and
+  non-kids projects append `''` and render byte-identical prompts. The image
+  style is a mandatory PREFIX on every image_prompt, so it lives in the
+  STORED prompt and every regen path (IR Build Request, Build Image Request,
+  the refusal rewrites) inherits it for free. Storybook bonus, deliberate:
+  "no photorealistic humans anywhere" also starves the Veo people-filter.
+- **Storyteller voice default**: kids + untouched tone control → `voice_tone
+  {stability 0.35, similarity 0.75, style 0.4, speakerBoost}` in the payload.
+  Visible and changeable at the audio step like any chosen tone — unlike the
+  usual "absent = each voice's own settings", which stays the rule everywhere
+  else.
+- **No length cap** — the producer refused one explicitly.
+
 ### Hands-off mode (auto-approve) — the site's hand, not n8n's
 
 `Editing Options.autoApprove` (brief section 08, off by default and strictly

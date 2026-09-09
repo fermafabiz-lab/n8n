@@ -47,6 +47,23 @@ export function licenceChip(a: CardAsset): { cls: "ok" | "warn" | "bad"; text: s
   return { cls: "ok", text: `✓ ${lic}${sa}${credit}`, title: "Auto-approved by the licence rules" };
 }
 
+/**
+ * The one-line credit under the title: who made it, how big it is, and both
+ * dates — the provider's own string, labelled "dated" because it is often the
+ * upload rather than the event, and the years the description MENTIONS, which
+ * are the nearest thing to a period the metadata offers.
+ */
+function metaLine(a: CardAsset): string {
+  return [
+    a.creator,
+    a.width && a.height ? `${a.width}×${a.height}` : null,
+    a.dateOriginal ? `dated ${a.dateOriginal}` : null,
+    a.yearsMentioned.length ? `mentions ${a.yearsMentioned.slice(0, 3).join(", ")}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 export const fmtDuration = (s: number | null): string | null => {
   if (s === null) return null;
   const m = Math.floor(s / 60);
@@ -59,21 +76,22 @@ export default function ArchiveCard({
   selected = false,
   onSelect,
   children,
-  style,
 }: {
   asset: CardAsset;
   selected?: boolean;
   onSelect?: () => void;
   /** The action row — options and buttons — rendered under the metadata. */
   children?: ReactNode;
-  style?: React.CSSProperties;
 }) {
   const chip = licenceChip(asset);
+  // No `style` escape hatch: the card fills whatever grid track it is dropped
+  // into, and both callers use the same track size on purpose. It had one, and
+  // the inline `width: 200` it carried is exactly what kept the suggestions
+  // from filling the room they were moved into.
   return (
     <div
       className={`${styles.card}${selected ? ` ${styles.sel}` : ""}`}
       onClick={onSelect}
-      style={style}
     >
       <div className={styles.thumb}>
         {asset.thumbnailUrl ? (
@@ -91,12 +109,11 @@ export default function ArchiveCard({
         <div className={styles.title} title={asset.title}>
           {asset.title}
         </div>
-        <div className={styles.meta}>
-          {asset.creator ? `${asset.creator} · ` : ""}
-          {asset.width && asset.height ? `${asset.width}×${asset.height}` : ""}
-          {asset.dateOriginal ? ` · dated ${asset.dateOriginal}` : ""}
-          {asset.yearsMentioned.length ? ` · mentions ${asset.yearsMentioned.slice(0, 3).join(", ")}` : ""}
-        </div>
+        {/* Joined from a filtered list rather than concatenated with its own
+            separators: a suggestion carries no width/height (the library row
+            the AI run stores has none), so the hand-written version printed
+            "NASA ·  · dated 1969" on every card in the suggestions bar. */}
+        <div className={styles.meta}>{metaLine(asset)}</div>
         <span className={`${styles.lic} ${styles[chip.cls]}`} title={chip.title}>
           {chip.text}
         </span>

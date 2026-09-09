@@ -1,8 +1,8 @@
+/* No margin: this is a panel in `.stagemain`, whose gap owns the spacing. */
 .wrap {
-  margin-top: 14px;
-  padding: 12px;
+  padding: 12px 14px 14px;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--r-lg);
   background: var(--bg2);
 }
 
@@ -35,6 +35,14 @@
   align-items: center;
 }
 
+/* See ArchiveCard.module.css `.actions button` — `.abtn` carries no horizontal
+   padding of its own, because the `.abtns` grid is what normally sizes it. */
+.row button:not([aria-pressed]),
+.head button {
+  padding: 8px 15px;
+  white-space: nowrap;
+}
+
 .q {
   flex: 1 1 200px;
   min-width: 0;
@@ -49,7 +57,7 @@
 }
 
 .q:focus {
-  border-color: var(--acc);
+  border-color: var(--accent);
 }
 
 .seg {
@@ -70,7 +78,7 @@
 }
 
 .seg button[aria-pressed="true"] {
-  background: var(--acc);
+  background: var(--accent);
   color: #fff;
 }
 
@@ -84,9 +92,11 @@
   color: var(--err, #c0392b);
 }
 
+/* Same track as the suggestions bar's row — offers and search results are the
+   same kind of thing and must not be two sizes of card on one screen. */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 10px;
   margin-top: 10px;
 }

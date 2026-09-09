@@ -332,6 +332,29 @@ export default function SceneBoard({
     step === "video" && !!active && !!active.videoUrl && !active.videoApproved;
 
   /**
+   * The archive section sits UNDER THE MONITOR, not in the Inspector rail.
+   *
+   * Both halves of it are wide by nature — the suggestions are a row of 200px
+   * cards and the picker is a grid of them — while the rail is capped at 400px
+   * (see `.stage`'s grid-template-columns), so in there a bar of four offers
+   * showed one and a half of them behind a scrollbar. Under the monitor they
+   * get the full width the picture gets, which is also where the eye already
+   * is: the offers sit directly beneath the AI image they would replace.
+   *
+   * The conditions are exactly the ones each panel carried in the Inspector,
+   * only hoisted so the two ArchivePicker call sites (images step, video step)
+   * can collapse into one — `step` makes them mutually exclusive, so there was
+   * never a moment both were mounted.
+   */
+  const archiveSuggestionsUp =
+    archive && !!active && imageControls && active.visualSource === "ai";
+  const archivePickerUp =
+    !!active &&
+    archiveOpen &&
+    ((archive && imageControls && !active.regenImage) ||
+      (videoControls && active.visualSource !== "ai"));
+
+  /**
    * The filmstrip is split by chapter, and WRAPS inside it.
    *
    * A 44-scene project turned the strip into a wall of unreadable thumbnails.
@@ -528,7 +551,10 @@ export default function SceneBoard({
 
   return (
     <div className="stage" ref={boardRef}>
-      <div>
+      {/* The monitor column: the picture being judged, and under it the
+          archive section, which belongs to that picture rather than to the
+          rail of labels beside it. */}
+      <div className="stagemain">
         {/* CinemaMode IS the monitor card — it takes the classes so every
             `.monitor …` selector keeps its target, and adds the dim-the-room
             button in the corner. */}
@@ -651,6 +677,31 @@ export default function SceneBoard({
             </p>
           )}
         </CinemaMode>
+
+        {/* What the AI run found for this scene, and the search that goes
+            looking on demand — see `archiveSuggestionsUp` for why they live
+            here and not in the Inspector. The picker keys off step AND scene
+            so a search never carries across either. */}
+        {archiveSuggestionsUp && active && (
+          <ArchiveSuggestions
+            key={`sug-${active.id}`}
+            projectId={projectId}
+            scene={active}
+            run={run}
+            pending={pending}
+          />
+        )}
+        {archivePickerUp && active && (
+          <ArchivePicker
+            key={`${step}-${active.id}`}
+            projectId={projectId}
+            sceneId={active.id}
+            hint={active.narration}
+            run={run}
+            pending={pending}
+            onClose={() => setArchiveOpen(false)}
+          />
+        )}
       </div>
 
       <div className="insp">
@@ -794,17 +845,6 @@ export default function SceneBoard({
 
             {imageControls && (
               <>
-                {/* What the AI run found for this scene, before the AI prompt:
-                    the offer comes first, the fallback (generate it) second. */}
-                {archive && active.visualSource === "ai" && (
-                  <ArchiveSuggestions
-                    key={`sug-${active.id}`}
-                    projectId={projectId}
-                    scene={active}
-                    run={run}
-                    pending={pending}
-                  />
-                )}
                 <label
                   style={{ display: "block", fontSize: 12, color: "var(--dim)", margin: "14px 0 6px" }}
                 >
@@ -922,29 +962,22 @@ export default function SceneBoard({
                       ↩ Back to AI image
                     </button>
                   )}
+                  {/* Opens the picker, which appears UNDER THE MONITOR — the
+                      panel is content and belongs beside the picture it would
+                      replace, while the button belongs in this row with the
+                      other things you can do to the image. */}
                   {archive && (
                     <button
                       className="abtn"
                       disabled={pending}
                       aria-pressed={archiveOpen}
-                      title="Search Wikimedia Commons for real footage or a photo to use instead of a generated picture"
+                      title="Search Wikimedia Commons for real footage or a photo to use instead of a generated picture — results open under the picture"
                       onClick={() => setArchiveOpen((v) => !v)}
                     >
                       🎞 {active.visualSource === "ai" ? "Archive footage…" : "Another archive asset…"}
                     </button>
                   )}
                 </div>
-                )}
-                {archive && archiveOpen && !active.regenImage && (
-                  <ArchivePicker
-                    key={active.id}
-                    projectId={projectId}
-                    sceneId={active.id}
-                    hint={active.narration}
-                    run={run}
-                    pending={pending}
-                    onClose={() => setArchiveOpen(false)}
-                  />
                 )}
               </>
             )}
@@ -1250,17 +1283,6 @@ export default function SceneBoard({
                 </a>
               </div>
               )
-            )}
-            {videoControls && active.visualSource !== "ai" && archiveOpen && (
-              <ArchivePicker
-                key={`v-${active.id}`}
-                projectId={projectId}
-                sceneId={active.id}
-                hint={active.narration}
-                run={run}
-                pending={pending}
-                onClose={() => setArchiveOpen(false)}
-              />
             )}
             {(imageControls || videoControls) && (
               <textarea

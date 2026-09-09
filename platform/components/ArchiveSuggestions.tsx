@@ -96,7 +96,6 @@ export default function ArchiveSuggestions({
               }}
               selected={isSel}
               onSelect={() => setSelected(p.stockId)}
-              style={{ flex: "0 0 200px", width: 200 }}
             >
               {p.reason && (
                 <div className={styles.why} title={p.reason}>

@@ -3579,6 +3579,46 @@ Fetch Scenes (GET, claims) → Build Query Prompt → Query Model → Parse Quer
   hand-searched picker; `ArchiveCard` is shared by both so a licence reads
   the same wherever it appears. The filmstrip shows `🎞 N` on scenes with
   offers that are still undecided.
+- **Both panels live UNDER THE MONITOR (`.stagemain`), not in the Inspector
+  rail** (moved 2026-09-09, producer's call). The rail is capped at 400px by
+  `.stage`'s `grid-template-columns`, and both halves are wide by nature — a
+  row of offers and a grid of search results — so in there four offers showed
+  as one and a half behind a scrollbar. Under the picture they get its full
+  width (786px measured at a 1440 viewport) and sit directly beneath the image
+  they would replace; the suggestions row became a `repeat(auto-fill,
+  minmax(180px, 1fr))` grid at the same track size as the picker's results, so
+  all four are visible at once and offers and search results are one kind of
+  card. The toggle BUTTONS stayed in the Inspector rows — they belong with
+  Approve/Regenerate, and a panel is content, not a control. On a narrow
+  viewport the grid collapses to one column and the section stays attached to
+  the monitor, above the Inspector.
+- **Two defects shipped with slice 2/3 and lived for two days because nobody
+  LOOKED at the page.** Both are invisible to tsc, to a build, and to reading
+  the file.
+  - **`var(--acc)` does not exist — the token is `--accent`.** An unknown
+    custom property makes the whole declaration invalid and it is simply
+    dropped, so the suggestions bar had NO background and NO border (measured:
+    `rgba(0,0,0,0)` and `0px`), a selected card had no ring, and the
+    picker's Any/Video/Photos control had no active state at all. Every one
+    of those rules parsed, shipped, and did nothing. **Check a new
+    stylesheet's tokens against the `:root` block** — `grep -ho 'var(--[a-z0-9-]*'
+    on the module, each name against globals.css — it is a five-second grep
+    and it is the only thing that catches this.
+  - **`.abtn` carries `padding: 12px 0`** — no horizontal padding, because it
+    is built for the `.abtns` GRID, where the cell supplies the width. Dropped
+    into a flex row it collapses to the width of its label: "Use" rendered as
+    a 27px circle with the word spilling out of both sides. Any archive panel
+    putting an `.abtn` in a flex row states the padding itself.
+  **The method, since a Claude Code session has no browser of its own:** write
+  a throwaway `app/zz-probe-*/page.tsx` that renders the component with mock
+  props (no database, no n8n), `next dev` on a spare port, and drive the
+  Playwright chromium already on the box at
+  `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`. Screenshot AND measure
+  — `getBoundingClientRect` on the panels proved the bar sits at the monitor's
+  exact x and width, and `getComputedStyle` is what turned "the panel looks
+  wrong" into "background is transparent because the token does not exist".
+  Delete the probe and `rm -rf .next/types` afterwards, or the generated route
+  types fail the next `tsc`.
 - **First live run, measured** (execution 10942 on "How ww2 started",
   `recjhLgA7KpmQ3WpZ`, 16 scenes, fired while the film sat at its image
   gate): **42 seconds** end to end, 16 scenes looked at, 13 judged worth

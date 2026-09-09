@@ -15,7 +15,60 @@
  * once.
  */
 
+import type { DocumentaryVisualSource } from "@/lib/archive/types";
+import {
+  normalizeConfidence,
+  normalizeVisualOrigin,
+  type VisualProvenance,
+} from "@/lib/provenance";
+
 export type StatusKind = "wait" | "run" | "done" | "err" | "idle";
+
+/**
+ * The archive asset behind a Documentary scene — enough for the Inspector to
+ * say where the picture came from and what it owes (a credit, share-alike),
+ * and for the picker to know it is replacing an archive choice rather than
+ * an AI one. The full row lives in hov.stock_media.
+ */
+export interface SceneStock {
+  id: string;
+  provider: string;
+  mediaType: "video" | "image";
+  title: string;
+  sourceUrl: string;
+  creator: string | null;
+  license: string | null;
+  attributionRequired: boolean;
+  /** The licence could not be auto-approved; the producer is the reviewer. */
+  needsReview: boolean;
+  /** Where in the source the segment starts (stock video only). */
+  offsetSeconds: number | null;
+}
+
+/**
+ * An archive asset a model proposed for a scene. An OFFER, ranked with a
+ * reason; using one goes through the same attach path as a hand-searched
+ * asset, so nothing here is ever a decision.
+ */
+export interface SceneArchiveSuggestion {
+  stockId: string;
+  /** Which source it came through — the card shows it. */
+  provider: string;
+  title: string;
+  mediaType: "video" | "image";
+  thumbnailUrl: string | null;
+  sourceUrl: string;
+  creator: string | null;
+  license: string | null;
+  reviewStatus: "auto_approved" | "manual_review" | "rejected";
+  durationSeconds: number | null;
+  dateOriginal: string | null;
+  yearsMentioned: number[];
+  /** 0..1 as the model judged it; null when the run did not score. */
+  relevance: number | null;
+  reason: string | null;
+  rank: number;
+}
 
 export interface EditingOptions {
   captions: boolean;
@@ -31,6 +84,16 @@ export interface EditingOptions {
   /** Background music AND the synthesized boom/whoosh/riser accents. Both
    *  are composed here, not in the footage, so they ride one switch. */
   music: boolean;
+  /**
+   * A specific track from the Drive `Muzica` folder, pinned by the producer,
+   * or null for "auto by tone" — the selection Final Assembly has always
+   * made on its own (tone subfolder → tone-in-name → default* → any, random
+   * within the pool). `Pick Music Track` in n8n checks this key FIRST, so a
+   * pinned id wins outright; the name rides along only so the site can say
+   * which track is pinned without asking Drive again. Meaningless while
+   * `music` is off — the switch owns silence, exactly like sfx/sfxLevel.
+   */
+  musicTrack: MusicTrack | null;
   /**
    * Whether the pipeline may put drawn cards in this film at all.
    *
@@ -55,6 +118,16 @@ export interface EditingOptions {
    * shadow and a deep accent vanishes into its own shadow.
    */
   captionColor: string | null;
+  /**
+   * Which Veo model the clips are generated on.
+   *
+   * Read by `Current Scene` in Media Generation, which is why this key has
+   * always existed in the stored JSON while the site never declared it. The
+   * site does not WRITE it — the default (`veo-3.1-lite-low-priority`) is free
+   * at any volume and is the whole reason the Ultra plan exists — but it has
+   * to read it, or the cost panel prices a paid film as a free one.
+   */
+  videoModel: string | null;
   /** Playback rate of the finished film: 0.9 slow, 1 normal, 1.1 fast.
    *
    *  This is what the creation form's PACE control finally means. Before it
@@ -76,6 +149,22 @@ export interface EditingOptions {
    * and leaves those films editable, the safe direction.
    */
   speedLocked: boolean;
+  /**
+   * Whether the film prints a small label saying what each visual IS — AI
+   * GENERATED, ARCHIVAL FOOTAGE, ACTUAL FOOTAGE, SOURCE UNVERIFIED.
+   *
+   * ON unless refused, like the other overlays, and for a stronger reason than
+   * most: the montage cuts generated pictures and real archive material into
+   * one continuous film, and saying nothing about a picture's origin reads as
+   * a claim that it is real. Absence therefore means ON, so every film made
+   * before this existed gains the label on its next render.
+   *
+   * It governs the LABEL only. Provenance is stored whatever it says, and a
+   * credit a licence REQUIRES is drawn whatever it says — two different
+   * systems, and conflating them would let a style switch drop a legal
+   * obligation. See docs/source-watermark-license-separation.md.
+   */
+  sourceWatermark: boolean;
   /**
    * Hands-off mode: the site signs off every gate by itself as the assets
    * land — script, scene texts, takes, images, clips — and presses the final
@@ -385,6 +474,23 @@ export interface Scene {
   videoPrompt: string | null;
   /** Kept drafts, newest last. */
   versions: SceneVersion[];
+  /** Documentary mode: where the picture comes from. `ai` for every scene made before it existed. */
+  visualSource: DocumentaryVisualSource;
+  /** The archive asset behind a stock scene; null for `ai`. */
+  stock: SceneStock | null;
+  /**
+   * What this scene's picture IS, and where it came from — the record the
+   * watermark prints and the Footage type control edits.
+   *
+   * Always present: a scene whose origin was never classified reads as
+   * `ai_generated`, which is what every film made by this pipeline before
+   * Documentary mode existed actually is.
+   */
+  provenance: VisualProvenance;
+  /** What the suggestion run proposed for this scene, best first. */
+  archiveSuggestions: SceneArchiveSuggestion[];
+  /** When a run last looked at the scene; null = not yet. Tells "none found" from "not looked". */
+  archiveSuggestedAt: string | null;
   status: string;
   statusKind: StatusKind;
 }
@@ -446,6 +552,23 @@ export interface RawScene {
   /** Already joined by the adapter — see buildVersions(). */
   versions: SceneVersion[];
   statusRaw: string;
+  /** Postgres only (db/007). The Airtable adapter never sets these: `ai`, null. */
+  visualSource?: DocumentaryVisualSource;
+  stock?: SceneStock | null;
+  /**
+   * Postgres only (db/009); absent reads as an AI-generated picture.
+   *
+   * `visualOrigin` is a plain string here rather than the union: it is a
+   * column value that has not been through `normalizeVisualOrigin` yet, and an
+   * adapter should not have to launder a database row into a type before the
+   * builder — whose job that is — has looked at it.
+   */
+  provenance?: (Omit<Partial<VisualProvenance>, "visualOrigin"> & {
+    visualOrigin?: string | null;
+  }) | null;
+  /** Postgres only (db/008). */
+  archiveSuggestions?: SceneArchiveSuggestion[];
+  archiveSuggestedAt?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -550,6 +673,10 @@ export interface Publishing {
   state: "review" | "ready" | "posted";
   /** The title the film will wear on YouTube (which cuts at 100 chars). */
   ytTitle: string;
+  /** The YouTube description — generated by /api/yt-kit, then hand-edited.
+   *  YouTube's own cap is 5000 chars; the store allows a little slack so an
+   *  over-long draft survives the round-trip and the counter can say so. */
+  description: string;
   /** Free notes — what to fix, what to remember at upload time. */
   notes: string;
   /** The YouTube link, once posted. */
@@ -557,6 +684,55 @@ export interface Publishing {
 }
 
 export const PUBLISHING_STATES = ["review", "ready", "posted"] as const;
+
+/**
+ * The Veo tiers a film may choose, with what each 8s clip costs in useapi
+ * credits — measured on the account (25,050/month, no rollover), not quoted.
+ * The model string reaches `Current Scene` in Media Generation verbatim, so
+ * this list must only ever hold ids useapi actually accepts: a wrong id
+ * burns three retries plus ~20 min of cooldowns before killing the batch.
+ */
+export const VIDEO_MODELS = [
+  { id: "veo-3.1-lite-low-priority", credits: 0 },
+  { id: "veo-3.1-lite", credits: 5 },
+  { id: "veo-3.1-fast", credits: 10 },
+  { id: "veo-3.1-quality", credits: 100 },
+] as const;
+
+/** A Drive file the producer pinned as this film's background track. */
+export interface MusicTrack {
+  /** Drive file id — what `Pick Music Track` builds the proxy URL from. */
+  id: string;
+  /** The file's name, kept so the UI can display the pin without Drive. */
+  name: string;
+}
+
+/**
+ * A pinned track, or null for "auto by tone". Defensive like every Editing
+ * Options reader: the value round-trips through jsonb and a merge-write, and
+ * anything without a usable id must read as auto — a malformed pin that
+ * still LOOKED pinned would make `Pick Music Track` emit a proxy URL for a
+ * file that does not exist, which kills the music silently on the render.
+ */
+export function normalizeMusicTrack(raw: unknown): MusicTrack | null {
+  const r = asRecord(raw);
+  const id = typeof r.id === "string" ? r.id.trim() : "";
+  // Drive ids are opaque but never contain whitespace or quotes; refuse
+  // anything shaped like markup so a bad value cannot reach the render.
+  if (!id || id.length > 200 || /[\s"'<>]/.test(id)) return null;
+  const name = typeof r.name === "string" && r.name.trim() ? r.name.trim().slice(0, 200) : id;
+  return { id, name };
+}
+
+/** A known model id, or null — absent means the free default, and stays so. */
+export function normalizeVideoModel(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const v = raw.trim();
+  if (!VIDEO_MODELS.some((m) => m.id === v)) return null;
+  // Storing the free default explicitly would be harmless today, but absence
+  // is the shape every reader already handles; keep one spelling of it.
+  return v === "veo-3.1-lite-low-priority" ? null : v;
+}
 
 /**
  * Defensive like every Editing Options reader: the value round-trips through
@@ -573,6 +749,7 @@ export function normalizePublishing(raw: unknown): Publishing {
   return {
     state,
     ytTitle: str(r.ytTitle, 200),
+    description: str(r.description, 5500),
     notes: str(r.notes, 4000),
     ytUrl: str(r.ytUrl, 500),
   };
@@ -667,10 +844,15 @@ export function buildProject(r: RawProject): Project {
       sfx: opts.sfx !== false,
       sfxLevel: normalizeSfxLevel(opts.sfxLevel),
       music: opts.music === true,
+      musicTrack: normalizeMusicTrack(opts.musicTrack),
       // On unless refused, like the other overlays: a film the pipeline found
       // nothing worth drawing in simply gets an empty list.
       drawnCards: opts.drawnCards !== false,
       captionColor: normalizeCaptionColor(opts.captionColor),
+      // Whitelisted, not merely a string: the id reaches the Flow API
+      // verbatim from Current Scene, and the brief's picker is the writer —
+      // an unknown value must read as the free default everywhere.
+      videoModel: normalizeVideoModel(opts.videoModel),
       // Editing Options is the OVERRIDE, the project's PACE field the default.
       // Two sources on purpose: PACE is chosen on the brief and stored on the
       // project, so falling back to it means every film already in the
@@ -687,6 +869,10 @@ export function buildProject(r: RawProject): Project {
       // before the audio step could sign the pace off — reads as unlocked
       // and keeps its control rather than arriving frozen.
       speedLocked: opts.speedLocked === true,
+      // On unless refused, exactly like the other overlays — and the absence
+      // is what makes every existing film gain the label rather than quietly
+      // shipping unlabelled. `sourceWatermark: false` is the only stored form.
+      sourceWatermark: opts.sourceWatermark !== false,
       // Strictly opt-in, `=== true`: hands-off is a real trade (nothing gets
       // a human look) and must never switch itself on by absence.
       autoApprove: opts.autoApprove === true,
@@ -708,6 +894,54 @@ export function buildProject(r: RawProject): Project {
     publishing: normalizePublishing(opts.publishing),
     castAssign: asRecord(opts.castAssign) as Record<string, string>,
     chapterVoices: asRecord(opts.chapterVoices) as Record<string, string>,
+  };
+}
+
+/**
+ * The scene's provenance record, as the UI and the render both read it.
+ *
+ * Read, never DERIVED: `visual_origin` is written by the site the moment
+ * anything about the picture settles (the archive attach, an image approval, a
+ * prompt edit, the producer's own override), and db/009 backfilled every row
+ * that predates it. A reader that re-classified could disagree with the record
+ * the producer approved — the exact divergence the whole design avoids.
+ *
+ * The archive fields ride along from the linked `stock_media` row rather than
+ * being stored twice; only the facts with nowhere else to live are columns.
+ */
+function buildProvenance(r: RawScene): VisualProvenance {
+  const p = r.provenance ?? {};
+  const stock = r.stock ?? null;
+  const origin =
+    normalizeVisualOrigin(p.visualOrigin) ??
+    // No stored classification: an Airtable-era scene, or a row read before
+    // db/009. Every film this pipeline made before Documentary mode is AI.
+    "ai_generated";
+  const text = (v: unknown): string | undefined => {
+    const s = typeof v === "string" ? v.trim() : "";
+    return s ? s : undefined;
+  };
+  return {
+    visualOrigin: origin,
+    ...(text(p.provider ?? stock?.provider) ? { provider: text(p.provider ?? stock?.provider)! } : {}),
+    ...(text(p.sourceTitle ?? stock?.title) ? { sourceTitle: text(p.sourceTitle ?? stock?.title)! } : {}),
+    ...(text(p.sourceUrl ?? stock?.sourceUrl) ? { sourceUrl: text(p.sourceUrl ?? stock?.sourceUrl)! } : {}),
+    ...(text(p.sourceCreator ?? stock?.creator)
+      ? { sourceCreator: text(p.sourceCreator ?? stock?.creator)! }
+      : {}),
+    ...(text(p.originalDate) ? { originalDate: text(p.originalDate)! } : {}),
+    ...(text(p.originalLocation) ? { originalLocation: text(p.originalLocation)! } : {}),
+    ...(text(p.eventName) ? { eventName: text(p.eventName)! } : {}),
+    // Derived, never stored: `actual_footage` IS the claim that this is the
+    // event, so a separate flag could only ever contradict it.
+    ...(origin === "actual_footage" ? { isExactEventMatch: true } : {}),
+    ...(text(p.rightsStatus) ? { rightsStatus: text(p.rightsStatus)! } : {}),
+    ...(text(p.licenseName ?? stock?.license) ? { licenseName: text(p.licenseName ?? stock?.license)! } : {}),
+    ...(p.attributionRequired ?? stock?.attributionRequired ? { attributionRequired: true } : {}),
+    ...(normalizeConfidence(p.provenanceConfidence) !== undefined
+      ? { provenanceConfidence: normalizeConfidence(p.provenanceConfidence) }
+      : {}),
+    ...(p.manuallyVerified === true ? { manuallyVerified: true } : {}),
   };
 }
 
@@ -814,6 +1048,11 @@ export function buildScene(r: RawScene, index: number): Scene {
     needsFactCheck: r.needsFactCheck,
     videoPrompt: r.videoPrompt,
     versions: r.versions,
+    visualSource: r.visualSource ?? "ai",
+    stock: r.stock ?? null,
+    provenance: buildProvenance(r),
+    archiveSuggestions: r.archiveSuggestions ?? [],
+    archiveSuggestedAt: r.archiveSuggestedAt ?? null,
     status: displayStatus(status),
     statusKind: kind,
   };

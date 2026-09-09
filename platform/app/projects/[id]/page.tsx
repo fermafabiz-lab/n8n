@@ -17,12 +17,15 @@ import ExpandableTitle from "@/components/ExpandableTitle";
 import FinishedFlash from "@/components/FinishedFlash";
 import OpsPanel from "@/components/OpsPanel";
 import AssemblyStatus from "@/components/AssemblyStatus";
+import MusicPicker from "@/components/MusicPicker";
 import SoundSettings from "@/components/SoundSettings";
 import UpscaleFilm from "@/components/UpscaleFilm";
 import PublishingPanel from "@/components/PublishingPanel";
 import AutoPilot from "@/components/AutoPilot";
 import CinemaMode from "@/components/CinemaMode";
 import ProductionActivity from "@/components/ProductionActivity";
+import RoughCutButton from "@/components/RoughCutButton";
+import FilmCost from "@/components/FilmCost";
 import { StepCard, StageNavProvider } from "@/components/StageNav";
 import {
   executionUrl,
@@ -245,7 +248,16 @@ export default async function ProductionRoom({
     showing(
       "audio",
       scenes.every((s) => s.sceneApproved) &&
-        withVoice.some((s) => !s.voiceApproved),
+        // `withVoice.length === 0` is the case this used to miss, and it is
+        // the whole window between approving the scenes and the first take
+        // landing. Requiring an existing take meant the page opened on the
+        // scene board — Images — for exactly the minute where Audio is the
+        // step the producer is waiting on, which is what the stepper had
+        // been saying all along (Audio goes "act" the moment the scenes are
+        // signed off). The panel already draws this state properly: it says
+        // the narration is being synthesized and the takes appear one by
+        // one. It simply was never on screen to say it.
+        (withVoice.length === 0 || withVoice.some((s) => !s.voiceApproved)),
     );
 
   // Script review phase: the Scripturi record is still awaiting approval.
@@ -456,6 +468,10 @@ export default async function ProductionRoom({
               </div>
             </div>
             <div className="wk-side">
+              {/* Highest up the page on purpose: the whole point is that the
+                  film can be watched at any moment, not only after the render
+                  at the very bottom. */}
+              <RoughCutButton scenes={scenes} portrait={project.aspect === "9:16"} />
               <NotifyChip />
               {/* Counted off the same pipeline() states the stepper draws, so
                   the bar can never claim a stage the cards do not show as
@@ -549,7 +565,15 @@ export default async function ProductionRoom({
               initialSpeed={project.editing.speed}
             />
             <UpscaleFilm projectId={id} sceneCount={scenes.length} />
-            <PublishingPanel projectId={id} initial={project.publishing} />
+            <PublishingPanel
+              projectId={id}
+              initial={project.publishing}
+              /* Thumbnail candidates: every scene's approved still, full
+                 resolution, already ours in the media store. */
+              stills={scenes
+                .filter((s) => s.imageUrl)
+                .map((s) => ({ label: s.label, url: s.imageUrl! }))}
+            />
           </div>
         )}
 
@@ -615,12 +639,22 @@ export default async function ProductionRoom({
         )}
 
         {showing("final", project.awaitingFinalSettings) && (
-          <FinalSettings
-            projectId={id}
-            initial={project.editing}
-            motifCards={project.motifCards}
-            silent={silent}
-          />
+          <>
+            <FinalSettings
+              projectId={id}
+              initial={project.editing}
+              motifCards={project.motifCards}
+              silent={silent}
+            />
+            {/* Deliberately beside FinalSettings, not a row inside it: that
+                panel batches choices into one confirm that also STARTS the
+                render, while pinning a track is a self-saving audition. */}
+            <MusicPicker
+              projectId={id}
+              current={project.editing.musicTrack}
+              musicOn={project.editing.music}
+            />
+          </>
         )}
 
         {showing("assembly", assembling && !project.finalVideoUrl) &&
@@ -652,6 +686,19 @@ export default async function ProductionRoom({
             }
           />
         )}
+        {/* Which track this render mixes under the film — the choice used to
+            be visible only by watching the finished cut. Auto = the pipeline's
+            own tone-matched pick from the Drive `Muzica` folder. */}
+        {showing("assembly", assembling && !project.finalVideoUrl) &&
+          !project.finalVideoUrl &&
+          project.editing.music && (
+            <div className="setupnote" style={{ marginTop: 10 }}>
+              🎵 Muzica acestui render:{" "}
+              {project.editing.musicTrack
+                ? project.editing.musicTrack.name.replace(/\.[a-z0-9]{2,4}$/i, "").replace(/[-_]+/g, " ")
+                : "aleasă automat după ton, din folderul Drive „Muzica”"}
+            </div>
+          )}
 
         {/* Live production activity: shown once media generation is the
             phase (every scene approved) and until production hands over to
@@ -676,6 +723,16 @@ export default async function ProductionRoom({
               silent={silent}
             />
           )}
+
+        {/* What the film has consumed. Below the activity because it answers a
+            different question — not "what is happening" but "what has this
+            cost me" — and it is the one number a client paying for an ad asks
+            for. Pure arithmetic over rows the page already has. */}
+        <FilmCost
+          scenes={scenes}
+          videoModel={project.editing.videoModel}
+          lengthSeconds={project.lengthSeconds}
+        />
 
         {/* Voice gate: images are signed off, so synthesis is the current
             step — the panel appears as soon as the pipeline reaches it, even
@@ -718,6 +775,10 @@ export default async function ProductionRoom({
             // On the live page the board picks the step itself, and it may
             // only pick "audio" when the panel that serves it is rendered.
             audioPanel={audioPanel}
+            // Documentary films may swap any scene's picture for archive
+            // footage; the picker is the board's, the permission is the
+            // category's.
+            archive={project.category === "documentary"}
           />
         ) : null}
 

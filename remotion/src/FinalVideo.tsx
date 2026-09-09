@@ -17,6 +17,7 @@ import {RouteCard} from './components/RouteCard';
 import {ScheduleCard} from './components/ScheduleCard';
 import {buildTextCards, toMontageCards} from './textCards';
 import {SourceVideo} from './components/SourceVideo';
+import {SourceWatermark} from './components/SourceWatermark';
 import {presetForTone} from './style';
 import {resolveCaptionAccent} from './captionColor';
 import type {FinalVideoProps} from './types';
@@ -44,6 +45,7 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 	textCards,
 	showTextCards = true,
 	narrationIsSpoken = true,
+	showSourceWatermark = true,
 }) => {
 	const {fps} = useVideoConfig();
 	const frame = useCurrentFrame();
@@ -287,6 +289,24 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 							preset={preset}
 							suppressUntilSeconds={hookSeconds - 0.4}
 							portrait={aspectRatio === '9:16'}
+						/>
+					)}
+					{/* What the viewer is actually looking at. Same two gates the
+					    captions carry, for two different reasons: a full-frame card
+					    REPLACES the picture, so labelling that frame's provenance
+					    would describe something nobody can see, and the hook is the
+					    film's one statement frame where the "one text element at a
+					    time" rule applies.
+					    Rendered whatever `showSourceWatermark` says: the switch owns
+					    the LABEL, and a licence that demands a credit is not a style
+					    choice. A scene owing neither draws nothing. */}
+					{!activeCard && !chapterCardUp && (
+						<SourceWatermark
+							scenes={scenes}
+							preset={preset}
+							showLabel={showSourceWatermark}
+							portrait={aspectRatio === '9:16'}
+							suppressUntilSeconds={hookSeconds}
 						/>
 					)}
 					{/* Text cards. Each gets its own Sequence so the component's clock

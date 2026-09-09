@@ -5,7 +5,11 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "check:review": "node --experimental-strip-types scripts/check-review.mjs",
+    "check:cost": "node --experimental-strip-types scripts/check-cost.mjs",
+    "check:provenance": "node --experimental-strip-types scripts/check-provenance.mjs",
+    "check:footage": "node --experimental-strip-types --no-warnings --import ./scripts/footage-loader.mjs scripts/check-footage.mjs"
   },
   "dependencies": {
     "next": "^15.3.0",

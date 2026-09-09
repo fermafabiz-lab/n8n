@@ -17,6 +17,16 @@ export function middleware(req: NextRequest) {
   // with an HTML page that every one of those nodes would happily parse as a
   // record.
   if (req.nextUrl.pathname.startsWith("/api/at/")) return NextResponse.next();
+  // The archive search serves the browser (cookie) AND n8n (key). Only a
+  // request carrying the right key skips the login redirect here; the route
+  // checks both credentials again itself, so this is a door, not the lock.
+  if (
+    (req.nextUrl.pathname.startsWith("/api/archive/") || req.nextUrl.pathname.startsWith("/api/footage/")) &&
+    process.env.MEDIA_INGEST_KEY &&
+    req.headers.get("x-hov-key") === process.env.MEDIA_INGEST_KEY
+  ) {
+    return NextResponse.next();
+  }
   if (req.cookies.get("vf_auth")?.value === expected) return NextResponse.next();
   const url = req.nextUrl.clone();
   url.pathname = "/login";

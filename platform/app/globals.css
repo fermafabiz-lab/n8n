@@ -1132,6 +1132,21 @@ body:has(.nb) .nav {
      edge and the Assembly card's right edge exactly as the script panel does. */
   padding: 0 2px;
 }
+/* The monitor column. It held one card for months and is a stack now: the
+   archive section sits under the picture, because a row of footage options is
+   about the picture and is far too wide for the 400px inspector rail. Same
+   gap as `.insp`, so the two columns' panels line up across the grid — and the
+   gap is the ONLY thing spacing them, which is why the archive panels declare
+   no margin of their own. */
+.stagemain {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  /* The suggestions row inside scrolls horizontally; without this the column
+     takes its content's width instead and the scroll never engages. `.stage > *`
+     already says it — repeated because this is the one that owns a scroller. */
+  min-width: 0;
+}
 .monitor {
   background: var(--card);
   border: 1px solid var(--line);
@@ -2071,6 +2086,14 @@ body:has(.nb) .nav {
   font-size: 21px;
   font-weight: 600;
   letter-spacing: -0.015em;
+}
+/* The one-line consequence under a control — the video-quality cost line. */
+.fsec .fnote {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--dim);
+  max-width: 56ch;
 }
 .fsec .fhint {
   margin-left: auto;
@@ -5601,59 +5624,4 @@ body:has(.mkt) .vignette {
   margin: 10px 0 0;
   font-size: 11.5px;
   color: var(--dim);
-}
-
-/* ── Publishing panel (under the finished film) ─────────────────────────── */
-.pubpanel .pubfield {
-  display: block;
-  margin-top: 12px;
-}
-.pubpanel .pubhead {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--soft);
-  margin-bottom: 6px;
-  letter-spacing: 0.02em;
-}
-.pubpanel .pubcount {
-  font-size: 11.5px;
-  font-weight: 500;
-  color: var(--dim);
-  font-variant-numeric: tabular-nums;
-}
-.pubpanel .pubcount.over {
-  color: var(--red);
-  font-weight: 700;
-}
-.pubpanel input,
-.pubpanel textarea {
-  width: 100%;
-  box-sizing: border-box;
-  background: var(--card);
-  border: 1px solid var(--line2);
-  border-radius: 12px;
-  color: var(--ink);
-  font: inherit;
-  font-size: 14px;
-  padding: 10px 13px;
-  outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-.pubpanel textarea {
-  resize: vertical;
-  min-height: 64px;
-}
-.pubpanel input:focus,
-.pubpanel textarea:focus {
-  border-color: var(--accent-a28);
-  box-shadow: 0 0 0 3px rgba(122, 79, 214, 0.12);
-}
-.pubpanel .pubwarn {
-  display: block;
-  margin-top: 5px;
-  font-size: 12px;
-  color: var(--red);
 }

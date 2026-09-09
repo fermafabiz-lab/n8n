@@ -1,0 +1,224 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line2);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--card2);
+}
+
+.card.sel {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.thumb {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #111;
+  overflow: hidden;
+}
+
+.thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.kind {
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+}
+
+/* The engine's score, top-right, where a rating badge is expected. */
+.score {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  min-width: 26px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.prov {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  border: 1px solid var(--line2);
+  background: var(--bg2);
+  color: var(--soft);
+}
+
+.pv {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent-deep);
+}
+
+.pvActual {
+  border-color: color-mix(in srgb, #2e9e5b 40%, transparent);
+  background: color-mix(in srgb, #2e9e5b 14%, transparent);
+  color: #1f7a45;
+}
+
+.pvUnknown {
+  border-color: var(--line2);
+  background: var(--bg2);
+  color: var(--dim);
+}
+
+.dur {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Fills the card's remaining height so `.actions` can be pinned to the
+   bottom: the grid stretches every card to the tallest, and without this a
+   one-line title floated its Use button half a card above its neighbours',
+   across a row whose whole job is being scanned side by side. */
+.body {
+  padding: 7px 8px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+
+.title {
+  color: var(--ink);
+  font-weight: 600;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.meta {
+  color: var(--dim);
+  font-size: 11px;
+}
+
+.lic {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  border: 1px solid transparent;
+  align-self: flex-start;
+}
+
+.lic.ok {
+  background: color-mix(in srgb, #2e9e5b 14%, transparent);
+  color: #1f7a45;
+  border-color: color-mix(in srgb, #2e9e5b 40%, transparent);
+}
+
+.lic.warn {
+  background: color-mix(in srgb, #d99a1e 16%, transparent);
+  color: #8a5f06;
+  border-color: color-mix(in srgb, #d99a1e 45%, transparent);
+}
+
+.lic.bad {
+  background: color-mix(in srgb, #c0392b 14%, transparent);
+  color: #9b2b1f;
+  border-color: color-mix(in srgb, #c0392b 40%, transparent);
+}
+
+.opts {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.opts label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--dim);
+  font-size: 11px;
+}
+
+.opts input {
+  width: 54px;
+  padding: 3px 6px;
+  border: 1px solid var(--line2);
+  border-radius: 7px;
+  background: var(--bg2);
+  color: var(--ink);
+  font: inherit;
+  font-size: 11.5px;
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: auto;
+  padding-top: 6px;
+}
+
+/* `.abtn` is built for the `.abtns` GRID, where the cell gives it its width —
+   its own padding is `12px 0`, no horizontal at all. Dropped into a flex row
+   it collapses to the width of its label, which is how "Use" rendered as a
+   27px circle with the word spilling out of it. Every archive panel that puts
+   an .abtn in a flex row has to say this. */
+/* `.abtn` has no horizontal padding of its own (it is built for a grid cell),
+   so it is stated here. The label may wrap: "Use — I accept the rights" is
+   wider than a 180px card and clipped mid-word under `nowrap` — measured on
+   the probe page, not guessed. */
+.actions button {
+  padding: 8px 12px;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.2;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.actions a {
+  color: var(--dim);
+  font-size: 11px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

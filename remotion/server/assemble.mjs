@@ -94,9 +94,10 @@ async function probeDuration(file, stream) {
  *
  * ElevenLabs pads what it generates: a take opens with a beat of near-silence
  * and closes with another. Inside one line that is natural. Laid end to end
- * down a film it is not — the scene length is `voiceDur + 0.35`, so every
- * padded tail is added to a gap that already exists, and the narration comes
- * out slower and more recited than the take sounds on its own.
+ * down a film it is not — the scene length is `voiceDur + sceneGap` (0.35s
+ * unless the request says otherwise), so every padded tail is added to a gap
+ * that already exists, and the narration comes out slower and more recited
+ * than the take sounds on its own.
  *
  * -45dB rather than a rounder number: the generated audio is clean, so the
  * floor only has to clear encoder noise, and a threshold set too high eats the
@@ -277,6 +278,16 @@ export function registerAssemble(app, {jobs, outputDir}) {
 		// Remotion pass that draws over this montage is 2.09x slower per frame
 		// at 1080p (measured, 0.107s against 0.224s), which is what pushes a
 		// long film past the graphics poll ceiling.
+		// How long the picture breathes past the narration on every scene.
+		// 0.35s has always been the montage's fixed gap; a category can ask
+		// for more — Kids story sends 0.8/1.2 so young listeners can follow.
+		// Clamped like every knob here: a bad value must fall back to the
+		// classic gap, never stall the film or crush the cut. Note chapter
+		// openers additionally keep their take's own lead-in (breath trim).
+		const sceneGap = (() => {
+			const n = Number(req.body && req.body.sceneGap);
+			return Number.isFinite(n) && n >= 0.2 && n <= 2 ? n : 0.35;
+		})();
 		const hd = String((req.body && req.body.resolution) || '720p').toLowerCase() === '1080p';
 		const W = portrait ? (hd ? 1080 : 720) : (hd ? 1920 : 1280);
 		const H = portrait ? (hd ? 1920 : 1280) : (hd ? 1080 : 720);
@@ -360,7 +371,7 @@ export function registerAssemble(app, {jobs, outputDir}) {
 					let stretch = 1;
 					let freeze = 0;
 					if (voiceDur) {
-						eff = voiceDur + 0.35;
+						eff = voiceDur + sceneGap;
 						stretch = eff / dur;
 						if (stretch > STRETCH_MAX) {
 							// Even at max slow-motion the clip can't cover the voice —

@@ -25,11 +25,20 @@ import {
   getScenes,
   getProjectScriptInfo,
   normalizePublishing,
+  refreshSceneVisualOrigin,
+  setSceneProvenance,
 } from "@/lib/data";
 import {
+  normalizeVisualOrigin,
+  refuseFootageType,
+  ORIGIN_LABELS,
+} from "@/lib/provenance";
+import {
   normalizeCaptionColor,
+  normalizeMusicTrack,
   normalizeSfxLevel,
   normalizeSpeed,
+  normalizeVideoModel,
   normalizeVoiceTone,
   type VoiceTone,
 } from "@/lib/data/derive";
@@ -41,6 +50,60 @@ import {
   stopExecution,
 } from "@/lib/n8n";
 import { getCategory } from "@/lib/categories";
+import { attachArchiveAsset, DEFAULT_SECONDS } from "@/lib/archive/attach";
+import { detachStockFromScene, resetArchiveSuggestions } from "@/lib/data/stock";
+
+/**
+ * Ask n8n to look for archive footage for this film's newly approved scenes.
+ *
+ * Fire-and-forget: the `archive-suggest` webhook answers as soon as it has
+ * the request and the run takes a minute or more, so nothing here waits on
+ * it, and a failure costs the suggestions and never the approval that
+ * triggered it. Only documentary films get one — every other category has
+ * no archive step at all.
+ */
+async function fireArchiveSuggest(projectId: string): Promise<void> {
+  try {
+    if (process.env.DATA_BACKEND !== "postgres") return;
+    const project = await getProject(projectId);
+    if (project?.category !== "documentary") return;
+    const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
+    const webhook = newProject?.replace(/new-project\/?$/, "archive-suggest");
+    if (!webhook?.includes("archive-suggest")) return;
+    await fetch(webhook, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project_id: projectId }),
+      signal: AbortSignal.timeout(8000),
+    });
+  } catch (e) {
+    console.warn(`archive-suggest webhook: ${(e as Error).message}`);
+  }
+}
+
+/**
+ * The manual door: look again, for every AI scene of the film that has no
+ * clip yet. Existing picks stay until the run replaces them.
+ */
+export async function requestArchiveSuggestions(projectId: string): Promise<ActionResult> {
+  if (!isConfigured) return { ok: true, message: "Demo mode — nothing was written." };
+  if (process.env.DATA_BACKEND !== "postgres") {
+    return { ok: false, message: "Archive suggestions need the Postgres backend." };
+  }
+  try {
+    const n = await resetArchiveSuggestions(projectId);
+    await fireArchiveSuggest(projectId);
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message: n
+        ? `Looking for archive footage for ${n} scene${n === 1 ? "" : "s"} — suggestions land on the Images step within a minute or two (the page refreshes itself).`
+        : "Every scene already has a clip or uses archive footage — nothing left to look for.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
 
 export interface ActionResult {
   ok: boolean;
@@ -117,6 +180,11 @@ async function flagStaleClip(
 ): Promise<"none" | "flagged" | "blocked"> {
   const inputs = await readSceneVideoInputs(sceneId).catch(() => null);
   if (!inputs?.hasClip) return "none";
+  // An archive scene's clip was cut from the archive, not made from the
+  // picture — approving the picture makes nothing stale. And a video regen
+  // flag on such a scene is worse than useless: Prep Video Regen throws
+  // without a Flow asset id, and a throw there kills the whole batch.
+  if (inputs.visualSource && inputs.visualSource !== "ai") return "none";
   if (!inputs.hasImageMediaId || !inputs.hasMotionPrompt) return "blocked";
   // This path replaces a clip the producer never asked to lose — it fires
   // when an approved image made the existing clip stale — so it is the one
@@ -158,6 +226,21 @@ async function autoKeep(sceneId: string, kind: "image" | "video"): Promise<void>
   await saveVersionOfScene(sceneId, kind, { auto: true }).catch(() => {});
 }
 
+/**
+ * Store what this scene's picture IS, now that the prompt behind it is settled.
+ *
+ * Run at the two moments the answer can change — the picture is approved, or a
+ * prompt is edited — because the classification has to be STORED: the render
+ * looks it up and never re-derives, which is the only reason a label about
+ * truthfulness can be trusted to match what the producer signed off.
+ *
+ * Swallows its errors on purpose, exactly like `autoKeep`: a corner label must
+ * never be able to block an approval.
+ */
+async function classifyScene(sceneId: string): Promise<void> {
+  await refreshSceneVisualOrigin(sceneId).catch(() => {});
+}
+
 export async function sceneAction(
   projectId: string,
   sceneId: string,
@@ -169,6 +252,18 @@ export async function sceneAction(
     return { ok: true, message: "Demo mode — nothing was written. Connect Airtable to make this real." };
   }
   try {
+    if (kind === "video" && action === "regenerate") {
+      // Same reason as in flagStaleClip: a stock scene must never carry the
+      // video-regen flag, and it has nothing for Veo to redo anyway.
+      const inputs = await readSceneVideoInputs(sceneId).catch(() => null);
+      if (inputs?.visualSource && inputs.visualSource !== "ai") {
+        return {
+          ok: false,
+          message:
+            "This scene uses archive footage, so there is nothing for Veo to regenerate — pick another archive asset, or send the scene back to AI from the Images step.",
+        };
+      }
+    }
     if (action === "regenerate" && feedback?.trim()) {
       // n8n appends this to the generation prompt, then clears it.
       await writeSceneFeedback(sceneId, feedback.trim());
@@ -177,6 +272,10 @@ export async function sceneAction(
     // the field the old asset is unreachable.
     if (action === "regenerate") await autoKeep(sceneId, kind);
     await writeSceneApproval(sceneId, kind, action);
+    // The approved picture is the final one, so this is the moment its origin
+    // is worth recording — including whether the prompt describes a historical
+    // reconstruction rather than an invention.
+    if (kind === "image" && action === "approve") await classifyScene(sceneId);
 
     // Image regeneration runs on its own webhook, so it no longer depends on
     // a live media-generation execution being alive to notice the flag.
@@ -275,6 +374,61 @@ export async function regenerateVoice(
   }
 }
 
+/**
+ * Take back the approvals just given, and nothing else.
+ *
+ * Approving is the one action on this page that is both irreversible and easy
+ * to fire by accident — "Approve all 71" is a single click, and `A` on the
+ * keyboard is one keystroke that also advances, so a double-press signs off a
+ * scene nobody looked at. Until now the only way back was `reopenStep`, one
+ * scene at a time, or SQL in /db.
+ *
+ * It clears the checkbox and DOES NOT set a regeneration flag. That
+ * distinction is the whole design: `writeSceneApproval(…, "regenerate")` would
+ * queue new work at fal or Flow, so an undo that used it would spend money to
+ * reverse a mistake. Undoing leaves the asset exactly where it was, merely
+ * unsigned, which is the state it was in a moment ago.
+ *
+ * It also does not cascade the way `reopenStep` does. Reopening a step means
+ * "this needs another look" and rightly invalidates what was derived from it;
+ * undo means "that click was a mistake", and taking a clip's approval away
+ * because the picture's approval was withdrawn would punish the producer for
+ * the misclick a second time.
+ *
+ * The one thing it cannot take back: if approving a picture already queued a
+ * fresh clip (`flagStaleClip`), that regeneration is dispatched and the caller
+ * is told so rather than being left to discover it.
+ */
+export async function undoApprovals(
+  projectId: string,
+  sceneIds: string[],
+  kind: "image" | "video",
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  if (!sceneIds.length) return { ok: true, message: "Nothing to undo." };
+  const field = kind === "image" ? "Aprobare Imagine" : "Aprobare Video";
+  try {
+    for (const id of sceneIds) {
+      await writeSceneFields(id, { [field]: false });
+      // Airtable rate limit is 5 req/s per base; n8n polls concurrently.
+      if (sceneIds.length > 1) await new Promise((r) => setTimeout(r, 250));
+    }
+    revalidatePath(`/projects/${projectId}`);
+    const n = sceneIds.length;
+    return {
+      ok: true,
+      message:
+        n === 1
+          ? `Approval taken back. The ${kind === "image" ? "picture" : "clip"} is unchanged.`
+          : `Took back ${n} approvals. Nothing was regenerated.`,
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
 export async function approveAllOfKind(
   projectId: string,
   sceneIds: string[],
@@ -296,6 +450,8 @@ export async function approveAllOfKind(
         const outcome = await flagStaleClip(id);
         if (outcome === "flagged") restaled++;
         if (outcome === "blocked") blocked++;
+        // Same as the single approve: record what the approved picture is.
+        await classifyScene(id);
       }
       // Airtable rate limit is 5 req/s per base; n8n polls concurrently.
       await new Promise((r) => setTimeout(r, 250));
@@ -365,6 +521,10 @@ export async function saveSceneScript(
       // Same door the audio panel uses — saves the line and re-reads it.
       await regenerateVoice(projectId, sceneId, narration);
     }
+    // A documentary scene just approved is one the archive run should look
+    // at; the run itself picks only scenes not yet looked at, so firing per
+    // approval is cheap and the lease keeps overlapping runs apart.
+    if (approve) await fireArchiveSuggest(projectId);
 
     revalidatePath(`/projects/${projectId}`);
     const suffix =
@@ -404,6 +564,10 @@ export async function saveImagePrompt(
   }
   try {
     await writeSceneScript(sceneId, { imagePrompt });
+    // The prompt is what the reconstruction test reads, so a changed prompt
+    // can change what this scene is. Left alone on a scene the producer
+    // classified by hand — see refreshSceneVisualOrigin.
+    await classifyScene(sceneId);
     revalidatePath(`/projects/${projectId}`);
     return { ok: true, message: "Image prompt saved." };
   } catch (e) {
@@ -465,6 +629,165 @@ export async function saveVideoPrompt(
       ok: true,
       message:
         "Shot direction saved — the clip is back for review. Press Regenerate video to shoot it again.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/**
+ * Documentary mode: put an archive asset on a scene.
+ *
+ * The site makes BOTH assets itself — the still (or the clip's first frame)
+ * as the scene image, and an mp4 clip cut or Ken-Burnsed to length — so the
+ * batch's `Needs Image?` / `Needs Clip?` find nothing to do and the scene
+ * flows through the same approval gates as a generated one. No n8n change.
+ *
+ * The outgoing image and clip are filed as drafts first, exactly like every
+ * other replacing path: the moment you want the AI picture back is the moment
+ * you did not think to save it.
+ */
+export async function useArchiveAsset(
+  projectId: string,
+  sceneId: string,
+  stockId: string,
+  opts: { offsetSeconds?: number; seconds?: number } = {},
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  if (process.env.DATA_BACKEND !== "postgres") {
+    return { ok: false, message: "Archive footage needs the Postgres backend — the library lives there." };
+  }
+  try {
+    const [project, scenes] = await Promise.all([getProject(projectId), getScenes(projectId)]);
+    if (!project) return { ok: false, message: "Project not found." };
+    const scene = scenes.find((s) => s.id === sceneId);
+    if (!scene) return { ok: false, message: "Scene not found." };
+
+    await autoKeep(sceneId, "image");
+    await autoKeep(sceneId, "video");
+    const r = await attachArchiveAsset({
+      sceneId,
+      stockId,
+      portrait: project.aspect === "9:16",
+      offsetSeconds: opts.offsetSeconds ?? 0,
+      seconds: opts.seconds ?? DEFAULT_SECONDS,
+      sceneOrder: scene.order,
+    });
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message: `Archive ${r.mediaType === "video" ? "clip" : "still"} in place — “${r.title}”, ${r.seconds}s. Approve the image, then the clip on the Video step; the batch skips this scene's generation.`,
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/**
+ * "Footage type" — the producer's own answer to what a scene's picture is.
+ *
+ * The classifier can say the picture is AI, or that it is a catalogued archive
+ * item. It cannot say whether an archive clip shows THE event the narration is
+ * describing, at that place, on that day — that is a judgement about the world,
+ * and getting it wrong is the one failure this whole feature exists to prevent.
+ * So `actual_footage` and `illustrative_footage` are reachable only here, by a
+ * person, and choosing one records that a person made the call.
+ *
+ * Two things it refuses (see `refuseFootageType`): an AI picture may not be
+ * relabelled as real of any kind — the door is replacing the media — and a real
+ * archive picture may not be relabelled as AI.
+ *
+ * `origin: "auto"` releases the pin and lets the classifier own the scene again.
+ */
+export async function setSceneFootageType(
+  projectId: string,
+  sceneId: string,
+  origin: string,
+  details: { eventName?: string; location?: string; date?: string } = {},
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    const inputs = await readSceneVideoInputs(sceneId).catch(() => null);
+    const visualSource = inputs?.visualSource ?? "ai";
+
+    if (origin === "auto") {
+      await setSceneProvenance(sceneId, {
+        // Cleared to the pipeline's default and then immediately re-decided by
+        // the classifier below, which is the only thing that may own it now.
+        visualOrigin: visualSource === "stock_video"
+          ? "archival_footage"
+          : visualSource === "stock_image"
+            ? "archival_photo"
+            : "ai_generated",
+        manuallyVerified: false,
+        confidence: 0,
+        eventName: null,
+        location: null,
+        date: null,
+      });
+      await refreshSceneVisualOrigin(sceneId);
+      revalidatePath(`/projects/${projectId}`);
+      return { ok: true, message: "Footage type is back to automatic." };
+    }
+
+    const next = normalizeVisualOrigin(origin);
+    if (!next) return { ok: false, message: "That is not a footage type." };
+    const refusal = refuseFootageType(next, { visualSource });
+    if (refusal) return { ok: false, message: refusal };
+
+    const clean = (v: string | undefined) => {
+      const s = String(v ?? "").trim();
+      return s ? s.slice(0, 200) : null;
+    };
+    await setSceneProvenance(sceneId, {
+      visualOrigin: next,
+      // Any explicit choice is a pin: without it the next image approval would
+      // quietly re-classify the scene and the producer's answer would vanish.
+      manuallyVerified: true,
+      // A person said so, which is the highest confidence this system has —
+      // and, for `actual_footage`, the ONLY way past the 90 threshold. An
+      // explicit "unknown" is the exception: it is a statement that nothing is
+      // known, so claiming confidence in it would be self-contradictory.
+      confidence: next === "unknown" ? 0 : 100,
+      eventName: clean(details.eventName),
+      location: clean(details.location),
+      // Only what a person typed ever reaches the screen — never the archive's
+      // own date field, which is frequently the upload date.
+      date: clean(details.date),
+    });
+    revalidatePath(`/projects/${projectId}`);
+    return { ok: true, message: `Footage type set to ${ORIGIN_LABELS[next]}.` };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/**
+ * The way back: drop the archive link and the clip, then ask for an AI
+ * picture through the ordinary image-regen webhook. `Scene Final URL` is
+ * cleared with it, so once the new picture is approved `Needs Clip?` sees a
+ * scene that owes a clip and Veo makes one.
+ */
+export async function backToAiImage(projectId: string, sceneId: string): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  if (process.env.DATA_BACKEND !== "postgres") {
+    return { ok: false, message: "Archive footage needs the Postgres backend." };
+  }
+  try {
+    await autoKeep(sceneId, "video");
+    await detachStockFromScene(sceneId);
+    const r = await sceneAction(projectId, sceneId, "image", "regenerate");
+    if (!r.ok) return r;
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message: "Back to AI — a new picture is being generated; approve it and the clip follows.",
     };
   } catch (e) {
     return { ok: false, message: friendlyError(e) };
@@ -850,6 +1173,9 @@ export async function confirmFinalSettings(
     music: boolean;
     drawnCards: boolean;
     captionColor: string | null;
+    /* Sent for the same reason as sfxLevel: this panel SHOWS the switch, so
+       writing it back is a no-op unless the producer moved it. */
+    sourceWatermark: boolean;
     /* NO `speed` here, on purpose. The pace is decided and signed off at the
        audio step, which is the only moment it is free to change, and this
        panel must not be able to move it — nor to reset it. Because
@@ -888,6 +1214,9 @@ export async function confirmFinalSettings(
         music: settings.music,
         drawnCards: settings.drawnCards,
         captionColor: normalizeCaptionColor(settings.captionColor),
+        // The LABEL only. Provenance stays stored and a licence credit still
+        // prints — see docs/source-watermark-license-separation.md.
+        sourceWatermark: settings.sourceWatermark !== false,
       });
     }
     // Same merge, separate condition: the cards change even when no toggle
@@ -1355,6 +1684,8 @@ export async function approveAllScenes(
       // Airtable rate limit is 5 req/s per base.
       await new Promise((r) => setTimeout(r, 250));
     }
+    // One run for the whole batch — see saveSceneScript.
+    await fireArchiveSuggest(projectId);
     revalidatePath(`/projects/${projectId}`);
     return { ok: true, message: `Approved ${sceneIds.length} scenes — production continues.` };
   } catch (e) {
@@ -1417,7 +1748,7 @@ export async function approveScript(
  */
 export async function savePublishing(
   projectId: string,
-  pub: { state: string; ytTitle: string; notes: string; ytUrl: string },
+  pub: { state: string; ytTitle: string; description: string; notes: string; ytUrl: string },
 ): Promise<ActionResult> {
   if (!isConfigured) {
     return { ok: true, message: "Demo mode — nothing was written." };
@@ -1428,6 +1759,35 @@ export async function savePublishing(
     revalidatePath(`/projects/${projectId}`);
     revalidatePath("/projects");
     return { ok: true, message: "Saved." };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/**
+ * Pin one background track from the Drive `Muzica` folder, or clear the pin
+ * (null) to go back to the auto-by-tone pick Final Assembly has always made.
+ * A merge write of one key, so the music SWITCH beside it is untouched: the
+ * pin says WHICH track, `music` still says WHETHER there is one.
+ */
+export async function saveMusicTrack(
+  projectId: string,
+  track: { id: string; name: string } | null,
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    const clean = track === null ? null : normalizeMusicTrack(track);
+    if (track !== null && clean === null) {
+      return { ok: false, message: "That track id doesn't look usable — pick it from the list." };
+    }
+    await updateEditingOptions(projectId, { musicTrack: clean });
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message: clean ? `Melodia „${clean.name}" e aleasă pentru acest film.` : "Înapoi la alegerea automată după ton.",
+    };
   } catch (e) {
     return { ok: false, message: friendlyError(e) };
   }
@@ -1650,6 +2010,21 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     // Hands-off mode — stored in Editing Options by Normalize Webhook Input,
     // read back by the project page's AutoPilot. yes|no like every finish.
     auto_approve: String(formData.get("auto_approve") ?? "no"),
+    // Which Veo tier generates the clips. Normalized here AND in n8n; an
+    // unknown id must never travel, because Current Scene sends the string
+    // to the Flow API verbatim. Absent/free posts "" and stores nothing.
+    video_model: normalizeVideoModel(formData.get("video_model")) ?? "",
+    // The producer's direction: the film's angle in their own words, plus up
+    // to three mandatory beats. Normalize stores both in Editing Options
+    // (producerBrief / mustInclude) so a script restart keeps them — the gap
+    // that makes Lore unrecoverable.
+    brief: String(formData.get("brief") ?? "").trim().slice(0, 2000),
+    must_haves: String(formData.get("must_haves") ?? "")
+      .split(/\r?\n/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .slice(0, 3)
+      .map((s) => s.slice(0, 200)),
     Style: String(formData.get("style") ?? ""),
     // In chapters mode (and no-narrator characters mode) there is no
     // narrator picker; the first cast voice doubles as the project voice so
@@ -1674,6 +2049,9 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     // "the producer said no".
     drawn_cards: String(formData.get("drawn_cards") ?? "yes"),
     music: String(formData.get("music") ?? "no"),
+    // NOTE: `source_watermark` is deliberately NOT in this payload. It is the
+    // one finish the site stores itself — see the write after the record is
+    // confirmed, below, and the note there for why.
     // How the narrator reads. OMITTED when the producer left it on "Voice
     // default", and that absence is the feature: every ElevenLabs voice has
     // its own stored settings, so sending an object we made up would override
@@ -1682,6 +2060,29 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     ...(voiceTone ? { voice_tone: voiceTone } : {}),
     ...(reference_image ? { reference_image } : {}),
   };
+  // Kids story: the category's pace select IS the speed decision, expressed
+  // in the machinery that already works — the whole-film retime. Relaxed is
+  // a gentle 0.9×, read-along a clear 0.8×. Only when the brief's own speed
+  // control was left untouched (=1): an explicit choice there still wins,
+  // because two controls that silently fight is how PACE was inert for
+  // months. The word rides along for the two writing prompts that read it.
+  if (payload.category === "kids") {
+    if (payload.speed === 1) {
+      payload.speed = categoryOptions.narration_pace === "very_slow" ? 0.8 : 0.9;
+      payload.Pace = "Slow";
+    }
+    // A warm storyteller default for the voice, only when the producer left
+    // the tone on "Voice default" — visible and changeable at the audio step
+    // like any chosen tone, unlike the silent absence it replaces.
+    if (!voiceTone) {
+      (payload as { voice_tone?: VoiceTone }).voice_tone = {
+        stability: 0.35,
+        similarity: 0.75,
+        style: 0.4,
+        speakerBoost: true,
+      };
+    }
+  }
   // A no-narration category has nothing to speak and nothing to caption —
   // enforce that server-side no matter what the form controls held.
   if (payload.category === "cinematic") {
@@ -1738,6 +2139,31 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
         // Airtable unreachable — fall through to the honest failure below.
       }
     }
+  }
+
+  /*
+   * The source watermark, stored by the SITE rather than by the orchestrator's
+   * `Normalize Webhook Input`, which owns every other finish.
+   *
+   * Deliberate, and not a shortcut. This setting has exactly one reader — the
+   * `Source Watermark` node in Final Assembly, which reads Editing Options
+   * directly — and two writers, both on the site: this form and Final touches.
+   * Final touches already writes it through `updateEditingOptions`, so putting
+   * the brief through the same writer leaves ONE write path for the key
+   * instead of two, in two languages, that have to agree about what absence
+   * means.
+   *
+   * Written only when the producer REFUSED it. Absence has to keep meaning ON:
+   * a film that says nothing about where its pictures came from reads as a
+   * claim that they are real, so every project — including all 56 made before
+   * this existed — must default to labelled. `updateEditingOptions` merges, so
+   * this touches nothing else the orchestrator has just written.
+   *
+   * A failure here leaves the watermark ON, which is the safe direction, and
+   * the producer can switch it off again at Final touches.
+   */
+  if (newProjectId && String(formData.get("source_watermark") ?? "yes") === "no") {
+    await updateEditingOptions(newProjectId, { sourceWatermark: false }).catch(() => {});
   }
 
   revalidatePath("/");

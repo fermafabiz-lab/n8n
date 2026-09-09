@@ -1,3 +1,5 @@
+import type {VisualProvenance} from './provenance';
+
 export type SceneCaption = {
 	/** Narration text spoken during this scene (from Airtable "Script Scenă"). */
 	narratorText: string;
@@ -20,6 +22,16 @@ export type SceneCaption = {
 	 * pack, so a card built from it can never cite something invented.
 	 */
 	evidenceRef?: string;
+	/**
+	 * What this scene's picture IS — AI, an AI reconstruction, archive footage,
+	 * an archive photograph — plus who it came from. Classified and STORED on
+	 * the site (platform/lib/provenance.ts, db/009) and handed here by
+	 * `Source Watermark` in Final Assembly; the render never derives it, so the
+	 * label can never disagree with the record the producer approved.
+	 *
+	 * Absent on every project rendered before this existed, which draws nothing.
+	 */
+	provenance?: VisualProvenance;
 };
 
 /**
@@ -214,6 +226,21 @@ export type FinalVideoProps = {
 	 * Omitted/true keeps every existing project rendering exactly as before.
 	 */
 	narrationIsSpoken?: boolean;
+	/**
+	 * The small corner badge naming each scene's origin (AI GENERATED,
+	 * ARCHIVAL FOOTAGE, SOURCE UNVERIFIED…).
+	 *
+	 * Omitted/true = on, per the producer's setting on the brief and in Final
+	 * touches. Switching it OFF removes the label and NOT the licence credit: a
+	 * credit CC BY or CC BY-SA demands is a legal obligation, so a scene whose
+	 * provenance carries one still draws it. See SourceWatermark and
+	 * docs/source-watermark-license-separation.md.
+	 *
+	 * A scene with no `provenance` draws nothing either way, which is why the
+	 * default can safely be "on": every project rendered before this existed
+	 * carries no provenance at all.
+	 */
+	showSourceWatermark?: boolean;
 };
 
 export const defaultFinalVideoProps: FinalVideoProps = {
@@ -235,6 +262,7 @@ export const defaultFinalVideoProps: FinalVideoProps = {
 	showEndScreen: true,
 	chapterTitles: {},
 	narrationIsSpoken: true,
+	showSourceWatermark: true,
 };
 
 /** Tone → visual language. Lowercased, diacritics-insensitive lookup. */

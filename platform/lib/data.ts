@@ -48,6 +48,7 @@ export type {
   StatusKind,
   EditingOptions,
   MotifCard,
+  MusicTrack,
   Publishing,
   Project,
   Scene,
@@ -61,6 +62,9 @@ export {
   MAX_VERSIONS_PER_KIND,
   PUBLISHING_STATES,
   normalizePublishing,
+  VIDEO_MODELS,
+  normalizeVideoModel,
+  normalizeMusicTrack,
   GENRE_EDITABLE,
   LIBRARY_EDITABLE,
   EXAMPLE_EDITABLE,
@@ -450,7 +454,7 @@ const DEMO_PROJECTS: Project[] = [
     finalVideoUrl: null,
     aspect: "16:9" as const,
     updatedAt: null,
-    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: true, sfxLevel: 0.35, music: false, drawnCards: true, captionColor: null, speed: 1, speedLocked: false, voice: null, autoApprove: false },
+    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: true, sfxLevel: 0.35, music: false, musicTrack: null, drawnCards: true, captionColor: null, videoModel: null, speed: 1, speedLocked: false, sourceWatermark: true, voice: null, autoApprove: false },
     awaitingFinalSettings: false,
     category: "story",
     language: "English",
@@ -460,7 +464,7 @@ const DEMO_PROJECTS: Project[] = [
     castAssign: {},
     chapterVoices: {},
     motifCards: [],
-    publishing: { state: "review", ytTitle: "", notes: "", ytUrl: "" },
+    publishing: { state: "review", ytTitle: "", description: "", notes: "", ytUrl: "" },
   },
   {
     id: "demo-2",
@@ -473,7 +477,7 @@ const DEMO_PROJECTS: Project[] = [
     finalVideoUrl: null,
     aspect: "16:9" as const,
     updatedAt: null,
-    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: true, sfxLevel: 0.35, music: false, drawnCards: true, captionColor: null, speed: 1, speedLocked: false, voice: null, autoApprove: false },
+    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: true, sfxLevel: 0.35, music: false, musicTrack: null, drawnCards: true, captionColor: null, videoModel: null, speed: 1, speedLocked: false, sourceWatermark: true, voice: null, autoApprove: false },
     awaitingFinalSettings: false,
     category: "story",
     language: "English",
@@ -483,7 +487,7 @@ const DEMO_PROJECTS: Project[] = [
     castAssign: {},
     chapterVoices: {},
     motifCards: [],
-    publishing: { state: "review", ytTitle: "", notes: "", ytUrl: "" },
+    publishing: { state: "review", ytTitle: "", description: "", notes: "", ytUrl: "" },
   },
   {
     id: "demo-3",
@@ -496,7 +500,7 @@ const DEMO_PROJECTS: Project[] = [
     finalVideoUrl: null,
     aspect: "16:9" as const,
     updatedAt: null,
-    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: true, sfxLevel: 0.35, music: false, drawnCards: true, captionColor: null, speed: 1, speedLocked: false, voice: null, autoApprove: false },
+    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: true, sfxLevel: 0.35, music: false, musicTrack: null, drawnCards: true, captionColor: null, videoModel: null, speed: 1, speedLocked: false, sourceWatermark: true, voice: null, autoApprove: false },
     awaitingFinalSettings: false,
     category: "story",
     language: "English",
@@ -506,7 +510,7 @@ const DEMO_PROJECTS: Project[] = [
     castAssign: {},
     chapterVoices: {},
     motifCards: [],
-    publishing: { state: "review", ytTitle: "", notes: "", ytUrl: "" },
+    publishing: { state: "review", ytTitle: "", description: "", notes: "", ytUrl: "" },
   },
   {
     id: "demo-4",
@@ -519,7 +523,7 @@ const DEMO_PROJECTS: Project[] = [
     finalVideoUrl: "#",
     aspect: "16:9" as const,
     updatedAt: null,
-    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: true, sfxLevel: 0.35, music: false, drawnCards: true, captionColor: null, speed: 1, speedLocked: false, voice: null, autoApprove: false },
+    editing: { captions: true, hookTitle: true, chapterCards: true, endScreen: true, sfx: true, sfxLevel: 0.35, music: false, musicTrack: null, drawnCards: true, captionColor: null, videoModel: null, speed: 1, speedLocked: false, sourceWatermark: true, voice: null, autoApprove: false },
     awaitingFinalSettings: false,
     category: "story",
     language: "English",
@@ -529,7 +533,7 @@ const DEMO_PROJECTS: Project[] = [
     castAssign: {},
     chapterVoices: {},
     motifCards: [],
-    publishing: { state: "review", ytTitle: "", notes: "", ytUrl: "" },
+    publishing: { state: "review", ytTitle: "", description: "", notes: "", ytUrl: "" },
   },
 ];
 
@@ -564,6 +568,11 @@ const DEMO_SCENES: Scene[] = Array.from({ length: 8 }, (_, i) => {
     evidenceRef: i === 1 ? "E1, E2" : null,
     needsFactCheck: false,
     versions: [],
+    visualSource: "ai" as const,
+    stock: null,
+    provenance: { visualOrigin: "ai_generated" as const, provenanceConfidence: 100 },
+    archiveSuggestions: [],
+    archiveSuggestedAt: null,
     voiceApproved: i < 3,
     imageApproved: i < 4,
     videoApproved: i < 2,
@@ -791,6 +800,8 @@ export async function readSceneVideoInputs(sceneId: string): Promise<{
   hasClip: boolean;
   hasImageMediaId: boolean;
   hasMotionPrompt: boolean;
+  /** Documentary mode (Postgres only): "ai" | "stock_video" | "stock_image". */
+  visualSource?: string;
 }> {
   if (USE_PG) return pgBackend.readSceneVideoInputs(sceneId);
   if (!isConfigured)
@@ -810,9 +821,57 @@ export async function readSceneVideoInputs(sceneId: string): Promise<{
   };
 }
 
+/**
+ * Re-classify a scene's picture and store what it is (db/009).
+ *
+ * Postgres only, and quiet on the Airtable backend: that base is frozen at the
+ * cutover and every scene in it is an AI-generated picture, which is exactly
+ * what `buildProvenance` answers for a scene with no stored classification.
+ *
+ * Deliberately swallows nothing — the callers do. A label is not worth failing
+ * an approval over, and every one of them wraps this in a catch that says so.
+ */
+export async function refreshSceneVisualOrigin(sceneId: string): Promise<void> {
+  if (USE_PG) return pgBackend.refreshSceneVisualOrigin(sceneId);
+}
+
+/** The producer's own Footage type choice. Postgres only, for the same reason. */
+export async function setSceneProvenance(
+  sceneId: string,
+  p: {
+    visualOrigin: string;
+    manuallyVerified: boolean;
+    confidence: number;
+    eventName: string | null;
+    location: string | null;
+    date: string | null;
+  },
+): Promise<void> {
+  if (!USE_PG) {
+    throw new Error("Footage type needs the Postgres backend — this project is on frozen Airtable.");
+  }
+  return pgBackend.setSceneProvenance(sceneId, p);
+}
+
 // Scene-script review: edits land in the same fields n8n reads after the
 // "Aprobare Scenă" gate, so approved text/prompts flow straight to TTS and
 // image generation.
+export type { EvidenceRow } from "./data/postgres";
+
+/**
+ * The film's research pack — the sourced claims its script was written
+ * against. Postgres only: the Airtable backend is frozen at the cutover and
+ * nothing runs on it, so growing it a new reader would be code for a museum.
+ * On that backend this answers empty, which degrades the YouTube description
+ * to one without a sources section rather than failing it.
+ */
+export async function getProjectEvidence(
+  projectId: string,
+): Promise<import("./data/postgres").EvidenceRow[]> {
+  if (USE_PG) return pgBackend.getProjectEvidence(projectId);
+  return [];
+}
+
 export async function writeSceneScript(
   sceneId: string,
   fields: { narration?: string; imagePrompt?: string; approve?: boolean },

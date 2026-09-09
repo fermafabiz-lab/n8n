@@ -79,6 +79,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/projects" className="navlink on">
               Projects
             </Link>
+            <Link href="/admin/footage" className="navlink">
+              Footage
+            </Link>
             <Link href="/admin" className="navlink">
               Settings
             </Link>

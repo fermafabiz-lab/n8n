@@ -166,7 +166,8 @@ const FINISHES: Array<{
     | "end_screen"
     | "sfx"
     | "drawn_cards"
-    | "music";
+    | "music"
+    | "source_watermark";
   label: string;
   sheet: string;
   on: string;
@@ -228,6 +229,16 @@ const FINISHES: Array<{
     on: "Background track plus whoosh/boom accents at the cuts",
     off: "No added music or accents",
     default: false,
+  },
+  {
+    name: "source_watermark",
+    label: "Source watermark",
+    sheet: "Source",
+    // The spec's own sentence, because it is the one that explains WHY the
+    // switch exists rather than what it toggles.
+    on: "Show a small label indicating whether each visual is AI-generated, authentic, archival, or illustrative.",
+    off: "No origin label on screen — the provenance is still recorded, and a credit a licence requires is still shown",
+    default: true,
   },
 ];
 

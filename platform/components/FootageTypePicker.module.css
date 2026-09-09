@@ -1,0 +1,124 @@
+/* Its own stylesheet, per the house rule: globals.css has no scoping and every
+   generic word in it is already taken. */
+
+.wrap {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.head label {
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.badge {
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+/* Two grounds, because the distinction the badge is FOR is exactly this one:
+   generated, or real. Everything else is detail. */
+.badge.ai {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent-deep);
+  border-color: color-mix(in srgb, var(--accent) 38%, transparent);
+}
+
+.badge.real {
+  background: color-mix(in srgb, #2e9e5b 14%, transparent);
+  color: #1f7a45;
+  border-color: color-mix(in srgb, #2e9e5b 40%, transparent);
+}
+
+.facts {
+  margin: 0 0 6px;
+  font-size: 11.5px;
+  color: var(--dim);
+  line-height: 1.4;
+}
+
+.facts a {
+  color: var(--dim);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.select {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--line2);
+  border-radius: var(--r-sm);
+  background: var(--card2);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12.5px;
+}
+
+.hint {
+  margin: 6px 0 0;
+  font-size: 11.5px;
+  color: var(--soft);
+  line-height: 1.45;
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.input {
+  width: 100%;
+  padding: 6px 9px;
+  border: 1px solid var(--line2);
+  border-radius: var(--r-sm);
+  background: var(--bg2);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+}
+
+/* `.abtn` is built for the `.abtns` GRID, where the cell gives it its width —
+   its own padding is `12px 0`, no horizontal at all, so in a flex row it
+   collapses to the width of its label. Every panel that puts one in a flex row
+   has to say this. */
+.row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.row button {
+  padding: 8px 15px;
+  white-space: nowrap;
+}
+
+.msg {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.msg.ok {
+  color: #1f7a45;
+}
+
+.msg.err {
+  color: #9b2b1f;
+}

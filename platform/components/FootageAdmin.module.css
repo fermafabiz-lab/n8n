@@ -1,0 +1,198 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.health {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 8px;
+}
+
+.hcard {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--card2);
+  font-size: 11.5px;
+  color: var(--dim);
+}
+
+.hcard b {
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.hoff {
+  opacity: 0.6;
+}
+
+.hheld {
+  border-color: color-mix(in srgb, #d99a1e 45%, transparent);
+}
+
+.herr {
+  color: #9b2b1f;
+  font-size: 11px;
+}
+
+.toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.chips button {
+  padding: 4px 11px;
+  border: 1px solid var(--line2);
+  border-radius: 999px;
+  background: var(--card2);
+  color: var(--dim);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.chips button[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.filters {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.filters select,
+.filters input {
+  padding: 6px 9px;
+  border: 1px solid var(--line2);
+  border-radius: 10px;
+  background: var(--card2);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+}
+
+.filters input {
+  width: 130px;
+}
+
+.doors {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* `.abtn` carries no horizontal padding of its own. */
+.doors button,
+.rowb button {
+  padding: 8px 15px;
+  white-space: nowrap;
+}
+
+.doors button[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent-deep);
+}
+
+.count {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.msg {
+  margin: 0;
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.msg.ok {
+  color: #1f7a45;
+}
+
+.msg.err {
+  color: #9b2b1f;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+
+.facts {
+  font-size: 11px;
+  color: var(--dim);
+}
+
+.panel {
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rowb {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--dim);
+}
+
+.form input,
+.form select,
+.form textarea {
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--line2);
+  border-radius: 8px;
+  background: var(--bg2);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.rt {
+  margin: 0;
+  font-size: 11px;
+  color: var(--soft);
+  line-height: 1.4;
+}

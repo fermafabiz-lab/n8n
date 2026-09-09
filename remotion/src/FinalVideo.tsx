@@ -9,12 +9,15 @@ import {Captions} from './components/Captions';
 import {FilmLayer, gradeForTone} from './components/FilmLayer';
 import {CutFlash, Transitions, kenBurnsTransform} from './components/Transitions';
 import {TimelineCard} from './components/TimelineCard';
+import {CompareCard} from './components/CompareCard';
+import {StepsCard} from './components/StepsCard';
 import {planMontage, shotAt, shotTransform} from './montage';
 import {TextCard} from './components/TextCard';
 import {RouteCard} from './components/RouteCard';
 import {ScheduleCard} from './components/ScheduleCard';
 import {buildTextCards, toMontageCards} from './textCards';
 import {SourceVideo} from './components/SourceVideo';
+import {SourceWatermark} from './components/SourceWatermark';
 import {presetForTone} from './style';
 import {resolveCaptionAccent} from './captionColor';
 import type {FinalVideoProps} from './types';
@@ -42,6 +45,7 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 	textCards,
 	showTextCards = true,
 	narrationIsSpoken = true,
+	showSourceWatermark = true,
 }) => {
 	const {fps} = useVideoConfig();
 	const frame = useCurrentFrame();
@@ -241,6 +245,9 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 			return <ScheduleCard card={card} seconds={seconds} preset={preset} />;
 		if (card.variant === 'timeline')
 			return <TimelineCard card={card} seconds={seconds} preset={preset} />;
+		if (card.variant === 'compare')
+			return <CompareCard card={card} seconds={seconds} preset={preset} />;
+		if (card.variant === 'steps') return <StepsCard card={card} seconds={seconds} preset={preset} />;
 		return <TextCard card={card} seconds={seconds} preset={preset} />;
 	};
 
@@ -282,6 +289,24 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 							preset={preset}
 							suppressUntilSeconds={hookSeconds - 0.4}
 							portrait={aspectRatio === '9:16'}
+						/>
+					)}
+					{/* What the viewer is actually looking at. Same two gates the
+					    captions carry, for two different reasons: a full-frame card
+					    REPLACES the picture, so labelling that frame's provenance
+					    would describe something nobody can see, and the hook is the
+					    film's one statement frame where the "one text element at a
+					    time" rule applies.
+					    Rendered whatever `showSourceWatermark` says: the switch owns
+					    the LABEL, and a licence that demands a credit is not a style
+					    choice. A scene owing neither draws nothing. */}
+					{!activeCard && !chapterCardUp && (
+						<SourceWatermark
+							scenes={scenes}
+							preset={preset}
+							showLabel={showSourceWatermark}
+							portrait={aspectRatio === '9:16'}
+							suppressUntilSeconds={hookSeconds}
 						/>
 					)}
 					{/* Text cards. Each gets its own Sequence so the component's clock

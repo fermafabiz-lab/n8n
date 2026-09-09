@@ -102,8 +102,9 @@ Leave it alone or archive it; do not repoint anything at it.
 
 Webhooks the site calls: `new-project`, `resume-project`, `restart-scripting`
 (all three on the Master Orchestrator), `scene-text-regen`,
-`scene-image-regen`, `scene-voice-regen` (all three on Claude Scripting) and
-`assemble`. The site derives all of them from `N8N_NEW_PROJECT_WEBHOOK_URL`
+`scene-image-regen`, `scene-voice-regen` (all three on Claude Scripting),
+`assemble`, and the single-purpose ones — `expand-brief`, `yt-scene-titles`,
+`upscale-film`, `list-music`/`share-music`, `archive-suggest`. The site derives all of them from `N8N_NEW_PROJECT_WEBHOOK_URL`
 by string-replacing the last path segment, so they must live on the same host
 — and each new one must be a plain `path` with no path parameters, or the
 derived URL will not resolve.
@@ -136,6 +137,19 @@ These each cost hours. Do not rediscover them.
   in `platform/lib/n8n.ts` threads this needle: `running` always counts;
   `waiting` counts only for worker workflows with a genuinely near wake-up.
 - **`execute_workflow` targets the first enabled webhook** in a workflow.
+- **Two branches out of one node do NOT run at the same time.** n8n's v1
+  execution order runs one branch to completion, then the other — measured,
+  not assumed: two branches each holding a 5-second Wait took **10.0s** in
+  total, the first finishing at +5.0s and the second at +10.0s. So "run the
+  audio loop and the image loop in parallel" cannot be done by forking the
+  canvas; inside one execution every arrangement is a different ORDER, never
+  an overlap. Real concurrency needs separate executions — an `Execute
+  Workflow` node with *wait for completion* switched off, or a webhook fired
+  at another workflow. Worth knowing what that buys before paying for it: the
+  audio stage is the cheap one (~1.2s of TTS per take plus its Drive upload),
+  so overlapping it with images saves roughly the audio stage and nothing
+  else, while the producer's first listenable take arrives at the same moment
+  either way.
 - **`runData` is EMPTY for the whole life of a healthy running execution**,
   and mistaking that for "it never started" cost a full day of the producer
   fighting the site. n8n does not persist node progress mid-run
@@ -1203,6 +1217,73 @@ constraint.** If it matters, something after the model has to be able to say
 whether it happened — and if the only thing you measure is length, length is
 what you will get.
 
+### The same lesson, three more times — inventory, the excerpt, the hook (2026-09-04)
+
+Asked what would make the SCRIPTS better, the answer came out of measuring five
+real films rather than out of opinion, and every finding has the shape above:
+the rule was already written and nothing counted it.
+
+| film | tone | ≤3-word sentences | commentary phrases |
+|---|---|---|---|
+| Boyd | **Motivational** | **46 of 185 (24.9%)** | **7** |
+| Stalin's son | Dramatic | 11 (11.6%) | 0 |
+| Ploiești | Dark | 9 (8.6%) | 0 |
+| Fall of Rome | Documentary | 1 (1.9%) | 0 |
+| Ceaușescu in N. Korea | Documentary | 1 (1.4%) | 0 |
+
+Four films write scenes; one writes an essay — "Low ceiling. Green felt. Brass
+ashtrays. A wall clock." and "That is the correction." The segmenter's rule 3
+is EVENTS NOT INVENTORY, its rule 5 bans abstract commentary, and the
+Motivational genre profile asks for "plain, direct sentences of 8-20 words".
+All three were obeyed by the four films that did not need them.
+
+- **`Narration Guard` now counts both**, beside the repetition pair and through
+  the same `editorFeedback` path: fragment DENSITY (fires at 18% and 10+, where
+  the worst good film is 11.6%) and banned commentary phrases (fires above 2,
+  where every good film scores 0). A RUN of three fragments is quoted as
+  evidence but never triggers — two of the good films carry one deliberate
+  triplet each ("Wheat bends. Earth trembles. Silence breaks."). **Neither check
+  runs on a silent or a dialogue film**: a beat sheet is terse by design and
+  speech is legitimately short, and the category is read from
+  `Fetch Project Record` exactly the way `Voice Mode` reads it.
+- **The style excerpt was the wrong 450 characters.** `Prepare Style Block`
+  shows the writer a verbatim paragraph from a real transcript of the genre —
+  the strongest lever on rhythm there is, because a model imitates a paragraph
+  far better than a description. Cut at a fixed offset it averaged **3.2
+  sentences and 323 characters** over the 63 active library rows, 36 of 57
+  gave under four sentences, and four gave a passage more than twice as
+  fragmentary as their own script — one of them a **Motivational** row quoting
+  at 25% from a transcript that runs at 6%. An excerpt is now whole sentences,
+  5+ of them and 300-900 characters, and is rejected unless it is
+  REPRESENTATIVE of its own script; under 20 sentences a row declines entirely
+  (one row is 3,407 words of unpunctuated auto-caption). After: 8.0 sentences,
+  825 characters, 60 of 63 usable, none unrepresentative. The Motivational
+  transcripts themselves measure 4.2 / 5.9 / 0.0 — the library was not the
+  defect, the window into it was.
+- **The hook never fit the shot it was written for.** Rule 1 says 18-22 words,
+  "NEVER more than 22 (it fills exactly one 8-second scene)". The 16
+  chapter-encoded films run 12,12,13,14,14,15,15,16,16,16,16,17,18,19,**32,52**
+  — two inside the window, and two so far over that `Plan Scene Splits` cut the
+  hook into TWO scenes. New `Hook Guard` + `If Hook Retry` loop back into
+  `Generate Hook` with the reason, twice, then accept. **Only the ceiling
+  really bites**: sixteen words is a shorter opening, not a worse one, and a
+  guard that argued a sharp hook up to the word count would be padding it for
+  arithmetic. The guard's own output carries the COMBINED NARRATION (that is
+  what the retry hands back to the prompt), so `Prepend Hook To Chapters` reads
+  the hook from `$('Generate Hook').first()` instead of `$json`.
+
+Two things measured and deliberately left alone: the **library is stocked where
+films are not made** — Cinematic 25 films / 2 active style rows, Emotional 4/1,
+Inspirational 1/0, against Funny 0 films / 11 rows and Educativ 1/10, which is
+a producer decision at `/admin` — and one project has its whole Tema pasted
+into the **Tonalitate** field, so it matched no genre profile and no style row
+and was written with the built-in fallback. A closed list on `/new` is the fix.
+
+None of this is measured against retention. It counts what the prompts already
+demand of the text.
+
+Rollback, the check script and the full measurements: `db/port/script-quality/`.
+
 ### Evidence retrieval (Claude Scripting)
 
 Scripts on researched topics are written against a pack of sourced claims,
@@ -1580,6 +1661,20 @@ the one that looked obvious.
   buffer it is handed, and the URLs are revoked only on unmount — freeing them
   in the measuring effect's cleanup would pull the source out of a take that is
   playing, because that effect re-runs as the batch grows.
+- **That cache must be keyed on the TAKE, not on the scene — and keying it
+  wrong made every re-record inaudible.** A re-recorded take is a new Drive
+  file (`VR Upload Audio` names it `<scene>-v<timestamp>.mp3`), so `Voiceover
+  URL` changes every time; but the effect skipped on "does this scene have a
+  duration yet" and its dependency was `withAudio.length`, which a replacement
+  never moves. So the blob, the displayed length and the trim bounds all stayed
+  with the recording that had just been thrown away, and the panel played it
+  for the rest of the visit. **The symptom names the cause if you listen to
+  it**: the producer reported that the download sounded completely different
+  from the player, and the download link goes straight to the real URL without
+  touching this cache — a difference between two surfaces reading the same
+  record is a caching bug, not a generation one. The HTTP layer was never
+  involved (`/api/media` sends `public, max-age=3600` on a full response, but
+  the URL changes, so the browser cache is keyed past it).
 - **The detection was wrong too, just far less wrong than it looked.** It
   measured RMS over 20ms windows while `silencedetect` measures sample
   MAGNITUDE, so `-45dB` meant something stricter here than on the server.
@@ -2140,6 +2235,45 @@ each piece handles it:
   "Working engine" (`recrlkONIpkgkYxzw`), whose single scene was reopened and
   never moved again. `reopenStep` now reads the project's category and leaves
   the voice alone on a silent film. **Any new cascade must do the same.**
+
+### Kids story is a real category now (2026-09-07)
+
+`category: 'kids'` — `ready: true`, built as variant B of the plan agreed with
+the producer: picture-book pacing + writing + look, with read-along extras
+(big karaoke captions, kids music folder, book-style chapter cards) deferred
+until a first test film is judged. How each piece works:
+
+- **Both category options are live** (`categories.ts`): `narration_pace`
+  (relaxed / very_slow) and `visual_style` (illustrated default / `cartoon3d`
+  — the producer asked for a "more realistic" Paw-Patrol-ish choice, which is
+  3D-animation realism, never photorealism; the option deliberately never
+  names brands). They ride `category_options` → Normalize stores them in
+  `categoryOptions` untouched — no orchestrator change was needed.
+- **Pace = the retime that already works.** `createProject` maps relaxed→0.9,
+  very_slow→0.8 into the existing `speed` payload (+ `Pace: "Slow"` for the
+  two prompts that read the word) — but ONLY when the brief's own speed
+  control was left at 1, so an explicit choice there still wins. Two controls
+  that silently fight is how PACE was inert for months.
+- **Longer breaths between scenes**: `/assemble` takes `sceneGap` (clamp
+  0.2–2, default 0.35 — the constant that was hard-coded in `eff = voiceDur +
+  0.35`). `Build Timeline` (Final Assembly, active `270dc41c`) derives it:
+  kids relaxed 0.8s, very_slow 1.2s, everyone else 0.35s. Film-time — the
+  retime stretches the gaps too, which is the point.
+- **Writing + look are ONE Voice Mode edit** (Claude Scripting, active
+  `0a162e0d`). The kids block is ADDITIVE — it appends to narrationRules /
+  segmentRules / hookRules instead of replacing them, so kids composes with
+  cinematic (silent kids film keeps silence) and dialogue (keeps tags), and
+  non-kids projects append `''` and render byte-identical prompts. The image
+  style is a mandatory PREFIX on every image_prompt, so it lives in the
+  STORED prompt and every regen path (IR Build Request, Build Image Request,
+  the refusal rewrites) inherits it for free. Storybook bonus, deliberate:
+  "no photorealistic humans anywhere" also starves the Veo people-filter.
+- **Storyteller voice default**: kids + untouched tone control → `voice_tone
+  {stability 0.35, similarity 0.75, style 0.4, speakerBoost}` in the payload.
+  Visible and changeable at the audio step like any chosen tone — unlike the
+  usual "absent = each voice's own settings", which stays the rule everywhere
+  else.
+- **No length cap** — the producer refused one explicitly.
 
 ### Hands-off mode (auto-approve) — the site's hand, not n8n's
 
@@ -2803,7 +2937,11 @@ the pipeline already produces.
   (`ScheduleCard`) flaps two times onto a departure board and states the gap
   between them; `timeline` (`TimelineCard`, 2026-09-03) measures a dimension
   line out across a span of years and marks each date at its REAL distance from
-  the others, so what it shows is the shape of the span. The planner needed no
+  the others, so what it shows is the shape of the span; `compare`
+  (`CompareCard`, 2026-09-09) grows two bars from one baseline with the figures
+  riding their ends, so what it shows is the RATIO; `steps` (`StepsCard`,
+  2026-09-09) rules a spine down the frame and lands three to five beats on it
+  one at a time, so what it shows is the SHAPE of a stretch of story. The planner needed no
   change at all to gain any of them — it places TIME and is written never to see
   what a card holds — so the only wiring is the variant dispatch in
   `FinalVideo`'s `renderCard`. Four rules came out of building them:
@@ -2875,6 +3013,57 @@ the pipeline already produces.
   in that README: a `review` card has nowhere to be reviewed until Final
   touches gets a panel, and explicit `textCards` still switch the derived
   figure cards off for that film.
+
+  **Updated 2026-09-09 — the producer reported that no project had any
+  animation, and they were right about the symptom and the cause both.** Two
+  separate things were true at once, and neither was a broken node:
+
+  - Films were getting `drawnCards: false`. On the Rome film (exec 11398) the
+    project record carried it beside `chapterCards: false` and
+    `hookTitle: false`, so `Draw Cards?` sent 0 items to the model and the
+    chain never ran. That is the producer having switched three finishes off on
+    the brief, working exactly as designed — **check the project's Editing
+    Options before debugging the chain.**
+  - Where it DID run, the model correctly returned nothing. The fable film
+    (exec 11332) reached `Validate Motif Cards` with `motifCards: []` and an
+    empty `motifReport`, which is the signature of a model that proposed
+    nothing rather than a validator that refused something. Three motifs all
+    want a documentary; that film is a snail racing a turtle.
+
+  So the answer was the one this file already prescribes — MORE MOTIFS — and
+  the two built from it are `compare` and `steps`, live in Scripting as
+  version `fd27296a`. `steps` is the one that changes the coverage: its beats
+  are quoted from three to five DIFFERENT scenes, which makes it a compression
+  of a stretch of film rather than one scene typeset, and almost any story that
+  goes somewhere can answer it.
+
+  **A live defect in the validator came out of building them, and it had been
+  silently refusing truthful cards for as long as the chain has existed:** its
+  number-word map held only Romanian, while the films are mostly written in
+  English. `quoteStatesTime` could not read "the ferry at five twenty" and a
+  compare note reading "six times fewer" proved nothing — both answering "the
+  film does not state that" about a film that states it in as many words. Found
+  by running a real card through `check-motif.mjs`, not by reading the code.
+
+  **And the apply produced a textbook instance of this section's own warning.**
+  The validator's number-separator class holds a no-break space and a narrow
+  no-break space, and the first apply sent them as `\u00A0` / `\u202F` escapes
+  — which were decoded back into the invisible characters themselves in
+  transit. Byte-identical to nothing, working perfectly, and caught ONLY by the
+  mandatory diff. It is now `\p{Zs}`, ASCII all the way down, exactly as `norm`
+  already uses `\p{M}`. **Prefer a property escape to any list of characters
+  you cannot see.**
+
+  **What the derived figure card looks like changed in the same pass**, because
+  it is the card almost every film actually gets and it was the one the
+  producer was really looking at: a year, set large, fading in with a 3% scale
+  settle. Its digits now roll into place one after another on a deterministic
+  counter — a different mechanism from the schedule board's flap, which pinches
+  through the horizontal — with a rule drawing under them and the kicker rising
+  in last. And the ground every drawn card prints on is `preset.cardGround`,
+  per tone, where four components used to hold the same hardcoded `#0B0A08`:
+  that single constant is most of why every project's graphics looked like
+  every other project's.
 
   **Updated 2026-09-03, after the first film that actually reached it.** Two
   truthful cards were proposed and none shipped. Provenance is no longer a map
@@ -3627,6 +3816,387 @@ the pipeline already produces.
   constant too or the "N more runs needed" hint goes stale. The panel's
   "likely on scene X" line is an estimate from landed assets and is labeled
   as such; the batch reports no per-scene progress.
+
+### Documentary mode — archive footage (2026-09-07)
+
+Any scene of a `documentary` project can take a real still or clip from a
+free archive instead of a generated picture. It is a **per-scene** decision on
+the Images step (`ArchivePicker` inside `SceneBoard`, offered when the
+project's category is `documentary`), never a project switch — the old
+`real_footage` toggle was removed for the Captions-rule reason: a control
+that changes nothing reads as a decision. The brief this came from (a
+ChatGPT spec) was right about the shape and wrong about two facts: it named
+Airtable as the database and Vercel as the host. The library is
+`hov.stock_media` (db/007) and the site runs on Hetzner.
+
+**It needs no change in n8n, and that is the whole design.** `Needs Image?`
+skips a scene that already holds `Imagine Scenă`, `Needs Clip?` skips one
+that already holds `Scene Final URL`, and every gate keys off the same
+checkboxes as ever. So `attachArchiveAsset` (`platform/lib/archive/attach.ts`)
+makes BOTH assets itself and writes them in one transaction
+(`attachStockToScene`) with `Status Producție Scenă: 'Așteaptă Aprobare
+Video'` — the stamp `Sort & Cap Scenes` counts as done, so the scene stops
+eating a slot in the cap of 8 — and the approvals reset, because the producer
+picked the asset, not signed it off. Final Assembly receives an ordinary mp4.
+
+- **A still** becomes the scene image (full quality) and an 8s Ken Burns clip:
+  constant-velocity push of 12%, direction alternating by scene order, made
+  by the ffmpeg that has been in the site's own image since the narration
+  bundle. **A video** becomes an 8s segment cut STRAIGHT FROM THE URL
+  (`-ss` before `-i`, so a 46-minute 553 MB NASA reel costs the bytes of its
+  eight seconds plus the index) and its first frame becomes the scene image
+  — the same role Veo's start frame plays. Both are h264 mp4 at 24 fps on the
+  project's canvas; Commons hands out VP9/Opus webm and Theora ogv, which
+  nothing downstream plays as-is. `seconds` is clamped 3..20 and `offset`
+  never starts past the end.
+- **The video-regen trap, and three guards for it.** A stock scene has no
+  Flow asset to regenerate from, and `Prep Video Regen` THROWS without an
+  `Image Media ID` — a throw that kills the whole batch, not the scene. So
+  `Regenerează Video` must never be set on a scene whose `visual_source` is
+  not `ai`: `flagStaleClip` answers `none` for it (approving the picture makes
+  nothing stale — the clip was cut from the archive, not made from the
+  picture), `sceneAction(video, regenerate)` refuses with a message, and the
+  board hides the button in favour of "Another archive clip…". **Any new
+  writer of that flag must check `visual_source` first.** Image regen is the
+  door back: `backToAiImage` drops the link, the clip and `Scene Final URL`,
+  then flags an ordinary image regeneration; once the new picture is
+  approved, `Needs Clip?` sees a scene owing a clip.
+- **Wikimedia was the only archive until 2026-09-09; the footage engine
+  (its own section below) added the EU Audiovisual Service, DVIDS and NASA.**
+  Read off real responses (executions 10893/10895/10898): `filetype:video`
+  finds both webm and ogv (`filemime:video/ogg` finds nothing — the ogv's
+  MIME is `application/ogg`); `filetype:bitmap` also returns animated GIFs,
+  skipped; `formatversion=2` makes `query.pages` an array; a public-domain
+  template can carry no `License` code at all (`Copyrighted: "False"` is the
+  fallback). NARA and Smithsonian were declared here as disabled
+  placeholders and have been REMOVED — never built, never searched, their
+  keys read nowhere (`docs/nara-smithsonian-deprecation.md`). Do not bring
+  them back as placeholders: a provider is a file under
+  `lib/footage/providers/` or it is nothing.
+- **The date field lies, so it is shown and never trusted.** Commons dated a
+  1969 NASA clip `2015-06-12` (its YouTube upload) and answered "Benz
+  Patent-Motorwagen 1886" with 2013 and 2021 photos of museum REPLICAS. The
+  provider's string is stored verbatim as `date_original` and labelled
+  "dated", the years the title and description MENTION ride alongside as
+  `years_mentioned`, and relevance stays a human's call (or a model's, in a
+  later slice). Do not derive a period from either field.
+- **Rights are decided by code, from an allowlist** (`lib/archive/rights.ts`,
+  13 fixture cases). NC and ND are rejected outright — no review can change
+  what a licence says, so offering one would only invite the wrong answer.
+  `ARCHIVE_AUTO_LICENSES` defaults to the brief's four (public domain, CC0,
+  CC BY, CC BY-SA); share-alike is admitted but STATED on the asset and in
+  the picker's chip. FAL, GFDL and anything unrecognised → `manual_review`,
+  which the picker shows with its reason and still lets the producer use —
+  they are the reviewer. `rejected` cannot be used.
+- **Two status columns, on purpose.** `stock_media.review_status` is the
+  rights verdict, refreshed on every sighting; `stock_media.status` is the
+  producer's decision (candidate / approved / rejected / used) and a refresh
+  never touches it. Conflated, a re-search would un-reject an asset.
+- **`/api/archive/search`** serves the browser with the site cookie and n8n
+  with the `x-hov-key` it already uses; `middleware.ts` opens the door only
+  for the key, and the route checks both again. Every result is filed into
+  the library best-effort (a filing failure costs the `id`, and the picker's
+  "Use" stays disabled with the reason, never the search). `library=1`
+  answers from what has already been seen.
+- **The site tolerates db/007 not being applied.** A push deploys by itself,
+  a migration runs by hand, and in between a scene query naming
+  `hov.stock_media` would take down every project page. `stockReady()` in
+  `postgres.ts` asks `to_regclass` (cached 60s) and the scene select drops
+  the archive columns until the table exists. Apply with
+  `docker exec -i n8n-postgres-1 psql -U hov -d hov -f - < db/007_stock_media.sql`.
+- **Both ffmpeg recipes are proven on the live site** (2026-09-07, execution
+  10907 on the disposable film `recaW2aLFFD06FpoN`): a 2400×3000 NASA still
+  became a Ken Burns clip on the 9:16 canvas in **2.6s**, and the 20s Jack
+  King webm was cut from second 5 into an 8s mp4 plus poster in **4.3s**,
+  neither touching n8n. Verified by EYE, not by status code: the render
+  server's `/inspect?mode=sheet` answers a contact-sheet JPEG, which an n8n
+  HTTP node (response format `file`) plus a Code node
+  (`getBinaryDataBuffer` → base64) carries into execution data, and
+  `get_execution` then saves to a file this box can decode and view. The
+  four tiles show the push-in and the real cut. That is the way to LOOK at
+  any media from a session with no outbound HTTP.
+  **How to exercise it without the UI:** `POST /api/archive/use` with the
+  ingest key from an n8n HTTP node at `web:3000` — the route exists for
+  exactly this. The scene rows read as designed afterwards: `visual_source`,
+  `stock_media_id`, `scene_final_url` on the media store, both attachment
+  rows replaced, approvals reset, one auto-kept draft per kind, and the
+  library row marked `used`.
+  **Credits are still owed**: `attribution_required` is stored and shown on
+  the Inspector, but nothing yet prints the source on the end screen — that
+  is a Remotion change (a Railway push) and the one legal obligation of a
+  CC BY asset.
+
+**AI-suggested footage, since 2026-09-07 (slice 3).** The producer's ask:
+"when I approve the scenes, an AI should already have looked for real
+footage for the scenes where it makes sense and offer me three or four
+options in a bar — the rest get generated." Workflow **`Archive
+Suggestions`** (`Lo78uXXCFYoIH73r`, webhook `archive-suggest`, POST
+`{project_id}`, answers on receipt) holds the two model calls — the OpenAI
+key lives in n8n, like `YT Scene Titles` and `Expand Brief` — and the site
+holds everything else in `/api/archive/suggest`:
+
+```
+Fetch Scenes (GET, claims) → Build Query Prompt → Query Model → Parse Queries
+  → Search Archives (POST stage=search) → Build Rank Prompts (batches of 8)
+  → Rank Model → Parse Ranks → Store Suggestions (POST stage=store)
+```
+
+- **Fired by the site on scene-text approval** (`saveSceneScript` with
+  approve, `approveAllScenes`), documentary films only, fire-and-forget.
+  The run picks scenes that are approved, still `ai`, without a clip and
+  not yet looked at, and **claims them for ten minutes**
+  (`archive_suggest_claimed_at`), because every approval fires a run and two
+  overlapping runs would spend the same model calls twice.
+- **Two stamps, told apart on purpose.** `archive_suggested_at` says the
+  scene was LOOKED AT, picks or not; without it "nothing relevant found" and
+  "nobody looked yet" read identically and would send the producer searching
+  by hand for a scene the AI had already cleared. The bar has three states —
+  offers, cleared ("will be generated"), not yet (with the manual door
+  "✨ Look for archive footage", which resets the stamps and fires again) —
+  because the run dies silently and something on screen must say so.
+- **Every Code node emits at least one item**, including a trivial model
+  payload when there is nothing to ask, so `Store Suggestions` runs on every
+  path and stamps what was processed. An IF-branched canvas would have been
+  cleaner and was not worth learning the SDK's branch syntax for.
+- **A pick must name a candidate the batch actually offered** (`Parse
+  Ranks` checks against `Build Rank Prompts`' candidate ids) and the store
+  drops any id the library does not hold — the same "an invented value
+  cannot survive code" rule as `Validate Evidence Refs`. `rejected`
+  licences are never offered at all. The rank prompt is told the catalogue
+  date is usually the upload date, since that is the trap measured above.
+- **Second search door for n8n**: the search stage runs up to two queries
+  per scene, `mediaType: any`, with a 300ms breath between requests — a
+  90-scene film can be a couple of hundred Commons calls, and the archive
+  asks clients to be polite. Videos are listed before stills for the ranker.
+- The bar's "Use" is `useArchiveAsset`, the same attach path as the
+  hand-searched picker; `ArchiveCard` is shared by both so a licence reads
+  the same wherever it appears. The filmstrip shows `🎞 N` on scenes with
+  offers that are still undecided.
+- **Both panels live UNDER THE MONITOR (`.stagemain`), not in the Inspector
+  rail** (moved 2026-09-09, producer's call). The rail is capped at 400px by
+  `.stage`'s `grid-template-columns`, and both halves are wide by nature — a
+  row of offers and a grid of search results — so in there four offers showed
+  as one and a half behind a scrollbar. Under the picture they get its full
+  width (786px measured at a 1440 viewport) and sit directly beneath the image
+  they would replace; the suggestions row became a `repeat(auto-fill,
+  minmax(180px, 1fr))` grid at the same track size as the picker's results, so
+  all four are visible at once and offers and search results are one kind of
+  card. The toggle BUTTONS stayed in the Inspector rows — they belong with
+  Approve/Regenerate, and a panel is content, not a control. On a narrow
+  viewport the grid collapses to one column and the section stays attached to
+  the monitor, above the Inspector.
+- **Two defects shipped with slice 2/3 and lived for two days because nobody
+  LOOKED at the page.** Both are invisible to tsc, to a build, and to reading
+  the file.
+  - **`var(--acc)` does not exist — the token is `--accent`.** An unknown
+    custom property makes the whole declaration invalid and it is simply
+    dropped, so the suggestions bar had NO background and NO border (measured:
+    `rgba(0,0,0,0)` and `0px`), a selected card had no ring, and the
+    picker's Any/Video/Photos control had no active state at all. Every one
+    of those rules parsed, shipped, and did nothing. **Check a new
+    stylesheet's tokens against the `:root` block** — `grep -ho 'var(--[a-z0-9-]*'
+    on the module, each name against globals.css — it is a five-second grep
+    and it is the only thing that catches this.
+  - **`.abtn` carries `padding: 12px 0`** — no horizontal padding, because it
+    is built for the `.abtns` GRID, where the cell supplies the width. Dropped
+    into a flex row it collapses to the width of its label: "Use" rendered as
+    a 27px circle with the word spilling out of both sides. Any archive panel
+    putting an `.abtn` in a flex row states the padding itself.
+  **The method, since a Claude Code session has no browser of its own:** write
+  a throwaway `app/zz-probe-*/page.tsx` that renders the component with mock
+  props (no database, no n8n), `next dev` on a spare port, and drive the
+  Playwright chromium already on the box at
+  `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`. Screenshot AND measure
+  — `getBoundingClientRect` on the panels proved the bar sits at the monitor's
+  exact x and width, and `getComputedStyle` is what turned "the panel looks
+  wrong" into "background is transparent because the token does not exist".
+  Delete the probe and `rm -rf .next/types` afterwards, or the generated route
+  types fail the next `tsc`.
+- **First live run, measured** (execution 10942 on "How ww2 started",
+  `recjhLgA7KpmQ3WpZ`, 16 scenes, fired while the film sat at its image
+  gate): **42 seconds** end to end, 16 scenes looked at, 13 judged worth
+  real footage, 2 of those found nothing usable (the House of Commons in
+  1939), 29 picks stored. The picks read right — Molotov signing on
+  23 August 1939, German soldiers at the Polish border barrier on
+  1 September, the Brest-Litovsk parade, the Warsaw siege film — and the
+  ranker demoted the generic "1939 Poland map" to 0.55 with a reason that
+  says so. A film that already had its AI images when the run fired keeps
+  them; the offers sit beside them and replace one only on Use.
+
+### The source watermark — saying which pictures are real (2026-09-09)
+
+A film cuts AI pictures, AI reconstructions and real archive material into one
+montage and nothing on screen ever said which was which. Now a small corner
+label does: **AI GENERATED · AI RECONSTRUCTION · ARCHIVAL FOOTAGE · ARCHIVAL
+PHOTO · ACTUAL FOOTAGE · ILLUSTRATIVE FOOTAGE · REAL FOOTAGE · SOURCE
+UNVERIFIED**. Full account in `docs/source-watermark-*.md` (six files); what
+belongs here is the load-bearing parts.
+
+- **The classification is STORED, never derived at read time.** `db/009` adds
+  six columns to `scene` (`visual_origin` not-null default `ai_generated`,
+  `provenance_confidence`, `provenance_manually_verified`, and event/location/
+  date), backfilled once from `visual_source`. Everything after that is a
+  WRITE: the archive attach, `detachStockFromScene`, an image approval, an
+  image-prompt edit, the producer's own override. The render is a pure lookup
+  — a renderer that re-derived provenance could disagree with the record the
+  producer approved, on the one overlay whose job is telling the truth.
+- **Nothing automatic may ever say ACTUAL FOOTAGE.** It means the media shows
+  THIS event, place and date, and no signal we have establishes that: a
+  ranker's relevance is a judgement about a search result, the archive's date
+  field is frequently the UPLOAD date (Commons dated a 1969 NASA reel
+  2015-06-12), and visual similarity says two newsreels look alike.
+  `classifyVisualOrigin` tops out at archival_footage/archival_photo and its
+  confidence is capped at **85, below `ACTUAL_FOOTAGE_MIN_CONFIDENCE` (90)** —
+  so no automatic number can read as authority. Only the producer's Footage
+  type control reaches actual/illustrative, and it sets `manuallyVerified`.
+- **An AI picture is REFUSED, not warned, when someone tries to call it real.**
+  A confirmation dialog cannot make model output authentic; the door is
+  replacing the media, which is what the refusal sentence says and what the
+  archive panel on the same step does. The mirror refusal (calling a real
+  archive picture AI) exists too, pointing at "Back to AI".
+- **The watermark and the licence credit are TWO SYSTEMS.** The switch owns the
+  LABEL. A credit CC BY / CC BY-SA demands is a legal obligation and is drawn
+  whether the switch is on or off — `planWatermarkBands({showLabel:false})`
+  keeps exactly the bands that owe one and drops the rest. Do not collapse them
+  into one flag, ever.
+- **No date or place is printed unless a PERSON typed it.** `provenance_date`
+  is deliberately separate from `stock_media.date_original`, and the picker does
+  not even pre-fill from it. Same reason as above.
+- **The label is per BAND, not per scene.** Consecutive scenes with the same
+  badge merge into one continuous label, or six archive shots in a row blink
+  the same words apart and back at every cut. It is suppressed over a full-frame
+  card (the card REPLACES the picture) and under the hook title — the same
+  `!activeCard && !chapterCardUp` gate the captions use.
+- **`showSourceWatermark` defaults to TRUE and that is safe only because a
+  scene with no `provenance` draws nothing.** Old props carry none. But note
+  the consequence: **every film re-rendered from now on gains the label**,
+  Story films included (every scene reads AI GENERATED), unless its producer
+  switches it off.
+- **This is the one finish the SITE stores, not `Normalize Webhook Input`.**
+  One reader (Final Assembly's `Source Watermark` node reads Editing Options
+  directly) and two writers, both on the site — the brief and Final touches —
+  and Final touches already used `updateEditingOptions`. `createProject` writes
+  `{sourceWatermark:false}` only on refusal, after the record is confirmed.
+  Absence means ON, like captionColor's white.
+- **`at_scene` was WRAPPED, not rewritten.** db/009 renames the db/002 view to
+  `at_scene_core` and builds `at_scene` on top of it, adding one `Provenance`
+  key. The obvious `create or replace view` would have meant retyping
+  twenty-one Romanian field names (`Status Producție Scenă`, `Observații
+  Scenă`…) that five workflows index by hand — and a mistyped diacritic there
+  does not raise, it silently produces keys no gate matches. **Any future
+  addition to at_scene should wrap the same way.**
+- Tests: `npm run check:provenance` (platform, 58) and `npm run check:watermark`
+  (remotion, 20). Commons returns creators as `Template:Helmut Laux`; both
+  formatters strip the prefix, and that is pinned.
+
+### The Universal Footage Engine (2026-09-09)
+
+One search behind every "real footage" door — the picker's *Search real
+footage*, the `archive-suggest` run, *Add from URL*, *Upload*, and the
+library at `/admin/footage`. `platform/lib/footage/` (engine, registry,
+router, rights, provenance, ranking, dedupe, health, URL import, six
+providers), `db/010_universal_footage.sql` (applied 2026-09-09: 19 columns
+on `stock_media`, the provider CHECK dropped, `footage_provider_status`,
+`footage_search_cache`; 178 rows backfilled to archival provenance), routes
+under `/api/footage/*`, and `docs/universal-footage-engine.md` plus nine
+sibling docs, which are the spec. What belongs HERE is what will bite:
+
+- **NARA and Smithsonian are gone, not disabled.** Not in the registry, not
+  in `ARCHIVE_PROVIDERS`, `adapterFor()` answers null, no key is read
+  anywhere. Old rows stay readable and still print their names in BOTH label
+  maps (`platform/lib/provenance.ts`, `remotion/src/provenance.ts` — in
+  lockstep, like `presetForTone`). `docs/nara-smithsonian-deprecation.md`.
+- **Rights are a filter, never a score.** `validateRights()` yields
+  `cleared | attribution_required | editorial_only | manual_review |
+  restricted | unknown`; `restricted` is removed before ranking and cannot be
+  raised by anyone; the three review classes reach a render only through a
+  human act recorded as `stock_media.status = 'approved'` (the picker's
+  "Use — I accept the rights", the admin page's Verify). The suggestion run
+  never offers a review class. `renderable()` is the one test.
+- **A `©` naming the provider's own organisation is not a third party.**
+  "© European Union" on an EU AV item, DoD branches on DVIDS. The first
+  version read every `©` as a third party and classed the whole EU service
+  as manual review — and DVIDS's own rights NOTICE contained the words
+  "third party", which the validator then matched. Words like *courtesy of*
+  / Getty / Reuters always mean somebody else; a bare copyright claim means
+  it only when it names someone other than the provider (`OWN_NAME` in
+  `lib/footage/rights.ts`). Never put the validator's own trigger words into
+  a notice the validator reads.
+- **ACTUAL FOOTAGE is decided from metadata, never from appearance**, and
+  only here: `assessProvenance(request, asset)` says it when the asset's
+  own event, filming date AND place all match the scene's request and the
+  spec-weighted score (event 30, date 20, place 20, people/org 10, topic 10,
+  metadata 10) reaches `ACTUAL_FOOTAGE_MIN_CONFIDENCE` (90). **A signal the
+  request cannot ask for leaves the denominator** — a scene naming no
+  person has no people evidence to find, so those ten points are not
+  silently failed; event, date and place are never waived. The media-only
+  `classifyVisualOrigin` still never says actual. **Uploads and URL imports
+  stay `unknown` however well they match** (§25); the admin page's *Change
+  provenance* is the only door up and demands event + place + date.
+- **A mismatch is a penalty; an absence is not.** Every signal in
+  `match.ts` is `yes | no | unknown`. An undated asset is not "the wrong
+  date". `dateOriginal` (the catalogue's upload date) is never read for
+  matching — only `filmingDate`, then `publicationDate`, then years the text
+  mentions.
+- **B-roll first, as a score and as a tie-break.** A speech, press
+  conference or interview under narration scores 0.15 visual and takes the
+  −15 poor-visual penalty ("a talking head where the scene wants
+  pictures"); it inverts when the scene quotes a speaker. Ties break
+  pictures > unclassified video > still > talking head. **When testing this,
+  give both fixtures the same descriptive text** — the first test compared a
+  B-roll clip with no event in its title against a presser that named it,
+  and "the presser won" was the weights working, not the ladder failing.
+- **Library first, always; `url_import` and `user_upload` are never
+  routed.** Both carry `searchCapabilities.localOnly`: the engine's library
+  pass reads their rows with everyone else's, so routing them would search
+  the same rows twice and report a "provider" that never left the box. The
+  picker's provider filter still reaches them through
+  `EngineOptions.providers`. Best library score ≥ 62 with ≥ 3 candidates
+  short-circuits every external call; the cache (6 h) is the second
+  short-circuit; a provider that fails three times in a row is held back
+  five minutes, a 429 fifteen — in memory, per process.
+- **URL import is not a downloader.** Platform hosts (YouTube, Vimeo,
+  TikTok, Facebook, Instagram, X, …) yield title and metadata only, no media
+  URL, rights manual review by the platform's terms; `.m3u8`/`.mpd` are
+  never media files; 401/403 pages are refused, never fetched around; no
+  in-box hosts, no credentials in URLs, no `file:`. A page that states no
+  licence is `manual_review`, not `unknown` — the page WAS read. Licence
+  URLs (`creativecommons.org/licenses/by-nc-sa/…`) are expanded to codes in
+  `classifyLicense()` before the NC/ND tests, or a CC link on a page reads
+  as unknown.
+- **The site tolerates db/010 not being applied** (`footageReady()` in
+  postgres.ts, the same `to_regclass`/column probe as db/007 and db/009):
+  `saveStockCandidates` writes the 15 enrichment columns only when the
+  column exists. Same reason as before — a push deploys itself, a migration
+  runs by hand, and the gap must not take down every project page.
+- **`DVIDS_API_KEY` is a WARNING in the deploy gate, like ElevenLabs**:
+  without it the provider reads as off with its reason and the router skips
+  it; the film is unaffected. `EU_AV_API_BASE` defaults to
+  `https://audiovisual.ec.europa.eu/api`. Both are in the heredoc that
+  writes `platform.env` — the rule from the ElevenLabs entry, obeyed in the
+  same commit. **The EU AV adapter's response shape is UNVERIFIED live**
+  (no outbound HTTP from here): it reads `items | results | data.results |
+  data.items` defensively, and a failure shows on `/admin/footage`'s health
+  strip rather than failing generation. The first real run should be
+  watched.
+- **The n8n half is one prompt edit** (`Archive Suggestions`, active
+  `6b5a1417` since 2026-09-09; repo copies in `db/port/footage-engine/`):
+  `Build Query Prompt` asks for a structured request per scene and forbids
+  invention in as many words, `Parse Queries` sanitises it, `Build Rank
+  Prompts` shows the ranking model the engine's score, provenance and
+  rights class. `/api/archive/suggest` accepts BOTH the old `queries[]` and
+  the new `request{}` shape, so prompt and site can move independently.
+  No `universal-footage-search` workflow was created: `/api/footage/search`
+  is that search, callable from any HTTP node with the ingest key.
+- **Tests run the real engine with the edges mocked.**
+  `scripts/footage-loader.mjs` is a `module.register` hook that resolves
+  the site's `@/` alias and extensionless imports (`./types` → `types.ts`,
+  `@/lib/footage` → `index.ts`) and swaps `lib/data/stock` and
+  `lib/data/postgres` for in-memory doubles; `check-footage.mjs` stubs
+  `globalThis.fetch` per hostname. `npm run check:footage`, 125 checks.
+  Anything under `lib/footage/` that grows a new import path needs the
+  loader to resolve it — Node knows neither the alias nor the missing
+  extension.
 
 ## Conventions
 
@@ -4578,6 +5148,17 @@ generated FROM it. The chain, and where each piece lives:
 
 ## Open work
 
+- **Documentary mode, what is still owed** (see the section above): the
+  picker itself has only been exercised through its HTTP twin, so click
+  through it once on a real documentary project; print archive credits on
+  the end screen (Remotion, i.e. a Railway push); put `DVIDS_API_KEY` into
+  GitHub Secrets so DVIDS is routed at all, and verify the EU Audiovisual
+  Service adapter against one real response — its API shape was read
+  defensively, never live (see the footage engine section). (The
+  "scripting proposes archive shots" half exists since the same day as the
+  `Archive Suggestions` run, above.) Scenes 102 and 103 of
+  the disposable film `recaW2aLFFD06FpoN` carry archive assets from the
+  verification run and can stay as the demonstration.
 - ~~Images on Google Flow instead of fal — designed, not applied.~~ **Applied
   and live 2026-09-02** (Media Generation `d88a638e`, Claude Scripting
   `bafbe64d`); see "Images are made on Google Flow" under the hard-won

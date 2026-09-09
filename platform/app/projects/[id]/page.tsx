@@ -248,7 +248,16 @@ export default async function ProductionRoom({
     showing(
       "audio",
       scenes.every((s) => s.sceneApproved) &&
-        withVoice.some((s) => !s.voiceApproved),
+        // `withVoice.length === 0` is the case this used to miss, and it is
+        // the whole window between approving the scenes and the first take
+        // landing. Requiring an existing take meant the page opened on the
+        // scene board — Images — for exactly the minute where Audio is the
+        // step the producer is waiting on, which is what the stepper had
+        // been saying all along (Audio goes "act" the moment the scenes are
+        // signed off). The panel already draws this state properly: it says
+        // the narration is being synthesized and the takes appear one by
+        // one. It simply was never on screen to say it.
+        (withVoice.length === 0 || withVoice.some((s) => !s.voiceApproved)),
     );
 
   // Script review phase: the Scripturi record is still awaiting approval.
@@ -768,6 +777,10 @@ export default async function ProductionRoom({
             // On the live page the board picks the step itself, and it may
             // only pick "audio" when the panel that serves it is rendered.
             audioPanel={audioPanel}
+            // Documentary films may swap any scene's picture for archive
+            // footage; the picker is the board's, the permission is the
+            // category's.
+            archive={project.category === "documentary"}
           />
         ) : null}
 

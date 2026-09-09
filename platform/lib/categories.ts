@@ -64,8 +64,8 @@ export const CATEGORIES: Category[] = [
     label: "Documentary",
     icon: "🎥",
     description:
-      "Fact-driven storytelling: researched narration built like a real documentary, with room for real footage between generated scenes.",
-    ready: false,
+      "Fact-driven storytelling: researched narration built like a real documentary. Any scene can use real footage or photos — from the EU Audiovisual Service, DVIDS, NASA, Wikimedia Commons, a pasted URL or your own upload — instead of a generated picture, chosen scene by scene on the Images step. Every scene says on screen what it is.",
+    ready: true,
     options: [
       {
         name: "multi_voice",
@@ -79,14 +79,10 @@ export const CATEGORIES: Category[] = [
         default: "off",
         reveals: "cast",
       },
-      {
-        name: "real_footage",
-        label: "Real images between scenes",
-        hint: "Interleave real photos/archive stills (uploaded by you) as B-roll over the narration.",
-        type: "toggle",
-        default: false,
-        comingSoon: true,
-      },
+      // `real_footage` used to sit here as a coming-soon toggle. Archive
+      // footage is a per-SCENE decision made on the Images step, not a
+      // project switch — a toggle here would have been a control that
+      // changes nothing, which reads as a decision (the Captions rule).
       {
         name: "source_rigor",
         label: "Research depth",
@@ -116,20 +112,30 @@ export const CATEGORIES: Category[] = [
     label: "Kids story",
     icon: "🧸",
     description:
-      "Gentle pacing for young listeners: slower narration, longer pauses between scenes, softer scene transitions.",
-    ready: false,
+      "A story written and drawn for young children: picture-book visuals, a warm storyteller voice, slower narration with longer breaths between scenes.",
+    ready: true,
     options: [
       {
         name: "narration_pace",
         label: "Narration pace",
-        hint: "Slower speech and longer breaths between scenes, so children can follow along.",
+        hint: "Slower speech and longer breaths between scenes, so children can follow along. Relaxed is a gentle 0.9×; Very slow is 0.8× with real pauses for read-along.",
         type: "select",
         choices: [
           { value: "relaxed", label: "Relaxed" },
           { value: "very_slow", label: "Very slow — read-along" },
         ],
         default: "relaxed",
-        comingSoon: true,
+      },
+      {
+        name: "visual_style",
+        label: "Visual style",
+        hint: "Storybook is soft watercolor illustration, like a picture book. 3D animation is the rounder, more realistic look of modern animated films for kids — realistic visually, never in the story.",
+        type: "select",
+        choices: [
+          { value: "illustrated", label: "Storybook — illustrated" },
+          { value: "cartoon3d", label: "3D animation — more realistic" },
+        ],
+        default: "illustrated",
       },
     ],
   },

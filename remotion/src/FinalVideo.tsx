@@ -9,6 +9,8 @@ import {Captions} from './components/Captions';
 import {FilmLayer, gradeForTone} from './components/FilmLayer';
 import {CutFlash, Transitions, kenBurnsTransform} from './components/Transitions';
 import {TimelineCard} from './components/TimelineCard';
+import {CompareCard} from './components/CompareCard';
+import {StepsCard} from './components/StepsCard';
 import {planMontage, shotAt, shotTransform} from './montage';
 import {TextCard} from './components/TextCard';
 import {RouteCard} from './components/RouteCard';
@@ -241,6 +243,9 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 			return <ScheduleCard card={card} seconds={seconds} preset={preset} />;
 		if (card.variant === 'timeline')
 			return <TimelineCard card={card} seconds={seconds} preset={preset} />;
+		if (card.variant === 'compare')
+			return <CompareCard card={card} seconds={seconds} preset={preset} />;
+		if (card.variant === 'steps') return <StepsCard card={card} seconds={seconds} preset={preset} />;
 		return <TextCard card={card} seconds={seconds} preset={preset} />;
 	};
 

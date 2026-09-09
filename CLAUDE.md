@@ -1033,6 +1033,73 @@ constraint.** If it matters, something after the model has to be able to say
 whether it happened — and if the only thing you measure is length, length is
 what you will get.
 
+### The same lesson, three more times — inventory, the excerpt, the hook (2026-09-04)
+
+Asked what would make the SCRIPTS better, the answer came out of measuring five
+real films rather than out of opinion, and every finding has the shape above:
+the rule was already written and nothing counted it.
+
+| film | tone | ≤3-word sentences | commentary phrases |
+|---|---|---|---|
+| Boyd | **Motivational** | **46 of 185 (24.9%)** | **7** |
+| Stalin's son | Dramatic | 11 (11.6%) | 0 |
+| Ploiești | Dark | 9 (8.6%) | 0 |
+| Fall of Rome | Documentary | 1 (1.9%) | 0 |
+| Ceaușescu in N. Korea | Documentary | 1 (1.4%) | 0 |
+
+Four films write scenes; one writes an essay — "Low ceiling. Green felt. Brass
+ashtrays. A wall clock." and "That is the correction." The segmenter's rule 3
+is EVENTS NOT INVENTORY, its rule 5 bans abstract commentary, and the
+Motivational genre profile asks for "plain, direct sentences of 8-20 words".
+All three were obeyed by the four films that did not need them.
+
+- **`Narration Guard` now counts both**, beside the repetition pair and through
+  the same `editorFeedback` path: fragment DENSITY (fires at 18% and 10+, where
+  the worst good film is 11.6%) and banned commentary phrases (fires above 2,
+  where every good film scores 0). A RUN of three fragments is quoted as
+  evidence but never triggers — two of the good films carry one deliberate
+  triplet each ("Wheat bends. Earth trembles. Silence breaks."). **Neither check
+  runs on a silent or a dialogue film**: a beat sheet is terse by design and
+  speech is legitimately short, and the category is read from
+  `Fetch Project Record` exactly the way `Voice Mode` reads it.
+- **The style excerpt was the wrong 450 characters.** `Prepare Style Block`
+  shows the writer a verbatim paragraph from a real transcript of the genre —
+  the strongest lever on rhythm there is, because a model imitates a paragraph
+  far better than a description. Cut at a fixed offset it averaged **3.2
+  sentences and 323 characters** over the 63 active library rows, 36 of 57
+  gave under four sentences, and four gave a passage more than twice as
+  fragmentary as their own script — one of them a **Motivational** row quoting
+  at 25% from a transcript that runs at 6%. An excerpt is now whole sentences,
+  5+ of them and 300-900 characters, and is rejected unless it is
+  REPRESENTATIVE of its own script; under 20 sentences a row declines entirely
+  (one row is 3,407 words of unpunctuated auto-caption). After: 8.0 sentences,
+  825 characters, 60 of 63 usable, none unrepresentative. The Motivational
+  transcripts themselves measure 4.2 / 5.9 / 0.0 — the library was not the
+  defect, the window into it was.
+- **The hook never fit the shot it was written for.** Rule 1 says 18-22 words,
+  "NEVER more than 22 (it fills exactly one 8-second scene)". The 16
+  chapter-encoded films run 12,12,13,14,14,15,15,16,16,16,16,17,18,19,**32,52**
+  — two inside the window, and two so far over that `Plan Scene Splits` cut the
+  hook into TWO scenes. New `Hook Guard` + `If Hook Retry` loop back into
+  `Generate Hook` with the reason, twice, then accept. **Only the ceiling
+  really bites**: sixteen words is a shorter opening, not a worse one, and a
+  guard that argued a sharp hook up to the word count would be padding it for
+  arithmetic. The guard's own output carries the COMBINED NARRATION (that is
+  what the retry hands back to the prompt), so `Prepend Hook To Chapters` reads
+  the hook from `$('Generate Hook').first()` instead of `$json`.
+
+Two things measured and deliberately left alone: the **library is stocked where
+films are not made** — Cinematic 25 films / 2 active style rows, Emotional 4/1,
+Inspirational 1/0, against Funny 0 films / 11 rows and Educativ 1/10, which is
+a producer decision at `/admin` — and one project has its whole Tema pasted
+into the **Tonalitate** field, so it matched no genre profile and no style row
+and was written with the built-in fallback. A closed list on `/new` is the fix.
+
+None of this is measured against retention. It counts what the prompts already
+demand of the text.
+
+Rollback, the check script and the full measurements: `db/port/script-quality/`.
+
 ### Evidence retrieval (Claude Scripting)
 
 Scripts on researched topics are written against a pack of sourced claims,
@@ -2488,7 +2555,11 @@ the pipeline already produces.
   (`ScheduleCard`) flaps two times onto a departure board and states the gap
   between them; `timeline` (`TimelineCard`, 2026-09-03) measures a dimension
   line out across a span of years and marks each date at its REAL distance from
-  the others, so what it shows is the shape of the span. The planner needed no
+  the others, so what it shows is the shape of the span; `compare`
+  (`CompareCard`, 2026-09-09) grows two bars from one baseline with the figures
+  riding their ends, so what it shows is the RATIO; `steps` (`StepsCard`,
+  2026-09-09) rules a spine down the frame and lands three to five beats on it
+  one at a time, so what it shows is the SHAPE of a stretch of story. The planner needed no
   change at all to gain any of them — it places TIME and is written never to see
   what a card holds — so the only wiring is the variant dispatch in
   `FinalVideo`'s `renderCard`. Four rules came out of building them:
@@ -2560,6 +2631,57 @@ the pipeline already produces.
   in that README: a `review` card has nowhere to be reviewed until Final
   touches gets a panel, and explicit `textCards` still switch the derived
   figure cards off for that film.
+
+  **Updated 2026-09-09 — the producer reported that no project had any
+  animation, and they were right about the symptom and the cause both.** Two
+  separate things were true at once, and neither was a broken node:
+
+  - Films were getting `drawnCards: false`. On the Rome film (exec 11398) the
+    project record carried it beside `chapterCards: false` and
+    `hookTitle: false`, so `Draw Cards?` sent 0 items to the model and the
+    chain never ran. That is the producer having switched three finishes off on
+    the brief, working exactly as designed — **check the project's Editing
+    Options before debugging the chain.**
+  - Where it DID run, the model correctly returned nothing. The fable film
+    (exec 11332) reached `Validate Motif Cards` with `motifCards: []` and an
+    empty `motifReport`, which is the signature of a model that proposed
+    nothing rather than a validator that refused something. Three motifs all
+    want a documentary; that film is a snail racing a turtle.
+
+  So the answer was the one this file already prescribes — MORE MOTIFS — and
+  the two built from it are `compare` and `steps`, live in Scripting as
+  version `fd27296a`. `steps` is the one that changes the coverage: its beats
+  are quoted from three to five DIFFERENT scenes, which makes it a compression
+  of a stretch of film rather than one scene typeset, and almost any story that
+  goes somewhere can answer it.
+
+  **A live defect in the validator came out of building them, and it had been
+  silently refusing truthful cards for as long as the chain has existed:** its
+  number-word map held only Romanian, while the films are mostly written in
+  English. `quoteStatesTime` could not read "the ferry at five twenty" and a
+  compare note reading "six times fewer" proved nothing — both answering "the
+  film does not state that" about a film that states it in as many words. Found
+  by running a real card through `check-motif.mjs`, not by reading the code.
+
+  **And the apply produced a textbook instance of this section's own warning.**
+  The validator's number-separator class holds a no-break space and a narrow
+  no-break space, and the first apply sent them as `\u00A0` / `\u202F` escapes
+  — which were decoded back into the invisible characters themselves in
+  transit. Byte-identical to nothing, working perfectly, and caught ONLY by the
+  mandatory diff. It is now `\p{Zs}`, ASCII all the way down, exactly as `norm`
+  already uses `\p{M}`. **Prefer a property escape to any list of characters
+  you cannot see.**
+
+  **What the derived figure card looks like changed in the same pass**, because
+  it is the card almost every film actually gets and it was the one the
+  producer was really looking at: a year, set large, fading in with a 3% scale
+  settle. Its digits now roll into place one after another on a deterministic
+  counter — a different mechanism from the schedule board's flap, which pinches
+  through the horizontal — with a rule drawing under them and the kicker rising
+  in last. And the ground every drawn card prints on is `preset.cardGround`,
+  per tone, where four components used to hold the same hardcoded `#0B0A08`:
+  that single constant is most of why every project's graphics looked like
+  every other project's.
 
   **Updated 2026-09-03, after the first film that actually reached it.** Two
   truthful cards were proposed and none shipped. Provenance is no longer a map

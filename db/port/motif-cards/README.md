@@ -1,7 +1,30 @@
 # Motif cards — the n8n half
 
-**APPLIED 2026-08-27. REVISED 2026-09-03** — see "What the first real film
-changed" at the end. Both workflows are live and verified; what follows
+**APPLIED 2026-08-27. REVISED 2026-09-03 and 2026-09-09** — see "What the
+first real film changed" at the end.
+
+**2026-09-09: two motifs added, `compare` and `steps`, live as version
+`fd27296a`.** Three nodes changed and nothing else — `Choose Motif Cards`
+(prompt), `Motif Parser` (one example per variant) and `Validate Motif Cards`
+(regenerated from `remotion/motif/validate.mjs`) — applied through the MCP
+connector, diffed byte-for-byte against this directory's build, then published
+by explicit `versionId`. The whole-workflow diff was checked first and named
+exactly those three nodes, with connections identical and all three Google
+Drive nodes keeping their `resource`/`operation`.
+
+**Do NOT apply `Claude Scripting.motif.json` with a PUT.** It is built from
+`Claude Scripting.original.json`, a snapshot of the 100-node workflow from
+08-27; the live workflow is 108 nodes and has gained the ElevenLabs migration,
+`Narration Guard` and `Hook Guard` since. A PUT would silently revert all of
+them. The file is the source of truth for what each motif node should CONTAIN
+— which is what the diff compares against — not a body to send.
+
+**The escaping trap fired again, and the diff is the only reason it was
+caught.** `magnitudeOf`'s separator class has to match a no-break space and a
+narrow no-break space. Sent as `\u00A0` / `\u202F` they arrived as the
+invisible characters themselves — a node that worked and was not what was
+written, which is this README's own warning, one section down, in the concrete.
+It is now `\p{Zs}`. Every apply still ends with the diff. Both workflows are live and verified; what follows
 describes what went in, and how to take it back off.
 
 One correction to the table below while you are reading it: `Attach Motif

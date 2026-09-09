@@ -117,6 +117,36 @@ function describeMotif(card: MotifCard): { title: string; detail: string } {
         .join("  —  "),
     };
   }
+  if (card.variant === "timeline") {
+    return {
+      title: "Timeline of the dates",
+      detail: [
+        (card.marks ?? []).map((m) => `${m.at} ${m.label}`).join("  ·  "),
+        card.note,
+      ]
+        .filter(Boolean)
+        .join("  —  "),
+    };
+  }
+  if (card.variant === "compare") {
+    return {
+      title: "Two figures compared",
+      detail: [
+        (card.sides ?? []).map((s) => `${s.label} ${s.value}`).join("  vs  "),
+        card.note,
+      ]
+        .filter(Boolean)
+        .join("  —  "),
+    };
+  }
+  if (card.variant === "steps") {
+    return {
+      title: "The sequence, step by step",
+      detail: [(card.steps ?? []).map((s) => s.label).join(" → "), card.note]
+        .filter(Boolean)
+        .join("  —  "),
+    };
+  }
   return {
     title: "Card",
     detail: card.note ?? card.label ?? card.variant,

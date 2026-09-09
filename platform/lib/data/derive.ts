@@ -260,6 +260,12 @@ export interface MotifCard {
   stops?: string[];
   /** Schedule: the timetable lines. */
   rows?: Array<{ label: string; value: string }>;
+  /** Timeline: the years the span is measured between. */
+  marks?: Array<{ at: string; label: string }>;
+  /** Compare: the two quantities set against each other. */
+  sides?: Array<{ label: string; value: string }>;
+  /** Steps: the beats of the sequence, in order. */
+  steps?: Array<{ label: string }>;
   /** The one line the footage cannot say — a distance, a margin. */
   note?: string;
   /**
@@ -587,11 +593,31 @@ function parseMotifCards(raw: unknown): MotifCard[] {
     const stops = Array.isArray(c.stops)
       ? (c.stops as unknown[]).filter((v): v is string => typeof v === "string")
       : undefined;
-    const rows = Array.isArray(c.rows)
-      ? (c.rows as unknown[])
+    // Every motif's own content, so the panel can say what a card DRAWS rather
+    // than name its type. `marks` was missing from the day the timeline motif
+    // shipped, which is why a timeline card had always shown in Final touches
+    // as a bare label with no dates under it.
+    const pairs = (v: unknown, a: string, b: string) =>
+      Array.isArray(v)
+        ? (v as unknown[])
+            .map((r) => asRecord(r))
+            .filter((r) => typeof r[a] === "string" && typeof r[b] === "string")
+            .map((r) => ({ [a]: String(r[a]), [b]: String(r[b]) }))
+        : undefined;
+    const rows = pairs(c.rows, "label", "value") as
+      | Array<{ label: string; value: string }>
+      | undefined;
+    const marks = pairs(c.marks, "at", "label") as
+      | Array<{ at: string; label: string }>
+      | undefined;
+    const sides = pairs(c.sides, "label", "value") as
+      | Array<{ label: string; value: string }>
+      | undefined;
+    const steps = Array.isArray(c.steps)
+      ? (c.steps as unknown[])
           .map((r) => asRecord(r))
-          .filter((r) => typeof r.label === "string" && typeof r.value === "string")
-          .map((r) => ({ label: String(r.label), value: String(r.value) }))
+          .filter((r) => typeof r.label === "string")
+          .map((r) => ({ label: String(r.label) }))
       : undefined;
     out.push({
       sceneIndex: c.sceneIndex,
@@ -600,6 +626,9 @@ function parseMotifCards(raw: unknown): MotifCard[] {
       ...(typeof c.label === "string" ? { label: c.label } : {}),
       ...(stops?.length ? { stops } : {}),
       ...(rows?.length ? { rows } : {}),
+      ...(marks?.length ? { marks } : {}),
+      ...(sides?.length ? { sides } : {}),
+      ...(steps?.length ? { steps } : {}),
       ...(typeof c.note === "string" ? { note: c.note } : {}),
       ...(c.verdict === "review" || c.verdict === "ok" ? { verdict: c.verdict } : {}),
       ...(typeof c.why === "string" ? { why: c.why } : {}),

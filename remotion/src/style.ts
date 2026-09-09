@@ -90,6 +90,20 @@ export type StylePreset = {
 	/** Impact card background + text accent. */
 	cardBg: string;
 	cardInk: string;
+	/**
+	 * The ground every DRAWN card is printed on — figure, claim, and each of
+	 * the motifs.
+	 *
+	 * It is deliberately not `cardBg`. That one is the chapter card's ground
+	 * and is light in three of the five tones; a drawn card has to stay ink so
+	 * the two never read as the same element, which is the rule TextCard was
+	 * written around. But it used to be one hardcoded `#0B0A08` copied into
+	 * four components, so a horror film and a corporate explainer printed
+	 * their cards on the identical black — the single loudest reason every
+	 * project's graphics looked like every other project's. Same rule, tuned
+	 * per tone: dark enough to be ink, tinted enough to belong to this film.
+	 */
+	cardGround: string;
 	/** Editing energy: 0 = calm (no punch-ins), 1 = moderate, 2 = punchy. */
 	energy: 0 | 1 | 2;
 	/**
@@ -138,6 +152,9 @@ export const presetForTone = (tone: string): StylePreset => {
 			typeSpeed: 14,
 			cardBg: '#0D0B10',
 			cardInk: '#C8452E',
+			// Colder and deeper than the chapter card's ground: this register wants
+			// the card to feel like a page from a dossier, not a title.
+			cardGround: '#08070C',
 			energy: 0,
 			titleAdvance: 0.7, // Bodoni Moda, uppercase
 		};
@@ -155,6 +172,10 @@ export const presetForTone = (tone: string): StylePreset => {
 			typeSpeed: 18,
 			cardBg: '#101826',
 			cardInk: '#E8B84B',
+			// The navy the chapter card sets, taken down to ink. Keeping the hue is
+			// what makes a documentary's cards and its chapter turns look authored
+			// by the same hand rather than merely adjacent.
+			cardGround: '#0A1018',
 			energy: 1,
 			// MEASURED, not inherited — the rule this file already learned the hard
 			// way on the Poppins card. Read straight off the hmtx advances of the
@@ -178,6 +199,9 @@ export const presetForTone = (tone: string): StylePreset => {
 			typeSpeed: 26,
 			cardBg: '#0B0B0B',
 			cardInk: '#FFD400',
+			// Neutral black, no tint: the yellow is doing all the work here and any
+			// warmth behind it takes the edge off the contrast this tone is for.
+			cardGround: '#0B0B0B',
 			energy: 2,
 			titleAdvance: 0.46, // Anton is condensed — nearly half a serif's width
 		};
@@ -192,6 +216,10 @@ export const presetForTone = (tone: string): StylePreset => {
 			typeSpeed: 22,
 			cardBg: '#F4F1EA',
 			cardInk: '#1D4ED8',
+			// The one tone whose chapter card is paper, so its drawn cards are the
+			// sharpest contrast in the film. Cool graphite rather than black keeps
+			// the blue accent from going violet against it.
+			cardGround: '#0E1319',
 			energy: 0,
 			titleAdvance: 0.6, // Space Grotesk, mixed case
 		};
@@ -208,6 +236,9 @@ export const presetForTone = (tone: string): StylePreset => {
 		typeSpeed: 20,
 		cardBg: '#F6EFE3',
 		cardInk: '#C77B32',
+		// Warm dark brown, the negative of this family's paper. Neutral black
+		// under Cormorant reads as a different film entirely.
+		cardGround: '#15100B',
 		energy: 1,
 		titleAdvance: 0.44, // Cormorant is narrow
 	};

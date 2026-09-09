@@ -105,6 +105,11 @@ const LENGTH_PRESETS = [
  */
 const SFX_LEVEL_PCT_MIN = 10;
 const SFX_LEVEL_PCT_DEFAULT = 35;
+/** Same shape for the background track: 22 is the gain the mixer has always
+ *  used for the music bed, so an untouched slider is today's sound. Steps of
+ *  1 rather than 5 so the default sits on the scale. */
+const MUSIC_LEVEL_PCT_MIN = 5;
+const MUSIC_LEVEL_PCT_DEFAULT = 22;
 
 /**
  * The Veo tiers, priced per 8s clip in useapi credits (measured on the
@@ -274,6 +279,9 @@ export default function NewVideo() {
   // render used to hard-code, so leaving the slider alone reproduces every
   // film made before this control existed.
   const [sfxLevel, setSfxLevel] = useState(SFX_LEVEL_PCT_DEFAULT);
+  // How loud the background track sits under the voice, same unit and same
+  // rule as the effects — shown only while Music is on.
+  const [musicLevel, setMusicLevel] = useState(MUSIC_LEVEL_PCT_DEFAULT);
   // Hex, or "" for the white default. Empty is not "unset" — it is the
   // choice most films should keep, so it is what the control starts on.
   const [captionColor, setCaptionColor] = useState("");
@@ -834,6 +842,46 @@ export default function NewVideo() {
                               </p>
                             </div>
                           )}
+                          {f.name === "music" && on && (
+                            <div style={{ marginTop: 10 }}>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "baseline",
+                                  justifyContent: "space-between",
+                                  fontSize: 12,
+                                  color: "var(--dim)",
+                                }}
+                              >
+                                <label htmlFor="music_level_range">Music volume</label>
+                                <b style={{ color: "var(--ink)", fontFamily: "var(--f-mono), ui-monospace, monospace" }}>
+                                  {musicLevel}%
+                                </b>
+                              </div>
+                              <input
+                                id="music_level_range"
+                                type="range"
+                                className="lenslider"
+                                min={MUSIC_LEVEL_PCT_MIN}
+                                max={100}
+                                step={1}
+                                value={musicLevel}
+                                onChange={(e) => setMusicLevel(Number(e.target.value))}
+                                style={{
+                                  margin: "8px 0 2px",
+                                  ["--fill" as string]: `${((musicLevel - MUSIC_LEVEL_PCT_MIN) / (100 - MUSIC_LEVEL_PCT_MIN)) * 100}%`,
+                                }}
+                                aria-label="Music volume"
+                              />
+                              <p style={{ margin: 0, fontSize: 11.5 }}>
+                                {musicLevel <= 15
+                                  ? "A whisper of a bed — felt more than heard."
+                                  : musicLevel <= 35
+                                    ? "Under the voice, clearly there. The narration still leads."
+                                    : "Forward and loud. The mix ducks it whenever the narrator speaks."}
+                              </p>
+                            </div>
+                          )}
                         </div>
                         <input type="hidden" name={f.name} value={on ? "yes" : "no"} />
                         <Toggle
@@ -852,6 +900,11 @@ export default function NewVideo() {
                     type="hidden"
                     name="sfx_level"
                     value={(sfxLevel / 100).toFixed(2)}
+                  />
+                  <input
+                    type="hidden"
+                    name="music_level"
+                    value={(musicLevel / 100).toFixed(2)}
                   />
                   <input type="hidden" name="caption_color" value={captionColor} />
                 </div>

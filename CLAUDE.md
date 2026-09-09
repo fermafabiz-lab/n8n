@@ -2029,6 +2029,50 @@ was "yes, but you find out WHICH track by watching the finished film". Now:
   prints which track the running render mixes ("aleasă automat după ton" when
   no pin), because that used to be invisible until the film arrived.
 
+**The music bed has a volume now, like the effects (2026-09-09).**
+`Editing Options.musicLevel` (0.05–1) is how loud the background TRACK sits
+under the narration, before the sidechain duck. Chosen on the brief's Music
+row (slider shown only while Music is on) and again in Final touches;
+`SoundSettings` keeps only the switch, exactly like `sfxLevel`.
+
+- **0.22 is the default, and that is continuity**: it is the `volume=0.22`
+  the mix graph in `assemble.mjs` has carried since the music bed existed, so
+  an untouched slider reproduces every film made before the control. Steps of
+  1 on the slider (not 5) so that default sits on the scale.
+- **The accents are NOT scaled by it.** The boom/whoosh/riser at the cuts keep
+  their fixed levels (0.45 / 0.4 / 0.35): they are moments, not a bed, and a
+  slider that made the hook boom twice as loud would be a surprise nobody
+  asked for. The label says "Music volume"; it means the track.
+- The refusal rule has **three copies plus the server's own clamp**:
+  `normalizeMusicLevel` in derive.ts, the orchestrator's `Normalize Webhook
+  Input` (writes it at creation from `music_level`), Final Assembly's
+  `Build Timeline` (sends it as `musicVolume`, only while music is on), and
+  `/assemble` (reads `musicVolume`, falls back to 0.22). Change one, change
+  all. An older server build simply ignores the key.
+- Verified on the disposable film — see the checked-in record below.
+
+**The library connection, checked end to end (2026-09-09)**, because the
+producer asked whether it really works:
+
+- `list-music` answers 47 tracks in 8 tone folders in ~1.2 s (execution
+  11646); `share-music` answers in ~0.35 s; the Railway `/media?id=` proxy the
+  render fetches through serves the file (`200 audio/mpeg`, 3.84 MB). A
+  render with music on (11530, "Peking to Paris") carried a real `musicUrl`
+  and succeeded.
+- **The `Muzica` folder is shared "anyone with the link → EDITOR"**, and every
+  track inherits it: the share nodes ask for `reader`, Drive answers
+  `role: writer` because the inherited grant is the wider one. Nothing in the
+  pipeline needs more than reader, so this is a Drive setting worth turning
+  down to Viewer — it is the producer's folder, not a code change.
+- **A tone with no folder falls back to `Default`, not to the nearest tone.**
+  `Match Tone Folder` matches the folder name against `Tonalitate`; a
+  Dramatic film found no `Dramatic` folder and got a track from `Default`
+  ("Curious Story"). Adding a folder named after the tone is the whole fix;
+  the auto pick is random inside the pool, so pin a track when it matters.
+- **`/media` on Railway answers 401 to HEAD** — the auth exemption tests
+  `method === 'GET'`. Harmless (ffmpeg GETs), but a HEAD-based health probe
+  would read as broken.
+
 ### The Cinematic category (silent film)
 
 `category: 'cinematic'` in Editing Options = no spoken words anywhere. How

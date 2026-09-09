@@ -41,6 +41,11 @@ export interface EditingOptions {
    * `music` is off — the switch owns silence, exactly like sfx/sfxLevel.
    */
   musicTrack: MusicTrack | null;
+  /** How loud the background track sits under the narration, 0–1, as
+   *  `musicVolume` in the assemble request. The track only — the
+   *  boom/whoosh/riser accents keep their own fixed levels. Meaningless
+   *  while `music` is off; the switch owns silence, like sfx/sfxLevel. */
+  musicLevel: number;
   /**
    * Whether the pipeline may put drawn cards in this film at all.
    *
@@ -253,6 +258,30 @@ export function normalizeSfxLevel(value: unknown): number {
   const n = Number(value);
   if (!Number.isFinite(n)) return SFX_LEVEL_DEFAULT;
   if (n < 0.05 || n > 1) return SFX_LEVEL_DEFAULT;
+  return Math.round(n * 100) / 100;
+}
+
+/**
+ * How loud the background track sits under the narration, 0–1.
+ *
+ * 0.22 is the gain `assemble.mjs` hard-coded for the music bed since the
+ * mix was written (`volume=0.22`, then sidechain-ducked 10:1 under the
+ * voice), so an untouched slider reproduces every film made before the
+ * control existed — the same continuity rule `sfxLevel` follows. It is a
+ * setting for the TRACK only: the synthesized boom/whoosh/riser accents keep
+ * their own fixed levels, because they are moments, not a bed.
+ *
+ * Same refusal rule as normalizeSfxLevel, and the same floor: silence is what
+ * the music switch is for. Three copies that must agree — here, the
+ * orchestrator's `Normalize Webhook Input`, and Final Assembly's
+ * `Build Timeline`; the render server clamps once more on its side.
+ */
+export const MUSIC_LEVEL_DEFAULT = 0.22;
+
+export function normalizeMusicLevel(value: unknown): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return MUSIC_LEVEL_DEFAULT;
+  if (n < 0.05 || n > 1) return MUSIC_LEVEL_DEFAULT;
   return Math.round(n * 100) / 100;
 }
 
@@ -713,6 +742,7 @@ export function buildProject(r: RawProject): Project {
       sfxLevel: normalizeSfxLevel(opts.sfxLevel),
       music: opts.music === true,
       musicTrack: normalizeMusicTrack(opts.musicTrack),
+      musicLevel: normalizeMusicLevel(opts.musicLevel),
       // On unless refused, like the other overlays: a film the pipeline found
       // nothing worth drawing in simply gets an empty list.
       drawnCards: opts.drawnCards !== false,

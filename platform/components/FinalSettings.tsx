@@ -126,6 +126,9 @@ function describeMotif(card: MotifCard): { title: string; detail: string } {
 /** The slider's floor, in percent. Mirrors the brief's control: the switch
  *  above owns silence, so the level never reaches zero. */
 const SFX_PCT_MIN = 10;
+/** The music bed's floor, same reasoning; steps of 1 so the 22% default the
+ *  mixer has always used sits on the scale. */
+const MUSIC_PCT_MIN = 5;
 
 export default function FinalSettings({
   projectId,
@@ -162,6 +165,8 @@ export default function FinalSettings({
     (opts.captionColor ?? null) !== (initial.captionColor ?? null);
   const sfxLevelMoved =
     rows.some((o) => o.key === "sfx") && opts.sfxLevel !== initial.sfxLevel;
+  const musicLevelMoved =
+    rows.some((o) => o.key === "music") && opts.musicLevel !== initial.musicLevel;
   // The pace is NOT here any more — it is decided and signed off at the audio
   // step, the one moment it costs nothing, and this panel neither shows it nor
   // writes it. (confirmFinalSettings therefore omits `speed` entirely rather
@@ -172,11 +177,16 @@ export default function FinalSettings({
   // film, and a button reading "Keep initial settings" after you switched one
   // off would be telling you something untrue.
   const changed =
-    changedKeys.length > 0 || dropped.length > 0 || sfxLevelMoved || captionColorMoved;
+    changedKeys.length > 0 ||
+    dropped.length > 0 ||
+    sfxLevelMoved ||
+    musicLevelMoved ||
+    captionColorMoved;
   const changeCount =
     changedKeys.length +
     dropped.length +
     (sfxLevelMoved ? 1 : 0) +
+    (musicLevelMoved ? 1 : 0) +
     (captionColorMoved ? 1 : 0);
   const done = msg?.ok === true;
   const router = useRouter();
@@ -249,6 +259,7 @@ export default function FinalSettings({
                   {o.label}
                   {(moved ||
                     (o.key === "sfx" && sfxLevelMoved) ||
+                    (o.key === "music" && musicLevelMoved) ||
                     (o.key === "captions" && captionColorMoved)) && (
                     <span className="chg">changed</span>
                   )}
@@ -304,6 +315,52 @@ export default function FinalSettings({
                         ["--fill" as string]: `${((Math.round(opts.sfxLevel * 100) - SFX_PCT_MIN) / (100 - SFX_PCT_MIN)) * 100}%`,
                       }}
                       aria-label="Effects volume"
+                    />
+                  </div>
+                )}
+                {/* The background track's level, only while music is on. The
+                    accents at the cuts keep their own fixed levels — this is
+                    the bed under the voice, nothing else. */}
+                {o.key === "music" && on && (
+                  <div style={{ marginTop: 10 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "baseline",
+                        justifyContent: "space-between",
+                        fontSize: 12,
+                        color: "var(--dim)",
+                      }}
+                    >
+                      <label htmlFor="fs_music_level">Music volume</label>
+                      <b
+                        style={{
+                          color: "var(--ink)",
+                          fontFamily: "var(--f-mono), ui-monospace, monospace",
+                        }}
+                      >
+                        {Math.round(opts.musicLevel * 100)}%
+                      </b>
+                    </div>
+                    <input
+                      id="fs_music_level"
+                      type="range"
+                      className="lenslider"
+                      min={MUSIC_PCT_MIN}
+                      max={100}
+                      step={1}
+                      value={Math.round(opts.musicLevel * 100)}
+                      onChange={(e) =>
+                        setOpts((p) => ({
+                          ...p,
+                          musicLevel: Number(e.target.value) / 100,
+                        }))
+                      }
+                      style={{
+                        margin: "8px 0 2px",
+                        ["--fill" as string]: `${((Math.round(opts.musicLevel * 100) - MUSIC_PCT_MIN) / (100 - MUSIC_PCT_MIN)) * 100}%`,
+                      }}
+                      aria-label="Music volume"
                     />
                   </div>
                 )}

@@ -28,6 +28,7 @@ import {
 } from "@/lib/data";
 import {
   normalizeCaptionColor,
+  normalizeMusicLevel,
   normalizeMusicTrack,
   normalizeSfxLevel,
   normalizeSpeed,
@@ -905,6 +906,9 @@ export async function confirmFinalSettings(
        those overwrites a choice made elsewhere. */
     sfxLevel: number;
     music: boolean;
+    /* Same rule as sfxLevel: shown here, so sent — writing back the stored
+       value is a no-op unless the slider moved. */
+    musicLevel: number;
     drawnCards: boolean;
     captionColor: string | null;
     /* NO `speed` here, on purpose. The pace is decided and signed off at the
@@ -943,6 +947,7 @@ export async function confirmFinalSettings(
         sfx: settings.sfx,
         sfxLevel: normalizeSfxLevel(settings.sfxLevel),
         music: settings.music,
+        musicLevel: normalizeMusicLevel(settings.musicLevel),
         drawnCards: settings.drawnCards,
         captionColor: normalizeCaptionColor(settings.captionColor),
       });
@@ -1775,6 +1780,10 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     // "the producer said no".
     drawn_cards: String(formData.get("drawn_cards") ?? "yes"),
     music: String(formData.get("music") ?? "no"),
+    // How loud the background track sits under the voice, 0–1 — the gain
+    // the mixer takes, like sfx_level. Stored by `Normalize Webhook Input`
+    // as Editing Options.musicLevel and read by Build Timeline at render.
+    music_level: normalizeMusicLevel(formData.get("music_level")),
     // How the narrator reads. OMITTED when the producer left it on "Voice
     // default", and that absence is the feature: every ElevenLabs voice has
     // its own stored settings, so sending an object we made up would override

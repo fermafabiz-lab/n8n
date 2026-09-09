@@ -25,7 +25,14 @@ import {
   getScenes,
   getProjectScriptInfo,
   normalizePublishing,
+  refreshSceneVisualOrigin,
+  setSceneProvenance,
 } from "@/lib/data";
+import {
+  normalizeVisualOrigin,
+  refuseFootageType,
+  ORIGIN_LABELS,
+} from "@/lib/provenance";
 import {
   normalizeCaptionColor,
   normalizeMusicTrack,
@@ -219,6 +226,21 @@ async function autoKeep(sceneId: string, kind: "image" | "video"): Promise<void>
   await saveVersionOfScene(sceneId, kind, { auto: true }).catch(() => {});
 }
 
+/**
+ * Store what this scene's picture IS, now that the prompt behind it is settled.
+ *
+ * Run at the two moments the answer can change — the picture is approved, or a
+ * prompt is edited — because the classification has to be STORED: the render
+ * looks it up and never re-derives, which is the only reason a label about
+ * truthfulness can be trusted to match what the producer signed off.
+ *
+ * Swallows its errors on purpose, exactly like `autoKeep`: a corner label must
+ * never be able to block an approval.
+ */
+async function classifyScene(sceneId: string): Promise<void> {
+  await refreshSceneVisualOrigin(sceneId).catch(() => {});
+}
+
 export async function sceneAction(
   projectId: string,
   sceneId: string,
@@ -250,6 +272,10 @@ export async function sceneAction(
     // the field the old asset is unreachable.
     if (action === "regenerate") await autoKeep(sceneId, kind);
     await writeSceneApproval(sceneId, kind, action);
+    // The approved picture is the final one, so this is the moment its origin
+    // is worth recording — including whether the prompt describes a historical
+    // reconstruction rather than an invention.
+    if (kind === "image" && action === "approve") await classifyScene(sceneId);
 
     // Image regeneration runs on its own webhook, so it no longer depends on
     // a live media-generation execution being alive to notice the flag.
@@ -424,6 +450,8 @@ export async function approveAllOfKind(
         const outcome = await flagStaleClip(id);
         if (outcome === "flagged") restaled++;
         if (outcome === "blocked") blocked++;
+        // Same as the single approve: record what the approved picture is.
+        await classifyScene(id);
       }
       // Airtable rate limit is 5 req/s per base; n8n polls concurrently.
       await new Promise((r) => setTimeout(r, 250));
@@ -536,6 +564,10 @@ export async function saveImagePrompt(
   }
   try {
     await writeSceneScript(sceneId, { imagePrompt });
+    // The prompt is what the reconstruction test reads, so a changed prompt
+    // can change what this scene is. Left alone on a scene the producer
+    // classified by hand — see refreshSceneVisualOrigin.
+    await classifyScene(sceneId);
     revalidatePath(`/projects/${projectId}`);
     return { ok: true, message: "Image prompt saved." };
   } catch (e) {
@@ -648,6 +680,87 @@ export async function useArchiveAsset(
       ok: true,
       message: `Archive ${r.mediaType === "video" ? "clip" : "still"} in place — “${r.title}”, ${r.seconds}s. Approve the image, then the clip on the Video step; the batch skips this scene's generation.`,
     };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/**
+ * "Footage type" — the producer's own answer to what a scene's picture is.
+ *
+ * The classifier can say the picture is AI, or that it is a catalogued archive
+ * item. It cannot say whether an archive clip shows THE event the narration is
+ * describing, at that place, on that day — that is a judgement about the world,
+ * and getting it wrong is the one failure this whole feature exists to prevent.
+ * So `actual_footage` and `illustrative_footage` are reachable only here, by a
+ * person, and choosing one records that a person made the call.
+ *
+ * Two things it refuses (see `refuseFootageType`): an AI picture may not be
+ * relabelled as real of any kind — the door is replacing the media — and a real
+ * archive picture may not be relabelled as AI.
+ *
+ * `origin: "auto"` releases the pin and lets the classifier own the scene again.
+ */
+export async function setSceneFootageType(
+  projectId: string,
+  sceneId: string,
+  origin: string,
+  details: { eventName?: string; location?: string; date?: string } = {},
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    const inputs = await readSceneVideoInputs(sceneId).catch(() => null);
+    const visualSource = inputs?.visualSource ?? "ai";
+
+    if (origin === "auto") {
+      await setSceneProvenance(sceneId, {
+        // Cleared to the pipeline's default and then immediately re-decided by
+        // the classifier below, which is the only thing that may own it now.
+        visualOrigin: visualSource === "stock_video"
+          ? "archival_footage"
+          : visualSource === "stock_image"
+            ? "archival_photo"
+            : "ai_generated",
+        manuallyVerified: false,
+        confidence: 0,
+        eventName: null,
+        location: null,
+        date: null,
+      });
+      await refreshSceneVisualOrigin(sceneId);
+      revalidatePath(`/projects/${projectId}`);
+      return { ok: true, message: "Footage type is back to automatic." };
+    }
+
+    const next = normalizeVisualOrigin(origin);
+    if (!next) return { ok: false, message: "That is not a footage type." };
+    const refusal = refuseFootageType(next, { visualSource });
+    if (refusal) return { ok: false, message: refusal };
+
+    const clean = (v: string | undefined) => {
+      const s = String(v ?? "").trim();
+      return s ? s.slice(0, 200) : null;
+    };
+    await setSceneProvenance(sceneId, {
+      visualOrigin: next,
+      // Any explicit choice is a pin: without it the next image approval would
+      // quietly re-classify the scene and the producer's answer would vanish.
+      manuallyVerified: true,
+      // A person said so, which is the highest confidence this system has —
+      // and, for `actual_footage`, the ONLY way past the 90 threshold. An
+      // explicit "unknown" is the exception: it is a statement that nothing is
+      // known, so claiming confidence in it would be self-contradictory.
+      confidence: next === "unknown" ? 0 : 100,
+      eventName: clean(details.eventName),
+      location: clean(details.location),
+      // Only what a person typed ever reaches the screen — never the archive's
+      // own date field, which is frequently the upload date.
+      date: clean(details.date),
+    });
+    revalidatePath(`/projects/${projectId}`);
+    return { ok: true, message: `Footage type set to ${ORIGIN_LABELS[next]}.` };
   } catch (e) {
     return { ok: false, message: friendlyError(e) };
   }
@@ -1060,6 +1173,9 @@ export async function confirmFinalSettings(
     music: boolean;
     drawnCards: boolean;
     captionColor: string | null;
+    /* Sent for the same reason as sfxLevel: this panel SHOWS the switch, so
+       writing it back is a no-op unless the producer moved it. */
+    sourceWatermark: boolean;
     /* NO `speed` here, on purpose. The pace is decided and signed off at the
        audio step, which is the only moment it is free to change, and this
        panel must not be able to move it — nor to reset it. Because
@@ -1098,6 +1214,9 @@ export async function confirmFinalSettings(
         music: settings.music,
         drawnCards: settings.drawnCards,
         captionColor: normalizeCaptionColor(settings.captionColor),
+        // The LABEL only. Provenance stays stored and a licence credit still
+        // prints — see docs/source-watermark-license-separation.md.
+        sourceWatermark: settings.sourceWatermark !== false,
       });
     }
     // Same merge, separate condition: the cards change even when no toggle
@@ -1930,6 +2049,9 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     // "the producer said no".
     drawn_cards: String(formData.get("drawn_cards") ?? "yes"),
     music: String(formData.get("music") ?? "no"),
+    // NOTE: `source_watermark` is deliberately NOT in this payload. It is the
+    // one finish the site stores itself — see the write after the record is
+    // confirmed, below, and the note there for why.
     // How the narrator reads. OMITTED when the producer left it on "Voice
     // default", and that absence is the feature: every ElevenLabs voice has
     // its own stored settings, so sending an object we made up would override
@@ -2017,6 +2139,31 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
         // Airtable unreachable — fall through to the honest failure below.
       }
     }
+  }
+
+  /*
+   * The source watermark, stored by the SITE rather than by the orchestrator's
+   * `Normalize Webhook Input`, which owns every other finish.
+   *
+   * Deliberate, and not a shortcut. This setting has exactly one reader — the
+   * `Source Watermark` node in Final Assembly, which reads Editing Options
+   * directly — and two writers, both on the site: this form and Final touches.
+   * Final touches already writes it through `updateEditingOptions`, so putting
+   * the brief through the same writer leaves ONE write path for the key
+   * instead of two, in two languages, that have to agree about what absence
+   * means.
+   *
+   * Written only when the producer REFUSED it. Absence has to keep meaning ON:
+   * a film that says nothing about where its pictures came from reads as a
+   * claim that they are real, so every project — including all 56 made before
+   * this existed — must default to labelled. `updateEditingOptions` merges, so
+   * this touches nothing else the orchestrator has just written.
+   *
+   * A failure here leaves the watermark ON, which is the safe direction, and
+   * the producer can switch it off again at Final touches.
+   */
+  if (newProjectId && String(formData.get("source_watermark") ?? "yes") === "no") {
+    await updateEditingOptions(newProjectId, { sourceWatermark: false }).catch(() => {});
   }
 
   revalidatePath("/");

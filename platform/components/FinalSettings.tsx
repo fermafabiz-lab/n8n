@@ -84,6 +84,13 @@ const OPTIONS: Array<{
     icon: "✏️",
   },
   {
+    key: "sourceWatermark",
+    label: "Source watermark",
+    on: "Show a small label indicating whether each visual is AI-generated, authentic, archival, or illustrative.",
+    off: "No origin label on screen — the provenance is still recorded, and a credit a licence requires is still shown",
+    icon: "🔎",
+  },
+  {
     key: "music",
     label: "Music",
     on: "A background track plus whoosh/boom accents at the cuts — composed here, unrelated to what the scenes show",

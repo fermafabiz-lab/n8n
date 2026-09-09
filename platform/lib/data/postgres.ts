@@ -27,6 +27,7 @@ import {
   type LibraryScript,
   type ScriptExample,
 } from "./derive";
+import { classifyVisualOrigin } from "@/lib/provenance";
 
 // ---------------------------------------------------------------------------
 // Connection
@@ -180,6 +181,13 @@ interface SceneRow {
   visual_source?: string | null;
   stock_media_id?: string | null;
   stock_offset_seconds?: string | number | null;
+  /** db/009: what the picture IS, and the facts a person stated about it. */
+  visual_origin?: string | null;
+  provenance_confidence?: number | null;
+  provenance_manually_verified?: boolean | null;
+  provenance_event_name?: string | null;
+  provenance_location?: string | null;
+  provenance_date?: string | null;
   /** The library row behind a stock scene, as one JSON object; null for `ai`. */
   stock?: {
     id: string;
@@ -188,7 +196,9 @@ interface SceneRow {
     title: string;
     source_url: string;
     creator: string | null;
+    credit: string | null;
     license_original: string | null;
+    rights_status: string | null;
     attribution_required: boolean;
     review_status: string;
   } | null;
@@ -236,7 +246,9 @@ const STOCK_SUBSELECT = `,
     (select jsonb_build_object(
               'id', m.id, 'provider', m.provider, 'media_type', m.media_type,
               'title', m.title, 'source_url', m.source_url, 'creator', m.creator,
+              'credit', m.credit,
               'license_original', m.license_original,
+              'rights_status', m.rights_status,
               'attribution_required', m.attribution_required,
               'review_status', m.review_status)
        from hov.stock_media m
@@ -283,6 +295,39 @@ async function tableReady(table: string): Promise<boolean> {
 }
 const stockReady = () => tableReady("hov.stock_media");
 const suggestReady = () => tableReady("hov.scene_archive_suggestion");
+
+/**
+ * The same question for a COLUMN, for the same reason.
+ *
+ * Reads survive an unapplied migration on their own — the scene query is
+ * `select s.*`, so a missing column is simply an absent key — but a WRITE that
+ * names one aborts its whole transaction, and `attachStockToScene` writes the
+ * media and the approvals in the same one. So the archive attach asks first
+ * and leaves the provenance columns out until db/009 has run.
+ */
+async function columnReady(table: string, column: string): Promise<boolean> {
+  const key = `${table}.${column}`;
+  const now = Date.now();
+  const hit = readyCache.get(key);
+  if (hit && now - hit.at < 60_000) return hit.ok;
+  let ok = false;
+  try {
+    const rows = await query<{ ok: boolean }>(
+      `select exists (
+         select 1 from information_schema.columns
+          where table_schema = 'hov' and table_name = $1 and column_name = $2) as ok`,
+      [table, column],
+    );
+    ok = Boolean(rows[0]?.ok);
+  } catch {
+    ok = false;
+  }
+  readyCache.set(key, { at: now, ok });
+  return ok;
+}
+
+/** db/009 applied? Exported because the archive attach writes those columns. */
+export const provenanceReady = () => columnReady("scene", "visual_origin");
 
 async function sceneSelect(): Promise<string> {
   const [stock, suggest] = await Promise.all([stockReady(), suggestReady()]);
@@ -342,6 +387,22 @@ function toRawScene(r: SceneRow): RawScene & { createdAt: string | null } {
           offsetSeconds: num(r.stock_offset_seconds ?? null),
         }
       : null,
+    // db/009. `select s.*` picks the columns up on its own, so an unapplied
+    // migration simply leaves them undefined and buildProvenance answers
+    // "ai_generated" — which is what every scene in that state actually is.
+    provenance: {
+      visualOrigin: r.visual_origin ?? undefined,
+      provenanceConfidence: r.provenance_confidence ?? undefined,
+      manuallyVerified: r.provenance_manually_verified === true,
+      eventName: r.provenance_event_name ?? undefined,
+      originalLocation: r.provenance_location ?? undefined,
+      // A person's date, not the catalogue's — stock_media.date_original is
+      // frequently the upload date and is never printed on screen.
+      originalDate: r.provenance_date ?? undefined,
+      sourceCreator: r.stock?.creator ?? r.stock?.credit ?? undefined,
+      rightsStatus: r.stock?.rights_status ?? undefined,
+      attributionRequired: r.stock?.attribution_required === true,
+    },
     archiveSuggestedAt: r.archive_suggested_at ? r.archive_suggested_at.toISOString() : null,
     archiveSuggestions: (r.archive_suggestions ?? []).map((g) => ({
       stockId: g.stock_id,
@@ -521,6 +582,103 @@ export async function readSceneVideoInputs(sceneId: string): Promise<{
   };
 }
 
+/**
+ * Re-classify a scene's picture and store the answer.
+ *
+ * Called at the two moments the answer can change: when the picture is
+ * APPROVED (the prompt that made it is final) and when a prompt is EDITED. The
+ * result is stored rather than derived at read time, so the site, the render
+ * and the producer are never looking at three different opinions — and so the
+ * render can be a lookup, which is the only way a label about truthfulness is
+ * worth anything.
+ *
+ * A scene the producer classified by hand is left alone: `manuallyVerified` is
+ * the one thing an automatic pass must never overwrite.
+ */
+export async function refreshSceneVisualOrigin(sceneId: string): Promise<void> {
+  if (!(await provenanceReady())) return;
+  const rows = await query<{
+    visual_source: string | null;
+    image_prompt: string | null;
+    motion_prompt: string | null;
+    visual_origin: string | null;
+    provenance_manually_verified: boolean | null;
+    provider: string | null;
+    creator: string | null;
+    credit: string | null;
+    source_url: string | null;
+    rights_status: string | null;
+    license_original: string | null;
+  }>(
+    `select s.visual_source, s.image_prompt, s.motion_prompt, s.visual_origin,
+            s.provenance_manually_verified,
+            m.provider, m.creator, m.credit, m.source_url, m.rights_status, m.license_original
+       from hov.scene s
+       left join hov.stock_media m on m.id = s.stock_media_id
+      where s.id = $1`,
+    [sceneId],
+  );
+  const r = rows[0];
+  if (!r || r.provenance_manually_verified === true) return;
+  const { origin, confidence } = classifyVisualOrigin({
+    visualSource: r.visual_source ?? "ai",
+    imagePrompt: r.image_prompt,
+    videoPrompt: r.motion_prompt,
+    stock: r.provider
+      ? {
+          provider: r.provider,
+          creator: r.creator,
+          credit: r.credit,
+          sourceUrl: r.source_url,
+          rightsStatus: r.rights_status,
+          license: r.license_original,
+        }
+      : null,
+  });
+  if (origin === r.visual_origin) return;
+  await query(`update hov.scene set visual_origin = $2, provenance_confidence = $3 where id = $1`, [
+    sceneId,
+    origin,
+    confidence,
+  ]);
+}
+
+/**
+ * The producer's own answer to "what is this?", from the Footage type control.
+ *
+ * `manuallyVerified` is set for exactly the origins that are a claim about the
+ * WORLD rather than about our records — actual and illustrative footage — and
+ * it is what stops the automatic pass above from quietly disagreeing later.
+ * Choosing a type the classifier could have reached on its own does not need
+ * pinning, so it clears the flag and lets the scene follow its media again.
+ */
+export async function setSceneProvenance(
+  sceneId: string,
+  p: {
+    visualOrigin: string;
+    manuallyVerified: boolean;
+    confidence: number;
+    eventName: string | null;
+    location: string | null;
+    date: string | null;
+  },
+): Promise<void> {
+  if (!(await provenanceReady())) {
+    throw new Error("The provenance columns are not in the database yet — apply db/009.");
+  }
+  await query(
+    `update hov.scene
+        set visual_origin = $2,
+            provenance_manually_verified = $3,
+            provenance_confidence = $4,
+            provenance_event_name = $5,
+            provenance_location = $6,
+            provenance_date = $7
+      where id = $1`,
+    [sceneId, p.visualOrigin, p.manuallyVerified, p.confidence, p.eventName, p.location, p.date],
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Writes
 //
@@ -563,6 +721,15 @@ const SCENE_FIELDS: Record<string, string> = {
   "Observații Scenă": "note",
   "Evidence Ref": "evidence_ref",
   "Needs Fact Check": "needs_fact_check",
+  // db/009 — visual provenance. New here too, with no Airtable original; the
+  // database's own copy of this map (hov.airtable_field) has the same rows, and
+  // an unmapped name throws on both sides rather than being dropped.
+  "Visual Origin": "visual_origin",
+  "Provenance Confidence": "provenance_confidence",
+  "Provenance Verified": "provenance_manually_verified",
+  "Provenance Event": "provenance_event_name",
+  "Provenance Location": "provenance_location",
+  "Provenance Date": "provenance_date",
 };
 
 const PROJECT_FIELDS: Record<string, string> = {

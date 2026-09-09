@@ -33,6 +33,7 @@ import { usePendingStage } from "@/components/StageNav";
 import CinemaMode from "@/components/CinemaMode";
 import ArchivePicker from "@/components/ArchivePicker";
 import ArchiveSuggestions from "@/components/ArchiveSuggestions";
+import FootageTypePicker from "@/components/FootageTypePicker";
 
 /** The three steps this board can serve, in the pipeline's own order. */
 type Step = "images" | "audio" | "video";
@@ -979,6 +980,14 @@ export default function SceneBoard({
                   )}
                 </div>
                 )}
+                {/* What this picture IS, and the producer's power to correct
+                    it. Documentary only, and on the Images step only: this is
+                    a statement about the PICTURE, so it belongs where the
+                    picture is being judged and where the archive panel that
+                    can change the answer already sits. Every other category
+                    is AI end to end, and a control with one possible answer
+                    reads as a decision nobody has to make. */}
+                {archive && <FootageTypePicker projectId={projectId} scene={active} pending={pending} />}
               </>
             )}
             {/* The voiceover player, its narration box, "Regenerate voice" and

@@ -3669,6 +3669,72 @@ Fetch Scenes (GET, claims) → Build Query Prompt → Query Model → Parse Quer
   says so. A film that already had its AI images when the run fired keeps
   them; the offers sit beside them and replace one only on Use.
 
+### The source watermark — saying which pictures are real (2026-09-09)
+
+A film cuts AI pictures, AI reconstructions and real archive material into one
+montage and nothing on screen ever said which was which. Now a small corner
+label does: **AI GENERATED · AI RECONSTRUCTION · ARCHIVAL FOOTAGE · ARCHIVAL
+PHOTO · ACTUAL FOOTAGE · ILLUSTRATIVE FOOTAGE · REAL FOOTAGE · SOURCE
+UNVERIFIED**. Full account in `docs/source-watermark-*.md` (six files); what
+belongs here is the load-bearing parts.
+
+- **The classification is STORED, never derived at read time.** `db/009` adds
+  six columns to `scene` (`visual_origin` not-null default `ai_generated`,
+  `provenance_confidence`, `provenance_manually_verified`, and event/location/
+  date), backfilled once from `visual_source`. Everything after that is a
+  WRITE: the archive attach, `detachStockFromScene`, an image approval, an
+  image-prompt edit, the producer's own override. The render is a pure lookup
+  — a renderer that re-derived provenance could disagree with the record the
+  producer approved, on the one overlay whose job is telling the truth.
+- **Nothing automatic may ever say ACTUAL FOOTAGE.** It means the media shows
+  THIS event, place and date, and no signal we have establishes that: a
+  ranker's relevance is a judgement about a search result, the archive's date
+  field is frequently the UPLOAD date (Commons dated a 1969 NASA reel
+  2015-06-12), and visual similarity says two newsreels look alike.
+  `classifyVisualOrigin` tops out at archival_footage/archival_photo and its
+  confidence is capped at **85, below `ACTUAL_FOOTAGE_MIN_CONFIDENCE` (90)** —
+  so no automatic number can read as authority. Only the producer's Footage
+  type control reaches actual/illustrative, and it sets `manuallyVerified`.
+- **An AI picture is REFUSED, not warned, when someone tries to call it real.**
+  A confirmation dialog cannot make model output authentic; the door is
+  replacing the media, which is what the refusal sentence says and what the
+  archive panel on the same step does. The mirror refusal (calling a real
+  archive picture AI) exists too, pointing at "Back to AI".
+- **The watermark and the licence credit are TWO SYSTEMS.** The switch owns the
+  LABEL. A credit CC BY / CC BY-SA demands is a legal obligation and is drawn
+  whether the switch is on or off — `planWatermarkBands({showLabel:false})`
+  keeps exactly the bands that owe one and drops the rest. Do not collapse them
+  into one flag, ever.
+- **No date or place is printed unless a PERSON typed it.** `provenance_date`
+  is deliberately separate from `stock_media.date_original`, and the picker does
+  not even pre-fill from it. Same reason as above.
+- **The label is per BAND, not per scene.** Consecutive scenes with the same
+  badge merge into one continuous label, or six archive shots in a row blink
+  the same words apart and back at every cut. It is suppressed over a full-frame
+  card (the card REPLACES the picture) and under the hook title — the same
+  `!activeCard && !chapterCardUp` gate the captions use.
+- **`showSourceWatermark` defaults to TRUE and that is safe only because a
+  scene with no `provenance` draws nothing.** Old props carry none. But note
+  the consequence: **every film re-rendered from now on gains the label**,
+  Story films included (every scene reads AI GENERATED), unless its producer
+  switches it off.
+- **This is the one finish the SITE stores, not `Normalize Webhook Input`.**
+  One reader (Final Assembly's `Source Watermark` node reads Editing Options
+  directly) and two writers, both on the site — the brief and Final touches —
+  and Final touches already used `updateEditingOptions`. `createProject` writes
+  `{sourceWatermark:false}` only on refusal, after the record is confirmed.
+  Absence means ON, like captionColor's white.
+- **`at_scene` was WRAPPED, not rewritten.** db/009 renames the db/002 view to
+  `at_scene_core` and builds `at_scene` on top of it, adding one `Provenance`
+  key. The obvious `create or replace view` would have meant retyping
+  twenty-one Romanian field names (`Status Producție Scenă`, `Observații
+  Scenă`…) that five workflows index by hand — and a mistyped diacritic there
+  does not raise, it silently produces keys no gate matches. **Any future
+  addition to at_scene should wrap the same way.**
+- Tests: `npm run check:provenance` (platform, 58) and `npm run check:watermark`
+  (remotion, 20). Commons returns creators as `Template:Helmut Laux`; both
+  formatters strip the prefix, and that is pinned.
+
 ## Conventions
 
 - Standalone webhooks over long-lived executions — they don't depend on a

@@ -16,6 +16,11 @@
  */
 
 import type { DocumentaryVisualSource } from "@/lib/archive/types";
+import {
+  normalizeConfidence,
+  normalizeVisualOrigin,
+  type VisualProvenance,
+} from "@/lib/provenance";
 
 export type StatusKind = "wait" | "run" | "done" | "err" | "idle";
 
@@ -142,6 +147,22 @@ export interface EditingOptions {
    * and leaves those films editable, the safe direction.
    */
   speedLocked: boolean;
+  /**
+   * Whether the film prints a small label saying what each visual IS — AI
+   * GENERATED, ARCHIVAL FOOTAGE, ACTUAL FOOTAGE, SOURCE UNVERIFIED.
+   *
+   * ON unless refused, like the other overlays, and for a stronger reason than
+   * most: the montage cuts generated pictures and real archive material into
+   * one continuous film, and saying nothing about a picture's origin reads as
+   * a claim that it is real. Absence therefore means ON, so every film made
+   * before this existed gains the label on its next render.
+   *
+   * It governs the LABEL only. Provenance is stored whatever it says, and a
+   * credit a licence REQUIRES is drawn whatever it says — two different
+   * systems, and conflating them would let a style switch drop a legal
+   * obligation. See docs/source-watermark-license-separation.md.
+   */
+  sourceWatermark: boolean;
   /**
    * Hands-off mode: the site signs off every gate by itself as the assets
    * land — script, scene texts, takes, images, clips — and presses the final
@@ -449,6 +470,15 @@ export interface Scene {
   visualSource: DocumentaryVisualSource;
   /** The archive asset behind a stock scene; null for `ai`. */
   stock: SceneStock | null;
+  /**
+   * What this scene's picture IS, and where it came from — the record the
+   * watermark prints and the Footage type control edits.
+   *
+   * Always present: a scene whose origin was never classified reads as
+   * `ai_generated`, which is what every film made by this pipeline before
+   * Documentary mode existed actually is.
+   */
+  provenance: VisualProvenance;
   /** What the suggestion run proposed for this scene, best first. */
   archiveSuggestions: SceneArchiveSuggestion[];
   /** When a run last looked at the scene; null = not yet. Tells "none found" from "not looked". */
@@ -517,6 +547,17 @@ export interface RawScene {
   /** Postgres only (db/007). The Airtable adapter never sets these: `ai`, null. */
   visualSource?: DocumentaryVisualSource;
   stock?: SceneStock | null;
+  /**
+   * Postgres only (db/009); absent reads as an AI-generated picture.
+   *
+   * `visualOrigin` is a plain string here rather than the union: it is a
+   * column value that has not been through `normalizeVisualOrigin` yet, and an
+   * adapter should not have to launder a database row into a type before the
+   * builder — whose job that is — has looked at it.
+   */
+  provenance?: (Omit<Partial<VisualProvenance>, "visualOrigin"> & {
+    visualOrigin?: string | null;
+  }) | null;
   /** Postgres only (db/008). */
   archiveSuggestions?: SceneArchiveSuggestion[];
   archiveSuggestedAt?: string | null;
@@ -797,6 +838,10 @@ export function buildProject(r: RawProject): Project {
       // before the audio step could sign the pace off — reads as unlocked
       // and keeps its control rather than arriving frozen.
       speedLocked: opts.speedLocked === true,
+      // On unless refused, exactly like the other overlays — and the absence
+      // is what makes every existing film gain the label rather than quietly
+      // shipping unlabelled. `sourceWatermark: false` is the only stored form.
+      sourceWatermark: opts.sourceWatermark !== false,
       // Strictly opt-in, `=== true`: hands-off is a real trade (nothing gets
       // a human look) and must never switch itself on by absence.
       autoApprove: opts.autoApprove === true,
@@ -818,6 +863,54 @@ export function buildProject(r: RawProject): Project {
     publishing: normalizePublishing(opts.publishing),
     castAssign: asRecord(opts.castAssign) as Record<string, string>,
     chapterVoices: asRecord(opts.chapterVoices) as Record<string, string>,
+  };
+}
+
+/**
+ * The scene's provenance record, as the UI and the render both read it.
+ *
+ * Read, never DERIVED: `visual_origin` is written by the site the moment
+ * anything about the picture settles (the archive attach, an image approval, a
+ * prompt edit, the producer's own override), and db/009 backfilled every row
+ * that predates it. A reader that re-classified could disagree with the record
+ * the producer approved — the exact divergence the whole design avoids.
+ *
+ * The archive fields ride along from the linked `stock_media` row rather than
+ * being stored twice; only the facts with nowhere else to live are columns.
+ */
+function buildProvenance(r: RawScene): VisualProvenance {
+  const p = r.provenance ?? {};
+  const stock = r.stock ?? null;
+  const origin =
+    normalizeVisualOrigin(p.visualOrigin) ??
+    // No stored classification: an Airtable-era scene, or a row read before
+    // db/009. Every film this pipeline made before Documentary mode is AI.
+    "ai_generated";
+  const text = (v: unknown): string | undefined => {
+    const s = typeof v === "string" ? v.trim() : "";
+    return s ? s : undefined;
+  };
+  return {
+    visualOrigin: origin,
+    ...(text(p.provider ?? stock?.provider) ? { provider: text(p.provider ?? stock?.provider)! } : {}),
+    ...(text(p.sourceTitle ?? stock?.title) ? { sourceTitle: text(p.sourceTitle ?? stock?.title)! } : {}),
+    ...(text(p.sourceUrl ?? stock?.sourceUrl) ? { sourceUrl: text(p.sourceUrl ?? stock?.sourceUrl)! } : {}),
+    ...(text(p.sourceCreator ?? stock?.creator)
+      ? { sourceCreator: text(p.sourceCreator ?? stock?.creator)! }
+      : {}),
+    ...(text(p.originalDate) ? { originalDate: text(p.originalDate)! } : {}),
+    ...(text(p.originalLocation) ? { originalLocation: text(p.originalLocation)! } : {}),
+    ...(text(p.eventName) ? { eventName: text(p.eventName)! } : {}),
+    // Derived, never stored: `actual_footage` IS the claim that this is the
+    // event, so a separate flag could only ever contradict it.
+    ...(origin === "actual_footage" ? { isExactEventMatch: true } : {}),
+    ...(text(p.rightsStatus) ? { rightsStatus: text(p.rightsStatus)! } : {}),
+    ...(text(p.licenseName ?? stock?.license) ? { licenseName: text(p.licenseName ?? stock?.license)! } : {}),
+    ...(p.attributionRequired ?? stock?.attributionRequired ? { attributionRequired: true } : {}),
+    ...(normalizeConfidence(p.provenanceConfidence) !== undefined
+      ? { provenanceConfidence: normalizeConfidence(p.provenanceConfidence) }
+      : {}),
+    ...(p.manuallyVerified === true ? { manuallyVerified: true } : {}),
   };
 }
 
@@ -926,6 +1019,7 @@ export function buildScene(r: RawScene, index: number): Scene {
     versions: r.versions,
     visualSource: r.visualSource ?? "ai",
     stock: r.stock ?? null,
+    provenance: buildProvenance(r),
     archiveSuggestions: r.archiveSuggestions ?? [],
     archiveSuggestedAt: r.archiveSuggestedAt ?? null,
     status: displayStatus(status),

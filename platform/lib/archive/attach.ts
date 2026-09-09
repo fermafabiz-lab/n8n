@@ -36,6 +36,7 @@ import os from "node:os";
 import path from "node:path";
 import { attachStockToScene, getStockMedia, type StockMedia } from "@/lib/data/stock";
 import { mediaPublicUrl, storeMediaBytes } from "@/lib/media-store";
+import { classifyVisualOrigin } from "@/lib/provenance";
 
 const USER_AGENT = "HouseOfVideos/1.0 (https://house-of-videos.com; documentary archive research)";
 const FPS = 24;
@@ -195,6 +196,23 @@ export async function attachArchiveAsset(input: AttachInput): Promise<AttachResu
   const why = refuse(stock);
   if (why) throw new Error(why);
 
+  // What the picture will BE once this lands, decided here because the library
+  // row is in hand and because the record of a scene's origin has to change in
+  // the same breath as its media. Never `actual_footage`: whether the asset
+  // shows the narrated event is a judgement about the world, and only the
+  // producer's own Footage type control may make it.
+  const classified = classifyVisualOrigin({
+    visualSource: stock.mediaType === "video" ? "stock_video" : "stock_image",
+    stock: {
+      provider: stock.provider,
+      creator: stock.creator,
+      credit: stock.credit,
+      sourceUrl: stock.sourceUrl,
+      rightsStatus: stock.rightsStatus,
+      license: stock.licenseOriginal,
+    },
+  });
+
   const W = input.portrait ? 720 : 1280;
   const H = input.portrait ? 1280 : 720;
   const seconds = clampSeconds(input.seconds);
@@ -252,6 +270,8 @@ export async function attachArchiveAsset(input: AttachInput): Promise<AttachResu
         sourceUrl: stock.sourceUrl,
       },
       videoUrl,
+      visualOrigin: classified.origin,
+      provenanceConfidence: classified.confidence,
     });
 
     return {

@@ -10,7 +10,8 @@
     "check:motif": "node motif/check-motif.mjs",
     "start:server": "node server/index.mjs",
     "lambda:deploy-function": "remotion lambda functions deploy",
-    "lambda:deploy-site": "remotion lambda sites create src/index.ts --site-name=final-video"
+    "lambda:deploy-site": "remotion lambda sites create src/index.ts --site-name=final-video",
+    "check:watermark": "node --experimental-strip-types scripts/check-watermark.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

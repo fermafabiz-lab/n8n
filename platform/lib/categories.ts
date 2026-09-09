@@ -64,7 +64,7 @@ export const CATEGORIES: Category[] = [
     label: "Documentary",
     icon: "🎥",
     description:
-      "Fact-driven storytelling: researched narration built like a real documentary. Any scene can use real archive footage or photos (Wikimedia Commons) instead of a generated picture — chosen scene by scene on the Images step.",
+      "Fact-driven storytelling: researched narration built like a real documentary. Any scene can use real footage or photos — from the EU Audiovisual Service, DVIDS, NASA, Wikimedia Commons, a pasted URL or your own upload — instead of a generated picture, chosen scene by scene on the Images step. Every scene says on screen what it is.",
     ready: true,
     options: [
       {

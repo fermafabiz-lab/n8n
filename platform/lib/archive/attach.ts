@@ -34,9 +34,12 @@ import { execFile } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { attachStockToScene, getStockMedia, type StockMedia } from "@/lib/data/stock";
+import { attachStockToScene, getSceneForFootage, getStockMedia, setStockStatus, type StockMedia } from "@/lib/data/stock";
 import { mediaPublicUrl, storeMediaBytes } from "@/lib/media-store";
 import { classifyVisualOrigin } from "@/lib/provenance";
+import { assessProvenance } from "@/lib/footage/provenance";
+import { buildFootageRequest } from "@/lib/footage/request";
+import { renderable, usableAutomatically, validateRights } from "@/lib/footage/rights";
 
 const USER_AGENT = "HouseOfVideos/1.0 (https://house-of-videos.com; documentary archive research)";
 const FPS = 24;
@@ -57,6 +60,8 @@ export interface AttachInput {
   seconds: number;
   /** Alternates the Ken Burns direction; pass the scene order. */
   sceneOrder: number;
+  /** A person is choosing (the picker, the admin page). False for automatic placement, which may not pass a review class. */
+  human?: boolean;
 }
 
 export interface AttachResult {
@@ -183,24 +188,41 @@ async function download(url: string): Promise<{ buf: Buffer; contentType: string
   return { buf, contentType: res.headers.get("content-type") };
 }
 
-function refuse(stock: StockMedia): string | null {
-  if (stock.reviewStatus === "rejected")
-    return `Its licence forbids this use — ${stock.reviewReason ?? stock.licenseOriginal ?? "restricted"}.`;
+/**
+ * The rights gate, through the central validator. `restricted` never passes,
+ * whoever is asking. `manual_review` and `editorial_only` pass only for a
+ * HUMAN act — the producer's own "Use" in the picker or the admin page —
+ * which the caller says with `human: true`; the automatic paths (a suggestion
+ * run placing footage on its own) may not.
+ */
+function refuse(stock: StockMedia, human: boolean): string | null {
   if (stock.status === "rejected") return "This asset was rejected earlier.";
+  const rights = validateRights(stock);
+  if (rights.status === "restricted")
+    return `Its licence forbids this use — ${rights.reason ?? stock.licenseOriginal ?? "restricted"}.`;
+  if (!usableAutomatically(rights) && !human && !renderable(rights, stock.status)) {
+    return `Its rights need a person's decision first (${rights.status.replace("_", " ")}${rights.reason ? ` — ${rights.reason}` : ""}).`;
+  }
   return null;
 }
 
 export async function attachArchiveAsset(input: AttachInput): Promise<AttachResult> {
   const stock = await getStockMedia(input.stockId);
   if (!stock) throw new Error("That archive asset is not in the library any more.");
-  const why = refuse(stock);
+  const why = refuse(stock, input.human !== false);
   if (why) throw new Error(why);
 
   // What the picture will BE once this lands, decided here because the library
   // row is in hand and because the record of a scene's origin has to change in
-  // the same breath as its media. Never `actual_footage`: whether the asset
-  // shows the narrated event is a judgement about the world, and only the
-  // producer's own Footage type control may make it.
+  // the same breath as its media.
+  //
+  // Two answers are combined. The media-only classifier says what the asset
+  // IS (archival footage, an archival photo) and can never say actual
+  // footage. The provenance engine, given the scene's own request, says
+  // whether the asset's metadata matches THIS event, place and date — and
+  // may say actual footage past the threshold, or illustrative when the
+  // scene named an event this asset is not proven to show. A library row a
+  // person already classified (verified_at) keeps their word.
   const classified = classifyVisualOrigin({
     visualSource: stock.mediaType === "video" ? "stock_video" : "stock_image",
     stock: {
@@ -212,6 +234,28 @@ export async function attachArchiveAsset(input: AttachInput): Promise<AttachResu
       license: stock.licenseOriginal,
     },
   });
+  let visualOrigin: string = classified.origin;
+  let confidence = classified.confidence;
+  if (stock.verifiedAt && stock.provenance && stock.provenance !== "unknown") {
+    visualOrigin = stock.provenance;
+    confidence = stock.provenanceConfidence ?? 100;
+  } else {
+    const scene = await getSceneForFootage(input.sceneId).catch(() => null);
+    if (scene) {
+      const request = buildFootageRequest({ id: scene.id, narration: scene.narration, visual: scene.visual });
+      const assessed = assessProvenance(request, stock);
+      if (assessed.provenance !== "unknown") {
+        visualOrigin = assessed.provenance;
+        confidence = assessed.confidence;
+      }
+    }
+  }
+  // A person's "Use" of a manual-review asset is the review (§18): the row
+  // is marked approved so the next scene that wants it does not ask again.
+  const rights = validateRights(stock);
+  if (!usableAutomatically(rights) && stock.status === "candidate") {
+    await setStockStatus(stock.id, "approved").catch(() => {});
+  }
 
   const W = input.portrait ? 720 : 1280;
   const H = input.portrait ? 1280 : 720;
@@ -270,8 +314,13 @@ export async function attachArchiveAsset(input: AttachInput): Promise<AttachResu
         sourceUrl: stock.sourceUrl,
       },
       videoUrl,
-      visualOrigin: classified.origin,
-      provenanceConfidence: classified.confidence,
+      visualOrigin,
+      provenanceConfidence: confidence,
+      // What the asset states about itself, so the watermark's source line
+      // can say where and when — only when the provider actually said.
+      eventName: stock.eventName ?? null,
+      location: stock.location ?? stock.country ?? null,
+      filmingDate: stock.filmingDate ?? null,
     });
 
     return {

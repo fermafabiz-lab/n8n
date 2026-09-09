@@ -39,6 +39,62 @@
   letter-spacing: 0.02em;
 }
 
+/* The engine's score, top-right, where a rating badge is expected. */
+.score {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  min-width: 26px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.prov {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  border: 1px solid var(--line2);
+  background: var(--bg2);
+  color: var(--soft);
+}
+
+.pv {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent-deep);
+}
+
+.pvActual {
+  border-color: color-mix(in srgb, #2e9e5b 40%, transparent);
+  background: color-mix(in srgb, #2e9e5b 14%, transparent);
+  color: #1f7a45;
+}
+
+.pvUnknown {
+  border-color: var(--line2);
+  background: var(--bg2);
+  color: var(--dim);
+}
+
 .dur {
   position: absolute;
   right: 6px;
@@ -147,9 +203,17 @@
    it collapses to the width of its label, which is how "Use" rendered as a
    27px circle with the word spilling out of it. Every archive panel that puts
    an .abtn in a flex row has to say this. */
+/* `.abtn` has no horizontal padding of its own (it is built for a grid cell),
+   so it is stated here. The label may wrap: "Use — I accept the rights" is
+   wider than a 180px card and clipped mid-word under `nowrap` — measured on
+   the probe page, not guessed. */
 .actions button {
-  padding: 8px 15px;
-  white-space: nowrap;
+  padding: 8px 12px;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.2;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .actions a {

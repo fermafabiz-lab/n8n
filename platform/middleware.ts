@@ -21,7 +21,7 @@ export function middleware(req: NextRequest) {
   // request carrying the right key skips the login redirect here; the route
   // checks both credentials again itself, so this is a door, not the lock.
   if (
-    req.nextUrl.pathname.startsWith("/api/archive/") &&
+    (req.nextUrl.pathname.startsWith("/api/archive/") || req.nextUrl.pathname.startsWith("/api/footage/")) &&
     process.env.MEDIA_INGEST_KEY &&
     req.headers.get("x-hov-key") === process.env.MEDIA_INGEST_KEY
   ) {

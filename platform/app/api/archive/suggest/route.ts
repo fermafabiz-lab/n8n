@@ -12,11 +12,18 @@
  *        → the scenes to look at (approved, still AI, no clip, not yet
  *          looked at), CLAIMED for ten minutes so overlapping runs do not
  *          double-spend, plus the film's name, language and brief.
- *   POST /api/archive/suggest  { stage: "search", scenes: [{id, queries}] }
- *        → runs the model's queries against the archives, files every hit
- *          in the library, answers up to 12 usable candidates per scene.
+ *   POST /api/archive/suggest  { stage: "search", scenes: [{id, request | queries}] }
+ *        → runs each scene's request through the Universal Footage Engine
+ *          (library first, then the routed providers), files every hit, and
+ *          answers up to 12 candidates per scene ranked best first with the
+ *          engine's own score and provenance — the model then only has to
+ *          judge relevance, not rediscover it.
  *   POST /api/archive/suggest  { stage: "store", project, processed, scenes: [{id, picks}] }
  *        → writes the ranked picks and stamps every processed scene.
+ *
+ * The search stage accepts both shapes the workflow has sent: the original
+ * `queries: []` (turned into a request from the scene's own text) and the
+ * structured `request: {…}` the current prompt produces.
  *
  * Same key as every other n8n→site call. The browser cookie is accepted too,
  * so the stages can be exercised by hand.
@@ -24,12 +31,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { searchArchives, type NormalizedArchiveAsset } from "@/lib/archive";
-import {
-  claimScenesForSuggestion,
-  saveStockCandidates,
-  storeArchiveSuggestions,
-} from "@/lib/data/stock";
+import { buildFootageRequest, searchFootage, usableAutomatically, type RankedFootage } from "@/lib/footage";
+import { footageAuthorized, footageUsable } from "@/lib/footage/auth";
+import { claimScenesForSuggestion, getSceneForFootage, storeArchiveSuggestions } from "@/lib/data/stock";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,19 +42,9 @@ export const maxDuration = 600;
 const bad = (status: number, error: string) => NextResponse.json({ ok: false, error }, { status });
 const REC = /^rec[0-9A-Za-z]{14}$/;
 
-function authorized(req: NextRequest): boolean {
-  const key = process.env.MEDIA_INGEST_KEY;
-  if (key && req.headers.get("x-hov-key") === key) return true;
-  const expected = process.env.SITE_PASSWORD;
-  if (!expected) return true;
-  return req.cookies.get("vf_auth")?.value === expected;
-}
-
-const usable = () => process.env.DATA_BACKEND === "postgres";
-
 export async function GET(req: NextRequest) {
-  if (!authorized(req)) return bad(401, "unauthorized");
-  if (!usable()) return bad(503, "archive suggestions need the Postgres backend");
+  if (!footageAuthorized(req)) return bad(401, "unauthorized");
+  if (!footageUsable()) return bad(503, "archive suggestions need the Postgres backend");
   const project = req.nextUrl.searchParams.get("project") ?? "";
   if (!REC.test(project)) return bad(400, "bad project");
   const out = await claimScenesForSuggestion(project);
@@ -59,25 +53,33 @@ export async function GET(req: NextRequest) {
 }
 
 /** What the ranking model gets to read about a candidate. Short on purpose. */
-function candidateOf(a: NormalizedArchiveAsset & { id: string }) {
+function candidateOf(c: RankedFootage & { asset: { id: string } }) {
+  const a = c.asset;
   return {
     id: a.id,
+    provider: a.provider,
     title: a.title.slice(0, 160),
     description: (a.description ?? "").slice(0, 240),
     mediaType: a.mediaType,
+    footageFormat: a.footageFormat ?? "unknown",
     durationSeconds: a.durationSeconds === null ? null : Math.round(a.durationSeconds),
     yearsMentioned: a.yearsMentioned.slice(0, 6),
+    filmingDate: a.filmingDate ?? null,
     dateOriginal: a.dateOriginal,
+    location: a.location ?? null,
+    eventName: a.eventName ?? null,
     creator: a.creator ? a.creator.slice(0, 80) : null,
     license: a.licenseOriginal,
-    reviewStatus: a.reviewStatus,
+    usage: c.rights.status,
+    score: c.score,
+    provenance: c.provenance,
     categories: a.categories.slice(0, 5),
   };
 }
 
 export async function POST(req: NextRequest) {
-  if (!authorized(req)) return bad(401, "unauthorized");
-  if (!usable()) return bad(503, "archive suggestions need the Postgres backend");
+  if (!footageAuthorized(req)) return bad(401, "unauthorized");
+  if (!footageUsable()) return bad(503, "archive suggestions need the Postgres backend");
   let body: {
     stage?: string;
     project?: string;
@@ -92,7 +94,7 @@ export async function POST(req: NextRequest) {
 
   if (body.stage === "search") {
     const scenes = Array.isArray(body.scenes) ? (body.scenes as Array<Record<string, unknown>>) : [];
-    const out: Array<{ id: string; candidates: ReturnType<typeof candidateOf>[] }> = [];
+    const out: Array<{ id: string; candidates: ReturnType<typeof candidateOf>[]; source: string; providers: string[] }> = [];
     let requests = 0;
     for (const s of scenes) {
       const id = String(s.id ?? "");
@@ -100,35 +102,49 @@ export async function POST(req: NextRequest) {
       const queries = (Array.isArray(s.queries) ? s.queries : [])
         .map((q) => String(q ?? "").replace(/\s+/g, " ").trim())
         .filter((q) => q.length >= 2 && q.length <= 120)
-        .slice(0, 2);
-      const seen = new Map<string, NormalizedArchiveAsset & { id: string }>();
-      for (const q of queries) {
-        // A breath between requests: this loop can run a hundred queries for
-        // one film, against an archive that asks clients to be polite.
-        if (requests > 0) await new Promise((r) => setTimeout(r, 300));
-        requests += 1;
-        try {
-          const { results } = await searchArchives(q, {
-            mediaType: "any",
-            limit: 6,
-            signal: AbortSignal.timeout(25_000),
-          });
-          const filed = await saveStockCandidates(results, q);
-          for (const a of results) {
-            const row = filed.get(`${a.provider}:${a.providerAssetId}`);
-            // Never offer what cannot be used: the licence said no.
-            if (!row || a.reviewStatus === "rejected") continue;
-            if (!seen.has(row.id)) seen.set(row.id, { ...a, id: row.id });
-          }
-        } catch (e) {
-          console.warn(`archive suggest: search "${q}" failed — ${(e as Error).message}`);
-        }
+        .slice(0, 4);
+      const structured = (s.request && typeof s.request === "object" ? s.request : {}) as Record<string, unknown>;
+      const scene = await getSceneForFootage(id).catch(() => null);
+      const request = buildFootageRequest({
+        id,
+        narration: String(structured.narration ?? scene?.narration ?? ""),
+        visual: scene?.visual ?? null,
+        queries,
+        topic: structured.topic as string | undefined,
+        event: structured.event as string | undefined,
+        location: structured.location as string | undefined,
+        country: structured.country as string | undefined,
+        dateFrom: structured.dateFrom as string | undefined,
+        dateTo: structured.dateTo as string | undefined,
+        people: structured.people as string[] | undefined,
+        organizations: structured.organizations as string[] | undefined,
+        keywords: structured.keywords as string[] | undefined,
+        preferredMediaType: structured.preferredMediaType === "image" ? "image" : "video",
+        preferredFootageType: structured.preferredFootageType as never,
+        requireExactEvent: structured.requireExactEvent === true,
+      });
+      // A breath between scenes: a ninety-scene film is a few hundred
+      // provider calls, against archives that ask clients to be polite.
+      if (requests > 0) await new Promise((r) => setTimeout(r, 300));
+      requests += 1;
+      try {
+        const r = await searchFootage(request, { limit: 6, top: 12, signal: AbortSignal.timeout(60_000) });
+        // Never offer what a run could not place on its own: an automatic
+        // path may not pass a review class, so those wait for the picker.
+        const usable = r.candidates.filter(
+          (c): c is RankedFootage & { asset: { id: string } } =>
+            Boolean(c.asset.id) && (usableAutomatically(c.rights) || c.asset.status === "approved" || c.asset.status === "used"),
+        );
+        out.push({
+          id,
+          candidates: usable.slice(0, 12).map(candidateOf),
+          source: r.source,
+          providers: r.providers.filter((p) => p.routed && !p.reason).map((p) => p.provider),
+        });
+      } catch (e) {
+        console.warn(`archive suggest: scene ${id} failed — ${(e as Error).message}`);
+        out.push({ id, candidates: [], source: "error", providers: [] });
       }
-      // Videos first — the producer asked for footage — then stills, each in
-      // the archive's own relevance order.
-      const list = [...seen.values()];
-      const ordered = [...list.filter((a) => a.mediaType === "video"), ...list.filter((a) => a.mediaType === "image")];
-      out.push({ id, candidates: ordered.slice(0, 12).map(candidateOf) });
     }
     return NextResponse.json({ ok: true, scenes: out, requests });
   }

@@ -3509,16 +3509,18 @@ picked the asset, not signed it off. Final Assembly receives an ordinary mp4.
   door back: `backToAiImage` drops the link, the clip and `Scene Final URL`,
   then flags an ordinary image regeneration; once the new picture is
   approved, `Needs Clip?` sees a scene owing a clip.
-- **Wikimedia is the only keyless archive, and the only one built.** Read off
-  real responses (executions 10893/10895/10898): `filetype:video` finds both
-  webm and ogv (`filemime:video/ogg` finds nothing — the ogv's MIME is
-  `application/ogg`); `filetype:bitmap` also returns animated GIFs, skipped;
-  `formatversion=2` makes `query.pages` an array; a public-domain template can
-  carry no `License` code at all (`Copyrighted: "False"` is the fallback).
-  NARA and Smithsonian are declared as DISABLED adapters that name the key
-  they need (`NARA_API_KEY` from catalog.archives.gov, `SMITHSONIAN_API_KEY`
-  from api.data.gov) — listed so the gap is visible, not pretended into
-  existence, because neither can be tested from here without a key.
+- **Wikimedia was the only archive until 2026-09-09; the footage engine
+  (its own section below) added the EU Audiovisual Service, DVIDS and NASA.**
+  Read off real responses (executions 10893/10895/10898): `filetype:video`
+  finds both webm and ogv (`filemime:video/ogg` finds nothing — the ogv's
+  MIME is `application/ogg`); `filetype:bitmap` also returns animated GIFs,
+  skipped; `formatversion=2` makes `query.pages` an array; a public-domain
+  template can carry no `License` code at all (`Copyrighted: "False"` is the
+  fallback). NARA and Smithsonian were declared here as disabled
+  placeholders and have been REMOVED — never built, never searched, their
+  keys read nowhere (`docs/nara-smithsonian-deprecation.md`). Do not bring
+  them back as placeholders: a provider is a file under
+  `lib/footage/providers/` or it is nothing.
 - **The date field lies, so it is shown and never trusted.** Commons dated a
   1969 NASA clip `2015-06-12` (its YouTube upload) and answered "Benz
   Patent-Motorwagen 1886" with 2013 and 2021 photos of museum REPLICAS. The
@@ -3734,6 +3736,115 @@ belongs here is the load-bearing parts.
 - Tests: `npm run check:provenance` (platform, 58) and `npm run check:watermark`
   (remotion, 20). Commons returns creators as `Template:Helmut Laux`; both
   formatters strip the prefix, and that is pinned.
+
+### The Universal Footage Engine (2026-09-09)
+
+One search behind every "real footage" door — the picker's *Search real
+footage*, the `archive-suggest` run, *Add from URL*, *Upload*, and the
+library at `/admin/footage`. `platform/lib/footage/` (engine, registry,
+router, rights, provenance, ranking, dedupe, health, URL import, six
+providers), `db/010_universal_footage.sql` (applied 2026-09-09: 19 columns
+on `stock_media`, the provider CHECK dropped, `footage_provider_status`,
+`footage_search_cache`; 178 rows backfilled to archival provenance), routes
+under `/api/footage/*`, and `docs/universal-footage-engine.md` plus nine
+sibling docs, which are the spec. What belongs HERE is what will bite:
+
+- **NARA and Smithsonian are gone, not disabled.** Not in the registry, not
+  in `ARCHIVE_PROVIDERS`, `adapterFor()` answers null, no key is read
+  anywhere. Old rows stay readable and still print their names in BOTH label
+  maps (`platform/lib/provenance.ts`, `remotion/src/provenance.ts` — in
+  lockstep, like `presetForTone`). `docs/nara-smithsonian-deprecation.md`.
+- **Rights are a filter, never a score.** `validateRights()` yields
+  `cleared | attribution_required | editorial_only | manual_review |
+  restricted | unknown`; `restricted` is removed before ranking and cannot be
+  raised by anyone; the three review classes reach a render only through a
+  human act recorded as `stock_media.status = 'approved'` (the picker's
+  "Use — I accept the rights", the admin page's Verify). The suggestion run
+  never offers a review class. `renderable()` is the one test.
+- **A `©` naming the provider's own organisation is not a third party.**
+  "© European Union" on an EU AV item, DoD branches on DVIDS. The first
+  version read every `©` as a third party and classed the whole EU service
+  as manual review — and DVIDS's own rights NOTICE contained the words
+  "third party", which the validator then matched. Words like *courtesy of*
+  / Getty / Reuters always mean somebody else; a bare copyright claim means
+  it only when it names someone other than the provider (`OWN_NAME` in
+  `lib/footage/rights.ts`). Never put the validator's own trigger words into
+  a notice the validator reads.
+- **ACTUAL FOOTAGE is decided from metadata, never from appearance**, and
+  only here: `assessProvenance(request, asset)` says it when the asset's
+  own event, filming date AND place all match the scene's request and the
+  spec-weighted score (event 30, date 20, place 20, people/org 10, topic 10,
+  metadata 10) reaches `ACTUAL_FOOTAGE_MIN_CONFIDENCE` (90). **A signal the
+  request cannot ask for leaves the denominator** — a scene naming no
+  person has no people evidence to find, so those ten points are not
+  silently failed; event, date and place are never waived. The media-only
+  `classifyVisualOrigin` still never says actual. **Uploads and URL imports
+  stay `unknown` however well they match** (§25); the admin page's *Change
+  provenance* is the only door up and demands event + place + date.
+- **A mismatch is a penalty; an absence is not.** Every signal in
+  `match.ts` is `yes | no | unknown`. An undated asset is not "the wrong
+  date". `dateOriginal` (the catalogue's upload date) is never read for
+  matching — only `filmingDate`, then `publicationDate`, then years the text
+  mentions.
+- **B-roll first, as a score and as a tie-break.** A speech, press
+  conference or interview under narration scores 0.15 visual and takes the
+  −15 poor-visual penalty ("a talking head where the scene wants
+  pictures"); it inverts when the scene quotes a speaker. Ties break
+  pictures > unclassified video > still > talking head. **When testing this,
+  give both fixtures the same descriptive text** — the first test compared a
+  B-roll clip with no event in its title against a presser that named it,
+  and "the presser won" was the weights working, not the ladder failing.
+- **Library first, always; `url_import` and `user_upload` are never
+  routed.** Both carry `searchCapabilities.localOnly`: the engine's library
+  pass reads their rows with everyone else's, so routing them would search
+  the same rows twice and report a "provider" that never left the box. The
+  picker's provider filter still reaches them through
+  `EngineOptions.providers`. Best library score ≥ 62 with ≥ 3 candidates
+  short-circuits every external call; the cache (6 h) is the second
+  short-circuit; a provider that fails three times in a row is held back
+  five minutes, a 429 fifteen — in memory, per process.
+- **URL import is not a downloader.** Platform hosts (YouTube, Vimeo,
+  TikTok, Facebook, Instagram, X, …) yield title and metadata only, no media
+  URL, rights manual review by the platform's terms; `.m3u8`/`.mpd` are
+  never media files; 401/403 pages are refused, never fetched around; no
+  in-box hosts, no credentials in URLs, no `file:`. A page that states no
+  licence is `manual_review`, not `unknown` — the page WAS read. Licence
+  URLs (`creativecommons.org/licenses/by-nc-sa/…`) are expanded to codes in
+  `classifyLicense()` before the NC/ND tests, or a CC link on a page reads
+  as unknown.
+- **The site tolerates db/010 not being applied** (`footageReady()` in
+  postgres.ts, the same `to_regclass`/column probe as db/007 and db/009):
+  `saveStockCandidates` writes the 15 enrichment columns only when the
+  column exists. Same reason as before — a push deploys itself, a migration
+  runs by hand, and the gap must not take down every project page.
+- **`DVIDS_API_KEY` is a WARNING in the deploy gate, like ElevenLabs**:
+  without it the provider reads as off with its reason and the router skips
+  it; the film is unaffected. `EU_AV_API_BASE` defaults to
+  `https://audiovisual.ec.europa.eu/api`. Both are in the heredoc that
+  writes `platform.env` — the rule from the ElevenLabs entry, obeyed in the
+  same commit. **The EU AV adapter's response shape is UNVERIFIED live**
+  (no outbound HTTP from here): it reads `items | results | data.results |
+  data.items` defensively, and a failure shows on `/admin/footage`'s health
+  strip rather than failing generation. The first real run should be
+  watched.
+- **The n8n half is one prompt edit** (`Archive Suggestions`, active
+  `6b5a1417` since 2026-09-09; repo copies in `db/port/footage-engine/`):
+  `Build Query Prompt` asks for a structured request per scene and forbids
+  invention in as many words, `Parse Queries` sanitises it, `Build Rank
+  Prompts` shows the ranking model the engine's score, provenance and
+  rights class. `/api/archive/suggest` accepts BOTH the old `queries[]` and
+  the new `request{}` shape, so prompt and site can move independently.
+  No `universal-footage-search` workflow was created: `/api/footage/search`
+  is that search, callable from any HTTP node with the ingest key.
+- **Tests run the real engine with the edges mocked.**
+  `scripts/footage-loader.mjs` is a `module.register` hook that resolves
+  the site's `@/` alias and extensionless imports (`./types` → `types.ts`,
+  `@/lib/footage` → `index.ts`) and swaps `lib/data/stock` and
+  `lib/data/postgres` for in-memory doubles; `check-footage.mjs` stubs
+  `globalThis.fetch` per hostname. `npm run check:footage`, 125 checks.
+  Anything under `lib/footage/` that grows a new import path needs the
+  loader to resolve it — Node knows neither the alias nor the missing
+  extension.
 
 ## Conventions
 
@@ -4646,10 +4757,12 @@ generated FROM it. The chain, and where each piece lives:
 - **Documentary mode, what is still owed** (see the section above): the
   picker itself has only been exercised through its HTTP twin, so click
   through it once on a real documentary project; print archive credits on
-  the end screen (Remotion, i.e. a Railway push); get `NARA_API_KEY` /
-  `SMITHSONIAN_API_KEY` and build those two adapters against real
-  responses. (The "scripting proposes archive shots" half exists since the
-  same day as the `Archive Suggestions` run, above.) Scenes 102 and 103 of
+  the end screen (Remotion, i.e. a Railway push); put `DVIDS_API_KEY` into
+  GitHub Secrets so DVIDS is routed at all, and verify the EU Audiovisual
+  Service adapter against one real response — its API shape was read
+  defensively, never live (see the footage engine section). (The
+  "scripting proposes archive shots" half exists since the same day as the
+  `Archive Suggestions` run, above.) Scenes 102 and 103 of
   the disposable film `recaW2aLFFD06FpoN` carry archive assets from the
   verification run and can stay as the demonstration.
 - **Images on Google Flow instead of fal — designed, not applied.**

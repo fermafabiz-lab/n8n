@@ -316,6 +316,13 @@ export function refuseFootageType(
 
 const PROVIDER_LABELS: Record<string, string> = {
   wikimedia: "Wikimedia Commons",
+  eu_av: "EU Audiovisual Service",
+  dvids: "DVIDS",
+  nasa: "NASA",
+  url_import: "URL import",
+  user_upload: "Manual upload",
+  // Retired providers (docs/nara-smithsonian-deprecation.md): no search
+  // reaches them, but rows they filed still print their real names.
   nara: "US National Archives",
   smithsonian: "Smithsonian",
 };

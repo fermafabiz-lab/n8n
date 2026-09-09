@@ -52,6 +52,8 @@ export interface SceneStock {
  */
 export interface SceneArchiveSuggestion {
   stockId: string;
+  /** Which source it came through — the card shows it. */
+  provider: string;
   title: string;
   mediaType: "video" | "image";
   thumbnailUrl: string | null;

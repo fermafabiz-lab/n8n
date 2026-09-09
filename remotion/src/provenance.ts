@@ -61,8 +61,17 @@ export const ORIGIN_LABELS: Record<VisualOrigin, string> = {
 	unknown: 'SOURCE UNVERIFIED',
 };
 
+// In lockstep with platform/lib/provenance.ts — the site's chips and the
+// film's watermark must name a source the same way.
 const PROVIDER_LABELS: Record<string, string> = {
 	wikimedia: 'Wikimedia Commons',
+	eu_av: 'EU Audiovisual Service',
+	dvids: 'DVIDS',
+	nasa: 'NASA',
+	url_import: 'URL import',
+	user_upload: 'Manual upload',
+	// Retired providers (docs/nara-smithsonian-deprecation.md): rows they
+	// filed still print their real names.
 	nara: 'US National Archives',
 	smithsonian: 'Smithsonian',
 };

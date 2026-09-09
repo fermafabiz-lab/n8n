@@ -206,6 +206,7 @@ interface SceneRow {
   archive_suggested_at?: Date | null;
   archive_suggestions?: Array<{
     stock_id: string;
+    provider?: string | null;
     title: string;
     media_type: string;
     thumbnail_url: string | null;
@@ -257,7 +258,7 @@ const STOCK_SUBSELECT = `,
 /** db/008: the ranked offers, with the library fields the card needs. */
 const SUGGEST_SUBSELECT = `,
     (select jsonb_agg(jsonb_build_object(
-              'stock_id', m.id, 'title', m.title, 'media_type', m.media_type,
+              'stock_id', m.id, 'provider', m.provider, 'title', m.title, 'media_type', m.media_type,
               'thumbnail_url', m.thumbnail_url, 'source_url', m.source_url,
               'creator', m.creator, 'license_original', m.license_original,
               'review_status', m.review_status, 'duration_seconds', m.duration_seconds,
@@ -328,6 +329,8 @@ async function columnReady(table: string, column: string): Promise<boolean> {
 
 /** db/009 applied? Exported because the archive attach writes those columns. */
 export const provenanceReady = () => columnReady("scene", "visual_origin");
+/** db/010 applied? The library writes the engine's columns only once they exist. */
+export const footageReady = () => columnReady("stock_media", "provenance");
 
 async function sceneSelect(): Promise<string> {
   const [stock, suggest] = await Promise.all([stockReady(), suggestReady()]);
@@ -406,6 +409,7 @@ function toRawScene(r: SceneRow): RawScene & { createdAt: string | null } {
     archiveSuggestedAt: r.archive_suggested_at ? r.archive_suggested_at.toISOString() : null,
     archiveSuggestions: (r.archive_suggestions ?? []).map((g) => ({
       stockId: g.stock_id,
+      provider: g.provider ?? "wikimedia",
       title: g.title,
       mediaType: g.media_type === "video" ? "video" : "image",
       thumbnailUrl: g.thumbnail_url,

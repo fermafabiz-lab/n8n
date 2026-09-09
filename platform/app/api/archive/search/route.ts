@@ -2,7 +2,12 @@
  * Search the free archives for documentary footage.
  *
  *   GET /api/archive/search?q=Apollo+11+launch&type=video|image|any&limit=12
- *                          &providers=wikimedia,nara&library=1
+ *                          &providers=wikimedia,nasa&library=1
+ *
+ * Kept for callers written against it; the engine's own door is
+ * /api/footage/search, which also takes a scene id and answers scored
+ * best matches. This one delegates to the same engine through
+ * `searchArchives()` and answers in the old shape.
  *
  * Two callers, two credentials. The producer's browser arrives with the site
  * cookie like every other page; n8n (a later slice — the scripting workflow

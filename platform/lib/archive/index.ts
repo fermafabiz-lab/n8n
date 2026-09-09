@@ -1,20 +1,23 @@
 /**
- * The archives, behind one call.
+ * The archives, behind one call — now a thin door onto the Universal Footage
+ * Engine (lib/footage), kept so the code written against it keeps working.
  *
- * `searchArchives` fans a query out to every enabled provider, normalizes,
- * and reports per provider — including the ones that could not answer, so a
- * screen can say "Smithsonian: no key" instead of quietly showing fewer
- * results. A provider that throws costs its own results and nothing else.
+ * `searchArchives(query, …)` is the free-text search the picker and the
+ * suggestion run used from the first day of Documentary mode. It now builds
+ * a minimal `FootageSearchRequest` from the query and lets the engine route
+ * it; the answer is the same `NormalizedArchiveAsset[]` plus a per-provider
+ * report, so a screen can still say "DVIDS: no key" instead of quietly
+ * showing fewer results.
  *
- * NARA and Smithsonian are declared here as DISABLED adapters rather than
- * left out: the picker lists all three so the gap is visible, and the day
- * their keys exist the only change is the adapter file. Both need a key we
- * do not hold (NARA: catalog.archives.gov, `x-api-key`; Smithsonian:
- * api.data.gov, `api_key`), and neither can be tested from here without one —
- * so they are not pretended into existence.
+ * NARA and Smithsonian are gone from here. They were declared as disabled
+ * placeholders for two months and never built; the registry does not list
+ * them, no search reaches them, and the rows the library may hold under
+ * their names stay readable. See docs/nara-smithsonian-deprecation.md.
  */
 
-import { wikimedia } from "./wikimedia";
+import { providerById, searchableProviders } from "@/lib/footage/registry";
+import { searchFootage } from "@/lib/footage/engine";
+import type { FootageSearchRequest } from "@/lib/footage/types";
 import type {
   ArchiveMediaType,
   ArchiveProvider,
@@ -25,33 +28,38 @@ import type {
 export * from "./types";
 export { classifyLicense, autoApprovedClasses } from "./rights";
 
-const notBuilt = (
-  provider: ArchiveProvider,
-  reason: string,
-): ArchiveProviderAdapter => ({
-  provider,
-  enabled: false,
-  disabledReason: reason,
-  async search() {
-    throw new Error(`${provider}: ${reason}`);
-  },
-  async getAsset() {
-    throw new Error(`${provider}: ${reason}`);
-  },
-});
-
-const ADAPTERS: readonly ArchiveProviderAdapter[] = [
-  wikimedia,
-  notBuilt("nara", "not built yet — needs NARA_API_KEY from catalog.archives.gov"),
-  notBuilt("smithsonian", "not built yet — needs SMITHSONIAN_API_KEY from api.data.gov"),
-];
+/** The legacy adapter view of a registry provider. */
+function asAdapter(id: string): ArchiveProviderAdapter | null {
+  const p = providerById(id);
+  if (!p) return null;
+  return {
+    provider: p.id,
+    enabled: p.enabled,
+    disabledReason: p.disabledReason,
+    async search(query, opts) {
+      const r = await searchFootage(requestFromQuery(query, opts.mediaType), {
+        providers: [p.id],
+        limit: opts.limit,
+        top: opts.limit * 2,
+        forceProviders: true,
+        signal: opts.signal,
+      });
+      return r.candidates.map((c) => c.asset);
+    },
+    async getAsset(providerAssetId, opts) {
+      return p.getAssetDetails ? p.getAssetDetails(providerAssetId, opts) : null;
+    },
+  };
+}
 
 export function archiveAdapters(): readonly ArchiveProviderAdapter[] {
-  return ADAPTERS;
+  return searchableProviders()
+    .map((p) => asAdapter(p.id))
+    .filter((a): a is ArchiveProviderAdapter => a !== null);
 }
 
 export function adapterFor(provider: string): ArchiveProviderAdapter | null {
-  return ADAPTERS.find((a) => a.provider === provider) ?? null;
+  return asAdapter(provider);
 }
 
 export interface ProviderReport {
@@ -67,6 +75,19 @@ export interface ArchiveSearchResult {
   providers: ProviderReport[];
 }
 
+/** A free-text query as a request: the words are the keywords, nothing is invented. */
+export function requestFromQuery(query: string, mediaType: ArchiveMediaType | "any"): FootageSearchRequest {
+  const q = query.trim().replace(/\s+/g, " ");
+  return {
+    sceneId: "adhoc",
+    narration: q,
+    keywords: q.split(" ").filter((w) => w.length >= 3).slice(0, 12),
+    preferredMediaType: mediaType === "image" ? "image" : "video",
+    preferredFootageType: "any",
+    queries: [q],
+  };
+}
+
 export async function searchArchives(
   query: string,
   opts: {
@@ -76,29 +97,20 @@ export async function searchArchives(
     signal?: AbortSignal;
   },
 ): Promise<ArchiveSearchResult> {
-  const wanted = ADAPTERS.filter((a) => !opts.providers || opts.providers.includes(a.provider));
-  const settled = await Promise.allSettled(
-    wanted.map((a) =>
-      a.enabled
-        ? a.search(query, { mediaType: opts.mediaType, limit: opts.limit, signal: opts.signal })
-        : Promise.reject(new Error(a.disabledReason ?? "disabled")),
-    ),
-  );
-  const results: NormalizedArchiveAsset[] = [];
-  const providers: ProviderReport[] = [];
-  settled.forEach((s, i) => {
-    const a = wanted[i];
-    if (s.status === "fulfilled") {
-      results.push(...s.value);
-      providers.push({ provider: a.provider, enabled: a.enabled, reason: null, count: s.value.length });
-    } else {
-      providers.push({
-        provider: a.provider,
-        enabled: a.enabled,
-        reason: s.reason instanceof Error ? s.reason.message : String(s.reason),
-        count: 0,
-      });
-    }
+  const r = await searchFootage(requestFromQuery(query, opts.mediaType), {
+    providers: opts.providers,
+    limit: opts.limit,
+    top: Math.max(opts.limit * 2, 24),
+    forceProviders: true,
+    signal: opts.signal,
   });
-  return { results, providers };
+  const results = r.candidates
+    .map((c) => c.asset)
+    .filter((a) => opts.mediaType === "any" || a.mediaType === opts.mediaType);
+  return {
+    results,
+    providers: r.providers
+      .filter((p) => p.routed)
+      .map((p) => ({ provider: p.provider, enabled: p.enabled, reason: p.reason, count: p.count })),
+  };
 }

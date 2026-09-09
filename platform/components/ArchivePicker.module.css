@@ -89,7 +89,82 @@
 }
 
 .status.err {
-  color: var(--err, #c0392b);
+  color: #9b2b1f;
+}
+
+.doors {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.doors button {
+  padding: 8px 15px;
+  white-space: nowrap;
+}
+
+.doors button[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent-deep);
+}
+
+/* A text link where a button would be one control too many. */
+.link {
+  border: 0;
+  background: transparent;
+  color: var(--dim);
+  font: inherit;
+  font-size: 11.5px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  padding: 4px 2px;
+}
+
+.providers {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.providers button {
+  padding: 4px 10px;
+  border: 1px solid var(--line2);
+  border-radius: 999px;
+  background: var(--card2);
+  color: var(--dim);
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.providers button[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.providers button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.why {
+  color: var(--soft);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.providerReport {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 11px;
+  color: var(--dim);
 }
 
 /* Same track as the suggestions bar's row — offers and search results are the
@@ -101,13 +176,3 @@
   margin-top: 10px;
 }
 
-.providers {
-  margin: 8px 0 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  font-size: 11px;
-  color: var(--dim);
-}

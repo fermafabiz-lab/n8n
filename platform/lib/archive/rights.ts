@@ -118,11 +118,26 @@ export function classifyLicense(
 type RightsClass = "pd" | "cc0" | "by" | "by_sa" | "nc" | "nd" | "fal" | "gfdl" | "unknown";
 
 /**
+ * A licence given as its creativecommons.org URL — how a web page's
+ * `rel="license"` link or JSON-LD `license` states it — carries the class in
+ * the path (`/licenses/by-nc-sa/4.0/`, `/publicdomain/zero/1.0/`), where the
+ * word tests below cannot see it. Spell the path out as the code it names;
+ * the NC/ND ordering then applies exactly as for a typed code.
+ */
+function expandLicenseUrls(s: string): string {
+  return s
+    .replace(/creativecommons\.org\/publicdomain\/zero\/[^\s]*/g, " cc0 ")
+    .replace(/creativecommons\.org\/publicdomain\/mark\/[^\s]*/g, " public domain ")
+    .replace(/creativecommons\.org\/licenses\/([a-z-]+)\/[^\s]*/g, (_, code: string) => ` cc-${code} `);
+}
+
+/**
  * Whole-word, order-sensitive matching. The NC/ND tests come FIRST because
  * "cc-by-nc-sa-4.0" also contains "cc-by" and "sa", and a licence that forbids
  * commercial use must never be read as the one that merely wants credit.
  */
-function rightsClassOf(s: string): RightsClass {
+function rightsClassOf(raw: string): RightsClass {
+  const s = expandLicenseUrls(raw);
   if (!s) return "unknown";
   if (/\bnc\b|non-?commercial/.test(s)) return "nc";
   if (/\bnd\b|no-?deriv/.test(s)) return "nd";

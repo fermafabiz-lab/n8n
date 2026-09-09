@@ -93,6 +93,8 @@ export default function ArchiveSuggestions({
                 durationSeconds: p.durationSeconds,
                 dateOriginal: p.dateOriginal,
                 yearsMentioned: p.yearsMentioned,
+                provider: p.provider,
+                score: p.relevance !== null ? Math.round(p.relevance * 100) : null,
               }}
               selected={isSel}
               onSelect={() => setSelected(p.stockId)}
@@ -100,9 +102,6 @@ export default function ArchiveSuggestions({
               {p.reason && (
                 <div className={styles.why} title={p.reason}>
                   {p.reason}
-                  {p.relevance !== null && (
-                    <span className={styles.score}> · {Math.round(p.relevance * 100)}%</span>
-                  )}
                 </div>
               )}
               {isSel && usable && (

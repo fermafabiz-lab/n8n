@@ -3923,10 +3923,21 @@ picked the asset, not signed it off. Final Assembly receives an ordinary mp4.
   `stock_media_id`, `scene_final_url` on the media store, both attachment
   rows replaced, approvals reset, one auto-kept draft per kind, and the
   library row marked `used`.
-  **Credits are still owed**: `attribution_required` is stored and shown on
-  the Inspector, but nothing yet prints the source on the end screen — that
-  is a Remotion change (a Railway push) and the one legal obligation of a
-  CC BY asset.
+  **Credits are printed in the YouTube DESCRIPTION since 2026-09-10, not yet
+  on the end screen.** The obligation is a CC BY / CC BY-SA licence naming its
+  author as the price of use, and the description is the cheap half — no
+  Railway push, no re-render, and it reaches every film already finished.
+  `footageCredits()` in `lib/provenance.ts` builds it in two tiers and
+  `/api/yt-kit` prints them under "Footage and images": REQUIRED credits come
+  from `attributionFor()` — the same function the on-screen watermark uses, so
+  the frame and the description cannot tell a viewer two different things —
+  and everything else real (public domain, CC0, a government reel) is listed
+  as a courtesy, because that is what a documentary description carries and
+  what our API applications promise each provider. **The cap can only ever
+  fall on the courtesy list**: dropping a required credit to fit a character
+  budget is the one failure here nobody would see, since the description would
+  still look complete. One line per SOURCE, not per scene. The end-screen
+  credit is still owed and is still a Remotion change.
 
 **AI-suggested footage, since 2026-09-07 (slice 3).** The producer's ask:
 "when I approve the scenes, an AI should already have looked for real
@@ -5237,7 +5248,8 @@ generated FROM it. The chain, and where each piece lives:
 - **Documentary mode, what is still owed** (see the section above): the
   picker itself has only been exercised through its HTTP twin, so click
   through it once on a real documentary project; print archive credits on
-  the end screen (Remotion, i.e. a Railway push); put the optional source
+  the end screen (Remotion, i.e. a Railway push — the DESCRIPTION half
+  shipped 2026-09-10, see above); put the optional source
   keys into GitHub Secrets — `DVIDS_API_KEY`, ~~`EUROPEANA_API_KEY`~~
   (**set 2026-09-10** and verified live: the key answers HTTP 200 with
   `success: true` and echoes itself back in `apikey`, and the deploy log

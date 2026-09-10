@@ -413,3 +413,69 @@ export function attributionFor(p: VisualProvenance | null | undefined): string |
   ].filter((v): v is string => Boolean(v));
   return parts.length ? parts.join(" · ") : null;
 }
+
+/**
+ * A scene, as far as a credit is concerned. Structural on purpose: this file
+ * imports nothing, and a credit needs only the archive asset and what is known
+ * about it — not the forty other fields a Scene carries.
+ */
+export interface CreditableScene {
+  stock?: {
+    provider: string;
+    title: string;
+    sourceUrl: string;
+    creator: string | null;
+  } | null;
+  provenance?: VisualProvenance | null;
+}
+
+/**
+ * The footage credits for a film, in two tiers.
+ *
+ * `required` is the OBLIGATION — a CC BY or CC BY-SA licence naming its author
+ * as the price of use — and it is built by `attributionFor` above, so the line
+ * a viewer reads in a YouTube description and the line the render draws over
+ * the picture come from one rule and cannot drift apart. `courtesy` is
+ * everything else real: public domain, CC0, a government reel. It owes nothing
+ * legally, and it is listed anyway, because that is what a documentary
+ * description carries and what our API applications tell each provider we do.
+ *
+ * The split exists so a CAP can only ever fall on the courtesy list. Dropping
+ * a required credit to fit a character budget is the one failure this can have
+ * that nobody would see — the description would still look complete.
+ *
+ * One line per SOURCE, not per scene: six shots lifted from one reel are one
+ * obligation, and six identical lines would read as a bug.
+ */
+export function footageCredits(
+  scenes: readonly CreditableScene[],
+  opts: { max?: number } = {},
+): { required: string[]; courtesy: string[]; lines: string[] } {
+  const seen = new Set<string>();
+  const required: string[] = [];
+  const courtesy: string[] = [];
+  for (const s of scenes) {
+    const st = s.stock;
+    // `stock` IS the archive asset — a Commons photo, a NASA reel, a URL
+    // import, an upload. Its presence is the honest test of "did this frame
+    // come from somewhere that can be credited", and it needs nothing from
+    // the provenance columns, so a film predating them still credits.
+    if (!st) continue;
+    const url = String(s.provenance?.sourceUrl ?? st.sourceUrl ?? "").trim();
+    const key = url || `${st.provider}|${st.title}`;
+    if (!key.trim() || seen.has(key)) continue;
+    seen.add(key);
+    const owed = attributionFor(s.provenance);
+    const who =
+      owed ?? [cleanCreator(st.creator), providerLabel(st.provider)].filter(Boolean).join(" · ");
+    if (!who && !url) continue;
+    const line = `• ${[who, url].filter(Boolean).join(" — ")}`;
+    (owed ? required : courtesy).push(line);
+  }
+  const max = opts.max ?? 20;
+  return {
+    required,
+    courtesy,
+    lines: [...required, ...courtesy.slice(0, Math.max(0, max - required.length))],
+  };
+}

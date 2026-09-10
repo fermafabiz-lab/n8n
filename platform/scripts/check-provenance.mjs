@@ -18,6 +18,7 @@ const {
 	ORIGIN_LABELS,
 	VISUAL_ORIGINS,
 	attributionFor,
+	footageCredits,
 	classifyVisualOrigin,
 	detectAiReconstruction,
 	formatSourceWatermark,
@@ -233,6 +234,53 @@ check(
 	formatSourceWatermark({visualOrigin: 'archival_photo', sourceCreator: 'Template:Helmut Laux'}).source,
 	'Source: Helmut Laux',
 );
+
+// ---------------------------------------------------------------------------
+// Footage credits — what a YouTube description owes each archive asset.
+// ---------------------------------------------------------------------------
+const byPhoto = {
+	stock: {provider: 'wikimedia', title: 'Molotov signs', sourceUrl: 'https://commons.wikimedia.org/a', creator: 'Template:Helmut Laux'},
+	provenance: {visualOrigin: 'archival_photo', provider: 'wikimedia', sourceUrl: 'https://commons.wikimedia.org/a', sourceCreator: 'Template:Helmut Laux', licenseName: 'CC BY-SA 3.0 de', attributionRequired: true},
+};
+const pdReel = {
+	stock: {provider: 'nasa', title: 'Apollo 11', sourceUrl: 'https://images.nasa.gov/b', creator: 'NASA'},
+	provenance: {visualOrigin: 'archival_footage', provider: 'nasa', sourceUrl: 'https://images.nasa.gov/b', sourceCreator: 'NASA'},
+};
+const generated = {stock: null, provenance: {visualOrigin: 'ai_generated'}};
+
+check(
+	'a CC BY-SA photo is a REQUIRED credit, worded exactly as the render draws it',
+	footageCredits([byPhoto]).required[0],
+	'• Helmut Laux · Wikimedia Commons · CC BY-SA 3.0 de — https://commons.wikimedia.org/a',
+);
+check('…and is not filed as a courtesy', footageCredits([byPhoto]).courtesy.length, 0);
+check('a public-domain reel is a COURTESY credit', footageCredits([pdReel]).courtesy.length, 1);
+check('…owing nothing legally', footageCredits([pdReel]).required.length, 0);
+check('an AI scene is credited to nobody', footageCredits([generated]).lines.length, 0);
+check(
+	'six shots from one reel are ONE line, not six',
+	footageCredits([pdReel, pdReel, pdReel, pdReel, pdReel, pdReel]).lines.length,
+	1,
+);
+// The failure nobody would see: a cap that silently drops an obligation.
+const many = Array.from({length: 40}, (_, i) => ({
+	stock: {provider: 'nasa', title: `reel ${i}`, sourceUrl: `https://images.nasa.gov/${i}`, creator: 'NASA'},
+	provenance: {visualOrigin: 'archival_footage', provider: 'nasa', sourceUrl: `https://images.nasa.gov/${i}`},
+}));
+const capped = footageCredits([...many, byPhoto], {max: 5});
+check('the cap falls on the courtesy list', capped.lines.length, 5);
+check('and never on an obligation', capped.lines[0].includes('Helmut Laux'), true);
+check(
+	'a required credit survives even a cap smaller than the obligations',
+	footageCredits([byPhoto], {max: 0}).lines.length,
+	1,
+);
+check(
+	'an asset with a URL but no known author still credits its provider',
+	footageCredits([{stock: {provider: 'internet_archive', title: 'x', sourceUrl: 'https://archive.org/z', creator: null}, provenance: {visualOrigin: 'archival_footage'}}]).lines[0],
+	'• Internet Archive — https://archive.org/z',
+);
+
 
 console.log(`\nactual footage needs ${ACTUAL_FOOTAGE_MIN_CONFIDENCE}% confidence, which only a person can supply`);
 console.log(`${results.filter(Boolean).length}/${results.length} passed`);

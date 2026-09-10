@@ -1,13 +1,16 @@
 // The YouTube description, assembled from what the pipeline already knows.
 //
-// GET /api/yt-kit?project=rec…  ->  { description, measured, chapters, sources }
+// GET /api/yt-kit?project=rec…
+//   -> { description, measured, chapters, sources, credits, creditsRequired }
 //
 // Nothing here is invented by a model. The hook paragraph is the film's own
 // opening narration; the chapter list is the script's own [CHAPTER n: title]
 // markers with timestamps summed from the real takes; the sources are the
 // Evidence rows the script was written against — the one part of the research
 // pack a viewer ever gets to see, and exactly what a documentary description
-// is expected to carry.
+// is expected to carry; and the footage credits are the archive assets the
+// film actually cuts, which is a legal obligation for the CC BY ones rather
+// than a courtesy (see the block that builds them).
 //
 // Timestamps are ≈ by construction. A scene's screen time is its take plus
 // 0.35s, minus the breath trim the assembler cuts from the take's ends — we
@@ -22,6 +25,7 @@ import {
   getProjectScriptInfo,
   getScenes,
 } from "@/lib/data";
+import { footageCredits } from "@/lib/provenance";
 import { mp3DurationSeconds } from "@/lib/mp3";
 import { chapterOf } from "@/lib/chapters";
 import { driveId } from "@/lib/media";
@@ -223,6 +227,12 @@ export async function GET(req: Request) {
     if (sourceLines.length >= 12) break;
   }
 
+  // --- footage credits -----------------------------------------------------
+  // The rule lives beside `attributionFor` in lib/provenance.ts, because the
+  // credit a description prints and the credit the render draws over the
+  // picture are the same obligation and must not be able to disagree.
+  const credits = footageCredits(scenes);
+
   // --- assembly ------------------------------------------------------------
   const parts: string[] = [];
   const opening = scenes.find((s) => (s.narration ?? "").trim());
@@ -235,6 +245,14 @@ export async function GET(req: Request) {
   if (sourceLines.length > 0) {
     parts.push(`${ro ? "Surse" : "Sources"}:\n${sourceLines.join("\n")}`);
   }
+  // Last, and after the research sources on purpose: these credit the
+  // PICTURES, which is a different question from what the script was written
+  // against, and a reader looking for either finds its own heading.
+  if (credits.lines.length > 0) {
+    parts.push(
+      `${ro ? "Imagini și filmări" : "Footage and images"}:\n${credits.lines.join("\n")}`,
+    );
+  }
 
   return new Response(
     JSON.stringify({
@@ -242,6 +260,8 @@ export async function GET(req: Request) {
       measured,
       chapters: chapterLines.length,
       sources: sourceLines.length,
+      credits: credits.lines.length,
+      creditsRequired: credits.required.length,
     }),
     { headers: { "Content-Type": "application/json" } },
   );

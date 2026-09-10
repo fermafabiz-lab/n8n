@@ -1,0 +1,279 @@
+[
+  {
+    "type": "updateNodeParameters",
+    "nodeName": "Generate Story Bible",
+    "parameters": {
+      "text": "=You are a film director and continuity supervisor preparing a STORY BIBLE for an AI-generated {{ $('Genre Profile').first().json.p.format }}. This bible will be injected into EVERY image and video prompt of the film, so it must lock the visual identity completely.\n\nProject:\n- Tema: {{ $('Receive Project Data').first().json.Tema }}\n- Tonalitate: {{ $('Receive Project Data').first().json.Tonalitate }}\n- Style: {{ $('Receive Project Data').first().json.Style }}\n- Narration language: {{ $('Receive Project Data').first().json.Language }} (but ALL visual descriptions in this bible MUST be written in English)\n- Total duration: {{ $('Receive Project Data').first().json.Lenght }} seconds = {{ Math.ceil($('Receive Project Data').first().json.Lenght / 8) }} scenes of 8 seconds\n\nTOPIC FIDELITY — THE MOST IMPORTANT RULE:\n- The Tema above is the CANONICAL subject. The film must be literally ABOUT it — never a loose reinterpretation, a metaphor, or a substitute story that merely reuses its words.\n- If the Tema references established lore, a franchise, a game, a historical event or an internet phenomenon, USE THE ACTUAL CANON/FACTS: its real settings, entities, aesthetics and terminology. Never swap the real nature of an event for a more \"cinematic\" version (a stealthy overnight vault break-in must NOT become an armed daylight hold-up).\n- Characters and locations must live INSIDE the Tema's world, never in an invented frame story around it.\n- If the Tema is dark, unsettling or horror-adjacent, KEEP it that way — do not sanitize it.\n\nGENRE — how this film treats reality:\n{{ $('Genre Profile').first().json.p.invention }}\n{{ ($('Receive Project Data').first().json.Lore && String($('Receive Project Data').first().json.Lore).trim()) ? ('\\nCANON REFERENCE — user-provided lore about this exact Tema. Treat every fact below as GROUND TRUTH that overrides everything else, including the research notes:\\n' + $('Receive Project Data').first().json.Lore + '\\n') : '' }}\nRESEARCH NOTES:\n{{ $('Genre Profile').first().json.p.factSheetFraming }}\n{{ $json.output }}\n\nVISUAL LANGUAGE of this genre — the bible's visual_style must be built in this direction (the user's Style field above refines it further):\n{{ $('Genre Profile').first().json.p.visual }}\n\nRules:\n1. Keep the cast and locations SMALL so they stay consistent: 1-3 recurring characters, 2-4 locations.\n2. Give characters CONCRETE identities. If the Tema names or describes its own protagonist (\"a man Bill who…\"), that name and role are CANONICAL — keep them exactly, even when the research found a real person with a similar story: research then supplies the authentic world around them, never a replacement. Real public names from the research only when the Tema is ABOUT that real person or event; otherwise natural descriptive roles (\"the bank teller\", \"a lone explorer\"). NEVER abstract template labels like \"Primary Subject\", \"Secondary Witness\" or \"Primary Environment\" — those leak into the narration and sound robotic.\n3. Every visual_description must be hyper-specific and self-contained so it can be pasted VERBATIM into an image prompt: age, build, hair, facial features, exact clothing (colors, materials), distinguishing props. Never write \"as before\" or \"same as\".\n4. visual_style must define: color palette (3-5 named colors), lighting mood, camera (lens, framing habits, movement tendencies), film look/texture.\n5. continuity_rules: 4-8 short imperative rules (e.g. \"The explorer always wears the same gray hoodie\", \"All rooms are lit with flickering fluorescent panels\").\n\nReturn ONLY raw JSON matching the output parser. No markdown, no explanations."
+    }
+  },
+  {
+    "type": "updateNodeParameters",
+    "nodeName": "Generate Outline",
+    "parameters": {
+      "text": "=You are the head writer of a {{ $('Genre Profile').first().json.p.format }} — the one person who holds the WHOLE film in mind. Plan it before a word of narration is written.\n\nThe film is {{ $('Receive Project Data').first().json.Lenght }} SECONDS long — {{ Math.ceil($('Receive Project Data').first().json.Lenght / 8) }} scenes of 8 seconds. The FIRST scene is RESERVED for a separate opening HOOK (written later and placed before chapter 1), so your chapters together must fill {{ Math.max(1, Math.ceil($('Receive Project Data').first().json.Lenght / 8) - 1) }} scenes ≈ {{ Math.max(1, Math.ceil($('Receive Project Data').first().json.Lenght / 8) - 1) * 22 }} spoken words IN TOTAL. Do NOT write the narration yet, and do NOT plan a hook/teaser chapter yourself — chapter 1 must start the story directly, knowing a hook precedes it.\n\nTOPIC FIDELITY: every chapter must stay strictly ON the Tema's ACTUAL subject, inside the Story Bible's world. If the Tema references established lore or a known phenomenon, the chapters tell a story from THAT canon — never an invented frame story that merely reuses its words, and never a sanitized substitute.\n\nWHO THE FILM IS ABOUT: if the Tema names or describes its own protagonist (\"a man Bill who…\", \"a young nurse who…\"), that person IS the protagonist — keep the name and the role the Tema gives them, even when research turned up a real person with a similar story. Research makes the WORLD authentic (the era, the places, how the trade really works, real numbers); it never swaps the protagonist for somebody else. Only when the Tema is ABOUT a real person or event are the real names the subject.\n\nGENRE — how this film treats reality:\n{{ $('Genre Profile').first().json.p.invention }}\n\nDRAMATIC STRUCTURE — THE SHAPE OF THIS GENRE. Map the story onto these beats, in this order, distributing them across your chapters:\n{{ $('Genre Profile').first().json.p.structure }}\n\nTema: {{ $('Receive Project Data').first().json.Tema }}\nTonalitate: {{ $('Receive Project Data').first().json.Tonalitate }}\nPace: {{ $('Receive Project Data').first().json.Pace }}\nLanguage: {{ $('Receive Project Data').first().json.Language }}\n\nSTORY BIBLE (the film's locked visual identity — every chapter must be tellable inside this world, using ONLY these characters and locations):\n{{ JSON.stringify($('Generate Story Bible').first().json.output) }}\n\nFIRST, write the STORY SPINE — what makes this a story instead of a list of facts:\n- protagonist: who the film follows (one person; a group only if the Tema says so)\n- want: the ONE concrete thing they are after\n- obstacle: what stands in the way — a force, a person, a lack, a fear — stated concretely\n- stakes: what is lost if they fail, in plain terms the viewer can picture\n- turning_points: EXACTLY {{ Math.max(3, Math.min(7, Math.ceil(Math.max(1, Math.ceil($('Receive Project Data').first().json.Lenght / 8) - 1) / 3))) }} SPECIFIC EVENTS, in story order, each one a moment where something HAPPENS — a decision, a failure, a discovery, a confrontation, a payoff — placed in time and space where the facts allow. Not themes, not moods: events. Each turning point belongs to exactly one chapter and is never revisited by another.\n- ending: the last thing the viewer sees and understands, one sentence\n- throughline: the question the viewer carries from the hook to the ending, one sentence\n\nTHEN create EXACTLY {{ Math.max(1, Math.min(5, Math.ceil($('Receive Project Data').first().json.Lenght / 120))) }} chapter(s) — no more, no fewer. Together they tell the spine as ONE continuous story following the DRAMATIC STRUCTURE above: chapter N picks up exactly where chapter N-1 left off, in time and place, and moves the story FORWARD. Every chapter owns its own turning points and its own new information. Nothing one chapter establishes — a fact, a date, a number, a place description, a character's introduction — is re-explained in another chapter; a later chapter may refer to it in a few words, never restate it. No chapter \"returns to\" an earlier moment.\n\nFor each chapter provide:\n- chapter_number (integer)\n- chapter_title (string)\n- chapter_summary: a RICH paragraph of 5-8 sentences with CONCRETE beats — the specific EVENTS of this chapter in order, who does what, where, which bible characters and locations appear, what the viewer SEES, and which turning points it delivers. Then end the summary with exactly two extra lines:\nENDS WITH: <the final visual + narrative beat of this chapter, one sentence>\nLEADS INTO: <how the NEXT chapter opens visually and narratively, one sentence — for the last chapter, how the video ends>\n- narrator_script: empty string \"\" for now\n\nSTYLE REFERENCE — shape the story structure and idea pacing to match the writing style described below. It is guidance only: NEVER copy phrases longer than 4 words from it and NEVER borrow its subject matter.\n{{ $('Prepare Style Block').first().json.styleBlock }}\n\nReturn ONLY raw JSON matching the output parser. No markdown."
+    }
+  },
+  {
+    "type": "updateNodeParameters",
+    "nodeName": "Outline Parser",
+    "parameters": {
+      "jsonSchemaExample": "{\"project_title\":\"string\",\"target_duration\":\"string\",\"story_spine\":{\"protagonist\":\"string\",\"want\":\"string\",\"obstacle\":\"string\",\"stakes\":\"string\",\"turning_points\":[\"string\"],\"ending\":\"string\",\"throughline\":\"string\"},\"chapters\":[{\"chapter_number\":1,\"chapter_title\":\"string\",\"chapter_summary\":\"string\",\"narrator_script\":\"string\"}]}"
+    }
+  },
+  {
+    "type": "updateNodeParameters",
+    "nodeName": "Generate Hook",
+    "parameters": {
+      "text": "=You are a hook writer for {{ $('Genre Profile').first().json.p.format }} videos. Viewers decide in the FIRST 8 SECONDS whether to keep watching.\n\nWrite the OPENING HOOK — the narrator's first words, spoken BEFORE chapter 1 begins. It must create a gap the rest of the video pays off.\n\nTHE HOOK RULE FOR THIS GENRE — follow it exactly:\n{{ $('Genre Profile').first().json.p.hookRule }}\n\nGENRE VOICE — the hook is spoken in the same voice as the rest of the narration:\n{{ $('Genre Profile').first().json.p.voice }}\n\nTHE STORY SPINE (protagonist, want, obstacle, stakes, throughline — the gap the hook opens is THIS one):\n{{ JSON.stringify($json.output.story_spine || {}) }}\n\nTHE FULL NARRATION (chapters JSON — the hook must set up THIS exact story, without spoiling its ending):\n{{ JSON.stringify($json.output.chapters) }}\n\nSTORY BIBLE (the film's locked world — the hook's visuals may use ONLY these characters and locations):\n{{ JSON.stringify($('Generate Story Bible').first().json.output) }}\n\nTema: {{ $('Receive Project Data').first().json.Tema }}\nTonalitate: {{ $('Receive Project Data').first().json.Tonalitate }}\nLanguage: {{ $('Receive Project Data').first().json.Language }}\n\nRules:\n1. hook_text: 18-22 words, NEVER more than 22 (it fills exactly one 8-second scene). Written in {{ $('Receive Project Data').first().json.Language }}. Concrete and specific to this story — no clichés (\"What if I told you\", \"You won't believe\"), no vague drama.\n2. hook_summary: in ENGLISH. 2-3 sentences describing what the viewer SEES on screen during the hook (use only Story Bible characters/locations). Then end with exactly two lines:\nENDS WITH: <the hook's final visual beat, one sentence>\nLEADS INTO: <how chapter 1 opens visually and narratively — it must match chapter 1's summary above>\n\nSTYLE REFERENCE — write the hook in the style described below (especially its HOOK PATTERN section). It is guidance only: NEVER copy phrases longer than 4 words from it and NEVER borrow its subject matter. Where it conflicts with THE HOOK RULE above, THE HOOK RULE wins.\n{{ $('Prepare Style Block').first().json.styleBlock }}\n\n{{ $('Voice Mode').first().json.hookRules }}\nReturn ONLY raw JSON matching the output parser. No markdown."
+    }
+  },
+  {
+    "type": "updateNodeParameters",
+    "nodeName": "Rewrite Script",
+    "parameters": {
+      "jsonBody": "={{ { model: 'gpt-5.4', messages: [ { role: 'system', content: 'You are an expert script editor. Rewrite the provided script according to the producer\\'s feedback, and make the result a story a viewer can follow easily: one throughline that moves forward, every fact, date, number and description stated ONCE in the whole script (never recap or re-establish earlier material), object inventories and one-to-four-word fragments turned into actions somebody takes, beats connected by cause and effect, no abstract commentary or morals mid-story. STRICT RULES: keep the exact [CHAPTER n: title] marker lines (titles may change, format may not), keep the same language as the original, keep the total word count within 10% of the original, never invent a fact that is not in the original, and output flowing spoken narration only — no markdown, no meta text, no explanations. Return ONLY the rewritten script.' }, { role: 'user', content: 'FEEDBACK FROM THE PRODUCER:\\n' + ($('Fetch Script Status').first().json.fields['Observații Script'] || 'Improve pacing, concreteness and flow.') + '\\n\\nCURRENT SCRIPT:\\n' + $('Fetch Script Status').first().json.fields['Script Content'] } ] } }}"
+    }
+  },
+  {
+    "type": "addNode",
+    "node": {
+      "name": "Write Full Narration",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        2752,
+        544
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are the scriptwriter of a {{ $('Genre Profile').first().json.p.format }}. Write the COMPLETE spoken narration of the whole film in ONE pass — every chapter, in order, as one continuous story. You are the only writer; nobody adds text after you, so what you write is the film.\n\nNOTE: a separate 8-second HOOK precedes chapter 1 — do NOT write a hook or teaser opening; chapter 1 starts the story directly.\n\nTHE STORY SPINE — the film exists to tell this:\n{{ JSON.stringify($json.output.story_spine || {}) }}\n\nTHE CHAPTER PLAN — follow it in order. Each chapter's ENDS WITH / LEADS INTO lines are where its story lands:\n{{ ($json.output.chapters || []).map(c => 'CHAPTER ' + c.chapter_number + ': ' + c.chapter_title + '\\n' + c.chapter_summary).join('\\n\\n') }}\n\nSTORY BIBLE (the world of this film — mention its characters and places by name where relevant):\n{{ JSON.stringify($('Generate Story Bible').first().json.output) }}\n\nGENRE VOICE — the narration must be written in exactly this voice; violating person, tense or the withholding rules is a failure as serious as losing the story:\n{{ $('Genre Profile').first().json.p.voice }}\n\nGENRE — how this film treats reality:\n{{ $('Genre Profile').first().json.p.invention }}\n\nTonalitate: {{ $('Receive Project Data').first().json.Tonalitate }}\nPace: {{ $('Receive Project Data').first().json.Pace }}\nLanguage: {{ $('Receive Project Data').first().json.Language }} (write the narration in this language)\n\nHOW A STORY IS TOLD HERE — these rules are what separate a film from a list of facts:\n1. ONE THROUGHLINE. Every beat moves the protagonist toward or away from what they want. If a sentence does not change the situation, cut it.\n2. SAY EVERYTHING ONCE. A fact, a date, a number, a character's introduction, a place's description, an image — each is stated exactly one time in the whole film. Later chapters never recap, never re-establish, never \"return to\" earlier material; they may refer back in three or four words at most. Re-read your draft for repeats before you finish.\n3. EVENTS, NOT INVENTORY. Show the world through what people DO in it — decisions, failures, discoveries, confrontations, small victories — never through lists of objects (\"Green felt. Brass ashtrays. A wall clock.\"). At most one short descriptive sentence per chapter; everything else is somebody doing something.\n4. CAUSE AND EFFECT. Consecutive beats connect by \"because\" and \"so\", never by \"and then\". The end of each beat creates the need for the next.\n5. CONCRETE AND VISUALIZABLE — real actions, places, people, moments. No abstract commentary (\"that is the correction\", \"this is how power starts\", \"in many ways\"), no lessons stated mid-story: the meaning is carried by the events. If the genre wants a lesson said aloud, it is said once, at the very end.\n6. SENTENCES of 8-20 words — complete, flowing, spoken. Write in BEATS of ~20-22 words (one sentence, or a pair of short ones), because the text is cut into 8-second scenes; an idea that needs several beats keeps them consecutive so it never breaks mid-scene.\n7. PROGRESSION. Time and place move forward and the viewer always knows when and where they are; no chapter re-opens in the moment a previous chapter opened.\n8. Flowing narration only — no headings other than the chapter markers, no scene numbers, no meta text.\n{{ $('Voice Mode').first().json.narrationRules }}\n{{ $('Extract Claims').first().json.claimsList ? 'VERIFIED FACTS — sourced claims about this topic. Every number, date, name and statistic you narrate MUST come from this list (or the canon lore in the Story Bible); if a fact is in neither, do not state it as a fact. Each fact is used ONCE:\\n' + $('Extract Claims').first().json.claimsList + '\\n' : '' }}\nLENGTH: the whole narration should be about {{ Math.max(1, Math.ceil($('Receive Project Data').first().json.Lenght / 8) - 1) * 22 }} words in total (between {{ Math.round(Math.max(1, Math.ceil($('Receive Project Data').first().json.Lenght / 8) - 1) * 22 * 0.9) }} and {{ Math.round(Math.max(1, Math.ceil($('Receive Project Data').first().json.Lenght / 8) - 1) * 22 * 1.1) }}), spread over the chapters roughly evenly — about {{ Math.round(Math.max(1, Math.ceil($('Receive Project Data').first().json.Lenght / 8) - 1) * 22 / Math.max(1, ($json.output.chapters || []).length)) }} words each. Under-length makes a shorter film and over-length a longer one — but never pad: reach the length with more EVENTS from the spine, never with description or repetition.\n\nSTYLE REFERENCE — imitate the WRITING STYLE described below (voice, rhythm, devices, pacing). It is guidance only: NEVER copy phrases longer than 4 words from it and NEVER borrow its subject matter. Where it conflicts with the GENRE VOICE above, the GENRE VOICE wins.\n{{ $('Prepare Style Block').first().json.styleBlock }}\n\nOUTPUT FORMAT — exactly this and nothing else:\n[CHAPTER 1: <title>]\n<narration of chapter 1>\n\n[CHAPTER 2: <title>]\n<narration of chapter 2>\n\n…one block per chapter, in order, with the chapter numbers and titles exactly as in the plan. Plain text — no JSON, no markdown, no commentary.",
+        "options": {}
+      },
+      "notes": "ONE call writes the whole film. The per-chapter writer (Write Chapter Narration) never saw the other chapters, so every chapter re-told the same facts and padded its word count with the bible's set-dressing."
+    }
+  },
+  {
+    "type": "addNode",
+    "node": {
+      "name": "Editor Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        2976,
+        752
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5.4",
+          "mode": "list",
+          "cachedResultName": "gpt-5.4"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "oPGuXelJ6pnDePIs",
+          "name": "OpenAI account"
+        }
+      }
+    }
+  },
+  {
+    "type": "addNode",
+    "node": {
+      "name": "Edit Full Narration",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        2992,
+        544
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are the script editor of a {{ $('Genre Profile').first().json.p.format }}. Below is the complete draft narration of the film. Make it a story a viewer can follow easily and enjoy — coherent, forward-moving, never repetitive — while keeping everything that already works.\n{{ $json.editorFeedback ? '\\nCORRECTIONS REQUIRED BY THE PREVIOUS PASS — fix these first, then everything else:\\n' + $json.editorFeedback + '\\n' : '' }}\nTHE STORY SPINE the film must tell:\n{{ JSON.stringify(($('Generate Outline').first().json.output || {}).story_spine || {}) }}\n\nTHE CHAPTER PLAN (each chapter's ENDS WITH / LEADS INTO lines are where its story lands):\n{{ (($('Generate Outline').first().json.output || {}).chapters || []).map(c => 'CHAPTER ' + c.chapter_number + ': ' + c.chapter_title + '\\n' + c.chapter_summary).join('\\n\\n') }}\n\nEDIT FOR, in this order of importance:\n1. REPETITION — the single biggest defect. Any fact, date, number, character introduction, place description, image or phrase that appears more than once stays ONLY where it works best and is removed everywhere else; a later mention may be a three-word reference, never a restatement. A chapter that re-opens the same scene, \"returns to\" earlier material or recaps is rewritten to move the story forward instead.\n2. FRAGMENTS AND INVENTORIES — lists of objects and one-to-four-word fragments (\"Worn floors. Old fixtures.\") become actions somebody takes, or go.\n3. THROUGHLINE — every chapter advances the spine's turning points in order; a beat that does not change the protagonist's situation is cut or replaced with an EVENT from the spine or the chapter plan.\n4. TRANSITIONS — each chapter ends on its ENDS WITH beat and the next opens where the previous one led; the viewer always knows when and where they are.\n5. ABSTRACT COMMENTARY — sermons, morals and meta-lines in the middle of the story are removed; if the genre calls for a lesson, it is said once, at the very end.\n6. VOICE — keep the genre voice exactly, and keep the language of the draft ({{ $('Receive Project Data').first().json.Language }}):\n{{ $('Genre Profile').first().json.p.voice }}\n7. BEATS — sentences of 8-20 words, in beats of ~20-22 words, because the text is cut into 8-second scenes.\n8. FACTS — never add a fact, number, date or name that is not already in the draft{{ $('Extract Claims').first().json.claimsList ? ' or in the VERIFIED FACTS below' : '' }}; correcting a real-world error is fine, inventing is not.\n{{ $('Extract Claims').first().json.claimsList ? 'VERIFIED FACTS:\\n' + $('Extract Claims').first().json.claimsList + '\\n' : '' }}\nLENGTH: the finished narration must be between {{ Math.round(Math.max(1, Math.ceil($('Receive Project Data').first().json.Lenght / 8) - 1) * 22 * 0.9) }} and {{ Math.round(Math.max(1, Math.ceil($('Receive Project Data').first().json.Lenght / 8) - 1) * 22 * 1.12) }} words in total (target {{ Math.max(1, Math.ceil($('Receive Project Data').first().json.Lenght / 8) - 1) * 22 }}). If the draft is short, add EVENTS from the spine and the chapter plan — never description, never repetition. If it is long, cut redundancy and commentary first.\n\nOUTPUT: the complete corrected narration in the same format — the [CHAPTER n: title] marker lines exactly as in the draft (same numbers, same count, same order; a title may be improved), each followed by that chapter's narration. Plain text only — no notes, no explanations, no markdown.\n\nDRAFT:\n{{ $json.output }}",
+        "options": {}
+      },
+      "notes": "Reads the whole draft once and removes repetition, inventories and sermons; Narration Guard sends it back with specific corrections when the result is malformed or outside the length window."
+    }
+  },
+  {
+    "type": "addNode",
+    "node": {
+      "name": "Narration Guard",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3232,
+        544
+      ],
+      "parameters": {
+        "jsCode": "// The editor's output, checked by code before it becomes the script: every\n// planned chapter present as a [CHAPTER n: title] block, none empty, and the\n// whole narration inside the length window. Anything wrong goes BACK to Edit\n// Full Narration with the problems spelled out, at most MAX_RETRIES times;\n// then the draft is accepted as it is (logged), because a slightly short film\n// beats a dead scripting run. Length is a code decision now, not the\n// writer's \"most important rule\" — that rule is what made the old chapters\n// pad themselves with set-dressing inventories.\nconst text = String($json.output !== undefined ? $json.output : ($json.text || '')).replace(/\\r\\n/g, '\\n').trim();\nconst outline = ($('Generate Outline').first().json.output || {});\nconst planned = outline.chapters || [];\nconst rp = $('Receive Project Data').first().json;\nconst scenes = Math.max(1, Math.ceil(Number(rp.Lenght || 64) / 8) - 1);\nconst target = scenes * 22;\nconst min = Math.round(target * 0.9);\nconst max = Math.round(target * 1.12);\nconst blocks = text.split(/\\n(?=\\[CHAPTER\\s+\\d+\\s*:)/i).map(b => b.trim()).filter(Boolean);\nconst chapters = [];\nfor (const block of blocks) {\n  const h = block.match(/^\\[CHAPTER\\s+(\\d+)\\s*:\\s*([^\\]]*)\\]\\s*\\n?/i);\n  if (!h) continue;\n  chapters.push({ chapter_number: parseInt(h[1], 10), chapter_title: h[2].trim(), narrator_script: block.slice(h[0].length).trim() });\n}\nchapters.sort((a, b) => a.chapter_number - b.chapter_number);\nconst wc = (s) => String(s || '').split(/\\s+/).filter(Boolean).length;\nconst words = chapters.reduce((n, c) => n + wc(c.narrator_script), 0);\nconst problems = [];\nif (chapters.length !== planned.length) problems.push('The draft has ' + chapters.length + ' [CHAPTER n: title] blocks but the plan has ' + planned.length + ' chapters (' + planned.map(c => c.chapter_number + ': ' + c.chapter_title).join('; ') + '). Output exactly one block per planned chapter, in order, with those numbers.');\nconst thin = chapters.filter(c => wc(c.narrator_script) < 15);\nif (thin.length) problems.push('Chapter(s) ' + thin.map(c => c.chapter_number).join(', ') + ' are empty or under 15 words.');\nif (words < min) problems.push('The narration is ' + words + ' words; it must be at least ' + min + ' (target ' + target + '). Add EVENTS from the spine and the chapter plan — no description, no repetition.');\nif (words > max) problems.push('The narration is ' + words + ' words; it must be at most ' + max + ' (target ' + target + '). Cut redundancy and commentary first.');\nconst attempt = $runIndex + 1;\nconst MAX_RETRIES = 2;\nif (problems.length && attempt <= MAX_RETRIES) {\n  console.log('NARRATION GUARD retry ' + attempt + '/' + MAX_RETRIES + ' (' + words + ' words): ' + problems.join(' | '));\n  return [{ json: { output: text, editorFeedback: problems.join('\\n'), retry: true, attempt } }];\n}\nif (!chapters.length) throw new Error('The narration has no [CHAPTER n: title] blocks after ' + MAX_RETRIES + ' editor passes. Head: ' + text.slice(0, 300));\nif (problems.length) console.log('NARRATION GUARD accepting after ' + MAX_RETRIES + ' retries with: ' + problems.join(' | '));\nconsole.log('NARRATION GUARD ok: ' + chapters.length + ' chapters, ' + words + ' words (target ' + target + ', window ' + min + '-' + max + ')');\nreturn [{ json: { output: text, retry: false, chapters, words, target, min, max } }];"
+      }
+    }
+  },
+  {
+    "type": "addNode",
+    "node": {
+      "name": "If Narration Retry",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3472,
+        544
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "narration-retry",
+              "leftValue": "={{ $json.retry }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    }
+  },
+  {
+    "type": "updateNodeParameters",
+    "nodeName": "Combine Chapters",
+    "parameters": {
+      "jsCode": "// Narration Guard hands over the edited narration already split into\n// chapters; the outline supplies each chapter's plan (summary, ENDS WITH /\n// LEADS INTO) for the segmenter. Matched by chapter_number, by position as a\n// fallback. story_spine rides along for the hook.\nconst g = $json;\nconst outline = $('Generate Outline').first().json.output || {};\nconst planned = outline.chapters || [];\nconst chapters = (g.chapters || []).map((c, i) => {\n  const o = planned.find(p => Number(p.chapter_number) === Number(c.chapter_number)) || planned[i] || {};\n  return {\n    chapter_number: c.chapter_number,\n    chapter_title: c.chapter_title || o.chapter_title || '',\n    chapter_summary: o.chapter_summary || '',\n    narrator_script: String(c.narrator_script || '').trim(),\n  };\n});\nif (!chapters.length) throw new Error('No chapters to combine.');\nreturn [{ json: { output: { project_title: outline.project_title || 'Untitled', target_duration: outline.target_duration || '', story_spine: outline.story_spine || null, chapters } } }];"
+    }
+  },
+  {
+    "type": "setNodePosition",
+    "nodeName": "Combine Chapters",
+    "position": [
+      3712,
+      544
+    ]
+  },
+  {
+    "type": "setNodePosition",
+    "nodeName": "Generate Hook",
+    "position": [
+      3952,
+      544
+    ]
+  },
+  {
+    "type": "setNodePosition",
+    "nodeName": "Hook Model",
+    "position": [
+      3936,
+      752
+    ]
+  },
+  {
+    "type": "setNodePosition",
+    "nodeName": "Hook Parser",
+    "position": [
+      4096,
+      752
+    ]
+  },
+  {
+    "type": "setNodePosition",
+    "nodeName": "Prepend Hook To Chapters",
+    "position": [
+      4192,
+      544
+    ]
+  },
+  {
+    "type": "setNodePosition",
+    "nodeName": "Save Script To Airtable",
+    "position": [
+      4432,
+      544
+    ]
+  },
+  {
+    "type": "removeConnection",
+    "source": "Generate Outline",
+    "target": "Split Outline Chapters"
+  },
+  {
+    "type": "removeConnection",
+    "source": "Split Outline Chapters",
+    "target": "Write Chapter Narration"
+  },
+  {
+    "type": "removeConnection",
+    "source": "Write Chapter Narration",
+    "target": "Combine Chapters"
+  },
+  {
+    "type": "removeConnection",
+    "source": "Narration Model",
+    "target": "Write Chapter Narration",
+    "connectionType": "ai_languageModel"
+  },
+  {
+    "type": "removeNode",
+    "nodeName": "Split Outline Chapters"
+  },
+  {
+    "type": "removeNode",
+    "nodeName": "Write Chapter Narration"
+  },
+  {
+    "type": "addConnection",
+    "source": "Generate Outline",
+    "target": "Write Full Narration"
+  },
+  {
+    "type": "addConnection",
+    "source": "Narration Model",
+    "target": "Write Full Narration",
+    "connectionType": "ai_languageModel"
+  },
+  {
+    "type": "addConnection",
+    "source": "Write Full Narration",
+    "target": "Edit Full Narration"
+  },
+  {
+    "type": "addConnection",
+    "source": "Editor Model",
+    "target": "Edit Full Narration",
+    "connectionType": "ai_languageModel"
+  },
+  {
+    "type": "addConnection",
+    "source": "Edit Full Narration",
+    "target": "Narration Guard"
+  },
+  {
+    "type": "addConnection",
+    "source": "Narration Guard",
+    "target": "If Narration Retry"
+  },
+  {
+    "type": "addConnection",
+    "source": "If Narration Retry",
+    "sourceIndex": 0,
+    "target": "Edit Full Narration"
+  },
+  {
+    "type": "addConnection",
+    "source": "If Narration Retry",
+    "sourceIndex": 1,
+    "target": "Combine Chapters"
+  }
+]

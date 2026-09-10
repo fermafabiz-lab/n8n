@@ -105,6 +105,11 @@ const LENGTH_PRESETS = [
  */
 const SFX_LEVEL_PCT_MIN = 10;
 const SFX_LEVEL_PCT_DEFAULT = 35;
+/** Same shape for the background track: 22 is the gain the mixer has always
+ *  used for the music bed, so an untouched slider is today's sound. Steps of
+ *  1 rather than 5 so the default sits on the scale. */
+const MUSIC_LEVEL_PCT_MIN = 5;
+const MUSIC_LEVEL_PCT_DEFAULT = 22;
 
 /**
  * The Veo tiers, priced per 8s clip in useapi credits (measured on the
@@ -161,7 +166,8 @@ const FINISHES: Array<{
     | "end_screen"
     | "sfx"
     | "drawn_cards"
-    | "music";
+    | "music"
+    | "source_watermark";
   label: string;
   sheet: string;
   on: string;
@@ -224,6 +230,16 @@ const FINISHES: Array<{
     off: "No added music or accents",
     default: false,
   },
+  {
+    name: "source_watermark",
+    label: "Source watermark",
+    sheet: "Source",
+    // The spec's own sentence, because it is the one that explains WHY the
+    // switch exists rather than what it toggles.
+    on: "Show a small label indicating whether each visual is AI-generated, authentic, archival, or illustrative.",
+    off: "No origin label on screen — the provenance is still recorded, and a credit a licence requires is still shown",
+    default: true,
+  },
 ];
 
 const VOICE_LABELS: Record<string, string> = {
@@ -274,6 +290,9 @@ export default function NewVideo() {
   // render used to hard-code, so leaving the slider alone reproduces every
   // film made before this control existed.
   const [sfxLevel, setSfxLevel] = useState(SFX_LEVEL_PCT_DEFAULT);
+  // How loud the background track sits under the voice, same unit and same
+  // rule as the effects — shown only while Music is on.
+  const [musicLevel, setMusicLevel] = useState(MUSIC_LEVEL_PCT_DEFAULT);
   // Hex, or "" for the white default. Empty is not "unset" — it is the
   // choice most films should keep, so it is what the control starts on.
   const [captionColor, setCaptionColor] = useState("");
@@ -281,6 +300,13 @@ export default function NewVideo() {
   // Hands-off mode: every gate signs itself off. Off by default — approving
   // unseen is a real trade, and it must never be the accident.
   const [autoApprove, setAutoApprove] = useState(false);
+  // The producer's direction: the film's angle in their own words, and up to
+  // three mandatory beats (one per line). Both optional, both steer the
+  // writer; the must-includes are verified by the Narration Guard.
+  const [brief, setBrief] = useState("");
+  const [mustHaves, setMustHaves] = useState("");
+  const [expanding, setExpanding] = useState(false);
+  const [expandNote, setExpandNote] = useState("");
   // Which Veo tier generates the clips. Free is the default and the business
   // model; a paid tier is a per-film decision, priced on the spot.
   const [videoModel, setVideoModel] = useState("veo-3.1-lite-low-priority");
@@ -300,6 +326,33 @@ export default function NewVideo() {
 
   const lang = languageByCode(language);
   const languageName = lang?.name ?? "English";
+
+  /** "✨ Develop my idea" — n8n's expand-brief webhook (the model keys live
+   *  there) turns the subject + rough draft into 2-4 sharper sentences, in
+   *  the film's language. Fills the textarea, stays fully editable; any
+   *  failure leaves whatever was typed untouched. */
+  const expandIdea = async () => {
+    setExpanding(true);
+    setExpandNote("");
+    try {
+      const res = await fetch("/api/expand-brief", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tema: name, brief, tone, language: languageName }),
+      });
+      const out = (await res.json()) as { brief?: string | null };
+      if (out.brief) {
+        setBrief(out.brief);
+        setExpandNote("Developed — edit it freely, it's your text now.");
+      } else {
+        setExpandNote("Couldn't develop it right now — your text is untouched.");
+      }
+    } catch {
+      setExpandNote("Couldn't develop it right now — your text is untouched.");
+    } finally {
+      setExpanding(false);
+    }
+  };
   const scenes = Math.max(1, Math.round(length / 8));
   const words = scenes * 22;
   const chapters = Math.max(1, Math.ceil(length / 120));
@@ -404,6 +457,58 @@ export default function NewVideo() {
                       </button>
                     ))}
                   </div>
+                </div>
+                {/* The producer's direction — the cheapest quality lever there
+                    is. A five-word title under-specifies a whole film; these
+                    two optional fields carry the angle and the mandatory
+                    beats. Both are STORED on the project (unlike Lore, which
+                    a restart loses), read by the Story Bible, the outline and
+                    the narration prompts — and the must-includes are VERIFIED
+                    by the Narration Guard after writing, because an
+                    instruction in a prompt is not a constraint. */}
+                <div className="field" style={{ marginTop: 22 }}>
+                  <label>
+                    What the film should really be about{" "}
+                    <span className="fhint">optional — the angle, in your own words</span>
+                  </label>
+                  <textarea
+                    name="brief"
+                    className="nb-ta"
+                    rows={3}
+                    maxLength={2000}
+                    value={brief}
+                    onChange={(e) => setBrief(e.target.value)}
+                    placeholder="The point of view, what to focus on, what to leave out — e.g. 'Not the whole biography: only the night of the crime and the investigation, told through the witnesses.'"
+                  />
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
+                    <button
+                      type="button"
+                      className="btn"
+                      disabled={expanding || !name.trim()}
+                      title={name.trim() ? "Let AI develop your idea into a sharper brief — editable after" : "Write the subject above first"}
+                      onClick={expandIdea}
+                    >
+                      {expanding ? "Developing…" : "✨ Develop my idea"}
+                    </button>
+                    {expandNote && (
+                      <span style={{ fontSize: 12, color: "var(--dim)" }}>{expandNote}</span>
+                    )}
+                  </div>
+                </div>
+                <div className="field" style={{ marginTop: 22 }}>
+                  <label>
+                    Must appear in the film{" "}
+                    <span className="fhint">optional — up to 3, one per line; the writer is checked on each</span>
+                  </label>
+                  <textarea
+                    name="must_haves"
+                    className="nb-ta"
+                    rows={3}
+                    maxLength={650}
+                    value={mustHaves}
+                    onChange={(e) => setMustHaves(e.target.value)}
+                    placeholder={"The moment the deal collapses\nWhy the case stayed unsolved for 27 years"}
+                  />
                 </div>
                 <div className="field" style={{ marginTop: 22 }}>
                   <label>What kind of film</label>
@@ -748,6 +853,46 @@ export default function NewVideo() {
                               </p>
                             </div>
                           )}
+                          {f.name === "music" && on && (
+                            <div style={{ marginTop: 10 }}>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "baseline",
+                                  justifyContent: "space-between",
+                                  fontSize: 12,
+                                  color: "var(--dim)",
+                                }}
+                              >
+                                <label htmlFor="music_level_range">Music volume</label>
+                                <b style={{ color: "var(--ink)", fontFamily: "var(--f-mono), ui-monospace, monospace" }}>
+                                  {musicLevel}%
+                                </b>
+                              </div>
+                              <input
+                                id="music_level_range"
+                                type="range"
+                                className="lenslider"
+                                min={MUSIC_LEVEL_PCT_MIN}
+                                max={100}
+                                step={1}
+                                value={musicLevel}
+                                onChange={(e) => setMusicLevel(Number(e.target.value))}
+                                style={{
+                                  margin: "8px 0 2px",
+                                  ["--fill" as string]: `${((musicLevel - MUSIC_LEVEL_PCT_MIN) / (100 - MUSIC_LEVEL_PCT_MIN)) * 100}%`,
+                                }}
+                                aria-label="Music volume"
+                              />
+                              <p style={{ margin: 0, fontSize: 11.5 }}>
+                                {musicLevel <= 15
+                                  ? "A whisper of a bed — felt more than heard."
+                                  : musicLevel <= 35
+                                    ? "Under the voice, clearly there. The narration still leads."
+                                    : "Forward and loud. The mix ducks it whenever the narrator speaks."}
+                              </p>
+                            </div>
+                          )}
                         </div>
                         <input type="hidden" name={f.name} value={on ? "yes" : "no"} />
                         <Toggle
@@ -766,6 +911,11 @@ export default function NewVideo() {
                     type="hidden"
                     name="sfx_level"
                     value={(sfxLevel / 100).toFixed(2)}
+                  />
+                  <input
+                    type="hidden"
+                    name="music_level"
+                    value={(musicLevel / 100).toFixed(2)}
                   />
                   <input type="hidden" name="caption_color" value={captionColor} />
                 </div>

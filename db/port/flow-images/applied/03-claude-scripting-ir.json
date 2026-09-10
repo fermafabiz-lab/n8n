@@ -1,0 +1,109 @@
+[
+  {
+    "type": "updateNodeParameters",
+    "nodeName": "IR Build Request",
+    "parameters": {
+      "jsCode": "// Rebuilds, from the database alone, everything the in-loop regeneration\n// holds in execution memory: the prompt, the aspect ratio, and the previous\n// scene's image as a style reference. Images are generated ON Google Flow\n// (useapi POST /google-flow/images), so a reference is a Flow media id —\n// the previous scene's 'Image Media ID' — and no download/upload happens.\n// Same body builder as Build Image Request in Media Generation; the MODEL\n// string must agree with it and with Regenerate Scene Image.\nconst MODEL = 'nano-banana-2';\nconst scene = $('IR Load Scene').first().json;\nconst f = scene.fields || {};\nconst project = ($('IR Load Project').first().json || {}).fields || {};\nconst all = ($('IR Load Siblings').first().json.records || [])\n  .slice()\n  .sort((a, b) => (Number((a.fields || {})['Ordine Scenă']) || 0) - (Number((b.fields || {})['Ordine Scenă']) || 0));\n\nlet prompt = f['Imagine First Frame'] || f['Prompt Vizual'] || '';\nif (!prompt) throw new Error('Scene ' + scene.id + ' has no image prompt.');\n// Reviewer feedback steers the re-roll instead of repeating it blindly.\nconst note = String(f['Observații Scenă'] || '').trim();\nif (note && !/REJECTED|FAILED|AUTO-REWRITE/i.test(note)) {\n  prompt += '\\n\\nADJUSTMENT REQUEST — the new image MUST follow this: ' + note;\n}\nconst rejectedBefore = /REJECTED|AUTO-REWRITE/i.test(note);\n\n// The producer's uploaded reference photo is GROUND TRUTH for the film's\n// first scene (Ordine 1) — it survives rejections too, because unlike the\n// generated n-1 chain it is producer-approved content. The batch uploads it\n// to Flow once per film and stores the id as refImageMediaId; a project\n// whose batch predates that has only the Drive URL, which Flow cannot take\n// as a reference, so the re-roll runs without it (logged, not fatal).\nlet opts = {};\ntry { opts = JSON.parse(project['Editing Options'] || '{}') || {}; } catch (e) {}\nconst isFirstScene = Number(f['Ordine Scenă']) === 1;\nlet userRefId = isFirstScene ? String(opts.refImageMediaId || '') : '';\nif (isFirstScene && !userRefId && String(opts.refImage || '').startsWith('http')) {\n  console.log('IR: scene 1 has a reference photo but no refImageMediaId yet (the next batch pass uploads it) — regenerating without it.');\n}\n\n// Previous scene's image = identity/wardrobe/palette reference, by media id.\n// Same guard as the batch path: when consecutive prompts are largely the\n// same words, drop it and let the text carry consistency. After a REJECTION\n// the reference is dropped unconditionally — the model reproduces the\n// refused content straight from the reference no matter how clean the new\n// prompt is.\nconst idx = all.findIndex((r) => r.id === scene.id);\nlet prevId = '';\nif (!userRefId && idx > 0 && !rejectedBefore) {\n  const prev = all[idx - 1].fields || {};\n  prevId = String(prev['Image Media ID'] || '');\n  const wordSet = (s) => new Set(String(s || '').toLowerCase().replace(/[^\\p{L}\\p{N}\\s]/gu, ' ').split(/\\s+/).filter((w) => w.length > 3));\n  const A = wordSet(prompt), B = wordSet(prev['Imagine First Frame']);\n  if (A.size && B.size) {\n    let hit = 0;\n    for (const w of A) if (B.has(w)) hit++;\n    if (hit / Math.max(A.size, B.size) > 0.55) prevId = '';\n  }\n}\n\nconst aspect = project['Format'] === '9:16' ? '9:16' : '16:9';\n// count: 1 is mandatory (the API defaults to four); captchaRetry: 1 so a\n// throttled account does not spend five captcha solves per request.\nconst body = { email: 'fermafabiz@gmail.com', model: MODEL, prompt: prompt, aspectRatio: aspect, count: 1, captchaRetry: 1 };\nif (userRefId) {\n  body.prompt = 'The reference image is GROUND TRUTH for this film: recreate its subject faithfully — the same exact appearance, design details, materials, colors and overall look — while composing the shot described here: ' + prompt;\n  body.reference_1 = userRefId;\n} else if (prevId) {\n  body.prompt = 'Use the reference image ONLY for character identity, wardrobe, color palette and film look. Create a COMPLETELY NEW shot with a different composition, camera angle and framing — do NOT copy the reference layout: ' + prompt;\n  body.reference_1 = prevId;\n}\nreturn [{ json: {\n  sceneId: scene.id,\n  prompt: prompt,\n  requestBody: body,\n  usedReference: userRefId || prevId || null,\n  refIsUser: !!userRefId,\n  aspect: aspect,\n} }];"
+    }
+  },
+  {
+    "type": "updateNodeParameters",
+    "nodeName": "IR Generate Image",
+    "replace": true,
+    "parameters": {
+      "method": "POST",
+      "url": "https://api.useapi.net/v1/google-flow/images",
+      "sendHeaders": true,
+      "headerParameters": {
+        "parameters": [
+          {
+            "name": "Authorization",
+            "value": "Bearer user:2923-RNCS1SSSMj5DqvdN7JUMo"
+          },
+          {
+            "name": "Content-Type",
+            "value": "application/json"
+          }
+        ]
+      },
+      "sendBody": true,
+      "specifyBody": "json",
+      "jsonBody": "={{ $json.requestBody }}",
+      "options": {
+        "timeout": 180000
+      }
+    }
+  },
+  {
+    "type": "setNodeSettings",
+    "nodeName": "IR Generate Image",
+    "settings": {
+      "retryOnFail": false,
+      "onError": "continueErrorOutput"
+    }
+  },
+  {
+    "type": "addNode",
+    "node": {
+      "name": "IR Decode Image",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2752,
+        2512
+      ],
+      "parameters": {
+        "jsCode": "// Flow answers synchronously: media[0].image.generatedImage carries the\n// signed fifeUrl (IR Write Image's ingest downloads and re-hosts it) and\n// the mediaGenerationId Submit Video uses as startImage.\nconst resp = $json;\nconst m0 = ((resp.media || [])[0] || {});\nconst gi = (m0.image && m0.image.generatedImage) || {};\nif (!gi.fifeUrl || !gi.mediaGenerationId) throw new Error('No image in Flow response. Head: ' + JSON.stringify(resp).slice(0, 400));\nreturn [{ json: { sceneId: $('IR Build Request').first().json.sceneId, url: gi.fifeUrl, mediaId: gi.mediaGenerationId } }];"
+      }
+    }
+  },
+  {
+    "type": "updateNodeParameters",
+    "nodeName": "IR Write Image",
+    "parameters": {
+      "jsonBody": "={{ JSON.stringify({ sceneId: $json.sceneId, field: 'image', url: $json.url, fields: { 'Image Media ID': $json.mediaId, 'Aprobare Imagine': false, 'Regenerează Imagine': false, 'Observații Scenă': '' } }) }}"
+    }
+  },
+  {
+    "type": "removeConnection",
+    "source": "IR Generate Image",
+    "sourceIndex": 0,
+    "target": "IR Download Image"
+  },
+  {
+    "type": "removeConnection",
+    "source": "IR Download Image",
+    "target": "IR Upload To Flow"
+  },
+  {
+    "type": "removeConnection",
+    "source": "IR Upload To Flow",
+    "sourceIndex": 0,
+    "target": "IR Write Image"
+  },
+  {
+    "type": "removeConnection",
+    "source": "IR Upload To Flow",
+    "sourceIndex": 1,
+    "target": "IR Mark Rejected"
+  },
+  {
+    "type": "removeNode",
+    "nodeName": "IR Download Image"
+  },
+  {
+    "type": "removeNode",
+    "nodeName": "IR Upload To Flow"
+  },
+  {
+    "type": "addConnection",
+    "source": "IR Generate Image",
+    "sourceIndex": 0,
+    "target": "IR Decode Image"
+  },
+  {
+    "type": "addConnection",
+    "source": "IR Decode Image",
+    "target": "IR Write Image"
+  }
+]

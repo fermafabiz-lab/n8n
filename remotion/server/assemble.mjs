@@ -22,6 +22,9 @@
 //   stingers (default OFF) adds the synthesized boom/whoosh/riser accents;
 //   musicUrl adds the background track. Both are "music" from the
 //   producer's point of view and ride the site's one music toggle.
+//   musicVolume (0.05..1, default 0.22) is the background track's gain
+//   before the sidechain duck — the site's "Music volume" slider. The
+//   accents keep their own fixed levels.
 // GET  /assemble/:jobId/status -> { status, outputUrl, verify: {videoSeconds,
 //   audioSeconds, sceneStartsSeconds} } — verify comes from ffprobe on the
 //   result, so callers can confirm alignment numerically.
@@ -94,9 +97,10 @@ async function probeDuration(file, stream) {
  *
  * ElevenLabs pads what it generates: a take opens with a beat of near-silence
  * and closes with another. Inside one line that is natural. Laid end to end
- * down a film it is not — the scene length is `voiceDur + 0.35`, so every
- * padded tail is added to a gap that already exists, and the narration comes
- * out slower and more recited than the take sounds on its own.
+ * down a film it is not — the scene length is `voiceDur + sceneGap` (0.35s
+ * unless the request says otherwise), so every padded tail is added to a gap
+ * that already exists, and the narration comes out slower and more recited
+ * than the take sounds on its own.
  *
  * -45dB rather than a rounder number: the generated audio is clean, so the
  * floor only has to clear encoder noise, and a threshold set too high eats the
@@ -261,6 +265,17 @@ export function registerAssemble(app, {jobs, outputDir}) {
 		// unconditionally, which is exactly what "music that has nothing to do
 		// with the clip" was. Opt-in now, alongside the background track.
 		const stingers = Boolean(req.body && req.body.stingers);
+		// The music bed's gain. 0.22 was the constant in the mix graph for as long
+		// as there has been a music bed, so absence keeps every older film's
+		// sound; the slider on the site sends a number. Refuses rather than
+		// guesses, same rule as the three copies upstream (derive.ts, Normalize
+		// Webhook Input, Build Timeline): out of range or unparseable is the
+		// default, never a clamp of a bad value.
+		const rawMusic = req.body ? req.body.musicVolume : undefined;
+		const musicVolume =
+			typeof rawMusic === 'number' && Number.isFinite(rawMusic) && rawMusic >= 0.05 && rawMusic <= 1
+				? Math.round(rawMusic * 100) / 100
+				: 0.22;
 		const rawNative = req.body ? req.body.nativeAudio : undefined;
 		const nativeVolume =
 			rawNative === false || rawNative === 0
@@ -277,6 +292,16 @@ export function registerAssemble(app, {jobs, outputDir}) {
 		// Remotion pass that draws over this montage is 2.09x slower per frame
 		// at 1080p (measured, 0.107s against 0.224s), which is what pushes a
 		// long film past the graphics poll ceiling.
+		// How long the picture breathes past the narration on every scene.
+		// 0.35s has always been the montage's fixed gap; a category can ask
+		// for more — Kids story sends 0.8/1.2 so young listeners can follow.
+		// Clamped like every knob here: a bad value must fall back to the
+		// classic gap, never stall the film or crush the cut. Note chapter
+		// openers additionally keep their take's own lead-in (breath trim).
+		const sceneGap = (() => {
+			const n = Number(req.body && req.body.sceneGap);
+			return Number.isFinite(n) && n >= 0.2 && n <= 2 ? n : 0.35;
+		})();
 		const hd = String((req.body && req.body.resolution) || '720p').toLowerCase() === '1080p';
 		const W = portrait ? (hd ? 1080 : 720) : (hd ? 1920 : 1280);
 		const H = portrait ? (hd ? 1920 : 1280) : (hd ? 1080 : 720);
@@ -360,7 +385,7 @@ export function registerAssemble(app, {jobs, outputDir}) {
 					let stretch = 1;
 					let freeze = 0;
 					if (voiceDur) {
-						eff = voiceDur + 0.35;
+						eff = voiceDur + sceneGap;
 						stretch = eff / dur;
 						if (stretch > STRETCH_MAX) {
 							// Even at max slow-motion the clip can't cover the voice —
@@ -563,7 +588,7 @@ export function registerAssemble(app, {jobs, outputDir}) {
 				if (music) {
 					const fadeStart = Math.max(0, totalDur - 2.5).toFixed(3);
 					parts.push(
-						`[${musicIdx}:a]${MONO},aloop=loop=-1:size=2000000000,atrim=duration=${totalDur.toFixed(3)},volume=0.22,afade=t=out:st=${fadeStart}:d=2.5[mus]`,
+						`[${musicIdx}:a]${MONO},aloop=loop=-1:size=2000000000,atrim=duration=${totalDur.toFixed(3)},volume=${musicVolume},afade=t=out:st=${fadeStart}:d=2.5[mus]`,
 					);
 					parts.push(
 						`[mus][vside]sidechaincompress=threshold=0.03:ratio=10:attack=8:release=450:makeup=1[mduck]`,

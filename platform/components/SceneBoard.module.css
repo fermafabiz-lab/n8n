@@ -70,3 +70,18 @@
   cursor: default;
   text-decoration: none;
 }
+
+/* Filmstrip badge: the AI found archive footage for this scene and nobody
+   has decided yet. Sits opposite the scene label so it never covers it. */
+.sug {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  pointer-events: none;
+}

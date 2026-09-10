@@ -71,28 +71,30 @@ A card must show what neither the voice nor the shot is showing. This fails in t
 - The narration already says it. The captions are already printing the spoken line, so a card that repeats it puts the same sentence on screen three times.
 - The shot already shows it. You are given each scene's SHOT and MOTION prompt, so you know what will be on screen. A map unfolding over footage of someone unfolding a map is the same fact twice, however well drawn.
 
-What a card CAN add: the shape of a journey, the size of a gap between two times, the spacing of dates across a life, a quantity a listener cannot hold in their head. If a scene has none of those, it gets no card.
+What a card CAN add: the shape of a journey, the size of a gap between two times, the spacing of dates across a life, the ratio between two quantities, the shape of a sequence spread over several scenes, a quantity a listener cannot hold in their head. If a scene has none of those, it gets no card.
 
 You may only choose from the motifs that exist:
 
 route — a chart unfolds and the journey draws itself across it. For a film that travels somewhere and names the legs. Fields: stops (2-4 objects {name, source}, in travel order; the last is the destination), label (optional short word naming the graphic, no digits, max 12 chars), note + noteSource (optional).
 schedule — a departure board flaps times into place. For two or three moments set against each other, where the gap between them is the tension. Fields: rows (2-3 objects {label, value, source} where value is a CLOCK TIME as HH:MM), label (optional, same rule), note + noteSource (optional; if the note states the gap between the times, use {"kind":"arithmetic"} and the code will check your subtraction).
 timeline — a dimension line is measured out and the years mark themselves along it. For a film that states three or more dates minutes apart: the card places them at their REAL distance apart, so the shape of the span is what it shows. Fields: marks (3-5 objects {at, label, source} in increasing order, where at is a year the film states and label is at most four words saying what happened there), label (optional, same rule), note + noteSource (optional; if the note states the length of the whole span use {"kind":"arithmetic"} and the code recomputes it in years).
+compare — two bars grow from one baseline and the figures ride their ends. For two quantities of the SAME kind, where the ratio between them is the fact: a listener cannot hold two numbers spoken a sentence apart and divide them. Fields: sides (EXACTLY 2 objects {label, value, source}, in the order the film names them, where value must contain a number and label is at most six words), label (optional, same rule), note + noteSource (optional; if the note states how many times larger one side is, or the difference between them, use {"kind":"arithmetic"} and the code recomputes it).
+steps — a ruled spine down the frame with the beats of a sequence arriving one at a time. This is the motif for a film with no dates, no clock times and no named legs, which is most fiction: what it shows is the SHAPE of a stretch of story — how many stages there were and where the turn came. Fields: steps (3-5 objects {label, source}, in the order they happen, each label at most six words), label (optional, same rule), note + noteSource (optional). Its one hard rule: every step must be quoted from a DIFFERENT scene, and the card is placed at or after the last of them. That is what makes it a compression of a stretch of film rather than one scene's sentences typeset — and the code refuses it otherwise.
 
 A clock time is not a year. 1893 is a date and belongs to a timeline; writing it as "18:93" to fit a departure board is a card the code will reject and should.
 
 You cannot invent a motif. A variant that is not on this list produces nothing.
 
-Everything you put on screen must already be in the film, and the proof travels WITH the thing it proves: every stop, row and mark carries its own "source" object, and a note is justified by "noteSource" beside it. Nothing is filed by path — a source under the wrong key is a card with no source at all. Three kinds are accepted:
-- quote — {"kind":"quote","sceneIndex":N,"from":"exact words"}. The words must appear verbatim in that scene's narration. One quote justifies the whole row or mark it sits on, so quote the phrase that carries both the number and the words beside it.
-- arithmetic — {"kind":"arithmetic"}, only for a schedule note stating the gap or a timeline note stating the span.
+Everything you put on screen must already be in the film, and the proof travels WITH the thing it proves: every stop, row, mark, side and step carries its own "source" object, and a note is justified by "noteSource" beside it. Nothing is filed by path — a source under the wrong key is a card with no source at all. Three kinds are accepted:
+- quote — {"kind":"quote","sceneIndex":N,"from":"exact words"}. The words must appear verbatim in that scene's narration. One quote justifies the whole row, mark, side or step it sits on, so quote the phrase that carries both the number and the words beside it.
+- arithmetic — {"kind":"arithmetic"}, only for a schedule note stating the gap, a timeline note stating the span, or a compare note stating the ratio or difference between the two sides.
 - evidence — {"kind":"evidence","ref":"E3"}, a row of the research pack. This is the ONLY door for a fact from outside the script.
 
 Every word on a card must be lifted from its own quote, unbroken and in that order: a label of "as a dealer" is proved by "arrives in Las Vegas in 1941 as a dealer", and "dealer in Vegas" is not, because the film never puts those words together. Numbers are the one thing you may re-render: "cinci si douazeci" may become "05:20". You may not introduce a fact the film does not contain — a distance, a date or a statistic that is nowhere in the script and nowhere in the research pack is not yours to add.
 
 A card may not use a word the film has not spoken yet: quote only from the card's own scene or an earlier one. Write each string in the film's own words; a card that says "Feribot" while the film has only said "ferry" is wrong even though it means the same.
 
-Aim for one to three cards on every film. This pipeline wants animations in its videos, so look hard: a journey with named legs, two times set against each other, a run of dates a listener cannot space out in their head. Take the best one or two even when neither is spectacular.
+Aim for one to three cards on every film. This pipeline wants animations in its videos, so look hard: a journey with named legs, two times set against each other, a run of dates a listener cannot space out in their head, two quantities of the same kind, a sequence of beats across several scenes. Take the best one or two even when neither is spectacular. Note that the last of those, steps, can be drawn from almost any story that goes somewhere — so a film that offers none of the other four usually still offers this one, and returning nothing on such a film is a miss rather than restraint.
 
 But never force one. If the script genuinely offers nothing that any motif can draw truthfully, return an empty array and say so in "none_because" — one line naming what the film DID offer that you had no motif for. That line is the most useful thing you can return on such a film: it is how the next motif gets chosen and built. Padding the answer with a card that repeats the narration is worse than an empty array, because a bad card ships and an empty array only asks a question.
 
@@ -299,6 +301,48 @@ const nodes = (baseX, baseY) => [
 							],
 							note: '2 h 40 min marja',
 							noteSource: {kind: 'arithmetic'},
+						},
+						{
+							sceneIndex: 9,
+							variant: 'compare',
+							priority: 4,
+							why: 'what this shows that the voice and the shot do not',
+							label: 'Crews',
+							sides: [
+								{
+									label: 'of the crews',
+									value: '38 percent',
+									source: {kind: 'quote', sceneIndex: 8, from: 'exact words from that scene'},
+								},
+								{
+									label: 'in command',
+									value: '6 percent',
+									source: {kind: 'quote', sceneIndex: 9, from: 'exact words from that scene'},
+								},
+							],
+							note: 'six times fewer',
+							noteSource: {kind: 'arithmetic'},
+						},
+						{
+							sceneIndex: 12,
+							variant: 'steps',
+							priority: 5,
+							why: 'what this shows that the voice and the shot do not',
+							label: 'The race',
+							steps: [
+								{
+									label: 'leaves the clearing',
+									source: {kind: 'quote', sceneIndex: 4, from: 'exact words from that scene'},
+								},
+								{
+									label: 'clears the rough patch',
+									source: {kind: 'quote', sceneIndex: 8, from: 'exact words from that scene'},
+								},
+								{
+									label: 'the pale petals',
+									source: {kind: 'quote', sceneIndex: 12, from: 'exact words from that scene'},
+								},
+							],
 						},
 					],
 				},

@@ -13,6 +13,16 @@
  *                      license: { id: "cc-by", label, url } },
  *         locations: [{ url (info.json), license, accessConditions[…] }] }] }
  *
+ * `include` accepts ONLY `source.contributors`, `source.languages`,
+ * `source.genres` and `source.subjects` on the IMAGES endpoint — the API says
+ * so itself, by name, in its 400 body. This adapter asked for
+ * `source.production` as well (valid on the WORKS endpoint, not this one) and
+ * was therefore refused on every single search from the day it was written
+ * until 2026-09-10, behind a bare "Wellcome answered HTTP 400" that named
+ * nothing. Losing production costs a date the classifier never trusted anyway
+ * — a catalogue date is frequently the upload date, so it is not read for
+ * matching (see §"The date field lies").
+ *
  * A IIIF `info.json` is not a picture; the picture is
  * `…/full/{width},/0/default.jpg` on the same base, which is how both the
  * thumbnail and the download here are built. The licence comes per image
@@ -43,6 +53,9 @@ interface WellcomeLocation {
 export interface WellcomeImage {
   id?: string;
   aspectRatio?: number;
+  // `production` is declared and never ASKED for: the images endpoint refuses
+  // it (see the include note below), so it arrives only if Wellcome ever adds
+  // it. The optional read below then costs nothing and gains a date for free.
   source?: { id?: string; title?: string; contributors?: Array<{ agent?: { label?: string } }>; production?: Array<{ dates?: Array<{ label?: string }> }> };
   thumbnail?: WellcomeLocation;
   locations?: WellcomeLocation[];
@@ -111,7 +124,7 @@ async function searchOne(q: string, limit: number, signal?: AbortSignal): Promis
   const url = new URL(`${API}/images`);
   url.searchParams.set("query", q);
   url.searchParams.set("pageSize", String(Math.min(Math.max(limit, 1), 100)));
-  url.searchParams.set("include", "source.contributors,source.production");
+  url.searchParams.set("include", "source.contributors");
   const res = await fetch(url, { headers: { "User-Agent": UA, Accept: "application/json" }, signal: signal ?? AbortSignal.timeout(20_000) });
   if (res.status === 429) throw new Error("Wellcome rate limit reached");
   if (!res.ok) throw new Error(`Wellcome answered HTTP ${res.status}` + (await describeHttpError(res)));
@@ -145,7 +158,7 @@ export const wellcomeProvider: FootageProvider = {
 
   async getAssetDetails(id, opts) {
     const url = new URL(`${API}/images/${encodeURIComponent(id)}`);
-    url.searchParams.set("include", "source.contributors,source.production");
+    url.searchParams.set("include", "source.contributors");
     const res = await fetch(url, { headers: { "User-Agent": UA, Accept: "application/json" }, signal: opts?.signal ?? AbortSignal.timeout(15_000) });
     if (res.status === 404) return null;
     if (!res.ok) throw new Error(`Wellcome answered HTTP ${res.status}` + (await describeHttpError(res)));

@@ -5238,8 +5238,16 @@ generated FROM it. The chain, and where each piece lives:
   picker itself has only been exercised through its HTTP twin, so click
   through it once on a real documentary project; print archive credits on
   the end screen (Remotion, i.e. a Railway push); put the optional source
-  keys into GitHub Secrets — `DVIDS_API_KEY`, `EUROPEANA_API_KEY` (the
-  public demo key answers meanwhile), `FLICKR_API_KEY`, `PEXELS_API_KEY`,
+  keys into GitHub Secrets — `DVIDS_API_KEY`, ~~`EUROPEANA_API_KEY`~~
+  (**set 2026-09-10** and verified live: the key answers HTTP 200 with
+  `success: true` and echoes itself back in `apikey`, and the deploy log
+  masks it as `***` where every other footage key is still blank — which
+  is the only proof a secret exists, since its value can never be read
+  back. Note what the key does NOT buy: `api2demo` answered the same
+  query with the same 1,844 results in the same minute, so the gain is
+  QUOTA, not reach — the demo key is shared and throttled, and a
+  ninety-scene film asking three hundred times is what would have hit
+  it), `FLICKR_API_KEY`, `PEXELS_API_KEY`,
   `PIXABAY_API_KEY`, `UNSPLASH_ACCESS_KEY`, `OPENVERSE_CLIENT_ID` +
   `OPENVERSE_CLIENT_SECRET` — because a keyed provider is OFF until its key
   exists, Openverse excepted (it runs anonymously at five requests an hour

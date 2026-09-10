@@ -1975,6 +1975,46 @@ and `SceneBoard` routes the active scene voice → image → clip.
 
 ### Remotion / the edit
 
+- **The karaoke highlight is ANCHORED to the take and estimated inside it —
+  and it used to be a straight division** (2026-09-10, `src/captionTiming.ts`).
+  Reported as captions that are not on the voice, sometimes with a big lag.
+  Everything about the scene-level timing was already right and is worth
+  knowing before suspecting it again: `startSeconds` comes from
+  `verify.sceneStartsSeconds` (frame-snapped), `durationSeconds` is the gap to
+  the next start, `speechSeconds` is the ffprobe'd take, the voice is placed at
+  offset 0 of its scene by the ffmpeg graph, and the speed re-time scales
+  picture and sound together. So **the highlight is exact at every scene start
+  and drifts within the scene** — which is why it looked intermittent.
+  The cause was `perWord = speech / words.length`: "și" and
+  "responsabilitatea" got identical slots. Measured on real scenes, 0.3–0.65s
+  of drift mid-scene, one to two words. Each word now costs a small onset plus
+  its syllables plus the pause that follows a clause or a full stop, normalized
+  to the take — **anchored at both ends**, so the first word starts with the
+  take, the last ends with it, and an error cannot accumulate past one scene.
+  Scored against the six ffprobe'd takes of the fixture it predicts a take's
+  real length to 0.42s against 0.95s for the best possible uniform rate.
+  Three things to keep:
+  - **It is an estimate of a performance and cannot be made exact.**
+    ElevenLabs is non-deterministic — the same line comes back at different
+    lengths — so no model of the text can close the gap. The exact answer is
+    `/v1/text-to-speech/{id}/with-timestamps`, which returns per-character
+    times with the synthesis; that makes the module a lookup, needs the TTS
+    nodes changed and a field on the scene, and cannot reach a film already
+    made. That last part is why the model exists.
+  - **The chapter opener is still early, by design elsewhere.** The breath
+    trim deliberately KEEPS the lead-in silence on a scene that opens a
+    chapter, so its `voiceDur` starts with 0.2–0.6s of nothing while the
+    captions start at word one. The render cannot know that number — closing
+    it means `assemble.mjs` reporting a `speechStartsSeconds` array and
+    `Build Remotion Props` passing it. Until then it is the one systematic
+    offset left.
+  - **`captionAt` lives in `captionTiming.ts`, not in the component**, so the
+    whole decision can be walked frame by frame without React —
+    `npm run check:captions` does exactly that over a fixture and asserts the
+    highlight never runs backwards, always sits inside the chunk on screen,
+    starts each scene on its first word and ends on its last. An off-by-one
+    between the chunk list and the timing list would show a caption on time
+    with the wrong word lit, and no still can catch that.
 - **A blind planner will fight the footage, and the framing ladder was sized
   for a goal that no longer exists.** Rungs ran 1.08 / 1.26 / 1.44 spaced 0.18,
   with `MIN_SCALE_STEP` at 0.14, because the framing step was expected to MAKE
@@ -4370,12 +4410,25 @@ generated FROM it. The chain, and where each piece lives:
   for the screen and n8n should pass it in `Build Remotion Props`; the prop
   already exists and bypasses the isTitleLike gate. Until then, projects whose
   Tema reads as a sentence open with no title card at all.
+- **`speechStartsSeconds` — the last systematic caption offset.** The breath
+  trim keeps the lead-in silence on a scene that opens a chapter (deliberately
+  — that pause IS the chapter break), so its take begins with 0.2–0.6s of
+  nothing while the captions begin at word one. Two lines fix it and both are
+  outside the render: `assemble.mjs` already computes the kept `head` in
+  `tightenTake`, so it can report it beside `voiceDurationsSeconds`, and
+  `Build Remotion Props` can pass it into each scene. `captionAt` would then
+  offset `elapsed` by it. Nothing can be guessed from inside Remotion.
 - Test `characters` multi-voice end to end again after the first run's three
   findings were fixed: the hook prompt now receives `hookRules` (no-narrator
   films tag the hook too), rule (e) bans third-person narration inside a
-  character tag, and captions strip `[...]` like both TTS paths do. Note the
-  site deliberately sets the project `Voice ID` to `cast[0]` when no narrator
-  is picked — any untagged line falls back to the first character's voice.
+  character tag, and captions strip `[...]` like both TTS paths do. **That
+  last clause was written about an intention and stayed here as fact for
+  weeks** — `Captions.tsx` did not strip anything until 2026-09-10, so every
+  multi-voice film printed `[CHARACTER: Maria]` on screen AND spent that word's
+  worth of time on it. `stripTags` in `src/captionTiming.ts` is the one owner
+  now. Note the site deliberately sets the project `Voice ID` to `cast[0]` when
+  no narrator is picked — any untagged line falls back to the first character's
+  voice.
 - The audio panel can pin a voice per scene: the regen webhook accepts
   `voice_id`, which beats every mode rule in `VR Pick Voice` for that one
   synthesis. The batch never overwrites an existing voiceover, so the pin

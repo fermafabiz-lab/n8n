@@ -2092,6 +2092,61 @@ writes `{sfx, music, speed}` and `updateEditingOptions` merges, so a stored
 level survives a post-render sound change untouched — it just cannot be
 changed from there.
 
+### The music sits UNDER the voice now, and one slider position is one level (2026-09-10)
+
+The producer's report was "muzica este proasta, se aude prea tare … in Premiere
+am un efect, simple parametric eq, care face ca muzica sa se auda sub voce".
+Two different defects wearing one complaint, and both are in the mix graph
+(`buildMixGraph` in `assemble.mjs`, extracted as a pure function so the wiring
+can be checked without an encoder — `npm run check:mix`).
+
+- **The bed was never loudness-normalized, so `musicVolume` meant a different
+  thing on every film.** The `Muzica` folder holds everything from a quiet
+  ambient pad to a commercially mastered cue, and those differ by more than
+  10 dB. At a fixed gain of 0.22 the first is inaudible and the second is
+  blaring — the slider was not the problem, the missing measurement was. Every
+  track is now measured (`loudnorm=print_format=json`, analysis only) and
+  corrected with ONE constant `volume` to `MUSIC_TARGET_LUFS`.
+  **Analysis, never loudnorm's own normalizing mode**: that rides the gain as
+  it plays, which would fight the sidechain underneath it and pump the bed —
+  the exact thing this section exists to stop.
+  **-20 LUFS is below typical library music (-14 to -16), so the bed is also
+  QUIETER than it used to be on an average track.** That is deliberate, it is
+  the answer to "prea tare", and it is one constant to tune — not a default in
+  four places. Note it changes the bed level on every film re-rendered from
+  now on, which is the point.
+- **The Premiere effect is a parametric EQ cut, and the honest version of it is
+  DYNAMIC.** A static carve makes the music sound hollow even in the pauses.
+  The bed is split at 300 Hz and 3800 Hz (two chained `acrossover`s — one split
+  point each, so there is no list syntax to get wrong, and Linkwitz-Riley bands
+  sum back flat), and only the SPEECH band ducks hard (ratio 20); body and air
+  lean back (ratio 4). The music keeps sounding like music while the words stay
+  clear, instead of the whole track pumping.
+- **Release is 900ms on the speech band, up from 450.** A scene gap is 0.35s,
+  so at 450 the bed surged back between every single sentence — that pumping is
+  most of what "deranjant" was. At 900 it stays down through a scene gap and
+  recovers over a chapter gap, where a breath belongs.
+- **`acrossover` is asked for, not assumed** (`hasFilter`, cached per process).
+  Bookworm ships ffmpeg 5.1 and has it, but a filtergraph naming a filter that
+  is not there fails the WHOLE render minutes in, so the flat fallback (a
+  static `equalizer` carve plus one broadband duck) keeps films rendering on a
+  build without it. Which path ran is in the deploy log and in
+  `verify.musicDuck`.
+- **`verify` now carries `musicLufs`, `musicGainDb`, `musicVolume`,
+  `musicDuck`** — the first place to look when someone says the music is wrong
+  on one particular film.
+- **The voice split is derived, not fixed at three.** It used to be
+  `asplit=3` with two `anullsink`s for the branches nobody wanted; the band
+  duck needs three keys. An unconsumed pad does not error, it STALLS the
+  graph, which is exactly what `check:mix` audits across all 24 combinations
+  of the switches — verified by mutation: restoring the old `asplit=3`, or
+  miscounting an `amix`, makes it fail.
+
+What none of this fixes is WHICH track plays. "Muzica este proasta" is partly
+that: a tone with no folder of its own falls back to `Default` and the pick
+inside a pool is random. Add a folder named after the tone, or pin a track in
+the picker.
+
 ### The background track is choosable now (2026-09-06)
 
 The producer asked whether the Drive music is used at all; the honest answer

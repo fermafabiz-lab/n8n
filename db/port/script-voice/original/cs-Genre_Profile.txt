@@ -1,0 +1,134 @@
+// Tone selects a PIPELINE CONFIGURATION, not an adjective.
+// The editable source of truth is the Airtable "Genre Profiles" table
+// (fetched by the previous node) — change a cell there and the next project
+// picks it up. The built-in profiles below are the FALLBACK when the table
+// has no matching Active row or Airtable is unreachable, so a missing row
+// can never break production.
+const tone = String(($('Receive Project Data').first().json.Tonalitate) || 'Documentary').trim().toLowerCase();
+
+const FACTUAL = {
+  format: 'documentary',
+  research: true,
+  researchBrief: 'Gather VERIFIED facts: what exactly happened, when, where, who (real names where public), key numbers, distinctive documented details, and the outcome. Flag explicitly anything that cannot be confirmed.',
+  factSheetFraming: 'Every fact below is GROUND TRUTH. The film’s events, people, places, era and mechanics MUST match it. Anything marked UNVERIFIED/UNKNOWN must NOT be invented — leave it out or keep it explicitly open.',
+  invention: 'Inventing events, names, quotes, documents or numbers is FORBIDDEN. Where the record is silent, say so on screen rather than filling the gap.',
+  structure: '1) Open on ONE concrete, verifiable anomaly — a specific object, number, date or moment that does not add up.\n2) Establish the stakes plainly: who was affected and what was at risk.\n3) Escalate through EVIDENCE, not adjectives — each chapter introduces a documented fact that reframes the previous one.\n4) The turn: the point where the obvious reading of events breaks down.\n5) Close on what is settled and what remains genuinely unknown. An open question is a legitimate ending; a manufactured resolution is not.',
+  voice: 'Third person, PAST tense. Attribute contested claims ("according to the inquest", "police recorded"). Specific nouns, real names, exact numbers and dates. Adjectives carry no emotional load — the facts do. No rhetorical questions to the viewer, no "imagine if", no second person.',
+  wpm: 145,
+  hookRule: 'A single verifiable fact, stated plainly, that sounds impossible. No teasing, no "what if I told you".',
+  montageIntensity: 1,
+  visual: 'Observational and archival: available light, handheld or locked-off framing, restrained grade, documents and objects shown as evidence.'
+};
+
+const FICTION = {
+  format: 'cinematic short film',
+  research: true,
+  researchBrief: 'Do NOT research the plot — the story is invented. Research ONLY the SETTING for authenticity: what the period, place, clothing, technology, work and daily texture actually looked like. If the brief has no real-world setting, output the NO RESEARCH line and stop.',
+  factSheetFraming: 'The notes below constrain only the SETTING’s texture (period, place, objects, how things actually worked). The story, characters and events are invented and are NOT bound by them.',
+  invention: 'Invention is REQUIRED. Do not hedge, do not cite, do not qualify. Once a rule of this world is set, it stays consistent.',
+  structure: '1) A character with a clear, concrete want, shown through action rather than statement.\n2) The inciting break — something puts that want out of reach.\n3) Rising cost: each chapter the character tries again and pays more.\n4) The climax is a CHOICE, not an accident.\n5) Close on what changed in the character, shown in a single concrete image.',
+  voice: 'PRESENT tense, close on one character. Visual and physical — what they do with their hands, where they look, what they avoid. Emotion is inferred from behaviour, never announced. No narrator commentary explaining the meaning of events.',
+  wpm: 130,
+  hookRule: 'A character already in trouble, mid-action. No setup, no context.',
+  montageIntensity: 1,
+  visual: 'Anamorphic feel, shallow depth of field, motivated light, blocking that places the character in relation to the space.'
+};
+
+const HORROR = {
+  format: 'horror story',
+  research: false,
+  researchBrief: '',
+  factSheetFraming: 'There is no fact sheet — this is fiction. Invent freely and keep the invented world internally consistent.',
+  invention: 'Invention is REQUIRED. Never research, cite or hedge. The world is yours; its rules must stay consistent once set.',
+  structure: '1) Normalcy, rendered in specific ordinary detail — the viewer must believe the place before it turns.\n2) The first wrongness: small, deniable, easy to explain away.\n3) Escalation — each chapter makes the previous explanation impossible.\n4) The thing is seen, or almost seen. Show less than the viewer wants.\n5) Aftermath, not resolution. Something remains.',
+  voice: 'FIRST or close SECOND person, PRESENT tense. Short sentences; fragments allowed. Concrete sensory detail — sound, smell, temperature, texture — instead of descriptions of emotion. Never name the fear directly and never tell the viewer to be afraid. Withhold: the sentence that explains everything is the sentence that kills the dread.',
+  wpm: 115,
+  hookRule: 'A sensory wrongness, not a claim. One image or sound that is almost normal.',
+  montageIntensity: 2,
+  visual: 'Darkness used as composition rather than absence. Negative space, obscured figures, single practical light sources, frames held a beat too long.'
+};
+
+const PROFILES = {
+  documentary: FACTUAL,
+  educativ: Object.assign({}, FACTUAL, {
+    format: 'explainer',
+    structure: '1) A question the viewer can actually feel, not a definition.\n2) The simplest true answer.\n3) Why that answer is incomplete.\n4) The mechanism, one step at a time, each step depending only on what came before.\n5) What the viewer can now understand that they could not at the start.',
+    voice: 'Second or third person, PRESENT tense. Define a term before using it. One new idea per beat. Analogies must be concrete and must not be stretched past their fit.',
+    wpm: 140,
+    hookRule: 'The everyday thing the viewer has never questioned, questioned.'
+  }),
+  conspiracy: Object.assign({}, FACTUAL, {
+    format: 'investigative documentary',
+    invention: 'You may report what people CLAIM, but you must NEVER assert an unverified claim as fact. Every contested statement is attributed to whoever makes it ("investigators alleged", "the family believed"). Inventing documents, quotes or numbers is forbidden. Where the record is thin, say the record is thin — that IS the story.',
+    structure: '1) The official account, stated fairly and in full.\n2) The first DOCUMENTED detail that does not fit it.\n3) Each chapter adds one more verifiable discrepancy — never speculation stacked on speculation.\n4) Separate explicitly what is documented from what is inferred.\n5) Close on the strongest unanswered question, without asserting a conclusion the evidence does not support.',
+    voice: 'Third person, PAST tense, scrupulously attributed. Never use loaded framing ("they don’t want you to know", "the truth they hid"). Trust the discrepancies to do the work.',
+    wpm: 140,
+    hookRule: 'The single documented discrepancy that is hardest to explain.'
+  }),
+  corporate: Object.assign({}, FACTUAL, {
+    format: 'brand film',
+    structure: '1) A problem the audience recognises as their own.\n2) Why the usual answers fall short.\n3) The approach, in plain terms.\n4) Concrete proof — numbers, named cases, results.\n5) One clear next step.',
+    voice: 'First person plural or third person, PRESENT tense. Plain and confident, zero hype. Claims are specific and checkable. No superlative without a number behind it.',
+    wpm: 140,
+    hookRule: 'The problem stated in the audience’s own words.',
+    visual: 'Clean, bright, shallow depth of field, real workplaces and real hands at work.'
+  }),
+  motivational: Object.assign({}, FACTUAL, {
+    format: 'motivational piece',
+    invention: 'Use only real examples; never invent a person’s story or attribute a quote that was not said.',
+    structure: '1) Name the exact moment of resistance the viewer is in right now.\n2) Why the usual advice fails there.\n3) One reframe, stated once, plainly.\n4) A concrete action small enough to do today.\n5) Return to the opening moment, changed.',
+    voice: 'SECOND person, PRESENT tense. Short declaratives. No lists, no "top five". Earn every imperative — at most one command per chapter.',
+    wpm: 135,
+    hookRule: 'The viewer’s own excuse, said back to them accurately.',
+    montageIntensity: 2
+  }),
+  horror: HORROR,
+  dark: HORROR,
+  cinematic: FICTION,
+  dramatic: Object.assign({}, FICTION, {
+    format: 'drama',
+    wpm: 125,
+    hookRule: 'A relationship already breaking, caught mid-sentence.'
+  }),
+  emotional: Object.assign({}, FICTION, {
+    format: 'emotional short film',
+    wpm: 120,
+    voice: FICTION.voice + ' Restraint carries the feeling: understate at the exact moment the viewer expects you to swell.',
+    hookRule: 'A small, specific, ordinary detail that will matter enormously later.',
+    montageIntensity: 0
+  }),
+  epic: Object.assign({}, FICTION, {
+    format: 'epic narrative',
+    wpm: 135,
+    hookRule: 'The scale of what is at stake, shown through one person who cannot avoid it.',
+    visual: 'Wide vistas against small figures, strong backlight, deep staging, weather as a character.',
+    montageIntensity: 2
+  })
+};
+
+let p = PROFILES[tone] || FACTUAL;
+let source = 'built-in';
+
+// Prefer the Airtable row when it exists and is coherent.
+try {
+  const rec = ($input.first().json.records || [])[0];
+  const f = rec && rec.fields;
+  if (f && f['Format'] && f['Structure'] && f['Voice']) {
+    p = {
+      format: f['Format'],
+      research: f['Research'] === true,
+      researchBrief: f['Research Brief'] || '',
+      factSheetFraming: f['Fact Sheet Framing'] || '',
+      invention: f['Invention'] || '',
+      structure: f['Structure'],
+      voice: f['Voice'],
+      wpm: Number(f['WPM']) || p.wpm,
+      hookRule: f['Hook Rule'] || p.hookRule,
+      montageIntensity: Number.isFinite(Number(f['Montage Intensity'])) ? Number(f['Montage Intensity']) : p.montageIntensity,
+      visual: f['Visual'] || p.visual,
+    };
+    source = 'airtable';
+  }
+} catch (e) { /* fetch failed — built-in profile stands */ }
+
+return [{ json: { p: Object.assign({}, p, { tone: $('Receive Project Data').first().json.Tonalitate || 'Documentary', profileSource: source }) } }];

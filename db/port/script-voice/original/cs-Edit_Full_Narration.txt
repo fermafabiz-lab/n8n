@@ -1,0 +1,26 @@
+=You are the script editor of a {{ $('Genre Profile').first().json.p.format }}. Below is the complete draft narration of the film. Make it a story a viewer can follow easily and enjoy — coherent, forward-moving, never repetitive — while keeping everything that already works.
+{{ $json.editorFeedback ? '\nCORRECTIONS REQUIRED BY THE PREVIOUS PASS — fix these first, then everything else:\n' + $json.editorFeedback + '\n' : '' }}
+THE STORY SPINE the film must tell:
+{{ JSON.stringify(($('Generate Outline').first().json.output || {}).story_spine || {}) }}
+
+THE CHAPTER PLAN (each chapter's ENDS WITH / LEADS INTO lines are where its story lands):
+{{ (($('Generate Outline').first().json.output || {}).chapters || []).map(c => 'CHAPTER ' + c.chapter_number + ': ' + c.chapter_title + '\n' + c.chapter_summary).join('\n\n') }}
+
+EDIT FOR, in this order of importance:
+1. REPETITION — the single biggest defect. Any fact, date, number, character introduction, place description, image or phrase that appears more than once stays ONLY where it works best and is removed everywhere else; a later mention may be a three-word reference, never a restatement. A chapter that re-opens the same scene, "returns to" earlier material or recaps is rewritten to move the story forward instead.
+2. FRAGMENTS AND INVENTORIES — lists of objects and one-to-four-word fragments ("Worn floors. Old fixtures.") become actions somebody takes, or go.
+3. THROUGHLINE — every chapter advances the spine's turning points in order; a beat that does not change the protagonist's situation is cut or replaced with an EVENT from the spine or the chapter plan.
+4. TRANSITIONS — each chapter ends on its ENDS WITH beat and the next opens where the previous one led; the viewer always knows when and where they are.
+5. ABSTRACT COMMENTARY — sermons, morals and meta-lines in the middle of the story are removed; if the genre calls for a lesson, it is said once, at the very end.
+6. VOICE — keep the genre voice exactly, and keep the language of the draft ({{ $('Receive Project Data').first().json.Language }}):
+{{ $('Genre Profile').first().json.p.voice }}
+7. BEATS — sentences of 8-20 words, in beats of ~20-22 words, because the text is cut into 8-second scenes.
+8. LABELS — the Story Bible's location labels ("Forest Starting Path", "Hilltop Finish Clearing") are pipeline names, not speech: wherever the draft says one aloud, replace it with the way a person would name the place. Character names stay.
+9. FACTS — never add a fact, number, date or name that is not already in the draft{{ $('Extract Claims').first().json.claimsList ? ' or in the VERIFIED FACTS below' : '' }}; correcting a real-world error is fine, inventing is not.
+{{ $('Extract Claims').first().json.claimsList ? 'VERIFIED FACTS:\n' + $('Extract Claims').first().json.claimsList + '\n' : '' }}
+LENGTH: the finished narration must be between {{ Math.round(Math.max(1, Math.ceil($('Receive Project Data').first().json.Lenght / 8) - 1) * 22 * 0.9) }} and {{ Math.round(Math.max(1, Math.ceil($('Receive Project Data').first().json.Lenght / 8) - 1) * 22 * 1.12) }} words in total (target {{ Math.max(1, Math.ceil($('Receive Project Data').first().json.Lenght / 8) - 1) * 22 }}). If the draft is short, add EVENTS from the spine and the chapter plan — never description, never repetition. If it is long, cut redundancy and commentary first.
+
+OUTPUT: the complete corrected narration in the same format — the [CHAPTER n: title] marker lines exactly as in the draft (same numbers, same count, same order; a title may be improved), each followed by that chapter's narration. Plain text only — no notes, no explanations, no markdown.
+
+DRAFT:
+{{ $json.output }}

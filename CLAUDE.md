@@ -1284,6 +1284,73 @@ demand of the text.
 
 Rollback, the check script and the full measurements: `db/port/script-quality/`.
 
+### Sharper scripts, and pictures that change — the library was reachable and useless (2026-09-10)
+
+The producer's report on the 86-scene Burj Al Arab film: "the scripting and
+the AI visuals feel bland and repetitive … until BAM the finished building
+appears from almost nothing … does the AI still have access to the library
+I made?" The answer was yes, and that was the problem. Full account, measured
+numbers and rollback: `db/port/script-voice/README.md`. What bites:
+
+- **`Fetch Style Card` matched the library on the film's TONE STRING and took
+  the first three rows by insertion order.** For `Educativ` that was a
+  Moroccan McDonald's vlog in broken English and a YouTube Shorts tutorial,
+  while the producer's own Burj Al Arab transcript sat in the library as tone
+  "Corporate" / category "Educational" and never matched. Now the rows come
+  from **`GET /api/style-refs?project=…`** (site, keyed for n8n): the
+  producer's PINNED references first (`Editing Options.styleRefs`, chosen on
+  `/new` under Tone by `StyleRefPicker`, up to three), then tone-family
+  matches (`toneFamily()` in `lib/style-refs.ts`: Educativ = Educational,
+  Funny = Fun …), then category/Look matches; newer and excerptable first.
+  `pickStyleRefs` is pure — `npm run check:style-refs`. The scripting log now
+  prints `STYLE REFS: "…" [tone/category; pinned by producer]`, which is the
+  line that answers the producer's question in one second.
+- **All 63 active transcripts are SRT files and nothing ever stripped the
+  cues**, so for seven weeks the "REAL EXCERPT" the writer imitated read
+  «67 00:02:39,360 --> 00:02:41,670 Marrakesh…». `cleanTranscript` (site) and
+  an identical copy in `Prepare Style Block` remove cue numbers, timecodes,
+  `[music]`, `>>` and `\h`. **Two copies; change both.** The excerpt
+  measurements in the entry above ("8.0 sentences, 825 characters") were
+  taken with the timecodes inside them.
+- **The Educativ genre profile ASKED for the glossary** ("Define a term before
+  using it. One new idea per beat."), and the writer prompt says GENRE VOICE
+  beats the style reference — so "A pile is a long structural element…" was
+  the pipeline obeying its configuration. All 11 profiles are rewritten
+  (`db/port/script-voice/genre_profiles.sql`, rollback beside it): no
+  definitions, no meta, no signposting, every `visual` demands the light
+  change between chapters. **The profile is a pipeline configuration**; read
+  it before the prompts when a film sounds wrong, the same lesson as the
+  Motivational essay.
+- **Three more things are COUNTED now, in `Narration Guard`**, thresholds
+  measured over the 14 most recent films first: glossary sentences (fires
+  above 1; Burj had 4, every other film 0–1), meta lines ("the camera enters
+  the atrium", "this is turning point four", "this chapter unveils" — fires
+  at 1, because every one found in 14 films was a defect), and steering
+  openers ("Now the work shifts", "So the question is" — fires at ≥10% of
+  sentences and ≥8; Burj 11.9%, the good films 0–6.8%). Same feedback path,
+  same `MAX_RETRIES = 2`. The writer has rules 9–14 to match and the editor
+  5b/5c.
+- **A place that changes over the story is one bible entry PER STATE** —
+  `"<Place> — <stage>"` in chronological order, up to 4 states, 8 entries in
+  all — and the segmenter picks the state the chapter has reached, never a
+  later one. The Burj bible had one tower, "at Completion", so the frame-
+  rising chapter anchored to the finished plate and scene 108 spoiled the
+  ending; a construction film has to be ABLE to show half-built.
+  `Set Plate Prep` makes up to 10 plates (was 6) to cover it. The assembler,
+  tags and judge needed no change: a state is just another location name.
+- **Lighting is a PROGRESSION in the bible now, and the segmenter moves it**:
+  3–5 named conditions with the chapters they belong to, at least two per
+  chapter, never more than five consecutive scenes in one `time_of_day`, no
+  two chapters opening in the same light; `time_of_day` gains `overcast` and
+  `storm`. `Validate Evidence Refs` logs `TOD MONOTONY` / `LOCATION
+  MONOTONY` per chapter — it cannot send a chapter back, but 75 of 86 scenes
+  reading "day" must never pass unlogged again.
+- **Wiring order that matters**: `Fetch Style Card` is `continueRegularOutput`
+  + `alwaysOutputData`, so until the site carrying `/api/style-refs` is
+  deployed the node answers a 404 and Scripting falls back to the genre voice
+  alone — degraded, never dead. Publish the site before expecting pinned
+  references to reach a film.
+
 ### Evidence retrieval (Claude Scripting)
 
 Scripts on researched topics are written against a pack of sourced claims,

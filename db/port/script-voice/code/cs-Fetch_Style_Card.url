@@ -1,0 +1,1 @@
+={{ 'http://web:3000/api/style-refs?project=' + encodeURIComponent(String($('Receive Project Data').first().json.Project_ID || '')) + '&tone=' + encodeURIComponent(String($('Receive Project Data').first().json.Tonalitate || '')) + '&look=' + encodeURIComponent(String($('Receive Project Data').first().json.Style || '')) }}

@@ -15,6 +15,7 @@
  * once.
  */
 
+import { normalizeStyleRefs } from "@/lib/style-refs";
 import type { DocumentaryVisualSource } from "@/lib/archive/types";
 import {
   normalizeConfidence,
@@ -99,6 +100,16 @@ export interface EditingOptions {
    *  boom/whoosh/riser accents keep their own fixed levels. Meaningless
    *  while `music` is off; the switch owns silence, like sfx/sfxLevel. */
   musicLevel: number;
+  /**
+   * Library scripts the producer chose as the film's WRITING references —
+   * `hov.script_library` record ids, in the order they were picked, at most
+   * three. `/api/style-refs` puts these first when it builds the rows
+   * Claude Scripting's `Fetch Style Card` reads; empty means "match the
+   * library on the film's tone", which is all the pipeline ever did before
+   * and is why the producer's own Burj Al Arab transcript was never used
+   * for the Burj Al Arab film (it sat under a different tone label).
+   */
+  styleRefs: string[];
   /**
    * Whether the pipeline may put drawn cards in this film at all.
    *
@@ -875,6 +886,7 @@ export function buildProject(r: RawProject): Project {
       music: opts.music === true,
       musicTrack: normalizeMusicTrack(opts.musicTrack),
       musicLevel: normalizeMusicLevel(opts.musicLevel),
+      styleRefs: normalizeStyleRefs(opts.styleRefs),
       // On unless refused, like the other overlays: a film the pipeline found
       // nothing worth drawing in simply gets an empty list.
       drawnCards: opts.drawnCards !== false,

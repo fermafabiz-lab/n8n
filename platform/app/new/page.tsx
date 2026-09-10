@@ -11,6 +11,7 @@ import { languageByCode } from "@/lib/languages";
 import { toneType } from "@/lib/tone-type";
 import SpeedPicker from "@/components/SpeedPicker";
 import VoiceTonePicker from "@/components/VoiceTonePicker";
+import StyleRefPicker from "@/components/StyleRefPicker";
 import type { VoiceTone } from "@/lib/data/derive";
 import { SPEED_BY_PACE } from "@/lib/data/derive";
 
@@ -544,6 +545,15 @@ export default function NewVideo() {
                       </button>
                     ))}
                   </div>
+                </div>
+                <div className="field" style={{ marginTop: 18 }}>
+                  <label>
+                    Reference scripts{" "}
+                    <span className="fhint">
+                      optional — up to 3 from your library; the writer imitates their rhythm and voice
+                    </span>
+                  </label>
+                  <StyleRefPicker tone={tone} />
                 </div>
                 <div className="field" style={{ marginTop: 18 }}>
                   <label htmlFor="style">Look</label>

@@ -4168,6 +4168,23 @@ spec. What belongs HERE is what will bite:
   and the adapter's shape was never verified); the defensive reader stays
   for the day the Commission publishes an endpoint, and an EU AV PAGE still
   comes in through URL import with the rights it states.
+- **DVIDS refuses `sort=relevance`, and that took the whole provider down
+  on its first real run** (2026-09-10, the day the key arrived):
+  `400 {"errors":{"sort":{"notInArray":"Invalid Sort Value (relevance)"}}}`.
+  The parameter was written from the documentation and never sent, which is
+  the risk `docs/footage-sources.md` names for every unkeyed adapter. It is
+  simply GONE now rather than replaced: the valid vocabulary is published
+  nowhere reachable (api.dvidshub.net/docs is behind a login), so any value
+  would be a second guess with the same failure mode — and nothing is lost,
+  because `rank.ts` re-scores every candidate from every provider together,
+  so a provider's own ordering never reaches the producer.
+  **The general shape, and the reason it was found in one look: an adapter
+  that throws away the API's own error body is an adapter that cannot be
+  debugged.** All thirteen now append what the archive actually SAID
+  (`describeHttpError` in `lib/footage/request.ts`) — bounded, HTML-stripped,
+  and never throwing, since a diagnostic that can fail would replace a real
+  error with its own. The Wellcome `source.production` bug had sat behind a
+  bare `HTTP 400` for exactly this reason.
 - **The Library of Congress answers the Hetzner box with a Cloudflare
   challenge** (HTTP 403 "Just a moment…", measured 2026-09-10 on
   `loc.gov/search/?fo=json`; `api.openverse.org/v1/images/` answered an

@@ -191,7 +191,20 @@ export const dvidsProvider: FootageProvider = {
         q,
         "type[]": types,
         max_results: String(Math.min(Math.max(opts.limit, 1), 50)),
-        sort: "relevance",
+        // NO `sort`. It was written as "relevance" from the documentation and
+        // DVIDS refuses that value outright — measured 2026-09-10, on the
+        // first real run after the key arrived:
+        //   400 {"errors":{"sort":{"notInArray":"Invalid Sort Value (relevance)"}}}
+        // which took the whole provider offline for every search. The valid
+        // vocabulary is not published anywhere reachable (api.dvidshub.net/docs
+        // is behind a login), so asking for ANY ordering here would be a second
+        // guess with the same failure mode.
+        //
+        // Nothing is lost by leaving it out: rank.ts re-scores every candidate
+        // from every provider against the scene's own request and orders them
+        // together, so a provider's own sort never reaches the producer — it
+        // only decides which page DVIDS samples for us, and its default for a
+        // keyword search is already that keyword's relevance.
         // DVIDS filters by date natively; hand it the window when the
         // request has one, and only then — a guessed window would hide the
         // right clip.

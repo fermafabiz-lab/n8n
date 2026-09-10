@@ -40,7 +40,7 @@ export default function FootageAdmin({
   total: number;
   /** Providers the library holds that are not in the fixed filter list (retired ones). */
   extraProviders: Array<{ provider: string; n: number }>;
-  health: Array<{ id: string; displayName: string; enabled: boolean; disabledReason: string | null; heldBack: string | null; searches: number; results: number; selected: number; avgScore: number | null; avgMs: number | null; lastError: string | null }>;
+  health: Array<{ id: string; displayName: string; enabled: boolean; disabledReason: string | null; notice: string | null; heldBack: string | null; searches: number; results: number; selected: number; avgScore: number | null; avgMs: number | null; lastError: string | null }>;
 }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -71,9 +71,13 @@ export default function FootageAdmin({
       {/* Provider health strip — which archives answer, and how well. */}
       <div className={styles.health}>
         {health.map((h) => (
-          <div key={h.id} className={`${styles.hcard} ${!h.enabled ? styles.hoff : h.heldBack ? styles.hheld : ""}`} title={h.disabledReason ?? h.heldBack ?? h.lastError ?? ""}>
+          <div key={h.id} className={`${styles.hcard} ${!h.enabled ? styles.hoff : h.heldBack ? styles.hheld : ""}`} title={h.disabledReason ?? h.heldBack ?? h.notice ?? h.lastError ?? ""}>
             <b>{h.displayName}</b>
-            <span>{!h.enabled ? h.disabledReason ?? "off" : h.heldBack ? "held back" : h.searches ? `${h.searches} searches · ${h.results} results · ${h.selected} used` : "not asked yet"}</span>
+            <span>{!h.enabled ? h.disabledReason ?? "off" : h.heldBack ? "held back" : h.searches ? `${h.searches} searches · ${h.results} results · ${h.selected} used` : h.notice ?? "not asked yet"}</span>
+            {/* An enabled provider with a caveat (anonymous, low quota) says so
+                even once it has been asked — the counts alone would read as a
+                source in full working order. */}
+            {h.enabled && h.notice && h.searches > 0 && <span>{h.notice}</span>}
             {h.enabled && h.searches > 0 && (
               <span>
                 {h.avgScore !== null ? `avg score ${h.avgScore}` : ""}

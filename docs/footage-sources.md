@@ -26,7 +26,7 @@ X" on `/admin/footage` and in the picker rather than failing.
 | **Library of Congress** | `loc` | archive | American history: National Screening Room, Prints & Photographs, early newsreels, presidents and Congress | video + image | `FOOTAGE_ENABLE_LOC=1` | **off by default** — Cloudflare blocks the box (below) |
 | **Wellcome Collection** | `wellcome` | archive | history of medicine, science and public health: epidemics, hospitals, laboratories, campaigns | image | none | **live, verified on real responses** |
 | **Flickr** | `flickr` | community | openly licensed photographs of recent events (protests, disasters, summits, cities on the day) plus The Commons (national libraries, no known restrictions) | image | `FLICKR_API_KEY` | off until keyed; written from the documented shape |
-| **Openverse** | `openverse` | community | the Creative Commons catalogue across hundreds of sources | image | `OPENVERSE_CLIENT_ID` + `_SECRET` | off until keyed — anonymous tier blocked by Cloudflare from the box |
+| **Openverse** | `openverse` | community | the Creative Commons catalogue across hundreds of sources | image | none needed; `OPENVERSE_CLIENT_ID` + `_SECRET` raise the quota | **live, anonymous** at 5 requests an hour — the box was Cloudflare-challenged on 09-10, the health strip will say if it still is |
 | **Pexels** | `pexels` | stock | generic present-day B-roll, no event | video + image | `PEXELS_API_KEY` | off until keyed; written from the documented shape |
 | **Pixabay** | `pixabay` | stock | generic present-day B-roll, no event | video + image | `PIXABAY_API_KEY` | off until keyed; written from the documented shape |
 | **Unsplash** | `unsplash` | stock | generic present-day photographs | image | `UNSPLASH_ACCESS_KEY` | off until keyed; written from the documented shape |
@@ -117,12 +117,34 @@ say whether the shape held. Only "no known restrictions" / "public domain" is
 read as public domain; everything else is manual review with the Library's
 own sentence attached.
 
-### Openverse — built, off behind OAuth
+### Openverse — two modes, never off
 
-Same Cloudflare challenge on the anonymous tier. The adapter uses the
-documented OAuth2 client-credentials flow (`/v1/auth_tokens/register/`,
-free) and caches the token; whether the authenticated path passes the
-challenge from this address is unverified.
+The official client answers anonymous requests, so the adapter does too
+(the producer's call, 2026-09-10 — the first version switched it off without
+a client, which was the wrong shape):
+
+- **Anonymous** (no client in the environment): no header, and the API's own
+  anonymous throttle — 5 requests an hour, 100 a day, at most 20 results a
+  page (its `anon_burst` / `anon_sustained` rates; the API's 429 is the
+  authority, the numbers here only keep us from asking for one — the docs
+  could not be fetched from this session, so verify them at
+  docs.openverse.org when adding the client). The adapter spends ONE request
+  per search, on the most specific query, and keeps its own sliding hourly
+  window: the fifth request in an hour is the last it sends until the window
+  frees, reported as a rate limit so the health module holds it back for a
+  quarter hour instead of collecting refusals. The provider carries a
+  `notice` saying so, which the admin strip and the picker show.
+- **Authenticated** (`OPENVERSE_CLIENT_ID` + `OPENVERSE_CLIENT_SECRET`, free
+  at `/v1/auth_tokens/register/`): OAuth2 client credentials, token cached
+  until it expires, the standard tier of 10,000 requests a day and up to
+  three queries per search.
+
+Measured on 2026-09-10: an anonymous request from the Hetzner IP was
+answered with Cloudflare's "Just a moment…" challenge (HTTP 403), not JSON.
+That is a fact about the address, not a reason to switch the mode off: the
+health strip reports it, a held-back provider no longer costs a router slot,
+and the client is the thing to add either way. Whether the authenticated
+path passes the challenge from that address is unverified.
 
 ### Flickr, Pexels, Pixabay, Unsplash — written from the documentation
 
@@ -175,7 +197,7 @@ source off and touches nothing else.
 | `PEXELS_API_KEY` | Pexels video + photos | pexels.com/api |
 | `PIXABAY_API_KEY` | Pixabay video + photos | pixabay.com/api/docs |
 | `UNSPLASH_ACCESS_KEY` | Unsplash (50 requests/hour in demo mode) | unsplash.com/developers |
-| `OPENVERSE_CLIENT_ID` + `OPENVERSE_CLIENT_SECRET` | Openverse | api.openverse.org/v1/#tag/auth |
+| `OPENVERSE_CLIENT_ID` + `OPENVERSE_CLIENT_SECRET` | Openverse at 10,000 requests a day instead of the anonymous 5 an hour | api.openverse.org/v1/#tag/auth |
 
 Two repo **Variables** (not secrets): `FOOTAGE_ENABLE_LOC=1` turns the
 Library of Congress on; `EU_AV_API_BASE` turns the EU service on, and is
@@ -188,7 +210,13 @@ left unset.
   category matches + a fit for the tier (official leads on its own subjects,
   archives own history and are the fallback through `general`, communities
   cover recent events and places, stock is asked only for a scene that
-  names no event). Still at most four providers per request.
+  names no event). Still at most four providers per request — and a
+  provider the health module is holding back gives its slot to the next
+  candidate instead of occupying one with a refusal.
+- **A provider can be on with a caveat.** `FootageProvider.notice` is a
+  line the admin strip and the picker chips show on an ENABLED provider
+  (Openverse's anonymous quota); `disabledReason` stays what it was, and a
+  provider with a notice is still routed.
 - **`attach.ts` resolves bytes through `provider.resolveDownload`** — the
   Archive's directory URL, NASA's preview, Unsplash's download endpoint —
   instead of trusting the search-time `downloadUrl`.
@@ -207,14 +235,16 @@ left unset.
 - The `Archive Suggestions` prompt (n8n, active `a3278855` since
   2026-09-10) names the new sources and adds the `stockshots` footage type
   for event-less B-roll.
-- `npm run check:footage`: 177 checks, the nine new normalizers pinned on
+- `npm run check:footage`: 186 checks, the nine new normalizers pinned on
   the real responses above (fixtures for the four keyed ones from the
-  documented shapes), and URL import skipping a provider that is off.
+  documented shapes), URL import skipping a provider that is off, both
+  Openverse modes with the anonymous budget, and the router's `skip`.
 
 ## Still owed
 
 - Put the keys in. Until then the live set is Wikimedia, NASA, the Internet
-  Archive, Europeana (demo key) and Wellcome.
+  Archive, Europeana (demo key), Wellcome and Openverse (anonymous, five
+  requests an hour).
 - Watch the first real run of each keyed adapter; their fixtures are the
   documentation's word, not a measurement.
 - Print archive credits on the end screen (Remotion, i.e. a Railway push).

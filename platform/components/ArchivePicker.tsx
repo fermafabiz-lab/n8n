@@ -51,6 +51,8 @@ interface ProviderOption {
   displayName: string;
   enabled: boolean;
   disabledReason: string | null;
+  /** A caveat on an enabled provider — anonymous mode, a low quota. */
+  notice?: string | null;
   heldBack: string | null;
 }
 
@@ -227,7 +229,7 @@ export default function ArchivePicker({
                   type="button"
                   aria-pressed={only === p.id}
                   disabled={!p.enabled}
-                  title={p.disabledReason ?? p.heldBack ?? ""}
+                  title={p.disabledReason ?? p.heldBack ?? p.notice ?? ""}
                   onClick={() => { setOnly(p.id); if (searched) void search(q, kind, p.id); }}
                 >
                   {p.displayName}

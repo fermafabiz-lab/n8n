@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
       displayName: p.displayName,
       enabled: p.enabled,
       disabledReason: p.disabledReason,
+      notice: p.notice ?? null,
       priority: p.priority,
       categories: p.categories,
       searchCapabilities: p.searchCapabilities,

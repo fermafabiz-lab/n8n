@@ -23,7 +23,7 @@ const { normalizeEuAvItem, euAvItems } = await import(join(root, 'lib', 'footage
 const { normalizeIaDoc, pickIaFile, iaQuery, iaFileUrl } = await import(join(root, 'lib', 'footage', 'providers', 'internetArchive.ts'));
 const { normalizeEuropeanaItem } = await import(join(root, 'lib', 'footage', 'providers', 'europeana.ts'));
 const { normalizeWellcomeImage, iiifImage } = await import(join(root, 'lib', 'footage', 'providers', 'wellcome.ts'));
-const { normalizeOpenverseResult, openverseLicenseCode } = await import(join(root, 'lib', 'footage', 'providers', 'openverse.ts'));
+const { normalizeOpenverseResult, openverseLicenseCode, openverseMode, resetOpenverseState, OPENVERSE_ANON_PER_HOUR, OPENVERSE_ANON_PAGE_MAX } = await import(join(root, 'lib', 'footage', 'providers', 'openverse.ts'));
 const { normalizeLocResult, locFiles } = await import(join(root, 'lib', 'footage', 'providers', 'loc.ts'));
 const { normalizeFlickrPhoto } = await import(join(root, 'lib', 'footage', 'providers', 'flickr.ts'));
 const { normalizePexelsVideo, normalizePexelsPhoto, pickPexelsFile } = await import(join(root, 'lib', 'footage', 'providers', 'pexels.ts'));
@@ -191,8 +191,12 @@ check('ARCHIVE_PROVIDERS is the same list', [...archive.ARCHIVE_PROVIDERS], ids)
 truthy('every entry is a real adapter, none a placeholder', F.allProviders().every((p) => typeof p.search === 'function' && typeof p.checkRights === 'function' && p.tier));
 check('an id the registry does not know is not a provider', F.providerById('legacy_archive'), null);
 check('the keyless archives are on', ['internet_archive', 'europeana', 'wellcome', 'wikimedia', 'nasa'].map((id) => F.providerById(id).enabled), [true, true, true, true, true]);
-check('the keyed ones are off without their keys', ['dvids', 'flickr', 'openverse', 'pexels', 'pixabay', 'unsplash'].map((id) => F.providerById(id).enabled), [false, false, false, false, false, false]);
-truthy('and each says which key', ['dvids', 'flickr', 'openverse', 'pexels', 'pixabay', 'unsplash'].every((id) => /_KEY|_ID/.test(F.providerById(id).disabledReason)));
+check('the keyed ones are off without their keys', ['dvids', 'flickr', 'pexels', 'pixabay', 'unsplash'].map((id) => F.providerById(id).enabled), [false, false, false, false, false]);
+truthy('and each says which key', ['dvids', 'flickr', 'pexels', 'pixabay', 'unsplash'].every((id) => /_KEY/.test(F.providerById(id).disabledReason)));
+// Openverse is the exception: the official client answers anonymous requests,
+// so a missing client means the low anonymous quota, never "off".
+check('Openverse is on without a client — anonymously, with a notice', [F.providerById('openverse').enabled, F.providerById('openverse').disabledReason, /anonymous/.test(F.providerById('openverse').notice)], [true, null, true]);
+truthy('and the picker options carry the notice', F.providerFilterOptions().some((p) => p.id === 'openverse' && p.enabled && /anonymous/.test(p.notice)));
 check('Library of Congress is off until asked for (Cloudflare)', [F.providerById('loc').enabled, /Cloudflare/.test(F.providerById('loc').disabledReason)], [false, true]);
 check('EU AV is on only with a base URL', (() => { const b = process.env.EU_AV_API_BASE; delete process.env.EU_AV_API_BASE; const off = F.providerById('eu_av').enabled; process.env.EU_AV_API_BASE = b; return [off, F.providerById('eu_av').enabled]; })(), [false, true]);
 process.env.DVIDS_API_KEY = 'test-key';
@@ -215,6 +219,11 @@ const plague = F.buildFootageRequest({ id: 's', narration: 'In 1854 cholera swep
 truthy('a medical history scene reaches Wellcome', route(plague).includes('wellcome'));
 truthy('never every provider for every scene', [req, military, space, meeting, history, plague].every((r) => route(r).length <= 4));
 check('an explicit filter is honoured', F.routeProviders(req, { only: ['nasa'] }).map((x) => x.provider.id), ['nasa']);
+// A provider the caller is holding back gives its slot to the next candidate
+// rather than occupying one of the four with a refusal.
+const skipped = F.routeProviders(req, { skip: (p) => p.id === 'eu_av' }).map((x) => x.provider.id);
+check('a skipped provider is not routed and its slot is filled', [skipped.includes('eu_av'), skipped.length], [false, Math.min(4, route(req).length)]);
+check('but an explicit filter is never thinned', F.routeProviders(req, { only: ['eu_av'], skip: () => true }).map((x) => x.provider.id), ['eu_av']);
 // Stock is for scenes that name no event, and only then — and even there it
 // comes AFTER the archives, whose `general` coverage is real dated material.
 // Note the fixture names no subject either: "a quiet BORDER town" matches the
@@ -299,6 +308,40 @@ const ov = normalizeOpenverseResult({ id: 'ov-1', title: 'Berlin Wall 1989', for
 check('Openverse: codes map to the classifier\'s', [openverseLicenseCode('by'), openverseLicenseCode('pdm'), openverseLicenseCode('cc0')], ['cc-by', 'public domain mark', 'cc0']);
 check('Openverse: CC BY with credit, the attribution kept', [ov.rightsStatus, ov.attributionRequired, ov.credit], ['cc_by', true, '"Berlin Wall 1989" by Someone is licensed under CC BY 2.0.']);
 check('Openverse: PDM is public domain', normalizeOpenverseResult({ id: 'x', url: 'https://x/1.jpg', license: 'pdm' }).rightsStatus, 'public_domain');
+
+// Openverse — two modes, never off. Anonymous spends one request per search
+// inside the API's own throttle; a client turns on the bearer path.
+{
+  const ovCalls = [];
+  world['api.openverse.org'] = async (url, init) => {
+    ovCalls.push({ path: url.pathname, page: Number(url.searchParams.get('page_size')), auth: (init && init.headers && init.headers.Authorization) || null });
+    if (url.pathname.endsWith('/auth_tokens/token/')) return [200, { access_token: 'tok', expires_in: 3600 }];
+    return [200, { results: [{ id: 'ov-1', title: 'Berlin Wall 1989', url: 'https://live.staticflickr.com/1.jpg', license: 'by', license_version: '2.0' }] }];
+  };
+  const ovReq = F.buildFootageRequest({ id: 's', narration: 'The Berlin Wall fell in November 1989.', event: 'Fall of the Berlin Wall', location: 'Berlin' });
+  delete process.env.OPENVERSE_CLIENT_ID;
+  delete process.env.OPENVERSE_CLIENT_SECRET;
+  resetOpenverseState();
+  const ovp = F.providerById('openverse');
+  check('Openverse anonymous: the mode reads from the environment', openverseMode(), 'anonymous');
+  let ovHits = await ovp.search(ovReq, { limit: 12 });
+  check('Openverse anonymous: ONE request, no bearer, page_size inside the anonymous cap', [ovCalls.length, ovCalls[0].auth, ovCalls[0].page <= OPENVERSE_ANON_PAGE_MAX, ovHits.length], [1, null, true, 1]);
+  for (let i = 1; i < OPENVERSE_ANON_PER_HOUR; i++) await ovp.search(ovReq, { limit: 12 });
+  let ovErr = null;
+  try { await ovp.search(ovReq, { limit: 12 }); } catch (e) { ovErr = e; }
+  check('Openverse anonymous: the hourly budget is refused locally, as a rate limit, before the API is asked', [ovCalls.length, /rate limit/.test(ovErr && ovErr.message)], [OPENVERSE_ANON_PER_HOUR, true]);
+  process.env.OPENVERSE_CLIENT_ID = 'id';
+  process.env.OPENVERSE_CLIENT_SECRET = 'secret';
+  resetOpenverseState();
+  ovCalls.length = 0;
+  check('Openverse authenticated: with a client, no notice', [openverseMode(), ovp.notice], ['authenticated', null]);
+  ovHits = await ovp.search(ovReq, { limit: 12 });
+  check('Openverse authenticated: a token first, then bearer searches, more than one query', [ovCalls[0].path.endsWith('/auth_tokens/token/'), ovCalls.slice(1).every((c) => c.auth === 'Bearer tok'), ovCalls.length > 2, ovHits.length], [true, true, true, 1]);
+  delete process.env.OPENVERSE_CLIENT_ID;
+  delete process.env.OPENVERSE_CLIENT_SECRET;
+  resetOpenverseState();
+  delete world['api.openverse.org'];
+}
 
 // Library of Congress — documented shape, unverified live (Cloudflare).
 const loc = normalizeLocResult({ id: 'https://www.loc.gov/item/2021667/', title: 'Apollo 11 launch', date: '1969', original_format: ['film, video'], image_url: ['https://tile.loc.gov/t.jpg'], contributor: ['NASA'], item: { rights: 'No known restrictions on publication.', location: ['Florida'] }, resources: [{ files: [[{ url: 'https://tile.loc.gov/a.mp4', mimetype: 'video/mp4', width: 640, height: 480, duration: 120 }]] }] });

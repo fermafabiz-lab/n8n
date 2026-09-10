@@ -200,14 +200,19 @@ function tierFit(tier: ProviderTier, p: FootageProvider, r: FootageSearchRequest
  */
 export function routeProviders(
   r: FootageSearchRequest,
-  opts: { only?: ArchiveProvider[]; max?: number; historical?: boolean } = {},
+  opts: { only?: ArchiveProvider[]; max?: number; historical?: boolean; skip?: (p: FootageProvider) => boolean } = {},
 ): RoutedProvider[] {
   const wanted = searchableProviders().filter((p) => !opts.only || opts.only.includes(p.id));
   if (opts.only?.length) return wanted.map((provider) => ({ provider, matches: 1, score: 1 }));
+  // A provider the caller knows cannot answer right now (held back after
+  // failures, rate-limited) gives its slot to the next candidate instead of
+  // occupying one of the four with a refusal. An explicit `only` list is the
+  // producer's own choice and is never thinned.
+  const candidates = opts.skip ? wanted.filter((p) => !opts.skip!(p)) : wanted;
 
   const cats = requestCategories(r);
   const historical = opts.historical ?? cats.includes("history");
-  const scored = wanted.map((provider) => {
+  const scored = candidates.map((provider) => {
     const matches = provider.categories.filter((c) => c !== "general" && cats.includes(c)).length;
     const fit = tierFit(provider.tier, provider, r, historical);
     const score = fit === -Infinity ? 0 : matches * 2 + fit;
@@ -220,8 +225,8 @@ export function routeProviders(
 }
 
 /** What the picker's provider filter offers. */
-export function providerFilterOptions(): Array<{ id: ArchiveProvider; label: string; enabled: boolean; reason: string | null; tier: ProviderTier }> {
-  return PROVIDERS.map((p) => ({ id: p.id, label: p.displayName, enabled: p.enabled, reason: p.disabledReason, tier: p.tier }));
+export function providerFilterOptions(): Array<{ id: ArchiveProvider; label: string; enabled: boolean; reason: string | null; notice: string | null; tier: ProviderTier }> {
+  return PROVIDERS.map((p) => ({ id: p.id, label: p.displayName, enabled: p.enabled, reason: p.disabledReason, notice: p.notice ?? null, tier: p.tier }));
 }
 
 export const FootageProviderRegistry = { all: allProviders, get: providerById, searchable: searchableProviders, route: routeProviders };

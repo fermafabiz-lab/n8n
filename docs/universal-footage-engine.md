@@ -111,15 +111,16 @@ used merely to avoid a generated picture (spec §32).
 | `PEXELS_API_KEY` | Pexels |
 | `PIXABAY_API_KEY` | Pixabay |
 | `UNSPLASH_ACCESS_KEY` | Unsplash |
-| `OPENVERSE_CLIENT_ID` + `OPENVERSE_CLIENT_SECRET` | Openverse (OAuth2 client credentials) |
+| `OPENVERSE_CLIENT_ID` + `OPENVERSE_CLIENT_SECRET` | Openverse's full quota (OAuth2 client credentials, 10,000 requests a day); without them Openverse still runs, anonymously, at 5 requests an hour |
 | `FOOTAGE_ENABLE_LOC` | `1` switches the Library of Congress on; off by default because the box is Cloudflare-challenged |
 | `EU_AV_API_BASE` | the EU Audiovisual Service, opt-in; no default — the service has no public API (`footage-sources.md`) |
 | `MEDIA_INGEST_KEY` | already existed — the `x-hov-key` header n8n uses against `/api/footage/*` and `/api/archive/*` |
 
 Every key is a WARNING in the deploy gate, never an error: absent, the
 provider reads as *off* with its reason in the registry, the picker and the
-admin page, and the router never asks it. Wikimedia, NASA, the Internet
-Archive and Wellcome are keyless. The keys and switches are GitHub repo
+admin page, and the router never asks it — except Openverse, which runs
+anonymously at its low quota and carries a `notice` instead. Wikimedia,
+NASA, the Internet Archive and Wellcome are keyless. The keys and switches are GitHub repo
 Secrets and Variables, written into `platform.env` by the deploy.
 
 ## Tests
@@ -127,7 +128,7 @@ Secrets and Variables, written into `platform.env` by the deploy.
 `npm run check:footage` (in `platform/`) runs `scripts/check-footage.mjs`
 against the real engine with the network and the database mocked at their
 edges (`scripts/footage-loader.mjs` maps the `@/` alias and swaps
-`lib/data/stock` and `lib/data/postgres` for in-memory doubles). 177 checks:
+`lib/data/stock` and `lib/data/postgres` for in-memory doubles). 186 checks:
 request building, the registry and the tier router, the thirteen
 normalizers (nine of them pinned on real responses saved 2026-09-10, the
 four keyed stock/community ones on the documented shapes), rights,

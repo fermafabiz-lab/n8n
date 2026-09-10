@@ -49,6 +49,7 @@ export default async function FootagePage({
       displayName: p.displayName,
       enabled: p.enabled,
       disabledReason: p.disabledReason,
+      notice: p.notice ?? null,
       heldBack: heldBack(p.id),
       searches: s?.searches ?? 0,
       results: s?.resultsReturned ?? 0,

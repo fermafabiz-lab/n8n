@@ -4157,15 +4157,31 @@ spec. What belongs HERE is what will bite:
   and the adapter's shape was never verified); the defensive reader stays
   for the day the Commission publishes an endpoint, and an EU AV PAGE still
   comes in through URL import with the rights it states.
-- **Library of Congress and Openverse answer the Hetzner box with a
-  Cloudflare challenge** (HTTP 403 "Just a moment…", measured 2026-09-10 on
-  `loc.gov/search/?fo=json` and `api.openverse.org/v1/images/`). Both
-  adapters exist, written from the documented shapes, and are OFF by
-  default — LoC behind `FOOTAGE_ENABLE_LOC=1`, Openverse behind its OAuth
-  client credentials (the anonymous tier is what is blocked). A blocked
-  provider must be off, not merely failing: three failures hold it back
-  for five minutes, so a permanently blocked one would burn a slot in every
-  routed request and print a red row for ever.
+- **The Library of Congress answers the Hetzner box with a Cloudflare
+  challenge** (HTTP 403 "Just a moment…", measured 2026-09-10 on
+  `loc.gov/search/?fo=json`; `api.openverse.org/v1/images/` answered an
+  anonymous request the same way). LoC is written from the documented
+  shape and OFF by default behind `FOOTAGE_ENABLE_LOC=1`.
+- **Openverse is NOT off without its client — it runs anonymously, as the
+  official client does** (the producer's correction, 2026-09-10; the first
+  version switched it off, which was the wrong shape: absence of a
+  credential means the lower quota, never no source). Anonymous is the
+  API's own throttle — 5 requests an hour, 100 a day, 20 results a page
+  (`anon_burst` / `anon_sustained`; the docs were unreachable from this
+  session, so the numbers are from the API's declared rates, and its 429 is
+  the authority) — so the adapter spends ONE request per search, on the
+  most specific query, and keeps its own hourly window, refusing the sixth
+  as a rate limit before the API is asked. `OPENVERSE_CLIENT_ID` +
+  `OPENVERSE_CLIENT_SECRET` (free) switch it to the 10,000-a-day tier and
+  three queries per search. Two mechanisms came with it: **`notice`** on
+  `FootageProvider` — a caveat on an ENABLED provider, shown on the admin
+  strip and the picker chips, distinct from `disabledReason` because a
+  provider with a notice is still routed — and **a held-back provider no
+  longer burns a slot**: `routeProviders` takes a `skip` predicate, the
+  engine passes `heldBack`, and the report says "held back" for it instead
+  of "not routed for this subject". That second one is what makes a
+  Cloudflare-blocked anonymous provider survivable: it fails, cools off, and
+  costs nothing while it does.
 - **Rights are a filter, never a score.** `validateRights()` yields
   `cleared | attribution_required | editorial_only | manual_review |
   restricted | unknown`; `restricted` is removed before ranking and cannot be
@@ -4236,7 +4252,8 @@ spec. What belongs HERE is what will bite:
   plus the two switches `FOOTAGE_ENABLE_LOC` and `EU_AV_API_BASE` (repo
   Variables, not Secrets). Without a key the provider reads as off with its
   reason, on the admin page and in the picker, and the router skips it; the
-  film is unaffected. All of them are in the heredoc that writes
+  film is unaffected (Openverse excepted — without its client it runs
+  anonymously at the low quota, see the bullet above). All of them are in the heredoc that writes
   `platform.env` — the rule from the ElevenLabs entry, obeyed in the same
   commit. **`enabled` must be a GETTER over the env var**, read at call
   time, or a key added later needs a container rebuild to count. **The four
@@ -4260,7 +4277,7 @@ spec. What belongs HERE is what will bite:
   the site's `@/` alias and extensionless imports (`./types` → `types.ts`,
   `@/lib/footage` → `index.ts`) and swaps `lib/data/stock` and
   `lib/data/postgres` for in-memory doubles; `check-footage.mjs` stubs
-  `globalThis.fetch` per hostname. `npm run check:footage`, 177 checks.
+  `globalThis.fetch` per hostname. `npm run check:footage`, 186 checks.
   Anything under `lib/footage/` that grows a new import path needs the
   loader to resolve it — Node knows neither the alias nor the missing
   extension. **A routing fixture must name no subject by accident**: "a
@@ -5225,7 +5242,8 @@ generated FROM it. The chain, and where each piece lives:
   public demo key answers meanwhile), `FLICKR_API_KEY`, `PEXELS_API_KEY`,
   `PIXABAY_API_KEY`, `UNSPLASH_ACCESS_KEY`, `OPENVERSE_CLIENT_ID` +
   `OPENVERSE_CLIENT_SECRET` — because a keyed provider is OFF until its key
-  exists (`docs/footage-sources.md` has the sign-up page for each); and
+  exists, Openverse excepted (it runs anonymously at five requests an hour
+  meanwhile) (`docs/footage-sources.md` has the sign-up page for each); and
   verify the four adapters written from documentation alone (Flickr,
   Pexels, Pixabay, Unsplash) against one real response each once a key is
   in. The EU Audiovisual Service is opt-in and off — it has no public API

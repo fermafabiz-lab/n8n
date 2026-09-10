@@ -4,13 +4,27 @@
  * Wikimedia, science agencies…). Images only; every result carries its
  * licence as a code and a URL, which is why it is worth a seat.
  *
- * KEYED, and off without `OPENVERSE_CLIENT_ID` + `OPENVERSE_CLIENT_SECRET`
- * (free, api.openverse.org/v1/auth_tokens/register/). Measured 2026-09-10
- * from the box: an anonymous request from the Hetzner IP is answered with
- * Cloudflare's "Just a moment…" challenge (HTTP 403), not JSON — so the
- * anonymous tier the documentation describes is not reachable from here, and
- * only the OAuth2 client-credentials path is worth trying. The token is
- * cached in memory until it expires.
+ * TWO MODES, never off. With `OPENVERSE_CLIENT_ID` + `OPENVERSE_CLIENT_SECRET`
+ * (free, api.openverse.org/v1/auth_tokens/register/) every request carries an
+ * OAuth2 client-credentials token — the API's standard tier, 10,000 requests
+ * a day and 100 a minute. Without them the adapter runs ANONYMOUSLY, exactly
+ * as the official client does: no header, and the API's anonymous throttle
+ * applies — 5 requests an hour, 100 a day, at most 20 results a page (the
+ * `anon_burst` / `anon_sustained` rates the API declares; its own 429 is the
+ * authority, these numbers only keep us from asking for one). So anonymous
+ * mode spends ONE request per search, on the most specific query, and keeps a
+ * sliding window of its own: the fifth request in an hour is the last this
+ * process sends until the window frees, reported as a rate limit so the
+ * health module holds the provider back for a quarter hour instead of burning
+ * the budget on refusals.
+ *
+ * Measured 2026-09-10 from the box: an anonymous request from the Hetzner IP
+ * was answered with Cloudflare's "Just a moment…" challenge (HTTP 403), not
+ * JSON. That is a fact about the address, not a reason to switch the mode
+ * off — the health strip says so when it happens, the router gives the slot
+ * to the next provider, and the credentials are the thing to add either way.
+ * Whether the authenticated path passes the challenge from that address is
+ * unverified.
  *
  * Documented shape (docs.openverse.org):
  *   GET /v1/images/?q=…&license=cc0,pdm,by,by-sa&page_size=…&mature=false
@@ -30,6 +44,23 @@ const API = "https://api.openverse.org/v1";
 const UA = "HouseOfVideos/1.0 (https://house-of-videos.com; documentary archive research)";
 const clientId = () => (process.env.OPENVERSE_CLIENT_ID ?? "").trim();
 const clientSecret = () => (process.env.OPENVERSE_CLIENT_SECRET ?? "").trim();
+
+/** The anonymous throttle as the API declares it. */
+export const OPENVERSE_ANON_PER_HOUR = 5;
+export const OPENVERSE_ANON_PER_DAY = 100;
+export const OPENVERSE_ANON_PAGE_MAX = 20;
+const AUTH_PAGE_MAX = 50;
+const HOUR_MS = 60 * 60_000;
+const DAY_MS = 24 * HOUR_MS;
+
+export type OpenverseMode = "authenticated" | "anonymous";
+
+/** Authenticated when both halves of the client are in the environment, anonymous otherwise. */
+export const openverseMode = (): OpenverseMode => (clientId() && clientSecret() ? "authenticated" : "anonymous");
+
+export const OPENVERSE_ANONYMOUS_NOTICE =
+  `anonymous — ${OPENVERSE_ANON_PER_HOUR} requests an hour, ${OPENVERSE_ANON_PER_DAY} a day, ${OPENVERSE_ANON_PAGE_MAX} results a page; ` +
+  "add OPENVERSE_CLIENT_ID + OPENVERSE_CLIENT_SECRET (free) for 10,000 a day";
 
 export interface OpenverseResult {
   id?: string;
@@ -115,6 +146,32 @@ export function normalizeOpenverseResult(r: OpenverseResult): NormalizedFootageA
 }
 
 let token: { value: string; until: number } | null = null;
+/** Timestamps of the anonymous requests this process has sent, oldest first. */
+let anonymousSent: number[] = [];
+
+/** For tests: forget the cached token and the anonymous window. */
+export function resetOpenverseState(): void {
+  token = null;
+  anonymousSent = [];
+}
+
+/** How many anonymous requests are left in the current hour and day. */
+export function openverseAnonymousBudget(now = Date.now()): { hour: number; day: number } {
+  anonymousSent = anonymousSent.filter((t) => now - t < DAY_MS);
+  const hour = anonymousSent.filter((t) => now - t < HOUR_MS).length;
+  return { hour: Math.max(0, OPENVERSE_ANON_PER_HOUR - hour), day: Math.max(0, OPENVERSE_ANON_PER_DAY - anonymousSent.length) };
+}
+
+function spendAnonymous(): void {
+  const left = openverseAnonymousBudget();
+  if (left.hour <= 0 || left.day <= 0) {
+    throw new Error(
+      `Openverse anonymous rate limit reached (${OPENVERSE_ANON_PER_HOUR} requests an hour, ${OPENVERSE_ANON_PER_DAY} a day without credentials) — ` +
+        "add OPENVERSE_CLIENT_ID + OPENVERSE_CLIENT_SECRET for the full quota",
+    );
+  }
+  anonymousSent.push(Date.now());
+}
 
 async function bearer(signal?: AbortSignal): Promise<string> {
   if (token && token.until > Date.now()) return token.value;
@@ -127,14 +184,23 @@ async function bearer(signal?: AbortSignal): Promise<string> {
   return token.value;
 }
 
+/** The headers for one request: a bearer when there is a client, the anonymous budget spent otherwise. */
+async function requestHeaders(signal?: AbortSignal): Promise<Record<string, string>> {
+  const h: Record<string, string> = { "User-Agent": UA, Accept: "application/json" };
+  if (openverseMode() === "authenticated") h.Authorization = `Bearer ${await bearer(signal)}`;
+  else spendAnonymous();
+  return h;
+}
+
 async function searchOne(q: string, limit: number, signal?: AbortSignal): Promise<NormalizedFootageAsset[]> {
   const url = new URL(`${API}/images/`);
   url.searchParams.set("q", q);
   url.searchParams.set("license", "cc0,pdm,by,by-sa");
-  url.searchParams.set("page_size", String(Math.min(Math.max(limit, 1), 50)));
+  const pageMax = openverseMode() === "anonymous" ? OPENVERSE_ANON_PAGE_MAX : AUTH_PAGE_MAX;
+  url.searchParams.set("page_size", String(Math.min(Math.max(limit, 1), pageMax)));
   url.searchParams.set("mature", "false");
-  const res = await fetch(url, { headers: { "User-Agent": UA, Accept: "application/json", Authorization: `Bearer ${await bearer(signal)}` }, signal: signal ?? AbortSignal.timeout(20_000) });
-  if (res.status === 429) throw new Error("Openverse rate limit reached");
+  const res = await fetch(url, { headers: await requestHeaders(signal), signal: signal ?? AbortSignal.timeout(20_000) });
+  if (res.status === 429) throw new Error(`Openverse rate limit reached (${openverseMode()} mode)`);
   if (!res.ok) throw new Error(`Openverse answered HTTP ${res.status}`);
   const ct = res.headers.get("content-type") ?? "";
   if (!/json/.test(ct)) throw new Error("Openverse answered with something other than JSON (a Cloudflare challenge, most likely)");
@@ -145,11 +211,11 @@ async function searchOne(q: string, limit: number, signal?: AbortSignal): Promis
 export const openverseProvider: FootageProvider = {
   id: "openverse",
   displayName: "Openverse",
-  get enabled() {
-    return Boolean(clientId() && clientSecret());
-  },
-  get disabledReason() {
-    return clientId() && clientSecret() ? null : "needs OPENVERSE_CLIENT_ID + OPENVERSE_CLIENT_SECRET (free) — anonymous requests from the box are challenged by Cloudflare";
+  // Never off: the official client answers anonymous requests, so do we.
+  enabled: true,
+  disabledReason: null,
+  get notice() {
+    return openverseMode() === "anonymous" ? OPENVERSE_ANONYMOUS_NOTICE : null;
   },
   priority: 65,
   tier: "community",
@@ -157,7 +223,9 @@ export const openverseProvider: FootageProvider = {
   searchCapabilities: { video: false, image: true, recentNews: true, historical: true, directDownload: true },
 
   async search(request: FootageSearchRequest, opts: ProviderSearchOptions) {
-    const queries = generateSearchQueries(request).slice(0, 3);
+    // Anonymous: one request, the most specific query — five an hour is the
+    // whole allowance, and three queries per scene would spend it on one scene.
+    const queries = generateSearchQueries(request).slice(0, openverseMode() === "anonymous" ? 1 : 3);
     const seen = new Set<string>();
     const out: NormalizedFootageAsset[] = [];
     for (const q of queries) {
@@ -171,7 +239,7 @@ export const openverseProvider: FootageProvider = {
   },
 
   async getAssetDetails(id, opts) {
-    const res = await fetch(`${API}/images/${encodeURIComponent(id)}/`, { headers: { "User-Agent": UA, Accept: "application/json", Authorization: `Bearer ${await bearer(opts?.signal)}` }, signal: opts?.signal ?? AbortSignal.timeout(15_000) });
+    const res = await fetch(`${API}/images/${encodeURIComponent(id)}/`, { headers: await requestHeaders(opts?.signal), signal: opts?.signal ?? AbortSignal.timeout(15_000) });
     if (res.status === 404) return null;
     if (!res.ok) throw new Error(`Openverse answered HTTP ${res.status}`);
     return normalizeOpenverseResult((await res.json()) as OpenverseResult);

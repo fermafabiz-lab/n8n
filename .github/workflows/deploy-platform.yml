@@ -92,6 +92,8 @@ jobs:
           # Aceeasi regula pentru celelalte surse cu cheie: fara ea, sursa apare
           # ca "off" pe /admin/footage si routerul o sare; filmul nu e afectat.
           # Europeana merge si fara cheie (cheia demo "api2demo", limitata).
+          # Openverse merge si fara client OAuth — anonim, cu limita mica
+          # (5 cereri/ora, 100/zi); clientul (gratuit) ridica limita la 10.000/zi.
           optional=""
           for v in EUROPEANA_API_KEY FLICKR_API_KEY PEXELS_API_KEY PIXABAY_API_KEY \
                    UNSPLASH_ACCESS_KEY OPENVERSE_CLIENT_ID OPENVERSE_CLIENT_SECRET; do

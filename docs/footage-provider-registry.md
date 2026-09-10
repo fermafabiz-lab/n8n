@@ -20,15 +20,18 @@ PROVIDERS = [
 allProviders()          // the fifteen, in that order
 providerById(id)        // null for anything retired or unknown
 searchableProviders()   // enabled, not localOnly, can search video or image
-providerFilterOptions() // the picker's chips: {id, label, enabled, reason, tier}
+providerFilterOptions() // the picker's chips: {id, label, enabled, reason, notice, tier}
 ```
 
 `enabled` is a getter wherever it depends on the environment — a key
 (`DVIDS_API_KEY`, `FLICKR_API_KEY`, `PEXELS_API_KEY`, `PIXABAY_API_KEY`,
-`UNSPLASH_ACCESS_KEY`, `OPENVERSE_CLIENT_ID` + `_SECRET`) or a switch
-(`FOOTAGE_ENABLE_LOC`, `EU_AV_API_BASE`) — so a key added to the environment
-takes effect on the next request, and a missing one makes the provider read
-as off with its `disabledReason` naming the key.
+`UNSPLASH_ACCESS_KEY`) or a switch (`FOOTAGE_ENABLE_LOC`, `EU_AV_API_BASE`)
+— so a key added to the environment takes effect on the next request, and a
+missing one makes the provider read as off with its `disabledReason` naming
+the key. Openverse is the one exception: without `OPENVERSE_CLIENT_ID` +
+`_SECRET` it stays on and runs anonymously at the API's low quota, and says
+so through `notice` — a caveat on an enabled provider, which the router
+still asks.
 
 ## Tiers
 
@@ -70,13 +73,17 @@ whatever else the text says.
 ## Routing
 
 ```ts
-routeProviders(request, { only?, max = 4, historical? }) → [{ provider, matches, score }]
+routeProviders(request, { only?, max = 4, historical?, skip? }) → [{ provider, matches, score }]
 ```
 
-1. An explicit `only` list (the picker's filter) is honoured as given.
-2. Otherwise every searchable provider is scored: **2 × the request
-   categories it claims** (`general` excluded) **+ its tier fit** from the
-   table above. A fit of −∞ removes the provider.
+1. An explicit `only` list (the picker's filter) is honoured as given —
+   never thinned, even by `skip`.
+2. Otherwise every searchable provider the caller does not `skip` is scored:
+   **2 × the request categories it claims** (`general` excluded) **+ its
+   tier fit** from the table above. A fit of −∞ removes the provider. The
+   engine passes `heldBack` as `skip`, so a provider in its cool-off gives
+   its slot to the next candidate and the report says "held back" rather
+   than "not routed for this subject".
 3. Providers scoring above zero are kept, highest first, priority breaking
    ties; the list is cut at `max`.
 

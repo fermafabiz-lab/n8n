@@ -11,6 +11,7 @@ interface FootageProvider {
   displayName: string;
   enabled: boolean;                 // a getter where it depends on an env var (a key, a switch)
   disabledReason: string | null;    // names the key that is missing
+  notice?: string | null;           // a caveat on an ENABLED provider (anonymous, low quota); still routed
   priority: number;                 // tie-break in the router, higher first
   tier: ProviderTier;               // official | archive | community | stock | library — see the registry doc
   categories: string[];             // what it is GOOD FOR — see the registry doc
@@ -86,7 +87,7 @@ The fields that were already there (`provider`, `providerAssetId`,
 | `loc` | `providers/loc.ts` | `FOOTAGE_ENABLE_LOC` | `loc.gov` JSON API; **off by default** — Cloudflare challenges the box; only "no known restrictions" / "public domain" reads as PD, the rest manual review with the Library's own sentence |
 | `wellcome` | `providers/wellcome.ts` | none | `api.wellcomecollection.org` images; IIIF `info.json` → `full/{w},/0/default.jpg`; licence per image |
 | `flickr` | `providers/flickr.ts` | `FLICKR_API_KEY` | `flickr.photos.search` restricted to licence ids 4,5,7,8,9,10; images only; date window → `min/max_taken_date` |
-| `openverse` | `providers/openverse.ts` | `OPENVERSE_CLIENT_ID` + `_SECRET` | OAuth2 client credentials, token cached; images only; the anonymous tier is Cloudflare-blocked from the box |
+| `openverse` | `providers/openverse.ts` | none needed; `OPENVERSE_CLIENT_ID` + `_SECRET` optional | two modes, never off: anonymous (one request per search, the API's 5/hour · 100/day · 20-a-page throttle kept locally, a `notice` on the provider) or OAuth2 client credentials (token cached, 10,000/day); images only |
 | `pexels` | `providers/pexels.ts` | `PEXELS_API_KEY` | video + photos; Pexels License → `other_free`, cleared, no credit |
 | `pixabay` | `providers/pixabay.ts` | `PIXABAY_API_KEY` | video + photos; Pixabay Content License → `other_free`, cleared, no credit |
 | `unsplash` | `providers/unsplash.ts` | `UNSPLASH_ACCESS_KEY` | photos; `attribution_required` ("Photo by X on Unsplash"); `resolveDownload` calls `download_location` |

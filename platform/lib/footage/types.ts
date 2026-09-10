@@ -140,6 +140,13 @@ export interface FootageProvider {
   /** False when a key or a base URL the adapter needs is not in the environment. */
   readonly enabled: boolean;
   readonly disabledReason: string | null;
+  /**
+   * A caveat on a provider that IS enabled — "anonymous, five requests an
+   * hour" — for the admin strip and the picker's chips. Null when there is
+   * nothing to say. Distinct from `disabledReason`: a provider with a notice
+   * is still routed.
+   */
+  readonly notice?: string | null;
   /** Router weight, 0–100. Ties between matching providers break on this. */
   readonly priority: number;
   readonly tier: ProviderTier;

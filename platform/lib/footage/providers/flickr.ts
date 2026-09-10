@@ -25,7 +25,7 @@
 
 import { classifyLicense } from "@/lib/archive/rights";
 import { qualityScoreOf, searchable, stripHtml, yearsIn } from "@/lib/archive/text";
-import { generateSearchQueries } from "../request";
+import { generateSearchQueries, describeHttpError } from "../request";
 import { validateRights } from "../rights";
 import type { FootageProvider, FootageSearchRequest, NormalizedFootageAsset, ProviderSearchOptions } from "../types";
 
@@ -132,7 +132,7 @@ async function call(params: Record<string, string>, signal?: AbortSignal): Promi
   url.searchParams.set("nojsoncallback", "1");
   const res = await fetch(url, { headers: { "User-Agent": UA, Accept: "application/json" }, signal: signal ?? AbortSignal.timeout(20_000) });
   if (res.status === 429) throw new Error("Flickr rate limit reached");
-  if (!res.ok) throw new Error(`Flickr answered HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`Flickr answered HTTP ${res.status}` + (await describeHttpError(res)));
   const body = (await res.json()) as { stat?: string; message?: string };
   if (body.stat && body.stat !== "ok") throw new Error(`Flickr: ${body.message ?? body.stat}`);
   return body;

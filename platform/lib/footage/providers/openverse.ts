@@ -36,7 +36,7 @@
 
 import { classifyLicense } from "@/lib/archive/rights";
 import { qualityScoreOf, searchable, stripHtml, yearsIn } from "@/lib/archive/text";
-import { generateSearchQueries } from "../request";
+import { generateSearchQueries, describeHttpError } from "../request";
 import { validateRights } from "../rights";
 import type { FootageProvider, FootageSearchRequest, NormalizedFootageAsset, ProviderSearchOptions } from "../types";
 
@@ -177,7 +177,7 @@ async function bearer(signal?: AbortSignal): Promise<string> {
   if (token && token.until > Date.now()) return token.value;
   const body = new URLSearchParams({ client_id: clientId(), client_secret: clientSecret(), grant_type: "client_credentials" });
   const res = await fetch(`${API}/auth_tokens/token/`, { method: "POST", headers: { "User-Agent": UA, "Content-Type": "application/x-www-form-urlencoded" }, body, signal: signal ?? AbortSignal.timeout(15_000) });
-  if (!res.ok) throw new Error(`Openverse token request answered HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`Openverse token request answered HTTP ${res.status}` + (await describeHttpError(res)));
   const j = (await res.json()) as { access_token?: string; expires_in?: number };
   if (!j.access_token) throw new Error("Openverse token request answered without a token");
   token = { value: j.access_token, until: Date.now() + Math.max(60, (j.expires_in ?? 3600) - 60) * 1000 };
@@ -201,7 +201,7 @@ async function searchOne(q: string, limit: number, signal?: AbortSignal): Promis
   url.searchParams.set("mature", "false");
   const res = await fetch(url, { headers: await requestHeaders(signal), signal: signal ?? AbortSignal.timeout(20_000) });
   if (res.status === 429) throw new Error(`Openverse rate limit reached (${openverseMode()} mode)`);
-  if (!res.ok) throw new Error(`Openverse answered HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`Openverse answered HTTP ${res.status}` + (await describeHttpError(res)));
   const ct = res.headers.get("content-type") ?? "";
   if (!/json/.test(ct)) throw new Error("Openverse answered with something other than JSON (a Cloudflare challenge, most likely)");
   const body = (await res.json()) as { results?: OpenverseResult[] };
@@ -241,7 +241,7 @@ export const openverseProvider: FootageProvider = {
   async getAssetDetails(id, opts) {
     const res = await fetch(`${API}/images/${encodeURIComponent(id)}/`, { headers: await requestHeaders(opts?.signal), signal: opts?.signal ?? AbortSignal.timeout(15_000) });
     if (res.status === 404) return null;
-    if (!res.ok) throw new Error(`Openverse answered HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`Openverse answered HTTP ${res.status}` + (await describeHttpError(res)));
     return normalizeOpenverseResult((await res.json()) as OpenverseResult);
   },
 

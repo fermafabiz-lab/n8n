@@ -19,7 +19,7 @@
  */
 
 import { qualityScoreOf, searchable, stripHtml } from "@/lib/archive/text";
-import { generateSearchQueries } from "../request";
+import { generateSearchQueries, describeHttpError } from "../request";
 import { validateRights } from "../rights";
 import type { FootageProvider, FootageSearchRequest, NormalizedFootageAsset, ProviderSearchOptions } from "../types";
 
@@ -174,7 +174,7 @@ async function call(path: string, params: Record<string, string>, signal?: Abort
   for (const [n, v] of Object.entries(params)) url.searchParams.set(n, v);
   const res = await fetch(url, { headers: { "User-Agent": UA, Accept: "application/json" }, signal: signal ?? AbortSignal.timeout(20_000) });
   if (res.status === 429) throw new Error("Pixabay rate limit reached");
-  if (!res.ok) throw new Error(`Pixabay answered HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`Pixabay answered HTTP ${res.status}` + (await describeHttpError(res)));
   return res.json();
 }
 

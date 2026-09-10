@@ -207,3 +207,48 @@ export function generateSearchQueries(r: FootageSearchRequest, max = 6): string[
   if (!out.length && kw.length) push(kw.slice(0, 3));
   return out.slice(0, max);
 }
+
+/**
+ * What an archive actually SAID when it refused, appended to the status.
+ *
+ * Every adapter used to throw `X answered HTTP 400` and drop the body on the
+ * floor — and a bare 400 is the least useful thing an API can tell you, because
+ * it means "your request is wrong" without saying which part. The Wellcome
+ * adapter sat broken behind exactly that message until someone probed the API
+ * by hand and it answered, in as many words, `include: 'source.production' is
+ * not a valid value`. That sentence was there the whole time and nobody was
+ * reading it.
+ *
+ * So a refusal now carries its own explanation to the health strip, where the
+ * producer can see it without a session that can reach the internet.
+ *
+ * Bounded and stripped: a provider that answers a Cloudflare challenge sends a
+ * whole HTML page, and an error string is a label, not a document. Never
+ * throws — a diagnostic that can fail is worse than none, since it would
+ * replace a real error with its own.
+ */
+export async function describeHttpError(res: Response, cap = 200): Promise<string> {
+  try {
+    const text = (await res.text()).trim();
+    if (!text) return "";
+    // A JSON body usually names the field; take the message rather than the
+    // whole envelope when it is shaped like an error.
+    let said = text;
+    if (text.startsWith("{") || text.startsWith("[")) {
+      const j: unknown = JSON.parse(text);
+      const o = (j && typeof j === "object" ? j : {}) as Record<string, unknown>;
+      const err = (o.error && typeof o.error === "object" ? o.error : o) as Record<string, unknown>;
+      const pick = [err.description, err.message, err.detail, err.error, o.message, o.detail]
+        .find((v): v is string => typeof v === "string" && v.trim().length > 0);
+      said = pick ?? text;
+    } else if (/<html|<!doctype/i.test(text)) {
+      // An HTML page is a challenge or a proxy notice, never an explanation.
+      const title = /<title[^>]*>([^<]{1,120})<\/title>/i.exec(text)?.[1]?.trim();
+      said = title ? `HTML page: ${title}` : "an HTML page, not an API answer";
+    }
+    const clean = said.replace(/\s+/g, " ").trim();
+    return clean ? ` — ${clean.slice(0, cap)}` : "";
+  } catch {
+    return "";
+  }
+}

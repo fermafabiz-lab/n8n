@@ -26,7 +26,7 @@
 
 import { classifyLicense } from "@/lib/archive/rights";
 import { qualityScoreOf, searchable, stripHtml, yearsIn } from "@/lib/archive/text";
-import { generateSearchQueries } from "../request";
+import { generateSearchQueries, describeHttpError } from "../request";
 import { validateRights } from "../rights";
 import type { FootageFormat, FootageProvider, FootageSearchRequest, NormalizedFootageAsset, ProviderSearchOptions } from "../types";
 
@@ -159,7 +159,7 @@ async function call(params: Record<string, string | string[]>, signal?: AbortSig
   }
   const res = await fetch(url, { headers: { "User-Agent": UA, Accept: "application/json" }, signal: signal ?? AbortSignal.timeout(20_000) });
   if (res.status === 429) throw new Error("Europeana rate limit reached");
-  if (!res.ok) throw new Error(`Europeana answered HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`Europeana answered HTTP ${res.status}` + (await describeHttpError(res)));
   return (await res.json()) as { items?: EuropeanaItem[] };
 }
 

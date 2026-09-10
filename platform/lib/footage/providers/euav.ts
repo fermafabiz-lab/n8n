@@ -29,7 +29,7 @@
 
 import { classifyLicense } from "@/lib/archive/rights";
 import { qualityScoreOf, searchable, stripHtml, yearsIn } from "@/lib/archive/text";
-import { generateSearchQueries } from "../request";
+import { generateSearchQueries, describeHttpError } from "../request";
 import { validateRights } from "../rights";
 import type { FootageFormat, FootageProvider, FootageSearchRequest, NormalizedFootageAsset, ProviderSearchOptions } from "../types";
 
@@ -175,7 +175,7 @@ async function call(path: string, params: Record<string, string>, signal?: Abort
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   const res = await fetch(url, { headers: { "User-Agent": UA, Accept: "application/json" }, signal: signal ?? AbortSignal.timeout(15_000) });
   if (res.status === 429) throw new Error("EU AV rate limit reached");
-  if (!res.ok) throw new Error(`EU AV answered HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`EU AV answered HTTP ${res.status}` + (await describeHttpError(res)));
   const ct = res.headers.get("content-type") ?? "";
   if (!/json/.test(ct)) throw new Error("EU AV answered with something other than JSON — check EU_AV_API_BASE");
   return res.json();

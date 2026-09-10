@@ -25,7 +25,7 @@
 
 import { classifyLicense } from "@/lib/archive/rights";
 import { qualityScoreOf, searchable, stripHtml, yearsIn } from "@/lib/archive/text";
-import { generateSearchQueries } from "../request";
+import { generateSearchQueries, describeHttpError } from "../request";
 import { validateRights } from "../rights";
 import type { FootageFormat, FootageProvider, FootageSearchRequest, NormalizedFootageAsset, ProviderSearchOptions } from "../types";
 
@@ -163,7 +163,7 @@ async function call(path: string, params: Record<string, string | string[]>, sig
   url.searchParams.set("api_key", k);
   const res = await fetch(url, { headers: { "User-Agent": UA, Accept: "application/json" }, signal: signal ?? AbortSignal.timeout(15_000) });
   if (res.status === 429) throw new Error("DVIDS rate limit reached");
-  if (!res.ok) throw new Error(`DVIDS answered HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`DVIDS answered HTTP ${res.status}` + (await describeHttpError(res)));
   return res.json();
 }
 

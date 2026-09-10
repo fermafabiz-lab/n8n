@@ -22,7 +22,7 @@
  */
 
 import { qualityScoreOf, searchable, stripHtml, yearsIn } from "@/lib/archive/text";
-import { generateSearchQueries } from "../request";
+import { generateSearchQueries, describeHttpError } from "../request";
 import { validateRights } from "../rights";
 import type { FootageProvider, FootageSearchRequest, NormalizedFootageAsset, ProviderSearchOptions } from "../types";
 
@@ -110,7 +110,7 @@ async function call(path: string, params: Record<string, string>, signal?: Abort
   for (const [n, v] of Object.entries(params)) url.searchParams.set(n, v);
   const res = await fetch(url, { headers: { "User-Agent": UA, Accept: "application/json", "Accept-Version": "v1", Authorization: `Client-ID ${k}` }, signal: signal ?? AbortSignal.timeout(20_000) });
   if (res.status === 429 || res.status === 403) throw new Error(`Unsplash rate limit reached (HTTP ${res.status})`);
-  if (!res.ok) throw new Error(`Unsplash answered HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`Unsplash answered HTTP ${res.status}` + (await describeHttpError(res)));
   return res.json();
 }
 

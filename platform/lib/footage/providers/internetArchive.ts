@@ -31,7 +31,7 @@
 
 import { classifyLicense } from "@/lib/archive/rights";
 import { searchable, stripHtml, yearsIn } from "@/lib/archive/text";
-import { generateSearchQueries } from "../request";
+import { generateSearchQueries, describeHttpError } from "../request";
 import { validateRights } from "../rights";
 import type { FootageFormat, FootageProvider, FootageSearchRequest, NormalizedFootageAsset, ProviderSearchOptions } from "../types";
 
@@ -190,7 +190,7 @@ export function iaFileUrl(id: string, name: string): string {
 async function getJson(url: URL | string, signal?: AbortSignal): Promise<unknown> {
   const res = await fetch(url, { headers: { "User-Agent": UA, Accept: "application/json" }, signal: signal ?? AbortSignal.timeout(20_000) });
   if (res.status === 429) throw new Error("Internet Archive rate limit reached");
-  if (!res.ok) throw new Error(`Internet Archive answered HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`Internet Archive answered HTTP ${res.status}` + (await describeHttpError(res)));
   return res.json();
 }
 

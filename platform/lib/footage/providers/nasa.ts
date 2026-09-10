@@ -21,7 +21,7 @@
 
 import { classifyLicense } from "@/lib/archive/rights";
 import { qualityScoreOf, searchable, stripHtml, yearsIn } from "@/lib/archive/text";
-import { generateSearchQueries } from "../request";
+import { generateSearchQueries, describeHttpError } from "../request";
 import { validateRights } from "../rights";
 import type { FootageProvider, FootageSearchRequest, NormalizedFootageAsset, ProviderSearchOptions } from "../types";
 
@@ -115,7 +115,7 @@ async function searchOne(q: string, mediaType: "video" | "image" | "any", limit:
   url.searchParams.set("media_type", mediaType === "any" ? "video,image" : mediaType);
   url.searchParams.set("page_size", String(Math.min(Math.max(limit, 1), 100)));
   const res = await fetch(url, { headers: { "User-Agent": UA, Accept: "application/json" }, signal: signal ?? AbortSignal.timeout(15_000) });
-  if (!res.ok) throw new Error(`NASA answered HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`NASA answered HTTP ${res.status}` + (await describeHttpError(res)));
   const body = (await res.json()) as { collection?: { items?: NasaItem[] } };
   return (body.collection?.items ?? []).map((it) => normalizeNasaItem(it)).filter((a): a is NormalizedFootageAsset => a !== null);
 }
@@ -131,7 +131,7 @@ export function pickRendition(hrefs: string[], mediaType: "video" | "image"): st
 
 async function manifest(id: string, signal?: AbortSignal): Promise<string[]> {
   const res = await fetch(`${API}/asset/${encodeURIComponent(id)}`, { headers: { "User-Agent": UA }, signal: signal ?? AbortSignal.timeout(15_000) });
-  if (!res.ok) throw new Error(`NASA asset manifest answered HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`NASA asset manifest answered HTTP ${res.status}` + (await describeHttpError(res)));
   const body = (await res.json()) as { collection?: { items?: Array<{ href?: string }> } };
   return (body.collection?.items ?? []).map((i) => i.href).filter((h): h is string => Boolean(h));
 }
@@ -165,7 +165,7 @@ export const nasaProvider: FootageProvider = {
     const url = new URL(`${API}/search`);
     url.searchParams.set("nasa_id", id);
     const res = await fetch(url, { headers: { "User-Agent": UA }, signal: opts?.signal ?? AbortSignal.timeout(15_000) });
-    if (!res.ok) throw new Error(`NASA answered HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`NASA answered HTTP ${res.status}` + (await describeHttpError(res)));
     const body = (await res.json()) as { collection?: { items?: NasaItem[] } };
     const item = body.collection?.items?.find((it) => it.data?.[0]?.nasa_id === id) ?? body.collection?.items?.[0];
     if (!item) return null;

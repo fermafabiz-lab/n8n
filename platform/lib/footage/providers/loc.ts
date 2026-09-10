@@ -30,7 +30,7 @@
 
 import { classifyLicense } from "@/lib/archive/rights";
 import { qualityScoreOf, searchable, stripHtml, yearsIn } from "@/lib/archive/text";
-import { generateSearchQueries } from "../request";
+import { generateSearchQueries, describeHttpError } from "../request";
 import { validateRights } from "../rights";
 import type { FootageProvider, FootageSearchRequest, NormalizedFootageAsset, ProviderSearchOptions } from "../types";
 
@@ -172,7 +172,7 @@ export function normalizeLocResult(r: LocResult): NormalizedFootageAsset | null 
 async function getJson(url: URL | string, signal?: AbortSignal): Promise<unknown> {
   const res = await fetch(url, { headers: { "User-Agent": UA, Accept: "application/json" }, signal: signal ?? AbortSignal.timeout(20_000) });
   if (res.status === 429) throw new Error("Library of Congress rate limit reached");
-  if (!res.ok) throw new Error(`Library of Congress answered HTTP ${res.status}${res.status === 403 ? " (Cloudflare challenge — the box's address is not admitted)" : ""}`);
+  if (!res.ok) throw new Error(`Library of Congress answered HTTP ${res.status}${res.status === 403 ? " (Cloudflare challenge — the box's address is not admitted)" : ""}` + (await describeHttpError(res)));
   const ct = res.headers.get("content-type") ?? "";
   if (!/json/.test(ct)) throw new Error("Library of Congress answered with something other than JSON");
   return res.json();

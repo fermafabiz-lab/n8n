@@ -4184,7 +4184,13 @@ spec. What belongs HERE is what will bite:
   (`describeHttpError` in `lib/footage/request.ts`) — bounded, HTML-stripped,
   and never throwing, since a diagnostic that can fail would replace a real
   error with its own. The Wellcome `source.production` bug had sat behind a
-  bare `HTTP 400` for exactly this reason.
+  bare `HTTP 400` for exactly this reason, and was FIXED the same hour —
+  `include` on the images endpoint accepts only `source.contributors`,
+  `source.languages`, `source.genres` and `source.subjects`, and every
+  Wellcome search since the adapter was written had been refused. Verified
+  live afterwards: "cholera epidemic london" answers 11 public-domain
+  lithographs from 1832-1854 in 600ms, and the two "In copyright" posters in
+  the same page correctly come back `manual_review` with their reason.
 - **The Library of Congress answers the Hetzner box with a Cloudflare
   challenge** (HTTP 403 "Just a moment…", measured 2026-09-10 on
   `loc.gov/search/?fo=json`; `api.openverse.org/v1/images/` answered an

@@ -2142,6 +2142,19 @@ can be checked without an encoder — `npm run check:mix`).
   of the switches — verified by mutation: restoring the old `asplit=3`, or
   miscounting an `amix`, makes it fail.
 
+**Verified on the real ffmpeg the same day**, which is the half `check:mix`
+cannot do: a throwaway workflow called `/assemble` directly (two scenes from
+the database, the second take doubling as the bed — the graph does not care
+what the music IS, only that it is audio), job `efdea227`, `status: done`,
+and the answer that mattered — **`musicDuck: "bands"`**. So `acrossover` is
+present on the container and the band-split path is what production runs; the
+static fallback is insurance, not the shipped behaviour. `musicLufs: -24.3`
+with `musicGainDb: +4.25` proves the measurement and the correction are live
+too. Note what that particular number is NOT: the "music" there was a
+voiceover take, so it says the mechanism works, not that the balance on a real
+bed is right. **That judgement needs an ear on a real film** — the numbers to
+read are in `verify`.
+
 What none of this fixes is WHICH track plays. "Muzica este proasta" is partly
 that: a tone with no folder of its own falls back to `Default` and the pick
 inside a pool is random. Add a folder named after the tone, or pin a track in

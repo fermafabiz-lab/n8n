@@ -27,7 +27,66 @@
 /** No film gets more than this, whatever the model proposes. */
 export const MAX_CARDS = 3;
 /** The motifs that exist. A variant not on this list cannot be drawn. */
-export const VARIANTS = ['route', 'schedule', 'timeline'];
+export const VARIANTS = ['route', 'schedule', 'timeline', 'compare', 'steps'];
+
+/**
+ * `compare` and `steps` were added on 2026-09-09, from the backlog the empty
+ * answers had been writing for weeks. The first three motifs all want a
+ * documentary — a journey with named legs, two clock times, dates spoken
+ * minutes apart — and most of what this pipeline makes is fiction, which has
+ * none of those. So most films got no card at all, which the producer saw as
+ * "no animation on any project".
+ *
+ * `compare` takes the commonest documentary material the other three could not
+ * hold: two quantities of the same kind, where the RATIO between them is the
+ * fact. `steps` is the one a story can always answer — three to five beats
+ * from three to five DIFFERENT scenes, which is a stretch of film compressed
+ * into one frame and therefore something no single spoken line does.
+ */
+
+/** Scale words, in both languages the producer writes in. Mirrors CompareCard. */
+const SCALES = [
+	{re: /\b(billion|miliarde|miliard)\b/i, by: 1e9},
+	{re: /\b(million|milioane|milion)\b/i, by: 1e6},
+	{re: /\b(thousand|mii|mie)\b/i, by: 1e3},
+];
+
+/**
+ * The number a compare side is drawn at.
+ *
+ * The DEFINITION lives in `src/components/CompareCard.tsx` (`magnitudeOf`);
+ * this is the copy the validator runs, for the same reason `toMontageCards`
+ * exists — the card is drawn by one of these and admitted by the other, and a
+ * side the validator sizes differently from the renderer is a bar that lies.
+ * Change one, change both.
+ */
+const magnitudeOf = (value) => {
+	const s = String(value ?? '');
+	// The separators a number can carry — an ordinary space, but also a no-break
+	// space (U+00A0) and a narrow no-break space (U+202F), both of which are
+	// real thousands separators and both INVISIBLE in a source file.
+	//
+	// Matched by PROPERTY (`\p{Zs}`, every space separator) rather than by
+	// listing them, and that is not tidiness. This class is copied into an n8n
+	// Code node, and the README's hardest-won lesson is that an invisible
+	// character survives the trip, works, and changes the day an editor
+	// normalises the file. It went wrong here twice in one afternoon: first the
+	// two copies of this regex held different sets of spaces, and then the
+	// escaped form was decoded back into the characters themselves in transit —
+	// caught only by the byte diff that every apply is supposed to end with.
+	// A property escape is ASCII all the way down and cannot be mangled, which
+	// is the same reason `norm` below matches `\p{M}` instead of a range.
+	const m = /-?\d[\d.,\p{Zs}]*/u.exec(s);
+	if (!m) return null;
+	const raw = m[0].trim().replace(/\p{Zs}/gu, '');
+	const normalised = /,\d{1,2}$/.test(raw)
+		? raw.replace(/\./g, '').replace(',', '.')
+		: raw.replace(/[.,](?=\d{3}\b)/g, '');
+	const n = Number(normalised);
+	if (!Number.isFinite(n)) return null;
+	const scale = SCALES.find((x) => x.re.test(s));
+	return Math.abs(n) * (scale ? scale.by : 1);
+};
 
 /**
  * Case, diacritics and punctuation are noise for a provenance test; words are
@@ -55,7 +114,21 @@ const norm = (s) =>
 
 const words = (s) => norm(s).split(' ').filter(Boolean);
 
-/** Romanian number words, enough to read a time out of a spoken line. */
+/**
+ * Number words, enough to read a time or a ratio out of a spoken line.
+ *
+ * **English was missing until 2026-09-09, and that was a live defect, not a
+ * gap in coverage.** This map had only Romanian, while the films this pipeline
+ * actually makes are mostly written in English — so `quoteStatesTime` could
+ * not read "the ferry at five twenty" and the compare note "six times fewer"
+ * proved nothing, in both cases returning "the film does not state that" about
+ * a film that states it in as many words. The failure is silent and looks like
+ * a truthful card being refused, which is the hardest kind to notice: the
+ * validator is supposed to refuse things.
+ *
+ * Found by running a real compare card through `check-motif.mjs` rather than
+ * by reading, which is the whole reason that harness exists.
+ */
 const NUMBERS = {
 	zero: 0, un: 1, unu: 1, una: 1, doi: 2, doua: 2, trei: 3, patru: 4, cinci: 5,
 	sase: 6, sapte: 7, opt: 8, noua: 9, zece: 10, unsprezece: 11, unspe: 11,
@@ -64,6 +137,14 @@ const NUMBERS = {
 	saisprezece: 16, saispe: 16, saptesprezece: 17, saptespe: 17,
 	optsprezece: 18, optspe: 18, nouasprezece: 19, nouaspe: 19,
 	douazeci: 20, treizeci: 30, patruzeci: 40, cincizeci: 50,
+	// English. `one` is deliberately here despite being a common article-like
+	// word: this map is only ever consulted to prove that a quote STATES a
+	// number the card already shows, so a spurious reading can admit a true
+	// card and can never invent a false one.
+	one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8,
+	nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14,
+	fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19,
+	twenty: 20, thirty: 30, forty: 40, fifty: 50,
 };
 
 /**
@@ -171,6 +252,15 @@ const fieldsOf = (card) => {
 			at(`marks[${i}].label`, m?.label, m?.source);
 		});
 	}
+	if (card.variant === 'compare') {
+		(card.sides ?? []).forEach((s, i) => {
+			at(`sides[${i}].label`, s?.label, s?.source);
+			at(`sides[${i}].value`, s?.value, s?.source);
+		});
+	}
+	if (card.variant === 'steps') {
+		(card.steps ?? []).forEach((s, i) => at(`steps[${i}].label`, s?.label, s?.source));
+	}
 	if (card.note) at('note', card.note, card.noteSource);
 	return out;
 };
@@ -210,11 +300,27 @@ const durationFor = (card) => {
 			? (card.stops?.length ?? 0)
 			: card.variant === 'timeline'
 				? (card.marks?.length ?? 0)
-				: (card.rows?.length ?? 0);
-	const per = card.variant === 'route' ? 0.3 : card.variant === 'timeline' ? 0.32 : 0.4;
-	const base = card.variant === 'route' ? 2.5 : 2.6;
+				: card.variant === 'compare'
+					? (card.sides?.length ?? 0)
+					: card.variant === 'steps'
+						? (card.steps?.length ?? 0)
+						: (card.rows?.length ?? 0);
+	const per =
+		card.variant === 'route'
+			? 0.3
+			: card.variant === 'timeline'
+				? 0.32
+				: card.variant === 'steps'
+					? 0.3
+					: 0.4;
+	const base = card.variant === 'route' ? 2.5 : card.variant === 'steps' ? 2.7 : 2.6;
 	const seconds = Math.min(4, Math.round((base + per * n) * 10) / 10);
-	const floor = card.variant === 'route' ? 2.6 : card.variant === 'timeline' ? 2.8 : 2.8;
+	// The floor is what the card's own reveal needs, not a preference. `steps`
+	// lands its last beat at ~1.9s and its note straight after, so 3s leaves the
+	// note a beat on screen before the exit begins; below that the planner is
+	// squeezing a card into a scene that cannot hold it.
+	const floor =
+		card.variant === 'route' ? 2.6 : card.variant === 'steps' ? 3 : 2.8;
 	return {seconds, minSeconds: Math.min(seconds, floor)};
 };
 
@@ -306,6 +412,57 @@ export function validateMotifCards(o) {
 				continue;
 			}
 		}
+		if (card.variant === 'compare') {
+			const sides = card.sides ?? [];
+			if (sides.length !== 2) {
+				// Three bars is a chart and a chart is a document. Refused here
+				// rather than truncated in the drawing: a card that silently drops
+				// the third quantity is a card that lies about the film.
+				drop('a compare card is exactly 2 sides');
+				continue;
+			}
+			const mags = sides.map((s) => magnitudeOf(s?.value));
+			if (mags.some((m) => m === null || !(m > 0))) {
+				// The bars ARE the numbers. With nothing to size them by there is no
+				// comparison, only two labels with rules under them.
+				drop('every compare side needs a number in its `value`');
+				continue;
+			}
+			const wordy = sides.find((s) => String(s?.label ?? '').trim().split(/\s+/).length > 6);
+			if (wordy) {
+				drop(`a compare label is at most 6 words: "${wordy.label}"`);
+				continue;
+			}
+		}
+		if (card.variant === 'steps') {
+			const list = card.steps ?? [];
+			if (list.length < 3 || list.length > 5) {
+				// Two beats are a before and an after, which is a comparison. Three
+				// is the fewest that has a SHAPE, which is all this motif shows.
+				drop('a steps card needs 3 to 5 steps');
+				continue;
+			}
+			const wordy = list.find((s) => String(s?.label ?? '').trim().split(/\s+/).length > 6);
+			if (wordy) {
+				drop(`a step is at most 6 words: "${wordy.label}"`);
+				continue;
+			}
+			// The whole claim of this motif is COMPRESSION — a stretch of film seen
+			// whole. Beats quoted from one scene would be that scene's sentences
+			// typeset, which is the script again and the thing every card here is
+			// written to avoid. Distinct scenes is that claim, made checkable.
+			const from = list.map((s) => (Number.isInteger(s?.source?.sceneIndex) ? s.source.sceneIndex : i));
+			if (new Set(from).size < list.length) {
+				drop('every step must be quoted from a DIFFERENT scene — one scene’s sentences are the script, not a card');
+				continue;
+			}
+			if (from.some((k, idx) => idx > 0 && k < from[idx - 1])) {
+				// The card draws an order. Quoted out of order, the drawing is a lie
+				// about the film even when every individual step is true.
+				drop('steps must be quoted in the order they happen, each scene at or after the last');
+				continue;
+			}
+		}
 		// The label is furniture — the word that names the graphic — so it is
 		// bounded rather than sourced. A digit in it would be a claim wearing
 		// furniture's clothes.
@@ -346,11 +503,43 @@ export function validateMotifCards(o) {
 			}
 
 			if (src.kind === 'arithmetic') {
-				if (key !== 'note' || (card.variant !== 'schedule' && card.variant !== 'timeline')) {
-					failed = `${key} claims arithmetic, which only a schedule or timeline note may do`;
+				const CAN_COMPUTE = ['schedule', 'timeline', 'compare'];
+				if (key !== 'note' || !CAN_COMPUTE.includes(card.variant)) {
+					failed = `${key} claims arithmetic, which only a schedule, timeline or compare note may do`;
 					break;
 				}
 				const stated = numbersIn(value);
+				if (card.variant === 'compare') {
+					// The ratio between the two sides is the one number on this card
+					// that nobody in the film says, and the reason the note exists at
+					// all. Every reasonable rendering of it is accepted — "six times",
+					// "6.3x", "32 points fewer" — but the numbers in the sentence have
+					// to be numbers the division or the subtraction actually produces.
+					const ms = card.sides.map((s) => magnitudeOf(s.value));
+					const hi = Math.max(...ms);
+					const lo = Math.min(...ms);
+					const ratio = lo > 0 ? hi / lo : null;
+					const allowed = new Set([Math.round(Math.abs(hi - lo))]);
+					if (ratio !== null) {
+						// Whole numbers only, because `numbersIn` reads the sentence in
+						// words and digits and a decimal point is punctuation to it:
+						// "6.3x" arrives as 6 and 3. Rounding either way is what a
+						// person writing "six times" or "seven times" would mean.
+						allowed.add(Math.round(ratio));
+						allowed.add(Math.floor(ratio));
+						allowed.add(Math.ceil(ratio));
+					}
+					if (!stated.some((n) => allowed.has(n))) {
+						failed = `${key} says "${value}", but ${hi} against ${lo} is ${
+							ratio === null ? '' : `${Math.round(ratio * 10) / 10}× and `
+						}a difference of ${Math.round(Math.abs(hi - lo))}`;
+						break;
+					}
+					notes.push(
+						`${key}: recomputed, ${ratio === null ? '' : `${Math.round(ratio * 10) / 10}× / `}${Math.round(Math.abs(hi - lo))} apart`,
+					);
+					continue;
+				}
 				if (card.variant === 'timeline') {
 					// The span, in years: the one number on the card that nobody in
 					// the film ever says, and the reason the note is allowed at all.
@@ -455,6 +644,10 @@ export function validateMotifCards(o) {
 			...(card.variant === 'timeline'
 				? {marks: card.marks.map((m) => ({at: m.at, label: m.label}))}
 				: {}),
+			...(card.variant === 'compare'
+				? {sides: card.sides.map((s) => ({label: s.label, value: s.value}))}
+				: {}),
+			...(card.variant === 'steps' ? {steps: card.steps.map((s) => ({label: s.label}))} : {}),
 			...(card.note ? {note: card.note} : {}),
 			seconds,
 			minSeconds,

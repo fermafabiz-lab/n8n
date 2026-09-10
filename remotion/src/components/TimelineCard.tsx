@@ -63,7 +63,6 @@ import {CURVES, curveAt, eased} from '../easing';
 /** Shared with the other cards: one family, one fade. */
 const IN = 0.22;
 const OUT = 0.2;
-const INK = '#0B0A08';
 const PAPER_LINE = 'rgba(238, 230, 214, 0.16)';
 
 /** The strip of paper is pulled out first, then ruled. */
@@ -187,7 +186,7 @@ export const TimelineCard: React.FC<{
 
 	return (
 		<AbsoluteFill
-			style={{background: INK, opacity, justifyContent: 'center', alignItems: 'center'}}
+			style={{background: preset.cardGround, opacity, justifyContent: 'center', alignItems: 'center'}}
 		>
 			<div
 				style={{

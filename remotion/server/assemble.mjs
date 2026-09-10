@@ -22,6 +22,9 @@
 //   stingers (default OFF) adds the synthesized boom/whoosh/riser accents;
 //   musicUrl adds the background track. Both are "music" from the
 //   producer's point of view and ride the site's one music toggle.
+//   musicVolume (0.05..1, default 0.22) is the background track's gain
+//   before the sidechain duck — the site's "Music volume" slider. The
+//   accents keep their own fixed levels.
 // GET  /assemble/:jobId/status -> { status, outputUrl, verify: {videoSeconds,
 //   audioSeconds, sceneStartsSeconds} } — verify comes from ffprobe on the
 //   result, so callers can confirm alignment numerically.
@@ -262,6 +265,17 @@ export function registerAssemble(app, {jobs, outputDir}) {
 		// unconditionally, which is exactly what "music that has nothing to do
 		// with the clip" was. Opt-in now, alongside the background track.
 		const stingers = Boolean(req.body && req.body.stingers);
+		// The music bed's gain. 0.22 was the constant in the mix graph for as long
+		// as there has been a music bed, so absence keeps every older film's
+		// sound; the slider on the site sends a number. Refuses rather than
+		// guesses, same rule as the three copies upstream (derive.ts, Normalize
+		// Webhook Input, Build Timeline): out of range or unparseable is the
+		// default, never a clamp of a bad value.
+		const rawMusic = req.body ? req.body.musicVolume : undefined;
+		const musicVolume =
+			typeof rawMusic === 'number' && Number.isFinite(rawMusic) && rawMusic >= 0.05 && rawMusic <= 1
+				? Math.round(rawMusic * 100) / 100
+				: 0.22;
 		const rawNative = req.body ? req.body.nativeAudio : undefined;
 		const nativeVolume =
 			rawNative === false || rawNative === 0
@@ -574,7 +588,7 @@ export function registerAssemble(app, {jobs, outputDir}) {
 				if (music) {
 					const fadeStart = Math.max(0, totalDur - 2.5).toFixed(3);
 					parts.push(
-						`[${musicIdx}:a]${MONO},aloop=loop=-1:size=2000000000,atrim=duration=${totalDur.toFixed(3)},volume=0.22,afade=t=out:st=${fadeStart}:d=2.5[mus]`,
+						`[${musicIdx}:a]${MONO},aloop=loop=-1:size=2000000000,atrim=duration=${totalDur.toFixed(3)},volume=${musicVolume},afade=t=out:st=${fadeStart}:d=2.5[mus]`,
 					);
 					parts.push(
 						`[mus][vside]sidechaincompress=threshold=0.03:ratio=10:attack=8:release=450:makeup=1[mduck]`,

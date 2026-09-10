@@ -35,6 +35,7 @@ import {
 } from "@/lib/provenance";
 import {
   normalizeCaptionColor,
+  normalizeMusicLevel,
   normalizeMusicTrack,
   normalizeSfxLevel,
   normalizeSpeed,
@@ -1171,6 +1172,9 @@ export async function confirmFinalSettings(
        those overwrites a choice made elsewhere. */
     sfxLevel: number;
     music: boolean;
+    /* Same rule as sfxLevel: shown here, so sent — writing back the stored
+       value is a no-op unless the slider moved. */
+    musicLevel: number;
     drawnCards: boolean;
     captionColor: string | null;
     /* Sent for the same reason as sfxLevel: this panel SHOWS the switch, so
@@ -1212,6 +1216,7 @@ export async function confirmFinalSettings(
         sfx: settings.sfx,
         sfxLevel: normalizeSfxLevel(settings.sfxLevel),
         music: settings.music,
+        musicLevel: normalizeMusicLevel(settings.musicLevel),
         drawnCards: settings.drawnCards,
         captionColor: normalizeCaptionColor(settings.captionColor),
         // The LABEL only. Provenance stays stored and a licence credit still
@@ -2049,6 +2054,10 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     // "the producer said no".
     drawn_cards: String(formData.get("drawn_cards") ?? "yes"),
     music: String(formData.get("music") ?? "no"),
+    // How loud the background track sits under the voice, 0–1 — the gain
+    // the mixer takes, like sfx_level. Stored by `Normalize Webhook Input`
+    // as Editing Options.musicLevel and read by Build Timeline at render.
+    music_level: normalizeMusicLevel(formData.get("music_level")),
     // NOTE: `source_watermark` is deliberately NOT in this payload. It is the
     // one finish the site stores itself — see the write after the record is
     // confirmed, below, and the note there for why.
@@ -2171,7 +2180,7 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
   return {
     ok: false,
     message:
-      `The project was NOT created — no record exists in Airtable. Nothing is running. ` +
+      `The project was NOT created — no record exists in the database. Nothing is running. ` +
       `n8n replied: ${webhookError ?? webhookReply ?? "no reply captured"}`,
   };
 }

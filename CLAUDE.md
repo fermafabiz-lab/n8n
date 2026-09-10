@@ -220,7 +220,8 @@ These each cost hours. Do not rediscover them.
   conclude from an empty read that credentials are missing.
 - **ai33 / useapi / Railway keys are hardcoded into node headers**, not
   credentials — `Submit Render`, `Check Render`, `Submit Mux*`, `Poll Mux*`,
-  `Upload*To Flow`, `Submit Video*`, `AB Submit Multi`, `VR Submit Multi` and
+  `Upload*To Flow`, `Submit Video*`, `AB Submit Multi`, `VR Submit Multi`,
+  `Generate Scene Image`, `Generate Cast Sheet`, `Generate Set Plate` and
   friends carry a literal `x-api-key` / `Authorization`. They work, but they
   live in the workflow JSON, so a rotation means editing nodes and any export
   leaks them.
@@ -792,6 +793,82 @@ people filter objected to.
 
 Rollback, measurements and the smoke test: `db/port/cast-sheet/`.
 
+### Consistency, taken further: turnarounds, set plates, tags and a judge (2026-09-08)
+
+The cast sheet above carried a FACE across a film and nothing else. The long
+film still showed the same man with a different coat from behind, and the same
+building rebuilt differently every time the story returned to it — because a
+portrait has no back, and a location existed only as prose. Live since
+2026-09-08 (Media Generation `3fd53a5f`, Claude Scripting `5ab94af7`; full
+account, originals and rollback ids in `db/port/consistency/`). Six pieces,
+in the order a film meets them:
+
+1. **The bible describes GEOMETRY and lists OBJECTS.** Rule 3 of both bible
+   prompts now demands each location's layout (what stands where, materials,
+   colours), and a new rule 6 lists hero objects (`bible.objects`: a car, a
+   machine, a boat). Both prompts moved in lockstep, as always.
+2. **The segmenter names who and where, in CODE-readable fields.** Each scene
+   carries `location`, `characters[]`, `objects[]`, `time_of_day` as EXACT
+   bible names; `Validate Evidence Refs` canonicalises them against the bible
+   (diacritic-insensitive) and drops anything not in it; `Save scenes To
+   Airtable1` stores them as `Tag-uri Scenă` — `loc:`, `char:`, `obj:`,
+   `tod:` — so no column was added. A film made before the tags falls back to
+   name-matching on `Prompt Vizual`, exactly as the cast sheet did.
+3. **Sheets by tier, once per film**, planned from the WHOLE film (`Load Scene
+   Cast` reads every approved scene before `Cast Sheet Prep`): a lead (in
+   ≥ max(3, 10%) of scenes, or the protagonist with ≥ 2) gets a four-view
+   TURNAROUND — front, both profiles, back — a recurring character (≥ 2) the
+   old single portrait, a one-scene extra nothing. A portrait is upgraded to a
+   turnaround when a character qualifies later. The producer's photo, when
+   there is one, is the protagonist's sheet (drawn FROM it, ground truth), so
+   the real face reaches every scene rather than only the hook. Hero objects
+   in ≥ 2 scenes get a three-view product sheet. Stored as `castRefs` /
+   `castSheets {name:{id,url,kind}}` / `objectRefs`, jsonb-merged.
+4. **Set plates**: one wide, EMPTY, neutral-overcast plate per bible location
+   (`Set Plate Prep → … → Save Set Plates`, stored as `locationRefs` /
+   `locationPlates`). The plate fixes what stands where; light and time follow
+   the text. `Generate Set Plate` is `continueRegularOutput` + `alwaysOutputData`
+   like `Generate Cast Sheet`: a failed plate logs `SET PLATE FAILED` and that
+   location runs on text, never a dead batch.
+5. **One reference assembler, inlined word for word in THREE places** —
+   `Build Image Request` (batch), `Evaluate Image Approval` (the gate's regen)
+   and `IR Build Request` (the site's regen). Order: producer photo (scene 1) →
+   up to two cast sheets (turnarounds first; the protagonist's sheet is skipped
+   when the photo is attached) → one object sheet → one set plate → the previous
+   frame LAST, palette only, and only if a slot is left. The prompt names each
+   reference BY POSITION. After a refusal nothing is attached. **Change one
+   copy, change all three** (`db/port/consistency/code/assembler.js` is the
+   source): a re-rolled picture anchored to different references than its
+   neighbours is the drift this exists to stop.
+6. **A judge, because a reference is still only an instruction.** Every new
+   frame is shown to gpt-4o beside the very sheets and plate it was anchored to
+   (`Judge Prep → Judge? → Consistency Judge → Judge Verdict → If Reroll?`);
+   identity/wardrobe under 0.6, place under 0.55, or the sheet leaking into the
+   frame, sends the SAME scene back through `CONS Reload Scene → Needs Image?`
+   in STRICT MATCH mode, at most twice per scene per pass
+   (`sd.consistencyRerolls`, reset by `Sort & Cap Scenes` like every other
+   counter). The drifted frame is never written. The judge is 3 retries then
+   `continueRegularOutput`, and an unreadable answer is a pass — the producer's
+   image gate is the backstop, as it is for refusals.
+
+**Verified on the disposable film the same day** (executions 11332/11339):
+turnarounds for both characters and three set plates within 100 s of the
+batch, exact `loc:`/`char:`/`tod:` tags on every new scene, `reference_1..4`
+per scene exactly as planned, four images and four clips, and the judge
+scoring identity 0.8–0.9 with place 1.0 on every frame, no re-roll needed.
+It also showed the sheet, assembler and judge wording assumed a HUMAN ("ONE
+person", "face, hair", "skin texture") — fixed the same evening to "ONE
+character (a person, an animal or a creature)" in all three copies (Media
+Generation `3fd53a5f`, Claude Scripting `5ab94af7`). Full record in
+`db/port/consistency/README.md`.
+
+Two limits worth knowing. **A sheet's `fifeUrl` dies in ~6 h**; the Flow id
+lives on, so GENERATION is unaffected, but the judge needs a URL to show, so
+a pass starting hours after the sheets were made runs unjudged (`JUDGE
+skipped` in the log). Re-hosting sheets through the media store is the fix
+when it matters. And **two sheets per shot is the cap**, the photo counting as
+one; the previous frame is the first thing dropped when slots run out.
+
 ### The batch cap
 
 **Since 2026-09-01 a pass is the WHOLE film: `CAP = 200`.** Every take, then
@@ -1046,6 +1123,46 @@ fewer scenes than were planned.
 Note the count can differ from the naive `ceil(words/22)` after runt
 folding (95 words → 4 scenes, not 5). That is intended.
 
+### The story layer — why films repeated themselves, and the fix (2026-09-02)
+
+The 71-scene Vegas film retold the same eight facts in every chapter ("1941,
+dealer" ×4, "Joe Crowley" ×5), 73 of its 185 sentences were under four words
+("Green felt. Brass ashtrays."), nothing happened in any scene, and the
+producer's fictional Bill had become Bill Boyd of Boyd Gaming. The producer's
+words: "fragmente aruncate random". Read `db/port/story-layer/README.md` for
+the full account; what bites is this:
+
+- **A chapter written by a call that cannot see the other chapters WILL
+  restate them.** `Write Chapter Narration` ran once per chapter with the
+  same bible and the same claims list; the only cross-chapter signal was
+  ENDS WITH / LEADS INTO. Now `Write Full Narration` writes the whole film
+  in ONE call, `Edit Full Narration` reads the whole draft once, and
+  `Narration Guard` (code) checks the `[CHAPTER n: title]` markers and the
+  length window and sends the draft back at most twice. A 12-minute film is
+  ~1,650 words — one call, always.
+- **"Word count is the most important rule" is an instruction to pad**, and
+  the prompt even said where from ("add detail from the Story Bible"). The
+  model recited the bible's visual inventories as narration. Length is a
+  window enforced by code now; the writer's top rule is the story.
+- **`Generate Outline` writes a STORY SPINE before the chapters** —
+  protagonist, want, obstacle, stakes, turning points that are EVENTS,
+  ending, throughline — and each chapter owns its turning points. The spine
+  rides on `output.story_spine` through `Combine Chapters` to the hook.
+- **The genre profile is a pipeline configuration, and Motivational's was an
+  essay.** "Name the moment of resistance … return to the opening moment,
+  changed" made four chapters return to the same moment. It is a narrative
+  arc now (row edited in `hov.genre_profile`, old values saved in the port
+  dir). When a film repeats itself, read the profile's `structure` before
+  the prompts.
+- **Research plus "use only real examples" replaced the Tema's protagonist.**
+  The Story Bible and the outline now say in words: if the Tema names or
+  describes its protagonist, that name and role are canonical; research
+  builds the world around them.
+- **How to judge a script without watching the film**: count facts per
+  chapter and sentences under four words (`db/port/story-layer/README.md`
+  shows the numbers). Both were measurable in the database in one query,
+  and both are what the producer saw.
+
 **The fold had no ceiling, and the bill arrived at the other end of the
 pipeline.** Merging a runt into a neighbour can only make a chunk BIGGER, and
 nothing checked how big — so on the 71-scene Boyd film one chunk came out at
@@ -1099,6 +1216,73 @@ Rollback: `db/port/chapter-titles-and-repetition/`.
 constraint.** If it matters, something after the model has to be able to say
 whether it happened — and if the only thing you measure is length, length is
 what you will get.
+
+### The same lesson, three more times — inventory, the excerpt, the hook (2026-09-04)
+
+Asked what would make the SCRIPTS better, the answer came out of measuring five
+real films rather than out of opinion, and every finding has the shape above:
+the rule was already written and nothing counted it.
+
+| film | tone | ≤3-word sentences | commentary phrases |
+|---|---|---|---|
+| Boyd | **Motivational** | **46 of 185 (24.9%)** | **7** |
+| Stalin's son | Dramatic | 11 (11.6%) | 0 |
+| Ploiești | Dark | 9 (8.6%) | 0 |
+| Fall of Rome | Documentary | 1 (1.9%) | 0 |
+| Ceaușescu in N. Korea | Documentary | 1 (1.4%) | 0 |
+
+Four films write scenes; one writes an essay — "Low ceiling. Green felt. Brass
+ashtrays. A wall clock." and "That is the correction." The segmenter's rule 3
+is EVENTS NOT INVENTORY, its rule 5 bans abstract commentary, and the
+Motivational genre profile asks for "plain, direct sentences of 8-20 words".
+All three were obeyed by the four films that did not need them.
+
+- **`Narration Guard` now counts both**, beside the repetition pair and through
+  the same `editorFeedback` path: fragment DENSITY (fires at 18% and 10+, where
+  the worst good film is 11.6%) and banned commentary phrases (fires above 2,
+  where every good film scores 0). A RUN of three fragments is quoted as
+  evidence but never triggers — two of the good films carry one deliberate
+  triplet each ("Wheat bends. Earth trembles. Silence breaks."). **Neither check
+  runs on a silent or a dialogue film**: a beat sheet is terse by design and
+  speech is legitimately short, and the category is read from
+  `Fetch Project Record` exactly the way `Voice Mode` reads it.
+- **The style excerpt was the wrong 450 characters.** `Prepare Style Block`
+  shows the writer a verbatim paragraph from a real transcript of the genre —
+  the strongest lever on rhythm there is, because a model imitates a paragraph
+  far better than a description. Cut at a fixed offset it averaged **3.2
+  sentences and 323 characters** over the 63 active library rows, 36 of 57
+  gave under four sentences, and four gave a passage more than twice as
+  fragmentary as their own script — one of them a **Motivational** row quoting
+  at 25% from a transcript that runs at 6%. An excerpt is now whole sentences,
+  5+ of them and 300-900 characters, and is rejected unless it is
+  REPRESENTATIVE of its own script; under 20 sentences a row declines entirely
+  (one row is 3,407 words of unpunctuated auto-caption). After: 8.0 sentences,
+  825 characters, 60 of 63 usable, none unrepresentative. The Motivational
+  transcripts themselves measure 4.2 / 5.9 / 0.0 — the library was not the
+  defect, the window into it was.
+- **The hook never fit the shot it was written for.** Rule 1 says 18-22 words,
+  "NEVER more than 22 (it fills exactly one 8-second scene)". The 16
+  chapter-encoded films run 12,12,13,14,14,15,15,16,16,16,16,17,18,19,**32,52**
+  — two inside the window, and two so far over that `Plan Scene Splits` cut the
+  hook into TWO scenes. New `Hook Guard` + `If Hook Retry` loop back into
+  `Generate Hook` with the reason, twice, then accept. **Only the ceiling
+  really bites**: sixteen words is a shorter opening, not a worse one, and a
+  guard that argued a sharp hook up to the word count would be padding it for
+  arithmetic. The guard's own output carries the COMBINED NARRATION (that is
+  what the retry hands back to the prompt), so `Prepend Hook To Chapters` reads
+  the hook from `$('Generate Hook').first()` instead of `$json`.
+
+Two things measured and deliberately left alone: the **library is stocked where
+films are not made** — Cinematic 25 films / 2 active style rows, Emotional 4/1,
+Inspirational 1/0, against Funny 0 films / 11 rows and Educativ 1/10, which is
+a producer decision at `/admin` — and one project has its whole Tema pasted
+into the **Tonalitate** field, so it matched no genre profile and no style row
+and was written with the built-in fallback. A closed list on `/new` is the fix.
+
+None of this is measured against retention. It counts what the prompts already
+demand of the text.
+
+Rollback, the check script and the full measurements: `db/port/script-quality/`.
 
 ### Evidence retrieval (Claude Scripting)
 
@@ -1677,6 +1861,75 @@ the point, and it is what the panel says out loud, because hearing the
 difference on the line already playing is the whole reason the control is
 there rather than two screens later.
 
+### Images are made on Google Flow, not fal (2026-09-02)
+
+`Generate Scene Image` (batch loop), `Regenerate Scene Image` (the gate's
+regen) and `IR Generate Image` (Claude Scripting's `scene-image-regen`
+webhook) all POST to useapi `/v1/google-flow/images` with `model:
+nano-banana-2`, `count: 1`, `captchaRetry: 1`. The design and the apply record
+are `db/port/flow-images/README.md`; what belongs here is what bites.
+
+- **The picture and the clip come from one place, so one filter instead of
+  two.** fal made a picture, we downloaded it, uploaded it to Flow, and Flow's
+  UPLOAD filter refused what fal had happily made. Generated on Flow it is
+  born past that filter, and the response carries BOTH the signed `fifeUrl`
+  (which `/api/media/ingest` re-hosts, as it already did for Flow's clips)
+  and the `mediaGenerationId` that `Submit Video` needs as `startImage`.
+  `Download Scene Image`, `Extract Asset Id`-in-the-loop and the whole regen
+  download/upload trio are gone; `Decode → Write` is the chain now. The n-1
+  reference is the previous scene's media id, no bytes moved.
+- **`count` DEFAULTS TO FOUR.** Omit it and every scene costs four images and
+  returns four; `Decode Scene Image` reads `media[0]` and would silently keep
+  the first. Proven on the probe (execution 9241): `count: 1` → one item,
+  23.6s, `modelNameType: NARWHAL`, id of the form `…-image:<uuid>`.
+- **Retries are OFF on all three generate nodes, on purpose**, and every
+  failure that is not a content refusal goes through time, not attempts:
+  `IMG Error Router → IMG Refusal? → IMG Cooldown Guard → Wait IMG Cooldown
+  (60s) → IMG Retry Now? → Flow Pace (8s) → Generate Scene Image`. A
+  `captcha_quality` / `UNUSUAL_ACTIVITY` error holds FIVE cooldowns before
+  the next try; max 20 per scene per pass (`sd.imgCooldowns`, reset by `Sort
+  & Cap`); `402` throws at once. n8n's own quick retries are exactly the
+  burst that trips Google's unusual-activity filter, which is why `retryOnFail`
+  must stay false here even though every other HTTP node in the batch has
+  it. `Generate Scene Image` reads its body from `$('Build Image Request')`
+  BY NAME so the cooldown loop can re-enter it with a cooldown item.
+- **A refusal enters the SAME rewrite ladder** (`Prep Flow Reject → IMG Give
+  Up? → Rewrite Prompt AI → Apply Rewritten Prompt → IMG Reload Scene`),
+  which is why the router exists: the ladder rewrites a PROMPT, so it must
+  only ever see a judgement on one. A throttle is tested first and can never
+  be classed as a refusal.
+- **The producer's reference photo is uploaded to Flow ONCE per film**, at
+  pass start (`IMG Load Project → User Ref? → Download User Ref → Upload
+  Asset To Flow → Extract Asset Id → Save User Ref Id → Find Audio Folder`),
+  because a Flow reference must be a Flow media id and the photo is a Drive
+  URL. The id lands in `Editing Options.refImageMediaId` through a jsonb
+  MERGE, never a rewrite of the JSON — the lost-update the site's
+  `updateEditingOptions` exists to avoid. `Build Image Request` reads it from
+  `IMG Load Project` or, on the pass that uploads it, from `Save User Ref
+  Id`'s `returning` (the project was read before the id existed).
+  `IR Build Request` reads only the id: a project whose batch predates the
+  port regenerates scene 1 WITHOUT its reference until a batch pass stores
+  it, and says so in the log.
+- **`captchaRetry: 1` is now on `Submit Video` / `Submit Video Regen` too.**
+  useapi solves Flow's reCAPTCHA through a paid provider and retried five
+  times per request; under a throttle those five were pure spend, and the
+  cooldown loops on both sides already supply the waiting.
+- **The account's session refreshes at ~01:24 UTC**, read off
+  `GET /accounts` (`nextRefresh`), not the 04:38 the design guessed; a
+  request in that minute fails and the cooldown covers it. Same call answers
+  `health: OK` — run it from a throwaway workflow before assuming a block has
+  lifted, exactly as the video section says.
+- **How it was applied is the method to reuse**: probe the endpoint from a
+  throwaway workflow first (a manual execution keeps its `runData`), stage
+  with `update_workflow`, fetch the draft, diff it node-by-node against
+  `activeVersionId` (`db/port/flow-images/applied/diff-against-active.js`
+  prints added/removed/changed nodes, edge deltas, dangling `$('…')`
+  references, the Drive `resource`/`operation` check, and a byte comparison of
+  every Code body against the file it was written from), then
+  `publish_workflow` with that draft's `versionId`. The first draft went up
+  with one running execution (9067) still alive; that is fine — executions
+  are version-pinned — and the running one simply finished on fal.
+
 ### Which Veo model the pipeline asks for
 
 `Submit Video` and `Submit Video Regen` (Media Generation) are the only two
@@ -1870,6 +2123,50 @@ was "yes, but you find out WHICH track by watching the finished film". Now:
   Own `MusicPicker.module.css` per the CSS-modules rule. The assembly panel
   prints which track the running render mixes ("aleasă automat după ton" when
   no pin), because that used to be invisible until the film arrived.
+
+**The music bed has a volume now, like the effects (2026-09-09).**
+`Editing Options.musicLevel` (0.05–1) is how loud the background TRACK sits
+under the narration, before the sidechain duck. Chosen on the brief's Music
+row (slider shown only while Music is on) and again in Final touches;
+`SoundSettings` keeps only the switch, exactly like `sfxLevel`.
+
+- **0.22 is the default, and that is continuity**: it is the `volume=0.22`
+  the mix graph in `assemble.mjs` has carried since the music bed existed, so
+  an untouched slider reproduces every film made before the control. Steps of
+  1 on the slider (not 5) so that default sits on the scale.
+- **The accents are NOT scaled by it.** The boom/whoosh/riser at the cuts keep
+  their fixed levels (0.45 / 0.4 / 0.35): they are moments, not a bed, and a
+  slider that made the hook boom twice as loud would be a surprise nobody
+  asked for. The label says "Music volume"; it means the track.
+- The refusal rule has **three copies plus the server's own clamp**:
+  `normalizeMusicLevel` in derive.ts, the orchestrator's `Normalize Webhook
+  Input` (writes it at creation from `music_level`), Final Assembly's
+  `Build Timeline` (sends it as `musicVolume`, only while music is on), and
+  `/assemble` (reads `musicVolume`, falls back to 0.22). Change one, change
+  all. An older server build simply ignores the key.
+- Verified on the disposable film — see the checked-in record below.
+
+**The library connection, checked end to end (2026-09-09)**, because the
+producer asked whether it really works:
+
+- `list-music` answers 47 tracks in 8 tone folders in ~1.2 s (execution
+  11646); `share-music` answers in ~0.35 s; the Railway `/media?id=` proxy the
+  render fetches through serves the file (`200 audio/mpeg`, 3.84 MB). A
+  render with music on (11530, "Peking to Paris") carried a real `musicUrl`
+  and succeeded.
+- **The `Muzica` folder is shared "anyone with the link → EDITOR"**, and every
+  track inherits it: the share nodes ask for `reader`, Drive answers
+  `role: writer` because the inherited grant is the wider one. Nothing in the
+  pipeline needs more than reader, so this is a Drive setting worth turning
+  down to Viewer — it is the producer's folder, not a code change.
+- **A tone with no folder falls back to `Default`, not to the nearest tone.**
+  `Match Tone Folder` matches the folder name against `Tonalitate`; a
+  Dramatic film found no `Dramatic` folder and got a track from `Default`
+  ("Curious Story"). Adding a folder named after the tone is the whole fix;
+  the auto pick is random inside the pool, so pin a track when it matters.
+- **`/media` on Railway answers 401 to HEAD** — the auth exemption tests
+  `method === 'GET'`. Harmless (ffmpeg GETs), but a HEAD-based health probe
+  would read as broken.
 
 ### The Cinematic category (silent film)
 
@@ -2640,7 +2937,11 @@ the pipeline already produces.
   (`ScheduleCard`) flaps two times onto a departure board and states the gap
   between them; `timeline` (`TimelineCard`, 2026-09-03) measures a dimension
   line out across a span of years and marks each date at its REAL distance from
-  the others, so what it shows is the shape of the span. The planner needed no
+  the others, so what it shows is the shape of the span; `compare`
+  (`CompareCard`, 2026-09-09) grows two bars from one baseline with the figures
+  riding their ends, so what it shows is the RATIO; `steps` (`StepsCard`,
+  2026-09-09) rules a spine down the frame and lands three to five beats on it
+  one at a time, so what it shows is the SHAPE of a stretch of story. The planner needed no
   change at all to gain any of them — it places TIME and is written never to see
   what a card holds — so the only wiring is the variant dispatch in
   `FinalVideo`'s `renderCard`. Four rules came out of building them:
@@ -2712,6 +3013,57 @@ the pipeline already produces.
   in that README: a `review` card has nowhere to be reviewed until Final
   touches gets a panel, and explicit `textCards` still switch the derived
   figure cards off for that film.
+
+  **Updated 2026-09-09 — the producer reported that no project had any
+  animation, and they were right about the symptom and the cause both.** Two
+  separate things were true at once, and neither was a broken node:
+
+  - Films were getting `drawnCards: false`. On the Rome film (exec 11398) the
+    project record carried it beside `chapterCards: false` and
+    `hookTitle: false`, so `Draw Cards?` sent 0 items to the model and the
+    chain never ran. That is the producer having switched three finishes off on
+    the brief, working exactly as designed — **check the project's Editing
+    Options before debugging the chain.**
+  - Where it DID run, the model correctly returned nothing. The fable film
+    (exec 11332) reached `Validate Motif Cards` with `motifCards: []` and an
+    empty `motifReport`, which is the signature of a model that proposed
+    nothing rather than a validator that refused something. Three motifs all
+    want a documentary; that film is a snail racing a turtle.
+
+  So the answer was the one this file already prescribes — MORE MOTIFS — and
+  the two built from it are `compare` and `steps`, live in Scripting as
+  version `fd27296a`. `steps` is the one that changes the coverage: its beats
+  are quoted from three to five DIFFERENT scenes, which makes it a compression
+  of a stretch of film rather than one scene typeset, and almost any story that
+  goes somewhere can answer it.
+
+  **A live defect in the validator came out of building them, and it had been
+  silently refusing truthful cards for as long as the chain has existed:** its
+  number-word map held only Romanian, while the films are mostly written in
+  English. `quoteStatesTime` could not read "the ferry at five twenty" and a
+  compare note reading "six times fewer" proved nothing — both answering "the
+  film does not state that" about a film that states it in as many words. Found
+  by running a real card through `check-motif.mjs`, not by reading the code.
+
+  **And the apply produced a textbook instance of this section's own warning.**
+  The validator's number-separator class holds a no-break space and a narrow
+  no-break space, and the first apply sent them as `\u00A0` / `\u202F` escapes
+  — which were decoded back into the invisible characters themselves in
+  transit. Byte-identical to nothing, working perfectly, and caught ONLY by the
+  mandatory diff. It is now `\p{Zs}`, ASCII all the way down, exactly as `norm`
+  already uses `\p{M}`. **Prefer a property escape to any list of characters
+  you cannot see.**
+
+  **What the derived figure card looks like changed in the same pass**, because
+  it is the card almost every film actually gets and it was the one the
+  producer was really looking at: a year, set large, fading in with a 3% scale
+  settle. Its digits now roll into place one after another on a deterministic
+  counter — a different mechanism from the schedule board's flap, which pinches
+  through the horizontal — with a rule drawing under them and the kicker rising
+  in last. And the ground every drawn card prints on is `preset.cardGround`,
+  per tone, where four components used to hold the same hardcoded `#0B0A08`:
+  that single constant is most of why every project's graphics looked like
+  every other project's.
 
   **Updated 2026-09-03, after the first film that actually reached it.** Two
   truthful cards were proposed and none shipped. Provenance is no longer a map
@@ -4197,6 +4549,45 @@ place the old code wrote a lazy `0` or `null` is now a candidate abort**, and
 the two zeroing entries under Airtable are the map of where those are. The
 failure is at least loud, which is the improvement.
 
+### A cleared text field is an empty string, not NULL (2026-09-03)
+
+**Every cinematic film died at creation, and the site said "no record exists
+in Airtable" over a database that has no Airtable in it.** The producer
+tried twice in the morning and once in the evening (orchestrator executions
+9558, 9559, 9690), each dead in under 100 ms at `Create Project in Airtable`:
+
+    null value in column "voice_id" of relation "project" violates not-null constraint
+
+The chain: `createProject` clears `voice_id` to `''` for a silent film
+(nothing speaks — deliberate, see the Cinematic section); the orchestrator
+sends `"Voice ID": ""`; `at_assign` turned every scalar into
+`nullif($1 ->> k, '')::type` — a rule that exists so `''` never reaches
+`''::integer` — and `project.voice_id` is `text not null default ''`. The
+webhook then answered 200 with an EMPTY body (the Respond node never ran), so
+the site's honest fallback fired. Airtable had swallowed the same `''` for
+months; this is the constraint class the cutover section predicted, found on
+the one category the cutover film never exercised.
+
+`db/008_text_fields_keep_empty_string.sql` (first landed as `006` on 09-03,
+then **overwritten on 09-04 by the trunk's `007_dedupe_at_assign.sql`**, which
+redefined the same function from the pre-fix body — the producer hit the
+identical error again on 09-06; `008` carries BOTH changes, and the lesson is
+that two branches editing one function each re-apply the whole body, so the
+later apply wins): for a TEXT column the value is
+written as-is (`''` stays `''`, a JSON null still becomes NULL); the numeric,
+boolean and date branch keeps the nullif. No reader can tell: the `at_*` views
+already `nullif(…, '')` on the way OUT, and 37 projects already stored `''`
+there. Applied live through a throwaway workflow (the n8n Postgres node
+passes a literal `$1` through untouched — probed before sending a function
+body full of them) and verified with a real `at_create` carrying
+`"Voice ID": ""`, then deleted. Note for that kind of probe: a data-modifying
+CTE cannot delete a row the same statement's function just inserted — same
+snapshot — so create and delete are two executions.
+
+The site's wording is fixed in `actions.ts` ("no record exists in the
+database") on this branch; it is not deployed until the branch reaches the
+trunk.
+
 That refusal is also what makes the compat layer testable without the box, and
 it is worth re-running after any change to either side. On a throwaway
 Postgres 16, applying `001` + `002` + `003` and exercising the layer confirms
@@ -4800,10 +5191,13 @@ generated FROM it. The chain, and where each piece lives:
 - **Media Generation**: new `IMG Load Project` (one GET at batch start,
   in-line before `Find Audio Folder`) exposes Editing Options to the image
   loop. `Build Image Request`: scene with `Ordine Scenă === 1` + refImage
-  → `nano-banana/edit` with the photo as GROUND TRUTH ("recreate the
-  subject faithfully"), which is a deliberately different instruction from
-  the n-1 chain's "identity only, different composition". User ref wins
-  over chaining and skips the similarity guard.
+  → the photo as GROUND TRUTH ("recreate the subject faithfully"), which is
+  a deliberately different instruction from the n-1 chain's "identity only,
+  different composition". User ref wins over chaining and skips the
+  similarity guard. **Since 2026-09-02 the reference is a Flow media id**
+  (`refImageMediaId`, uploaded once per film by the user-ref chain after
+  `IMG Load Project`), not the Drive URL — see "Images are made on Google
+  Flow".
 - **Regen path** (`IR Build Request`/`IR Generate Image` in Scripting):
   same rule, keyed by `refIsUser`. Unlike the n-1 chain, the user ref
   survives a prior rejection — it is producer-approved content; the
@@ -4840,17 +5234,15 @@ generated FROM it. The chain, and where each piece lives:
   Scenes 102 and 103 of the disposable film `recaW2aLFFD06FpoN` carry
   archive assets from the verification run and can stay as the
   demonstration.
-- **Images on Google Flow instead of fal — designed, not applied.**
-  `db/port/flow-images/README.md` holds the whole port: the useapi
-  `POST /google-flow/images` contract (sync, `count` defaults to 4, the
-  response carries `fifeUrl` + `mediaGenerationId`), the node-by-node
-  replacement for the batch loop, the gate regen and Scripting's
-  `IR Generate Image`, and the anti-throttle rules (one request in flight,
-  an 8s pace, no n8n quick retries, 5-minute holds on `captcha_quality:`,
-  `captchaRetry: 1`). It removes the download → upload hop and the second
-  content filter at upload time; images on Flow spend no credits on the
-  Ultra plan (producer, 2026-09-02), same as Veo lite low-priority. The n8n
-  connector dropped before it could be applied.
+- ~~Images on Google Flow instead of fal — designed, not applied.~~ **Applied
+  and live 2026-09-02** (Media Generation `d88a638e`, Claude Scripting
+  `bafbe64d`); see "Images are made on Google Flow" under the hard-won
+  lessons and `db/port/flow-images/README.md` for the apply record, the
+  four deliberate deviations from the design and the rollback ids.
+  **Verified end to end the same day** on the disposable test film
+  (execution 9361): four generated `…-image:<uuid>` ids, four clips made
+  from them as `startImage`, and one refusal walking the rewrite ladder to
+  a picture in 65 s. Details and timings at the end of that README.
 
 - ~~Do not publish the Media Generation draft parked since 2026-08-17~~ — that
   draft is gone, superseded by later edits, and the six Google Drive upload

@@ -35,7 +35,6 @@ import {CURVES, curveAt, eased} from '../easing';
 /** Shared with TextCard: one card family, one fade. */
 const IN = 0.22;
 const OUT = 0.2;
-const INK = '#0B0A08';
 const PAPER_LINE = 'rgba(238, 230, 214, 0.16)';
 
 /** The unfold. Across first, then down — the way a map is opened. */
@@ -175,7 +174,7 @@ export const RouteCard: React.FC<{
 
 	return (
 		<AbsoluteFill
-			style={{background: INK, opacity, justifyContent: 'center', alignItems: 'center'}}
+			style={{background: preset.cardGround, opacity, justifyContent: 'center', alignItems: 'center'}}
 		>
 			<div
 				style={{
@@ -268,7 +267,7 @@ export const RouteCard: React.FC<{
 									cx={at.x}
 									cy={at.y}
 									r={px(last ? 11 : 7) * (0.6 + 0.4 * p)}
-									fill={last ? stroke : INK}
+									fill={last ? stroke : preset.cardGround}
 									stroke={stroke}
 									strokeWidth={px(2.5)}
 								/>

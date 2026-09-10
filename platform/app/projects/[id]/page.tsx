@@ -697,6 +697,8 @@ export default async function ProductionRoom({
               {project.editing.musicTrack
                 ? project.editing.musicTrack.name.replace(/\.[a-z0-9]{2,4}$/i, "").replace(/[-_]+/g, " ")
                 : "aleasă automat după ton, din folderul Drive „Muzica”"}
+              {" · volum "}
+              {Math.round(project.editing.musicLevel * 100)}%
             </div>
           )}
 

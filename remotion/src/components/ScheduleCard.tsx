@@ -32,7 +32,6 @@ import {CURVES, curveAt, eased} from '../easing';
 /** Shared with the other cards: one family, one fade. */
 const IN = 0.22;
 const OUT = 0.2;
-const INK = '#0B0A08';
 
 /** The board itself, then each row's label, then its time flapping in. */
 const BOARD: readonly [number, number] = [0.08, 0.42];
@@ -104,7 +103,7 @@ export const ScheduleCard: React.FC<{
 
 	return (
 		<AbsoluteFill
-			style={{background: INK, opacity, justifyContent: 'center', alignItems: 'center'}}
+			style={{background: preset.cardGround, opacity, justifyContent: 'center', alignItems: 'center'}}
 		>
 			<div style={{width: blockWidth}}>
 				{card.label && (

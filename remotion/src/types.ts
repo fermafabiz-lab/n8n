@@ -57,7 +57,7 @@ export type EvidenceClaim = {
 export type TextCardSpec = {
 	/** The scene whose narration this card belongs with. */
 	sceneIndex: number;
-	variant: 'claim' | 'figure' | 'route' | 'schedule' | 'timeline';
+	variant: 'claim' | 'figure' | 'route' | 'schedule' | 'timeline' | 'compare' | 'steps';
 	/**
 	 * The line the card is built around: the claim, or the figure itself.
 	 * A route card draws its stops instead, so it may leave this empty.
@@ -86,10 +86,32 @@ export type TextCardSpec = {
 	 * between the marks are what the narration can never say.
 	 */
 	marks?: {at: string; label: string}[];
-	/** Route, schedule and timeline cards: the small tracked label naming the graphic. */
+	/**
+	 * Compare card: exactly two quantities of the SAME kind, in the order the
+	 * film names them, each with the words that say what it counts.
+	 *
+	 * The bars are drawn proportional to the numbers read out of `value`, so
+	 * what the card shows is the RATIO between them — the one thing a listener
+	 * cannot do with two figures heard a sentence apart. Two, never three: a
+	 * third bar turns a comparison into a chart, and a chart is a document.
+	 */
+	sides?: {label: string; value: string}[];
+	/**
+	 * Steps card: the beats of a sequence, in the order they happen, each in
+	 * the film's own words.
+	 *
+	 * This is the motif for a film with no dates, no clock times and no named
+	 * legs — which is most fiction. What it shows is the SHAPE of the sequence:
+	 * how many stages there were and how far in the turn came. Its beats are
+	 * quoted from DIFFERENT scenes on purpose, so the card compresses a stretch
+	 * of film into one frame, which is precisely what no single spoken line
+	 * does.
+	 */
+	steps?: {label: string}[];
+	/** Every drawn motif: the small tracked label naming the graphic. */
 	label?: string;
 	/**
-	 * Route, schedule and timeline cards: the one thing the footage cannot say
+	 * Every drawn motif: the one thing the footage cannot say
 	 * — a distance, a margin between two times, the length of a span.
 	 *
 	 * Deliberately AUTHORED rather than derived. A distance is not in the

@@ -2834,6 +2834,39 @@ body:has(.nb) .nav {
 .admin {
   max-width: 1000px;
 }
+/* These two screens are the only ones with no hero, and `.page` sets no top
+   padding — so their heading started flush under the nav pill, which is
+   sticky and translucent, and the first thing anyone read was already half
+   behind the blur. Every other page pays `.hero`'s 92px for the same
+   clearance; a utility screen wants less of it than a landing page. */
+.page.admin {
+  padding-top: 52px;
+}
+/* A title with a PARAGRAPH under it, which is not what `.sechead` is: that is
+   a flex row for a title with a small control opposite (a count, a button),
+   and it carries no gap because the control sits at the far end. Handed a
+   paragraph as the second child it laid body text hard against the title's
+   own glyphs — "Footage library" wrapped to two lines and the description ran
+   straight into it. The margins already written in this section say a column
+   was always meant: `.sechead.sub h3` carries `0 0 6px`, and a 68ch measure
+   means nothing to a flex item sharing a line. */
+.admin .sechead {
+  display: block;
+}
+.admin .sechead > h2 {
+  margin: 0 0 10px;
+}
+/* `:not(.backendnote)` because that note sets its own smaller, dimmer type
+   six lines down, and a rule this specific would otherwise win on colour and
+   size while never mentioning them — the panel-scoped-button trap, in a
+   paragraph. */
+.admin .sechead > p:not(.backendnote) {
+  max-width: 68ch;
+  margin: 0;
+  color: var(--soft);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
 .admin .backendnote {
   margin-top: 6px;
   color: var(--dim);

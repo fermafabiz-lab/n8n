@@ -2092,6 +2092,61 @@ writes `{sfx, music, speed}` and `updateEditingOptions` merges, so a stored
 level survives a post-render sound change untouched — it just cannot be
 changed from there.
 
+### The music sits UNDER the voice now, and one slider position is one level (2026-09-10)
+
+The producer's report was "muzica este proasta, se aude prea tare … in Premiere
+am un efect, simple parametric eq, care face ca muzica sa se auda sub voce".
+Two different defects wearing one complaint, and both are in the mix graph
+(`buildMixGraph` in `assemble.mjs`, extracted as a pure function so the wiring
+can be checked without an encoder — `npm run check:mix`).
+
+- **The bed was never loudness-normalized, so `musicVolume` meant a different
+  thing on every film.** The `Muzica` folder holds everything from a quiet
+  ambient pad to a commercially mastered cue, and those differ by more than
+  10 dB. At a fixed gain of 0.22 the first is inaudible and the second is
+  blaring — the slider was not the problem, the missing measurement was. Every
+  track is now measured (`loudnorm=print_format=json`, analysis only) and
+  corrected with ONE constant `volume` to `MUSIC_TARGET_LUFS`.
+  **Analysis, never loudnorm's own normalizing mode**: that rides the gain as
+  it plays, which would fight the sidechain underneath it and pump the bed —
+  the exact thing this section exists to stop.
+  **-20 LUFS is below typical library music (-14 to -16), so the bed is also
+  QUIETER than it used to be on an average track.** That is deliberate, it is
+  the answer to "prea tare", and it is one constant to tune — not a default in
+  four places. Note it changes the bed level on every film re-rendered from
+  now on, which is the point.
+- **The Premiere effect is a parametric EQ cut, and the honest version of it is
+  DYNAMIC.** A static carve makes the music sound hollow even in the pauses.
+  The bed is split at 300 Hz and 3800 Hz (two chained `acrossover`s — one split
+  point each, so there is no list syntax to get wrong, and Linkwitz-Riley bands
+  sum back flat), and only the SPEECH band ducks hard (ratio 20); body and air
+  lean back (ratio 4). The music keeps sounding like music while the words stay
+  clear, instead of the whole track pumping.
+- **Release is 900ms on the speech band, up from 450.** A scene gap is 0.35s,
+  so at 450 the bed surged back between every single sentence — that pumping is
+  most of what "deranjant" was. At 900 it stays down through a scene gap and
+  recovers over a chapter gap, where a breath belongs.
+- **`acrossover` is asked for, not assumed** (`hasFilter`, cached per process).
+  Bookworm ships ffmpeg 5.1 and has it, but a filtergraph naming a filter that
+  is not there fails the WHOLE render minutes in, so the flat fallback (a
+  static `equalizer` carve plus one broadband duck) keeps films rendering on a
+  build without it. Which path ran is in the deploy log and in
+  `verify.musicDuck`.
+- **`verify` now carries `musicLufs`, `musicGainDb`, `musicVolume`,
+  `musicDuck`** — the first place to look when someone says the music is wrong
+  on one particular film.
+- **The voice split is derived, not fixed at three.** It used to be
+  `asplit=3` with two `anullsink`s for the branches nobody wanted; the band
+  duck needs three keys. An unconsumed pad does not error, it STALLS the
+  graph, which is exactly what `check:mix` audits across all 24 combinations
+  of the switches — verified by mutation: restoring the old `asplit=3`, or
+  miscounting an `amix`, makes it fail.
+
+What none of this fixes is WHICH track plays. "Muzica este proasta" is partly
+that: a tone with no folder of its own falls back to `Default` and the pick
+inside a pool is random. Add a folder named after the tone, or pin a track in
+the picker.
+
 ### The background track is choosable now (2026-09-06)
 
 The producer asked whether the Drive music is used at all; the honest answer
@@ -2402,6 +2457,46 @@ and `SceneBoard` routes the active scene voice → image → clip.
 
 ### Remotion / the edit
 
+- **The karaoke highlight is ANCHORED to the take and estimated inside it —
+  and it used to be a straight division** (2026-09-10, `src/captionTiming.ts`).
+  Reported as captions that are not on the voice, sometimes with a big lag.
+  Everything about the scene-level timing was already right and is worth
+  knowing before suspecting it again: `startSeconds` comes from
+  `verify.sceneStartsSeconds` (frame-snapped), `durationSeconds` is the gap to
+  the next start, `speechSeconds` is the ffprobe'd take, the voice is placed at
+  offset 0 of its scene by the ffmpeg graph, and the speed re-time scales
+  picture and sound together. So **the highlight is exact at every scene start
+  and drifts within the scene** — which is why it looked intermittent.
+  The cause was `perWord = speech / words.length`: "și" and
+  "responsabilitatea" got identical slots. Measured on real scenes, 0.3–0.65s
+  of drift mid-scene, one to two words. Each word now costs a small onset plus
+  its syllables plus the pause that follows a clause or a full stop, normalized
+  to the take — **anchored at both ends**, so the first word starts with the
+  take, the last ends with it, and an error cannot accumulate past one scene.
+  Scored against the six ffprobe'd takes of the fixture it predicts a take's
+  real length to 0.42s against 0.95s for the best possible uniform rate.
+  Three things to keep:
+  - **It is an estimate of a performance and cannot be made exact.**
+    ElevenLabs is non-deterministic — the same line comes back at different
+    lengths — so no model of the text can close the gap. The exact answer is
+    `/v1/text-to-speech/{id}/with-timestamps`, which returns per-character
+    times with the synthesis; that makes the module a lookup, needs the TTS
+    nodes changed and a field on the scene, and cannot reach a film already
+    made. That last part is why the model exists.
+  - **The chapter opener is still early, by design elsewhere.** The breath
+    trim deliberately KEEPS the lead-in silence on a scene that opens a
+    chapter, so its `voiceDur` starts with 0.2–0.6s of nothing while the
+    captions start at word one. The render cannot know that number — closing
+    it means `assemble.mjs` reporting a `speechStartsSeconds` array and
+    `Build Remotion Props` passing it. Until then it is the one systematic
+    offset left.
+  - **`captionAt` lives in `captionTiming.ts`, not in the component**, so the
+    whole decision can be walked frame by frame without React —
+    `npm run check:captions` does exactly that over a fixture and asserts the
+    highlight never runs backwards, always sits inside the chunk on screen,
+    starts each scene on its first word and ends on its last. An off-by-one
+    between the chunk list and the timing list would show a caption on time
+    with the wrong word lit, and no still can catch that.
 - **A blind planner will fight the footage, and the framing ladder was sized
   for a goal that no longer exists.** Rungs ran 1.08 / 1.26 / 1.44 spaced 0.18,
   with `MIN_SCALE_STEP` at 0.14, because the framing step was expected to MAKE
@@ -5420,12 +5515,25 @@ generated FROM it. The chain, and where each piece lives:
   for the screen and n8n should pass it in `Build Remotion Props`; the prop
   already exists and bypasses the isTitleLike gate. Until then, projects whose
   Tema reads as a sentence open with no title card at all.
+- **`speechStartsSeconds` — the last systematic caption offset.** The breath
+  trim keeps the lead-in silence on a scene that opens a chapter (deliberately
+  — that pause IS the chapter break), so its take begins with 0.2–0.6s of
+  nothing while the captions begin at word one. Two lines fix it and both are
+  outside the render: `assemble.mjs` already computes the kept `head` in
+  `tightenTake`, so it can report it beside `voiceDurationsSeconds`, and
+  `Build Remotion Props` can pass it into each scene. `captionAt` would then
+  offset `elapsed` by it. Nothing can be guessed from inside Remotion.
 - Test `characters` multi-voice end to end again after the first run's three
   findings were fixed: the hook prompt now receives `hookRules` (no-narrator
   films tag the hook too), rule (e) bans third-person narration inside a
-  character tag, and captions strip `[...]` like both TTS paths do. Note the
-  site deliberately sets the project `Voice ID` to `cast[0]` when no narrator
-  is picked — any untagged line falls back to the first character's voice.
+  character tag, and captions strip `[...]` like both TTS paths do. **That
+  last clause was written about an intention and stayed here as fact for
+  weeks** — `Captions.tsx` did not strip anything until 2026-09-10, so every
+  multi-voice film printed `[CHARACTER: Maria]` on screen AND spent that word's
+  worth of time on it. `stripTags` in `src/captionTiming.ts` is the one owner
+  now. Note the site deliberately sets the project `Voice ID` to `cast[0]` when
+  no narrator is picked — any untagged line falls back to the first character's
+  voice.
 - The audio panel can pin a voice per scene: the regen webhook accepts
   `voice_id`, which beats every mode rule in `VR Pick Voice` for that one
   synthesis. The batch never overwrites an existing voiceover, so the pin

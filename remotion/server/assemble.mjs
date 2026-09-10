@@ -24,7 +24,11 @@
 //   producer's point of view and ride the site's one music toggle.
 //   musicVolume (0.05..1, default 0.22) is the background track's gain
 //   before the sidechain duck — the site's "Music volume" slider. The
-//   accents keep their own fixed levels.
+//   accents keep their own fixed levels. The track is loudness-MEASURED
+//   and corrected to MUSIC_TARGET_LUFS first, so that one slider position
+//   means one level whichever track the folder handed over, and the bed
+//   ducks by BAND: the speech range steps aside for every spoken syllable
+//   while the bass and the air only lean back. See buildMixGraph.
 // GET  /assemble/:jobId/status -> { status, outputUrl, verify: {videoSeconds,
 //   audioSeconds, sceneStartsSeconds} } — verify comes from ffprobe on the
 //   result, so callers can confirm alignment numerically.
@@ -246,6 +250,211 @@ function ensureSfx() {
 
 const MONO = 'aformat=sample_rates=44100:channel_layouts=mono';
 
+/**
+ * Where a voice lives.
+ *
+ * Speech carries almost all of its intelligibility between roughly 300 Hz and
+ * 4 kHz; below that is body, above it is air. A music bed that keeps its bass
+ * and its sparkle but steps out of THAT window is the "simple parametric EQ"
+ * move an editor makes by hand — the music stays full and the words stay
+ * clear, instead of the whole track pumping up and down.
+ */
+const SPEECH_BAND_LOW = 300;
+const SPEECH_BAND_HIGH = 3800;
+
+/**
+ * The loudness every music bed is brought to before the producer's slider is
+ * applied.
+ *
+ * Without this the slider means a different thing on every track: the `Muzica`
+ * folder holds everything from a quiet ambient bed to a commercially mastered
+ * cue, and those differ by more than 10 dB. At a fixed gain of 0.22 the first
+ * is inaudible and the second is blaring — which is exactly the complaint the
+ * measurement fixes. Normalized first, 0.22 is one level on every film.
+ *
+ * -20 LUFS is below typical library music (-14 to -16), so the bed also sits
+ * QUIETER than it used to on an average track. That is deliberate and it is
+ * the number to change if the balance still is not right — one constant, not
+ * a slider default in four places.
+ */
+const MUSIC_TARGET_LUFS = -20;
+/** Never trust a measurement enough to swing the bed further than this. */
+const MUSIC_GAIN_LIMIT_DB = 12;
+
+/**
+ * Is this ffmpeg build carrying a given filter?
+ *
+ * The band-split duck below needs `acrossover`, which every ffmpeg since 4.3
+ * has (the image is bookworm, so 5.1) — but a filtergraph naming a filter that
+ * is not there fails the WHOLE render, and a render is minutes of work. So it
+ * is asked rather than assumed, once per process, and the flat fallback keeps
+ * films rendering on a build that lacks it.
+ */
+const filterCache = new Map();
+async function hasFilter(name) {
+	if (filterCache.has(name)) return filterCache.get(name);
+	let present = false;
+	try {
+		const {stdout} = await run('ffmpeg', ['-hide_banner', '-filters']);
+		present = new RegExp(`^\\s*\\S+\\s+${name}\\s`, 'm').test(String(stdout));
+	} catch (e) {
+		console.warn(`ffmpeg -filters failed (${e.message}) — assuming no ${name}`);
+	}
+	filterCache.set(name, present);
+	return present;
+}
+
+/**
+ * A track's integrated loudness in LUFS, or null when it cannot be measured.
+ *
+ * `loudnorm` in analysis mode rather than in its normalizing mode on purpose:
+ * what comes back is a NUMBER, which is then applied as one constant `volume`.
+ * Loudnorm's own dynamic mode rides the gain as it goes, which would fight the
+ * sidechain duck underneath it and pump the bed — the one thing this whole
+ * section exists to stop.
+ */
+async function measureLoudness(file) {
+	const {stderr} = await run('ffmpeg', [
+		'-hide_banner', '-nostats',
+		'-i', file,
+		'-af', 'loudnorm=print_format=json',
+		'-f', 'null', '-',
+	]);
+	const m = String(stderr).match(/"input_i"\s*:\s*"(-?[\d.]+)"/);
+	const lufs = m ? parseFloat(m[1]) : NaN;
+	// Digital silence measures -inf and parses as a huge negative number; a
+	// correction derived from it would be a 100 dB boost of nothing.
+	if (!Number.isFinite(lufs) || lufs < -70) return null;
+	return lufs;
+}
+
+/**
+ * The audio mix bus, as a list of filtergraph parts.
+ *
+ * Pure and exported for the same reason `parseSpeechBounds` is: this box has
+ * no ffmpeg to rehearse a graph against, and the failure this shape produces
+ * is total — a pad produced and never consumed, or consumed and never
+ * produced, and ffmpeg refuses the whole render minutes into the job. Built
+ * as data it can at least be checked for that (`npm run check:mix`), across
+ * every combination of switches, without an encoder.
+ *
+ * Returns the parts; the caller owns `parts` and the input indices.
+ */
+export function buildMixGraph({
+	nativeOn,
+	nativeVolume,
+	music,
+	musicDuck,
+	musicGainDb,
+	musicVolume,
+	musicIdx,
+	totalDur,
+	stingers,
+	boomIdx,
+	whooshIdx,
+	riserIdx,
+	chapterBoundaries,
+}) {
+	const out = [];
+	// Mix bus: narration first (defines length), then ducked music, then SFX.
+	//
+	// The voice is split into one copy for the mix plus one KEY per thing
+	// that ducks against it. The count is derived rather than fixed at
+	// three: an unused branch has to be sunk explicitly or the graph
+	// stalls, and the band-split music below needs three keys of its own.
+	const mixInputs = [];
+	const sideCount = (nativeOn ? 1 : 0) + (music ? (musicDuck === 'bands' ? 3 : 1) : 0);
+	const keys = Array.from({length: sideCount}, (_, i) => `[vk${i}]`);
+	// Nothing ducks against the voice (no music, no ambience), so there is no
+	// split to make. `asplit=1` is legal and this is one filter fewer to be
+	// wrong about; the format filter is a no-op the graph already uses.
+	out.push(
+		sideCount === 0
+			? `[voiceraw]${MONO}[vmain]`
+			: `[voiceraw]asplit=${1 + sideCount}[vmain]${keys.join('')}`,
+	);
+	mixInputs.push('[vmain]');
+	let nextKey = 0;
+	if (nativeOn) {
+		// Ambience sits under the narration the same way the music does:
+		// ducked by the voice so it never competes with a spoken line,
+		// but audible in the gaps between them.
+		out.push(`[natraw]${MONO},volume=${nativeVolume}[natlvl]`);
+		out.push(
+			`[natlvl]${keys[nextKey++]}sidechaincompress=threshold=0.05:ratio=8:attack=10:release=350:makeup=1[natduck]`,
+		);
+		mixInputs.push('[natduck]');
+	}
+	if (music) {
+		const fadeStart = Math.max(0, totalDur - 2.5).toFixed(3);
+		// The measured correction comes FIRST, so the producer's slider
+		// rides on a bed that is already the same loudness on every film.
+		const level = musicGainDb ? `volume=${musicGainDb.toFixed(2)}dB,` : '';
+		out.push(
+			`[${musicIdx}:a]${MONO},aloop=loop=-1:size=2000000000,atrim=duration=${totalDur.toFixed(3)},` +
+				`${level}volume=${musicVolume},afade=t=out:st=${fadeStart}:d=2.5[mus]`,
+		);
+		if (musicDuck === 'bands') {
+			// Two crossovers rather than one with a two-value `split`: each
+			// takes a single frequency, so there is no list syntax to get
+			// wrong, and Linkwitz-Riley bands sum back flat either way.
+			out.push(`[mus]acrossover=split=${SPEECH_BAND_LOW}[mlo][mrest]`);
+			out.push(`[mrest]acrossover=split=${SPEECH_BAND_HIGH}[mmid][mhi]`);
+			// The speech band gets out of the way properly — a low
+			// threshold so any spoken syllable triggers it, a hard ratio,
+			// and a slow release so it does NOT surge back in the 0.35s
+			// between two scenes. It recovers over a chapter gap, which is
+			// long enough to be heard as a breath rather than a pump.
+			out.push(
+				`[mmid]${keys[nextKey++]}sidechaincompress=threshold=0.02:ratio=20:attack=5:release=900:makeup=1[mmidd]`,
+			);
+			// Body and air only lean back. This is the whole point: the bed
+			// keeps sounding like music while the words are being said.
+			out.push(
+				`[mlo]${keys[nextKey++]}sidechaincompress=threshold=0.05:ratio=4:attack=20:release=700:makeup=1[mlod]`,
+			);
+			out.push(
+				`[mhi]${keys[nextKey++]}sidechaincompress=threshold=0.05:ratio=4:attack=20:release=700:makeup=1[mhid]`,
+			);
+			out.push(`[mlod][mmidd][mhid]amix=inputs=3:duration=longest:normalize=0[mduck]`);
+		} else {
+			// No crossover in this build: carve the speech band out
+			// statically — the plain parametric-EQ cut — and duck the rest
+			// broadband. Costs the bed some presence even in the pauses,
+			// which is why it is the fallback and not the design.
+			out.push(`[mus]equalizer=f=1600:t=q:w=1.1:g=-7[muscut]`);
+			out.push(
+				`[muscut]${keys[nextKey++]}sidechaincompress=threshold=0.03:ratio=10:attack=8:release=700:makeup=1[mduck]`,
+			);
+		}
+		mixInputs.push('[mduck]');
+	}
+	if (stingers) {
+		// Boom under the hook title.
+		out.push(`[${boomIdx}:a]adelay=150|150,volume=0.45[sfxboom]`);
+		mixInputs.push('[sfxboom]');
+		// Whoosh at every chapter boundary (one input, split as needed).
+		if (chapterBoundaries.length) {
+			const n = chapterBoundaries.length;
+			out.push(`[${whooshIdx}:a]asplit=${n}${chapterBoundaries.map((_, i) => `[w${i}]`).join('')}`);
+			chapterBoundaries.forEach((b, i) => {
+				const ms = Math.max(0, Math.round((b - 0.45) * 1000));
+				out.push(`[w${i}]adelay=${ms}|${ms},volume=0.4[sw${i}]`);
+				mixInputs.push(`[sw${i}]`);
+			});
+		}
+		// Riser into the last two seconds (leads into the end screen).
+		const riserMs = Math.max(0, Math.round((totalDur - 2.4) * 1000));
+		out.push(`[${riserIdx}:a]adelay=${riserMs}|${riserMs},volume=0.35[sfxriser]`);
+		mixInputs.push('[sfxriser]');
+	}
+
+	out.push(
+		`${mixInputs.join('')}amix=inputs=${mixInputs.length}:duration=first:normalize=0,alimiter=limit=0.95[outa]`,
+	);
+	return out;
+}
+
 export function registerAssemble(app, {jobs, outputDir}) {
 	app.post('/assemble', (req, res) => {
 		const scenes = req.body && req.body.scenes;
@@ -429,9 +638,33 @@ export function registerAssemble(app, {jobs, outputDir}) {
 					if (job) job.progress = 0.35 * ((i + 1) / scenes.length);
 				}
 				let music = null;
+				/** The track's own loudness, and the correction applied for it. */
+				let musicLufs = null;
+				let musicGainDb = 0;
+				/** 'bands' = the speech band ducks on its own; 'flat' = the whole bed. */
+				let musicDuck = null;
 				if (musicUrl) {
 					music = path.join(work, 'music.audio');
 					await download(musicUrl, music);
+					// Measured, never assumed — and never fatal. A track that cannot
+					// be analysed plays at its own level, which is exactly the old
+					// behaviour, rather than costing the film its render.
+					musicLufs = await measureLoudness(music).catch((e) => {
+						console.warn(`music: loudness not measured — ${e.message}`);
+						return null;
+					});
+					if (musicLufs !== null) {
+						musicGainDb = Math.max(
+							-MUSIC_GAIN_LIMIT_DB,
+							Math.min(MUSIC_GAIN_LIMIT_DB, MUSIC_TARGET_LUFS - musicLufs),
+						);
+						console.log(
+							`music: ${musicLufs.toFixed(1)} LUFS → ${musicGainDb >= 0 ? '+' : ''}` +
+								`${musicGainDb.toFixed(1)} dB to reach ${MUSIC_TARGET_LUFS}`,
+						);
+					}
+					musicDuck = (await hasFilter('acrossover')) ? 'bands' : 'flat';
+					console.log(`music: ducking the ${musicDuck === 'bands' ? 'speech band only' : 'whole bed'}`);
 				}
 
 				// Scene timing + chapter boundary times (for whooshes).
@@ -569,56 +802,22 @@ export function registerAssemble(app, {jobs, outputDir}) {
 						: `${labels.join('')}concat=n=${items.length}:v=1:a=1[outv][voiceraw]`,
 				);
 
-				// Mix bus: narration first (defines length), then ducked music, then SFX.
-				const mixInputs = [];
-				parts.push(`[voiceraw]asplit=3[vmain][vside][vsidenat]`);
-				mixInputs.push('[vmain]');
-				if (nativeOn) {
-					// Ambience sits under the narration the same way the music does:
-					// ducked by the voice so it never competes with a spoken line,
-					// but audible in the gaps between them.
-					parts.push(`[natraw]${MONO},volume=${nativeVolume}[natlvl]`);
-					parts.push(
-						`[natlvl][vsidenat]sidechaincompress=threshold=0.05:ratio=8:attack=10:release=350:makeup=1[natduck]`,
-					);
-					mixInputs.push('[natduck]');
-				} else {
-					parts.push(`[vsidenat]anullsink`);
-				}
-				if (music) {
-					const fadeStart = Math.max(0, totalDur - 2.5).toFixed(3);
-					parts.push(
-						`[${musicIdx}:a]${MONO},aloop=loop=-1:size=2000000000,atrim=duration=${totalDur.toFixed(3)},volume=${musicVolume},afade=t=out:st=${fadeStart}:d=2.5[mus]`,
-					);
-					parts.push(
-						`[mus][vside]sidechaincompress=threshold=0.03:ratio=10:attack=8:release=450:makeup=1[mduck]`,
-					);
-					mixInputs.push('[mduck]');
-				} else {
-					parts.push(`[vside]anullsink`);
-				}
-				if (stingers) {
-					// Boom under the hook title.
-					parts.push(`[${boomIdx}:a]adelay=150|150,volume=0.45[sfxboom]`);
-					mixInputs.push('[sfxboom]');
-					// Whoosh at every chapter boundary (one input, split as needed).
-					if (chapterBoundaries.length) {
-						const n = chapterBoundaries.length;
-						parts.push(`[${whooshIdx}:a]asplit=${n}${chapterBoundaries.map((_, i) => `[w${i}]`).join('')}`);
-						chapterBoundaries.forEach((b, i) => {
-							const ms = Math.max(0, Math.round((b - 0.45) * 1000));
-							parts.push(`[w${i}]adelay=${ms}|${ms},volume=0.4[sw${i}]`);
-							mixInputs.push(`[sw${i}]`);
-						});
-					}
-					// Riser into the last two seconds (leads into the end screen).
-					const riserMs = Math.max(0, Math.round((totalDur - 2.4) * 1000));
-					parts.push(`[${riserIdx}:a]adelay=${riserMs}|${riserMs},volume=0.35[sfxriser]`);
-					mixInputs.push('[sfxriser]');
-				}
-
 				parts.push(
-					`${mixInputs.join('')}amix=inputs=${mixInputs.length}:duration=first:normalize=0,alimiter=limit=0.95[outa]`,
+					...buildMixGraph({
+						nativeOn,
+						nativeVolume,
+						music: Boolean(music),
+						musicDuck,
+						musicGainDb,
+						musicVolume,
+						musicIdx,
+						totalDur,
+						stingers,
+						boomIdx,
+						whooshIdx,
+						riserIdx,
+						chapterBoundaries,
+					}),
 				);
 
 				const outputFile = `${jobId}.mp4`;
@@ -658,6 +857,13 @@ export function registerAssemble(app, {jobs, outputDir}) {
 						// means the trim ran and found nothing, or every take failed
 						// analysis and kept its original — the log line says which.
 						breathTrimmedSeconds: Number(trimmedTotal.toFixed(2)),
+						// What the music bed was measured at, what was done about it,
+						// and which duck ran. The one place to look when someone says
+						// the music is too loud on a particular film.
+						musicLufs: musicLufs === null ? null : Number(musicLufs.toFixed(1)),
+						musicGainDb: music ? Number(musicGainDb.toFixed(2)) : null,
+						musicVolume: music ? musicVolume : null,
+						musicDuck,
 					},
 				});
 			} catch (err) {

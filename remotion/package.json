@@ -7,6 +7,8 @@
     "studio": "node scripts/studio.mjs",
     "render": "remotion render src/index.ts FinalVideo out/final-video.mp4",
     "check:montage": "node --experimental-strip-types scripts/check-montage.mjs",
+    "check:captions": "node --experimental-strip-types scripts/check-captions.mjs",
+    "check:mix": "node scripts/check-mix.mjs",
     "check:motif": "node motif/check-motif.mjs",
     "start:server": "node server/index.mjs",
     "lambda:deploy-function": "remotion lambda functions deploy",

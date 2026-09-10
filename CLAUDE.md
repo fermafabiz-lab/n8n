@@ -1345,6 +1345,15 @@ numbers and rollback: `db/port/script-voice/README.md`. What bites:
   `storm`. `Validate Evidence Refs` logs `TOD MONOTONY` / `LOCATION
   MONOTONY` per chapter — it cannot send a chapter back, but 75 of 86 scenes
   reading "day" must never pass unlogged again.
+- **The first run after publishing died on OpenAI credits, not on the
+  change** (2026-09-10 19:04 UTC, scripting 12022: "You have no credits
+  remaining"). Everything before the model call was verified — `styleRefs`
+  stored and read back, the new profile fetched, the route's absence degraded
+  cleanly — and nothing after it has run yet. The prompts are published and
+  byte-verified, unproven on a film; the disposable test project
+  `recTdqIxXei94goJF` (Educativ, 32 s, pinned Burj reference) is the one to
+  `restart-scripting` after the top-up. **Check the date on this note before
+  repeating it as a live blocker.**
 - **Wiring order that matters**: `Fetch Style Card` is `continueRegularOutput`
   + `alwaysOutputData`, so until the site carrying `/api/style-refs` is
   deployed the node answers a 404 and Scripting falls back to the genre voice

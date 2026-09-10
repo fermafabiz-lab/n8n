@@ -57,3 +57,30 @@ Definitions fire above 1, meta lines at 1 (every one found was a defect), signpo
 - n8n: `publish_workflow` with the "was" ids above.
 - profiles: `original/genre_profile.rollback.sql`.
 - site: revert the commit; the n8n `Fetch Style Card` is `continueRegularOutput` + `alwaysOutputData`, so a missing route degrades to "no style reference" exactly as a missing table did.
+
+## First live run after publishing (2026-09-10 19:04 UTC)
+
+A disposable 32-second Educativ project (`recTdqIxXei94goJF`, "TEST disposable
+— How the Golden Gate Bridge was built…") was created through the real
+`new-project` webhook with `style_refs: ["recH6fHwjDFva1wzv"]` (the producer's
+Burj Al Arab transcript). Orchestrator execution 12021, Scripting 12022:
+
+- `Normalize Webhook Input` stored `styleRefs` on the project — read back by
+  `Fetch Project Record` inside Scripting. ✔
+- `Fetch Genre Profile` returned the rewritten Educativ profile. ✔
+- `Fetch Style Card` called `/api/style-refs` on the LIVE site, which does not
+  carry the route yet (this branch is not merged into the trunk): the
+  middleware answered the login page, `Prepare Style Block` degraded to "No
+  style reference available" exactly as designed. The pinned reference is
+  verified only up to the project record until the site deploys. ✔ (degraded)
+- `Research Tema` died: **"You have no credits remaining"** from OpenAI
+  (`org-qkmJQuJ2WnvoIKMr2UJwIJkZ`, model gpt-5.4). Every scripting run is dead
+  until the account is topped up; that is not this change. The test project
+  is left as it is — `restart-scripting` on it after the top-up (styleRefs
+  are on the record, so the restart keeps them) exercises the whole chain.
+
+So the writer/editor/guard/bible/segmenter prompts are published and
+byte-verified but have NOT yet produced a film. Watch the first real run for:
+`STYLE REFS:` in the log naming the pinned row, a bible with
+`"<Place> — <stage>"` entries where the subject changes, no `TOD MONOTONY`
+line, and the guard's new feedback lines only when they should fire.

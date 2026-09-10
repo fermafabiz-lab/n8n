@@ -3,18 +3,18 @@
  * own footage library: stockshots of institutions and cities, B-roll of
  * summits and border operations, press conferences, speeches.
  *
- * The public site is driven by a JSON search API. Its base is configurable
- * (`EU_AV_API_BASE`, default `https://audiovisual.ec.europa.eu/api`) because
- * the service has moved its endpoints before, and a moved endpoint should
- * cost one environment variable and not a deploy. The adapter reads the
- * response defensively — every field it uses is looked up under the two or
- * three names the service has used — and anything it cannot make sense of is
- * an empty answer, never an exception that would take the other providers
- * down with it.
- *
- * NOT verified against the live service from this session (no outbound
- * HTTP here); the provider health page will say on the first search whether
- * the shape held. See docs/universal-footage-engine.md, "Providers".
+ * OPT-IN, off until `EU_AV_API_BASE` names a public JSON search endpoint.
+ * Checked 2026-09-10 (docs/footage-sources.md): the service publishes no
+ * developer API. Its website is an Angular app talking to an internal AWS
+ * API Gateway with a bearer token embedded in the app's own bundle — an
+ * access control, not an offer, and the spec is explicit that this engine
+ * never goes around one. So the adapter stays (the reader is defensive:
+ * every field it uses is looked up under the two or three names such
+ * services use, and anything it cannot make sense of is an empty answer,
+ * never an exception), but it is not routed until a person sets the base
+ * URL of an endpoint the Commission actually offers. Until then an EU AV
+ * PAGE still enters through the URL-import door like any other page, with
+ * the rights the page states.
  *
  * Rights. The Commission's reuse decision (2011/833/EU) makes its own
  * material reusable with attribution — "© European Union, <year>" — unless
@@ -34,7 +34,7 @@ import { validateRights } from "../rights";
 import type { FootageFormat, FootageProvider, FootageSearchRequest, NormalizedFootageAsset, ProviderSearchOptions } from "../types";
 
 const UA = "HouseOfVideos/1.0 (https://house-of-videos.com; documentary archive research)";
-const base = () => (process.env.EU_AV_API_BASE ?? "https://audiovisual.ec.europa.eu/api").replace(/\/+$/, "");
+const base = () => (process.env.EU_AV_API_BASE ?? "").trim().replace(/\/+$/, "");
 const SITE = "https://audiovisual.ec.europa.eu";
 
 /** One item as the service's search answers it — every spelling we have seen or expect. */
@@ -170,6 +170,7 @@ export function normalizeEuAvItem(it: EuAvItem): NormalizedFootageAsset | null {
 }
 
 async function call(path: string, params: Record<string, string>, signal?: AbortSignal): Promise<unknown> {
+  if (!base()) throw new Error("EU_AV_API_BASE is not set");
   const url = new URL(`${base()}${path}`);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   const res = await fetch(url, { headers: { "User-Agent": UA, Accept: "application/json" }, signal: signal ?? AbortSignal.timeout(15_000) });
@@ -198,9 +199,14 @@ export function euAvItems(body: unknown): EuAvItem[] {
 export const euAvProvider: FootageProvider = {
   id: "eu_av",
   displayName: "EU Audiovisual Service",
-  enabled: true,
-  disabledReason: null,
+  get enabled() {
+    return Boolean(base());
+  },
+  get disabledReason() {
+    return base() ? null : "no public API (the site's own backend is behind an embedded credential) — set EU_AV_API_BASE if the Commission offers one; its pages still import by URL";
+  },
   priority: 90,
+  tier: "official",
   categories: ["europe", "politics", "migration", "government", "eu", "geopolitics", "humanitarian"],
   searchCapabilities: { video: true, image: true, recentNews: true, historical: false, directDownload: true },
 

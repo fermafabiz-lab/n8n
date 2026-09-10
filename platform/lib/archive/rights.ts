@@ -128,6 +128,9 @@ function expandLicenseUrls(s: string): string {
   return s
     .replace(/creativecommons\.org\/publicdomain\/zero\/[^\s]*/g, " cc0 ")
     .replace(/creativecommons\.org\/publicdomain\/mark\/[^\s]*/g, " public domain ")
+    // The retired CC "Public Domain Dedication and Certification" URL, still
+    // the licence string on thousands of Internet Archive items.
+    .replace(/creativecommons\.org\/licenses\/publicdomain\/?[^\s]*/g, " public domain ")
     .replace(/creativecommons\.org\/licenses\/([a-z-]+)\/[^\s]*/g, (_, code: string) => ` cc-${code} `);
 }
 

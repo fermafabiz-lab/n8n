@@ -111,6 +111,25 @@ export interface ProviderSearchOptions {
 }
 
 /**
+ * What KIND of source a provider is — the router's second axis after the
+ * subject categories, and the reason "never every provider for every scene"
+ * survives a registry of a dozen:
+ *
+ *   official   a body publishing its own footage of its own events (EU AV,
+ *              DVIDS, NASA): asked first on their subjects, never on history
+ *   archive    a catalogue of dated historical material (Internet Archive,
+ *              Library of Congress, Europeana, Wellcome, Wikimedia): asked on
+ *              history and on named events, and as the general fallback
+ *   community  photographs people licensed openly (Flickr, Openverse): asked
+ *              on recent events and places, after official sources
+ *   stock      generic B-roll with a blanket licence (Pexels, Pixabay,
+ *              Unsplash): asked only when the scene names NO event — a real
+ *              clip of the wrong thing is not "real footage" of anything
+ *   library    answers from our own rows (uploads, URL imports): never routed
+ */
+export type ProviderTier = "official" | "archive" | "community" | "stock" | "library";
+
+/**
  * One source of real footage. Everything the engine needs from an adapter and
  * nothing it does not: the shape is deliberately small so a new archive is an
  * afternoon, not a project.
@@ -123,6 +142,7 @@ export interface FootageProvider {
   readonly disabledReason: string | null;
   /** Router weight, 0–100. Ties between matching providers break on this. */
   readonly priority: number;
+  readonly tier: ProviderTier;
   /** The topic strengths the router matches a request against. */
   readonly categories: readonly string[];
   readonly searchCapabilities: ProviderSearchCapabilities;

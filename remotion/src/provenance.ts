@@ -29,7 +29,7 @@ export type VisualOrigin =
  */
 export type VisualProvenance = {
 	visualOrigin: VisualOrigin;
-	/** Free string: "wikimedia", "nara", "reuters", "producer_upload"… */
+	/** Free string: "wikimedia", "internet_archive", "reuters", "producer_upload"… */
 	provider?: string;
 	sourceTitle?: string;
 	sourceUrl?: string;
@@ -68,12 +68,17 @@ const PROVIDER_LABELS: Record<string, string> = {
 	eu_av: 'EU Audiovisual Service',
 	dvids: 'DVIDS',
 	nasa: 'NASA',
+	internet_archive: 'Internet Archive',
+	europeana: 'Europeana',
+	loc: 'Library of Congress',
+	wellcome: 'Wellcome Collection',
+	flickr: 'Flickr',
+	openverse: 'Openverse',
+	pexels: 'Pexels',
+	pixabay: 'Pixabay',
+	unsplash: 'Unsplash',
 	url_import: 'URL import',
 	user_upload: 'Manual upload',
-	// Retired providers (docs/nara-smithsonian-deprecation.md): rows they
-	// filed still print their real names.
-	nara: 'US National Archives',
-	smithsonian: 'Smithsonian',
 };
 
 /**

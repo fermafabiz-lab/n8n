@@ -36,6 +36,7 @@ export const wikimediaProvider: FootageProvider = {
   enabled: wikimedia.enabled,
   disabledReason: wikimedia.disabledReason,
   priority: 75,
+  tier: "archive",
   categories: ["general", "history", "places", "people", "events", "politics"],
   searchCapabilities: { video: true, image: true, recentNews: false, historical: true, directDownload: true },
 

@@ -18,20 +18,29 @@ Suggest Webhook → Fetch Scenes (GET /api/archive/suggest?project=…, claims s
   → Store Suggestions (POST /api/archive/suggest stage=store)
 ```
 
-**Published 2026-09-09, version `6b5a1417-2828-4e1d-ae0b-28ea1b6a454a`**
-(previous active `6ac5f5f1-e0b7-4f34-8fd2-b5e50af9062b`, 2026-09-07). Three
-Code nodes changed; the repo copies are in
-`db/port/footage-engine/nodes/` and `verify.mjs` there diffs a fetched
-workflow against them.
+**Active version `a3278855-7c67-4e1f-960f-5ef7168d1127` since 2026-09-10**
+(before it `6b5a1417-2828-4e1d-ae0b-28ea1b6a454a`, 2026-09-09, and
+`6ac5f5f1-e0b7-4f34-8fd2-b5e50af9062b`, 2026-09-07). The 09-09 publish
+changed three Code nodes; the 09-10 one changed only `Build Query Prompt`.
+The repo copies are in `db/port/footage-engine/nodes/` and `verify.mjs`
+there diffs a fetched workflow against them.
 
 - **`Build Query Prompt`** asks the model, per scene, for a structured
   request — `topic, event, location, country, dateFrom, dateTo, people,
   organizations, keywords, preferredMediaType, preferredFootageType,
   requireExactEvent` — plus 3–6 short catalogue queries, and tells it which
-  providers exist (Wikimedia, EU Audiovisual Service, DVIDS, NASA) and
-  what each is for. It forbids invention in as many words: *never invent a
-  date, a place, a person or an event the narration does not support; leave
-  the field null instead.* NARA and the Smithsonian are no longer named.
+  sources exist and what each is for: the public archives (Wikimedia
+  Commons, the Internet Archive's newsreels and government films, Europeana,
+  the Library of Congress, the Wellcome Collection), the official services
+  (EU Audiovisual Service, DVIDS, NASA), the photo communities (Flickr,
+  Openverse) and, for generic present-day B-roll only, the stock libraries
+  (Pexels, Pixabay, Unsplash) — that last case is the `stockshots` footage
+  type, with `event` null. It forbids invention in as many words: *never
+  invent a date, a place, a person or an event the narration does not
+  support; leave the field null instead.* The prompt names sources, never
+  keys: which of them are actually reachable is the site's registry's
+  business, and a scene asking for a source that is off simply gets the
+  others.
 - **`Parse Queries`** sanitises the answer (types, lengths, ISO dates,
   the footage-type vocabulary) and emits `{ id, request, queries, why }`.
   It still accepts the old `years: [from, to]` as a fallback for the date
@@ -92,8 +101,10 @@ HTTP node against that route.
 - Site: the `HOV Media Ingest` header credential (`8kpY42LmZaBYBzfY`) on
   every call into `web:3000` — `middleware.ts` opens `/api/archive/*` and
   `/api/footage/*` to that key.
-- Provider keys (`DVIDS_API_KEY`) live on the SITE (`platform.env`), not in
-  n8n: the providers are called from the site's engine.
+- Provider keys (`DVIDS_API_KEY`, `EUROPEANA_API_KEY`, `FLICKR_API_KEY`,
+  the stock keys, the Openverse client) live on the SITE (`platform.env`,
+  from GitHub Secrets), not in n8n: the providers are called from the
+  site's engine.
 
 ## Applying an edit here
 

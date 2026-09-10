@@ -142,6 +142,7 @@ export const nasaProvider: FootageProvider = {
   enabled: true,
   disabledReason: null,
   priority: 90,
+  tier: "official",
   categories: ["space", "science", "technology", "earth", "missions", "aviation"],
   searchCapabilities: { video: true, image: true, recentNews: true, historical: true, directDownload: true },
 

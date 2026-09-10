@@ -177,6 +177,7 @@ export const dvidsProvider: FootageProvider = {
     return key() ? null : "needs DVIDS_API_KEY (free, dvidshub.net/about/api)";
   },
   priority: 90,
+  tier: "official",
   categories: ["military", "war", "aviation", "humanitarian", "disaster", "geopolitics", "government"],
   searchCapabilities: { video: true, image: true, recentNews: true, historical: false, directDownload: true },
 

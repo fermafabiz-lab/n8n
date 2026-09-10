@@ -8,7 +8,9 @@ import { heldBack, providerStats } from "@/lib/footage/health";
 // cached copy of what someone just changed.
 export const dynamic = "force-dynamic";
 
-const FIXED = new Set(["wikimedia", "eu_av", "dvids", "nasa", "url_import", "user_upload"]);
+// The registry's own ids; anything else in the library is a retired provider
+// and gets its own chip from the counts.
+const FIXED = new Set<string>(allProviders().map((p) => p.id));
 
 export default async function FootagePage({
   searchParams,

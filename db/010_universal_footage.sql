@@ -5,8 +5,8 @@
 -- filed the moment a search sees it, with the bytes fetched only when a scene
 -- takes it. That does not change. What changes:
 --
--- - `provider` stops being an enum of three. NARA and Smithsonian were never
---   built (docs/nara-smithsonian-deprecation.md); the EU Audiovisual Service,
+-- - `provider` stops being an enum of three (two of the three were never
+--   built and are retired); the EU Audiovisual Service,
 --   DVIDS, NASA, pasted URLs and uploads are real. A provider is a free
 --   string so the next one needs an adapter and not a migration. Rows from
 --   the retired names stay readable — nothing deletes a row over its
@@ -32,7 +32,7 @@ alter table stock_media drop constraint if exists stock_media_provider_check;
 
 comment on column stock_media.provider is
   'Free string: wikimedia | eu_av | dvids | nasa | url_import | user_upload | (a future adapter). '
-  'nara and smithsonian were declared in db/007 and never searched; rows carrying them stay readable.';
+  'Two ids db/007 allowed were never searched and are retired; rows carrying them stay readable.';
 
 -- ---------------------------------------------------------------------------
 -- The engine's enrichments. Every one nullable or defaulted, so a row filed

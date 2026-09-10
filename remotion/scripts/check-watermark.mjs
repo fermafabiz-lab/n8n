@@ -38,7 +38,7 @@ check('the label table', ORIGIN_LABELS, {
 });
 check('an absent record is never silent', getSourceLabel(undefined), 'SOURCE UNVERIFIED');
 check('nor is an origin we do not know', getSourceLabel({visualOrigin: 'real_ish'}), 'SOURCE UNVERIFIED');
-check('a known provider keeps its real name', providerLabel('nara'), 'US National Archives');
+check('a known provider keeps its real name', providerLabel('internet_archive'), 'Internet Archive');
 check('a new one is title-cased rather than dropped', providerLabel('eu_audiovisual'), 'EU Audiovisual');
 check(
 	'a source line only when somebody stated something',

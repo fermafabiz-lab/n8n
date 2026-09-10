@@ -92,8 +92,8 @@ check(
 // THE rule: nothing automatic ever reaches actual_footage, whatever it is given.
 const everyAutomatic = [
 	classifyVisualOrigin({visualSource: 'ai'}),
-	classifyVisualOrigin({visualSource: 'stock_video', stock: {provider: 'nara', creator: 'US Army', sourceUrl: 'u', rightsStatus: 'public_domain', license: 'PD'}}),
-	classifyVisualOrigin({visualSource: 'stock_image', stock: {provider: 'nara', creator: 'US Army', sourceUrl: 'u', rightsStatus: 'public_domain', license: 'PD'}}),
+	classifyVisualOrigin({visualSource: 'stock_video', stock: {provider: 'internet_archive', creator: 'US Army', sourceUrl: 'u', rightsStatus: 'public_domain', license: 'PD'}}),
+	classifyVisualOrigin({visualSource: 'stock_image', stock: {provider: 'internet_archive', creator: 'US Army', sourceUrl: 'u', rightsStatus: 'public_domain', license: 'PD'}}),
 	classifyVisualOrigin({visualSource: 'nonsense'}),
 ];
 check('the classifier never says ACTUAL FOOTAGE', everyAutomatic.filter((r) => r.origin === 'actual_footage').length, 0);
@@ -189,7 +189,7 @@ check(
 	{label: 'AI GENERATED', source: null},
 );
 
-check('a known provider gets its real name', providerLabel('nara'), 'US National Archives');
+check('a known provider gets its real name', providerLabel('internet_archive'), 'Internet Archive');
 check('an unknown one is title-cased, not dropped', providerLabel('eu_audiovisual'), 'EU Audiovisual');
 check('a plain new provider works untouched', providerLabel('Reuters'), 'Reuters');
 check('and nothing is still nothing', providerLabel(''), null);

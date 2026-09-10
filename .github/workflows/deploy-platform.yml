@@ -51,6 +51,13 @@ jobs:
           SSH_KEY: ${{ secrets.SSH_KEY }}
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
           DVIDS_API_KEY: ${{ secrets.DVIDS_API_KEY }}
+          EUROPEANA_API_KEY: ${{ secrets.EUROPEANA_API_KEY }}
+          FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+          UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
+          OPENVERSE_CLIENT_ID: ${{ secrets.OPENVERSE_CLIENT_ID }}
+          OPENVERSE_CLIENT_SECRET: ${{ secrets.OPENVERSE_CLIENT_SECRET }}
         run: |
           missing=""
           # SITE_PASSWORD gol nu e o valoare implicita blanda: middleware.ts
@@ -81,6 +88,17 @@ jobs:
           # (EU AV, NASA, Wikimedia) nu au nevoie de cheie.
           if [ -z "${DVIDS_API_KEY}" ]; then
             echo "::warning::DVIDS_API_KEY nu e setat — DVIDS nu va fi cautat in Documentary (gratuit, dvidshub.net/about/api)."
+          fi
+          # Aceeasi regula pentru celelalte surse cu cheie: fara ea, sursa apare
+          # ca "off" pe /admin/footage si routerul o sare; filmul nu e afectat.
+          # Europeana merge si fara cheie (cheia demo "api2demo", limitata).
+          optional=""
+          for v in EUROPEANA_API_KEY FLICKR_API_KEY PEXELS_API_KEY PIXABAY_API_KEY \
+                   UNSPLASH_ACCESS_KEY OPENVERSE_CLIENT_ID OPENVERSE_CLIENT_SECRET; do
+            [ -n "${!v}" ] || optional="$optional $v"
+          done
+          if [ -n "$optional" ]; then
+            echo "::warning::Surse de footage fara cheie (optionale):$optional — vezi docs/footage-sources.md."
           fi
           echo "Toate secretele necesare sunt setate."
 
@@ -113,7 +131,17 @@ jobs:
           N8N_API_KEY: ${{ secrets.N8N_API_KEY }}
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
           DVIDS_API_KEY: ${{ secrets.DVIDS_API_KEY }}
-          EU_AV_API_BASE: ${{ vars.EU_AV_API_BASE || 'https://audiovisual.ec.europa.eu/api' }}
+          # Empty unless the Commission offers a public endpoint: the adapter
+          # is opt-in (see lib/footage/providers/euav.ts).
+          EU_AV_API_BASE: ${{ vars.EU_AV_API_BASE }}
+          EUROPEANA_API_KEY: ${{ secrets.EUROPEANA_API_KEY }}
+          FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+          UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
+          OPENVERSE_CLIENT_ID: ${{ secrets.OPENVERSE_CLIENT_ID }}
+          OPENVERSE_CLIENT_SECRET: ${{ secrets.OPENVERSE_CLIENT_SECRET }}
+          FOOTAGE_ENABLE_LOC: ${{ vars.FOOTAGE_ENABLE_LOC }}
           SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
           AIRTABLE_PROJECTS_TABLE: ${{ vars.AIRTABLE_PROJECTS_TABLE || 'Proiecte' }}
           AIRTABLE_SCENES_TABLE: ${{ vars.AIRTABLE_SCENES_TABLE || 'Scene' }}
@@ -126,7 +154,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          envs: AIRTABLE_API_KEY,AIRTABLE_BASE_ID,N8N_API_KEY,ELEVENLABS_API_KEY,DVIDS_API_KEY,EU_AV_API_BASE,SITE_PASSWORD,AIRTABLE_PROJECTS_TABLE,AIRTABLE_SCENES_TABLE,AIRTABLE_SCRIPTS_TABLE,N8N_API_URL,N8N_NEW_PROJECT_WEBHOOK_URL,REGISTRY_TOKEN,REGISTRY_USER
+          envs: AIRTABLE_API_KEY,AIRTABLE_BASE_ID,N8N_API_KEY,ELEVENLABS_API_KEY,DVIDS_API_KEY,EU_AV_API_BASE,EUROPEANA_API_KEY,FLICKR_API_KEY,PEXELS_API_KEY,PIXABAY_API_KEY,UNSPLASH_ACCESS_KEY,OPENVERSE_CLIENT_ID,OPENVERSE_CLIENT_SECRET,FOOTAGE_ENABLE_LOC,SITE_PASSWORD,AIRTABLE_PROJECTS_TABLE,AIRTABLE_SCENES_TABLE,AIRTABLE_SCRIPTS_TABLE,N8N_API_URL,N8N_NEW_PROJECT_WEBHOOK_URL,REGISTRY_TOKEN,REGISTRY_USER
           script: |
             set -euo pipefail
             cd /opt/n8n
@@ -148,6 +176,14 @@ jobs:
             ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
             DVIDS_API_KEY=${DVIDS_API_KEY}
             EU_AV_API_BASE=${EU_AV_API_BASE}
+            EUROPEANA_API_KEY=${EUROPEANA_API_KEY}
+            FLICKR_API_KEY=${FLICKR_API_KEY}
+            PEXELS_API_KEY=${PEXELS_API_KEY}
+            PIXABAY_API_KEY=${PIXABAY_API_KEY}
+            UNSPLASH_ACCESS_KEY=${UNSPLASH_ACCESS_KEY}
+            OPENVERSE_CLIENT_ID=${OPENVERSE_CLIENT_ID}
+            OPENVERSE_CLIENT_SECRET=${OPENVERSE_CLIENT_SECRET}
+            FOOTAGE_ENABLE_LOC=${FOOTAGE_ENABLE_LOC}
             SITE_PASSWORD=${SITE_PASSWORD}
             ENVEOF
 

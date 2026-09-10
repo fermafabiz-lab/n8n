@@ -40,6 +40,23 @@ import { classifyVisualOrigin } from "@/lib/provenance";
 import { assessProvenance } from "@/lib/footage/provenance";
 import { buildFootageRequest } from "@/lib/footage/request";
 import { renderable, usableAutomatically, validateRights } from "@/lib/footage/rights";
+import { providerById } from "@/lib/footage/registry";
+
+/**
+ * Where the bytes actually are, asked of the provider at use time. A NASA
+ * search result holds only its preview, an Internet Archive item is a
+ * directory of renditions, an Unsplash download has to be announced first —
+ * so a provider with a resolver is the authority, and its failure is a
+ * failure (falling back to the stored URL would attach a thumbnail as the
+ * clip). A provider without one stored the file itself.
+ */
+async function resolveMediaUrl(stock: StockMedia): Promise<string> {
+  const p = providerById(stock.provider);
+  if (!p?.resolveDownload) return stock.downloadUrl;
+  const r = await p.resolveDownload(stock);
+  if (!r.url) throw new Error(`${p.displayName} resolved no download for ${stock.providerAssetId}`);
+  return r.url;
+}
 
 const USER_AGENT = "HouseOfVideos/1.0 (https://house-of-videos.com; documentary archive research)";
 const FPS = 24;
@@ -267,15 +284,16 @@ export async function attachArchiveAsset(input: AttachInput): Promise<AttachResu
     const clip = path.join(work, "clip.mp4");
     let image: { buf: Buffer; url: string; contentType: string | null; ext?: string };
 
+    const src = await resolveMediaUrl(stock);
     if (stock.mediaType === "image") {
-      const { buf, contentType } = await download(stock.downloadUrl);
-      const stillExt = (stock.downloadUrl.split(".").pop() ?? "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+      const { buf, contentType } = await download(src);
+      const stillExt = (src.split("?")[0].split(".").pop() ?? "jpg").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 4) || "jpg";
       const still = path.join(work, `still.${stillExt}`);
       await writeFile(still, buf);
       await kenBurns(still, clip, W, H, seconds, input.sceneOrder % 2 === 1);
-      image = { buf, url: stock.downloadUrl, contentType };
+      image = { buf, url: src, contentType };
     } else {
-      await cutSegment(stock.downloadUrl, clip, W, H, offset, seconds);
+      await cutSegment(src, clip, W, H, offset, seconds);
       const poster = path.join(work, "poster.jpg");
       await run("ffmpeg", ["-y", "-i", clip, "-frames:v", "1", "-q:v", "3", poster], 60_000);
       image = { buf: await readFile(poster), url: stock.sourceUrl, contentType: "image/jpeg", ext: "jpg" };

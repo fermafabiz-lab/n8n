@@ -3510,17 +3510,19 @@ picked the asset, not signed it off. Final Assembly receives an ordinary mp4.
   then flags an ordinary image regeneration; once the new picture is
   approved, `Needs Clip?` sees a scene owing a clip.
 - **Wikimedia was the only archive until 2026-09-09; the footage engine
-  (its own section below) added the EU Audiovisual Service, DVIDS and NASA.**
-  Read off real responses (executions 10893/10895/10898): `filetype:video`
+  (its own section below) added the EU Audiovisual Service, DVIDS and NASA,
+  and 2026-09-10 added nine more — `docs/footage-sources.md` is the
+  catalogue.** Read off real responses (executions 10893/10895/10898): `filetype:video`
   finds both webm and ogv (`filemime:video/ogg` finds nothing — the ogv's
   MIME is `application/ogg`); `filetype:bitmap` also returns animated GIFs,
   skipped; `formatversion=2` makes `query.pages` an array; a public-domain
   template can carry no `License` code at all (`Copyrighted: "False"` is the
-  fallback). NARA and Smithsonian were declared here as disabled
-  placeholders and have been REMOVED — never built, never searched, their
-  keys read nowhere (`docs/nara-smithsonian-deprecation.md`). Do not bring
-  them back as placeholders: a provider is a file under
-  `lib/footage/providers/` or it is nothing.
+  fallback). Two US institutions were once declared here as disabled
+  placeholders and have been REMOVED at the producer's request (2026-09-10:
+  "I don't want to use them anymore") — never built, never searched, their
+  keys read nowhere, their names gone from code, tests and labels. Do not
+  bring them back, and do not bring anything back as a placeholder: a
+  provider is a file under `lib/footage/providers/` or it is nothing.
 - **The date field lies, so it is shown and never trusted.** Commons dated a
   1969 NASA clip `2015-06-12` (its YouTube upload) and answered "Benz
   Patent-Motorwagen 1886" with 2013 and 2021 photos of museum REPLICAS. The
@@ -3742,18 +3744,76 @@ belongs here is the load-bearing parts.
 One search behind every "real footage" door — the picker's *Search real
 footage*, the `archive-suggest` run, *Add from URL*, *Upload*, and the
 library at `/admin/footage`. `platform/lib/footage/` (engine, registry,
-router, rights, provenance, ranking, dedupe, health, URL import, six
-providers), `db/010_universal_footage.sql` (applied 2026-09-09: 19 columns
-on `stock_media`, the provider CHECK dropped, `footage_provider_status`,
-`footage_search_cache`; 178 rows backfilled to archival provenance), routes
-under `/api/footage/*`, and `docs/universal-footage-engine.md` plus nine
-sibling docs, which are the spec. What belongs HERE is what will bite:
+router, rights, provenance, ranking, dedupe, health, URL import, fifteen
+providers in five tiers — `docs/footage-sources.md` is the catalogue of
+what each covers, what was measured on it and which key unlocks it),
+`db/010_universal_footage.sql` (applied 2026-09-09: 19 columns on
+`stock_media`, the provider CHECK dropped, `footage_provider_status`,
+`footage_search_cache`; 178 rows backfilled to archival provenance) and
+`db/011_footage_sources.sql` (applied 2026-09-10: comments and one index,
+nothing to migrate), routes under `/api/footage/*`, and
+`docs/universal-footage-engine.md` plus ten sibling docs, which are the
+spec. What belongs HERE is what will bite:
 
-- **NARA and Smithsonian are gone, not disabled.** Not in the registry, not
+- **A retired provider is absent, never disabled.** Not in the registry, not
   in `ARCHIVE_PROVIDERS`, `adapterFor()` answers null, no key is read
-  anywhere. Old rows stay readable and still print their names in BOTH label
-  maps (`platform/lib/provenance.ts`, `remotion/src/provenance.ts` — in
-  lockstep, like `presetForTone`). `docs/nara-smithsonian-deprecation.md`.
+  anywhere, no label map names it (a row it once filed still reads, with a
+  title-cased id as its name). Two US institutions left this way on
+  2026-09-10 at the producer's request; do not bring them back. The two
+  label maps (`platform/lib/provenance.ts`, `remotion/src/provenance.ts`)
+  stay in lockstep, like `presetForTone`.
+- **Stock is a tier, not a subject, and it is routed only for a scene that
+  names NO event** (`tierFit` in the registry): a real clip of the wrong
+  thing is not real footage of anything. Even then the archives' `general`
+  coverage outranks it — dated material first — and on a scene that names
+  a subject ("a quiet BORDER town" matches geopolitics and migration) the
+  official and archive sources fill all four slots and stock falls off the
+  cap, which is the right order for a documentary. The other tiers: an
+  official source LEADS on its own subjects (+3, or NASA loses an Artemis
+  scene to the general archives), archives own history and are the
+  fallback through `general`, communities (Flickr, Openverse) cover recent
+  events and places, the library tier is never routed.
+- **The Internet Archive's community area is unlicensed by default, and
+  the first query proved it**: "moon landing" answered a YouTube mirror of
+  a hoax video from the `altcensored` / `fringe` / `deemphasize`
+  collections with no licence at all. So `internet_archive` never searches
+  blind: film comes from collections whose POLICY is public domain
+  (`PD_COLLECTIONS`: prelinger, universal_newsreels, FedFlix, usgovfilms,
+  nasa) or carries a `licenseurl`; stills come from the PD collections
+  only, because "berlin wall" stills under uploader-declared licences were
+  junk; an uploader-declared licence outside those collections by a
+  non-institutional creator is `manual_review`; YouTube mirrors
+  (`identifier:youtube*`) and the Archive's own flagged collections are
+  excluded outright. So filtered, "berlin wall" answered a 1961 US Army film
+  of the Brandenburg Gate under a public-domain mark. The search-time
+  `downloadUrl` there is a DIRECTORY (`/download/{id}`); the file is picked
+  from `/metadata/{id}` at use time.
+- **`attach.ts` resolves the bytes through `provider.resolveDownload`**
+  (`resolveMediaUrl`), never from `stock.downloadUrl` directly. Three
+  providers need it: the Archive's directory URL above, NASA (the search
+  answer holds a preview), and Unsplash (its guidelines require a
+  `download_location` call before use). Trusting the search-time URL would
+  have attached a directory listing as a clip.
+- **The EU Audiovisual Service is OPT-IN and off, because it has no public
+  API.** Checked 2026-09-10 by fetching the site from n8n: the search page
+  is an Angular app talking to an internal AWS API Gateway with a bearer
+  token embedded in the app's own JS bundle. That token is an access
+  control, not an offer, and the spec's URL-import rule ("never bypass an
+  access control") applies to adapters too — so it is NOT used and must
+  never be written into this repo or its docs. `EU_AV_API_BASE` has no
+  default any more (the old default pointed at a path that does not exist,
+  and the adapter's shape was never verified); the defensive reader stays
+  for the day the Commission publishes an endpoint, and an EU AV PAGE still
+  comes in through URL import with the rights it states.
+- **Library of Congress and Openverse answer the Hetzner box with a
+  Cloudflare challenge** (HTTP 403 "Just a moment…", measured 2026-09-10 on
+  `loc.gov/search/?fo=json` and `api.openverse.org/v1/images/`). Both
+  adapters exist, written from the documented shapes, and are OFF by
+  default — LoC behind `FOOTAGE_ENABLE_LOC=1`, Openverse behind its OAuth
+  client credentials (the anonymous tier is what is blocked). A blocked
+  provider must be off, not merely failing: three failures hold it back
+  for five minutes, so a permanently blocked one would burn a slot in every
+  routed request and print a red row for ever.
 - **Rights are a filter, never a score.** `validateRights()` yields
   `cleared | attribution_required | editorial_only | manual_review |
   restricted | unknown`; `restricted` is removed before ranking and cannot be
@@ -3817,34 +3877,43 @@ sibling docs, which are the spec. What belongs HERE is what will bite:
   `saveStockCandidates` writes the 15 enrichment columns only when the
   column exists. Same reason as before — a push deploys itself, a migration
   runs by hand, and the gap must not take down every project page.
-- **`DVIDS_API_KEY` is a WARNING in the deploy gate, like ElevenLabs**:
-  without it the provider reads as off with its reason and the router skips
-  it; the film is unaffected. `EU_AV_API_BASE` defaults to
-  `https://audiovisual.ec.europa.eu/api`. Both are in the heredoc that
-  writes `platform.env` — the rule from the ElevenLabs entry, obeyed in the
-  same commit. **The EU AV adapter's response shape is UNVERIFIED live**
-  (no outbound HTTP from here): it reads `items | results | data.results |
-  data.items` defensively, and a failure shows on `/admin/footage`'s health
-  strip rather than failing generation. The first real run should be
-  watched.
+- **Every provider key is a WARNING in the deploy gate, like ElevenLabs**:
+  `DVIDS_API_KEY`, `EUROPEANA_API_KEY` (the demo key answers meanwhile),
+  `FLICKR_API_KEY`, `PEXELS_API_KEY`, `PIXABAY_API_KEY`,
+  `UNSPLASH_ACCESS_KEY`, `OPENVERSE_CLIENT_ID` + `OPENVERSE_CLIENT_SECRET`,
+  plus the two switches `FOOTAGE_ENABLE_LOC` and `EU_AV_API_BASE` (repo
+  Variables, not Secrets). Without a key the provider reads as off with its
+  reason, on the admin page and in the picker, and the router skips it; the
+  film is unaffected. All of them are in the heredoc that writes
+  `platform.env` — the rule from the ElevenLabs entry, obeyed in the same
+  commit. **`enabled` must be a GETTER over the env var**, read at call
+  time, or a key added later needs a container rebuild to count. **The four
+  adapters written without a key (Flickr, Pexels, Pixabay, Unsplash) are
+  pinned on the documentation's shapes, not on a measured response** —
+  watch each one's first real run on the health strip.
 - **The n8n half is one prompt edit** (`Archive Suggestions`, active
-  `6b5a1417` since 2026-09-09; repo copies in `db/port/footage-engine/`):
-  `Build Query Prompt` asks for a structured request per scene and forbids
-  invention in as many words, `Parse Queries` sanitises it, `Build Rank
-  Prompts` shows the ranking model the engine's score, provenance and
-  rights class. `/api/archive/suggest` accepts BOTH the old `queries[]` and
-  the new `request{}` shape, so prompt and site can move independently.
-  No `universal-footage-search` workflow was created: `/api/footage/search`
-  is that search, callable from any HTTP node with the ingest key.
+  `a3278855` since 2026-09-10, `6b5a1417` the day before; repo copies in
+  `db/port/footage-engine/`): `Build Query Prompt` names the SOURCES (never
+  the keys — which are reachable is the registry's business), asks for a
+  structured request per scene with a `stockshots` type for event-less
+  B-roll, and forbids invention in as many words; `Parse Queries` sanitises
+  it; `Build Rank Prompts` shows the ranking model the engine's score,
+  provenance and rights class. `/api/archive/suggest` accepts BOTH the old
+  `queries[]` and the new `request{}` shape, so prompt and site can move
+  independently. No `universal-footage-search` workflow was created:
+  `/api/footage/search` is that search, callable from any HTTP node with
+  the ingest key.
 - **Tests run the real engine with the edges mocked.**
   `scripts/footage-loader.mjs` is a `module.register` hook that resolves
   the site's `@/` alias and extensionless imports (`./types` → `types.ts`,
   `@/lib/footage` → `index.ts`) and swaps `lib/data/stock` and
   `lib/data/postgres` for in-memory doubles; `check-footage.mjs` stubs
-  `globalThis.fetch` per hostname. `npm run check:footage`, 125 checks.
+  `globalThis.fetch` per hostname. `npm run check:footage`, 177 checks.
   Anything under `lib/footage/` that grows a new import path needs the
   loader to resolve it — Node knows neither the alias nor the missing
-  extension.
+  extension. **A routing fixture must name no subject by accident**: "a
+  quiet border town" was meant as the generic case and matched two
+  categories, and the "stock is routed" test failed for the right reason.
 
 ## Conventions
 
@@ -4757,14 +4826,20 @@ generated FROM it. The chain, and where each piece lives:
 - **Documentary mode, what is still owed** (see the section above): the
   picker itself has only been exercised through its HTTP twin, so click
   through it once on a real documentary project; print archive credits on
-  the end screen (Remotion, i.e. a Railway push); put `DVIDS_API_KEY` into
-  GitHub Secrets so DVIDS is routed at all, and verify the EU Audiovisual
-  Service adapter against one real response — its API shape was read
-  defensively, never live (see the footage engine section). (The
-  "scripting proposes archive shots" half exists since the same day as the
-  `Archive Suggestions` run, above.) Scenes 102 and 103 of
-  the disposable film `recaW2aLFFD06FpoN` carry archive assets from the
-  verification run and can stay as the demonstration.
+  the end screen (Remotion, i.e. a Railway push); put the optional source
+  keys into GitHub Secrets — `DVIDS_API_KEY`, `EUROPEANA_API_KEY` (the
+  public demo key answers meanwhile), `FLICKR_API_KEY`, `PEXELS_API_KEY`,
+  `PIXABAY_API_KEY`, `UNSPLASH_ACCESS_KEY`, `OPENVERSE_CLIENT_ID` +
+  `OPENVERSE_CLIENT_SECRET` — because a keyed provider is OFF until its key
+  exists (`docs/footage-sources.md` has the sign-up page for each); and
+  verify the four adapters written from documentation alone (Flickr,
+  Pexels, Pixabay, Unsplash) against one real response each once a key is
+  in. The EU Audiovisual Service is opt-in and off — it has no public API
+  (see the footage engine section). (The "scripting proposes archive shots"
+  half exists since the same day as the `Archive Suggestions` run, above.)
+  Scenes 102 and 103 of the disposable film `recaW2aLFFD06FpoN` carry
+  archive assets from the verification run and can stay as the
+  demonstration.
 - **Images on Google Flow instead of fal — designed, not applied.**
   `db/port/flow-images/README.md` holds the whole port: the useapi
   `POST /google-flow/images` contract (sync, `count` defaults to 4, the

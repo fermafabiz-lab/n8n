@@ -19,6 +19,7 @@ export const urlImportProvider: FootageProvider = {
   enabled: true,
   disabledReason: null,
   priority: 65,
+  tier: "library",
   categories: ["general"],
   searchCapabilities: { video: true, image: true, recentNews: true, historical: true, directDownload: false, localOnly: true },
 

@@ -21,6 +21,7 @@ export const userUploadProvider: FootageProvider = {
   enabled: true,
   disabledReason: null,
   priority: 60,
+  tier: "library",
   categories: ["general"],
   searchCapabilities: { video: true, image: true, recentNews: true, historical: true, directDownload: true, localOnly: true },
 

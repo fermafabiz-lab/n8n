@@ -347,6 +347,11 @@ export async function importFootageFromUrl(raw: string, opts: { signal?: AbortSi
 
   for (const p of allProviders()) {
     if (p.matchesUrl?.(url) && p.importFromUrl) {
+      // A provider that is off (no key, or opt-in and not opted in) cannot
+      // answer from its catalogue — its importer would only throw about the
+      // missing key. The page then goes through the generic reader below,
+      // like any other page, with whatever rights it states.
+      if (!p.enabled) break;
       const asset = await p.importFromUrl(url, opts);
       if (asset) return { asset, warnings: [], via: "provider" };
       break;

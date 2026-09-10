@@ -6,8 +6,8 @@
 // own results and nothing else; that a restricted licence is a filter and
 // never a score; that ACTUAL FOOTAGE is a matter of metadata and threshold,
 // never of appearance; that an upload is unknown until a person says; that a
-// talking head loses to eight seconds of B-roll; that NARA and Smithsonian
-// are gone from every search and still readable in the library.
+// talking head loses to eight seconds of B-roll; that a retired provider is
+// absent from every search and still readable in the library.
 //
 //   node --experimental-strip-types --import ./scripts/footage-loader.mjs scripts/check-footage.mjs
 import { dirname, join } from 'node:path';
@@ -20,6 +20,19 @@ const mock = await import(join(root, 'scripts', 'mocks', 'stock.mjs'));
 const { normalizeDvidsResult } = await import(join(root, 'lib', 'footage', 'providers', 'dvids.ts'));
 const { normalizeNasaItem, pickRendition } = await import(join(root, 'lib', 'footage', 'providers', 'nasa.ts'));
 const { normalizeEuAvItem, euAvItems } = await import(join(root, 'lib', 'footage', 'providers', 'euav.ts'));
+const { normalizeIaDoc, pickIaFile, iaQuery, iaFileUrl } = await import(join(root, 'lib', 'footage', 'providers', 'internetArchive.ts'));
+const { normalizeEuropeanaItem } = await import(join(root, 'lib', 'footage', 'providers', 'europeana.ts'));
+const { normalizeWellcomeImage, iiifImage } = await import(join(root, 'lib', 'footage', 'providers', 'wellcome.ts'));
+const { normalizeOpenverseResult, openverseLicenseCode } = await import(join(root, 'lib', 'footage', 'providers', 'openverse.ts'));
+const { normalizeLocResult, locFiles } = await import(join(root, 'lib', 'footage', 'providers', 'loc.ts'));
+const { normalizeFlickrPhoto } = await import(join(root, 'lib', 'footage', 'providers', 'flickr.ts'));
+const { normalizePexelsVideo, normalizePexelsPhoto, pickPexelsFile } = await import(join(root, 'lib', 'footage', 'providers', 'pexels.ts'));
+const { normalizePixabayVideo, normalizePixabayImage } = await import(join(root, 'lib', 'footage', 'providers', 'pixabay.ts'));
+const { normalizeUnsplashPhoto } = await import(join(root, 'lib', 'footage', 'providers', 'unsplash.ts'));
+
+// EU AV is opt-in (no public API — see the adapter); the engine cases below
+// exercise it as if the Commission offered one at the site's own host.
+process.env.EU_AV_API_BASE = 'https://audiovisual.ec.europa.eu/api';
 
 const results = [];
 const check = (name, got, want) => {
@@ -125,6 +138,26 @@ world['images-api.nasa.gov'] = async (url) => {
   return [200, { collection: { items: [{ href: 'https://images-assets.nasa.gov/video/KSC-20260908-1/KSC-20260908-1~orig.mp4' }, { href: 'https://images-assets.nasa.gov/video/KSC-20260908-1/KSC-20260908-1~medium.mp4' }] } }];
 };
 
+// The new archives, answering with what they really answered on 2026-09-10
+// (executions 11839–11842), trimmed.
+const IA_BRANDENBURG = { identifier: 'LC-44552', title: 'Brandenburg Gate Border Action, Berlin, Germany, 08/14/1961', description: 'LS, crowds of civilians on western side of the border at the Brandenburg Gate.', date: '1961-08-14T00:00:00Z', year: 1961, creator: 'United States. Army', collection: ['opensource_movies', 'community', 'fav-basilbob'], licenseurl: 'http://creativecommons.org/publicdomain/mark/1.0/', mediatype: 'movies', downloads: 3597, publicdate: '2011-02-01T00:00:00Z' };
+const IA_CONCERT = { identifier: 'dua-lipa-99-luftballons', title: 'Dua Lipa - 99 Luftballons (Hamburg, May 19, 2025)', date: '2025-05-19T00:00:00Z', licenseurl: 'https://creativecommons.org/licenses/by-nc-nd/4.0/', collection: ['opensource_movies'], mediatype: 'movies' };
+const IA_FILES = [
+  { name: 'LC-44552.gif', format: 'Animated GIF', size: '99456', source: 'derivative' },
+  { name: 'LC-44552.mp4', format: 'h.264', size: '45463077', width: '640', height: '360', length: '437.95', source: 'derivative' },
+  { name: 'LC-44552.ogv', format: 'Ogg Video', size: '31568459', width: '532', height: '300', length: '437.94', source: 'derivative' },
+  { name: 'LC-44552.thumbs/LC-44552_000001.jpg', format: 'Thumbnail', size: '1941', source: 'derivative' },
+];
+world['archive.org'] = async (url) => {
+  if (url.pathname === '/advancedsearch.php') return [200, { response: { numFound: 2, docs: [IA_BRANDENBURG, IA_CONCERT] } }];
+  if (url.pathname.startsWith('/metadata/')) return [200, { metadata: IA_BRANDENBURG, files: IA_FILES, server: 'ia', dir: '/0/items/LC-44552' }];
+  return [404, 'no', 'text/plain'];
+};
+const EUROPEANA_MESSTER = { id: '/08626/1037479000000222039', title: ['Knife Week No. 4', 'Messter-Woche Nr. 4', 'Messter Newsreel No. 4'], dcTitleLangAware: { en: ['Messter Newsreel No. 4'] }, type: 'VIDEO', year: ['1914'], rights: ['http://creativecommons.org/publicdomain/mark/1.0/'], edmIsShownBy: ['https://www.filmportal.de/sites/default/files/video/BArch_K_26356_Messter_Woche_Nr_4.mp4'], edmIsShownAt: ['https://www.filmportal.de/node/1225577'], edmPreview: ['https://api.europeana.eu/thumbnail/v2/url.json?uri=x&type=VIDEO'], dataProvider: ['Federal Archives of Germany'], edmTimespanLabel: [{ def: '1914' }, { def: '20. Jahrhundert' }], edmPlaceLabel: [{ def: 'Western Europe' }], country: ['Germany'], dcDescription: ['Credits: Messter Weekly No. 4. Intertitle: Next to a blown-up railway bridge over the Meuse our forces have constructed a provisional bridge.'], dcCreator: null, guid: 'https://www.europeana.eu/item/08626/1037479000000222039?utm_source=api' };
+world['api.europeana.eu'] = async () => [200, { success: true, totalResults: 1, items: [EUROPEANA_MESSTER] }];
+const WELLCOME_CHOLERA = { id: 'r9qn9a58', type: 'Image', aspectRatio: 1.5625, source: { id: 'd5vcm8mc', title: 'A London Board of Health hunting after cases like a cholera.', contributors: [{ agent: { label: 'Cruikshank, George' } }] }, thumbnail: { url: 'https://iiif.wellcomecollection.org/image/L0006896/info.json', credit: 'Wellcome Collection', license: { id: 'cc-by', label: 'Attribution 4.0 International (CC BY 4.0)', url: 'http://creativecommons.org/licenses/by/4.0/' } }, locations: [{ url: 'https://iiif.wellcomecollection.org/image/L0006896/info.json', credit: 'Wellcome Collection', license: { id: 'cc-by', label: 'Attribution 4.0 International (CC BY 4.0)', url: 'http://creativecommons.org/licenses/by/4.0/' } }] };
+world['api.wellcomecollection.org'] = async () => [200, { totalResults: 1, results: [WELLCOME_CHOLERA] }];
+
 const CEUTA_SCENE = {
   id: 'recSCENE000000001',
   narration: 'The migrant crisis in Ceuta intensified as people attempted to reach Spain from Morocco in May 2026.',
@@ -153,29 +186,50 @@ truthy('authored queries go first', F.generateSearchQueries({ ...req, queries: [
 // ---------------------------------------------------------------------------
 console.log('\n--- registry & router ---');
 const ids = F.allProviders().map((p) => p.id);
-check('the six providers', ids, ['eu_av', 'dvids', 'nasa', 'wikimedia', 'url_import', 'user_upload']);
-check('NARA is not a provider', ids.includes('nara'), false);
-check('Smithsonian is not a provider', ids.includes('smithsonian'), false);
-check('no adapter asks for a NARA key', F.allProviders().some((p) => /NARA_API_KEY/.test(p.disabledReason ?? '')), false);
-check('no adapter asks for a Smithsonian key', F.allProviders().some((p) => /SMITHSONIAN/.test(p.disabledReason ?? '')), false);
-check('DVIDS is off without its key', F.providerById('dvids').enabled, false);
+check('the fifteen providers, in registry order', ids, ['eu_av', 'dvids', 'nasa', 'internet_archive', 'europeana', 'loc', 'wikimedia', 'wellcome', 'flickr', 'openverse', 'pexels', 'pixabay', 'unsplash', 'url_import', 'user_upload']);
+check('ARCHIVE_PROVIDERS is the same list', [...archive.ARCHIVE_PROVIDERS], ids);
+truthy('every entry is a real adapter, none a placeholder', F.allProviders().every((p) => typeof p.search === 'function' && typeof p.checkRights === 'function' && p.tier));
+check('an id the registry does not know is not a provider', F.providerById('legacy_archive'), null);
+check('the keyless archives are on', ['internet_archive', 'europeana', 'wellcome', 'wikimedia', 'nasa'].map((id) => F.providerById(id).enabled), [true, true, true, true, true]);
+check('the keyed ones are off without their keys', ['dvids', 'flickr', 'openverse', 'pexels', 'pixabay', 'unsplash'].map((id) => F.providerById(id).enabled), [false, false, false, false, false, false]);
+truthy('and each says which key', ['dvids', 'flickr', 'openverse', 'pexels', 'pixabay', 'unsplash'].every((id) => /_KEY|_ID/.test(F.providerById(id).disabledReason)));
+check('Library of Congress is off until asked for (Cloudflare)', [F.providerById('loc').enabled, /Cloudflare/.test(F.providerById('loc').disabledReason)], [false, true]);
+check('EU AV is on only with a base URL', (() => { const b = process.env.EU_AV_API_BASE; delete process.env.EU_AV_API_BASE; const off = F.providerById('eu_av').enabled; process.env.EU_AV_API_BASE = b; return [off, F.providerById('eu_av').enabled]; })(), [false, true]);
 process.env.DVIDS_API_KEY = 'test-key';
-check('and on with it', F.providerById('dvids').enabled, true);
+check('DVIDS is on with its key', F.providerById('dvids').enabled, true);
 
 const route = (r) => F.routeProviders(r).map((x) => x.provider.id);
-check('European migration → EU AV first, Wikimedia along', route(req).slice(0, 2), ['eu_av', 'wikimedia']);
+check('European migration → EU AV first', route(req)[0], 'eu_av');
+truthy('and Wikimedia along', route(req).includes('wikimedia'));
 const military = F.buildFootageRequest({ id: 's', narration: 'Navy sailors delivered humanitarian aid after the earthquake in Turkey.', topic: 'military humanitarian operation', country: 'Turkey' });
 check('military conflict → DVIDS first', route(military)[0], 'dvids');
 const space = F.buildFootageRequest({ id: 's', narration: 'Artemis III lifted off from Kennedy Space Center.', topic: 'space mission', event: 'Artemis III launch' });
-check('a NASA mission → NASA first', route(space)[0], 'nasa');
-truthy('and Wikimedia along', route(space).includes('wikimedia'));
+check('a NASA mission → NASA first, over the general archives', route(space)[0], 'nasa');
+truthy('and an archive along', route(space).some((id) => id === 'internet_archive' || id === 'wikimedia'));
 const meeting = F.buildFootageRequest({ id: 's', narration: 'The European Council met in Brussels to discuss the budget.', organizations: ['European Council'], location: 'Brussels' });
 check('a European political meeting → EU AV', route(meeting)[0], 'eu_av');
 const history = F.buildFootageRequest({ id: 's', narration: 'In 1944 the Allied armies landed in Normandy.', event: 'Normandy landings' });
 check('a 1944 request skips the newsrooms', route(history).includes('dvids') || route(history).includes('eu_av'), false);
-check('but keeps the archive', route(history).includes('wikimedia'), true);
-truthy('never every provider for every scene', route(req).length <= 4);
+truthy('and goes to the archives', route(history).includes('wikimedia') && route(history).includes('internet_archive') && route(history).includes('europeana'));
+const plague = F.buildFootageRequest({ id: 's', narration: 'In 1854 cholera swept through Soho and the doctors argued about the pump.', event: 'Broad Street cholera outbreak' });
+truthy('a medical history scene reaches Wellcome', route(plague).includes('wellcome'));
+truthy('never every provider for every scene', [req, military, space, meeting, history, plague].every((r) => route(r).length <= 4));
 check('an explicit filter is honoured', F.routeProviders(req, { only: ['nasa'] }).map((x) => x.provider.id), ['nasa']);
+// Stock is for scenes that name no event, and only then — and even there it
+// comes AFTER the archives, whose `general` coverage is real dated material.
+// Note the fixture names no subject either: "a quiet BORDER town" matches the
+// geopolitics and migration categories, and on a subject the official and
+// archive sources fill all four slots, which is the right order for a
+// documentary and pushes stock off the cap.
+process.env.PEXELS_API_KEY = 'test-key';
+const generic = F.buildFootageRequest({ id: 's', narration: 'A quiet street at dawn, shutters still closed, a cat on the steps.' });
+truthy('a scene with no event may get stock B-roll', route(generic).includes('pexels'));
+check('but behind the archives', route(generic).indexOf('pexels'), route(generic).length - 1);
+const subject = F.buildFootageRequest({ id: 's', narration: 'A quiet border town at dawn, the crossing still closed.' });
+check('a generic scene on a real subject goes to the sources that cover it', route(subject).includes('eu_av'), true);
+check('a scene that names an event never gets stock', route(req).includes('pexels'), false);
+check('nor one that demands the exact event', route({ ...generic, requireExactEvent: true }).includes('pexels'), false);
+delete process.env.PEXELS_API_KEY;
 
 // ---------------------------------------------------------------------------
 // Normalizers — one shape from four dialects
@@ -207,6 +261,70 @@ const euEd = normalizeEuAvItem({ ref: 'I-2', title: 'T', type: 'video', copyrigh
 check('EU AV: editorial-only is editorial-only', F.validateRights(euEd).status, 'editorial_only');
 check('EU AV: the envelope is found under any of its names', euAvItems({ data: { results: [{ ref: 'x' }] } }).length, 1);
 check('EU AV: a speech is classified as one', normalizeEuAvItem({ ref: 'I-3', title: 'Statement by the President', type: 'video', genre: 'Speech' }).footageFormat, 'speech');
+
+// Internet Archive — the 1961 US Army film that the licensed query really answered.
+const ia = normalizeIaDoc(IA_BRANDENBURG);
+check('IA: provider, id, media', [ia.provider, ia.providerAssetId, ia.mediaType], ['internet_archive', 'LC-44552', 'video']);
+check('IA: a public-domain mark is public domain, credit not owed', [ia.rightsStatus, ia.reviewStatus, ia.attributionRequired], ['public_domain', 'auto_approved', false]);
+check('IA: the date is the film\'s, and it is historical', [ia.filmingDate, ia.origin, ia.yearsMentioned.includes(1961)], ['1961-08-14', 'historical', true]);
+check('IA: the item page and the thumbnail service', [ia.sourceUrl, ia.thumbnailUrl], ['https://archive.org/details/LC-44552', 'https://archive.org/services/img/LC-44552']);
+check('IA: a BY-NC-ND upload is refused by the classifier', normalizeIaDoc(IA_CONCERT).reviewStatus, 'rejected');
+check('IA: an uploader\'s own PDM outside the curated collections is manual review', normalizeIaDoc({ identifier: 'img-0667', title: 'Screenshots Of Evil Nun Roblox', creator: 'Jacob Winters', collection: ['opensource_image'], licenseurl: 'https://creativecommons.org/publicdomain/mark/1.0/', mediatype: 'image' }).reviewStatus, 'manual_review');
+check('IA: a Prelinger film with no licence is public domain by collection', normalizeIaDoc({ identifier: 'p1', title: 'Duck and Cover', collection: ['prelinger'], mediatype: 'movies', date: '1951-01-01T00:00:00Z' }).rightsStatus, 'public_domain');
+check('IA: a flagged collection is never an asset', normalizeIaDoc({ identifier: 'x', title: 'x', collection: ['fringe'], mediatype: 'movies' }), null);
+check('IA: the old CC public-domain URL reads as public domain', normalizeIaDoc({ identifier: 'g', title: 'Berlin Documentary', creator: 'United States. Army', collection: ['FedFlix'], licenseurl: 'http://creativecommons.org/licenses/publicdomain/', mediatype: 'movies' }).rightsStatus, 'public_domain');
+check('IA: h.264 beats Ogg, and the URL is the download path', [pickIaFile(IA_FILES, 'video').name, iaFileUrl('LC-44552', 'LC-44552.mp4')], ['LC-44552.mp4', 'https://archive.org/download/LC-44552/LC-44552.mp4']);
+truthy('IA: the query excludes the flagged collections and YouTube mirrors', /NOT collection:\(altcensored OR fringe OR deemphasize\)/.test(iaQuery('moon landing', 'video')) && /NOT identifier:youtube\*/.test(iaQuery('moon landing', 'video')));
+check('IA: stills come only from the curated collections', /licenseurl/.test(iaQuery('berlin wall', 'image')), false);
+truthy('IA: Solr syntax in a query is words, not operators', !/[:"()]/.test(iaQuery('a:b "c" (d)', 'video').split(') AND')[0].slice(1)));
+
+// Europeana — the 1914 Messter newsreel the mp4 query really answered.
+const eur = normalizeEuropeanaItem(EUROPEANA_MESSTER);
+check('Europeana: provider, id, media, the English title', [eur.provider, eur.providerAssetId, eur.mediaType, eur.title], ['europeana', '/08626/1037479000000222039', 'video', 'Messter Newsreel No. 4']);
+check('Europeana: the file is the mp4, the page is the provider\'s', [eur.downloadUrl.endsWith('.mp4'), eur.sourceUrl], [true, 'https://www.filmportal.de/node/1225577']);
+check('Europeana: PDM, the archive as credit, 1914, Germany, historical', [eur.rightsStatus, eur.credit, eur.filmingDate, eur.country, eur.origin], ['public_domain', 'Federal Archives of Germany', '1914', 'Germany', 'historical']);
+check('Europeana: a newsreel is a news package', eur.footageFormat, 'news_package');
+check('Europeana: no file, no asset', normalizeEuropeanaItem({ ...EUROPEANA_MESSTER, edmIsShownBy: [] }), null);
+
+// Wellcome — the cholera print the image query really answered.
+const wc = normalizeWellcomeImage(WELLCOME_CHOLERA);
+check('Wellcome: provider, id, CC BY with credit', [wc.provider, wc.providerAssetId, wc.rightsStatus, wc.attributionRequired], ['wellcome', 'r9qn9a58', 'cc_by', true]);
+check('Wellcome: IIIF info.json becomes a picture', [wc.downloadUrl, wc.thumbnailUrl], ['https://iiif.wellcomecollection.org/image/L0006896/full/2000,/0/default.jpg', 'https://iiif.wellcomecollection.org/image/L0006896/full/400,/0/default.jpg']);
+check('Wellcome: the artist and the work page', [wc.creator, wc.sourceUrl], ['Cruikshank, George', 'https://wellcomecollection.org/works/d5vcm8mc/images?id=r9qn9a58']);
+check('Wellcome: an NC licence is refused', normalizeWellcomeImage({ ...WELLCOME_CHOLERA, locations: [{ url: 'https://iiif.wellcomecollection.org/image/X/info.json', license: { id: 'cc-by-nc', label: 'CC BY-NC 4.0' } }] }).reviewStatus, 'rejected');
+check('iiifImage', iiifImage('https://iiif.example/image/A/info.json', 800), 'https://iiif.example/image/A/full/800,/0/default.jpg');
+
+// Openverse — documented shape.
+const ov = normalizeOpenverseResult({ id: 'ov-1', title: 'Berlin Wall 1989', foreign_landing_url: 'https://www.flickr.com/photos/x/1', url: 'https://live.staticflickr.com/1.jpg', creator: 'Someone', license: 'by', license_version: '2.0', license_url: 'https://creativecommons.org/licenses/by/2.0/', provider: 'flickr', source: 'flickr', tags: [{ name: 'berlin' }, { name: 'wall' }], attribution: '"Berlin Wall 1989" by Someone is licensed under CC BY 2.0.', width: 1024, height: 768, thumbnail: 'https://api.openverse.org/v1/images/ov-1/thumb/' });
+check('Openverse: codes map to the classifier\'s', [openverseLicenseCode('by'), openverseLicenseCode('pdm'), openverseLicenseCode('cc0')], ['cc-by', 'public domain mark', 'cc0']);
+check('Openverse: CC BY with credit, the attribution kept', [ov.rightsStatus, ov.attributionRequired, ov.credit], ['cc_by', true, '"Berlin Wall 1989" by Someone is licensed under CC BY 2.0.']);
+check('Openverse: PDM is public domain', normalizeOpenverseResult({ id: 'x', url: 'https://x/1.jpg', license: 'pdm' }).rightsStatus, 'public_domain');
+
+// Library of Congress — documented shape, unverified live (Cloudflare).
+const loc = normalizeLocResult({ id: 'https://www.loc.gov/item/2021667/', title: 'Apollo 11 launch', date: '1969', original_format: ['film, video'], image_url: ['https://tile.loc.gov/t.jpg'], contributor: ['NASA'], item: { rights: 'No known restrictions on publication.', location: ['Florida'] }, resources: [{ files: [[{ url: 'https://tile.loc.gov/a.mp4', mimetype: 'video/mp4', width: 640, height: 480, duration: 120 }]] }] });
+check('LoC: no known restrictions is public domain', [loc.provider, loc.mediaType, loc.rightsStatus, loc.reviewStatus], ['loc', 'video', 'public_domain', 'auto_approved']);
+check('LoC: the nested file list is read, the id is the path', [loc.downloadUrl, loc.durationSeconds, loc.providerAssetId], ['https://tile.loc.gov/a.mp4', 120, 'item/2021667']);
+check('LoC: any other rights sentence is manual review, kept verbatim', normalizeLocResult({ id: 'https://www.loc.gov/item/1/', title: 'T', original_format: ['photo, print, drawing'], item: { rights: 'Rights status not evaluated.' } }).reviewReason.includes('Rights status not evaluated'), true);
+check('locFiles flattens', locFiles([{ files: [[{ url: 'a' }], [{ url: 'b' }]] }, { video: 'c' }]).map((f) => f.url), ['a', 'b', 'c']);
+
+// Flickr — documented shape.
+const fl = normalizeFlickrPhoto({ id: '51', owner: '12@N01', pathalias: 'someone', title: 'Protest in Ceuta', license: '4', description: { _content: 'May 2026' }, datetaken: '2026-05-18 10:00:00', ownername: 'Someone', tags: 'ceuta protest', url_l: 'https://live.staticflickr.com/l.jpg', width_l: 1024, height_l: 768, url_o: 'https://live.staticflickr.com/o.jpg', width_o: 4000, height_o: 3000 });
+check('Flickr: CC BY with credit, the original file, the day taken', [fl.rightsStatus, fl.attributionRequired, fl.downloadUrl, fl.filmingDate, fl.width], ['cc_by', true, 'https://live.staticflickr.com/o.jpg', '2026-05-18', 4000]);
+check('Flickr: a photo of the day is recent news; a Commons one is historical', [fl.origin, normalizeFlickrPhoto({ id: '1', license: '7', url_l: 'https://x/l.jpg' }).origin], ['recent_news', 'historical']);
+check('Flickr: no known copyright restrictions is public domain, credit not owed', normalizeFlickrPhoto({ id: '1', license: '7', url_l: 'https://x/l.jpg' }).rightsStatus, 'public_domain');
+check('Flickr: a licence the query never asks for is not an asset', normalizeFlickrPhoto({ id: '1', license: '2', url_l: 'https://x/l.jpg' }), null);
+
+// Stock — documented shapes, and one rule: cleared under the library's blanket licence.
+const px = normalizePexelsVideo({ id: 7, width: 3840, height: 2160, duration: 12, url: 'https://www.pexels.com/video/7/', image: 'https://i/7.jpg', user: { name: 'Ana' }, video_files: [{ quality: 'uhd', file_type: 'video/mp4', width: 3840, height: 2160, link: 'https://v/uhd.mp4' }, { quality: 'hd', file_type: 'video/mp4', width: 1920, height: 1080, link: 'https://v/hd.mp4' }, { quality: 'sd', file_type: 'video/mp4', width: 960, height: 540, link: 'https://v/sd.mp4' }] });
+check('Pexels: the HD file, not the 4K one', [px.downloadUrl, px.width], ['https://v/hd.mp4', 1920]);
+check('Pexels: cleared, no credit owed, real stock', [F.validateRights(px).status, px.provenance, px.footageFormat, px.tier], ['cleared', 'real_stock', 'stockshots', undefined]);
+check('Pexels: a photo', normalizePexelsPhoto({ id: 9, width: 4000, height: 3000, url: 'https://www.pexels.com/photo/9/', photographer: 'Ana', alt: 'A quiet town', src: { large2x: 'https://i/9-2x.jpg', medium: 'https://i/9-m.jpg' } }).title, 'A quiet town');
+check('pickPexelsFile with only 4K takes it', pickPexelsFile([{ file_type: 'video/mp4', width: 3840, height: 2160, link: 'u' }]).link, 'u');
+const pb = normalizePixabayVideo({ id: 3, pageURL: 'https://pixabay.com/videos/id-3/', tags: 'town, dawn', duration: 20, user: 'Ion', videos: { large: { url: 'https://p/l.mp4', width: 1920, height: 1080, size: 100, thumbnail: 'https://p/l.jpg' }, medium: { url: 'https://p/m.mp4', width: 1280, height: 720 } } });
+check('Pixabay: large at 1920, cleared, tagged', [pb.downloadUrl, F.validateRights(pb).status, pb.categories], ['https://p/l.mp4', 'cleared', ['town', 'dawn']]);
+check('Pixabay: a photo', normalizePixabayImage({ id: 4, largeImageURL: 'https://p/4.jpg', tags: 'sea', imageWidth: 1920, imageHeight: 1280, user: 'Ion' }).title, 'Stock photo: sea');
+const us = normalizeUnsplashPhoto({ id: 'abcdefghijk', alt_description: 'a harbour at dusk', width: 6000, height: 4000, urls: { full: 'https://u/full.jpg', small: 'https://u/s.jpg' }, links: { html: 'https://unsplash.com/photos/abcdefghijk', download_location: 'https://api.unsplash.com/photos/abcdefghijk/download' }, user: { name: 'Maria' }, location: { city: 'Constanța', country: 'Romania' } });
+check('Unsplash: credit is OWED (the API guideline), and reads as it must', [F.validateRights(us).status, us.credit, us.location], ['attribution_required', 'Photo by Maria on Unsplash', 'Constanța, Romania']);
 
 // ---------------------------------------------------------------------------
 // Rights — the central validator
@@ -285,7 +403,9 @@ mock.reset();
 calls.length = 0;
 let r = await F.searchFootage(ceutaReq, { limit: 6, top: 12 });
 truthy('external providers were asked on an empty library', calls.length > 0);
-check('EU AV and Wikimedia were routed', r.providers.filter((p) => p.routed).map((p) => p.provider).sort(), ['eu_av', 'wikimedia']);
+const routed = r.providers.filter((p) => p.routed).map((p) => p.provider);
+truthy('EU AV and Wikimedia were routed, at most four in all', routed.includes('eu_av') && routed.includes('wikimedia') && routed.length <= 4);
+truthy('the library providers are never in the report as routed', !routed.includes('url_import') && !routed.includes('user_upload'));
 truthy('best match is EU AV B-roll of the event', r.candidates[0].asset.provider === 'eu_av' && r.candidates[0].asset.footageFormat === 'stockshots');
 check('the restricted third-party asset was filtered out, not merely ranked low', r.candidates.some((c) => c.asset.providerAssetId === 'I-260003' && c.rights.status === 'restricted'), false);
 truthy('every candidate is filed with an id', r.candidates.every((c) => c.asset.id));
@@ -382,6 +502,12 @@ world['commons.wikimedia.org'] = async (url) => url.searchParams.get('titles') ?
 imp = await F.importFootageFromUrl('https://commons.wikimedia.org/wiki/File:A.webm');
 check('a Commons page goes through the Commons adapter', [imp.via, imp.asset.provider, imp.asset.providerAssetId], ['provider', 'wikimedia', '77']);
 world['commons.wikimedia.org'] = commonsOrig;
+// A keyed provider that is OFF cannot answer from its catalogue; its page is
+// read like any other instead of the import dying on the missing key.
+delete process.env.PEXELS_API_KEY;
+world['www.pexels.com'] = async () => [200, page(''), 'text/html'];
+imp = await F.importFootageFromUrl('https://www.pexels.com/video/a-city-at-night-12345/');
+check('a page from a provider that is off goes through the generic reader', [imp.via === 'provider', imp.asset.provider], [false, 'url_import']);
 
 // ---------------------------------------------------------------------------
 // The legacy door, and the retired providers
@@ -390,18 +516,16 @@ console.log('\n--- legacy & deprecation ---');
 mock.reset();
 const legacy = await archive.searchArchives('Ceuta border', { mediaType: 'any', limit: 6 });
 truthy('searchArchives still answers, through the engine', legacy.results.length > 0);
-check('ARCHIVE_PROVIDERS names no retired provider', archive.ARCHIVE_PROVIDERS.filter((p) => p === 'nara' || p === 'smithsonian'), []);
-check('adapterFor(nara) is null — no search reaches it', archive.adapterFor('nara'), null);
-check('adapterFor(smithsonian) is null', archive.adapterFor('smithsonian'), null);
-// An old row under a retired provider stays readable and rankable.
+// A retired provider: absent from the registry, null from the door, and the
+// rows it once filed still readable and rankable in the library.
+check('ARCHIVE_PROVIDERS names only registry ids', archive.ARCHIVE_PROVIDERS.filter((p) => !F.providerById(p)), []);
+check('adapterFor(a retired id) is null — no search reaches it', archive.adapterFor('legacy_archive'), null);
 mock.reset();
-await mock.saveStockCandidates([{ ...eu, provider: 'nara', providerAssetId: 'old-1', title: 'Ceuta 1936 newsreel', description: 'Spain', searchableText: 'ceuta 1936 newsreel spain' }]);
+await mock.saveStockCandidates([{ ...eu, provider: 'legacy_archive', providerAssetId: 'old-1', title: 'Ceuta 1936 newsreel', description: 'Spain', searchableText: 'ceuta 1936 newsreel spain' }]);
 r = await F.searchFootage(ceutaReq, { limit: 6, top: 12, localOnly: true });
-check('an old NARA row is still found in the library', r.candidates.some((c) => c.asset.provider === 'nara'), true);
-check('and no provider named nara was asked', r.providers.some((p) => p.provider === 'nara'), false);
-const routedIds = F.searchableProviders().map((p) => p.id);
-check('the router can never pick a retired provider', routedIds.filter((id) => id === 'nara' || id === 'smithsonian'), []);
-check('an old provider keeps a readable name', F.providerById('nara'), null);
+check('an old row under a retired provider is still found in the library', r.candidates.some((c) => c.asset.provider === 'legacy_archive'), true);
+check('and no provider by that name was asked', r.providers.some((p) => p.provider === 'legacy_archive'), false);
+check('the router can never pick it', F.searchableProviders().map((p) => p.id).includes('legacy_archive'), false);
 
 // ---------------------------------------------------------------------------
 // The watermark contract: what the scene would print for a chosen asset
@@ -413,7 +537,8 @@ check('an actual-footage match prints ACTUAL FOOTAGE with its source', P.formatS
 const ill = F.judge(ceutaReq, { ...wrongPlace, id: 'rec2' }, false);
 check('an illustrative match prints ILLUSTRATIVE FOOTAGE', P.getSourceLabel({ visualOrigin: ill.provenance }), 'ILLUSTRATIVE FOOTAGE');
 check('DVIDS prints its own name', P.providerLabel('dvids'), 'DVIDS');
-check('and a retired provider still prints one', P.providerLabel('nara'), 'US National Archives');
+check('so do the new archives', ['internet_archive', 'europeana', 'wellcome', 'loc'].map((id) => P.providerLabel(id)), ['Internet Archive', 'Europeana', 'Wellcome Collection', 'Library of Congress']);
+check('and a retired provider still prints something readable', P.providerLabel('legacy_archive'), 'Legacy Archive');
 
 console.log(`\n${results.filter(Boolean).length}/${results.length} passed`);
 process.exit(results.every(Boolean) ? 0 : 1);

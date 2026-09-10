@@ -75,7 +75,7 @@ export const VISUAL_ORIGINS: readonly VisualOrigin[] = [
 export interface VisualProvenance {
   visualOrigin: VisualOrigin;
   /**
-   * Free string on purpose (§22): "wikimedia", "nara", "reuters",
+   * Free string on purpose (§22): "wikimedia", "internet_archive", "reuters",
    * "eu_audiovisual", "producer_upload". A new source must not need a code
    * change to be nameable, so unknown values are title-cased for display
    * rather than rejected.
@@ -314,17 +314,24 @@ export function refuseFootageType(
   return null;
 }
 
+// In lockstep with remotion/src/provenance.ts — the site's chips and the
+// film's watermark must name a source the same way.
 const PROVIDER_LABELS: Record<string, string> = {
   wikimedia: "Wikimedia Commons",
   eu_av: "EU Audiovisual Service",
   dvids: "DVIDS",
   nasa: "NASA",
+  internet_archive: "Internet Archive",
+  europeana: "Europeana",
+  loc: "Library of Congress",
+  wellcome: "Wellcome Collection",
+  flickr: "Flickr",
+  openverse: "Openverse",
+  pexels: "Pexels",
+  pixabay: "Pixabay",
+  unsplash: "Unsplash",
   url_import: "URL import",
   user_upload: "Manual upload",
-  // Retired providers (docs/nara-smithsonian-deprecation.md): no search
-  // reaches them, but rows they filed still print their real names.
-  nara: "US National Archives",
-  smithsonian: "Smithsonian",
 };
 
 /**

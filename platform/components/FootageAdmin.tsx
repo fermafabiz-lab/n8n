@@ -24,15 +24,9 @@ import FootageImport from "./FootageImport";
 import FootageUpload from "./FootageUpload";
 import styles from "./FootageAdmin.module.css";
 
-const PROVIDER_FILTERS: Array<{ id: string; label: string }> = [
-  { id: "all", label: "All" },
-  { id: "wikimedia", label: "Wikimedia" },
-  { id: "eu_av", label: "EU Audiovisual" },
-  { id: "dvids", label: "DVIDS" },
-  { id: "nasa", label: "NASA" },
-  { id: "url_import", label: "URL Import" },
-  { id: "user_upload", label: "Manual Upload" },
-];
+// The provider chips are the registry's own list (it arrives as `health`),
+// so a new adapter shows up here the day it lands and nothing is retyped.
+const PROVIDER_FILTERS: Array<{ id: string; label: string }> = [{ id: "all", label: "All" }];
 
 const PROVENANCES = ["actual_footage", "illustrative_footage", "archival_footage", "archival_photo", "real_stock", "unknown"] as const;
 
@@ -93,7 +87,7 @@ export default function FootageAdmin({
 
       <div className={styles.toolbar}>
         <div className={styles.chips} role="group" aria-label="Provider">
-          {PROVIDER_FILTERS.map((p) => (
+          {[...PROVIDER_FILTERS, ...health.map((h) => ({ id: h.id, label: h.displayName }))].map((p) => (
             <button key={p.id} type="button" aria-pressed={get("provider", "all") === p.id} onClick={() => set({ provider: p.id })}>
               {p.label}
             </button>

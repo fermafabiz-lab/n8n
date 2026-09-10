@@ -2,36 +2,62 @@
  * The provider registry and the router that reads it.
  *
  * A request is a description of what a scene NEEDS; the registry knows what
- * each provider is GOOD FOR. The router puts the two together: it reads the
- * request's topic, event, place, country, dates, people and organisations,
- * turns them into a handful of category tags, and asks the providers whose
- * categories intersect — most matches first, priority breaking ties — with
- * the general providers always in the list so an unusual subject is never
- * met with silence.
+ * each provider is GOOD FOR, on two axes. The subject categories say WHAT a
+ * provider holds (military, space, medicine, Europe…); the tier says what
+ * KIND of source it is — an official body publishing its own footage, an
+ * archive of dated historical material, a community of openly licensed
+ * photographs, or a stock library of generic B-roll. The router scores every
+ * enabled provider on both, asks the best four, and never the whole list:
+ * a stock library has nothing to say about a named event, an official
+ * newsroom nothing about 1944, and a request that matches nothing still
+ * reaches the general archives so no scene is met with silence.
  *
  * Adding a provider is one entry here and one file in ./providers. Nothing in
  * the scene-matching path names a provider.
  */
 
 import type { ArchiveProvider } from "@/lib/archive/types";
-import type { FootageProvider, FootageSearchRequest } from "./types";
+import type { FootageProvider, FootageSearchRequest, ProviderTier } from "./types";
 import { wikimediaProvider } from "./providers/wikimedia";
 import { euAvProvider } from "./providers/euav";
 import { dvidsProvider } from "./providers/dvids";
 import { nasaProvider } from "./providers/nasa";
+import { internetArchiveProvider } from "./providers/internetArchive";
+import { europeanaProvider } from "./providers/europeana";
+import { locProvider } from "./providers/loc";
+import { wellcomeProvider } from "./providers/wellcome";
+import { flickrProvider } from "./providers/flickr";
+import { openverseProvider } from "./providers/openverse";
+import { pexelsProvider } from "./providers/pexels";
+import { pixabayProvider } from "./providers/pixabay";
+import { unsplashProvider } from "./providers/unsplash";
 import { urlImportProvider } from "./providers/urlImport";
 import { userUploadProvider } from "./providers/upload";
 
 /**
- * The active providers, in priority order. NARA and Smithsonian are NOT here
- * and must not come back as "disabled" placeholders — see
- * docs/nara-smithsonian-deprecation.md; the library still reads their rows.
+ * The active providers, in priority order within each tier. Every one is a
+ * file under ./providers; a provider the producer has retired is simply not
+ * here — never a disabled placeholder (docs/footage-sources.md).
  */
 const PROVIDERS: readonly FootageProvider[] = [
+  // official — a body's own footage of its own events
   euAvProvider,
   dvidsProvider,
   nasaProvider,
+  // archive — dated historical material with a rights statement per item
+  internetArchiveProvider,
+  europeanaProvider,
+  locProvider,
   wikimediaProvider,
+  wellcomeProvider,
+  // community — photographs people licensed openly
+  flickrProvider,
+  openverseProvider,
+  // stock — generic B-roll under a blanket licence
+  pexelsProvider,
+  pixabayProvider,
+  unsplashProvider,
+  // library — our own rows; never routed
   urlImportProvider,
   userUploadProvider,
 ];
@@ -45,7 +71,7 @@ export function providerById(id: string): FootageProvider | null {
 }
 
 /**
- * Providers the router may ASK. The two local ones (uploads, URL imports)
+ * Providers the router may ASK. The local ones (uploads, URL imports)
  * answer from the library, which the engine reads first anyway — routing them
  * would search the same rows twice and report a "provider" that never left
  * the box. The picker's explicit filter still reaches them through the
@@ -87,6 +113,8 @@ const CATEGORY_TERMS: Record<string, RegExp> = {
   space:
     /\b(space\w*|nasa|orbit\w*|astronaut\w*|cosmonaut\w*|rocket\w*|launch\w*|satellite\w*|iss\b|space station|apollo|artemis|mars|moon|lunar|shuttle|spatiu|spatial\w*|racheta|astronaut\w*|lansar\w*)/i,
   science: /\b(scien\w*|research\w*|laborator\w*|experiment\w*|physics|biology|chemistry|telescope|stiint\w*|cercet\w*)/i,
+  medicine:
+    /\b(medic\w*|health|disease\w*|epidemic\w*|pandemic\w*|hospital\w*|doctor\w*|nurse\w*|vaccin\w*|cholera|plague|surgery|surgeon\w*|anatomy|virus\w*|sanatate|boal\w*|spital\w*|epidemi\w*|pandemi\w*)/i,
   technology: /\b(technolog\w*|engineer\w*|prototype|robot\w*|computer\w*|software|tehnolog\w*|ingine\w*)/i,
   earth: /\b(earth observation|climate|atmosphere|glacier\w*|ocean\w*|hurricane|weather|satellite imagery|clima\w*|ghetar\w*)/i,
   missions: /\b(mission\w*|launch\w*|landing|docking|spacewalk|misiun\w*)/i,
@@ -128,42 +156,72 @@ export interface RoutedProvider {
   provider: FootageProvider;
   /** How many of the request's categories it claims. */
   matches: number;
+  /** The router's score — why it is in the list, for the report. */
+  score: number;
+}
+
+/** How far a tier fits what the request is: its era and whether it names an event. */
+function tierFit(tier: ProviderTier, p: FootageProvider, r: FootageSearchRequest, historical: boolean): number {
+  const hasEvent = Boolean(r.event);
+  const hasPlace = Boolean(r.location || r.country);
+  const wantsPictures = r.preferredFootageType !== "speech" && r.preferredFootageType !== "interview";
+  switch (tier) {
+    case "official":
+      // A newsroom cannot search the past; on its own subjects it LEADS —
+      // a body's footage of its own events outranks an archive's general
+      // coverage, which is what the +3 buys against the archive's `general`.
+      if (historical && !p.searchCapabilities.historical) return -Infinity;
+      return p.categories.some((c) => c !== "general" && requestCategories(r).includes(c)) ? 3 : 0;
+    case "archive":
+      // Dated material: the whole answer for history, a strong second on any
+      // named event, and — through `general` — the fallback for everything.
+      return (historical ? 2 : hasEvent ? 1 : 0) + (p.categories.includes("general") ? 2 : 0);
+    case "community":
+      // Photographs of the day: recent events and places, after the official
+      // sources; the Commons side (historical capability) rides along on history.
+      return historical ? (p.searchCapabilities.historical ? 0.5 : -Infinity) : hasEvent || hasPlace ? 1 : 0;
+    case "stock":
+      // Generic B-roll is an answer only when the scene names NO event: a
+      // real clip of the wrong thing is not real footage of anything.
+      return hasEvent || r.requireExactEvent || !wantsPictures ? -Infinity : 1;
+    case "library":
+      return -Infinity;
+  }
 }
 
 /**
- * Which providers to ask, in order. Every enabled searchable provider that
- * shares a category with the request, most matches first, then priority;
- * providers that only claim "general" ride along at the end. A request that
- * names an explicit provider list is honoured as given. `max` bounds the
- * fan-out — four at a time is plenty, and the spec is explicit about not
- * searching everything for everything.
+ * Which providers to ask, in order. Every enabled searchable provider is
+ * scored — two points per subject category it shares with the request,
+ * plus its tier's fit for the request's era and shape — and the best `max`
+ * with a positive score are asked, priority breaking ties. A request that
+ * names an explicit provider list is honoured as given. Four at a time is
+ * plenty, and the spec is explicit about not searching everything for
+ * everything.
  */
 export function routeProviders(
   r: FootageSearchRequest,
   opts: { only?: ArchiveProvider[]; max?: number; historical?: boolean } = {},
 ): RoutedProvider[] {
   const wanted = searchableProviders().filter((p) => !opts.only || opts.only.includes(p.id));
-  if (opts.only?.length) return wanted.map((provider) => ({ provider, matches: 1 }));
+  if (opts.only?.length) return wanted.map((provider) => ({ provider, matches: 1, score: 1 }));
 
   const cats = requestCategories(r);
   const historical = opts.historical ?? cats.includes("history");
   const scored = wanted.map((provider) => {
-    let matches = provider.categories.filter((c) => c !== "general" && cats.includes(c)).length;
-    // Historical requests belong to the archive, not to the newsrooms; a
-    // provider that cannot search the past loses its topical matches.
-    if (historical && !provider.searchCapabilities.historical) matches = 0;
-    return { provider, matches };
+    const matches = provider.categories.filter((c) => c !== "general" && cats.includes(c)).length;
+    const fit = tierFit(provider.tier, provider, r, historical);
+    const score = fit === -Infinity ? 0 : matches * 2 + fit;
+    return { provider, matches, score };
   });
-  const general = (p: FootageProvider) => p.categories.includes("general");
   const chosen = scored
-    .filter(({ provider, matches }) => matches > 0 || general(provider))
-    .sort((a, b) => b.matches - a.matches || b.provider.priority - a.provider.priority);
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score || b.provider.priority - a.provider.priority);
   return chosen.slice(0, Math.max(1, opts.max ?? 4));
 }
 
 /** What the picker's provider filter offers. */
-export function providerFilterOptions(): Array<{ id: ArchiveProvider; label: string; enabled: boolean; reason: string | null }> {
-  return PROVIDERS.map((p) => ({ id: p.id, label: p.displayName, enabled: p.enabled, reason: p.disabledReason }));
+export function providerFilterOptions(): Array<{ id: ArchiveProvider; label: string; enabled: boolean; reason: string | null; tier: ProviderTier }> {
+  return PROVIDERS.map((p) => ({ id: p.id, label: p.displayName, enabled: p.enabled, reason: p.disabledReason, tier: p.tier }));
 }
 
 export const FootageProviderRegistry = { all: allProviders, get: providerById, searchable: searchableProviders, route: routeProviders };

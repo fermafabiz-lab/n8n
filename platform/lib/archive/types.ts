@@ -30,28 +30,45 @@ export const VISUAL_SOURCES: readonly DocumentaryVisualSource[] = [
 ];
 
 /**
- * A provider id. The six the registry knows are named so the compiler can
+ * A provider id. The ones the registry knows are named so the compiler can
  * catch a typo in the code that routes to them; the `string` tail keeps the
- * type open, because the library holds rows from providers that no longer
- * search (NARA and Smithsonian were declared and never built — see
- * docs/nara-smithsonian-deprecation.md) and a future provider must be
- * storable the day its adapter lands, with no migration.
+ * type open, because the library may hold rows from a provider that has
+ * since been retired, and a future provider must be storable the day its
+ * adapter lands, with no migration.
  */
 export type ArchiveProvider =
   | "wikimedia"
   | "eu_av"
   | "dvids"
   | "nasa"
+  | "internet_archive"
+  | "europeana"
+  | "loc"
+  | "wellcome"
+  | "flickr"
+  | "openverse"
+  | "pexels"
+  | "pixabay"
+  | "unsplash"
   | "url_import"
   | "user_upload"
   | (string & {});
 
-/** The providers that SEARCH today, in registry order. */
+/** The providers the registry holds, in registry order (docs/footage-sources.md). */
 export const ARCHIVE_PROVIDERS: readonly ArchiveProvider[] = [
   "eu_av",
   "dvids",
   "nasa",
+  "internet_archive",
+  "europeana",
+  "loc",
   "wikimedia",
+  "wellcome",
+  "flickr",
+  "openverse",
+  "pexels",
+  "pixabay",
+  "unsplash",
   "url_import",
   "user_upload",
 ];

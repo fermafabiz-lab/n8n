@@ -43,9 +43,16 @@ page — and takes, in order of trust:
 | duration | ISO 8601 `duration` (`PT1M30S` → 90) or `video:duration` |
 | rights | `rel="license"` link, JSON-LD `license` (creativecommons.org URLs are understood), `copyrightNotice`/`copyright` metas, `copyrightHolder`; then the host's published policy (`DOMAIN_RIGHTS`: europa.eu, nasa.gov, defense.gov/mil sites); else *No licence stated on the page* |
 
-A Wikimedia Commons `File:` page is routed to the Commons adapter instead
-(`matchesUrl` / `importFromUrl` on the provider), so it arrives as a
-`wikimedia` asset with the template's licence.
+A page that belongs to a provider is routed to that provider's own
+importer instead (`matchesUrl` / `importFromUrl` on the adapter): a
+Commons `File:` page arrives as a `wikimedia` asset with the template's
+licence, an `archive.org/details/…` page as an `internet_archive` asset
+with its collection's rights, and likewise Europeana, Library of Congress,
+Wellcome, NASA, DVIDS, EU AV, Flickr, Pexels, Pixabay and Unsplash item
+pages — the provider's catalogue answer, not a scrape of its HTML. A
+provider that is off (no key, or opt-in and not opted in) is skipped, and
+the page goes through the generic reader below like any other, with the
+rights it states.
 
 ## Rights
 

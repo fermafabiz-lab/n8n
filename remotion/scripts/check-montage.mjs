@@ -28,6 +28,7 @@ const {planMontage, montageStats, auditCuts, pictureChanges, framingOverscan, MI
 // Cards are derived exactly as FinalVideo derives them, so the report measures
 // the edit that will actually render rather than a framing-only skeleton.
 const {buildTextCards, toMontageCards} = await import(join(root, 'src', 'textCards.ts'));
+const {hookEndSeconds} = await import(join(root, 'src', 'hook.ts'));
 
 const args = process.argv.slice(2);
 const iFlag = args.indexOf('--intensity');
@@ -52,7 +53,9 @@ const cards = buildTextCards({
 	evidence: props.evidence,
 	explicit: props.textCards,
 	chapterCardsOn: props.showChapterCards !== false,
-	hookSeconds: props.showHookTitle === false ? 0 : (props.hookTitleDurationInSeconds ?? 3.5),
+	// The whole teaser: cards never land on a hook shot. Same derivation
+	// FinalVideo makes (src/hook.ts), so the report measures the real edit.
+	hookSeconds: hookEndSeconds(props.scenes ?? []),
 });
 console.log(
 	cards.length

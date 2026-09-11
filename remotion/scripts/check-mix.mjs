@@ -97,7 +97,9 @@ for (const nativeOn of [true, false]) {
 	for (const musicDuck of [null, 'bands', 'flat']) {
 		for (const stingers of [true, false]) {
 			for (const chapters of [[], [12.5, 40.25]]) {
-				CASES.push({nativeOn, musicDuck, stingers, chapterBoundaries: chapters});
+				for (const hookRiser of [true, false]) {
+					CASES.push({nativeOn, musicDuck, stingers, chapterBoundaries: chapters, hookRiser});
+				}
 			}
 		}
 	}
@@ -115,6 +117,9 @@ for (const c of CASES) {
 	const boomIdx = c.stingers ? idx++ : -1;
 	const whooshIdx = c.stingers ? idx++ : -1;
 	const riserIdx = c.stingers ? idx++ : -1;
+	// The hook's own pair, after the stingers exactly as assemble orders them.
+	const hookRiserIdx = c.hookRiser ? idx++ : -1;
+	const hookBoomIdx = c.hookRiser ? idx++ : -1;
 	const parts = buildMixGraph({
 		nativeOn: c.nativeOn,
 		nativeVolume: 0.35,
@@ -129,6 +134,10 @@ for (const c of CASES) {
 		whooshIdx,
 		riserIdx,
 		chapterBoundaries: c.chapterBoundaries,
+		hookRiser: c.hookRiser,
+		hookRiserIdx,
+		hookBoomIdx,
+		hookEndSeconds: c.hookRiser ? 12.5 : 0,
 	});
 	const problems = audit(parts, {
 		external: c.nativeOn ? ['voiceraw', 'natraw'] : ['voiceraw'],
@@ -139,7 +148,7 @@ for (const c of CASES) {
 		if (!worstDetail) {
 			worstDetail =
 				`native=${c.nativeOn} music=${c.musicDuck} stingers=${c.stingers} ` +
-				`chapters=${c.chapterBoundaries.length}\n      ` +
+				`chapters=${c.chapterBoundaries.length} hookRiser=${c.hookRiser}\n      ` +
 				problems.join('\n      ');
 		}
 	}
@@ -210,6 +219,25 @@ const g = (over = {}) =>
 	const none = g({music: false, musicDuck: null});
 	check(!none.includes('[mduck]') && !none.includes('acrossover'), 'no music means no music chain');
 	check(none.includes('asplit=2[vmain]'), 'and the voice is split only as far as it is needed');
+}
+{
+	// The hook riser ends ON the cut to the story and the boom lands on it —
+	// independent of the music switch, because it is what the shots are doing.
+	const {HOOK_RISER_SECONDS} = await import(join(root, 'server', 'assemble.mjs'));
+	const hook = g({music: false, musicDuck: null, hookRiser: true, hookRiserIdx: 7, hookBoomIdx: 8, hookEndSeconds: 12.5});
+	const riser = hook.match(/\[7:a\]adelay=(\d+)\|/);
+	const boom = hook.match(/\[8:a\]adelay=(\d+)\|/);
+	check(
+		riser && Number(riser[1]) === Math.round((12.5 - HOOK_RISER_SECONDS) * 1000),
+		'the hook riser ends exactly on the hook boundary',
+		riser ? `${riser[1]}ms + ${HOOK_RISER_SECONDS}s` : 'no riser',
+	);
+	check(boom && Number(boom[1]) === 12500, 'the boom lands on the cut to the story');
+	check(
+		!g({hookRiser: true, hookRiserIdx: 7, hookBoomIdx: 8, hookEndSeconds: 0}).includes('[hookriser]'),
+		'a film with no hook gets no riser however it was asked',
+	);
+	check(!g().includes('[hookriser]'), 'and nothing is placed when it was not asked');
 }
 
 console.log(

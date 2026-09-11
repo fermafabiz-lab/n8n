@@ -29,9 +29,14 @@
 //   means one level whichever track the folder handed over, and the bed
 //   ducks by BAND: the speech range steps aside for every spoken syllable
 //   while the bass and the air only lean back. See buildMixGraph.
+//   The HOOK (2026-09-11): a scene may carry holdSeconds / minSeconds /
+//   gapSeconds to be cut as a teaser shot rather than as a narrated scene,
+//   and hookRiser: true places a riser under the last seconds of chapter 0
+//   with a boom on the cut to chapter 1. Both are decided by n8n's Build
+//   Timeline from the project's hookPlan; absent, nothing changes.
 // GET  /assemble/:jobId/status -> { status, outputUrl, verify: {videoSeconds,
-//   audioSeconds, sceneStartsSeconds} } — verify comes from ffprobe on the
-//   result, so callers can confirm alignment numerically.
+//   audioSeconds, sceneStartsSeconds, hookEndSeconds} } — verify comes from
+//   ffprobe on the result, so callers can confirm alignment numerically.
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
@@ -221,6 +226,9 @@ async function hasAudioStream(file) {
 	}
 }
 
+/** Length of the hook riser, in seconds; it ends exactly on the hook boundary. */
+export const HOOK_RISER_SECONDS = 3.2;
+
 // Synthesize the SFX bank once. Pure ffmpeg — no downloaded assets.
 let sfxReady = null;
 function ensureSfx() {
@@ -242,7 +250,16 @@ function ensureSfx() {
 				await run('ffmpeg', ['-y', '-f', 'lavfi', '-i', 'anoisesrc=color=brown:duration=2.2:amplitude=0.8',
 					'-af', 'highpass=f=200,afade=t=in:d=1.9,afade=t=out:st=1.9:d=0.3,aformat=sample_rates=44100:channel_layouts=mono', riser]);
 			}
-			return {whoosh, boom, riser};
+			// The hook's riser: longer and brighter than the end-screen one, so
+			// it reads as tension building under the teaser's last shots rather
+			// than as a sign-off. HOOK_RISER_SECONDS is what the mix graph
+			// subtracts from the hook boundary to land its end ON the cut.
+			const hookRiser = path.join(SFX_DIR, 'hookriser.wav');
+			if (!fs.existsSync(hookRiser)) {
+				await run('ffmpeg', ['-y', '-f', 'lavfi', '-i', `anoisesrc=color=pink:duration=${HOOK_RISER_SECONDS}:amplitude=0.8`,
+					'-af', `highpass=f=160,lowpass=f=6500,afade=t=in:d=${(HOOK_RISER_SECONDS - 0.25).toFixed(2)},afade=t=out:st=${(HOOK_RISER_SECONDS - 0.25).toFixed(2)}:d=0.25,aformat=sample_rates=44100:channel_layouts=mono`, hookRiser]);
+			}
+			return {whoosh, boom, riser, hookRiser};
 		})();
 	}
 	return sfxReady;
@@ -354,6 +371,10 @@ export function buildMixGraph({
 	whooshIdx,
 	riserIdx,
 	chapterBoundaries,
+	hookRiser = false,
+	hookRiserIdx = -1,
+	hookBoomIdx = -1,
+	hookEndSeconds = 0,
 }) {
 	const out = [];
 	// Mix bus: narration first (defines length), then ducked music, then SFX.
@@ -448,6 +469,18 @@ export function buildMixGraph({
 		out.push(`[${riserIdx}:a]adelay=${riserMs}|${riserMs},volume=0.35[sfxriser]`);
 		mixInputs.push('[sfxriser]');
 	}
+	if (hookRiser && hookEndSeconds > 0) {
+		// Tension under the teaser's last shots, ending ON the cut to the story,
+		// and a boom on that cut. The riser's own length is subtracted so its
+		// peak and the boundary are the same instant; a hook shorter than the
+		// riser simply starts it at zero.
+		const riserMs = Math.max(0, Math.round((hookEndSeconds - HOOK_RISER_SECONDS) * 1000));
+		out.push(`[${hookRiserIdx}:a]adelay=${riserMs}|${riserMs},volume=0.42[hookriser]`);
+		mixInputs.push('[hookriser]');
+		const boomMs = Math.max(0, Math.round(hookEndSeconds * 1000));
+		out.push(`[${hookBoomIdx}:a]adelay=${boomMs}|${boomMs},volume=0.5[hookboom]`);
+		mixInputs.push('[hookboom]');
+	}
 
 	out.push(
 		`${mixInputs.join('')}amix=inputs=${mixInputs.length}:duration=first:normalize=0,alimiter=limit=0.95[outa]`,
@@ -511,6 +544,34 @@ export function registerAssemble(app, {jobs, outputDir}) {
 			const n = Number(req.body && req.body.sceneGap);
 			return Number.isFinite(n) && n >= 0.2 && n <= 2 ? n : 0.35;
 		})();
+		// Per-scene overrides, for the HOOK (2026-09-11). A teaser is cut fast:
+		// its shots are three seconds, not eight, its gap is on the last word,
+		// not a breath after it, and a SILENT shot has no narration to take its
+		// length from at all. So a scene may carry, each optional and each
+		// clamped on its own:
+		//   holdSeconds  the length of a scene with NO voice (else the clip's own)
+		//   minSeconds   the floor for a scene WITH voice (a two-word beat still
+		//                needs long enough for the picture to register)
+		//   gapSeconds   this scene's breath after its narration, replacing sceneGap
+		// Absent, every scene times exactly as it always has.
+		const sceneOverride = (s) => {
+			const num = (v, lo, hi) => {
+				const n = Number(v);
+				return Number.isFinite(n) && n >= lo && n <= hi ? n : null;
+			};
+			return {
+				hold: num(s && s.holdSeconds, 0.5, 20),
+				min: num(s && s.minSeconds, 0.5, 20),
+				gap: num(s && s.gapSeconds, 0, 2),
+			};
+		};
+		// A riser under the last seconds of the hook and a boom on its boundary
+		// — asked for by the cliffhanger and action styles, whose whole point is
+		// tension that breaks on the cut. Independent of `stingers`: those are
+		// music-like accents unrelated to the picture, this one is what the
+		// shots themselves are doing. Only meaningful when the film HAS a hook
+		// (a chapter-0 run followed by chapter 1); otherwise it is ignored.
+		const hookRiser = Boolean(req.body && req.body.hookRiser);
 		const hd = String((req.body && req.body.resolution) || '720p').toLowerCase() === '1080p';
 		const W = portrait ? (hd ? 1080 : 720) : (hd ? 1920 : 1280);
 		const H = portrait ? (hd ? 1920 : 1280) : (hd ? 1080 : 720);
@@ -528,7 +589,7 @@ export function registerAssemble(app, {jobs, outputDir}) {
 		(async () => {
 			const work = fs.mkdtempSync(path.join(os.tmpdir(), 'assemble-'));
 			try {
-				const sfx = stingers ? await ensureSfx() : null;
+				const sfx = stingers || hookRiser ? await ensureSfx() : null;
 
 				// 1. Download everything and measure each clip's real video length.
 				const items = [];
@@ -593,8 +654,18 @@ export function registerAssemble(app, {jobs, outputDir}) {
 					let eff = dur;
 					let stretch = 1;
 					let freeze = 0;
+					const over = sceneOverride(scenes[i]);
+					if (!voiceDur && over.hold !== null) {
+						// A silent hook shot: the plan says how long it is held. The
+						// clip is retimed to it exactly as a voiced scene is to its
+						// narration — a three-second hold on an eight-second clip
+						// plays at 1.54x and cuts, which is the pace a teaser wants.
+						eff = over.hold;
+						stretch = Math.max(STRETCH_MIN, Math.min(STRETCH_MAX, eff / dur));
+						if (eff > dur * STRETCH_MAX) freeze = eff - dur * STRETCH_MAX;
+					}
 					if (voiceDur) {
-						eff = voiceDur + sceneGap;
+						eff = Math.max(voiceDur + (over.gap !== null ? over.gap : sceneGap), over.min ?? 0);
 						stretch = eff / dur;
 						if (stretch > STRETCH_MAX) {
 							// Even at max slow-motion the clip can't cover the voice —
@@ -684,6 +755,19 @@ export function registerAssemble(app, {jobs, outputDir}) {
 						chapterBoundaries.push(sceneStartsSeconds[i]);
 					}
 				}
+				// Where the hook ends: the first story scene's start, when the film
+				// opens on chapter 0. Zero means no hook — nothing is placed off it.
+				// Reported in `verify` so the graphics pass and the site read the
+				// same number the mix used, rather than deriving their own.
+				const hookEndSeconds = (() => {
+					if ((sceneChapters[0] ?? 0) !== 0) return 0;
+					for (let i = 1; i < items.length; i++) {
+						if ((sceneChapters[i] ?? 0) >= 1) return sceneStartsSeconds[i];
+					}
+					return 0;
+				})();
+				const hookRiserOn = hookRiser && hookEndSeconds > 0;
+				if (hookRiser && !hookRiserOn) console.log('hook riser asked for, but this film has no hook — skipped');
 
 				// 2. One ffmpeg pass: normalize video, trim+silence-pad each voice
 				// to its scene's exact duration, concat, then layer music + SFX.
@@ -705,12 +789,15 @@ export function registerAssemble(app, {jobs, outputDir}) {
 				const boomIdx = stingers ? idx++ : -1;
 				const whooshIdx = stingers ? idx++ : -1;
 				const riserIdx = stingers ? idx++ : -1;
+				const hookRiserIdx = hookRiserOn ? idx++ : -1;
+				const hookBoomIdx = hookRiserOn ? idx++ : -1;
 				// concat wants the same stream count from every segment, so scenes
 				// without usable clip audio borrow silence from here.
 				const nativeOn = items.some((it) => it.nativeAudio);
 				const silenceIdx = nativeOn ? idx++ : -1;
 				if (music) args.push('-i', music);
 				if (stingers) args.push('-i', sfx.boom, '-i', sfx.whoosh, '-i', sfx.riser);
+				if (hookRiserOn) args.push('-i', sfx.hookRiser, '-i', sfx.boom);
 				if (nativeOn) args.push('-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=mono');
 
 				const parts = [];
@@ -817,6 +904,10 @@ export function registerAssemble(app, {jobs, outputDir}) {
 						whooshIdx,
 						riserIdx,
 						chapterBoundaries,
+						hookRiser: hookRiserOn,
+						hookRiserIdx,
+						hookBoomIdx,
+						hookEndSeconds,
 					}),
 				);
 
@@ -864,6 +955,11 @@ export function registerAssemble(app, {jobs, outputDir}) {
 						musicGainDb: music ? Number(musicGainDb.toFixed(2)) : null,
 						musicVolume: music ? musicVolume : null,
 						musicDuck,
+						// Where the teaser ends (0 = no hook), and whether the riser
+						// was placed under it. The graphics pass derives the same
+						// boundary from the scenes; this is the number to compare it to.
+						hookEndSeconds: Number(hookEndSeconds.toFixed(6)),
+						hookRiser: hookRiserOn,
 					},
 				});
 			} catch (err) {

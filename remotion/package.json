@@ -9,6 +9,7 @@
     "check:montage": "node --experimental-strip-types scripts/check-montage.mjs",
     "check:captions": "node --experimental-strip-types scripts/check-captions.mjs",
     "check:mix": "node scripts/check-mix.mjs",
+    "check:hook": "node --experimental-strip-types scripts/check-hook.mjs",
     "check:motif": "node motif/check-motif.mjs",
     "start:server": "node server/index.mjs",
     "lambda:deploy-function": "remotion lambda functions deploy",

@@ -104,7 +104,7 @@ Webhooks the site calls: `new-project`, `resume-project`, `restart-scripting`
 (all three on the Master Orchestrator), `scene-text-regen`,
 `scene-image-regen`, `scene-voice-regen` (all three on Claude Scripting),
 `assemble`, and the single-purpose ones — `expand-brief`, `yt-scene-titles`,
-`upscale-film`, `list-music`/`share-music`, `archive-suggest`. The site derives all of them from `N8N_NEW_PROJECT_WEBHOOK_URL`
+`upscale-film`, `list-music`/`share-music`, `archive-suggest`, `hook-regen`. The site derives all of them from `N8N_NEW_PROJECT_WEBHOOK_URL`
 by string-replacing the last path segment, so they must live on the same host
 — and each new one must be a plain `path` with no path parameters, or the
 derived URL will not resolve.
@@ -2342,6 +2342,107 @@ until a first test film is judged. How each piece works:
   usual "absent = each voice's own settings", which stays the rule everywhere
   else.
 - **No length cap** — the producer refused one explicitly.
+
+### The hook is a teaser — six styles, one shot per beat, a plan the site can rewrite (2026-09-11)
+
+The film used to open on ONE 8-second scene of 18-22 narrated words with the
+project's TITLE typed over it — "Opening title" on the brief, `HookTitle` in
+the render. The producer's ask: every film opens on something dramatic and
+FAST, a trailer of the most dramatic stretch that never spoils the end; and
+when the producer wants to, a chosen kind — a slate with place and date, the
+robber grabbing the money, a riser into the moment before the fall. Live
+since 2026-09-11 on all four pieces (Scripting `5a32e43e`, Media Generation
+`b9779578`, Final Assembly draft `ebf193c5` — see the note at the end —,
+orchestrator `40ae627e`; Hook Regen `MDYR0J93RJDU8ftf`; render commit
+`b932eaf`, site `7b553cb`). What is load-bearing:
+
+- **Six styles, three of them SILENT.** `teaser` (3-5 spoken beats of 2-10
+  words, one shot each), `question` (1-2 beats + the question on screen),
+  `figure` (1-2 beats + a number the film STATES, set huge, with its source
+  when the research pack has one), `slate` (one silent establishing shot,
+  PLACE and DATE over it), `action` (2-3 silent shots of the climax in
+  motion), `cliffhanger` (2-3 silent shots of the moment before the turn, a
+  riser building, a boom on the cut). `Editing Options.hookStyle` is `auto`
+  (the default everywhere — absent reads as auto) or a style; the brief's
+  "Cold open" control writes it, `Voice Mode` reads it. A silent film may only
+  open silently, a kids film may not use action/cliffhanger. **The style list
+  is whitelisted in THREE places that must agree**: `HOOK_STYLES` in
+  derive.ts, `Normalize Webhook Input`, `Voice Mode` (plus the copy inside
+  `Hook Regen`'s `HR Prep`).
+- **One beat = one scene, and the split is on LINE BREAKS.** `Prepend Hook To
+  Chapters` writes the hook chapter's `narrator_script` as one line per beat;
+  `Plan Scene Splits` cuts chapter 0 on `\n` instead of the 22-word chunker
+  — otherwise "One student." would be folded into its neighbour and the
+  teaser would come back as one 8-second scene again. The segmenter gets
+  `hookSegmentRules` for chapter 0 only: 3-second shots (6 for a slate),
+  one strong subject, one decisive camera move. Verified on the first film
+  (execution 12303, `recN8pR5qKPQhSmMB`): four shots, orders 1-4, `Durată` 3,
+  "Fast push-in", "Hard tracking shot", "crash-zoom", "Handheld follow".
+- **A silent beat is stored with EMPTY narration and `Aprobare Voce` already
+  true.** The beat text travels as `[SILENT] …` so the segmenter copies it
+  verbatim, `Save scenes To Airtable1` strips it into `Script Scenă: ''`, and
+  three Media Generation nodes know what an empty line means: `AB No Speech?`
+  skips TTS for it, `Evaluate Image Approval` waives the Voiceover URL for it
+  (`silentScene`), and `Current Scene` gives every chapter-0 shot
+  **`veo-3.1-fast`** (`hookVideoModel` overrides; the free tier stays the
+  body's default — 4-5 hook shots on Quality would have been 400-500 credits
+  a film, more than the whole month's allowance at three films a day).
+- **`Hook Guard` measures the style rules** (beat counts, words per beat, the
+  card fields a style needs, a figure or a date the film actually states, no
+  number that appears only in the last chapter — that is the ending), two
+  retries with the reason, then accept. Same shape as `Narration Guard`, same
+  reason: an instruction in a prompt is not a constraint.
+- **The plan is STORED**: `Save Hook Plan` merges `Editing Options.hookPlan`
+  `{style, silent, beats, card{line1,line2,source}, chosenBy, writtenAt}`
+  in-line before `Save Script To Airtable` (`Hook Plan Done` hands the item
+  stream back, the `Evidence Done` pattern). `chosenBy` is `producer` only
+  when a style was asked for, `default` when the category left one,
+  `ai` otherwise.
+- **The render knows two things and derives one of them.** `hookEndSeconds`
+  (remotion/src/hook.ts) is the first chapter-≥1 scene's start, from the
+  SCENES, never from the plan — the scenes carry what was actually made.
+  `hookCardWindow` places the one card a style draws (`HookCard`: question /
+  figure / slate) and ends it before the chapter card's flare peaks on the
+  first story frame; captions run over a spoken teaser and step aside only
+  for that card; text cards never land on a hook shot. `HookTitle` is gone.
+  `npm run check:hook`.
+- **`/assemble` cuts the teaser the way the plan says.** Per-scene
+  `holdSeconds` / `minSeconds` / `gapSeconds` (Build Timeline sends them for
+  chapter-0 scenes of a film WITH a hookPlan, so every older film times
+  exactly as before): a silent shot is held for its planned length, a spoken
+  beat cuts 0.12s after its last word with a 1.6s floor. `hookRiser` (sent
+  for cliffhanger and action) places a 3.2s riser ending ON the cut to the
+  story plus a boom on it, independent of the music switch — it is what the
+  shots are doing, not an accent. `verify.hookEndSeconds` reports the
+  boundary. `check:mix` covers it in all 48 combinations.
+- **`hook-regen` rewrites the hook ALONE** (workflow `Hook Regen`, POST
+  `{project_id, hook_style}`): loads project + chapters + evidence + genre
+  profile from Postgres, writes the beats under the same rules and the same
+  guard (a second copy of both — `HR Prep`, `HR Guard`), writes one shot per
+  beat (`HR Shots Prompt`, a second copy of the segmenter's hook rules),
+  then in ONE transaction deletes the chapter-0 scenes, creates the new ones
+  through `hov.at_create` with exactly the fields `Save scenes To Airtable1`
+  writes, rewrites the hook chapter's script and merges `hookPlan` while
+  clearing `hookRegen`. The new scenes arrive UNAPPROVED (`Aprobare Scenă`
+  false) — a rewritten line is reviewed like any other — and with no
+  picture, so the next production pass makes them (Resume / nudge when no
+  batch is alive). `create_workflow_from_code` skipped the credentials on
+  both HTTP nodes again, fourth occurrence.
+- **The site sets `Editing Options.hookRegen` before firing and the run
+  clears it — the stranded-flag shape, so `HookPanel` carries its own exits**
+  ("Send the rewrite again" / "Cancel — keep this hook"), exactly as the
+  scene rewrite does. The panel shows the plan the moment the script exists
+  (scene step, where a rewrite costs one model call) and again beside Final
+  touches (where it also costs new shots, and says so). `confirmFinalSettings`
+  deliberately does not send `hookStyle`: a rewrite is new shots, not an
+  overlay.
+- **Every hook shot is fresh footage the batch has to make**: 3-5 more images
+  and clips per film, on Fast. On the cost panel that is ~40 credits a film.
+- **Final Assembly's draft `ebf193c5` is verified but PUBLISH IT ONLY WITH
+  THE RENDER BUILD** (commit `b932eaf` on Railway): the draft sends keys an
+  older `/assemble` ignores harmlessly, but `hookPlan` reaching an older
+  Remotion bundle is equally harmless — so the order only matters for the
+  teaser actually being cut fast. Publish after the trunk deploy goes green.
 
 ### Hands-off mode (auto-approve) — the site's hand, not n8n's
 
@@ -5576,10 +5677,10 @@ generated FROM it. The chain, and where each piece lives:
   That project is mid-flight: Story Bible and approved script exist, no
   chapters and no scenes. `restart-scripting` is the door back in.
   (Both of those projects have since finished — see the strike-through above.)
-- **Ask Dan for `hookTitle`.** Scripting should write a 3-6 word line meant
-  for the screen and n8n should pass it in `Build Remotion Props`; the prop
-  already exists and bypasses the isTitleLike gate. Until then, projects whose
-  Tema reads as a sentence open with no title card at all.
+- ~~Ask Dan for `hookTitle`.~~ Moot since 2026-09-11: the opening title card
+  is retired and every film opens on the teaser (see "The hook is a teaser").
+  `hookTitle` / `showHookTitle` are still accepted by the render props and
+  ignored.
 - **`speechStartsSeconds` — the last systematic caption offset.** The breath
   trim keeps the lead-in silence on a scene that opens a chapter (deliberately
   — that pause IS the chapter break), so its take begins with 0.2–0.6s of

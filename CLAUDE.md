@@ -2438,11 +2438,16 @@ orchestrator `40ae627e`; Hook Regen `MDYR0J93RJDU8ftf`; render commit
   overlay.
 - **Every hook shot is fresh footage the batch has to make**: 3-5 more images
   and clips per film, on Fast. On the cost panel that is ~40 credits a film.
-- **Final Assembly's draft `ebf193c5` is verified but PUBLISH IT ONLY WITH
-  THE RENDER BUILD** (commit `b932eaf` on Railway): the draft sends keys an
-  older `/assemble` ignores harmlessly, but `hookPlan` reaching an older
-  Remotion bundle is equally harmless — so the order only matters for the
-  teaser actually being cut fast. Publish after the trunk deploy goes green.
+- **Final Assembly `ebf193c5` was published only AFTER the Railway build of
+  the render commit went green** (deployment `ee1430d3`, 21:53 UTC): the
+  draft sends keys an older `/assemble` ignores harmlessly and `hookPlan`
+  reaching an older Remotion bundle is equally harmless, but the teaser is
+  only cut fast once both halves agree. The site's first deploy of the same
+  push FAILED (run 125): `HookPanel`, a client component, imported the
+  style list as a VALUE from `lib/data`, which drags the Postgres adapter
+  (`pg`, `net`, `tls`) into the browser bundle. Every other client component
+  imports only TYPES from `lib/data`; values come from `lib/data/derive`.
+  Fixed in `583b08c` (run 126).
 
 ### Hands-off mode (auto-approve) — the site's hand, not n8n's
 

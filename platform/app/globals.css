@@ -2747,8 +2747,12 @@ body:has(.nb) .nav {
   .nav a.navlink {
     display: none; /* the brand is the same link */
   }
+  /* Ends 6px under the pill (10 + 50). It was 84, which reached 14px INTO
+     the library's hero shell — the blurred band sat over the top of the
+     purple arc, which the producer read as "the transparent effect covers
+     the purple edge". The pill itself is what the band exists to ground. */
   .navfade {
-    height: 84px;
+    height: 66px;
   }
   .hero {
     padding: 48px 0 24px;
@@ -4716,6 +4720,21 @@ body:has(.mkt) .vignette {
   border: 1px solid rgba(255, 255, 255, 0.7);
   box-shadow: var(--shadow-sm);
 }
+.page.pj .eyebrow.prow .ftabs {
+  margin-left: 24px;
+}
+.page.pj .eyebrow.prow .ptools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* Pulls the buttons off the baseline: their descent would otherwise
+     stretch the flex line and float the active tab's underline. */
+  align-self: center;
+}
+/* The pager's "Page 2 of 5" is a phone control; the numbers say it here. */
+.pgcur {
+  display: none;
+}
 .page.pj .ftab {
   border-radius: var(--r-pill);
   padding: 8px 14px;
@@ -5034,6 +5053,92 @@ body:has(.mkt) .vignette {
     width: 100%;
     order: 9;
   }
+}
+
+/* --- the library on a phone (2026-09-11, from the producer's screenshots) --- */
+@media (max-width: 720px) {
+  /* The toolbar was a 999px pill — right for one row, an OVAL the moment
+     its contents wrap to four, with the tabs squeezed into the round ends.
+     A rounded rectangle, left-aligned, in a deliberate order: label and
+     Select on the first line, the tabs (they may wrap — every tab stays
+     visible, nothing scrolls off), the search, then Grid | Index. */
+  .page.pj .eyebrow.prow {
+    /* Sticky here was ~245px tall and rode down the screen over the cards —
+       "coboară în timp ce dai scroll și îți obturează vederea". */
+    position: static;
+    border-radius: var(--r-lg);
+    padding: 14px 16px 16px;
+    gap: 12px 10px;
+    justify-content: flex-start;
+  }
+  .page.pj .eyebrow.prow .plabel {
+    order: 0;
+  }
+  .page.pj .eyebrow.prow .ptools {
+    order: 1;
+    margin-left: auto;
+  }
+  .page.pj .eyebrow.prow .sp {
+    display: none;
+  }
+  .page.pj .eyebrow.prow .ftabs {
+    order: 2;
+    width: 100%;
+    margin-left: 0;
+    gap: 6px;
+  }
+  .page.pj .eyebrow.prow .psearch {
+    order: 3;
+  }
+  .page.pj .eyebrow.prow .vtog {
+    order: 4;
+  }
+  .page.pj .ftab {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+  /* The lit arc is placed for a 1200px shell: on a 334px one its ring ran
+     horizontally along the whole top edge, which the shell's clip cut flat —
+     a hard purple line under the nav. Re-aimed so the ring falls diagonally
+     across the top-right corner, as it does on a laptop. */
+  .pj-shell .arc {
+    right: -300px;
+    top: -560px;
+    width: 640px;
+    height: 700px;
+  }
+  /* auto-fit + minmax(150px, 1fr) still overflowed: a stat's min-content is
+     its label, and min-width:auto let the tracks grow past the shell. Two
+     columns with a zero floor. */
+  .page.pj .stats {
+    /* The base rule flows COLUMN-wise (grid-auto-flow: column, so the row
+       grows a tile per extra bucket) — a column template alone leaves the
+       three overflow tiles as three more implicit columns. Row flow is what
+       makes "two columns" mean two. */
+    grid-auto-flow: row;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .page.pj .stat {
+    min-width: 0;
+    padding: 16px 16px 18px;
+  }
+  .page.pj .stat:nth-child(even) {
+    border-right: none;
+  }
+  .page.pj .stat:nth-child(n + 3) {
+    border-top: 1px solid rgba(24, 20, 40, 0.08);
+  }
+  .pgcur {
+    display: inline;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+    padding: 0 4px;
+  }
+}
+/* Where "scroll to the head of the list" lands: clear of the sticky nav
+   (16 + 56 on a laptop, 10 + 50 on a phone) with a little air. */
+.page.pj .eyebrow.prow {
+  scroll-margin-top: 84px;
 }
 
 

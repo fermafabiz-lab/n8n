@@ -3237,6 +3237,58 @@ the pipeline already produces.
 
 - The project page auto-refreshes every 10s, which remounts components. Drafts
   in progress must be backed by `sessionStorage` to survive it.
+- **The phone is a place of WORK, not of reading, and a layout switcher was
+  the wrong tool for it** (2026-09-11). The producer approves, starts films,
+  checks renders and regenerates from the phone, and asked for a
+  desktop / mobile / tablet button in the bar. Declined, with the reason
+  measured: the site already adapts by width (14 `@media` blocks at the
+  time), it just adapted THINLY — landing, brief and library had Daylight
+  phone rules, the project workspace (`.stage`) had exactly one, at 900px.
+  A named-layout toggle would duplicate the browser's own "request desktop
+  site", cost three copies of every future component (the multi-copy trap
+  this file already pays for), and nobody picks "tablet" on a continuum of
+  widths. The answer is real phone rules per screen, verified by rendering
+  at 390px, never a switch. The library pass, from the producer's own
+  screenshots:
+  - **A pill radius is right for one row and an OVAL for four.** The library
+    toolbar (`.eyebrow.prow`) wrapped to four lines on a phone inside
+    `border-radius: 999px`, which squeezed the tabs into the round ends —
+    "foarte prost încadrate". Under 720px it is a `--r-lg` rectangle with a
+    deliberate order (label + Select, tabs, search, Grid | Index; the
+    `.sp` spacer hidden). The tabs WRAP rather than scroll sideways: every
+    tab stays visible. `.ptools` and `.plabel` exist so CSS can order them —
+    they were inline styles before.
+  - **…and a sticky toolbar 245px tall is a curtain.** It rode down the
+    screen over the cards ("îți obturează vederea"). Static on the phone;
+    still sticky on a laptop, where it is one 64px row.
+  - **The lit arc is aimed for a 1200px shell.** On a 334px one its ring ran
+    horizontally along the whole top edge and the shell's clip cut it flat —
+    a hard purple line under the nav, which the producer read as the nav's
+    blur "covering the purple edge". Re-aimed under 720px (`right:-300px;
+    top:-560px; 640×700`) so the ring crosses the top-right corner
+    diagonally, like desktop. `.navfade` also shrank 84→66px there: it
+    reached 14px INTO the shell. Same shape as the Footage header fix.
+  - **`.stats` flows COLUMN-wise** (`grid-auto-flow: column`, so the row grows
+    a tile per bucket). A phone rule that only sets a two-column template
+    still gets five columns — the three overflow tiles become implicit
+    COLUMNS. `grid-auto-flow: row` beside it, or "two columns" means nothing.
+    Found by `getComputedStyle().gridTemplateColumns` reading
+    `66.8px ×5`, not by eye.
+  - **Paging must scroll back to the head of the list** (`goPage` +
+    `scroll-margin-top` on the toolbar). Without it the new page renders into
+    the OLD scroll position — the bottom — and "Next" reads as jumping to the
+    end of something. Only the pager sets the flag: filter and search also
+    reset to page 1, and yanking the viewport under someone typing is worse.
+    The phone shows "Page 2 of 5" (`.pgcur`) where the numbers are hidden.
+  - **The bar folds its sections behind one button under 720px**
+    (`NavMenu`, own module CSS): brand + "New video" already fill the pill at
+    390 (measured 368 in 368), so Projects / Footage / Settings had simply
+    been `display: none` — "seacă". The panel is `position: absolute`
+    against `.nav`, which is sticky and therefore a containing block, so it
+    sits under the pill at any scroll and detaches from nothing on the
+    brief, where the bar scrolls away. Closes on tap-outside, Escape and the
+    route change it caused.
+  The project workspace is the next pass and the bigger one.
 - **The app and the render share one type system.** **Outfit** / Inter / IBM
   Plex Mono are loaded in `platform/app/layout.tsx` via `next/font` and mirror
   `remotion/src/style.ts`, so the site looks like the films it makes.

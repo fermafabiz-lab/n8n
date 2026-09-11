@@ -136,6 +136,20 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
   /** Filters title and category live, exactly as the design's search does. */
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
+  /**
+   * Paging scrolls the list back to its head. Without this a page change
+   * lands you at the BOTTOM of the new page — the new cards render into the
+   * same scroll position the old ones held, and "Next" reads as having
+   * jumped to the end of something. Only the pager sets the flag: a filter
+   * or a search also resets to page 1, and yanking the viewport while
+   * someone is typing would be worse than the thing this fixes.
+   */
+  const headRef = useRef<HTMLDivElement>(null);
+  const scrollOnPage = useRef(false);
+  const goPage = (n: number) => {
+    scrollOnPage.current = true;
+    setPage(n);
+  };
   // Hover preview on finished covers: the final video plays muted in the
   // card. Mounted only after ~350ms of hover intent — the bytes come through
   // our own /api/media proxy (Drive-hosted), so drive-by hovers must not
@@ -204,6 +218,12 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
    * reads as "everything is gone" rather than "you are on page 4 of 2".
    */
   const current = Math.min(Math.max(1, page), totalPages);
+  useEffect(() => {
+    if (!scrollOnPage.current) return;
+    scrollOnPage.current = false;
+    // scroll-margin-top on the toolbar keeps it clear of the sticky nav.
+    headRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [current]);
   const from = (current - 1) * PAGE_SIZE;
   const shown = matched.slice(from, from + PAGE_SIZE);
 
@@ -245,9 +265,9 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
           wears the page's own typeface instead of the mono used by every
           other eyebrow. `.eyebrow` is app-wide, so this has to be scoped or
           every label on every page changes with it. */}
-      <div className="eyebrow prow">
-        <span>Projects</span>
-        <span className="ftabs" style={{ marginLeft: 24 }}>
+      <div className="eyebrow prow" ref={headRef}>
+        <span className="plabel">Projects</span>
+        <span className="ftabs">
           {/* A tab also stays visible while it IS the active filter — the
               dashboard refetches every 15s, and a count dropping to zero must
               not strand the producer on a filter with no visible tab. */}
@@ -303,7 +323,7 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
         {/* alignSelf pulls this off the baseline: the buttons' descent would
             otherwise stretch the flex line and float the active tab's amber
             underline ~6px above the eyebrow hairline. */}
-        <span style={{ display: "flex", alignItems: "center", gap: 10, alignSelf: "center" }}>
+        <span className="ptools">
           {msg && (
             <span className={`formmsg ${msg.ok ? "ok" : "err"}`} style={{ margin: 0 }}>
               {msg.message}
@@ -526,7 +546,7 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
               <button
                 type="button"
                 className="pgbtn"
-                onClick={() => setPage(current - 1)}
+                onClick={() => goPage(current - 1)}
                 disabled={current === 1}
               >
                 ← Previous
@@ -542,7 +562,7 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
                       type="button"
                       key={n}
                       className={`pgnum ${n === current ? "on" : ""}`}
-                      onClick={() => setPage(n)}
+                      onClick={() => goPage(n)}
                       aria-current={n === current ? "page" : undefined}
                     >
                       {n}
@@ -550,10 +570,15 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
                   ),
                 )}
               </span>
+              {/* Phone only: the numbers are hidden there, and Previous /
+                  Next alone never say where you are. */}
+              <span className="pgcur">
+                Page {current} of {totalPages}
+              </span>
               <button
                 type="button"
                 className="pgbtn"
-                onClick={() => setPage(current + 1)}
+                onClick={() => goPage(current + 1)}
                 disabled={current === totalPages}
               >
                 Next →

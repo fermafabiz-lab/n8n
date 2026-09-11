@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { IBM_Plex_Mono, Inter, Outfit } from "next/font/google";
+import NavMenu from "@/components/NavMenu";
 import ProductionTicker from "@/components/ProductionTicker";
 import StaleCopyBanner from "@/components/StaleCopyBanner";
 import "./globals.css";
@@ -88,6 +89,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <span className="sp" />
             <ProductionTicker />
             <span className="sp" />
+            {/* Phone only (the module hides it above 720px): the three
+                section links above fold behind one button there, because
+                brand + "New video" already fill the pill at 390px. */}
+            <NavMenu />
             <Link href="/new" className="btn gold navcta">
               New video
             </Link>

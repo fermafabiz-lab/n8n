@@ -35,6 +35,7 @@ import {
 } from "@/lib/provenance";
 import {
   normalizeCaptionColor,
+  normalizeHookStyle,
   normalizeMusicLevel,
   normalizeMusicTrack,
   normalizeSfxLevel,
@@ -372,6 +373,74 @@ export async function regenerateVoice(
       };
     }
     return { ok: false, message: msg };
+  }
+}
+
+/**
+ * Rewrite the cold open in another style — the hook alone, not the script.
+ *
+ * Fires Claude Scripting's standalone `hook-regen` webhook, which rewrites
+ * the beats, replaces the chapter-0 scenes and merges the new `hookPlan`.
+ * The flag is set FIRST (it drives the "rewriting…" state), and n8n clears it
+ * when the shots are stored — the same in-flight shape as every regeneration
+ * here, with the same trap, so `cancelHookRegen` is the panel's own way out.
+ *
+ * A style is also stored as the film's `hookStyle`, so a later restart of
+ * scripting writes the hook the producer last asked for.
+ */
+export async function regenerateHook(
+  projectId: string,
+  style: string,
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  const hookStyle = normalizeHookStyle(style);
+  try {
+    await updateEditingOptions(projectId, {
+      hookStyle,
+      hookRegen: { style: hookStyle, at: new Date().toISOString() },
+    });
+    const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
+    const webhook = newProject?.replace(/new-project\/?$/, "hook-regen");
+    if (!webhook?.includes("hook-regen")) {
+      throw new Error("N8N_NEW_PROJECT_WEBHOOK_URL is not set — cannot reach the hook-regen webhook.");
+    }
+    const res = await fetch(webhook, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project_id: projectId, hook_style: hookStyle }),
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message:
+        "Hook rewrite queued — new shots are written in about a minute; their pictures and clips follow on the next production pass.",
+    };
+  } catch (e) {
+    // The flag must not outlive a webhook that never started.
+    try {
+      await updateEditingOptions(projectId, { hookRegen: null });
+    } catch {
+      /* the panel's cancel button covers this */
+    }
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/** The local exit from a stranded hook rewrite — keeps whatever hook is stored. */
+export async function cancelHookRegen(projectId: string): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    await updateEditingOptions(projectId, { hookRegen: null });
+    revalidatePath(`/projects/${projectId}`);
+    return { ok: true, message: "Kept the current hook." };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
   }
 }
 
@@ -1161,7 +1230,6 @@ export async function confirmFinalSettings(
   projectId: string,
   settings?: {
     captions: boolean;
-    hookTitle: boolean;
     chapterCards: boolean;
     endScreen: boolean;
     sfx: boolean;
@@ -1209,8 +1277,10 @@ export async function confirmFinalSettings(
       });
       // MERGED into the existing JSON, never overwritten — Editing Options
       // also carries category/multi-voice state that this panel doesn't own.
+      // NO `hookStyle` here: the cold open is rewritten from its own panel
+      // (regenerateHook), because changing the style means new shots, not a
+      // different overlay on the same ones. Merged, so the key stays as is.
       await updateEditingOptions(projectId, {
-        hookTitle: settings.hookTitle,
         chapterCards: settings.chapterCards,
         endScreen: settings.endScreen,
         sfx: settings.sfx,
@@ -2041,7 +2111,11 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     // the render treats an absent or unrecognised value the same way.
     caption_color: normalizeCaptionColor(formData.get("caption_color")) ?? "",
     lore: String(formData.get("lore") ?? ""),
-    hook_title: String(formData.get("hook_title") ?? "yes"),
+    // The cold open's style: `auto` lets Scripting choose, a named style
+    // forces it. Whitelisted here AND in Normalize Webhook Input AND in Voice
+    // Mode — the string becomes the rule the hook prompt is told to obey.
+    // Replaced `hook_title` (the retired opening title card) on 2026-09-11.
+    hook_style: normalizeHookStyle(formData.get("hook_style")),
     chapter_cards: String(formData.get("chapter_cards") ?? "yes"),
     end_screen: String(formData.get("end_screen") ?? "yes"),
     sfx: String(formData.get("sfx") ?? "yes"),

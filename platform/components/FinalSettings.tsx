@@ -48,13 +48,9 @@ const OPTIONS: Array<{
     // than no toggle: it reads as a decision and silently isn't one.
     spokenOnly: true,
   },
-  {
-    key: "hookTitle",
-    label: "Opening title",
-    on: "The hook line types itself over the first scene",
-    off: "Clean opening, straight into the story",
-    icon: "✨",
-  },
+  // The "Opening title" row is gone (2026-09-11): the title card was retired
+  // with the teaser hook, and the cold open is reviewed in its own panel
+  // beside this one (HookPanel) — a rewrite means new shots, not an overlay.
   {
     key: "chapterCards",
     label: "Chapter cards",

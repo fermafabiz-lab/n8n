@@ -72,7 +72,16 @@ export interface SceneArchiveSuggestion {
 
 export interface EditingOptions {
   captions: boolean;
-  hookTitle: boolean;
+  /**
+   * How the film opens — the cold open's STYLE, chosen on the brief and
+   * changeable from the hook panel. `auto` (the default) lets Scripting pick
+   * from the six; a named style forces it. Read by `Voice Mode` in Claude
+   * Scripting; what Scripting then WROTE is `Project.hookPlan`.
+   *
+   * Replaced the old `hookTitle` switch on 2026-09-11: the opening title card
+   * is retired, and every film gets a teaser of several fast shots instead.
+   */
+  hookStyle: HookStyleChoice;
   chapterCards: boolean;
   endScreen: boolean;
   /** Scene sound effects in the final mix — the Veo clips' own ambience,
@@ -414,6 +423,10 @@ export interface Project {
   editing: EditingOptions;
   /** Drawn cards chosen by the pipeline, droppable in Final touches. */
   motifCards: MotifCard[];
+  /** The cold open Scripting wrote — null before it has, and on older films. */
+  hookPlan: HookPlan | null;
+  /** A hook rewrite the site fired and n8n has not yet finished. */
+  hookRegen: HookRegen | null;
   /** Post-delivery state: review status, YouTube title, notes, link. */
   publishing: Publishing;
   /** The batch is holding, waiting for those options to be confirmed. */
@@ -728,6 +741,84 @@ export const VIDEO_MODELS = [
   { id: "veo-3.1-quality", credits: 100 },
 ] as const;
 
+/**
+ * The cold open's styles, as Claude Scripting's `Voice Mode` knows them.
+ * Three are SILENT (slate, action, cliffhanger): their beats are shot notes,
+ * nothing is spoken, and the film's first word is the story's. The list is
+ * whitelisted in THREE places that must agree — here, the brief's picker and
+ * `Voice Mode` — because the string reaches the prompt as the rule the model
+ * is told to obey.
+ */
+export const HOOK_STYLES = [
+  { id: "teaser", label: "Teaser", silent: false, blurb: "3–5 spoken beats, one fast shot each — the most dramatic stretch of the story told like a trailer, never the ending." },
+  { id: "question", label: "Question", silent: false, blurb: "One or two spoken beats, and the question the film answers set large over them." },
+  { id: "figure", label: "Figure", silent: false, blurb: "A number the film states — a year, a sum, a count — set huge over the opening shots." },
+  { id: "slate", label: "Slate", silent: true, blurb: "One silent establishing shot of the place, with PLACE and DATE over it. Documentary suspense." },
+  { id: "action", label: "Action", silent: true, blurb: "Two or three silent shots of the climax in motion, then the story starts from the beginning." },
+  { id: "cliffhanger", label: "Cliffhanger", silent: true, blurb: "Two or three silent shots of the moment BEFORE the turn, a riser building, cut on the frame before the outcome." },
+] as const;
+export type HookStyle = (typeof HOOK_STYLES)[number]["id"];
+/** What the brief stores: a style, or `auto` for "let the AI choose". */
+export type HookStyleChoice = HookStyle | "auto";
+
+/** Absent, unknown or malformed reads as `auto` — the default on every reader. */
+export function normalizeHookStyle(value: unknown): HookStyleChoice {
+  const s = String(value ?? "").trim().toLowerCase();
+  if (s === "auto") return "auto";
+  return (HOOK_STYLES.some((h) => h.id === s) ? s : "auto") as HookStyleChoice;
+}
+
+/**
+ * The cold open Scripting WROTE for this film — one line per shot, the style
+ * it chose (or was told), and the one card that style may draw. Stored as
+ * `Editing Options.hookPlan` by `Save Hook Plan`, read by Final Assembly's
+ * `Build Remotion Props` and by the render (remotion/src/hook.ts holds the
+ * twin of this reader). Null on every film written before 2026-09-11.
+ */
+export interface HookPlan {
+  style: HookStyle;
+  silent: boolean;
+  beats: string[];
+  card: { line1: string; line2: string; source: string };
+  chosenBy: "ai" | "producer" | "default";
+  writtenAt: string | null;
+}
+
+export function normalizeHookPlan(value: unknown): HookPlan | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const v = value as Record<string, unknown>;
+  const style = String(v.style ?? "").trim().toLowerCase();
+  const def = HOOK_STYLES.find((h) => h.id === style);
+  if (!def) return null;
+  const c = v.card && typeof v.card === "object" ? (v.card as Record<string, unknown>) : {};
+  const line = (x: unknown) => String(x ?? "").replace(/\s+/g, " ").trim();
+  return {
+    style: def.id,
+    silent: v.silent === true || def.silent,
+    beats: Array.isArray(v.beats) ? v.beats.map((b) => line(b)).filter(Boolean) : [],
+    card: { line1: line(c.line1), line2: line(c.line2), source: line(c.source) },
+    chosenBy: v.chosenBy === "producer" ? "producer" : v.chosenBy === "default" ? "default" : "ai",
+    writtenAt: typeof v.writtenAt === "string" ? v.writtenAt : null,
+  };
+}
+
+/**
+ * A hook rewrite in flight: the site sets it when it fires `hook-regen`, and
+ * the n8n run clears it when the new shots are stored. Same shape as every
+ * other "in flight" flag in this project, and it carries the same trap — a
+ * death between the two strands it — so the panel offers its own way out.
+ */
+export interface HookRegen {
+  style: HookStyleChoice;
+  at: string | null;
+}
+
+export function normalizeHookRegen(value: unknown): HookRegen | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const v = value as Record<string, unknown>;
+  return { style: normalizeHookStyle(v.style), at: typeof v.at === "string" ? v.at : null };
+}
+
 /** A Drive file the producer pinned as this film's background track. */
 export interface MusicTrack {
   /** Drive file id — what `Pick Music Track` builds the proxy URL from. */
@@ -862,7 +953,7 @@ export function buildProject(r: RawProject): Project {
     coverUrl: r.coverUrl ?? null,
     editing: {
       captions: r.noCaptions !== true,
-      hookTitle: opts.hookTitle !== false,
+      hookStyle: normalizeHookStyle(opts.hookStyle),
       chapterCards: opts.chapterCards !== false,
       endScreen: opts.endScreen !== false,
       // The clips' own sound is the footage's natural audio, so it is ON
@@ -921,6 +1012,8 @@ export function buildProject(r: RawProject): Project {
       ? (opts.cast as unknown[]).filter((v): v is string => typeof v === "string" && v.includes("_"))
       : [],
     motifCards: parseMotifCards(opts.motifCards),
+    hookPlan: normalizeHookPlan(opts.hookPlan),
+    hookRegen: normalizeHookRegen(opts.hookRegen),
     publishing: normalizePublishing(opts.publishing),
     castAssign: asRecord(opts.castAssign) as Record<string, string>,
     chapterVoices: asRecord(opts.chapterVoices) as Record<string, string>,

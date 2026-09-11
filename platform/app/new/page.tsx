@@ -11,8 +11,8 @@ import { languageByCode } from "@/lib/languages";
 import { toneType } from "@/lib/tone-type";
 import SpeedPicker from "@/components/SpeedPicker";
 import VoiceTonePicker from "@/components/VoiceTonePicker";
-import type { VoiceTone } from "@/lib/data/derive";
-import { SPEED_BY_PACE } from "@/lib/data/derive";
+import type { HookStyleChoice, VoiceTone } from "@/lib/data/derive";
+import { HOOK_STYLES, SPEED_BY_PACE } from "@/lib/data/derive";
 
 async function submit(_prev: ActionResult | null, formData: FormData) {
   return createProject(formData);
@@ -161,7 +161,6 @@ const LENGTH_MAX = LENGTH_PRESETS[LENGTH_PRESETS.length - 1].s;
 const FINISHES: Array<{
   name:
     | "captions"
-    | "hook_title"
     | "chapter_cards"
     | "end_screen"
     | "sfx"
@@ -182,14 +181,9 @@ const FINISHES: Array<{
     off: "No subtitles — visuals and voice only",
     default: true,
   },
-  {
-    name: "hook_title",
-    label: "Opening title",
-    sheet: "Hook",
-    on: "The hook line types itself over the first scene",
-    off: "Clean opening, straight into the story",
-    default: true,
-  },
+  // "Opening title" left this list on 2026-09-11: the title card is retired
+  // and every film opens on a teaser of fast shots. Its STYLE is the "Cold
+  // open" control in the same section, posted as `hook_style`.
   {
     name: "chapter_cards",
     label: "Chapter cards",
@@ -285,6 +279,10 @@ export default function NewVideo() {
   const [finishes, setFinishes] = useState<Record<string, boolean>>(
     Object.fromEntries(FINISHES.map((f) => [f.name, f.default])),
   );
+  // How the film opens. `auto` — the default — lets Scripting choose among
+  // the six styles; a named one forces it. Posted as `hook_style`, stored by
+  // Normalize Webhook Input as Editing Options.hookStyle, read by Voice Mode.
+  const [hookStyle, setHookStyle] = useState<HookStyleChoice>("auto");
   // How loud the scenes' own ambience sits under the narration, as a
   // percentage for the producer and 0–1 for the mixer. 35 is the level the
   // render used to hard-code, so leaving the slider alone reproduces every
@@ -613,10 +611,12 @@ export default function NewVideo() {
                     {(() => {
                       const t = VIDEO_TIERS.find((x) => x.id === videoModel)!;
                       const clips = Math.max(1, Math.round(length / 8));
-                      const hookExtra = t.credits === 0 ? 100 : 0;
+                      // The teaser's 3-5 shots render on Fast (10 credits
+                      // each) whatever the body runs on — see Current Scene.
+                      const hookExtra = t.credits === 0 ? 40 : 0;
                       const total = clips * t.credits + hookExtra;
                       return t.credits === 0
-                        ? `Free tier — clips cost no credits (the opening hook still renders on Cinema, ~100 credits). Fine for scenery and slow shots; complex motion (races, crowds, physical contact) is where it glitches.`
+                        ? `Free tier — clips cost no credits (the opening teaser's few shots still render on Fast, ~40 credits). Fine for scenery and slow shots; complex motion (races, crowds, physical contact) is where it glitches.`
                         : `${t.note} ≈ ${total.toLocaleString("en-US")} credits for this film (${clips} clips × ${t.credits}), out of 25,050/month.`;
                     })()}
                   </p>
@@ -918,6 +918,39 @@ export default function NewVideo() {
                     value={(musicLevel / 100).toFixed(2)}
                   />
                   <input type="hidden" name="caption_color" value={captionColor} />
+                </div>
+                <div className="frow" style={{ marginTop: 18 }}>
+                  <label>Cold open</label>
+                  {/* Every film opens on a teaser of a few fast shots now —
+                      the old opening title card is retired. This only decides
+                      the teaser's STYLE, and the AI's own pick is the default;
+                      a silent film can only take a silent style, so the list
+                      narrows for it (Voice Mode applies the same rule). */}
+                  <input type="hidden" name="hook_style" value={hookStyle} />
+                  <div className="seg" role="group" aria-label="Cold open style" style={{ flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      className={hookStyle === "auto" ? "on" : ""}
+                      onClick={() => setHookStyle("auto")}
+                    >
+                      AI picks
+                    </button>
+                    {HOOK_STYLES.filter((h) => !silent || h.silent).map((h) => (
+                      <button
+                        type="button"
+                        key={h.id}
+                        className={hookStyle === h.id ? "on" : ""}
+                        onClick={() => setHookStyle(h.id)}
+                      >
+                        {h.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="fnote">
+                    {hookStyle === "auto"
+                      ? "Scripting reads the story and opens it the way that fits — a spoken teaser for most films, a silent slate or cliffhanger where the story asks for one. Changeable after the script is written, hook only."
+                      : HOOK_STYLES.find((h) => h.id === hookStyle)?.blurb}
+                  </p>
                 </div>
               </section>
 

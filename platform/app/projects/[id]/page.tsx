@@ -8,6 +8,7 @@ import ScriptReview from "@/components/ScriptReview";
 import SceneReview from "@/components/SceneReview";
 import AudioReview from "@/components/AudioReview";
 import FinalSettings from "@/components/FinalSettings";
+import HookPanel from "@/components/HookPanel";
 import AutoRefresh from "@/components/AutoRefresh";
 import MediaPlayer from "@/components/MediaPlayer";
 import StageChime, { NotifyChip } from "@/components/StageChime";
@@ -646,6 +647,18 @@ export default async function ProductionRoom({
               motifCards={project.motifCards}
               silent={silent}
             />
+            {/* The cold open, beside Final touches for the same reason the
+                music picker is: rewriting it is a self-saving action that
+                must not arm the render button. Here it also costs new shots. */}
+            <HookPanel
+              projectId={id}
+              plan={project.hookPlan}
+              regen={project.hookRegen}
+              hookStyle={project.editing.hookStyle}
+              category={project.category}
+              hookShots={scenes.filter((s) => s.order < 100).length}
+              hookAssets={scenes.some((s) => s.order < 100 && (s.imageUrl || s.videoUrl))}
+            />
             {/* Deliberately beside FinalSettings, not a row inside it: that
                 panel batches choices into one confirm that also STARTS the
                 render, while pinning a track is a self-saving audition. */}
@@ -760,8 +773,21 @@ export default async function ProductionRoom({
         {scenes.length > 0 &&
         showing("scenes", scenes.some((s) => !s.sceneApproved)) ? (
           // Scene text review phase: scripts are split into scenes but not
-          // all approved yet — media generation hasn't started.
-          <SceneReview projectId={id} scenes={scenes} />
+          // all approved yet — media generation hasn't started. The cold open
+          // is shown first: this is the one moment a rewrite costs only a
+          // model call, before any of its shots has a picture.
+          <>
+            <HookPanel
+              projectId={id}
+              plan={project.hookPlan}
+              regen={project.hookRegen}
+              hookStyle={project.editing.hookStyle}
+              category={project.category}
+              hookShots={scenes.filter((s) => s.order < 100).length}
+              hookAssets={scenes.some((s) => s.order < 100 && (s.imageUrl || s.videoUrl))}
+            />
+            <SceneReview projectId={id} scenes={scenes} />
+          </>
         ) : scenes.length > 0 &&
           (!viewing || viewing === "images" || viewing === "video") ? (
           <SceneBoard

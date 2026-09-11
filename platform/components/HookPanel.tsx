@@ -24,7 +24,11 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { cancelHookRegen, regenerateHook, type ActionResult } from "@/app/actions";
-import { HOOK_STYLES, type HookPlan, type HookRegen, type HookStyleChoice } from "@/lib/data";
+// From derive, not from lib/data: this is a CLIENT component, and a value
+// import through lib/data drags the Postgres adapter (and `pg`, and `net`)
+// into the browser bundle — which is exactly how the first build of this
+// file failed. derive.ts is pure and is where the list lives anyway.
+import { HOOK_STYLES, type HookPlan, type HookRegen, type HookStyleChoice } from "@/lib/data/derive";
 import styles from "./HookPanel.module.css";
 
 /**

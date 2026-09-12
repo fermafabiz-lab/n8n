@@ -2448,11 +2448,24 @@ orchestrator `40ae627e`; Hook Regen `MDYR0J93RJDU8ftf`; render commit
   `holdSeconds` / `minSeconds` / `gapSeconds` (Build Timeline sends them for
   chapter-0 scenes of a film WITH a hookPlan, so every older film times
   exactly as before): a silent shot is held for its planned length, a spoken
-  beat cuts 0.12s after its last word with a 1.6s floor. `hookRiser` (sent
-  for cliffhanger and action) places a 3.2s riser ending ON the cut to the
-  story plus a boom on it, independent of the music switch — it is what the
-  shots are doing, not an accent. `verify.hookEndSeconds` reports the
-  boundary. `check:mix` covers it in all 48 combinations.
+  beat gets **0.45s** of breath after its last word with a 1.6s floor.
+  `hookRiser` (sent for cliffhanger and action) places a 3.2s riser ending ON
+  the cut to the story plus a boom on it, independent of the music switch — it
+  is what the shots are doing, not an accent. `verify.hookEndSeconds` reports
+  the boundary. `check:mix` covers it in all 48 combinations.
+
+  **That gap was 0.12s until 2026-09-12, and the producer's report was "vocea
+  este data prea rapid si nu se intelege nimic".** It was not a playback rate:
+  an ordinary scene gets 0.35s, and the breath trim has ALREADY cut the take's
+  own lead-in and tail silence off, so 0.12 was all the air a teaser beat had —
+  **less than the same narrator leaves between two clauses of one sentence**,
+  with three to five whole statements arriving back to back. The number was
+  chosen so the PICTURE cuts hard on the last word, which is right; the mistake
+  was giving the picture and the voice one number. 0.45 is deliberately MORE
+  than an ordinary scene's 0.35, because a teaser line has to land on its own —
+  that is the whole reason it is a separate shot. Silent shots are untouched.
+  Costs about 1.3s on a four-beat hook. **Generalises: a constant shared by a
+  visual cut and a spoken line is two decisions wearing one name.**
 - **`hook-regen` rewrites the hook ALONE** (workflow `Hook Regen`, POST
   `{project_id, hook_style}`): loads project + chapters + evidence + genre
   profile from Postgres, writes the beats under the same rules and the same
@@ -3380,6 +3393,47 @@ the pipeline already produces.
   draw — and `Validate Motif Cards` logs it as `MOTIF NONE: …`. That log is the
   backlog: it is how the third motif gets chosen, and it is also what stops "no
   cards" and "the node is broken" from looking identical.
+
+**Updated 2026-09-12 — "pe absolut fiecare videoclip este aceeasi animatie de
+cacat", and the count says so: of the 18 most recent films, exactly ONE carried
+a motif card.** With `motifCards` empty, `Attach Motif Cards` leaves
+`body.textCards` unset and the render falls back to DERIVING figure cards from
+the narration — a year, set large — which is identical on every film. Three
+causes, each found in a real execution:
+
+- **The validator refused truthful cards over bookkeeping.** Peking to Paris
+  (execution 9952) proposed a four-stop route and it was dropped for
+  `stops[0] cites undefined`: the model filed its research ref as
+  `{"kind":"evidence","from":"E3"}` while the validator read `src.ref`. The
+  prompt's PROSE says `ref` — but its structured EXAMPLE showed only `quote`
+  sources, whose text lives in `from`, and **a model copies the example it can
+  see; prose that contradicts the example loses**. This is the third time a
+  card has died of mis-keyed provenance. The validator now reads
+  `src.ref ?? src.from`, and the example carries an evidence stop.
+- **A route could never satisfy the no-spoiler rule.** With that fixed the same
+  card died on "quotes scene 8, which the film has not reached at scene 7". A
+  route is a map of the WHOLE journey, so anchored before its destination it
+  cites forward and anchored after it is a summary — the rule made the motif
+  unsatisfiable. Lifted for `route` only; provenance is untouched, every stop
+  must still be verbatim in a real scene.
+- **`drawnCards: false` silenced only half of what it names.** It gates
+  Scripting's `Draw Cards?` and `Attach Motif Cards` — not the render's own
+  derivation, which nothing gated — so six of those eighteen films had the
+  switch OFF and still drew the year card. `Build Remotion Props` now sends
+  `showTextCards: opts.drawnCards !== false`. **This is the one fix that
+  reaches films already made**: switch it off and re-render, no re-scripting.
+  Related trap: the Burj film had it off at scripting time and reads `true`
+  today because Final touches turned it on later — which cannot work, since
+  Scripting stored no cards. "Switching back on restores the list exactly" is
+  true only if the brief left it ON.
+
+Deliberately NOT changed: the timeline's strictly-increasing-years rule (the
+same film's timeline had three marks all at `1907`, which would stack on one
+another — the route was the right motif for it), and the Aston Martin failures,
+whose payload turned out to predate the 09-03 provenance fix. **Read the
+model's actual payload before fixing a rule its report line accuses.** Live as
+Scripting `05bf7412` and Final Assembly `559cde3c`; full account, the refused
+card as a runnable fixture, and what is still owed: `db/port/motif-rescue/`.
 
 ### The site
 

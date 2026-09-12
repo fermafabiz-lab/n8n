@@ -1,0 +1,45 @@
+[
+ {
+  "sceneIndex": 7,
+  "variant": "route",
+  "priority": 2,
+  "why": "Shows the larger journey shape from Peking toward Paris, not just the car leaving one gate.",
+  "label": "westbound",
+  "stops": [
+   {
+    "name": "Peking",
+    "source": {
+     "kind": "evidence",
+     "sceneIndex": 7,
+     "from": "E3"
+    }
+   },
+   {
+    "name": "steppe",
+    "source": {
+     "kind": "quote",
+     "sceneIndex": 8,
+     "from": "On the open steppe"
+    }
+   },
+   {
+    "name": "river",
+    "source": {
+     "kind": "quote",
+     "sceneIndex": 16,
+     "from": "a broad gray river"
+    }
+   },
+   {
+    "name": "Paris",
+    "source": {
+     "kind": "quote",
+     "sceneIndex": 47,
+     "from": "rolls into Paris"
+    }
+   }
+  ],
+  "marks": [],
+  "rows": []
+ }
+]

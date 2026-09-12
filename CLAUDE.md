@@ -1217,6 +1217,44 @@ constraint.** If it matters, something after the model has to be able to say
 whether it happened — and if the only thing you measure is length, length is
 what you will get.
 
+### The film has to END, not just stop (2026-09-12)
+
+The producer: *"se termina brusc parca fara sens sau concluzie, cred ca tine de
+partea de scripting."* They were right about where it lives. Measured on the
+last sentence of the last chapter of the six most recent finished films of 2+
+minutes: **five of six stop on a trailing subordinate clause** — "…while Paris
+gathers around him", "…while the shop stays open behind you", "…while hidden
+light fills the water" — which is a camera direction wearing narration's
+clothes. The sixth, Boyd, ends on a statement.
+
+**The cause is a field whose spec contradicted a rule elsewhere.**
+`Generate Outline` asked the spine for *"ending: the last thing the viewer sees
+and understands"* — a camera position plus a feeling — while writer rule 10 (NO
+META) forbids the narration from mentioning the camera, the film or the viewer.
+So the planned ending was by construction a thing the writer was not allowed to
+say, and the only way it could reach the film was as a final SHOT. The Burj Al
+Arab spine says it outright (execution 11663): *"The last image is the completed
+Burj Al Arab seen from its island … and the viewer understands that…"*, and the
+film duly ends on the water. **Neither prompt was wrong on its own — a field
+whose spec contradicts a rule elsewhere does not fail loudly, it degrades into
+whatever the model can legally do with it.**
+
+Four nodes, live as Claude Scripting `8b8d7b74` (was `5a32e43e`): the outline's
+`ending` is now the CLOSING EVENT and what it leaves behind, *sayable aloud*;
+writer rule 15 and editor rule 4b ask the last chapter to finish on a closing
+beat of two or three sentences — the one place in the script where meaning may
+be stated, still not a summary, a moral, a new fact or a camera position; and
+`Narration Guard` CHECKS the last sentence for that trailing clause and feeds
+the existing `editorFeedback` path, same `MAX_RETRIES = 2`, same accept-anyway
+ending. The pattern carries both languages the pipeline writes in and needs
+three words after the connector, so a short tail ("…as planned.") is not an
+offender; it is skipped for a silent or a dialogue film by the same gate as the
+fragment and commentary checks, because a beat sheet legitimately ends on an
+image. Backtested on those six films plus three controls before shipping.
+
+**It reaches films written from now on only** — a film whose script exists keeps
+the ending it has. Full account and rollback: `db/port/story-ending/`.
+
 ### The same lesson, three more times — inventory, the excerpt, the hook (2026-09-04)
 
 Asked what would make the SCRIPTS better, the answer came out of measuring five

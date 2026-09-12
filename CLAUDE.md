@@ -4099,6 +4099,25 @@ the pipeline already produces.
   for: a progress display derived from a clock must not render at all when
   there is no clock** — the honest empty state is cheaper than the confident
   wrong one, and step one held forever looks exactly like a hang.
+- **Handing over to Final touches is not one-way, and the page assumed it
+  was.** `ProductionActivity` — the ONLY panel carrying Resume and Restart
+  production — was gated on `!awaitingFinalSettings && !assembling`, which
+  reads as "production is finished, stop showing its controls". A hook
+  rewrite breaks that premise by construction: it deletes the chapter-0
+  scenes and writes new ones with no picture and no clip onto a film that had
+  already reached Final touches. So on 2026-09-12 the Burj Al Arab film sat
+  with five approved hook scenes owing every asset, a batch from an hour
+  earlier still alive (which makes `resumeProject` refuse anyway — correctly,
+  it would duplicate), and **not one button on screen to start production**.
+  The producer's report was *"nu imi apare ca lucreaza la audio sau imagini
+  pt scene"*, and they were right: nothing was working and nothing could be
+  made to. The panel now also renders whenever `outstandingShots > 0` — an
+  approved scene with no clip and no video approval, the same `isPending`
+  test the panel and the n8n batch already use. Every normal film has a clip
+  on every approved scene by the time it hands over, so that count is 0 and
+  the behaviour is unchanged; it is only the films that get work BACK that
+  see it. **Generalises past the hook: any feature that returns a film to an
+  earlier phase must ask which controls the later phase hid.**
 - **A stranded in-flight flag must reach its exit from ANY step.** `hookRegen`
   lives in Editing Options and its two exits (re-send / cancel) live on
   `HookPanel`, which was rendered on the scene step and beside Final touches

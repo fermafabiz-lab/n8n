@@ -247,6 +247,19 @@ export default async function ProductionRoom({
     scenes.length > 0 && showing("scenes", scenes.some((s) => !s.sceneApproved));
   const hookOnFinalStep = showing("final", project.awaitingFinalSettings);
 
+  /**
+   * Approved scenes that still owe a clip — the same test `ProductionActivity`
+   * calls `isPending`, and the n8n batch's own rule: checkboxes and assets,
+   * never the status text.
+   *
+   * It exists because production work can come BACK to a film that already
+   * handed over to Final touches, and until 2026-09-12 nothing on the page
+   * could express that.
+   */
+  const outstandingShots = scenes.filter(
+    (s) => s.sceneApproved && !s.videoUrl && !s.videoApproved,
+  ).length;
+
   // Whether the voice gate is on the page. Computed once because SceneBoard
   // needs the same answer: it owns the image and video steps only, and may
   // hand a scene to the audio step just when this panel is there to catch it.
@@ -757,11 +770,21 @@ export default async function ProductionRoom({
             7" along with it — that is the state of the whole film, not of the
             panel you opened. The failure list below stays on every step on
             purpose: a broken generation is worth seeing wherever you are. */}
+        {/* Handing over to final settings hides this panel — UNLESS the film
+            has production work outstanding again. A hook rewrite is the way
+            that happens: it deletes the chapter-0 scenes and writes new ones
+            with no picture and no clip, onto a film that had already reached
+            Final touches. The status then reads `Setări Finale` or
+            `Asamblare`, which hid the one panel carrying Resume and Restart,
+            so the five new shots could never be made and nothing on screen
+            said why. Every normal film has a clip on every approved scene by
+            the time it hands over, so `outstanding` is 0 there and this reads
+            exactly as it always did. */}
         {!viewing &&
           scenes.length > 0 &&
           scenes.every((s) => s.sceneApproved) &&
-          !project.awaitingFinalSettings &&
-          !assembling &&
+          (outstandingShots > 0 ||
+            (!project.awaitingFinalSettings && !assembling)) &&
           project.statusKind !== "done" && (
             <ProductionActivity
               projectId={id}

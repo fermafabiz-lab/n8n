@@ -258,6 +258,18 @@ export interface AssemblyState {
    * every healthy project.
    */
   stopped: boolean;
+  /**
+   * The production execution holding the project up, when the answer is
+   * "no render yet, and that is fine".
+   *
+   * Without it the caller cannot tell that third state apart from the two
+   * real ones, and the panel said "Assembling your video" over a step list
+   * with no timer under it — a film that had not started rendering,
+   * presented as one that had, stuck on step one for as long as the batch
+   * lasted. The producer read that as the render being frozen and stopped
+   * it, which is the one thing that actually costs work.
+   */
+  upstream: ExecutionSummary | null;
 }
 
 /**
@@ -266,7 +278,8 @@ export interface AssemblyState {
  */
 export async function getAssemblyState(): Promise<AssemblyState> {
   // Can't see n8n at all — no verdict, never "stopped".
-  if (!n8nConfigured) return { running: null, failed: null, stopped: false };
+  if (!n8nConfigured)
+    return { running: null, failed: null, stopped: false, upstream: null };
   const isAssembly = (e: ExecutionSummary) =>
     e.workflowId === FINAL_ASSEMBLY_WORKFLOW_ID;
   const [runningNow, waitingNow] = await Promise.all([
@@ -285,14 +298,14 @@ export async function getAssemblyState(): Promise<AssemblyState> {
     ),
   ];
   const running = alive.find(isAssembly) ?? null;
-  if (running) return { running, failed: null, stopped: false };
+  if (running) return { running, failed: null, stopped: false, upstream: null };
 
   // Production is still upstream: media generation marks the project as
   // assembling when it reaches the final-settings gate, long before there is
-  // any render to watch. That gap is normal, not a stopped render.
-  if (alive.some((e) => WORKER_WORKFLOWS.has(e.workflowId))) {
-    return { running: null, failed: null, stopped: false };
-  }
+  // any render to watch. That gap is normal, not a stopped render — but it is
+  // not a render either, so it is returned as itself rather than as silence.
+  const upstream = alive.find((e) => WORKER_WORKFLOWS.has(e.workflowId)) ?? null;
+  if (upstream) return { running: null, failed: null, stopped: false, upstream };
 
   // Only a failure from the last few minutes can belong to the render the
   // page is currently watching — executions carry no project id, so an older
@@ -302,11 +315,13 @@ export async function getAssemblyState(): Promise<AssemblyState> {
     (await getExecutions("error", 10)).find(
       (e) => isAssembly(e) && new Date(e.startedAt ?? 0).getTime() > recent,
     ) ?? null;
-  if (!failed) return { running: null, failed: null, stopped: true };
+  if (!failed)
+    return { running: null, failed: null, stopped: true, upstream: null };
   return {
     running: null,
     failed: { ...failed, detail: await getExecutionError(failed.id) },
     stopped: false,
+    upstream: null,
   };
 }
 

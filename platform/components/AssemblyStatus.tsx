@@ -252,11 +252,12 @@ export default function AssemblyStatus({
             )}
           </p>
           {/* The step estimate is drawn ONLY against a real clock. Rendered
-              without one it froze on step one and read as a dead render. */}
-          <div
-            style={{ display: "flex", flexDirection: "column", gap: 7 }}
-            hidden={!started}
-          >
+              without one it froze on step one and read as a dead render.
+              Not `hidden`: this element sets `display: flex` inline, and an
+              inline display wins over the user agent's `[hidden]` rule, so
+              the attribute would have hidden nothing at all. */}
+          {started && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
             {STEPS.map((s, i) => {
               const state = i < stepIndex ? "past" : i === stepIndex ? "now" : "next";
               return (
@@ -283,6 +284,7 @@ export default function AssemblyStatus({
               );
             })}
           </div>
+          )}
           {started && (
             <p style={{ margin: "12px 0 0", fontSize: 11.5, color: "var(--dim)" }}>
               The steps above are an estimate from elapsed time — the render

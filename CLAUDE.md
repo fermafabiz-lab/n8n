@@ -2428,6 +2428,10 @@ orchestrator `40ae627e`; Hook Regen `MDYR0J93RJDU8ftf`; render commit
   picture, so the next production pass makes them (Resume / nudge when no
   batch is alive). `create_workflow_from_code` skipped the credentials on
   both HTTP nodes again, fourth occurrence.
+  **`HR Commit`'s transaction is also why every literal in `HR Apply` is
+  base64** — read the transaction-batching trap under "The write mechanism"
+  before touching that node; it is the bug that killed the first rewrite a
+  producer ever fired (2026-09-12), and dollar-quoting is what caused it.
 - **The site sets `Editing Options.hookRegen` before firing and the run
   clears it — the stranded-flag shape, so `HookPanel` carries its own exits**
   ("Send the rewrite again" / "Cancel — keep this hook"), exactly as the
@@ -4075,6 +4079,36 @@ the pipeline already produces.
 - Transient states need a grace period. The render-error panel fires on healthy
   gaps between executions; `AssemblyStatus` uses a 75s sessionStorage-backed
   grace before crying failure.
+- **`getAssemblyState()` has THREE answers and the panel only drew two, so the
+  third was drawn as a lie.** "A render is alive" and "nothing is alive" were
+  both handled; the middle one — the project reads `Asamblare` while a
+  production pass is still running, which n8n deliberately reports as no
+  verdict — fell into the healthy layout with `startedAt: null`. Everything
+  the panel says about progress hangs off elapsed time, so with no start time
+  it printed the chip as "Running" with no clock, froze the step list on step
+  one, and could never reach `slow`, which is the only condition that offers
+  Restart. A film that had not begun rendering, presented as one that had,
+  stuck at the first step for as long as the batch lasted. Reported 2026-09-12
+  as *"nu trece de primul pas, nu arata nici cat dureaza render-ul"* — and the
+  producer did the reasonable thing and stopped it, which on a real render is
+  the one move that throws work away. `AssemblyState` now carries `upstream`
+  (the worker execution holding it up) and the panel reads "Getting ready to
+  assemble · Not started yet", names what is running, hides the step list
+  entirely without a clock, and offers "← Back to Final touches" instead of
+  "■ Stop the render". **The generalisation is the one this file keeps paying
+  for: a progress display derived from a clock must not render at all when
+  there is no clock** — the honest empty state is cheaper than the confident
+  wrong one, and step one held forever looks exactly like a hang.
+- **A stranded in-flight flag must reach its exit from ANY step.** `hookRegen`
+  lives in Editing Options and its two exits (re-send / cancel) live on
+  `HookPanel`, which was rendered on the scene step and beside Final touches
+  only — so a producer who moved on to the render found the spinner gone from
+  the screen it was on and nothing anywhere to cancel it. The panel now
+  follows a rewrite in flight onto whatever step is open. Same shape as the
+  scene-rewrite and video-regen badges; this is the third time, so when you
+  add a state whose exit is written by someone else, ask not only whether it
+  HAS a local exit but whether that exit is on screen at the moment it is
+  needed.
 - `ProductionActivity` (project page) mirrors the batch rule from `Sort & Cap
   Scenes`: a scene is done for the batch once its clip exists, pending scenes
   sort first, and `MEDIA_BATCH_CAP` in `platform/lib/n8n.ts` is a display
@@ -5113,6 +5147,48 @@ round-tripped byte for byte, booleans included, with the regen timestamp set.
 Only a literal `$hov$` in the data could break it, which no prompt will contain.
 `queryReplacement` was the obvious alternative and is worse: it splits on
 commas, and these payloads are full of them.
+
+**That last paragraph is true ONLY under the default query batching, and the
+exception ate a feature on its first real use.** Set `options.queryBatching` to
+`transaction` (or `independently`) and the node stops handing the SQL straight
+to the driver: it goes through pg-promise WITH an empty values array, so every
+`$` followed by a digit anywhere in the query text is read as a positional
+parameter and the whole statement is refused —
+
+    Variable $321 out of range. Parameters array length: 0
+
+Dollar-quoting does not merely fail to help, it **manufactures** the hazard:
+the closing `$` of `$hov$` in front of a value starting with a digit IS `$321`.
+That is how the first producer-fired `hook-regen` died (execution 12490) on a
+hook beat reading *"321 metres, standing in the Gulf"*. A leading digit is not
+the only way in — `$1B` mid-sentence fails identically, and this pipeline
+writes films about $1B hotels.
+
+Measured both ways rather than reasoned about (execution 12511, four queries):
+under default batching `$321`, `$1B` and `$5 million` all round-trip; under
+`transaction` the first two are refused and only base64 survives. **So the 44
+existing Postgres nodes are safe** — every one of them uses the default — and
+the rule for a new one is:
+
+- default batching → dollar-quote as above, unchanged;
+- transaction batching → **no `$` may reach the query at all**. Encode each
+  literal and let Postgres decode it:
+  `convert_from(decode('<base64>','base64'),'UTF8')`, `::jsonb` on the end
+  where a jsonb argument is wanted. Base64's alphabet has no `$` in it, so no
+  data can form a placeholder. `HR Apply` in Hook Regen is the worked example.
+
+Do not "fix" this by dropping the transaction. In `HR Commit` the transaction
+is what deletes the old hook scenes and writes the new ones atomically, and on
+the day it failed that is precisely what saved the film: every statement rolled
+back and the stored hook was untouched.
+
+**And a write that only the failing run can undo needs an error branch.** The
+site sets `Editing Options.hookRegen` before firing and the run clears it, so
+a dead run strands the spinner — the shape this file already names once per
+regeneration. `HR Commit` is `continueErrorOutput` into `HR Release Flag`,
+which clears the flag on its own (default batching, `executeOnce`), so a
+refused rewrite now ends with the producer looking at buttons rather than at a
+spinner with nothing behind it.
 
 ### The four search shapes
 

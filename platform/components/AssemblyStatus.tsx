@@ -21,14 +21,19 @@ const STEPS = [
   "Drawing captions, titles and the end screen",
 ];
 
-function useElapsed(startedAt: string | null): number | null {
+/** One ticking clock for the whole panel — two would drift apart on screen. */
+function useNow(): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
-  if (!startedAt) return null;
-  return Math.max(0, Math.floor((now - new Date(startedAt).getTime()) / 1000));
+  return now;
+}
+
+function since(now: number, at: string | null): number | null {
+  if (!at) return null;
+  return Math.max(0, Math.floor((now - new Date(at).getTime()) / 1000));
 }
 
 /** How long a trouble signal must persist before it is believed. */
@@ -107,6 +112,11 @@ export default function AssemblyStatus({
   missing,
   /** The film's length, so "slow" is judged against THIS film, not a 60s one. */
   lengthSeconds = null,
+  /**
+   * A production pass still running, when that is WHY there is no render.
+   * Named rather than left blank: see the `upstream` note in lib/n8n.ts.
+   */
+  upstream = null,
 }: {
   projectId: string;
   startedAt: string | null;
@@ -114,8 +124,11 @@ export default function AssemblyStatus({
   n8nUrl: string | null;
   missing: boolean;
   lengthSeconds?: number | null;
+  upstream?: { name: string; startedAt: string | null } | null;
 }) {
-  const elapsed = useElapsed(startedAt);
+  const now = useNow();
+  const elapsed = since(now, startedAt);
+  const upstreamFor = since(now, upstream?.startedAt ?? null);
   const expected = expectedRenderSeconds(lengthSeconds);
   const [msg, setMsg] = useState<ActionResult | null>(null);
   const [pending, setPending] = useState(false);
@@ -135,6 +148,16 @@ export default function AssemblyStatus({
   // may be wrong even though n8n still calls the execution "running".
   const slowAfter = expected !== null ? expected * 1.5 : 15 * 60;
   const slow = elapsed !== null && elapsed > slowAfter;
+  /**
+   * A render is genuinely under way — n8n named an execution and when it
+   * began. Everything that pretends to know how far along it is hangs off
+   * this, and nothing else may: without a start time the elapsed seconds are
+   * unknown, so the step estimate below would report step one forever and
+   * the "taking longer than usual" test could never fire. That combination
+   * is what a producer sees as a frozen render, and stopping a healthy one
+   * is the only move here that throws work away.
+   */
+  const started = elapsed !== null;
   // Only after the signal has held for the grace period — see useSettled.
   const broken = (!!failure || missing) && settled;
   // Which step it is plausibly on — honest pacing, not a fake progress bar:
@@ -184,10 +207,14 @@ export default function AssemblyStatus({
       <div className="sechead">
         <h2>
           <span style={{ marginRight: 8 }}>{broken ? "⚠" : "🎬"}</span>
-          {broken ? "The render stopped" : "Assembling your video"}
+          {broken
+            ? "The render stopped"
+            : started
+              ? "Assembling your video"
+              : "Getting ready to assemble"}
         </h2>
         <span className={`chip ${broken ? "err" : "run"}`}>
-          {broken ? "Needs attention" : elapsed !== null ? mmss(elapsed) : "Running"}
+          {broken ? "Needs attention" : started ? mmss(elapsed!) : "Not started yet"}
         </span>
       </div>
 
@@ -196,14 +223,40 @@ export default function AssemblyStatus({
       {!broken && (
         <>
           <p style={{ margin: "0 0 14px", fontSize: 13.5, color: "var(--soft)" }}>
-            All the clips are approved and the final video is being put
-            together.{" "}
-            {expected !== null
-              ? `A film this long takes about ${minutes(expected)} to render — the captions and titles are drawn frame by frame, roughly two frames a second.`
-              : "This usually takes a few minutes."}{" "}
-            It appears at the top of this page by itself when it&apos;s done.
+            {started ? (
+              <>
+                All the clips are approved and the final video is being put
+                together.{" "}
+                {expected !== null
+                  ? `A film this long takes about ${minutes(expected)} to render — the captions and titles are drawn frame by frame, roughly two frames a second.`
+                  : "This usually takes a few minutes."}{" "}
+                It appears at the top of this page by itself when it&apos;s
+                done.
+              </>
+            ) : upstream ? (
+              <>
+                The render has not started yet — {upstream.name} is still
+                running on this film
+                {upstreamFor !== null ? `, for ${mmss(upstreamFor)} now` : ""}.
+                Nothing is stuck: the render begins once that pass hands
+                over, and this panel starts counting then.
+                {expected !== null
+                  ? ` It will then take about ${minutes(expected)} for a film this long.`
+                  : ""}
+              </>
+            ) : (
+              <>
+                Waiting for n8n to report the render. If it does not appear in
+                the next minute or two, this panel will offer to restart it.
+              </>
+            )}
           </p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+          {/* The step estimate is drawn ONLY against a real clock. Rendered
+              without one it froze on step one and read as a dead render. */}
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: 7 }}
+            hidden={!started}
+          >
             {STEPS.map((s, i) => {
               const state = i < stepIndex ? "past" : i === stepIndex ? "now" : "next";
               return (
@@ -230,10 +283,12 @@ export default function AssemblyStatus({
               );
             })}
           </div>
-          <p style={{ margin: "12px 0 0", fontSize: 11.5, color: "var(--dim)" }}>
-            The steps above are an estimate from elapsed time — the render
-            doesn&apos;t report progress while it works.
-          </p>
+          {started && (
+            <p style={{ margin: "12px 0 0", fontSize: 11.5, color: "var(--dim)" }}>
+              The steps above are an estimate from elapsed time — the render
+              doesn&apos;t report progress while it works.
+            </p>
+          )}
           {slow && (
             <p className="formmsg" style={{ marginTop: 12 }}>
               This is taking longer than a film this length should
@@ -262,18 +317,19 @@ export default function AssemblyStatus({
                   Keep rendering
                 </button>
                 <span style={{ fontSize: 12, color: "var(--dim)" }}>
-                  The render is thrown away and the project goes back to Final
-                  touches. Clips, takes and approvals are untouched.
+                  {started ? "The render is thrown away and the project goes back to Final touches." : "The project goes back to Final touches."}{" "}
+                  Clips, takes and approvals are untouched.
                 </span>
               </>
             ) : (
               <>
                 <button className="btn" onClick={() => setConfirmStop(true)}>
-                  ■ Stop the render
+                  {started ? "■ Stop the render" : "← Back to Final touches"}
                 </button>
                 <span style={{ fontSize: 12, color: "var(--dim)" }}>
-                  The other steps are locked while this runs — stop it to go
-                  back and change anything.
+                  {started
+                    ? "The other steps are locked while this runs — stop it to go back and change anything."
+                    : "Nothing is rendering yet, so going back costs nothing."}
                 </span>
               </>
             )}

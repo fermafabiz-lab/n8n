@@ -221,6 +221,32 @@ export default async function ProductionRoom({
   // the denominator is the list's own length.
   const stepsDone = steps.filter((s) => s.state === "done").length;
 
+  /**
+   * The cold open panel's props, and the two steps that normally carry it.
+   *
+   * Hoisted because a rewrite in flight must be able to reach its own way
+   * out from ANY step. `hookRegen` is the stranded-flag shape this repo
+   * keeps paying for: the site sets it, the n8n run clears it, and a run
+   * that dies leaves it set with nobody left to clear it — while the panel
+   * shows a spinner instead of the buttons. Both of its exits live on that
+   * panel, so a producer who moved on to Final touches and then to the
+   * render found the spinner gone from the screen it was on and no way to
+   * cancel it anywhere. Whatever step is open, a rewrite that is in flight
+   * brings the panel with it.
+   */
+  const hookPanel = {
+    projectId: id,
+    plan: project.hookPlan,
+    regen: project.hookRegen,
+    hookStyle: project.editing.hookStyle,
+    category: project.category,
+    hookShots: scenes.filter((s) => s.order < 100).length,
+    hookAssets: scenes.some((s) => s.order < 100 && (s.imageUrl || s.videoUrl)),
+  };
+  const hookOnScenesStep =
+    scenes.length > 0 && showing("scenes", scenes.some((s) => !s.sceneApproved));
+  const hookOnFinalStep = showing("final", project.awaitingFinalSettings);
+
   // Whether the voice gate is on the page. Computed once because SceneBoard
   // needs the same answer: it owns the image and video steps only, and may
   // hand a scene to the audio step just when this panel is there to catch it.
@@ -629,6 +655,12 @@ export default async function ProductionRoom({
           )
         )}
 
+        {/* A hook rewrite that is in flight follows the producer, because
+            the only two ways to cancel or re-send it are on this panel. */}
+        {project.hookRegen && !hookOnScenesStep && !hookOnFinalStep && (
+          <HookPanel {...hookPanel} />
+        )}
+
         {showing("script", !!script) && script && (
           <ScriptReview
             projectId={id}
@@ -650,15 +682,7 @@ export default async function ProductionRoom({
             {/* The cold open, beside Final touches for the same reason the
                 music picker is: rewriting it is a self-saving action that
                 must not arm the render button. Here it also costs new shots. */}
-            <HookPanel
-              projectId={id}
-              plan={project.hookPlan}
-              regen={project.hookRegen}
-              hookStyle={project.editing.hookStyle}
-              category={project.category}
-              hookShots={scenes.filter((s) => s.order < 100).length}
-              hookAssets={scenes.some((s) => s.order < 100 && (s.imageUrl || s.videoUrl))}
-            />
+            <HookPanel {...hookPanel} />
             {/* Deliberately beside FinalSettings, not a row inside it: that
                 panel batches choices into one confirm that also STARTS the
                 render, while pinning a track is a self-saving audition. */}
@@ -689,6 +713,15 @@ export default async function ProductionRoom({
             // no-verdict answer — which is what kept the false restart
             // button on screen.
             missing={!!assembly?.stopped}
+            // Why there is no render, when there is none and that is fine.
+            upstream={
+              assembly?.upstream
+                ? {
+                    name: assembly.upstream.workflowName,
+                    startedAt: assembly.upstream.startedAt,
+                  }
+                : null
+            }
             n8nUrl={
               assembly?.running || assembly?.failed
                 ? executionUrl(
@@ -777,15 +810,7 @@ export default async function ProductionRoom({
           // is shown first: this is the one moment a rewrite costs only a
           // model call, before any of its shots has a picture.
           <>
-            <HookPanel
-              projectId={id}
-              plan={project.hookPlan}
-              regen={project.hookRegen}
-              hookStyle={project.editing.hookStyle}
-              category={project.category}
-              hookShots={scenes.filter((s) => s.order < 100).length}
-              hookAssets={scenes.some((s) => s.order < 100 && (s.imageUrl || s.videoUrl))}
-            />
+            <HookPanel {...hookPanel} />
             <SceneReview projectId={id} scenes={scenes} />
           </>
         ) : scenes.length > 0 &&

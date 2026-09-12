@@ -92,7 +92,7 @@ Everything you put on screen must already be in the film, and the proof travels 
 
 Every word on a card must be lifted from its own quote, unbroken and in that order: a label of "as a dealer" is proved by "arrives in Las Vegas in 1941 as a dealer", and "dealer in Vegas" is not, because the film never puts those words together. Numbers are the one thing you may re-render: "cinci si douazeci" may become "05:20". You may not introduce a fact the film does not contain — a distance, a date or a statistic that is nowhere in the script and nowhere in the research pack is not yours to add.
 
-A card may not use a word the film has not spoken yet: quote only from the card's own scene or an earlier one. Write each string in the film's own words; a card that says "Feribot" while the film has only said "ferry" is wrong even though it means the same.
+A card may not use a word the film has not spoken yet: quote only from the card's own scene or an earlier one. The ONE exception is a route, which is a map of a whole journey — its later stops are places the film reaches after the card is shown, so quote them from wherever they are spoken and place the card where the journey BEGINS, not where it ends. A map shown after the arrival is a summary, not a map. Write each string in the film's own words; a card that says "Feribot" while the film has only said "ferry" is wrong even though it means the same.
 
 Aim for one to three cards on every film. This pipeline wants animations in its videos, so look hard: a journey with named legs, two times set against each other, a run of dates a listener cannot space out in their head, two quantities of the same kind, a sequence of beats across several scenes. Take the best one or two even when neither is spectacular. Note that the last of those, steps, can be drawn from almost any story that goes somewhere — so a film that offers none of the other four usually still offers this one, and returning nothing on such a film is a miss rather than restraint.
 
@@ -283,6 +283,10 @@ const nodes = (baseX, baseY) => [
 								{
 									name: 'Mannheim',
 									source: {kind: 'quote', sceneIndex: 3, from: 'exact words from that scene'},
+								},
+								{
+									name: 'Pforzheim',
+									source: {kind: 'evidence', ref: 'E3'},
 								},
 							],
 						},

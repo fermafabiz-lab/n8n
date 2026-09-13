@@ -1400,7 +1400,15 @@ numbers and rollback: `db/port/narration-voice/README.md`. What bites:
   on Burj (all three of its hits are real — "silhouette against sea and sky",
   "the camera enters"), silent on the documentaries and Peking.
 - **Check `guardcheck.mjs` after touching the regexes** — it reads them out
-  of the guard body, so the test and the node cannot drift.
+  of the guard body, so the test and the node cannot drift. The first test
+  film found `mist\w*` matching "mistimes" (hence "mistake", "mister"); a
+  `\w*` suffix on a texture word is a false positive waiting for a story.
+- **Measured on the first film after publishing** (Claude Scripting active
+  `d5972f17`; disposable `recDNqlXH2h1A19TY`, same tone and settings as the
+  Lego chase): narration/shot overlap 33% → 21% (what remains is the
+  characters' and objects' NAMES, which are in the frame by construction),
+  texture words 1.5/100 → 0.0, scenery openers 25% → 0%, and the script came
+  in at 263 words against a 308 target — shorter than ordered, as decided.
 
 ### Evidence retrieval (Claude Scripting)
 

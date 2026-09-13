@@ -65,7 +65,7 @@ no human narrator ever says, because the viewer is looking at the road.
 
 ## What changed
 
-### Claude Scripting `gkEtGMecv4TC3ZHp` — active `b2d90d70` (was `05bf7412`)
+### Claude Scripting `gkEtGMecv4TC3ZHp` — active `d5972f17` (was `05bf7412`; `b2d90d70` for seven minutes in between)
 
 Exactly six nodes differ; `code/` holds the new bodies, `original/` the live
 ones they replaced, byte-verified both ways.
@@ -123,4 +123,57 @@ documentaries, Tupac, the Epic and Peking.
   byte-identical to `code/`. Published with `versionId: b2d90d70`.
 - SQL applied through a throwaway runner (`IwbFqzh75gomrqM4`, archived after);
   read back: all 11 rows carry the shared clause, `updated_at` 16:55:19.
-- First film: below.
+- `b2d90d70` was live from 17:04 to 17:11 UTC; the first test film (below)
+  showed `mist\w*` in the TEXTURE regex matching "mistimes" (and so
+  "mistake", "mister"), fixed to `mist(?:y|ier|iest|s|ed|ing)?` and published
+  as `d5972f17` after the same diff (zero nodes differing from the expected
+  state, connections and settings identical).
+
+## First film after publishing — 2026-09-13 17:06 UTC
+
+A disposable 120-second Dramatic story, the same shape as the Lego chase the
+diagnosis was built on ("TEST disposable — A lego story about a firefighter
+racing to stop a runaway fuel truck before it reaches the Brick City
+harbour", `recDNqlXH2h1A19TY`, orchestrator 12957, scripting 12958),
+created through the real `new-project` webhook with the Lego film's own
+settings. The script was approved by SQL so the segmenter would run; the
+scenes were NOT approved, so nothing past scripting was spent. Measured
+through the same code (`Measure Overlap` in the runner = `measure/*.mjs`),
+both films, whole film / chapters only:
+
+| | Lego chase (09-13 13:26, before) | test film (17:06, after) |
+|---|---|---|
+| narration ∩ own shot description, median | **33%** / 33% | **21%** / 21% |
+| texture words per 100 | **1.5** / 1.3 (6 hits) | **0.0** / 0.0 |
+| camera words | 0 | 0 |
+| sentences opening on scenery | **25%** / 22% | **0%** / 0% |
+| words (chapters) | 375 | 263 — target 308, ceiling 339: **shorter than ordered, as decided** |
+| the script arrived | — | 49 s after the webhook, one editor pass |
+
+What the remaining 21% is: the names. "Maya throws the switch on purpose and
+seals the road with Rex still in the cab" shares *Maya, switch, seals, road,
+Rex, cab* with a shot that shows exactly that — the subject of a sentence is
+in the frame by construction. The documentaries sit at 6–14% because a fact
+has no picture. What is gone is the other kind of overlap: "The road climbs
+above the river, slick and narrow under flashing lamps" has no counterpart in
+the new film at all.
+
+The script itself (chapter 1, 14 sentences): "Captain Maya Blaze hears one
+fact that kills every slower plan: the truck is already on city roads. Nora
+offers a wider blockade three districts ahead, but Maya starts the pumper
+because waiting gives the tanker more road than the city can afford. That
+choice leaves the station response behind and trades backup for one moving
+chance on Main Avenue." — every sentence a decision, a cost or a
+consequence; not one describes the picture. And the segmenter, with no
+picture in the line to copy, staged the events on its own ("Maya freezes for
+a fraction of a second beside the truck, then her expression hardens as she
+grabs the door handle. The shot turns a spoken update into a visible
+decision point") — rule 5 doing what it was rewritten to do.
+
+Honest limits: one film, one tone, one language, fiction only. The voice is
+now decision-and-cost throughout and reads slightly abstract in places
+("trades backup for one moving chance") — that is the vocabulary the shared
+clause asks for, and whether it is the right amount is the producer's call
+after listening to a take. The hook (4 beats) still describes the picture
+("The barrier switch stands, untouched, in the distance") because the hook
+prompt was deliberately not touched in this pass.

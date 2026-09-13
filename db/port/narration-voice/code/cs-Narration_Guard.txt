@@ -176,7 +176,7 @@ if (category !== 'cinematic' && !(multiVoice === 'characters' && castCount > 0))
   // of its sentences on rain, roads, sirens and shutters, and a third of its
   // narration words were the same words as its own shot descriptions. The
   // three factual films sat at 0.0 / 0%. Thresholds sit between the two.
-  const TEXTURE = /\b(?:glossy|gleam\w*|glint\w*|glow\w*|shimmer\w*|slick|matte|hazy|haze|mist\w*|spray|sparks?|strob\w*|puls\w*|flash\w*|reflections?|sheen|striped|printed|tinted|chrome|glare)\b/i;
+  const TEXTURE = /\b(?:glossy|gleam\w*|glint\w*|glow\w*|shimmer\w*|slick|matte|hazy|haze|mist(?:y|ier|iest|s|ed|ing)?|spray|sparks?|strob\w*|puls\w*|flash\w*|reflections?|sheen|striped|printed|tinted|chrome|glare)\b/i;
   const CAMERA = /\b(?:shot|framed|camera|angle|close-?ups?|lens|foreground|background|silhouettes?|vantage)\b/i;
   const SCENERY = /^(?:the\s+)?(?:rain|snow|fog|mist|wind|light|sunlight|daylight|dusk|dawn|night|morning|shadows?|road|sky|sea|water|river|walls?|floor|air|sun|streets?|city|harbou?r|roof|room|door|window|glass|steel|stone|concrete|smoke|dust|steam|sparks|sirens?|lamps?|lights|warehouses?|containers?|towers?|cranes?|barges?|traffic)\b/i;
   const TEXTURE_PER100 = 0.4, TEXTURE_MIN = 4, CAMERA_MIN = 2, SCENERY_PCT = 12, SCENERY_MIN = 4;

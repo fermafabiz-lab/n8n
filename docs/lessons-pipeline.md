@@ -1395,3 +1395,70 @@ generated FROM it. The chain, and where each piece lives:
   hits when you mean to fire a webhook, which silently creates empty
   projects — target webhooks by POSTing the URL, not via execute_workflow.
 
+
+### Direction: why Veo played the shot backwards — 2026-09-13, LIVE
+
+The producer: *"scena spunea cum mașina iese din curte, iar mașina mergea cu
+spatele către curte"* — and *"rateuri cu lucruri fără logică"* generally, on
+`veo-3.1-lite-low-priority`, which is the tier every film runs on and is
+staying on by their explicit choice. Full account, node bodies and the
+verification runs: `db/port/veo-direction/`.
+
+**The motion prompt was never the problem.** A query against live scenes
+shows the segmenter's rule 6 works — *"surges right to left out of the
+substation"*, *"advances away from the camera"*. Direction is stated. What
+was APPENDED underneath it was the problem:
+
+> everything that moves travels the same way as the subject — no oncoming
+> vehicles, nobody walking or driving against the flow
+
+That is not a general truth. It is a rule that **forbids shots this pipeline
+legitimately writes**: scene 101 of the LEGO chase film asks for the cruiser
+right-to-left with the Ferrari left-to-right ahead of it, and the clause bans
+it outright. So does a crossing, and so does a car pulling into traffic.
+Handed a prompt and a rule that contradict each other, the weakest model on
+the tier resolves the contradiction whichever way it likes — a coin flip on
+every clip, which is exactly the symptom. `no reversed motion` went with it:
+it reads two ways (reverse PLAYBACK, or a vehicle driving backwards) and it
+is a negation, which is a poor way to not get a thing. **When a clip does the
+opposite of its prompt, read what else is in the prompt before blaming the
+model.**
+
+**Free Veo will take a last frame, and that changes direction from rhetoric
+into geometry.** useapi supports I2V-FL — `startImage` + `endImage` — on
+every Veo variant. Given two frames Google silently routes this tier to
+`veo_3_1_interpolation_lite_low_priority` with
+`VIDEO_MODEL_CAPABILITY_START_AND_END_IMAGE`, still at zero credits
+(verified: `remainingCredits` unmoved, 8s/720p in 55s). A car that must END
+outside the gate cannot get there by driving in. The end frame is drawn by
+the same image model with the approved still as `reference_1`, so only what
+moves has moved; it is scaffolding, never stored or shown. **Its cost is
+queue time** — ~25-30s per scene, two image generations each paying a ~5.5s
+captcha — which is why `endFrame: false` exists.
+
+**`reference_*` / `character_*` cannot be combined with `startImage` /
+`endImage`** — both trigger R2V (Ingredients) on Veo. So Flow Characters and
+a start frame are mutually exclusive, and the approved still wins.
+
+**Interpolation's failure mode is a MORPH, and it is invisible to a
+direction check.** Two frames too far apart make the model dissolve between
+them rather than move anything — and the car does end up outside the gate, by
+fading there. Hence the motion judge scores `morph` separately, and morph is
+the one verdict a different seed cannot fix: the same two frames dissolve
+again at any seed, so that verdict drops the end frame instead.
+
+**Then: an instruction in a prompt is not a constraint.** Both fixes above
+only ask Veo more nicely. So the clip now gets what the still already gets
+from `Judge Prep` — a contact sheet, gpt-4o, and a score. `direction`,
+`coherent`, `morph`; thresholds deliberately low (0.5 / 0.45) because a
+re-roll costs a whole generation, and every way of not getting an answer
+KEEPS the clip. One re-roll per scene per pass; `motionJudge: false` turns it
+off. ~1,410 prompt tokens a clip, about 30 cents an eighty-scene film.
+
+**A resubmit that reuses the seed returns the same clip.** `Current Scene`
+derives the seed from the scene id and the takes already FILED, and a take
+rejected by the judge is never filed — so a plain resubmit would send the same
+seed, prompt and frames. `Motion Resubmit` overrides the seed and resets
+`sd.polls[sceneId]` so the new job is not declared timed out on arrival. (The
+older `Resubmit Guard` has the same blind spot harmlessly: it retries jobs
+that FAILED, where an identical request is the right thing.)

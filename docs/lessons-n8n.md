@@ -1120,3 +1120,51 @@ now has a button on the site.
    Airtable plan; it is the only rollback there is.
 
 
+
+### `addNode` through MCP does NOT carry a credential — 2026-09-13
+
+`update_workflow`'s `addNode` accepts a `credentials` field, but a node
+created from SDK code or from a plain `addNode` operation comes out with
+none. For an httpRequest node using `authentication: predefinedCredentialType`
+that is not a visible error: the node is valid, the workflow publishes, and
+every call answers **401**.
+
+That is worse than it sounds when the node is a judge. `Motion Judge` was
+built so that any failure to get an answer KEEPS the clip — so an unbound
+credential would have meant the motion judge silently passing every clip in
+every film, looking exactly like a judge that never finds anything wrong.
+**The failure mode of a well-designed fail-open component is silence**, so
+bind the credential in the same breath as adding the node:
+
+```
+{type: 'setNodeCredential', nodeName: 'Motion Judge',
+ credentialKey: 'openAiApi', credentialId: '…', credentialName: 'OpenAI account'}
+```
+
+Remember `setNodeCredential` applies **in place to the live version** — it is
+the one edit that does not stage a draft (see the entry above) — so it takes
+effect the moment it is sent, before any `publish_workflow`.
+
+The tool result names this itself, in the line that is easy to skim past:
+*"HTTP Request nodes (Motion Judge) were skipped during credential
+auto-assignment. Their credentials must be configured manually."* Read it.
+
+### The diff rule has no tooling on a 180-node workflow in a web session
+
+`db/port/lib/diff-workflow.mjs` needs both versions as files on disk. In a
+Claude Code web session there is no way to get them there: `get_workflow_details`
+returns ~500 kB into context, and writing it back out means retyping all of
+it. For Media Generation (188 nodes) that is not worth it, so the guard that
+actually applies is a different one:
+
+- `get_workflow_history` first — if `versionId` equals `activeVersionId` and
+  the newest entry is your own, nobody has parked a draft that your publish
+  would ship;
+- `update_workflow` is **operation-scoped**, not a whole-body PUT, and its
+  result reports `appliedOperations`; check it equals the number you sent;
+- `nodeCount` in the result is a cheap arithmetic check that exactly the
+  nodes you added were added and nothing was removed.
+
+That is weaker than a node-by-node diff and should be said out loud rather
+than implied. The tooling is still the right thing from a machine that can
+reach `wf7` and hold the file.

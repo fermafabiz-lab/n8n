@@ -1702,3 +1702,34 @@ model's actual payload before fixing a rule its report line accuses.** Live as
 Scripting `05bf7412` and Final Assembly `559cde3c`; full account, the refused
 card as a runnable fixture, and what is still owed: `db/port/motif-rescue/`.
 
+
+### `/inspect?save=1` — a contact sheet as a URL, for the judges
+
+`GET /inspect?url=<media>&mode=sheet&interval=1&save=1` writes the sheet
+under `/output` and answers `{file, url}` instead of streaming the JPEG.
+Added 2026-09-13 for Media Generation's motion judge.
+
+The reason is n8n's execution data, not convenience. A vision model has to be
+given the picture somehow, and base64 in the request body means every sheet
+travels through the execution on a node that runs once per clip of an
+eighty-scene film — hundreds of kB each. A URL costs nothing, and it is
+already how `Consistency Judge` feeds gpt-4o the frame it judges. `/output`
+is deliberately key-free with unguessable names (the comment in `index.mjs`
+says why), which is what makes this possible without opening anything up.
+
+Two details worth keeping:
+
+- **Sheets are swept after two hours** on the way past, best-effort, so a
+  long pass cannot fill the container's disk with pictures nobody will open.
+- **The URL respects `x-forwarded-proto`.** Behind Railway's proxy
+  `req.protocol` is `http`, and the URL is handed to OpenAI to fetch. Plain
+  http worked on the day, but it is the kind of thing a third-party fetcher
+  tightens up on later. (`/render/:id/status`'s `outputUrl` still has the
+  unguarded form; it is only ever read by n8n and the site, so it was left
+  alone rather than touched for tidiness.)
+
+Measured end to end on an 8s, 7 MB Flow clip: download + ffmpeg + the gpt-4o
+read, **3.2 seconds total**, 1,410 prompt tokens at `detail: 'high'`.
+`detail: 'low'` is cheaper and is what the still judge uses, but it
+downscales the whole grid to 512 px — which is exactly where the movement
+lives.

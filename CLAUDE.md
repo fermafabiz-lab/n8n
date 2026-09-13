@@ -263,6 +263,27 @@ expected and harmless for an app touching only its own Drive.
 
 ## Open work
 
+- **The Veo direction work needs a real film to measure it** (2026-09-13,
+  Media Generation `6a79f422`; full account `db/port/veo-direction/`, lessons
+  in `docs/lessons-pipeline.md` under "Direction: why Veo played the shot
+  backwards"). Three changes went live in one afternoon against the
+  producer's report that clips contradict their own scene — the contradictory
+  continuity clause is gone, every clip is now made from a start frame AND an
+  end frame, and a gpt-4o judge scores each finished clip and re-rolls it
+  once when it clearly disagrees with its brief. Each was verified at the API
+  level on a throwaway (executions 12930, 12933, 12947) and the one clip that
+  exists scored `direction: 1, coherent: 1, morph: false` on exactly the
+  reported failure. **None of that is a measurement.** What is owed:
+  watch one real film and count how many clips the judge re-rolls — too many
+  means the thresholds (0.5 / 0.45 in `Motion Verdict`) are wrong, near zero
+  on a film the producer still dislikes means the judge is too kind;
+  watch for MORPHING, which is what interpolation does when the two frames
+  are too far apart and is invisible to a direction check;
+  and mirror the end frame onto the regen path (`Submit Video Regen`), which
+  still submits with a start frame only, so a regenerated clip gets the
+  direction its neighbours got. The two escape hatches, if a film goes wrong
+  at 2 a.m.: `endFrame: false` and `motionJudge: false` in `Editing Options`.
+
 - **Documentary mode, what is still owed** (see `docs/lessons-site.md`,
   "Documentary mode — archive footage" and "The Universal Footage Engine"):
   the picker itself has only been exercised through its HTTP twin, so click

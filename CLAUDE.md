@@ -173,6 +173,21 @@ the full entry in the file named:
   on, node by node, confirming the ONLY entry that differs is yours** — use
   `db/port/lib/diff-workflow.mjs` rather than ad hoc python/jq. See
   `db/port/lib/README.md`.
+- **Never write a prompt instruction as a negation.** Google's Veo guidance is
+  explicit that "no walls" / "don't show walls" makes the model render walls;
+  what is unwanted belongs in a bare comma-separated NOUN LIST. This pipeline
+  produced a clip where a held object vanished and a table duplicated because
+  our own tail said "nobody and nothing appears, disappears or duplicates".
+  Same for props: "the swinging door" is an instruction to animate the door.
+  Full account: `docs/lessons-pipeline.md`, "A prompt that names a failure
+  summons it".
+- **A prompt fragment always lives in more copies than the one you found.** The
+  motion-prompt tail lived in seven places across three workflows; a fix that
+  touched two was reported as done and shipped half-broken. Before calling a
+  prompt change complete, grep EVERY workflow JSON for a distinctive phrase from
+  the text you replaced. Guardrails are cheapest composed at submit time, where
+  one node owns them, rather than stored in the database where changing them
+  means a backfill.
 - **Editing Options fields are refuse-then-clamp, never silently coerced** —
   the `normalize*` family in `platform/lib/data/derive.ts`, fixture-tested by
   `npm run check:normalize`. A value stored by the site, read by n8n and

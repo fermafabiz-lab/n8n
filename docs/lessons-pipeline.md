@@ -1462,3 +1462,129 @@ seed, prompt and frames. `Motion Resubmit` overrides the seed and resets
 `sd.polls[sceneId]` so the new job is not declared timed out on arrival. (The
 older `Resubmit Guard` has the same blind spot harmlessly: it retries jobs
 that FAILED, where an identical request is the right thing.)
+
+### A prompt that names a failure summons it — 2026-09-13 (evening), LIVE
+
+Hours after the direction fix above, the producer came back with an 8-second
+clip from the café film `recXibIyVuLvMIqy3` and a list: *"personajul ia ceva in
+mana apoi dispare, usa la frigider se deschide singura, bate vantul peste acele
+foi lipite ce nu are sens ca nu bate vantul in cafenea, usa de la camera se
+inchide singura, personajul ia acel teanc de foi pleaca cu el apoi se intoarce
+nenatural"*. Pulled apart at 4 fps, all 34 frames confirm every complaint, plus
+two they did not mention: the prep table vanishes and returns in a different
+place, and the apron flickers between a bib cut and a waist cut.
+
+**Almost none of it was the model inventing. The prompt asked for it.** The
+stored `motion_prompt` for that scene, verbatim in the parts that matter:
+
+> …**reaches to the shelf, strips off the last sleeve stack, and pivots back
+> toward the swinging door**. Fluorescent prep-room light stays cold and static
+> while **loose paper edges quiver from her movement** … Negative: … **no
+> subject appears, disappears, duplicates or changes identity.**
+
+Four separate lessons, each of which has now changed a node:
+
+**1. Never mandate ambient motion.** Rule 6(c) required every shot to carry
+*"the ambient/atmospheric motion of the environment (drifting steam, rippling
+water, flickering light, moving crowd, blowing dust)"*. In a still indoor room
+there is nothing to move, so the model invents something — and what it reaches
+for is paper. Nine of that film's sixteen scenes asked for motion nothing in
+frame could cause. The rule now reads: ambient motion **only where something in
+frame causes it** (steam off a machine, dust in a sunbeam, a clock's second
+hand), **indoors there is no weather**, and **write nothing at all if nothing
+causes motion**.
+
+**2. An adjective on a prop is an instruction to animate it.** *"the swinging
+door"* is how the door came to swing with nobody near it; three of sixteen
+scenes labelled a prop with a motion word. The rule is now literal: write *"the
+door"*, never *"the swinging door"*.
+
+**3. One action per shot.** *"reaches … strips off … pivots back toward the
+door"* is three actions in eight seconds. The model, with more to do than fits,
+performed the first one twice, lost the object between the two, and walked out
+of frame and back — which is precisely the producer's *"pleaca cu el apoi se
+intoarce nenatural"*. Rule 6 now caps a shot at one action and carries that exact
+sentence as its worked counter-example.
+
+**4. Naming what you do not want is how you get it.** Google's own Veo guidance
+is explicit: **do not use instructive negative language** (*"no walls"*,
+*"don't show walls"*) — put what is unwanted in a bare comma-separated **noun
+list** instead, because naming a thing in a negative makes the model more likely
+to render it. Our tails were almost entirely that anti-pattern — **and so was
+the clause added that same afternoon** by the fix above, which read *"nothing
+floats, melts or morphs; nobody and nothing appears, disappears or duplicates"*.
+We wrote "disappears" and "duplicates" into the positive prompt and then got
+exactly those. Both tails are now a positive world-state followed by one noun
+list: `Negative: speech, voices, dialogue, …, duplicated subject, morphing,
+warping, reversed playback.`
+
+**The stored prompt is now the ACTION ONLY; guardrails are composed at submit
+time.** That is the architectural half of the fix and it is what makes it cheap:
+`Current Scene`, `Submit Video Regen` and `End Frame Prompt` each strip any
+legacy tail with `String(x).split(/\s*Negative:\s*/i)[0].trim()` before use, so
+**all 368 legacy scenes across 18 projects are repaired with no backfill**. A
+guardrail that lives in the database is a guardrail you have to migrate; one
+composed at submit time is a guardrail you can change in a single node.
+
+**The same text lived in more places than the obvious one.** The afternoon fix
+touched two nodes and was reported as done; it was one of **three** copies, and
+a full fan-out found **seven** places that compose or preserve the tail — the
+segmenter's rule 6, `HR Shots Prompt` in Hook Regen (a second full copy, and the
+broken clip was a hook scene, so this was the copy that actually wrote it),
+`VP Rewrite AI` (explicitly instructed to keep the trailing clause, which
+launders it back into the database on every content-policy rewrite),
+`Rewrite Scene Text` / `Rewrite Scene Standalone` (a third, shorter literal),
+and the site (which writes no tail — the correct shape). **Before declaring a
+prompt change done, grep every workflow for a distinctive phrase from the text
+you just replaced.**
+
+**The end frame is implicated in the round trip, and that is worth remembering
+about any scaffolding.** `End Frame Prompt` embedded the WHOLE stored prompt,
+so an after-frame for scene 3 was drawn with the subject *"pivoted back toward
+the swinging door"* — and `veo_3_1_interpolation_lite_low_priority` must LAND on
+the frame it is given. A chained action in the text therefore became a mandatory
+round trip in the picture. Scaffolding built from a bad brief does not dilute the
+brief, it enforces it.
+
+**Two further findings from the same fan-out, both live the same evening.**
+
+**The producer's regeneration note was being DELETED, and the submit-time strip
+is what deleted it.** `Evaluate Video Approval` built the regeneration brief as
+`<stored prompt> + ' ADJUSTMENT REQUEST — the new video MUST follow this: …'`,
+appended. `Submit Video Regen` then stripped the legacy tail with
+`split(/\s*Negative:\s*/i)[0]` and kept the half BEFORE it — so on any scene
+still carrying that tail, which is 368 of 504, the producer's own words went
+over the cliff with the tail. Reject a clip, write what is wrong with it, wait
+ninety seconds, receive a re-roll of the identical brief. That is the shape of
+"regenerate does nothing", and it was introduced by the strip itself a few hours
+earlier the same day. The fix is ordering: strip FIRST, then append the
+correction, so the human's sentence becomes part of the action. **A strip and an
+append on the same string are a pair — whichever runs second decides whether the
+other one mattered.**
+
+**Both new judge questions needed an escape clause, and finding that out took
+running the node rather than reading it.** `direction` has always ended "if the
+brief names no direction, answer 1". `permanence` and `untouched` shipped without
+an equivalent and would have fired constantly: rule 6 MANDATES a named camera
+move on every shot, so things entering and leaving frame is the design, and an
+absolute permanence question docks every well-made pan; and `untouched` is a rule
+about INTERIORS, while outdoors wind, water, foliage, traffic and crowds move
+with nobody touching them, so the same question re-rolls street scenes for being
+streets. Both questions now carve those out by name. **The threshold is the
+second line of defence and the wording is the first** — if a gate fires on
+ordinary films, fix the question before touching the number.
+
+**The apron flicker has one owner reached by two doors.** A character's look is
+authored exactly once, as `bible.characters[].visual_description` by rule 3 of
+`Generate Story Bible` — and `Rebuild Story Bible` carries that rule byte for
+byte, as the same author reached after a script rewrite. Everything else only
+RELAYS it. That is the right shape, and it is exactly why an ambiguity is
+expensive: every consumer resolves it independently, so the cast sheet picks one
+reading, the scene picks another, the end frame a third, and Veo interpolates
+between a bib apron and a waist apron for eight seconds. The bible had said only
+"forest-green short-sleeve coffee shop apron". Rule 3 now requires every garment
+down to its CUT and its FASTENING, with the test being that two illustrators
+given only that sentence would draw the same clothes. **Publish the two bible
+nodes together or neither** — they were byte-identical before (1,235 chars) and
+after (2,319), and updating only one means a producer who rewrites their script
+silently gets the under-specified wardrobe back.

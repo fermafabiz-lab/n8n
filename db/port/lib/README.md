@@ -85,6 +85,57 @@ failure (a dangling reference, an unexpected `connections` diff without
 Everything is printed either way — read the output, the exit code is a
 convenience for scripting, not a substitute for it.
 
+## `node-body.mjs` — read one node out of a snapshot
+
+    node db/port/lib/node-body.mjs <snapshot.json> "<Node Name>" [parameter.path]
+    node db/port/lib/node-body.mjs <snapshot.json> --list
+
+Prints a node's `parameters`, or one parameter raw when given a path, so it
+can be redirected to a file and then `node --check`ed, diffed, or fed to
+`check-expression.mjs`. It accepts all three snapshot envelopes this repo
+produces — `get_workflow_version` (`{nodes, connections}`),
+`get_workflow_details` (`{workflow: {...}}`) and a plain REST `GET` — because
+three tools write them and they disagree.
+
+**It exists because of the oversized-result trick.** `get_workflow_details`
+on a 500 KB workflow overflows the tool result and the harness spills it to a
+file, naming the path in the error. That is not a failure to work around: it
+is the cheapest way to get a whole live workflow into a session without
+putting any of it in context. Save the file, point these tools at it, and the
+500 KB never costs a token.
+
+    node db/port/lib/node-body.mjs "Media Generation.draft.json" "Current Scene" jsCode > /tmp/live.js
+    node --check /tmp/live.js
+    diff /tmp/live.js paste/"Current Scene".js
+
+## `check-expression.mjs` — syntax-check an `={{ ... }}` parameter
+
+    node db/port/lib/check-expression.mjs <file> [--messages]
+
+An httpRequest node's `jsonBody` here is nearly always one n8n expression
+wrapping a JavaScript object literal — `={{ { model: '...', messages: [{role:
+'system', content: '...'}] } }}`. Editing the prompt inside it means editing a
+string literal nested in an object literal, by hand, through a tool call.
+`node --check` cannot help, because the file is not a program. One unescaped
+apostrophe and the node throws at runtime, on a producer's click, hours later.
+
+This evaluates the expression with `$()`, `$json` and friends stubbed to an
+opaque proxy, then reports the shape: top-level keys, model, message count and
+each message's role and length. It exits 1 on a syntax error, on
+non-serialisable output, or on `messages` that is not an array.
+
+**Use it differentially.** Run it on the live body and on your edit, then
+compare the two reports: a prompt that grew is expected, a key that vanished
+is the bug.
+
+    node db/port/lib/node-body.mjs snap.json "VP Rewrite AI" jsonBody > /tmp/live.txt
+    node db/port/lib/check-expression.mjs /tmp/live.txt
+    node db/port/lib/check-expression.mjs paste/"VP Rewrite AI".txt
+
+It checks syntax and shape, nothing else: every `$('Node')` chain evaluates to
+a stub on purpose, so it will not tell you a node name is wrong — that is
+`diff-workflow.mjs`'s dangling-reference scan.
+
 ## The mandatory canonical-source-file convention
 
 **Any Code-node body or prompt edited through the MCP connector must come

@@ -6,6 +6,7 @@ import {
   voiceMentionsLanguage,
   type Language,
 } from "@/lib/languages";
+import { VoicesQuery, ValidationError, parseQuery } from "@/lib/validation";
 
 /**
  * The voice library, read straight from ElevenLabs.
@@ -80,11 +81,18 @@ export async function GET(req: NextRequest) {
     );
   }
   const sp = req.nextUrl.searchParams;
-  const q = sp.get("q") || "";
-  const page = sp.get("page") || "1";
+  let query: ReturnType<typeof VoicesQuery.parse>;
+  try {
+    query = parseQuery(sp, VoicesQuery);
+  } catch (e) {
+    if (e instanceof ValidationError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
+  const q = query.q;
+  const page = query.page;
 
   // Name lookup: ?ids=elevenlabs_abc,elevenlabs_def -> {id: "Charlie"}.
-  const ids = sp.get("ids");
+  const ids = query.ids;
   if (ids) {
     const resolved = await resolveNames(ids, key);
     return NextResponse.json({
@@ -187,7 +195,7 @@ export async function GET(req: NextRequest) {
 
   // The picker already omits the filter for a baseline language; this guards
   // the same rule for anything calling the route directly. See narrowsUsefully.
-  const asked: Language | null = languageByCode(sp.get("lang") || "");
+  const asked: Language | null = languageByCode(query.lang);
   const lang: Language | null = asked && narrowsUsefully(asked.code) ? asked : null;
 
   if (lang) {

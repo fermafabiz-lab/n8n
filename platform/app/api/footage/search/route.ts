@@ -22,6 +22,7 @@ import { buildFootageRequest, searchFootage, type FootageSearchRequest } from "@
 import { providerFilterOptions } from "@/lib/footage/registry";
 import { getSceneForFootage } from "@/lib/data/stock";
 import type { ArchiveProvider } from "@/lib/archive/types";
+import { FootageSearchQuery, FootageSearchBody, ValidationError, parseQuery, parseJsonBody } from "@/lib/validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -64,13 +65,17 @@ export async function GET(req: NextRequest) {
   if (!footageAuthorized(req)) return bad(401, "unauthorized");
   if (!footageUsable()) return bad(503, "the footage engine needs the Postgres backend");
   const p = req.nextUrl.searchParams;
-  const q = (p.get("q") ?? "").trim().replace(/\s+/g, " ");
-  const sceneId = p.get("scene") ?? "";
-  if (q.length < 2 && !REC.test(sceneId)) return bad(400, "q must be at least 2 characters (or pass scene=)");
-  if (q.length > 200) return bad(400, "q is too long");
-  const typeRaw = p.get("type") ?? "any";
+  let query: ReturnType<typeof FootageSearchQuery.parse>;
+  try {
+    query = parseQuery(p, FootageSearchQuery);
+  } catch (e) {
+    if (e instanceof ValidationError) return bad(e.status, e.message);
+    throw e;
+  }
+  const { q, limit } = query;
+  const sceneId = query.scene;
+  const typeRaw = query.type;
   const mediaType = typeRaw === "image" ? "image" : "video";
-  const limit = Math.min(Math.max(Number(p.get("limit")) || 12, 1), 40);
 
   // A scene id turns the free text into a request WITH the scene's own
   // context — its narration and visual note — so the ranker has something
@@ -92,11 +97,11 @@ export async function GET(req: NextRequest) {
   }
 
   const r = await searchFootage(request, {
-    providers: providerList(p.get("providers")),
+    providers: providerList(query.providers),
     limit,
     top: Math.max(limit, 12),
-    localOnly: p.get("library") === "1",
-    forceProviders: p.get("fresh") === "1" || q.length >= 2,
+    localOnly: query.library === "1",
+    forceProviders: query.fresh === "1" || q.length >= 2,
     signal: AbortSignal.timeout(60_000),
   });
   const out = serialize(r, request);
@@ -107,14 +112,14 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   if (!footageAuthorized(req)) return bad(401, "unauthorized");
   if (!footageUsable()) return bad(503, "the footage engine needs the Postgres backend");
-  let body: { request?: Partial<FootageSearchRequest>; providers?: string; top?: number; localOnly?: boolean; fresh?: boolean };
+  let body: ReturnType<typeof FootageSearchBody.parse>;
   try {
-    body = await req.json();
-  } catch {
-    return bad(400, "body is not JSON");
+    body = await parseJsonBody(req, FootageSearchBody);
+  } catch (e) {
+    if (e instanceof ValidationError) return bad(e.status, e.message);
+    throw e;
   }
-  const raw = body.request ?? {};
-  if (!raw.narration && !(raw.keywords?.length) && !(raw.queries?.length)) return bad(400, "request needs narration, keywords or queries");
+  const raw = body.request;
   const request = buildFootageRequest({
     id: String(raw.sceneId ?? "adhoc"),
     narration: String(raw.narration ?? ""),
@@ -134,7 +139,7 @@ export async function POST(req: NextRequest) {
   });
   const r = await searchFootage(request, {
     providers: providerList(body.providers),
-    top: Math.min(Math.max(Number(body.top) || 12, 1), 40),
+    top: body.top,
     localOnly: body.localOnly === true,
     forceProviders: body.fresh === true,
     signal: AbortSignal.timeout(90_000),

@@ -9,6 +9,8 @@
 // and answers its uc?export=download URL, which `mediaSrc()` then routes
 // through /api/media so the browser can actually play it: Drive's direct
 // links answer redirects/HTML without a session.
+import { MusicShareBody } from "@/lib/validation";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -56,12 +58,15 @@ export async function GET() {
 export async function POST(req: Request) {
   const webhook = webhookFor("share-music");
   if (!webhook) return Response.json({ url: null, error: "n8n not configured" });
-  let id = "";
+  // Soft-fail on purpose, like expand-brief: a bad body answers {url:null},
+  // never a 400 — the picker just treats it as "nothing to share yet".
+  let raw: unknown;
   try {
-    const body = (await req.json()) as { id?: unknown };
-    id = typeof body.id === "string" ? body.id.trim() : "";
+    raw = await req.json();
   } catch {}
-  if (!id || /[\s"'<>]/.test(id)) return Response.json({ url: null, error: "bad id" });
+  const parsed = MusicShareBody.safeParse(raw);
+  if (!parsed.success) return Response.json({ url: null, error: "bad id" });
+  const id = parsed.data.id;
   try {
     const res = await fetch(webhook, {
       method: "POST",

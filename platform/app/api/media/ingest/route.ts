@@ -20,6 +20,7 @@
 
 import { attachMedia } from "@/lib/data/postgres";
 import { storeMediaBytes } from "@/lib/media-store";
+import { MediaIngestBody, ValidationError, parseJsonBody } from "@/lib/validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,23 +42,15 @@ export async function POST(req: Request) {
   if (!INGEST_KEY) return bad(500, "MEDIA_INGEST_KEY is not set");
   if (req.headers.get("x-hov-key") !== INGEST_KEY) return bad(401, "bad key");
 
-  let body: {
-    sceneId?: string;
-    field?: string;
-    url?: string;
-    fields?: Record<string, unknown>;
-  };
+  let body: ReturnType<typeof MediaIngestBody.parse>;
   try {
-    body = await req.json();
-  } catch {
-    return bad(400, "body is not JSON");
+    body = await parseJsonBody(req, MediaIngestBody);
+  } catch (e) {
+    if (e instanceof ValidationError) return bad(e.status, e.message);
+    throw e;
   }
-
   const { sceneId, url } = body;
-  const field = body.field as Field;
-  if (!sceneId || !/^rec[0-9A-Za-z]{14}$/.test(sceneId)) return bad(400, "bad sceneId");
-  if (!FIELDS.includes(field)) return bad(400, `field must be one of ${FIELDS.join(", ")}`);
-  if (!url || !/^https?:\/\//i.test(url)) return bad(400, "bad url");
+  const field: Field = body.field;
 
   // Download first, write second, record third. An attachment row that names a
   // file which does not exist is worse than no row: the scene would render a

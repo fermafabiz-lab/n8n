@@ -6,16 +6,21 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "check": "npm run check:review && npm run check:cost && npm run check:provenance && npm run check:normalize && npm run check:validation && npm run check:routes && npm run check:footage",
     "check:review": "node --experimental-strip-types scripts/check-review.mjs",
     "check:cost": "node --experimental-strip-types scripts/check-cost.mjs",
     "check:provenance": "node --experimental-strip-types scripts/check-provenance.mjs",
+    "check:normalize": "node --experimental-strip-types --no-warnings --import ./scripts/alias-loader.mjs scripts/check-normalize.mjs",
+    "check:validation": "node --experimental-strip-types --no-warnings scripts/check-validation.mjs",
+    "check:routes": "node --experimental-strip-types --no-warnings --import ./scripts/alias-loader.mjs scripts/check-routes.mjs",
     "check:footage": "node --experimental-strip-types --no-warnings --import ./scripts/footage-loader.mjs scripts/check-footage.mjs"
   },
   "dependencies": {
     "next": "^15.3.0",
     "pg": "^8.13.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "zod": "^4.6.4"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

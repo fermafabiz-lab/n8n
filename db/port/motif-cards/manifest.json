@@ -1,0 +1,18 @@
+{
+  "targets": [
+    {
+      "id": "gkEtGMecv4TC3ZHp",
+      "name": "Claude Scripting",
+      "original": "Claude Scripting.original.json",
+      "ported": "Claude Scripting.motif.json",
+      "expect": ["Prep Motif Input", "Choose Motif Cards", "Validate Motif Cards", "Save Motif Cards", "Motif Done"]
+    },
+    {
+      "id": "BY22Vlhh20Xdkr5Z",
+      "name": "4. Final Assembly",
+      "original": "Final Assembly.original.json",
+      "ported": "Final Assembly.motif.json",
+      "expect": ["Attach Motif Cards"]
+    }
+  ]
+}

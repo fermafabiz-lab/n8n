@@ -80,7 +80,11 @@ export function registerInspect(app, {outputDir} = {}) {
 				sweepSaved(outputDir);
 				const name = `inspect-${randomUUID()}.jpg`;
 				fs.copyFileSync(output, path.join(outputDir, name));
-				const base = `${req.protocol}://${req.get('host')}`;
+				// Behind Railway's proxy req.protocol is http, and this URL is handed
+				// to OpenAI to fetch. It works today, but a plain-http image URL is
+				// exactly the kind of thing a fetcher tightens up on later.
+				const proto = String(req.headers['x-forwarded-proto'] || req.protocol).split(',')[0].trim();
+				const base = `${proto}://${req.get('host')}`;
 				return res.json({file: name, url: `${base}/output/${name}`});
 			}
 			const img = fs.readFileSync(output);

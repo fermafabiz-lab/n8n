@@ -1462,3 +1462,86 @@ seed, prompt and frames. `Motion Resubmit` overrides the seed and resets
 `sd.polls[sceneId]` so the new job is not declared timed out on arrival. (The
 older `Resubmit Guard` has the same blind spot harmlessly: it retries jobs
 that FAILED, where an identical request is the right thing.)
+
+### A prompt that names a failure summons it — 2026-09-13 (evening), LIVE
+
+Hours after the direction fix above, the producer came back with an 8-second
+clip from the café film `recXibIyVuLvMIqy3` and a list: *"personajul ia ceva in
+mana apoi dispare, usa la frigider se deschide singura, bate vantul peste acele
+foi lipite ce nu are sens ca nu bate vantul in cafenea, usa de la camera se
+inchide singura, personajul ia acel teanc de foi pleaca cu el apoi se intoarce
+nenatural"*. Pulled apart at 4 fps, all 34 frames confirm every complaint, plus
+two they did not mention: the prep table vanishes and returns in a different
+place, and the apron flickers between a bib cut and a waist cut.
+
+**Almost none of it was the model inventing. The prompt asked for it.** The
+stored `motion_prompt` for that scene, verbatim in the parts that matter:
+
+> …**reaches to the shelf, strips off the last sleeve stack, and pivots back
+> toward the swinging door**. Fluorescent prep-room light stays cold and static
+> while **loose paper edges quiver from her movement** … Negative: … **no
+> subject appears, disappears, duplicates or changes identity.**
+
+Four separate lessons, each of which has now changed a node:
+
+**1. Never mandate ambient motion.** Rule 6(c) required every shot to carry
+*"the ambient/atmospheric motion of the environment (drifting steam, rippling
+water, flickering light, moving crowd, blowing dust)"*. In a still indoor room
+there is nothing to move, so the model invents something — and what it reaches
+for is paper. Nine of that film's sixteen scenes asked for motion nothing in
+frame could cause. The rule now reads: ambient motion **only where something in
+frame causes it** (steam off a machine, dust in a sunbeam, a clock's second
+hand), **indoors there is no weather**, and **write nothing at all if nothing
+causes motion**.
+
+**2. An adjective on a prop is an instruction to animate it.** *"the swinging
+door"* is how the door came to swing with nobody near it; three of sixteen
+scenes labelled a prop with a motion word. The rule is now literal: write *"the
+door"*, never *"the swinging door"*.
+
+**3. One action per shot.** *"reaches … strips off … pivots back toward the
+door"* is three actions in eight seconds. The model, with more to do than fits,
+performed the first one twice, lost the object between the two, and walked out
+of frame and back — which is precisely the producer's *"pleaca cu el apoi se
+intoarce nenatural"*. Rule 6 now caps a shot at one action and carries that exact
+sentence as its worked counter-example.
+
+**4. Naming what you do not want is how you get it.** Google's own Veo guidance
+is explicit: **do not use instructive negative language** (*"no walls"*,
+*"don't show walls"*) — put what is unwanted in a bare comma-separated **noun
+list** instead, because naming a thing in a negative makes the model more likely
+to render it. Our tails were almost entirely that anti-pattern — **and so was
+the clause added that same afternoon** by the fix above, which read *"nothing
+floats, melts or morphs; nobody and nothing appears, disappears or duplicates"*.
+We wrote "disappears" and "duplicates" into the positive prompt and then got
+exactly those. Both tails are now a positive world-state followed by one noun
+list: `Negative: speech, voices, dialogue, …, duplicated subject, morphing,
+warping, reversed playback.`
+
+**The stored prompt is now the ACTION ONLY; guardrails are composed at submit
+time.** That is the architectural half of the fix and it is what makes it cheap:
+`Current Scene`, `Submit Video Regen` and `End Frame Prompt` each strip any
+legacy tail with `String(x).split(/\s*Negative:\s*/i)[0].trim()` before use, so
+**all 368 legacy scenes across 18 projects are repaired with no backfill**. A
+guardrail that lives in the database is a guardrail you have to migrate; one
+composed at submit time is a guardrail you can change in a single node.
+
+**The same text lived in more places than the obvious one.** The afternoon fix
+touched two nodes and was reported as done; it was one of **three** copies, and
+a full fan-out found **seven** places that compose or preserve the tail — the
+segmenter's rule 6, `HR Shots Prompt` in Hook Regen (a second full copy, and the
+broken clip was a hook scene, so this was the copy that actually wrote it),
+`VP Rewrite AI` (explicitly instructed to keep the trailing clause, which
+launders it back into the database on every content-policy rewrite),
+`Rewrite Scene Text` / `Rewrite Scene Standalone` (a third, shorter literal),
+and the site (which writes no tail — the correct shape). **Before declaring a
+prompt change done, grep every workflow for a distinctive phrase from the text
+you just replaced.**
+
+**The end frame is implicated in the round trip, and that is worth remembering
+about any scaffolding.** `End Frame Prompt` embedded the WHOLE stored prompt,
+so an after-frame for scene 3 was drawn with the subject *"pivoted back toward
+the swinging door"* — and `veo_3_1_interpolation_lite_low_priority` must LAND on
+the frame it is given. A chained action in the text therefore became a mandatory
+round trip in the picture. Scaffolding built from a bad brief does not dilute the
+brief, it enforces it.

@@ -15,6 +15,7 @@ const MAP = {
   'Build Query Prompt': 'build-query-prompt.js',
   'Parse Queries': 'parse-queries.js',
   'Build Rank Prompts': 'build-rank-prompts.js',
+  'Parse Ranks': 'parse-ranks.js',
 };
 const dir = join(dirname(fileURLToPath(import.meta.url)), 'nodes');
 const wf = JSON.parse(readFileSync(process.argv[2], 'utf8'));

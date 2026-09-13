@@ -198,9 +198,8 @@ export default function FootageAdmin({
                 {a.verifiedAt ? " · verified" : ""}
               </div>
               <div className={actionsClass}>
-                <a href={a.sourceUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
-                  open source ↗
-                </a>
+                {/* The source link is the provider's name on the card itself;
+                    only the preview of the FILE belongs here. */}
                 {a.downloadUrl !== a.sourceUrl && (
                   <a href={a.downloadUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
                     preview ↗

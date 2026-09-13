@@ -130,9 +130,8 @@ export default function ArchiveSuggestions({
                 >
                   Use
                 </button>
-                <a href={p.sourceUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
-                  source ↗
-                </a>
+                {/* No "source ↗" here: the provider's name on the card is
+                    that link, and it says where it goes. */}
               </div>
             </ArchiveCard>
           );

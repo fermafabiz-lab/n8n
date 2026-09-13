@@ -23,7 +23,7 @@ export { allProviders, providerById, providerFilterOptions, requestCategories, r
 export { validateRights, usableAutomatically, usableWithReview, renderable, attributionLine, USAGE_LABELS, FootageRightsValidator } from "./rights";
 export { matchSignals } from "./match";
 export { assessProvenance, baseProvenance, PROVENANCE_WEIGHTS } from "./provenance";
-export { rankOne, orderByScore, visualUsefulness, RANK_WEIGHTS, RANK_PENALTIES, PROVIDER_RELIABILITY } from "./rank";
+export { rankOne, orderByScore, visualUsefulness, RANK_WEIGHTS, RANK_PENALTIES, PROVIDER_RELIABILITY, VIDEO_FIRST_BONUS } from "./rank";
 export { dedupeAssets, canonicalUrl, identityKeys } from "./dedupe";
 export { heldBack, providerStats, recordSearch, recordSelection, recordFailure } from "./health";
 export { importFootageFromUrl, readPage, ImportRefused } from "./urlImport";

@@ -14,7 +14,29 @@ let regen = null;
 for (const r of recs) {
   const f = r.json.fields || {};
   if (f['Regenerează Video'] === true) {
-    const feedback = String(f['Observații Scenă'] || '').trim();
+    // `Observații Scenă` IS NOT A PRODUCER-ONLY FIELD, and that is what makes
+    // the reordering below dangerous without this line. Five nodes in this
+    // workflow write MACHINE text into it and none of them ever clears it:
+    // `VP Apply` ("AUTO-REWRITE-VIDEO (attempt N): the video filter refused
+    // this scene — …"), `Apply Rewritten Prompt`, `Mark Flow Upload Rejected`,
+    // `Mark Video Prompt Rejected` and `Mark Regen Filtered` (all "REJECTED by
+    // …"). `VP Apply` writes that note AND sets `Regenerează Video: true` in
+    // the same statement, so the very next poll arrives here with a machine
+    // sentence sitting in the producer's feedback slot.
+    //
+    // Before the reordering this was hidden by a bug: the note was appended
+    // after the legacy "Negative:" tail and `Submit Video Regen` cut it off.
+    // Strip-then-append fixes the producer's case and would have handed Veo
+    // "the new video MUST follow this: AUTO-REWRITE-VIDEO (attempt 2): the
+    // video filter refused this scene …" as a mandatory instruction. Worse, it
+    // would persist: nothing clears the field, so every later regeneration of
+    // that scene would carry it again.
+    //
+    // `Evaluate Image Approval` one gate upstream already solves this with the
+    // same test, and this is deliberately the same shape so the two stay
+    // greppable together. Extend BOTH if a sixth machine writer appears.
+    let feedback = String(f['Observații Scenă'] || '').trim();
+    if (/^(AUTO-REWRITE|REJECTED)/i.test(feedback)) feedback = '';
     // 2026-09-13 — WHERE THE PRODUCER'S CORRECTION LANDS IN THE PROMPT.
     //
     // `Video Scenă URL` holds the motion PROMPT, not a URL (historic field
@@ -61,11 +83,19 @@ for (const r of recs) {
     // quoted verbatim in both of those nodes' comments. If it ever changes,
     // change it in all three.
     //
-    // Edge worth knowing: a row whose stored prompt was nothing BUT a tail now
-    // strips to '' and, with no feedback typed, `Prep Video Regen` throws
-    // "has no motion prompt". That is the honest failure — the alternative is
-    // submitting guardrails with no shot in them.
-    let motionPrompt = String(f['Video Scenă URL'] || '').split(/\s*Negative:\s*/i)[0].trim();
+    // The tail-only edge must NEVER produce an empty prompt. `Prep Video
+    // Regen` throws "has no motion prompt" on one, and it carries no onError
+    // setting, so that throw aborts the WHOLE Media Generation execution —
+    // the batch loop, the image gate and the video gate for every other scene
+    // — and strands `Regenerează Video` true with no writer left inside the
+    // run to clear it. A row whose stored prompt is nothing but a tail is
+    // rare, but "rare" and "takes the film down with it" is not a trade worth
+    // making for tidiness. Falling back to the raw stored string restores
+    // exactly the pre-2026-09-13 behaviour for that one case and can only be
+    // better than nothing.
+    const storedPrompt = String(f['Video Scenă URL'] || '');
+    const action = storedPrompt.split(/\s*Negative:\s*/i)[0].trim();
+    let motionPrompt = action || storedPrompt.trim();
     if (feedback) {
       // Defensive, and only against the literal section token: if a producer
       // types "Negative:" in their note, the submit-time split would truncate

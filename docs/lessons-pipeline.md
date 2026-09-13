@@ -1588,3 +1588,39 @@ given only that sentence would draw the same clothes. **Publish the two bible
 nodes together or neither** — they were byte-identical before (1,235 chars) and
 after (2,319), and updating only one means a producer who rewrites their script
 silently gets the under-specified wardrobe back.
+
+**The adversarial pass earned its keep twice, and both catches were about a fix
+making something else worse.** Worth recording because the pattern will repeat.
+
+**REJECT on `Evaluate Video Approval`: a fix that unmasked an older leak.**
+Strip-then-append was right for the producer, and it turned a second, hidden
+problem into a live one. `Observații Scenă` is NOT a producer-only field —
+five nodes in Media Generation write machine text into it (`VP Apply`,
+`Apply Rewritten Prompt`, `Mark Flow Upload Rejected`, `Mark Video Prompt
+Rejected`, `Mark Regen Filtered`), all prefixed `AUTO-REWRITE*` or `REJECTED*`,
+and **nothing in that workflow ever clears it** (the only three clears live in
+Claude Scripting). `VP Apply` writes the note AND sets `Regenerează Video: true`
+in the same statement, so the very next poll finds a machine sentence sitting in
+the producer's feedback slot. While the note was being deleted by the strip that
+did not matter; the moment it stopped being deleted, Veo would have been handed
+*"the new video MUST follow this: AUTO-REWRITE-VIDEO (attempt 2): the video
+filter refused this scene …"* as a mandatory instruction — and again on every
+later regeneration of that scene, forever, because nothing clears the field.
+`Evaluate Image Approval` one gate upstream already had the answer
+(`/^(AUTO-REWRITE|REJECTED)/i` → treat as not-feedback); the video gate now
+carries the same test. **When you stop discarding something, check what else was
+riding on it being discarded.** The same review caught that a tail-only stored
+prompt would strip to `''`, and `Prep Video Regen` throws on that with no
+`onError` set — which aborts the whole batch, not one scene, and strands the
+in-flight flag. It now falls back to the raw string.
+
+**Two more, in prompts that are written by one model and read by another.**
+`VP Rewrite AI` forbade a trailing `Negative:` clause but not inline negation —
+and its output is stored in `Video Scenă URL` and handed verbatim to the image
+model, which strips only a tail and never an inline "no X". It now has to write
+positively, with the content filter's own required phrase (*no resemblance to
+any real person*) as the single carved-out exception, because a blanket ban
+would have contradicted a rule three lines above it. And both scene rewriters
+told the model to *"keep the style and mood words the current motion prompt ENDS
+WITH"* — on 368 of 504 rows the prompt ends with the old prohibition list, so
+"the style" it was pointed at was a list of things not to do.

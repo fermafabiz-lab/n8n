@@ -1545,3 +1545,46 @@ the swinging door"* — and `veo_3_1_interpolation_lite_low_priority` must LAND 
 the frame it is given. A chained action in the text therefore became a mandatory
 round trip in the picture. Scaffolding built from a bad brief does not dilute the
 brief, it enforces it.
+
+**Two further findings from the same fan-out, both live the same evening.**
+
+**The producer's regeneration note was being DELETED, and the submit-time strip
+is what deleted it.** `Evaluate Video Approval` built the regeneration brief as
+`<stored prompt> + ' ADJUSTMENT REQUEST — the new video MUST follow this: …'`,
+appended. `Submit Video Regen` then stripped the legacy tail with
+`split(/\s*Negative:\s*/i)[0]` and kept the half BEFORE it — so on any scene
+still carrying that tail, which is 368 of 504, the producer's own words went
+over the cliff with the tail. Reject a clip, write what is wrong with it, wait
+ninety seconds, receive a re-roll of the identical brief. That is the shape of
+"regenerate does nothing", and it was introduced by the strip itself a few hours
+earlier the same day. The fix is ordering: strip FIRST, then append the
+correction, so the human's sentence becomes part of the action. **A strip and an
+append on the same string are a pair — whichever runs second decides whether the
+other one mattered.**
+
+**Both new judge questions needed an escape clause, and finding that out took
+running the node rather than reading it.** `direction` has always ended "if the
+brief names no direction, answer 1". `permanence` and `untouched` shipped without
+an equivalent and would have fired constantly: rule 6 MANDATES a named camera
+move on every shot, so things entering and leaving frame is the design, and an
+absolute permanence question docks every well-made pan; and `untouched` is a rule
+about INTERIORS, while outdoors wind, water, foliage, traffic and crowds move
+with nobody touching them, so the same question re-rolls street scenes for being
+streets. Both questions now carve those out by name. **The threshold is the
+second line of defence and the wording is the first** — if a gate fires on
+ordinary films, fix the question before touching the number.
+
+**The apron flicker has one owner reached by two doors.** A character's look is
+authored exactly once, as `bible.characters[].visual_description` by rule 3 of
+`Generate Story Bible` — and `Rebuild Story Bible` carries that rule byte for
+byte, as the same author reached after a script rewrite. Everything else only
+RELAYS it. That is the right shape, and it is exactly why an ambiguity is
+expensive: every consumer resolves it independently, so the cast sheet picks one
+reading, the scene picks another, the end frame a third, and Veo interpolates
+between a bib apron and a waist apron for eight seconds. The bible had said only
+"forest-green short-sleeve coffee shop apron". Rule 3 now requires every garment
+down to its CUT and its FASTENING, with the test being that two illustrators
+given only that sentence would draw the same clothes. **Publish the two bible
+nodes together or neither** — they were byte-identical before (1,235 chars) and
+after (2,319), and updating only one means a producer who rewrites their script
+silently gets the under-specified wardrobe back.

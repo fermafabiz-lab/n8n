@@ -429,6 +429,23 @@ const ordered = F.orderByScore([{ score: 50, asset: presser }, { score: 50, asse
 check('ties break pictures > speech, video > still', ordered.map((x) => x.asset.footageFormat === 'press_conference' ? 'presser' : x.asset.mediaType), ['video', 'image', 'presser']);
 truthy('an image is a fallback, not a match, when video was wanted', F.visualUsefulness({ ...broll, mediaType: 'image' }, 'broll', 'video') < F.visualUsefulness(broll, 'broll', 'video'));
 
+// Video first, relevance dominant — the producer's rule, in both directions.
+// A film is moving pictures, so a clip that is roughly as relevant as a still
+// is the better answer; a still that is CLEARLY more relevant still wins.
+const still = { ...broll, mediaType: 'image', providerAssetId: 'still-1', footageFormat: 'unknown', durationSeconds: null };
+const near = F.orderByScore([{ score: 60, asset: still }, { score: 50, asset: broll }], ceutaReq);
+check('a clip 10 points behind a photograph is offered first', near[0].asset.mediaType, 'video');
+const clear = F.orderByScore([{ score: 80, asset: still }, { score: 50, asset: broll }], ceutaReq);
+check('a photograph 30 points ahead of a clip is offered first', clear[0].asset.mediaType, 'image');
+check('the lift is smaller than the gap it may not cross', F.VIDEO_FIRST_BONUS < 30 && F.VIDEO_FIRST_BONUS > 0, true);
+// The lift rides on the B-roll ladder, not on the media type: a talking head
+// carries a −15 visual penalty, and lifting every video by +15 would cancel it
+// exactly — quietly undoing B-roll-first, which is the whole §22 rule.
+const heads = F.orderByScore([{ score: 60, asset: still }, { score: 50, asset: presser }], ceutaReq);
+check('a talking head is never lifted past a better photograph', heads[0].asset.footageFormat, 'unknown');
+const imgReq = { ...ceutaReq, preferredMediaType: 'image' };
+check('and a scene that asked for a still gets the still', F.orderByScore([{ score: 60, asset: still }, { score: 55, asset: broll }], imgReq)[0].asset.mediaType, 'image');
+
 // ---------------------------------------------------------------------------
 // Dedupe
 // ---------------------------------------------------------------------------

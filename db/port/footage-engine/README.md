@@ -67,23 +67,33 @@ schema rollback as plain library rows.
 
 | | version |
 |---|---|
-| active since 2026-09-10 | `a3278855-7c67-4e1f-960f-5ef7168d1127` |
+| active since 2026-09-13 | `916a51d1-62f8-4d0c-b19f-af39ac4a8013` |
+| active 2026-09-10 → 09-13 | `a3278855-7c67-4e1f-960f-5ef7168d1127` |
 | active 2026-09-09 → 09-10 | `6b5a1417-2828-4e1d-ae0b-28ea1b6a454a` |
 | active 2026-09-07 → 09-09 | `6ac5f5f1-e0b7-4f34-8fd2-b5e50af9062b` |
 
 09-09 changed three Code nodes — `Build Query Prompt`, `Parse Queries`,
 `Build Rank Prompts`; 09-10 changed `Build Query Prompt` alone (the system
-prompt names the new sources and adds the `stockshots` footage type). Each
-time the draft was diffed node by node against the active version before
-publishing and only the intended nodes differed. `nodes/` holds the exact
-`jsCode` of each; `dump.mjs` prints them JSON-encoded for pasting into an
-`updateNodeParameters` operation; `verify.mjs <workflow.json>` diffs a
-fetched workflow against them byte for byte.
+prompt names the new sources and adds the `stockshots` footage type); 09-13
+changed `Build Rank Prompts` and `Parse Ranks` (up to 16 picks per scene
+instead of 4, and a clip and a still returned together with the clip
+first). Each time the draft was diffed node by node against the active
+version before publishing and only the intended nodes differed. `nodes/`
+holds the exact `jsCode` of each; `dump.mjs` prints them JSON-encoded for
+pasting into an `updateNodeParameters` operation; `verify.mjs
+<workflow.json>` diffs a fetched workflow against them byte for byte.
+
+**16 is the third copy of `MAX_PICKS_PER_SCENE`**, beside the site's store
+stage (`app/api/archive/suggest/route.ts`) and the sentence in the rank
+prompt. Change one, change all three: the prompt asking for more than the
+parser keeps would waste model output, and the parser keeping more than the
+store writes would be a silent drop.
 
 ### Rollback
 
 `restore_workflow_version { workflowId: "Lo78uXXCFYoIH73r", versionId:
-"6b5a1417-2828-4e1d-ae0b-28ea1b6a454a" }` then publish it (or `6ac5f5f1…`
-for the 09-07 prompt). The site's `/api/archive/suggest` accepts every
-shape the three prompts produce, so the workflow can be rolled back on its
-own.
+"a3278855-7c67-4e1f-960f-5ef7168d1127" }` then publish it (or `6b5a1417…` /
+`6ac5f5f1…` for the earlier prompts). The site's `/api/archive/suggest`
+accepts every shape the prompts produce and its own cap is independent, so
+the workflow can be rolled back on its own — a rolled-back prompt simply
+returns at most four picks again.

@@ -1062,6 +1062,35 @@ Fetch Scenes (GET, claims) → Build Query Prompt → Query Model → Parse Quer
   ranker demoted the generic "1939 Poland map" to 0.55 with a reason that
   says so. A film that already had its AI images when the run fired keeps
   them; the offers sit beside them and replace one only on Use.
+- **"Three or four options" became the ceiling, and the ceiling filled with
+  photographs** (2026-09-13, after the NASA film). The producer's original
+  words above were built into the product as a hard FOUR in three places at
+  once: the rank prompt's last sentence, `Parse Ranks`, and the store
+  stage's `.slice(0, 4)`. A scene whose archives held one clip and three
+  stills therefore offered four stills, and the report was "it finds mostly
+  photos" — which read as a search problem and was a display cap. All three
+  are `MAX_PICKS_PER_SCENE` = 16 now, a sanity bound on a prompt and a
+  table rather than a number of options anyone chose, and the candidate
+  pool the model reads went 12 → 16 out of a ranked `top` of 30. **A
+  phrase from a feature request is a description, not a specification**:
+  four was the producer picturing the feature, and it outlived the sentence
+  by becoming a constant.
+- **Video first, relevance dominant, in two places that must agree.**
+  `VIDEO_FIRST_BONUS` (15, `lib/footage/rank.ts`) lifts a clip in the SORT
+  key so it is offered ahead of a photograph of similar relevance, while a
+  photograph that is clearly better still wins; `SUGGEST_SUBSELECT`
+  (`lib/data/postgres.ts`) writes the same rule on the model's 0–1 scale and
+  orders the bar on READ, so offers stored before the rule obey it too. The
+  lift rides on the B-roll ladder, never on the media type: a talking head
+  already carries a −15 visual penalty and lifting every video by +15 would
+  cancel it exactly, undoing B-roll-first without a word in the diff to say
+  so.
+- **The provider's NAME is the link now.** The card carried a chip saying
+  where an asset came through and, separately, a "source ↗" in each
+  caller's action row: two controls for one fact, and the one you could
+  click did not say where it went. `ArchiveCard` owns the link, so the
+  suggestions bar, the picker and the admin page all gained it at once and
+  each dropped its own.
 
 ### The source watermark — saying which pictures are real (2026-09-09)
 

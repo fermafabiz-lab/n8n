@@ -139,10 +139,28 @@ export default function ArchiveCard({
             hand-written version printed "NASA ·  · dated 1969". */}
         <div className={styles.meta}>{metaLine(asset)}</div>
         <div className={styles.chips}>
-          {asset.provider && (
-            <span className={styles.prov} title="Where it came through">
-              {providerLabel(asset.provider)}
-            </span>
+          {/* The site's NAME is the link to the asset's own page. It used to
+              be a chip saying where the asset came through, beside a separate
+              "source ↗" in every caller's action row — two controls for one
+              fact, and the one you could click did not say where it went.
+              A card with no provider keeps the door, labelled plainly. */}
+          {asset.sourceUrl ? (
+            <a
+              className={`${styles.prov} ${styles.provLink}`}
+              href={asset.sourceUrl}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              title={asset.provider ? `Open this on ${providerLabel(asset.provider)}` : "Open the page this came from"}
+            >
+              {asset.provider ? providerLabel(asset.provider) : "source"} ↗
+            </a>
+          ) : (
+            asset.provider && (
+              <span className={styles.prov} title="Where it came through">
+                {providerLabel(asset.provider)}
+              </span>
+            )
           )}
           <span className={`${styles.lic} ${styles[chip.cls]}`} title={chip.title}>
             {chip.text}

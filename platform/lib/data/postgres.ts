@@ -264,7 +264,15 @@ const SUGGEST_SUBSELECT = `,
               'review_status', m.review_status, 'duration_seconds', m.duration_seconds,
               'date_original', m.date_original, 'years_mentioned', m.years_mentioned,
               'relevance', g.relevance, 'reason', g.reason, 'rank', g.rank)
-            order by g.rank)
+            -- Video first, relevance dominant: the second copy of
+            -- VIDEO_FIRST_BONUS (lib/footage/rank.ts), written on the model's
+            -- 0–1 relevance scale instead of the engine's 0–100. A clip that
+            -- is roughly as relevant as a still is the better answer for a
+            -- film; a still that is CLEARLY more relevant still comes first.
+            -- Ordered on read, not on write, so the bar obeys the rule for
+            -- offers stored before it existed. The stored rank stays the
+            -- model's own order and breaks ties.
+            order by (coalesce(g.relevance, 0) + case when m.media_type = 'video' then 0.15 else 0 end) desc, g.rank)
        from hov.scene_archive_suggestion g
        join hov.stock_media m on m.id = g.stock_media_id
       where g.scene_id = s.id) as archive_suggestions`;

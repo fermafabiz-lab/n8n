@@ -49,6 +49,26 @@ pictures, then unclassified video, then a still, then a talking head — a
 real photograph of the event beats a press conference about it, because
 the still can carry the scene and the speaker cannot.
 
+## Video first, relevance dominant
+
+`VIDEO_FIRST_BONUS` (15) is added to a clip's SORT key, never to its score.
+A film is moving pictures, so a clip that is roughly as relevant as a still
+is the better answer; a photograph that beats a clip by more than fifteen
+points still comes first, which is the producer's rule in as many words.
+
+Two things make it safe. It is a sort bonus, so the number on the card and
+the floor `fallbackPlan()` compares against stay the engine's own judgement
+of relevance. And it rides on the B-roll ladder rather than on the media
+type: a talking head already carries the −15 visual penalty, and lifting
+every video by +15 would cancel it exactly, quietly undoing B-roll-first.
+Only the tiers the ladder calls good for this scene are lifted, and a scene
+that asked for a still lifts nothing.
+
+The same rule is written a second time, on the model's 0–1 relevance scale,
+in `SUGGEST_SUBSELECT` (`platform/lib/data/postgres.ts`), which orders the
+suggestion bar on READ — so the bar obeys it for offers stored before it
+existed, and the stored rank only breaks ties. Change one, change both.
+
 ## Reasons
 
 Every `RankedFootage` carries `reasons: string[]` — *names the event*,
@@ -71,4 +91,7 @@ a 24-minute press conference for narration and the presser is told why;
 the presser wins when the scene quotes a statement; wrong country and wrong
 date are penalised; reuse is penalised; an absent date is not a wrong date;
 ties break pictures > still > speech; an image is a fallback, not a match,
-when video was wanted.
+when video was wanted; a clip ten points behind a photograph is offered
+first and a photograph thirty points ahead of a clip is not displaced; a
+talking head is never lifted past a better photograph; and a scene that
+asked for a still gets the still.

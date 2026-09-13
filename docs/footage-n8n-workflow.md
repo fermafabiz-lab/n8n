@@ -56,9 +56,18 @@ there diffs a fetched workflow against them.
   provenance and its rights class, and tells it what the provenance words
   mean, to prefer B-roll under narration, and not to rank a candidate over
   a higher engine score without a concrete reason from the text.
-- `Parse Ranks` and `Store Suggestions` are unchanged. A pick must name a
-  candidate the batch offered; the store drops any id the library does not
-  hold.
+- **How many picks, and clips first (2026-09-13, version `916a51d1`).** The
+  prompt used to end "Up to 4 picks per scene" and `Parse Ranks` enforced
+  the same four, so a scene whose archives held one clip and three
+  photographs offered the producer four photographs — reported as "it finds
+  mostly photos". Both now allow **16**, the third copy of
+  `MAX_PICKS_PER_SCENE` in the site's store stage, and it is a sanity bound
+  on a prompt and a table rather than a number of options anyone chose. The
+  prompt also asks for a clip and a still to be returned TOGETHER with the
+  clip first, and the site orders the bar the same way — see
+  `VIDEO_FIRST_BONUS` in `footage-ranking.md`.
+- `Store Suggestions` is unchanged. A pick must name a candidate the batch
+  offered; the store drops any id the library does not hold.
 
 Three properties carried over from the first version and still true:
 every Code node emits at least one item so `Store Suggestions` always runs

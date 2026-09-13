@@ -332,9 +332,8 @@ export default function ArchivePicker({
                         >
                           {a.usage === "manual_review" || a.usage === "editorial_only" ? "Use — I accept the rights" : "Use for this scene"}
                         </button>
-                        <a href={a.sourceUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
-                          source ↗
-                        </a>
+                        {/* No "source ↗" here: the provider's name on the
+                            card is that link, and it says where it goes. */}
                       </div>
                     </ArchiveCard>
                   );

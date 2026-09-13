@@ -72,6 +72,19 @@
   color: var(--soft);
 }
 
+/* The same chip, when it is the link to the asset's page. It has to read as
+   clickable without becoming a second button next to "Use", so it lifts on
+   hover rather than wearing an underline at 10.5px. */
+.provLink {
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.provLink:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .pv {
   display: inline-block;
   padding: 1px 7px;

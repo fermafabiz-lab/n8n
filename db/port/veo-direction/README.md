@@ -12,8 +12,9 @@ Three changes, none of which touch the model tier.
 | | What | Where | State |
 |---|---|---|---|
 | **B** | Drop the continuity clause that contradicted the shot | `Current Scene`, `Submit Video Regen` | **LIVE** — version `b4dec1a9` |
-| **A** | Draw the END frame and send `startImage + endImage` | 4 new nodes + `Submit Video`, `Submit Cooldown Guard` | draft `281e9134` |
-| **C** | Judge the clip's motion, re-roll when it is wrong | 6 new nodes + `Submit Video`, plus `/inspect?save=1` | draft |
+| **A** | Draw the END frame and send `startImage + endImage` | 4 new nodes + `Submit Video`, `Submit Cooldown Guard` | **LIVE** — `281e9134` |
+| **C** | Judge the clip's motion, re-roll when it is wrong | 7 new nodes + `Submit Video`, plus `/inspect?save=1` | **LIVE** — `6a79f422` |
+| **A+C on the regen path** | The same two, mirrored onto the gate's regeneration | 7 new `RG *` nodes + `Submit Video Regen`, `Regen Cooldown Guard` | **LIVE** — `69c992f9` |
 
 Baseline for both: `Media Generation.original.json`, a `get_workflow_details`
 dump at `b9779578` (177 nodes) — the version B was built on. Every node body
@@ -301,3 +302,79 @@ for `Motion Judge`: `addNode` does not carry a credential, so without it the
 judge would have answered 401 on every clip and the verdict would have
 silently kept everything — the exact shape of failure this feature is
 designed around, which is why it would have been invisible.
+
+
+---
+
+## The regen path — the same two, mirrored (2026-09-13, `69c992f9`)
+
+The batch path is where a film is first made; the **gate's regeneration** is
+where the producer clicks "regenerate" on a clip they have just rejected. It
+had none of this, so the one clip in a film made because a human said the
+last one was wrong was also the one clip with no direction control — and a
+regenerated clip that obeys different rules from its neighbours is a new
+inconsistency, the trap `Prep Video Regen` already warns about for the model
+choice.
+
+```
+Prep Video Regen → RG End Frame Prompt → RG End Frame? ─true→ RG Generate End Frame → RG Attach End Frame ─┐
+                                               └─────false───────────────────────────────────────→ Submit Video Regen
+
+Extract Regen Video URL → RG Motion Prep → RG Judge Motion? ─true→ RG Motion Sheet → RG Motion Judge ─┐
+                                                  └──────false──────────────────────────→ RG Motion Verdict
+RG Motion Verdict → RG Motion Reroll? ─true→ RG Motion Resubmit → Submit Video Regen
+                              └────false→ Download Regen Clip
+```
+
+### The one structural difference: `Submit Video Regen` reads `$json`
+
+Unlike `Submit Video`, which reads `$('Current Scene')`, the regen submit
+reads the item in front of it — which is why both guards that loop back into
+it (`Regen Cooldown Guard`, `Regen Resubmit Guard`) end with
+`return [{ json: payload }]`. So **every node inserted between `Prep Video
+Regen` and the submit has to pass the whole payload through**, hence
+`Object.assign({}, p, …)` in all three new Code nodes rather than a fresh
+object. Getting this wrong would not have been a subtle bug: the submit would
+have gone out with no model, no prompt and no start image.
+
+That is also why the end frame is read back through
+`$('RG Attach End Frame')` with a scene-id guard rather than simply off
+`$json`. Both guards re-feed `Prep Video Regen`'s payload, which has no end
+frame on it — so a cooldown retry or a failed-job resubmit would silently
+have dropped it, and the rescued clip would again be the odd one out.
+`Submit Video Regen` now carries the same three levers as `Submit Video`.
+
+### Why the judge matters MORE here
+
+A producer who rejected a clip because the car drove the wrong way clicks
+regenerate, waits a minute and a half, and is handed another one. That is the
+moment this is for. And the brief it judges against is better: `Evaluate
+Video Approval` appends their own *"ADJUSTMENT REQUEST — the new video MUST
+follow this: `<Observații Scenă>`"* to the motion prompt, so **both the end
+frame and the judge are working from what the human said went wrong**. The
+after-picture is composed from their own correction.
+
+Re-rolls are keyed `regen:<id>`, the way the cooldown counters already are,
+so a scene that used its batch re-roll still gets one here — different takes,
+judged against different briefs. Still one each, still `motionJudge: false`
+and `endFrame: false` to turn either off, and `sd.endFrameOffAt` is shared
+with the batch path on purpose: if Flow is refusing end frames it is refusing
+them for the whole instance, and one scene paying to find that out is enough.
+
+### Verified before publishing — execution 12955
+
+The one thing genuinely unproven on **both** paths was `encodeURIComponent`
+inside an n8n expression, which is how the sheet URL is built. It resolves,
+Railway answered `{file, url}`, and the URL came back as **https** — so the
+`x-forwarded-proto` fix is live too.
+
+The credential re-bind afterwards produced **no new version in the history**,
+which is the clean confirmation of the `setNodeCredential` rule: it applies
+in place to the live version and stages nothing. Both `Motion Judge` and `RG
+Motion Judge` are bound on `69c992f9`.
+
+### Still owed
+
+The regen path has not been exercised end to end on a real scene — only its
+pieces have. The first real "regenerate this clip" click is the test, and the
+log lines to look for are `RG ENDFRAME <id>: got …` and `RG MOTION <id>: ok`.

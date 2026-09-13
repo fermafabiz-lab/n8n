@@ -1168,3 +1168,23 @@ actually applies is a different one:
 That is weaker than a node-by-node diff and should be said out loud rather
 than implied. The tooling is still the right thing from a machine that can
 reach `wf7` and hold the file.
+
+### `Submit Video Regen` reads `$json` — the regen path's shape
+
+A trap worth knowing before inserting anything into the video gate's
+regeneration chain. `Submit Video` reads `$('Current Scene')`; **`Submit
+Video Regen` reads the item in front of it**, which is why both guards that
+loop back into it (`Regen Cooldown Guard`, `Regen Resubmit Guard`) end with
+`return [{ json: payload }]` — they exist partly to re-feed it.
+
+So every node inserted between `Prep Video Regen` and that submit must pass
+the whole payload through (`Object.assign({}, p, …)`, never a fresh object).
+Getting it wrong is not subtle: the submit goes out with no model, no prompt
+and no start image.
+
+The corollary bit us in the design of the end frame there: anything a new
+node *adds* to the payload is **lost on any loop back through a guard**,
+because the guards re-feed `Prep Video Regen`'s original output. So a value
+that must survive a cooldown or a resubmit has to be read back by node
+reference with a scene-id guard (`$('RG Attach End Frame').first()`), exactly
+as the batch path does — not off `$json`.

@@ -279,10 +279,12 @@ expected and harmless for an app touching only its own Drive.
   on a film the producer still dislikes means the judge is too kind;
   watch for MORPHING, which is what interpolation does when the two frames
   are too far apart and is invisible to a direction check;
-  and mirror the end frame onto the regen path (`Submit Video Regen`), which
-  still submits with a start frame only, so a regenerated clip gets the
-  direction its neighbours got. The two escape hatches, if a film goes wrong
-  at 2 a.m.: `endFrame: false` and `motionJudge: false` in `Editing Options`.
+  and click "regenerate" on one real clip — the gate's regeneration got the
+  same two changes mirrored onto it (`69c992f9`, seven `RG *` nodes) but has
+  only had its pieces exercised, never the whole chain; the log lines to look
+  for are `RG ENDFRAME <id>: got …` and `RG MOTION <id>: ok`. The two escape
+  hatches, if a film goes wrong at 2 a.m.: `endFrame: false` and
+  `motionJudge: false` in `Editing Options`.
 
 - **Documentary mode, what is still owed** (see `docs/lessons-site.md`,
   "Documentary mode — archive footage" and "The Universal Footage Engine"):

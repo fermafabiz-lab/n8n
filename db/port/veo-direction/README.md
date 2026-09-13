@@ -13,7 +13,7 @@ Three changes, none of which touch the model tier.
 |---|---|---|---|
 | **B** | Drop the continuity clause that contradicted the shot | `Current Scene`, `Submit Video Regen` | **LIVE** — version `b4dec1a9` |
 | **A** | Draw the END frame and send `startImage + endImage` | 4 new nodes + `Submit Video`, `Submit Cooldown Guard` | draft `281e9134` |
-| **C** | Judge the clip's motion, re-roll when it is wrong | not started | — |
+| **C** | Judge the clip's motion, re-roll when it is wrong | 6 new nodes + `Submit Video`, plus `/inspect?save=1` | draft |
 
 Baseline for both: `Media Generation.original.json`, a `get_workflow_details`
 dump at `b9779578` (177 nodes) — the version B was built on. Every node body
@@ -190,3 +190,114 @@ outside the gate now actually drives out rather than reversing in is a
 question only the producer watching clips can answer. The probe's own clip
 (red hatchback pulling out of a walled yard, the exact failure they reported)
 is the first thing to watch.
+
+
+---
+
+## C — the judge that looks at the clip
+
+A and B both do the same thing: ask Veo more nicely. Nothing in either of
+them LOOKS at what came back. This repo's hardest-won rule, already written
+into `Judge Prep` one stage upstream for the stills, is that **an instruction
+in a prompt is not a constraint** — if it matters, something after the model
+has to say whether it happened. So the clip gets what the still already gets:
+a contact sheet, a vision model, and a score rather than a hope.
+
+```
+Extract Video URL → Motion Prep → Judge Motion? ─true→ Motion Sheet → Motion Judge ─┐
+                                        └─────false──────────────────────────→ Motion Verdict
+Motion Verdict → Motion Reroll? ─true→ Motion Resubmit → Submit Video
+                          └────false→ Download Clip   (exactly the old path)
+```
+
+`Motion Sheet` asks Railway for `/inspect?mode=sheet&interval=1&save=1` — one
+frame a second from the 8-second clip, tiled in time order. `save=1` is new
+(see `remotion/server/inspect.mjs`): the sheet is written under the key-free
+`/output` and only its URL travels, because base64 in the request body would
+put hundreds of kB per clip through n8n's execution data on a node that runs
+once per scene of an eighty-scene film. `Consistency Judge` already feeds
+gpt-4o a URL for exactly this reason.
+
+### What is scored, and why those three
+
+- **direction** — the reported bug. The brief said the car leaves the yard;
+  the clip had it reversing in. The wording asks only whether the clip does
+  what the SENTENCE claims, never whether the shot is good: a judge given
+  licence to have taste will re-roll half the film.
+- **morph** — the risk A introduced, and the reason C is not optional now.
+  Given two frames Google routes this tier to
+  `veo_3_1_interpolation_lite_low_priority`, and an interpolator handed two
+  frames too far apart dissolves between them instead of moving anything.
+  That failure is **invisible to a direction question** — the car does end up
+  outside the gate, by fading there.
+- **coherent** — the catch-all for what the producer called *"lucruri fără
+  logică"*: solid things passing through each other, a moving vehicle with no
+  driver, people popping in and out between frames.
+
+Thresholds are deliberately low (`direction < 0.5`, `coherent < 0.45`). A
+re-roll costs a whole Veo generation and a place in the queue, so it fires
+only when the judge is confident the shot contradicts its brief, not when it
+is merely unenthusiastic.
+
+### A plain resubmit would have done nothing
+
+`Current Scene` derives the seed from the scene id and the number of takes
+already **filed**, and a take rejected by the judge is never filed — so a
+second submission would carry the same seed, the same prompt and the same two
+frames, and Veo would return the same clip. `Motion Resubmit` therefore hands
+`Submit Video` a fresh seed, and resets `sd.polls[sceneId]` so the new job is
+not declared timed out on arrival (the same thing `Resubmit Guard` does, for
+the same reason).
+
+**Morph is the one verdict a different seed cannot fix**, so that verdict
+drops the end frame instead: the same two frames dissolve into each other at
+any seed, and animating freely from the still is exactly what the film did
+before end frames existed. `Submit Video`'s expression now carries three
+levers — attach the end frame, drop it after a failed submission, and
+seed/drop on a motion re-roll — each of them guarded by a scene-id match,
+because `.first()` returns a node's latest run rather than the current item's.
+
+### Failure is always "keep the clip"
+
+Skipped, unreadable, sheet unavailable, OpenAI down — every one of them
+returns the take untouched, carrying `Extract Video URL`'s own fields on to
+`Download Clip`. A judge that can take a film down by being unavailable is
+worse than no judge. Bounded to one re-roll per scene per pass; off entirely
+with `motionJudge: false` in `Editing Options`.
+
+### What it costs
+
+Per clip: a Railway download and ffmpeg pass (the clip is ~7 MB), plus one
+gpt-4o call with the sheet at `detail: 'high'` — about 850 image tokens, so
+on the order of a cent a scene. `detail: 'low'` would be cheaper and is what
+`Consistency Judge` uses, but it downscales the whole grid to 512 px, which
+is exactly where the movement lives. A re-roll costs a full generation on top.
+
+
+### Verified live before publishing — 2026-09-13, execution 12947
+
+A throwaway ran the whole chain against the clip the I2V-FL probe had just
+made, and the whole chain took **3.2 seconds**: Railway fetched the 7 MB clip,
+tiled eight frames, answered
+`{file, url: …/output/inspect-69132284-….jpg}`, and gpt-4o read it for 1,410
+prompt tokens — about a third of a cent, so roughly 30 cents for an
+eighty-scene film.
+
+The verdict on that clip is the interesting part:
+
+```json
+{"direction": 1, "coherent": 1, "morph": false, "problems": []}
+```
+
+The brief was *"the red hatchback pulls forward out of the yard, through the
+open gate, and turns onto the street toward the camera"* — deliberately the
+producer's own failure, a car leaving a yard — and with a start frame and an
+end frame it left. One clip is not a measurement, but it is the first
+evidence that A does the thing it was built to do, and it was produced by the
+machinery that will now be checking every clip.
+
+Published as `6a79f422`, which also carries the `setNodeCredential` binding
+for `Motion Judge`: `addNode` does not carry a credential, so without it the
+judge would have answered 401 on every clip and the verdict would have
+silently kept everything — the exact shape of failure this feature is
+designed around, which is why it would have been invisible.

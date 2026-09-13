@@ -1149,25 +1149,63 @@ The tool result names this itself, in the line that is easy to skim past:
 *"HTTP Request nodes (Motion Judge) were skipped during credential
 auto-assignment. Their credentials must be configured manually."* Read it.
 
-### The diff rule has no tooling on a 180-node workflow in a web session
+### The diff rule DOES work in a web session — via the overflow file
 
-`db/port/lib/diff-workflow.mjs` needs both versions as files on disk. In a
-Claude Code web session there is no way to get them there: `get_workflow_details`
-returns ~500 kB into context, and writing it back out means retyping all of
-it. For Media Generation (188 nodes) that is not worth it, so the guard that
-actually applies is a different one:
+An earlier entry here (written the same day, now replaced) claimed
+`db/port/lib/diff-workflow.mjs` was unusable on a large workflow from a Claude
+Code web session, because `get_workflow_details` returns ~500 kB and writing it
+back to disk would mean retyping all of it.
 
-- `get_workflow_history` first — if `versionId` equals `activeVersionId` and
-  the newest entry is your own, nobody has parked a draft that your publish
-  would ship;
-- `update_workflow` is **operation-scoped**, not a whole-body PUT, and its
-  result reports `appliedOperations`; check it equals the number you sent;
-- `nodeCount` in the result is a cheap arithmetic check that exactly the
-  nodes you added were added and nothing was removed.
+That was wrong, and the way out is a property of the harness rather than of
+n8n: **a tool result too large for the context is written to a file, and the
+error names the path.** So the sequence is
 
-That is weaker than a node-by-node diff and should be said out loud rather
-than implied. The tooling is still the right thing from a machine that can
-reach `wf7` and hold the file.
+1. call `get_workflow_details` and let it overflow;
+2. `python3` the named file into `db/port/<feature>/<Workflow>.original.json`;
+3. make the edit through `update_workflow`;
+4. call `get_workflow_details` again, save that as `…draft.json`;
+5. `node db/port/lib/diff-workflow.mjs original.json draft.json --expect "A,B"`.
+
+Done exactly this way on Claude Scripting (110 nodes, 489 kB) on 2026-09-13:
+`✓ only the expected nodes differ`, `✓ connections identical`, `✓ no dangling
+$('Node Name') references` — the full guard the convention asks for, with no
+node body ever passing through the conversation.
+
+The same trick reads an execution's node data without spending context on it,
+which is how the motif diagnosis in `db/port/motif-rescue/` was made.
+
+**What still cannot be done from a web session is WRITING a large node body.**
+`update_workflow` needs the literal string in the call, so a node whose body is
+18 kB of generated code can only be changed by transcribing it — which is a
+real risk, not a nuisance, when that body is a validator every film depends on.
+Read-and-diff is free; write is not.
+
+### A strict output-parser schema turns one bad card into no cards
+
+`Motif Parser` used `schemaType: fromJson` with an example holding five
+differently-shaped cards. **`jsonSchemaExample` infers an array's item shape
+from the FIRST element only**, so only the first card's keys were ever
+allowed; `stops`, `rows`, `sides` and `steps` were absent from the generated
+schema even though the example's own later cards used them. Every answer
+carrying a route, compare or steps card was rejected **whole** — 14 films
+wanted drawn cards in 30 days and exactly one got any.
+
+Two lessons, both general:
+
+- **`fromJson` cannot express a union.** If the thing you are parsing is one
+  of several shapes, write the schema by hand (`schemaType: manual`,
+  `inputSchema`) and keep it permissive. `$ref` is not supported there; inline
+  the shared definitions.
+- **Do not validate at the parser when you already validate downstream.** The
+  strict schema was duplicating `Validate Motif Cards`, which refuses cards
+  one at a time and says why. All the strictness bought was turning a reasoned
+  refusal into silence.
+
+And the fingerprint worth remembering: when the parser rejects the answer, the
+agent (onError:continueRegularOutput) hands the next node `{error: …}`, so
+`cards` reads as `[]` and the film is indistinguishable from one the model had
+nothing to say about. **An empty result with an empty report means the answer
+never arrived; a real refusal always leaves a reason.**
 
 ### `Submit Video Regen` reads `$json` — the regen path's shape
 

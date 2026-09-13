@@ -161,6 +161,18 @@ const VALIDATE_CODE = `${validatorSource()}
 // The agent is onError:continueRegularOutput — a model that refuses, times out
 // or answers rubbish must never kill a scripting run, so a missing or unusable
 // answer simply means this film has no cards.
+//
+// THE PARSER CAN ALSO FAIL, AND THAT IS NOT THE SAME AS "NO CARDS".
+// When the output parser refuses the model's answer, the agent hands this node
+// \`{error: "Model output doesn't fit required format"}\` instead of cards, and
+// every read below quietly yields an empty array — so the film looks exactly
+// like one the model had nothing to say about. It is not. On 2026-09-13 the
+// model proposed a good route card AND a good steps card for the LEGO chase
+// film, both of which this validator accepts, and the parser threw the pair
+// away. Told apart here, and written down, because it was invisible.
+let parserError = '';
+try { if ($json && $json.error && !$json.output && !$json.cards) parserError = String($json.error); } catch (e) {}
+
 let proposed = [];
 try {
   const out = $json.output ?? $json;
@@ -194,10 +206,29 @@ for (const r of report) {
 if (!accepted.length) {
   let why = '';
   try { why = String(($json.output || {}).none_because || ''); } catch (e) {}
-  console.log(\`MOTIF NONE: \${why || 'the model returned nothing and gave no reason'}\`);
+  if (parserError) {
+    // Loud on purpose: this is the one "no cards" that is a BUG rather than a
+    // judgement, and from the database it reads identically to the others.
+    console.log(\`MOTIF PARSER FAILED — the model answered and the schema refused it: \${parserError}\`);
+    report.push({ verdict: 'parser-error', variant: null, at: 'response', why: parserError, notes: [] });
+  } else {
+    console.log(\`MOTIF NONE: \${why || 'the model returned nothing and gave no reason'}\`);
+  }
 }
 
-return [{ json: { motifCards: accepted, motifReport: report } }];`;
+// Stored beside the cards by \`Save Motif Cards\`, so "why did this film get
+// nothing" is answerable from the database rather than by reading an
+// execution. Trimmed because it rides in Editing Options, which the site
+// parses on every project page render.
+const slim = report.slice(0, 12).map((r) => ({
+  verdict: r.verdict,
+  variant: r.variant ?? null,
+  at: r.at,
+  why: String(r.why || '').slice(0, 300),
+  notes: (r.notes || []).slice(0, 4).map((n) => String(n).slice(0, 200)),
+}));
+
+return [{ json: { motifCards: accepted, motifReport: slim } }];`;
 
 const SAVE_QUERY = `-- A true merge, one statement. Editing Options is shared by the creation form,
 -- the final-settings step and the sound switches, and writing it wholesale is
@@ -206,12 +237,17 @@ const SAVE_QUERY = `-- A true merge, one statement. Editing Options is shared by
 -- has to MERGE into one — the same reason the site's updateEditingOptions is
 -- \`editing_options || $1::jsonb\` instead of a read-modify-write.
 --
+-- motifReport rides along with the cards on purpose. An empty motifCards is
+-- ambiguous from the database — a film the model had nothing to say about and
+-- a film whose answer the parser refused look identical — and reading an
+-- execution to tell them apart is what two investigations have now had to do.
+--
 -- Dollar-quoting, exactly as every other Postgres node here does it: the
 -- expression is interpolated between $hov$ markers, so nothing in a title or a
 -- quoted line can close the string.
 update hov.project
    set editing_options = coalesce(editing_options, '{}'::jsonb)
-     || $hov\${{ JSON.stringify({ motifCards: $json.motifCards }) }}$hov\$::jsonb
+     || $hov\${{ JSON.stringify({ motifCards: $json.motifCards, motifReport: $json.motifReport }) }}$hov\$::jsonb
  where id = $hov\${{ $('Receive Project Data').first().json.Project_ID }}$hov\$
 returning id;`;
 

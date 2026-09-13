@@ -189,45 +189,65 @@ at all. The 2026-09-12 investigation above read `motifCards: []` and went
 looking for validator refusals; this is the other way for that array to be
 empty, and it is invisible from the database.
 
-The schema comes from `Motif Parser`'s `jsonSchemaExample`
-(`db/port/motif-cards/paste/motif-parser.json`), which shows three cards —
-`timeline`, `route`, `schedule`. It has no `steps` key and no `sides` key
-anywhere. So a response containing a `steps` card cannot validate, and the
-parser rejects **the whole response** — taking the perfectly good route card
-with it.
+**Why, corrected.** The first reading of this was that the parser's example
+only showed three variants. It shows all five — the 2026-09-09 change added
+`compare` and `steps` to both the example and the writer's prompt, and the
+live prompt describes them in full. The example was never the problem.
 
-## The deeper drift: three surfaces disagree about which motifs exist
+`jsonSchemaExample` **infers an array's item shape from the FIRST element
+only.** The example's `cards[0]` is a `timeline` card, so the schema handed to
+the model allowed exactly `{sceneIndex, variant, priority, why, label, marks,
+note, noteSource}` — and `stops`, `rows`, `sides` and `steps` were not in it
+at all, *even though the example's own later cards use them*. Every card is
+one of five shapes, and `fromJson` cannot express a union.
 
-| Surface | Variants |
-|---|---|
-| `remotion/motif/validate.mjs` | `route, schedule, timeline, compare, steps` |
-| `remotion/src/types.ts` | documents `steps` as "the motif for a film with no dates, no clock times and no named legs — **which is most fiction**" |
-| `Choose Motif Cards` system prompt | `route, schedule, timeline` only |
-| `Motif Parser` example | `timeline, route, schedule` only |
+So the 09-09 change appended the two new variants to the end of an example
+where the schema generator never looks. It has been dead since the day it
+shipped, and it took the other three variants down with it: any answer
+carrying a route, compare or steps card was refused **whole**, which is how a
+perfectly good route card died beside the steps card here.
 
-All three variants the writer is offered are documentary-shaped: a journey
-with named legs, clock times, a run of real dates. **On a fiction film the
-prompt offers nothing usable**, while the renderer has had the right motif
-for fiction — `steps` — all along.
+## The fix, applied 2026-09-13 — Claude Scripting `39c35589`
 
-That is the size of it: of 19 films in the last 30 days, 14 wanted drawn
-cards and **exactly one has any**.
+`Motif Parser` no longer infers a schema from an example. It carries an
+explicit, permissive JSON Schema (`schemaType: manual`): the four fields every
+card has are required, every variant's own list is allowed, and
+`additionalProperties` is open everywhere so a sixth motif never breaks
+parsing again. `$ref` is deliberately not used — the node's own hint says
+refs are unsupported, so the source object is inlined at each site.
 
-## The fix, not yet applied
+**The parser stops doing validation work that `Validate Motif Cards` already
+does properly**, card by card, with a reason for each refusal. That is the
+real lesson: a strict schema at the parser turns one unusable card into zero
+cards, while the validator turns it into one refusal and a report.
 
-1. **Teach `Motif Parser`'s example `steps` and `compare`.** This is the same
-   lesson as (a) above and as 2026-09-03, for the third time: *a model copies
-   the example it can see, and prose that contradicts the example loses.* Here
-   the prompt did not even offer `steps` and the model reached for it anyway,
-   because it is the only motif that fits a story.
-2. **Describe `steps` and `compare` in `Choose Motif Cards`**, with the same
-   field-by-field shape the other three get, so fiction has a motif to choose.
-3. **Do not let one bad card discard the good ones.** The parser is all-or-
-   nothing by construction, so the resilience has to sit after it: keep the
-   raw text on a parser failure and salvage the cards that do validate, rather
-   than returning an empty array. `Validate Motif Cards` already refuses cards
-   one at a time — it just never gets the chance.
-4. **Store `motifReport` beside `motifCards`** — already owed above, and this
-   is the second investigation that needed it and had to read an execution
-   instead. It is what distinguishes "refused, and here is why" from "never
-   arrived".
+Verified before publishing, in this order:
+
+1. The exact payload the parser rejected (`motif-fiction/original/rejected-payload.json`,
+   lifted from scripting execution 12869) validates against the new schema.
+2. Both its cards pass the REAL validator with the film's real 23 scenes —
+   `route @5 ok`, `steps @22 ok`. The LEGO film should have had two drawn
+   cards.
+3. A live agent on the new schema returned a `route` card with `stops` and,
+   on a second run, a `steps` card with four steps — both parsed, no error.
+   `stops` and `steps` are precisely the keys the old inferred schema lacked.
+4. `diff-workflow.mjs` against the pre-change version: only `Motif Parser` and
+   `Save Motif Cards` differ, connections identical, no dangling references.
+
+`Save Motif Cards` now writes `motifReport` beside `motifCards`, so "why did
+this film get nothing" is answerable from the database instead of by reading
+an execution — which is what both of these investigations had to do.
+
+### Staged in the generator, NOT live
+
+`db/port/motif-cards/add-motif-nodes.mjs` also gained a glue change for
+`Validate Motif Cards`: it now tells a parser failure apart from an empty
+answer (`{error: …}` arrives instead of cards and every read yields `[]`, so
+the two are indistinguishable) and records a `parser-error` entry in the
+report. **That node was not updated live.** Editing it through MCP means
+sending its whole 18 KB body in the call, 14.6 KB of which is `validate.mjs`
+inlined verbatim, and hand-transcribing a generated validator that gates every
+card on every film is a worse risk than the diagnostic is worth. It applies
+the next time that node is regenerated and re-applied from a machine that can
+reach `wf7`. The schema fix above removes the failure it reports.
+

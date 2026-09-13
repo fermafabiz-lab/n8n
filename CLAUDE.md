@@ -1360,6 +1360,48 @@ numbers and rollback: `db/port/script-voice/README.md`. What bites:
   alone — degraded, never dead. Publish the site before expecting pinned
   references to reach a film.
 
+### The voice says what the picture cannot (2026-09-13)
+
+The producer: "AI-ul bagă mult din descrierea vizuală a scenei și în scriptul
+audio … noi nu scriem o carte." Measured, not argued: in the fiction films a
+THIRD of the narration's content words are the same words as that scene's own
+shot description (Lego chase, Peking, Senate: 33% median; documentaries
+6–14%), and the Lego chase carried 1.6 texture words per hundred against
+**0.0 in nine real scripts from the producer's own library**. Full account,
+numbers and rollback: `db/port/narration-voice/README.md`. What bites:
+
+- **Four causes, and the fourth is this file's oldest lesson again.** The
+  writer and the outline were handed the WHOLE Story Bible (1,530 words of
+  wardrobe and geometry for a 404-word script); the outline's chapter plan
+  was itself a shot list; the 09-10 profiles ASKED for it ("The sentence is a
+  SHOT", "hands, objects, weather") — the Lego film, the only one written
+  under them, has the worst numbers; and `Narration Guard`'s length FLOOR
+  (90%) sent thin drafts back to be lengthened once repetition, inventories,
+  glossary and meta were all counted, so the padding went to the one outlet
+  still unmeasured. **A guard that measures length gets length, through
+  whatever it does not measure.**
+- **The two writing prompts see a STRIPPED bible** — WHO AND WHERE: names,
+  roles, place names, object names, logline, era. Nothing visual. The full
+  bible still reaches the segmenter and every image path untouched; only
+  `Generate Outline` and `Write Full Narration` lost it.
+- **Writer rule 16 / editor rule 2b / the SHARED clause in all 11 profiles**
+  say the same thing: the voice carries intent, stake, cost, cause,
+  consequence, number; a place or time may be NAMED, never described. The
+  segmenter's rule 5 now DECIDES the shot from the event a line is about,
+  because the line no longer tells it what to draw. A silent film is the
+  exception, said in words inside `Voice Mode`'s cinematic block.
+- **Length is a CEILING now.** Writer "AT MOST 1.1×", editor "at most 1.12×
+  … otherwise LEAVE IT SHORT", guard floor 0.9 → **0.55** (only a broken
+  draft goes back for length). A film shorter than ordered is the right
+  outcome — the producer's decision, 2026-09-13.
+- **Description is COUNTED** in `Narration Guard`: texture words ≥ 0.4/100
+  and ≥ 4, or camera words ≥ 2, or ≥ 12% of sentences opening on scenery.
+  Verified on the seven films before publishing: fires on the Lego chase and
+  on Burj (all three of its hits are real — "silhouette against sea and sky",
+  "the camera enters"), silent on the documentaries and Peking.
+- **Check `guardcheck.mjs` after touching the regexes** — it reads them out
+  of the guard body, so the test and the node cannot drift.
+
 ### Evidence retrieval (Claude Scripting)
 
 Scripts on researched topics are written against a pack of sourced claims,

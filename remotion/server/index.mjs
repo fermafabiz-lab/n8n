@@ -182,7 +182,7 @@ app.post('/render', async (req, res) => {
 });
 
 registerAssemble(app, {jobs, outputDir: OUTPUT_DIR});
-registerInspect(app);
+registerInspect(app, {outputDir: OUTPUT_DIR});
 registerTranscript(app, {outputDir: OUTPUT_DIR});
 registerAnalyze(app, {outputDir: OUTPUT_DIR});
 registerTts(app, {jobs, outputDir: OUTPUT_DIR});

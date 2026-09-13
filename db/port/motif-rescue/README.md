@@ -145,3 +145,89 @@ identical, Drive nodes keeping `resource`/`operation`.
 - **The next film is the test.** These fixes reach films written from now on
   (a and b) — the ones already made keep their empty `motifCards`. Watch the
   first new documentary's `motifReport` for what still gets refused.
+
+---
+
+# The cards never reached the validator (2026-09-13)
+
+The producer, on the LEGO chase film: *"nu a facut nicio animatie cu remotion,
+de ce?"* — and they are right. Measured on the delivered cut: **18 of 20
+sampled frames carry subtitles, and there is no title card, no end screen and
+no drawn card anywhere.** Remotion ran for eight minutes (execution 12908, 93
+polls, `progress: 1`) to add captions and nothing else.
+
+Six reasons, five of them boring and one of them a real bug.
+
+| | Why nothing was drawn |
+|---|---|
+| End screen | `endScreen: false` in the project's own Editing Options |
+| Chapter cards | `chapterCards: false`, same place |
+| Opening title | retired 2026-09-11; every film opens on the teaser |
+| Montage movement | no `montageIntensity` key → the deliberate default of 0 |
+| Figure cards | derived only from a percentage, a year 1000-2029, a scaled quantity or a number of 3+ digits. A LEGO chase has none — "unit 27" is two digits, below the bar on purpose |
+| **Motif cards** | **the model wrote two good ones and the parser threw them away** |
+
+## The bug: one unusable card kills every card
+
+`Choose Motif Cards` did its job. Scripting execution 12869 shows it proposing
+a `route` (Downtown Brick City → Riverside Overpass → dock gate) and a `steps`
+card (five turning beats of the chase), every stop and step quoted verbatim
+from a real scene. Exactly the animation the producer keeps asking for.
+
+`Motif Parser` then threw:
+
+    Model output doesn't fit required format
+    outputParserFailReason: Model output does not match the expected schema
+
+`Choose Motif Cards` emitted `{error: "Model output doesn't fit required
+format"}`, and `Validate Motif Cards` — handed no cards — returned
+`{motifCards: [], motifReport: []}`.
+
+**That empty report is the fingerprint.** A refused card produces a report
+entry saying why. An EMPTY report means the cards never reached the validator
+at all. The 2026-09-12 investigation above read `motifCards: []` and went
+looking for validator refusals; this is the other way for that array to be
+empty, and it is invisible from the database.
+
+The schema comes from `Motif Parser`'s `jsonSchemaExample`
+(`db/port/motif-cards/paste/motif-parser.json`), which shows three cards —
+`timeline`, `route`, `schedule`. It has no `steps` key and no `sides` key
+anywhere. So a response containing a `steps` card cannot validate, and the
+parser rejects **the whole response** — taking the perfectly good route card
+with it.
+
+## The deeper drift: three surfaces disagree about which motifs exist
+
+| Surface | Variants |
+|---|---|
+| `remotion/motif/validate.mjs` | `route, schedule, timeline, compare, steps` |
+| `remotion/src/types.ts` | documents `steps` as "the motif for a film with no dates, no clock times and no named legs — **which is most fiction**" |
+| `Choose Motif Cards` system prompt | `route, schedule, timeline` only |
+| `Motif Parser` example | `timeline, route, schedule` only |
+
+All three variants the writer is offered are documentary-shaped: a journey
+with named legs, clock times, a run of real dates. **On a fiction film the
+prompt offers nothing usable**, while the renderer has had the right motif
+for fiction — `steps` — all along.
+
+That is the size of it: of 19 films in the last 30 days, 14 wanted drawn
+cards and **exactly one has any**.
+
+## The fix, not yet applied
+
+1. **Teach `Motif Parser`'s example `steps` and `compare`.** This is the same
+   lesson as (a) above and as 2026-09-03, for the third time: *a model copies
+   the example it can see, and prose that contradicts the example loses.* Here
+   the prompt did not even offer `steps` and the model reached for it anyway,
+   because it is the only motif that fits a story.
+2. **Describe `steps` and `compare` in `Choose Motif Cards`**, with the same
+   field-by-field shape the other three get, so fiction has a motif to choose.
+3. **Do not let one bad card discard the good ones.** The parser is all-or-
+   nothing by construction, so the resilience has to sit after it: keep the
+   raw text on a parser failure and salvage the cards that do validate, rather
+   than returning an empty array. `Validate Motif Cards` already refuses cards
+   one at a time — it just never gets the chance.
+4. **Store `motifReport` beside `motifCards`** — already owed above, and this
+   is the second investigation that needed it and had to read an execution
+   instead. It is what distinguishes "refused, and here is why" from "never
+   arrived".

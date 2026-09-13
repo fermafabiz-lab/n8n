@@ -29,6 +29,7 @@ import { footageCredits } from "@/lib/provenance";
 import { mp3DurationSeconds } from "@/lib/mp3";
 import { chapterOf } from "@/lib/chapters";
 import { driveId } from "@/lib/media";
+import { YtKitQuery, ValidationError, parseQuery } from "@/lib/validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -82,8 +83,14 @@ async function takeSeconds(voiceUrl: string): Promise<number> {
 
 export async function GET(req: Request) {
   const reqUrl = new URL(req.url);
-  const projectId = reqUrl.searchParams.get("project") ?? "";
-  if (!/^rec[A-Za-z0-9]{5,}$/.test(projectId)) return bad(400, "bad project id");
+  let query: ReturnType<typeof YtKitQuery.parse>;
+  try {
+    query = parseQuery(reqUrl.searchParams, YtKitQuery);
+  } catch (e) {
+    if (e instanceof ValidationError) return bad(e.status, e.message);
+    throw e;
+  }
+  const projectId = query.project;
 
   const project = await getProject(projectId);
   if (!project) return bad(404, "project not found");

@@ -8,6 +8,8 @@
 // last path segment of the new-project URL) and forwards. Any failure answers
 // with brief: null and the form keeps whatever the producer typed — a dead
 // button, never a lost draft.
+import { ExpandBriefBody } from "@/lib/validation";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -17,10 +19,15 @@ export async function POST(req: Request) {
   if (!webhook?.includes("expand-brief")) {
     return Response.json({ brief: null, error: "n8n not configured" }, { status: 200 });
   }
-  let body: { tema?: unknown; brief?: unknown; tone?: unknown; language?: unknown } = {};
+  // Soft-fail on purpose (see the header comment above): a malformed body
+  // still parses to the all-defaults shape rather than a 400, so a bad
+  // request behaves exactly like "no topic" below, not like an error page.
+  let raw: unknown = {};
   try {
-    body = await req.json();
+    raw = await req.json();
   } catch {}
+  const parsed = ExpandBriefBody.safeParse(raw);
+  const body = parsed.success ? parsed.data : ExpandBriefBody.parse({});
   const tema = String(body.tema ?? "").trim();
   if (!tema) return Response.json({ brief: null, error: "no topic" }, { status: 200 });
   try {

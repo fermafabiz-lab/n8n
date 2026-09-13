@@ -33,6 +33,7 @@
 
 import { NextRequest } from "next/server";
 import { atList, atRead, atWrite, atCreateMany } from "@/lib/data/airtable-shim";
+import { AtListQuery, AtWriteBody, AtCreateBody, ValidationError, parseQuery, parseJsonBody } from "@/lib/validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -68,29 +69,44 @@ async function handle(
   try {
     if (verb === "GET") {
       if (recordId) return Response.json(await atRead(table, recordId));
-      const p = req.nextUrl.searchParams;
+      let query: ReturnType<typeof AtListQuery.parse>;
+      try {
+        query = parseQuery(req.nextUrl.searchParams, AtListQuery);
+      } catch (e) {
+        if (e instanceof ValidationError) return fail(e.status, e.message);
+        throw e;
+      }
       return Response.json(
         await atList(table, {
-          filterByFormula: p.get("filterByFormula"),
-          maxRecords: p.get("maxRecords") ? Number(p.get("maxRecords")) : null,
-          pageSize: p.get("pageSize") ? Number(p.get("pageSize")) : null,
+          filterByFormula: query.filterByFormula ?? null,
+          maxRecords: query.maxRecords ?? null,
+          pageSize: query.pageSize ?? null,
         }),
       );
     }
 
-    const body = (await req.json()) as {
-      fields?: Record<string, unknown>;
-      records?: Array<{ fields?: Record<string, unknown> }>;
-    };
-
     if (verb === "PATCH") {
       if (!recordId) return fail(400, "PATCH needs a record id");
-      return Response.json(await atWrite(table, recordId, body.fields ?? {}));
+      let body: ReturnType<typeof AtWriteBody.parse>;
+      try {
+        body = await parseJsonBody(req, AtWriteBody);
+      } catch (e) {
+        if (e instanceof ValidationError) return fail(e.status, e.message);
+        throw e;
+      }
+      return Response.json(await atWrite(table, recordId, body.fields));
     }
 
     // POST is the batch create Save Evidence uses.
     if (recordId) return fail(400, "POST does not take a record id");
-    return Response.json(await atCreateMany(table, body.records ?? []));
+    let body: ReturnType<typeof AtCreateBody.parse>;
+    try {
+      body = await parseJsonBody(req, AtCreateBody);
+    } catch (e) {
+      if (e instanceof ValidationError) return fail(e.status, e.message);
+      throw e;
+    }
+    return Response.json(await atCreateMany(table, body.records));
   } catch (e) {
     const message = (e as Error).message || "shim failed";
     // 422 is what Airtable answers for a bad field, and what the nodes'

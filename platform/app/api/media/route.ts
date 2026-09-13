@@ -10,6 +10,7 @@
 // cannot be pointed at an arbitrary host.
 
 import { safeFilename } from "@/lib/media";
+import { MediaQuery, ValidationError, parseQuery } from "@/lib/validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,17 +20,23 @@ const driveUrl = (id: string) =>
 
 export async function GET(req: Request) {
 	const params = new URL(req.url).searchParams;
-	const id = params.get("id") ?? "";
+	let query: ReturnType<typeof MediaQuery.parse>;
+	try {
+		query = parseQuery(params, MediaQuery);
+	} catch (e) {
+		if (e instanceof ValidationError) {
+			return new Response(JSON.stringify({error: e.message}), {
+				status: e.status,
+				headers: {"Content-Type": "application/json"},
+			});
+		}
+		throw e;
+	}
+	const {id} = query;
 	// `dl` turns the same proxied bytes into a download. Opt-in by query, not
 	// by default: the players use this route too, and an attachment header
 	// would make every scene clip download instead of play.
-	const download = safeFilename(params.get("dl") ?? "");
-	if (!/^[\w-]{10,}$/.test(id)) {
-		return new Response(JSON.stringify({error: "invalid id"}), {
-			status: 400,
-			headers: {"Content-Type": "application/json"},
-		});
-	}
+	const download = safeFilename(query.dl);
 
 	const range = req.headers.get("range");
 	let upstream: Response;

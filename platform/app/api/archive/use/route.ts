@@ -17,6 +17,7 @@ import { revalidatePath } from "next/cache";
 import { attachArchiveAsset, DEFAULT_SECONDS } from "@/lib/archive/attach";
 import { getSceneCanvas } from "@/lib/data/stock";
 import { saveVersionOfScene } from "@/lib/data";
+import { ArchiveUseBody, ValidationError, parseJsonBody } from "@/lib/validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,15 +39,14 @@ export async function POST(req: NextRequest) {
   if (!authorized(req)) return bad(401, "unauthorized");
   if (process.env.DATA_BACKEND !== "postgres") return bad(503, "archive footage needs the Postgres backend");
 
-  let body: { sceneId?: string; stockId?: string; offsetSeconds?: unknown; seconds?: unknown };
+  let body: ReturnType<typeof ArchiveUseBody.parse>;
   try {
-    body = await req.json();
-  } catch {
-    return bad(400, "body is not JSON");
+    body = await parseJsonBody(req, ArchiveUseBody);
+  } catch (e) {
+    if (e instanceof ValidationError) return bad(e.status, e.message);
+    throw e;
   }
   const { sceneId, stockId } = body;
-  if (!sceneId || !/^rec[0-9A-Za-z]{14}$/.test(sceneId)) return bad(400, "bad sceneId");
-  if (!stockId || !/^rec[0-9A-Za-z]{14}$/.test(stockId)) return bad(400, "bad stockId");
 
   const canvas = await getSceneCanvas(sceneId);
   if (!canvas) return bad(404, "scene not found");

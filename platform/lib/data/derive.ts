@@ -16,6 +16,7 @@
  */
 
 import type { DocumentaryVisualSource } from "@/lib/archive/types";
+import { parseEditingOptionsShape } from "@/lib/editingOptionsShape";
 import {
   normalizeConfidence,
   normalizeVisualOrigin,
@@ -692,14 +693,20 @@ function asRecord(v: unknown): Record<string, unknown> {
   return typeof v === "object" && v !== null ? (v as Record<string, unknown>) : {};
 }
 
-/** Editing Options arrives as a JSON string (Airtable) or an object (jsonb). */
+/**
+ * Editing Options arrives as a JSON string (Airtable) or an object (jsonb).
+ *
+ * `parseEditingOptionsShape` (lib/editingOptionsShape.ts — NOT lib/validation.ts,
+ * which pulls in next/server and cannot be imported here; see that file's own
+ * comment) checks only that the result is a usable object, logging a clear
+ * warning instead of silently defaulting when it is not — a corrupted row or
+ * a bad migration now leaves a greppable trace instead of nothing. Absent
+ * (`undefined`/`null`) is the ordinary case for a project with no options set
+ * yet and does not warn.
+ */
 function parseEditing(raw: unknown): Record<string, unknown> {
-  if (raw && typeof raw === "object") return raw as Record<string, unknown>;
-  try {
-    return asRecord(JSON.parse(String(raw ?? "{}")));
-  } catch {
-    return {};
-  }
+  if (raw === undefined || raw === null || raw === "") return {};
+  return parseEditingOptionsShape(raw, "parseEditing");
 }
 
 /**

@@ -21,6 +21,7 @@ import { ImportRefused, importFootageFromUrl } from "@/lib/footage/urlImport";
 import { validateRights } from "@/lib/footage/rights";
 import { saveStockCandidates, updateStockMedia } from "@/lib/data/stock";
 import type { NormalizedFootageAsset } from "@/lib/footage/types";
+import { FootageImportBody, ValidationError, parseJsonBody } from "@/lib/validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,26 +37,14 @@ const text = (v: unknown, cap = 400): string | null => {
 export async function POST(req: NextRequest) {
   if (!footageAuthorized(req)) return bad(401, "unauthorized");
   if (!footageUsable()) return bad(503, "the footage library needs the Postgres backend");
-  let body: {
-    url?: string;
-    confirm?: boolean;
-    title?: string;
-    description?: string;
-    eventName?: string;
-    location?: string;
-    country?: string;
-    filmingDate?: string;
-    rights?: "cleared" | "attribution_required" | "manual_review";
-    attribution?: string;
-    notes?: string;
-  };
+  let body: ReturnType<typeof FootageImportBody.parse>;
   try {
-    body = await req.json();
-  } catch {
-    return bad(400, "body is not JSON");
+    body = await parseJsonBody(req, FootageImportBody);
+  } catch (e) {
+    if (e instanceof ValidationError) return bad(e.status, e.message);
+    throw e;
   }
-  const url = String(body.url ?? "").trim();
-  if (!url) return bad(400, "url is required");
+  const url = body.url;
 
   let imported;
   try {

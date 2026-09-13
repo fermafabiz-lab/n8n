@@ -34,6 +34,7 @@ import { revalidatePath } from "next/cache";
 import { buildFootageRequest, searchFootage, usableAutomatically, type RankedFootage } from "@/lib/footage";
 import { footageAuthorized, footageUsable } from "@/lib/footage/auth";
 import { claimScenesForSuggestion, getSceneForFootage, storeArchiveSuggestions } from "@/lib/data/stock";
+import { ArchiveSuggestQuery, ArchiveSuggestBody, ValidationError, parseQuery, parseJsonBody } from "@/lib/validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,9 +46,14 @@ const REC = /^rec[0-9A-Za-z]{14}$/;
 export async function GET(req: NextRequest) {
   if (!footageAuthorized(req)) return bad(401, "unauthorized");
   if (!footageUsable()) return bad(503, "archive suggestions need the Postgres backend");
-  const project = req.nextUrl.searchParams.get("project") ?? "";
-  if (!REC.test(project)) return bad(400, "bad project");
-  const out = await claimScenesForSuggestion(project);
+  let query: ReturnType<typeof ArchiveSuggestQuery.parse>;
+  try {
+    query = parseQuery(req.nextUrl.searchParams, ArchiveSuggestQuery);
+  } catch (e) {
+    if (e instanceof ValidationError) return bad(e.status, e.message);
+    throw e;
+  }
+  const out = await claimScenesForSuggestion(query.project);
   if (!out.project) return bad(404, "project not found");
   return NextResponse.json({ ok: true, ...out });
 }
@@ -80,16 +86,15 @@ function candidateOf(c: RankedFootage & { asset: { id: string } }) {
 export async function POST(req: NextRequest) {
   if (!footageAuthorized(req)) return bad(401, "unauthorized");
   if (!footageUsable()) return bad(503, "archive suggestions need the Postgres backend");
-  let body: {
-    stage?: string;
-    project?: string;
-    processed?: unknown;
-    scenes?: unknown;
-  };
+  // The two stages carry genuinely different bodies, and an unrecognised
+  // stage is a business-rule 400 (below), not a schema rejection — see
+  // ArchiveSuggestBody's own comment in lib/apiSchemas.ts.
+  let body: { stage: string; project?: string; processed?: unknown[]; scenes?: unknown[] };
   try {
-    body = await req.json();
-  } catch {
-    return bad(400, "body is not JSON");
+    body = await parseJsonBody(req, ArchiveSuggestBody);
+  } catch (e) {
+    if (e instanceof ValidationError) return bad(e.status, e.message);
+    throw e;
   }
 
   if (body.stage === "search") {

@@ -138,3 +138,55 @@ The producer's own switch is `endFrame: false` in `Editing Options`.
   frames that differ too much give a dissolve rather than a move. The end
   frame prompt leans hard on the reference for everything that must NOT
   change precisely because of this, but it has not been seen on a long film.
+
+---
+
+## Verified live before publishing — 2026-09-13, execution 12930
+
+A throwaway workflow (`zz endframe probe`, archived) drew a start frame, drew
+the end frame from it, and submitted one clip on the free tier. Every step of
+the design was confirmed by Google's own echo of the request, not by a green
+tick:
+
+**The end frame took the start frame as a reference.** The images call came
+back with `imageGenerationImageInputs: [{ imageInputType:
+IMAGE_INPUT_TYPE_REFERENCE, mediaId: 5947ff58-… }]` — `reference_1` is the
+right parameter name for a Flow media id, as `Build Image Request` already
+uses it for cast sheets and set plates.
+
+**The free tier accepts I2V-FL.** This is the whole question A rested on, and
+the answer is in the video request Google echoed back:
+
+```
+videoModelName:        veo_3_1_interpolation_lite_low_priority
+videoModelCapabilities: [VIDEO_MODEL_CAPABILITY_START_AND_END_IMAGE]
+videoGenerationMode:   VIDEO_GENERATION_MODE_IMAGE_TO_VIDEO
+videoGenerationImageInputs:
+  - IMAGE_USAGE_TYPE_START_IMAGE  5947ff58-…
+  - IMAGE_USAGE_TYPE_END_IMAGE    efd54edf-…
+```
+
+Note the model name: given two frames, Google routes `veo-3.1-lite-low-priority`
+to its **interpolation** variant automatically. Same tier, same request,
+different engine — which is also why morphing is the failure mode to watch
+for rather than a wrong direction.
+
+**It finished, and it was free.** `MEDIA_GENERATION_STATUS_SUCCESSFUL`, 8s at
+720p, 6,984,446 bytes, submitted 16:45:42 and done 16:46:37 — 55 s.
+`remainingCredits: 23880`, i.e. the clip cost nothing, exactly as the tier is
+supposed to.
+
+**What it costs is queue time, and now we know how much.** Start frame
+16:44:49→16:45:05 (16 s), end frame 16:45:15→16:45:38 (23 s), each paying a
+~5.5 s CapSolver captcha on the way. So an end frame adds roughly **25–30 s
+per scene** before the clip is even submitted. On an eighty-scene film that
+is a real addition to the pass, and it is the reason `endFrame: false` exists.
+
+Published as `281e9134` immediately after this run.
+
+**Not yet judged: whether the clip is BETTER.** The probe proves the API
+accepts the shape and the pipeline can build it; whether a car that must end
+outside the gate now actually drives out rather than reversing in is a
+question only the producer watching clips can answer. The probe's own clip
+(red hatchback pulling out of a walled yard, the exact failure they reported)
+is the first thing to watch.

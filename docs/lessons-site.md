@@ -1085,6 +1085,27 @@ Fetch Scenes (GET, claims) → Build Query Prompt → Query Model → Parse Quer
   already carries a −15 visual penalty and lifting every video by +15 would
   cancel it exactly, undoing B-roll-first without a word in the diff to say
   so.
+- **"It finds mostly photos" had three causes stacked, and only the first
+  was the cap** (measured on the NASA film the same hour, executions 12936
+  and 12940). Raising the cap took the film from 14 offers to 26 and still
+  produced not one clip. Second cause: `Build Query Prompt` let the model
+  choose `preferredMediaType` freely and it chose "image" on five scenes of
+  seven, which makes the engine prefer stills AND switches off
+  `VIDEO_FIRST_BONUS`, since a scene that asked for a still is asking for a
+  still. Video is the prompt's default now and five of eight scenes asked
+  for it on the next run. Third cause, and the one that still stands: the
+  clips then DID reach the candidate lists and DID rank top — the Space Act
+  signing scene had eight videos, the best at score 75 against stills in the
+  forties — and the ranking model chose three scans of the Act anyway,
+  because those clips are 2018 NASA anniversary montages, not 1958 newsreel,
+  and the prompt tells it to reject the wrong decade. **That last one is not
+  a bug and must not be "fixed" by loosening the rule**: a modern
+  retrospective offered as archive footage of 1958 is exactly what the
+  provenance system exists to prevent. A film about an institution founded
+  in 1915 genuinely has photographs where it wants film. **The lesson is
+  where to look**: a display cap, a request field and a model's judgement
+  produce the identical symptom, and only re-running it end to end and
+  reading what each stage ASKED FOR and was OFFERED tells them apart.
 - **The provider's NAME is the link now.** The card carried a chip saying
   where an asset came through and, separately, a "source ↗" in each
   caller's action row: two controls for one fact, and the one you could

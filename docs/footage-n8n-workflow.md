@@ -41,6 +41,17 @@ there diffs a fetched workflow against them.
   keys: which of them are actually reachable is the site's registry's
   business, and a scene asking for a source that is off simply gets the
   others.
+- **Video is the DEFAULT media type (2026-09-13, version `788fe2c3`).** The
+  prompt used to offer `preferredMediaType` as a free choice between
+  "video" and "image", and on the NASA film the model chose image for five
+  scenes out of seven. That is the quietest way to get a bar full of
+  photographs: the engine then prefers stills AND the site's video-first
+  lift switches off, because a scene that asked for a still is asking for a
+  still. The same subjects returned twelve clips out of twelve when asked
+  for video. The prompt now says video is the right answer for almost every
+  scene and reserves image for subjects that survive only as a still: a
+  document, a signature, a map, a painting, a portrait of someone never
+  filmed, or a scene set before cinema.
 - **`Parse Queries`** sanitises the answer (types, lengths, ISO dates,
   the footage-type vocabulary) and emits `{ id, request, queries, why }`.
   It still accepts the old `years: [from, to]` as a fallback for the date

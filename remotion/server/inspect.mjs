@@ -5,10 +5,39 @@
 //   GET /inspect?url=<media>&mode=sheet             -> grid of frames (jpg)
 //   GET /inspect?url=<media>&mode=frame&t=2.5       -> single full-res frame
 //   GET /inspect?url=<media>&mode=wave              -> audio waveform picture
+//   ...&save=1                                      -> {url} under /output instead
+//
+// `save=1` exists for the MOTION JUDGE in Media Generation. A vision model
+// has to be handed the picture somehow, and the two ways of doing that are
+// not equal: base64 in the request body means every sheet travels through
+// n8n's execution data (hundreds of kB per scene, on a node that runs once
+// per clip of an eighty-scene film), whereas a URL costs nothing and is
+// exactly how `Consistency Judge` already feeds it the frame it judges. So
+// the sheet is written under /output — which is deliberately key-free, with
+// unguessable names, for precisely this reason — and only its URL travels.
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
+import {randomUUID} from 'crypto';
 import {execFile} from 'child_process';
+
+// Sheets are scaffolding: a judge looks at one once, within seconds. Sweep
+// anything older than this on the way past, so a long pass cannot fill the
+// container's disk with pictures nobody will ever open again. Best-effort —
+// a failed sweep must never fail the inspection that triggered it.
+const SAVED_TTL_MS = 2 * 60 * 60 * 1000;
+function sweepSaved(dir) {
+	try {
+		const now = Date.now();
+		for (const f of fs.readdirSync(dir)) {
+			if (!f.startsWith('inspect-') || !f.endsWith('.jpg')) continue;
+			const full = path.join(dir, f);
+			try {
+				if (now - fs.statSync(full).mtimeMs > SAVED_TTL_MS) fs.unlinkSync(full);
+			} catch {}
+		}
+	} catch {}
+}
 
 function run(cmd, args, timeoutMs = 3 * 60 * 1000) {
 	return new Promise((resolve, reject) => {
@@ -19,9 +48,11 @@ function run(cmd, args, timeoutMs = 3 * 60 * 1000) {
 	});
 }
 
-export function registerInspect(app) {
+export function registerInspect(app, {outputDir} = {}) {
 	app.get('/inspect', async (req, res) => {
-		const {url, mode = 'sheet', t = '1', interval = '3'} = req.query;
+		const {url, mode = 'sheet', t = '1', interval = '3', save} = req.query;
+		const wantSave = save === '1' || save === 'true';
+		if (wantSave && !outputDir) return res.status(500).json({error: 'save=1 needs an output dir'});
 		if (!url) return res.status(400).json({error: 'url query param is required'});
 
 		const work = fs.mkdtempSync(path.join(os.tmpdir(), 'inspect-'));
@@ -44,6 +75,13 @@ export function registerInspect(app) {
 				await run('ffmpeg', ['-y', '-i', input, '-vf',
 					`fps=1/${iv},scale=400:-1,tile=4x5:margin=4:padding=4`,
 					'-frames:v', '1', '-q:v', '5', output]);
+			}
+			if (wantSave) {
+				sweepSaved(outputDir);
+				const name = `inspect-${randomUUID()}.jpg`;
+				fs.copyFileSync(output, path.join(outputDir, name));
+				const base = `${req.protocol}://${req.get('host')}`;
+				return res.json({file: name, url: `${base}/output/${name}`});
 			}
 			const img = fs.readFileSync(output);
 			res.setHeader('Content-Type', 'image/jpeg');

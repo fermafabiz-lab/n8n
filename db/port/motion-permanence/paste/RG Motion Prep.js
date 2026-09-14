@@ -39,7 +39,10 @@ sd.motionRerolls = sd.motionRerolls || {};
 
 // Keyed 'regen:<id>' the way the cooldown counters already are, so a scene
 // that used its batch re-roll still gets one here — these are different
-// takes, judged against different briefs.
+// takes, judged against different briefs. `Sort & Cap Scenes` deliberately
+// does NOT clear these keys when it resets the batch ones, because it runs on
+// every regen cycle and a wholesale reset would make MAX_REROLLS meaningless
+// here.
 const key = 'regen:' + p.id;
 const MAX_REROLLS = 1;
 let opts = {};

@@ -186,7 +186,7 @@ truthy('authored queries go first', F.generateSearchQueries({ ...req, queries: [
 // ---------------------------------------------------------------------------
 console.log('\n--- registry & router ---');
 const ids = F.allProviders().map((p) => p.id);
-check('the sixteen providers, in registry order', ids, ['eu_av', 'dvids', 'nasa', 'internet_archive', 'europeana', 'loc', 'wikimedia', 'wellcome', 'flickr', 'openverse', 'pexels', 'pixabay', 'unsplash', 'destockd', 'url_import', 'user_upload']);
+check('the sixteen providers, in registry order', ids, ['eu_av', 'dvids', 'nasa', 'destockd', 'internet_archive', 'europeana', 'loc', 'wikimedia', 'wellcome', 'flickr', 'openverse', 'pexels', 'pixabay', 'unsplash', 'url_import', 'user_upload']);
 check('ARCHIVE_PROVIDERS is the same list', [...archive.ARCHIVE_PROVIDERS], ids);
 truthy('every entry is a real adapter, none a placeholder', F.allProviders().every((p) => typeof p.search === 'function' && typeof p.checkRights === 'function' && p.tier));
 check('an id the registry does not know is not a provider', F.providerById('legacy_archive'), null);
@@ -214,7 +214,11 @@ const meeting = F.buildFootageRequest({ id: 's', narration: 'The European Counci
 check('a European political meeting → EU AV', route(meeting)[0], 'eu_av');
 const history = F.buildFootageRequest({ id: 's', narration: 'In 1944 the Allied armies landed in Normandy.', event: 'Normandy landings' });
 check('a 1944 request skips the newsrooms', route(history).includes('dvids') || route(history).includes('eu_av'), false);
-truthy('and goes to the archives', route(history).includes('wikimedia') && route(history).includes('internet_archive') && route(history).includes('europeana'));
+// Destockd takes one of the four slots on a WWII request, which is the point
+// of adding it — FedFlix is US government war film, cut to the shot. Europeana
+// is what it displaces here; the cap is four and a sixteenth provider has to
+// cost somebody a slot.
+truthy('and goes to the archives', route(history).includes('wikimedia') && route(history).includes('internet_archive') && route(history).includes('destockd'));
 const plague = F.buildFootageRequest({ id: 's', narration: 'In 1854 cholera swept through Soho and the doctors argued about the pump.', event: 'Broad Street cholera outbreak' });
 truthy('a medical history scene reaches Wellcome', route(plague).includes('wellcome'));
 truthy('never every provider for every scene', [req, military, space, meeting, history, plague].every((r) => route(r).length <= 4));
@@ -569,42 +573,80 @@ world['www.pexels.com'] = async () => [200, page(''), 'text/html'];
 imp = await F.importFootageFromUrl('https://www.pexels.com/video/a-city-at-night-12345/');
 check('a page from a provider that is off goes through the generic reader', [imp.via === 'provider', imp.asset.provider], [false, 'url_import']);
 
-// Destockd: a shot-level front end over FedFlix whose data endpoints are
-// Disallow: /api/ in robots.txt. Nothing here may reach that path — the clip
-// file is taken directly, and a page is resolved through the Internet
-// Archive, which we are allowed to search.
-const destockdCalls = [];
+// ---------------------------------------------------------------------------
+// Destockd — FedFlix cut into shots, searched like any archive but paced
+// ---------------------------------------------------------------------------
+console.log('\n--- destockd ---');
+// A real /api/search result, saved 2026-09-14.
+const DESTOCKD_SHOT = {
+  film: 'Apollo (11) Spacecraft #107, Saturn V Rocket, AS-506, Launch and Tracking - July 16, 1969',
+  shot: 'shot_008',
+  keyframe: '/keyframes/Apollo%20%2811%29%20Spacecraft%20%23107/shot_008.jpg',
+  clip: 'https://clips.destockd.com/clips/Apollo%20%2811%29%20Spacecraft%20%23107/shot_008.mp4',
+  preview: 'https://clips.destockd.com/clips/Apollo%20%2811%29%20Spacecraft%20%23107/shot_008_preview.mp4',
+  color_type: 'bw',
+  score: 0.2757,
+};
+const dq = [];
 world['www.destockd.com'] = async (url) => {
-  destockdCalls.push(url.pathname);
-  if (url.pathname.startsWith('/api/')) return new Error('the engine must never call a Disallow: /api/ path');
+  dq.push(url.pathname + url.search);
+  if (url.pathname === '/api/search') return [200, { query: url.searchParams.get('q'), results: [DESTOCKD_SHOT], page: 1, total: 1527, per_page: 48, has_more: true }];
+  if (url.pathname.startsWith('/api/shot/')) return [200, { ...DESTOCKD_SHOT, archive_url: 'https://archive.org/details/242-p-43', national_archives_url: 'https://catalog.archives.gov/id/44598', prev_shot: 'shot_007', next_shot: 'shot_009' }];
   if (/\.mp4$/.test(url.pathname)) return [206, 'x', 'video/mp4'];
   return [200, page(''), 'text/html'];
 };
-imp = await F.importFootageFromUrl('https://www.destockd.com/clips/The%20Big%20Picture%20-%20shot_0042.mp4');
-check('a Destockd clip file is filed under Destockd', [imp.via, imp.asset.provider, imp.asset.mediaType], ['provider', 'destockd', 'video']);
-check('and carries the film and the shot from its filename', imp.asset.title, 'The Big Picture — shot_0042');
-check('its rights are the FedFlix basis, held for review, credit not required', [imp.asset.licenseCode, imp.asset.reviewStatus, imp.asset.attributionRequired], ['pd', 'manual_review', false]);
-truthy('and the disclaimer it accepted is on the asset', /not independently verified/i.test(imp.asset.rightsText ?? ''));
+world['clips.destockd.com'] = world['www.destockd.com'];
+const dAsset = F.normalizeDestockdResult(DESTOCKD_SHOT);
+check('a shot is one video asset, identified film/shot', [dAsset.mediaType, dAsset.providerAssetId.endsWith('/shot_008'), dAsset.footageFormat], ['video', true, 'broll']);
+check('the film title carries the year the ranker matches on', dAsset.yearsMentioned, [1969]);
+check('its rights are the FedFlix basis, cleared, no credit owed to Destockd', [dAsset.licenseCode, dAsset.reviewStatus, dAsset.attributionRequired], ['pd', 'auto_approved', false]);
+truthy('and the disclaimer rides with it', /not independently verified/i.test(dAsset.rightsText ?? ''));
+check('the relative keyframe is made absolute', dAsset.thumbnailUrl.startsWith('https://www.destockd.com/keyframes/'), true);
+check('the source URL is the human page, hash and all', dAsset.sourceUrl.includes('/#/shot/'), true);
+check('a clip is usable without review', (await F.judge(ceutaReq, dAsset)).rights.status, 'cleared');
+// Routed like an archive, and asked ONCE — every other adapter runs three
+// queries; this one is a small independent site.
+dq.length = 0;
+const dRes = await F.providerById('destockd').search(F.buildFootageRequest({ id: 'x', narration: 'The Saturn V lifts off from Cape Kennedy in July 1969.' }), { limit: 6 });
+check('one search is one request', dq.length, 1);
+check('and it returns the shot', [dRes.length, dRes[0].provider], [1, 'destockd']);
+truthy('Destockd is routed for a historical subject', F.routeProviders(F.buildFootageRequest({ id: 'y', narration: 'Berlin, August 1961: the Brandenburg Gate.', dateFrom: '1961', dateTo: '1961' })).some((r) => r.provider.id === 'destockd'));
+// The ceiling is the politeness, and it is code: past it the client refuses
+// itself before the request is made.
+F.resetDestockdState();
+let dRefused = null;
+for (let i = 0; i < F.DESTOCKD_MAX_PER_MINUTE; i++) await F.providerById('destockd').search(F.buildFootageRequest({ id: 'x', narration: 'Saturn V launch 1969' }), { limit: 1 });
+try { await F.providerById('destockd').search(F.buildFootageRequest({ id: 'x', narration: 'Saturn V launch 1969' }), { limit: 1 }); } catch (e) { dRefused = e; }
+truthy('past the self-imposed ceiling it refuses itself', dRefused && /rate limit/i.test(dRefused.message));
+check('and the budget is spent', F.destockdBudget(), 0);
+F.resetDestockdState();
+// The import doors.
+imp = await F.importFootageFromUrl('https://clips.destockd.com/clips/The%20Big%20Picture/shot_0042.mp4');
+check('a clip file is filed under Destockd, film from its directory', [imp.via, imp.asset.provider, imp.asset.title], ['provider', 'destockd', 'The Big Picture — shot_0042']);
 check('a filename with no shot half still names the film', F.splitClipFilename('Apollo%2011.mp4'), { film: 'Apollo 11', shot: null });
 check('the hash is the identity, since the server never sees it', F.parseDestockdHash(new URL('https://www.destockd.com/#/shot/The%20Big%20Picture/shot_0042')), { film: 'The Big Picture', shot: 'shot_0042' });
 check('a film page parses too', F.parseDestockdHash(new URL('https://www.destockd.com/#/film/The%20Big%20Picture')), { film: 'The Big Picture', shot: null });
 check('a page that names no shot or film yields nothing to look up', F.parseDestockdHash(new URL('https://www.destockd.com/#/faq')), null);
-// The page door: resolved to the FedFlix item on archive.org, never to /api/.
+imp = await F.importFootageFromUrl('https://www.destockd.com/#/shot/Apollo/shot_008');
+check('a shot page comes back as that shot', [imp.asset.provider, imp.asset.mediaType], ['destockd', 'video']);
+truthy('and the detail read names the source film', /archive\.org\/details\/242-p-43/.test(imp.asset.rightsText ?? ''));
+// A film page names no shot, so the Archive's own item is the honest answer.
 const iaOrig = world['archive.org'];
 world['archive.org'] = async (url) => {
-  if (url.pathname === '/advancedsearch.php') {
-    truthy('the film is looked up inside FedFlix only', /collection:FedFlix/.test(url.searchParams.get('q') ?? ''));
+  if (url.pathname === '/advancedsearch.php' && /collection:FedFlix/.test(url.searchParams.get('q') ?? '')) {
     return [200, { response: { numFound: 1, docs: [{ identifier: 'LC-44552', title: 'Brandenburg Gate Border Action, Berlin, Germany, 08/14/1961' }] } }];
   }
   return iaOrig(url);
 };
-imp = await F.importFootageFromUrl('https://www.destockd.com/#/shot/Brandenburg%20Gate%20Border%20Action%2C%20Berlin%2C%20Germany%2C%2008%2F14%2F1961/shot_7');
-check('a Destockd shot page comes back as the Internet Archive film it was cut from', [imp.via, imp.asset.provider, imp.asset.providerAssetId], ['provider', 'internet_archive', 'LC-44552']);
-truthy('and says which shot to trim to', /shot_7/.test(imp.asset.description ?? ''));
+imp = await F.importFootageFromUrl('https://www.destockd.com/#/film/Brandenburg%20Gate%20Border%20Action%2C%20Berlin%2C%20Germany%2C%2008%2F14%2F1961');
+check('a film page comes back as the Internet Archive film', [imp.asset.provider, imp.asset.providerAssetId], ['internet_archive', 'LC-44552']);
 world['archive.org'] = iaOrig;
-check('no request ever reached a disallowed path', destockdCalls.filter((p) => p.startsWith('/api/')), []);
-check('Destockd is never routed for a search', F.routeProviders(ceutaReq).some((r) => r.provider.id === 'destockd'), false);
-truthy('and it says why on its chip', /robots\.txt/.test(F.providerById('destockd')?.notice ?? ''));
+// One variable turns the search off without touching the import doors.
+process.env.FOOTAGE_DESTOCKD = 'off';
+check('FOOTAGE_DESTOCKD=off switches it off, and says so', [F.providerById('destockd').enabled, /FOOTAGE_DESTOCKD/.test(F.providerById('destockd').disabledReason ?? '')], [false, true]);
+delete process.env.FOOTAGE_DESTOCKD;
+check('and on again by default', F.providerById('destockd').enabled, true);
+truthy('its chip says it is an independent site we pace ourselves on', /independent/.test(F.providerById('destockd')?.notice ?? ''));
 
 // ---------------------------------------------------------------------------
 // The legacy door, and the retired providers

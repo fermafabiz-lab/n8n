@@ -46,6 +46,7 @@ const PROVIDERS: readonly FootageProvider[] = [
   dvidsProvider,
   nasaProvider,
   // archive — dated historical material with a rights statement per item
+  destockdProvider,
   internetArchiveProvider,
   europeanaProvider,
   locProvider,
@@ -59,7 +60,6 @@ const PROVIDERS: readonly FootageProvider[] = [
   pixabayProvider,
   unsplashProvider,
   // library — our own rows; never routed
-  destockdProvider,
   urlImportProvider,
   userUploadProvider,
 ];

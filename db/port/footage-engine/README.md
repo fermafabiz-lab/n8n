@@ -67,7 +67,8 @@ schema rollback as plain library rows.
 
 | | version |
 |---|---|
-| active since 2026-09-13 (2) | `788fe2c3-728c-4392-87b7-45af6b1c2e35` |
+| active since 2026-09-14 | `2e370445-dfa1-4225-8e7c-6ea1082d6f9a` |
+| active 2026-09-13 (2) → 09-14 | `788fe2c3-728c-4392-87b7-45af6b1c2e35` |
 | active 2026-09-13 (1) | `916a51d1-62f8-4d0c-b19f-af39ac4a8013` |
 | active 2026-09-10 → 09-13 | `a3278855-7c67-4e1f-960f-5ef7168d1127` |
 | active 2026-09-09 → 09-10 | `6b5a1417-2828-4e1d-ae0b-28ea1b6a454a` |
@@ -78,7 +79,7 @@ schema rollback as plain library rows.
 prompt names the new sources and adds the `stockshots` footage type); 09-13
 changed `Build Rank Prompts` and `Parse Ranks` (up to 16 picks per scene
 instead of 4, and a clip and a still returned together with the clip
-first), then `Build Query Prompt` again an hour later. Each time the draft was diffed node by node against the active
+first), then `Build Query Prompt` again an hour later; 09-14 changed `Build Query Prompt` once more, to name Destockd among the sources. Each time the draft was diffed node by node against the active
 version before publishing and only the intended nodes differed. `nodes/`
 holds the exact `jsCode` of each; `dump.mjs` prints them JSON-encoded for
 pasting into an `updateNodeParameters` operation; `verify.mjs

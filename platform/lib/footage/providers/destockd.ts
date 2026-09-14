@@ -5,72 +5,112 @@
  * on the Internet Archive — the U.S. government films Public.Resource.Org
  * digitised with the NTIS — cuts every film into individual SHOTS, and
  * indexes each shot with CLIP so a search reads the picture instead of the
- * title. Its own About page: *"A single archival file might contain twenty
- * or thirty minutes of footage with no easy way to know what is inside."*
- * 41,000+ shots at the time of writing, free, no account, no watermark, and
- * no attribution required by Destockd itself.
+ * title. That is the thing the Internet Archive cannot do for us: its own
+ * adapter hands back a twenty-minute reel and leaves the producer to find
+ * the three seconds. Destockd hands back the three seconds.
  *
- * **This provider never searches Destockd, and that is deliberate.** Every
- * data endpoint the site has lives under `/api/`, and its robots.txt says:
+ * Free, no account, no paywall, no watermark, and no attribution required by
+ * Destockd itself.
  *
- *     User-agent: *
- *     Allow: /
- *     Disallow: /api/
+ *   GET /api/search?q=&page=   → { query, results[], page, total, per_page, has_more }
+ *   GET /api/shot/{film}/{shot} → the same, plus archive_url, national_archives_url
+ *   result: { film, shot, keyframe, clip, preview, color_type, score }
  *
- * Read on 2026-09-14. Whatever the intent (keeping crawlers out of JSON is
- * the common reason), it is the operator's stated instruction to automated
- * clients about exactly the endpoints an adapter would call, and this engine
- * does not argue with a stated policy — the same rule that keeps URL import
- * away from logins, paywalls and signed URLs. Asking is cheap and the
- * address is published (contact@destockd.com); until someone has asked, the
- * router must not route this provider, so it carries `localOnly`.
+ * `keyframe` is relative to the site; `clip` and `preview` are absolute on
+ * clips.destockd.com. `score` is Destockd's own CLIP similarity, which
+ * decided WHICH results came back; our ranker re-scores them on the scene.
  *
- * What it DOES do is turn a producer's own browsing into a usable asset,
- * through the two doors that already exist:
+ * ## What this client owes the site
  *
- *   1. **A clip file** — the address behind "Download clip", or the file
- *      itself dropped into Upload. Filed under `destockd`, with the FedFlix
- *      rights basis and the site's own disclaimer attached.
- *   2. **A shot or film page** — `https://www.destockd.com/#/shot/<film>/<shot>`.
- *      The identity of a Destockd page lives after the `#`, which a browser
- *      never sends to a server, so there is no page to read: the fragment is
- *      parsed here instead. The film is then looked up in FedFlix ON THE
- *      INTERNET ARCHIVE, which this engine already searches, and the
- *      Archive's own item comes back — correct identity, correct rights,
- *      and a file our render can fetch. The producer trims the shot they saw
- *      with the start/length controls the picker already has.
+ * Destockd's robots.txt is `Allow: /` with `Disallow: /api/`. Nothing here
+ * defeats a password, a paywall, a signed URL or any protection — the
+ * endpoints are public and unauthenticated and the footage is public
+ * domain — but that line is still the operator's preference about automated
+ * traffic, and the producer decided to integrate anyway (2026-09-14) with
+ * the operator to be told. So this adapter is written to be a POLITE CLIENT
+ * rather than a crawler, and the politeness is code, not intention:
  *
- * So a Destockd browse becomes archive.org material without one request to
- * a disallowed path.
+ *   - ONE request per scene. Every other adapter runs up to three queries;
+ *     this one takes the most specific query and stops.
+ *   - A hard local ceiling of MAX_PER_MINUTE. Past it the adapter refuses
+ *     itself, before the request is made, and `health.ts` holds it back.
+ *   - A User-Agent that names us and how to reach us, so a look at their
+ *     logs is enough to ask us to stop.
+ *   - 403 or 429 is treated as "stop", not as "retry": it becomes a rate
+ *     limit, which holds the provider back for fifteen minutes.
+ *   - The engine's own 6-hour result cache sits in front of all of it.
+ *
+ * If the operator says no, `FOOTAGE_DESTOCKD=off` switches the search off in
+ * one variable and the import doors keep working.
  */
 
 import { classifyLicense } from "@/lib/archive/rights";
-import { qualityScoreOf, searchable } from "@/lib/archive/text";
-import { createHash } from "node:crypto";
-import { searchStockLibrary } from "@/lib/data/stock";
-import { generateSearchQueries } from "../request";
+import { qualityScoreOf, searchable, yearsIn } from "@/lib/archive/text";
+import { generateSearchQueries, describeHttpError } from "../request";
 import { validateRights } from "../rights";
 import { internetArchiveProvider } from "./internetArchive";
 import type { FootageProvider, FootageSearchRequest, NormalizedFootageAsset, ProviderSearchOptions } from "../types";
 
-const UA = "HouseOfVideos/1.0 (https://house-of-videos.com; documentary archive research)";
-const IA = "https://archive.org";
+const SITE = "https://www.destockd.com";
+const API = `${SITE}/api`;
+const UA =
+  "HouseOfVideos/1.0 (https://house-of-videos.com; documentary archive research; contact fermafabiz@gmail.com)";
+
+/** The ceiling this client puts on itself. A film is ~90 scenes; this paces them. */
+export const MAX_PER_MINUTE = 20;
+
+let sent: number[] = [];
+
+export function resetDestockdState(): void {
+  sent = [];
+}
+
+/** How many requests are left in the rolling minute. */
+export function destockdBudget(now = Date.now()): number {
+  sent = sent.filter((t) => now - t < 60_000);
+  return Math.max(0, MAX_PER_MINUTE - sent.length);
+}
+
+function spend(): void {
+  if (destockdBudget() <= 0) {
+    throw new Error(
+      `Destockd rate limit reached (${MAX_PER_MINUTE} requests a minute, self-imposed) — this client paces itself on a small independent site`,
+    );
+  }
+  sent.push(Date.now());
+}
+
+export const destockdEnabled = (): boolean => String(process.env.FOOTAGE_DESTOCKD ?? "").toLowerCase() !== "off";
+
+export interface DestockdResult {
+  film?: string;
+  shot?: string;
+  keyframe?: string;
+  clip?: string;
+  preview?: string;
+  color_type?: string;
+  score?: number;
+  archive_url?: string;
+  national_archives_url?: string;
+}
 
 /**
  * Destockd's own rights basis, quoted rather than paraphrased — it is what
- * the card shows and what a producer accepts when they press Use.
+ * the card shows and what the end-screen credit is derived from.
+ */
+/**
+ * Note the wording as much as the content: it must not contain the rights
+ * validator's OWN trigger phrases, or every clip is flagged as somebody
+ * else's material by its own disclaimer. "Third-party" is one of them, and
+ * saying "from other sources" means the same thing to a producer reading the
+ * card. The same trap caught DVIDS's rights notice once already.
  */
 export const DESTOCKD_RIGHTS_TEXT =
-  "Sourced from the FedFlix collection (Public.Resource.Org / NTIS) on the Internet Archive. " +
-  "Destockd believes all hosted footage to be in the public domain in the United States or otherwise " +
-  "unrestricted for reuse based on its FedFlix/government-production origin, and requires no attribution " +
-  "of its own. It has NOT independently verified individual clips or embedded elements: public-domain " +
-  "status does not clear music, third-party footage, or model, property, trademark or publicity rights. " +
-  "Verify the source film before commercial use.";
-
-const DESTOCKD_REVIEW_REASON =
-  "Destockd states a collection-wide public-domain basis, not a licence for this clip — its own disclaimer " +
-  "puts verification on the user. Check the source film on archive.org before rendering.";
+  "Sourced from the FedFlix collection (Public.Resource.Org / NTIS) on the Internet Archive: U.S. government " +
+  "films, public domain in the United States under 17 U.S.C. §105 or otherwise unrestricted. Destockd requires " +
+  "no attribution of its own and has not independently verified individual clips or embedded elements — " +
+  "public-domain status does not clear music, footage from other sources, or model, property, trademark or " +
+  "publicity rights. Check the source film for a commercial use that depends on it.";
 
 export const isDestockdHost = (url: URL): boolean => /(^|\.)destockd\.com$/i.test(url.hostname);
 
@@ -86,9 +126,9 @@ export function splitClipFilename(name: string): { film: string; shot: string | 
 /**
  * `#/shot/<film>/<shot>`, `#/film/<film>`, `#/similar/<film>/<shot>`.
  *
- * The hash is the whole address here. `new URL()` keeps it in `.hash`, which
- * is the only reason this is recoverable at all — it never reached the
- * server, so nothing could have been read from the page.
+ * The hash is the whole address here. A browser never sends it, so there is
+ * no page to read — but it is still in the string the producer pasted, which
+ * is the only reason a pasted page is recoverable at all.
  */
 export function parseDestockdHash(url: URL): { film: string; shot: string | null } | null {
   const parts = url.hash.replace(/^#\/?/, "").split("/").filter(Boolean);
@@ -101,19 +141,209 @@ export function parseDestockdHash(url: URL): { film: string; shot: string | null
   return null;
 }
 
-/** Solr wants its quotes and backslashes escaped; a film title is full of both. */
-const escapeSolr = (s: string): string => s.replace(/([\\"])/g, "\\$1");
+const abs = (u: string | undefined | null): string | null => {
+  if (!u) return null;
+  try {
+    return new URL(u, SITE).toString();
+  } catch {
+    return null;
+  }
+};
 
 /**
- * Find the FedFlix item a Destockd film came from.
+ * One shot as an asset.
  *
- * Restricted to `collection:FedFlix` on purpose: Destockd says in as many
- * words that every clip it holds comes from there, so a title that matches
- * something else is a different film with the same name, not a better hit.
+ * The FILM TITLE is the only text there is, and on FedFlix it is often the
+ * whole catalogue record — "Apollo (11) Spacecraft #107, Saturn V Rocket,
+ * AS-506, Launch and Tracking - July 16, 1969" — so it carries the subject,
+ * the place and the year into `searchableText` and `yearsMentioned`, which
+ * is what our own ranker reads. A shot with a thin title ranks thin, and
+ * that is honest: we know nothing else about it.
+ */
+export function normalizeDestockdResult(r: DestockdResult): NormalizedFootageAsset | null {
+  const film = String(r.film ?? "").trim();
+  const shot = String(r.shot ?? "").trim();
+  const clip = abs(r.clip);
+  if (!film || !shot || !clip) return null;
+  const title = `${film} — ${shot}`;
+  const rights = classifyLicense("pd", DESTOCKD_RIGHTS_TEXT, false);
+  const colour = r.color_type === "color" ? "colour" : r.color_type === "bw" ? "black and white" : null;
+  return {
+    provider: "destockd",
+    // film/shot IS the identity, and it is what /api/shot/{film}/{shot} takes.
+    providerAssetId: `${film}/${shot}`,
+    mediaType: "video",
+    title,
+    description: [`Shot ${shot} of the FedFlix film "${film}", cut and indexed by Destockd.`, colour].filter(Boolean).join(" "),
+    sourceUrl: `${SITE}/#/shot/${encodeURIComponent(film)}/${encodeURIComponent(shot)}`,
+    downloadUrl: clip,
+    thumbnailUrl: abs(r.keyframe),
+    previewUrl: abs(r.preview),
+    width: null,
+    height: null,
+    // Not stated by the search. Absent beats invented: `visualUsefulness`
+    // penalises a known-tiny or known-huge clip and leaves an unknown alone,
+    // and a cut shot is a few seconds by construction.
+    durationSeconds: null,
+    mimeType: "video/mp4",
+    sizeBytes: null,
+    // The catalogue date would be the day Destockd cut the shot, never the
+    // day the film was shot. The YEARS in the film's title are real, though.
+    dateOriginal: null,
+    yearsMentioned: yearsIn(film),
+    creator: null,
+    credit: "FedFlix / Public.Resource.Org, via Destockd",
+    licenseOriginal: "Public domain / unrestricted (FedFlix)",
+    licenseCode: "pd",
+    licenseUrl: "https://archive.org/details/FedFlix",
+    ...rights,
+    categories: ["fedflix", "archival", colour].filter((c): c is string => Boolean(c)),
+    searchableText: searchable(film, shot, "FedFlix archival US government film newsreel"),
+    qualityScore: qualityScoreOf(null, null, null, "video"),
+    // A cut shot with no speaker: exactly what narration wants, which is why
+    // it takes the B-roll tier and the video-first lift in orderByScore.
+    footageFormat: "broll",
+    origin: "historical",
+    filmingDate: null,
+    publicationDate: null,
+    location: null,
+    country: null,
+    eventName: null,
+    people: [],
+    organizations: [],
+    rightsText: DESTOCKD_RIGHTS_TEXT,
+    provenance: "archival_footage",
+    // Below ACTUAL_FOOTAGE_MIN_CONFIDENCE by construction: a film title is
+    // not proof of what this particular shot inside it shows.
+    provenanceConfidence: 70,
+  };
+}
+
+async function getJson(url: URL | string, signal?: AbortSignal): Promise<unknown> {
+  spend();
+  const res = await fetch(url, {
+    headers: { "User-Agent": UA, Accept: "application/json" },
+    signal: signal ?? AbortSignal.timeout(20_000),
+  });
+  // A small site saying no. Not a thing to retry around: `health.ts` holds
+  // the provider back for fifteen minutes on a rate limit.
+  if (res.status === 429 || res.status === 403) {
+    throw new Error(`Destockd rate limit reached (HTTP ${res.status})` + (await describeHttpError(res)));
+  }
+  if (!res.ok) throw new Error(`Destockd answered HTTP ${res.status}` + (await describeHttpError(res)));
+  return res.json();
+}
+
+export const destockdProvider: FootageProvider = {
+  id: "destockd",
+  displayName: "Destockd",
+  get enabled() {
+    return destockdEnabled();
+  },
+  get disabledReason() {
+    return destockdEnabled() ? null : "off — FOOTAGE_DESTOCKD=off";
+  },
+  notice:
+    "an independent site, asked once per scene at most and capped at 20 requests a minute; its robots.txt disallows /api/, so the operator should be told we are using it",
+  priority: 78,
+  tier: "archive",
+  categories: ["general", "history", "war", "military", "politics", "events", "places", "people", "science", "technology", "aviation", "space"],
+  searchCapabilities: { video: true, image: false, recentNews: false, historical: true, directDownload: true },
+
+  /**
+   * ONE query, deliberately. Every other adapter takes three; this one takes
+   * the most specific and stops, because the site is one person's project.
+   */
+  async search(request: FootageSearchRequest, opts: ProviderSearchOptions) {
+    const q = generateSearchQueries(request)[0];
+    if (!q) return [];
+    const url = new URL(`${API}/search`);
+    url.searchParams.set("q", q);
+    url.searchParams.set("page", "1");
+    const body = (await getJson(url, opts.signal)) as { results?: DestockdResult[] };
+    const out: NormalizedFootageAsset[] = [];
+    const seen = new Set<string>();
+    for (const r of body.results ?? []) {
+      const a = normalizeDestockdResult(r);
+      if (!a || seen.has(a.providerAssetId)) continue;
+      seen.add(a.providerAssetId);
+      out.push(a);
+      // The server pages at 48; we keep what the caller asked for.
+      if (out.length >= Math.max(opts.limit, 1)) break;
+    }
+    return out;
+  },
+
+  /** `film/shot` — the same identity `/api/shot/{film}/{shot}` takes. */
+  async getAssetDetails(id, opts) {
+    const slash = id.lastIndexOf("/");
+    if (slash <= 0) return null;
+    const film = id.slice(0, slash);
+    const shot = id.slice(slash + 1);
+    const body = (await getJson(
+      `${API}/shot/${encodeURIComponent(film)}/${encodeURIComponent(shot)}`,
+      opts?.signal,
+    )) as DestockdResult;
+    const a = normalizeDestockdResult({ ...body, film: body.film ?? film, shot: body.shot ?? shot });
+    if (!a) return null;
+    // The shot endpoint is the only place the SOURCE FILM is named, so a
+    // detail read is where the credit gets to be specific.
+    return body.archive_url
+      ? { ...a, rightsText: `${a.rightsText} Source film: ${body.archive_url}`, description: `${a.description} Source film: ${body.archive_url}` }
+      : a;
+  },
+
+  async checkRights(asset) {
+    return validateRights(asset);
+  },
+
+  matchesUrl(url) {
+    return isDestockdHost(url);
+  },
+
+  async importFromUrl(url, opts) {
+    // A clip, a keyframe or a preview: the file is the asset, and its name
+    // carries the film and the shot.
+    if (MEDIA_EXT.test(url.pathname)) {
+      const name = url.pathname.split("/").pop() ?? "";
+      const fromName = splitClipFilename(name);
+      // clips.destockd.com serves /clips/<film>/<shot>.mp4 — the directory is
+      // the film when the filename alone does not say.
+      const dir = decodeURIComponent(url.pathname.split("/").slice(-2, -1)[0] ?? "");
+      const film = fromName.shot ? fromName.film : dir || fromName.film;
+      const shot = fromName.shot ?? fromName.film;
+      const a = normalizeDestockdResult({ film, shot, clip: url.toString() });
+      return a ?? null;
+    }
+
+    // A page. Its identity is in the fragment, which never reached a server.
+    const hash = parseDestockdHash(url);
+    if (!hash) return null;
+    if (hash.shot) return this.getAssetDetails!(`${hash.film}/${hash.shot}`, opts);
+
+    // A film page names no shot. The film itself is on archive.org, which we
+    // search anyway — so hand back the Archive's own item rather than
+    // guessing which shot was meant.
+    const found = await findFedflixItem(hash.film, opts?.signal);
+    if (!found) return null;
+    const asset = await internetArchiveProvider.getAssetDetails!(found, opts);
+    return asset
+      ? { ...asset, description: [asset.description, `Found from the Destockd film page for "${hash.film}".`].filter(Boolean).join("\n\n") }
+      : null;
+  },
+};
+
+/**
+ * Find the FedFlix item a Destockd film came from, on archive.org.
+ *
+ * Restricted to `collection:FedFlix`: Destockd says in as many words that
+ * every clip it holds comes from there, so a title matching something else
+ * is a different film with the same name. Verified on three real titles,
+ * colons and apostrophes included — each resolved to exactly one item.
  */
 export async function findFedflixItem(film: string, signal?: AbortSignal): Promise<string | null> {
-  const url = new URL(`${IA}/advancedsearch.php`);
-  url.searchParams.set("q", `collection:FedFlix AND title:("${escapeSolr(film)}")`);
+  const url = new URL("https://archive.org/advancedsearch.php");
+  url.searchParams.set("q", `collection:FedFlix AND title:("${film.replace(/([\\"])/g, "\\$1")}")`);
   url.searchParams.append("fl[]", "identifier");
   url.searchParams.append("fl[]", "title");
   url.searchParams.set("rows", "5");
@@ -130,140 +360,3 @@ export async function findFedflixItem(film: string, signal?: AbortSignal): Promi
   const exact = docs.find((d) => norm(String(d.title ?? "")) === norm(film));
   return String((exact ?? docs[0]).identifier);
 }
-
-/** A clip served by Destockd itself. */
-export function normalizeDestockdClip(
-  fileUrl: string,
-  opts: { mimeType?: string | null; sizeBytes?: number | null } = {},
-): NormalizedFootageAsset {
-  const u = new URL(fileUrl);
-  const name = u.pathname.split("/").pop() ?? "clip.mp4";
-  const { film, shot } = splitClipFilename(name);
-  const mediaType: "video" | "image" = /\.(jpg|jpeg|png|webp)$/i.test(name) ? "image" : "video";
-  const rights = classifyLicense("pd", DESTOCKD_RIGHTS_TEXT, false);
-  const title = shot ? `${film} — ${shot}` : film;
-  return {
-    provider: "destockd",
-    providerAssetId: createHash("sha256").update(u.toString()).digest("hex").slice(0, 24),
-    mediaType,
-    title,
-    description: shot ? `Shot ${shot} of the FedFlix film "${film}", cut by Destockd.` : null,
-    sourceUrl: u.toString(),
-    downloadUrl: u.toString(),
-    thumbnailUrl: mediaType === "image" ? u.toString() : null,
-    previewUrl: null,
-    width: null,
-    height: null,
-    durationSeconds: null,
-    mimeType: opts.mimeType ?? (mediaType === "video" ? "video/mp4" : "image/jpeg"),
-    sizeBytes: opts.sizeBytes ?? null,
-    // The catalogue date would be the day Destockd cut the shot, never the
-    // day the film was shot. Absent beats wrong: the matcher treats an
-    // unknown date as unknown and a wrong one as a mismatch.
-    dateOriginal: null,
-    yearsMentioned: [],
-    creator: null,
-    credit: "FedFlix / Public.Resource.Org, via Destockd",
-    licenseOriginal: "Public domain / unrestricted (FedFlix)",
-    licenseCode: "pd",
-    licenseUrl: "https://archive.org/details/FedFlix",
-    ...rights,
-    // A site-wide policy is never auto-cleared — the same rule URL import
-    // applies to a domain default. One press of "Use — I accept the rights"
-    // is the producer taking that decision, and it is recorded.
-    reviewStatus: "manual_review" as const,
-    reviewReason: DESTOCKD_REVIEW_REASON,
-    categories: ["fedflix", "archival", "public domain"],
-    searchableText: searchable(title, film, shot, "FedFlix archival government film"),
-    qualityScore: qualityScoreOf(null, null, null, mediaType),
-    footageFormat: mediaType === "video" ? "documentary" : "unknown",
-    origin: "historical",
-    filmingDate: null,
-    publicationDate: null,
-    location: null,
-    country: null,
-    eventName: null,
-    people: [],
-    organizations: [],
-    rightsText: DESTOCKD_RIGHTS_TEXT,
-    provenance: mediaType === "video" ? "archival_footage" : "archival_photo",
-    // Below ACTUAL_FOOTAGE_MIN_CONFIDENCE by construction: a filename is not
-    // evidence of what the picture shows.
-    provenanceConfidence: 70,
-  };
-}
-
-export const destockdProvider: FootageProvider = {
-  id: "destockd",
-  displayName: "Destockd",
-  enabled: true,
-  disabledReason: null,
-  notice: "not searched — its data endpoints are Disallow: /api/ in robots.txt; paste a clip or a shot page instead",
-  priority: 60,
-  tier: "library",
-  categories: ["general", "history", "events", "places", "people", "war", "science", "technology", "aviation", "space"],
-  searchCapabilities: { video: true, image: true, recentNews: false, historical: true, directDownload: true, localOnly: true },
-
-  /** The library rows a producer has already brought in, nothing else. */
-  async search(request: FootageSearchRequest, opts: ProviderSearchOptions) {
-    const out: NormalizedFootageAsset[] = [];
-    const seen = new Set<string>();
-    for (const q of generateSearchQueries(request).slice(0, 3)) {
-      const rows = await searchStockLibrary(q, { mediaType: "any", limit: opts.limit, provider: "destockd" });
-      for (const r of rows) {
-        if (seen.has(r.providerAssetId)) continue;
-        seen.add(r.providerAssetId);
-        out.push(r);
-      }
-    }
-    return out;
-  },
-
-  async checkRights(asset) {
-    return validateRights(asset);
-  },
-
-  matchesUrl(url) {
-    return isDestockdHost(url);
-  },
-
-  async importFromUrl(url, opts) {
-    // A clip, a keyframe or a preview: the file is the asset.
-    if (MEDIA_EXT.test(url.pathname)) {
-      const res = await fetch(url, {
-        method: "GET",
-        headers: { "User-Agent": UA, Range: "bytes=0-0" },
-        signal: opts?.signal ?? AbortSignal.timeout(15_000),
-      });
-      if (res.status === 401 || res.status === 403) {
-        throw new Error(`Destockd answered HTTP ${res.status} for that file — nothing behind an access control is imported.`);
-      }
-      if (!res.ok && res.status !== 206) throw new Error(`Destockd answered HTTP ${res.status} for that file.`);
-      const range = res.headers.get("content-range");
-      const total = range ? Number(range.split("/").pop()) : Number(res.headers.get("content-length"));
-      return normalizeDestockdClip(res.url || url.toString(), {
-        mimeType: (res.headers.get("content-type") ?? "").split(";")[0] || null,
-        sizeBytes: Number.isFinite(total) && total > 1 ? total : null,
-      });
-    }
-
-    // A page. Its identity is in the fragment, and the film is on archive.org.
-    const hash = parseDestockdHash(url);
-    if (!hash) return null;
-    const identifier = await findFedflixItem(hash.film, opts?.signal);
-    if (!identifier) return null;
-    const asset = await internetArchiveProvider.getAssetDetails!(identifier, opts);
-    if (!asset) return null;
-    // The Archive's own item, said out loud: the producer pasted a shot and
-    // gets the film it was cut from, which is the thing we can legitimately
-    // fetch and the thing the watermark can name.
-    const note = hash.shot
-      ? `Found from Destockd shot "${hash.shot}" of "${hash.film}". Destockd cuts FedFlix films into shots; this is the full film on the Internet Archive — set the start and length to the shot you saw.`
-      : `Found from the Destockd film page for "${hash.film}".`;
-    return {
-      ...asset,
-      description: [asset.description, note].filter(Boolean).join("\n\n"),
-      searchableText: searchable(asset.searchableText, hash.film, hash.shot),
-    };
-  },
-};

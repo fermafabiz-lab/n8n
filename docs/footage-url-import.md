@@ -79,24 +79,23 @@ rights it states.
    row is `approved`, `rightsText` gains *Rights confirmed by the producer
    at import*, and `verified_note` says who.
 
-## Destockd: the one provider whose whole point is this door
+## Destockd: the provider whose pages live in the fragment
 
-`destockd.com` is in the registry as a `library` provider that is never
-routed, because its data endpoints are `Disallow: /api/` in robots.txt
-(`footage-sources.md`). Its adapter exists only for imports, and it handles
-two shapes:
+`destockd.com` is a searched archive (`footage-sources.md`), but its pages
+are a hash router, so importing one is a special case worth knowing:
 
-- a clip file on its host → filed under `destockd`, titled from the
-  filename (`Film Title - shot_0042.mp4`), FedFlix rights, `manual_review`;
-- `#/shot/<film>/<shot>` → the identity is in the FRAGMENT, which never
-  reaches a server. It is parsed from the URL string, the film is resolved
-  against `collection:FedFlix` on archive.org, and the Archive's own item is
-  what comes back — so the row's provider is `internet_archive`, not
-  `destockd`, because that is genuinely where the media lives.
+- a clip file on `clips.destockd.com` → filed under `destockd`; the
+  directory is the film and the filename the shot;
+- `#/shot/<film>/<shot>` → the identity is in the FRAGMENT, which a browser
+  never sends to a server. It is parsed from the URL string and read through
+  the shot endpoint, which also names the source film on archive.org;
+- `#/film/<film>` → names no shot, so the FedFlix item on archive.org is
+  handed back instead of a guess. That row's provider is `internet_archive`,
+  because that is genuinely where the media lives.
 
 **`canonicalUrl()` drops the fragment**, which is right for identity
 everywhere else and would erase a Destockd page's whole meaning — the
-adapter reads `url.hash` before anything canonicalises it.
+provider door runs before anything canonicalises, and reads `url.hash`.
 
 ## Provenance
 

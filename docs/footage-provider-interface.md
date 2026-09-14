@@ -91,7 +91,7 @@ The fields that were already there (`provider`, `providerAssetId`,
 | `pexels` | `providers/pexels.ts` | `PEXELS_API_KEY` | video + photos; Pexels License → `other_free`, cleared, no credit |
 | `pixabay` | `providers/pixabay.ts` | `PIXABAY_API_KEY` | video + photos; Pixabay Content License → `other_free`, cleared, no credit |
 | `unsplash` | `providers/unsplash.ts` | `UNSPLASH_ACCESS_KEY` | photos; `attribution_required` ("Photo by X on Unsplash"); `resolveDownload` calls `download_location` |
-| `destockd` | `providers/destockd.ts` | — | **imported from, never searched**: the FedFlix archive cut into 41,000+ shots with CLIP search, whose data endpoints are `Disallow: /api/` in robots.txt. A clip file is filed under `destockd` with the FedFlix rights basis and its own disclaimer; a `#/shot/<film>/<shot>` page is parsed from the FRAGMENT (it never reached a server) and resolved to the FedFlix item on archive.org |
+| `destockd` | `providers/destockd.ts` | none | the FedFlix archive cut into 41,000+ shots with CLIP search. Searched like any archive but **paced on purpose**: one query per scene, a self-imposed 20/minute ceiling, a User-Agent naming us, 403/429 treated as stop, `FOOTAGE_DESTOCKD=off` to switch off. Imports too: a clip file (directory = film, filename = shot), a `#/shot/…` page read from the FRAGMENT, a `#/film/…` page resolved to the FedFlix item on archive.org |
 | `url_import` | `providers/urlImport.ts` | — | local only: searches the library rows an import created |
 | `user_upload` | `providers/upload.ts` | — | local only: searches the library rows an upload created |
 

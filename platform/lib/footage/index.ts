@@ -20,6 +20,18 @@
 export * from "./types";
 export { buildFootageRequest, generateSearchQueries } from "./request";
 export { allProviders, providerById, providerFilterOptions, requestCategories, routeProviders, searchableProviders, FootageProviderRegistry } from "./registry";
+// Destockd: the normalizer, the two pure parsers (a page keeps its identity
+// after the `#`, a clip keeps it in the filename) and the self-imposed rate
+// limit, all exported so the checks can pin them.
+export {
+  normalizeDestockdResult,
+  parseDestockdHash,
+  splitClipFilename,
+  destockdBudget,
+  resetDestockdState,
+  MAX_PER_MINUTE as DESTOCKD_MAX_PER_MINUTE,
+  DESTOCKD_RIGHTS_TEXT,
+} from "./providers/destockd";
 export { validateRights, usableAutomatically, usableWithReview, renderable, attributionLine, USAGE_LABELS, FootageRightsValidator } from "./rights";
 export { matchSignals } from "./match";
 export { assessProvenance, baseProvenance, PROVENANCE_WEIGHTS } from "./provenance";

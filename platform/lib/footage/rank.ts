@@ -57,6 +57,9 @@ export const PROVIDER_RELIABILITY: Record<string, number> = {
   pexels: 0.4,
   pixabay: 0.4,
   unsplash: 0.4,
+  // Its metadata is a filename and a collection policy, not a catalogue
+  // record — trusted like the Archive it mirrors, no further.
+  destockd: 0.5,
   url_import: 0.3,
   user_upload: 0.4,
 };

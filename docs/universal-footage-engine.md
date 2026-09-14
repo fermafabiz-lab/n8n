@@ -113,6 +113,7 @@ used merely to avoid a generated picture (spec §32).
 | `UNSPLASH_ACCESS_KEY` | Unsplash |
 | `OPENVERSE_CLIENT_ID` + `OPENVERSE_CLIENT_SECRET` | Openverse's full quota (OAuth2 client credentials, 10,000 requests a day); without them Openverse still runs, anonymously, at 5 requests an hour |
 | `FOOTAGE_ENABLE_LOC` | `1` switches the Library of Congress on; off by default because the box is Cloudflare-challenged |
+| `FOOTAGE_DESTOCKD` | `off` stops searching Destockd; on by default, and the import doors work either way |
 | `EU_AV_API_BASE` | the EU Audiovisual Service, opt-in; no default — the service has no public API (`footage-sources.md`) |
 | `MEDIA_INGEST_KEY` | already existed — the `x-hov-key` header n8n uses against `/api/footage/*` and `/api/archive/*` |
 
@@ -128,8 +129,8 @@ Secrets and Variables, written into `platform.env` by the deploy.
 `npm run check:footage` (in `platform/`) runs `scripts/check-footage.mjs`
 against the real engine with the network and the database mocked at their
 edges (`scripts/footage-loader.mjs` maps the `@/` alias and swaps
-`lib/data/stock` and `lib/data/postgres` for in-memory doubles). 186 checks:
-request building, the registry and the tier router, the thirteen
+`lib/data/stock` and `lib/data/postgres` for in-memory doubles). 214 checks:
+request building, the registry and the tier router, the fourteen
 normalizers (nine of them pinned on real responses saved 2026-09-10, the
 four keyed stock/community ones on the documented shapes), rights,
 provenance, ranking, dedupe, the engine end to end (local-first, isolation,
@@ -152,8 +153,9 @@ platform/lib/footage/
   urlImport.ts    readPage, importFootageFromUrl
   engine.ts       searchFootage, judge, fallbackPlan
   auth.ts         footageAuthorized, footageUsable
-  providers/      euav, dvids, nasa · internetArchive, europeana, loc, wikimedia, wellcome
-                  · flickr, openverse · pexels, pixabay, unsplash · urlImport, upload
+  providers/      euav, dvids, nasa · destockd, internetArchive, europeana, loc,
+                  wikimedia, wellcome · flickr, openverse
+                  · pexels, pixabay, unsplash · urlImport, upload
 ```
 
 The sources themselves — what each covers, what was measured on it, which

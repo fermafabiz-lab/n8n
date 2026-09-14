@@ -1106,6 +1106,37 @@ Fetch Scenes (GET, claims) → Build Query Prompt → Query Model → Parse Quer
   where to look**: a display cap, a request field and a model's judgement
   produce the identical symptom, and only re-running it end to end and
   reading what each stage ASKED FOR and was OFFERED tells them apart.
+- **Destockd, and what a robots.txt line is worth** (2026-09-14). The
+  producer asked for `destockd.com`: a shot-level front end over the FedFlix
+  films our Internet Archive adapter already searches, cutting each film into
+  shots and indexing them with CLIP — the one thing the Archive cannot do,
+  since it hands back a twenty-minute reel and `rank.ts` halves anything over
+  ten minutes. Its robots.txt is `Allow: /` with `Disallow: /api/`, and every
+  data endpoint is under `/api/`. I built it import-only first and said so;
+  the producer asked twice for it to be searched like the others, **and that
+  is their call to make**: nothing here defeats a password, a paywall or a
+  signed URL, the endpoints are public and unauthenticated, and the footage
+  is public domain. What the decision changes is not permission but MANNERS,
+  so the manners are code — one query per scene where every other adapter
+  runs three, a self-imposed 20-a-minute ceiling that refuses before the
+  request is made, a User-Agent naming us and how to reach us, 403/429 read
+  as "stop" rather than "retry", and `FOOTAGE_DESTOCKD=off` as a one-variable
+  exit. **Telling the operator is still owed and is not optional**;
+  `contact@destockd.com` is on their About page.
+  Three smaller findings, each of which decided part of the shape. Its pages
+  are a hash router, so a shot's identity lives after the `#` and never
+  reaches a server — which sounds like a dead end and is the opposite, since
+  the fragment is still in the string a producer pasted. Its film TITLE is
+  the only text a shot has, and on FedFlix that title is often the whole
+  record ("Apollo (11) Spacecraft #107, Saturn V Rocket, AS-506, Launch and
+  Tracking - July 16, 1969"), which is what carries subject, place and year
+  into our own ranker. And its rights text had to be REWORDED: it said
+  "third-party", which is one of the rights validator's own trigger phrases,
+  so every clip was flagged as somebody else's material by its own
+  disclaimer — the trap DVIDS's notice had already sprung once.
+  **Read robots.txt and the legal page before designing an adapter**: both
+  are public, both are free to fetch, and between them they settled every
+  question before a line was written.
 - **The provider's NAME is the link now.** The card carried a chip saying
   where an asset came through and, separately, a "source ↗" in each
   caller's action row: two controls for one fact, and the one you could
@@ -1388,7 +1419,7 @@ spec. What belongs HERE is what will bite:
   the site's `@/` alias and extensionless imports (`./types` → `types.ts`,
   `@/lib/footage` → `index.ts`) and swaps `lib/data/stock` and
   `lib/data/postgres` for in-memory doubles; `check-footage.mjs` stubs
-  `globalThis.fetch` per hostname. `npm run check:footage`, 186 checks.
+  `globalThis.fetch` per hostname. `npm run check:footage`, 214 checks.
   Anything under `lib/footage/` that grows a new import path needs the
   loader to resolve it — Node knows neither the alias nor the missing
   extension. **A routing fixture must name no subject by accident**: "a

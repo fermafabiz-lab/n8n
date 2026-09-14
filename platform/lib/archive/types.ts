@@ -41,6 +41,7 @@ export type ArchiveProvider =
   | "eu_av"
   | "dvids"
   | "nasa"
+  | "destockd"
   | "internet_archive"
   | "europeana"
   | "loc"
@@ -59,6 +60,7 @@ export const ARCHIVE_PROVIDERS: readonly ArchiveProvider[] = [
   "eu_av",
   "dvids",
   "nasa",
+  "destockd",
   "internet_archive",
   "europeana",
   "loc",

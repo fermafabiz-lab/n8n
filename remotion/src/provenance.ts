@@ -77,6 +77,7 @@ const PROVIDER_LABELS: Record<string, string> = {
 	pexels: 'Pexels',
 	pixabay: 'Pixabay',
 	unsplash: 'Unsplash',
+	destockd: 'Destockd',
 	url_import: 'URL import',
 	user_upload: 'Manual upload',
 };

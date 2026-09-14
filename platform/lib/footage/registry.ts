@@ -31,6 +31,7 @@ import { openverseProvider } from "./providers/openverse";
 import { pexelsProvider } from "./providers/pexels";
 import { pixabayProvider } from "./providers/pixabay";
 import { unsplashProvider } from "./providers/unsplash";
+import { destockdProvider } from "./providers/destockd";
 import { urlImportProvider } from "./providers/urlImport";
 import { userUploadProvider } from "./providers/upload";
 
@@ -45,6 +46,7 @@ const PROVIDERS: readonly FootageProvider[] = [
   dvidsProvider,
   nasaProvider,
   // archive — dated historical material with a rights statement per item
+  destockdProvider,
   internetArchiveProvider,
   europeanaProvider,
   locProvider,

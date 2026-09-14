@@ -10,14 +10,14 @@ every provider for every scene* — and the router enforces it with a cap of
 
 ```ts
 PROVIDERS = [
-  euAv, dvids, nasa,                                     // official
-  internetArchive, europeana, loc, wikimedia, wellcome,  // archive
-  flickr, openverse,                                     // community
-  pexels, pixabay, unsplash,                             // stock
-  urlImport, userUpload,                                 // library
+  euAv, dvids, nasa,                                                // official
+  destockd, internetArchive, europeana, loc, wikimedia, wellcome,   // archive
+  flickr, openverse,                                                // community
+  pexels, pixabay, unsplash,                                        // stock
+  urlImport, userUpload,                                            // library
 ]
 
-allProviders()          // the fifteen, in that order
+allProviders()          // the sixteen, in that order
 providerById(id)        // null for anything retired or unknown
 searchableProviders()   // enabled, not localOnly, can search video or image
 providerFilterOptions() // the picker's chips: {id, label, enabled, reason, notice, tier}
@@ -41,7 +41,7 @@ into a fit for the request (`tierFit`).
 | Tier | Who | What it means to the router |
 |---|---|---|
 | `official` | EU AV, DVIDS, NASA | a body's own footage of its own events: **+3** when one of its categories is in the request, else 0; never searched for history unless it can (`searchCapabilities.historical`) |
-| `archive` | Internet Archive, Europeana, LoC, Wikimedia, Wellcome | dated material with a rights statement per item: **+2** on a historical request, **+1** on any named event, and **+2** more for claiming `general`, which makes it the fallback for everything |
+| `archive` | Destockd, Internet Archive, Europeana, LoC, Wikimedia, Wellcome | dated material with a rights statement per item: **+2** on a historical request, **+1** on any named event, and **+2** more for claiming `general`, which makes it the fallback for everything |
 | `community` | Flickr, Openverse | photographs of the day: **+1** on a recent event or a place; on history only if it has some (+0.5), else out |
 | `stock` | Pexels, Pixabay, Unsplash | generic present-day B-roll: **+1** only when the scene names NO event, does not demand one, and wants pictures; **never otherwise** — a real clip of the wrong thing is not real footage of anything |
 | `library` | URL import, uploads | never routed; the engine's library-first pass reads their rows |
@@ -61,6 +61,7 @@ into a fit for the request (`tierFit`).
 | `flickr` | events, places, people, politics, disaster, humanitarian, migration, history | 70 |
 | `openverse` | events, places, people, politics, history, science | 65 |
 | `pexels` / `pixabay` / `unsplash` | stock | 50 / 45 / 40 |
+| `destockd` | general, history, war, military, politics, events, places, people, science, technology, aviation, space | 78 |
 
 `requestCategories(request)` derives a request's categories from its
 structured fields (topic, event, place, country, people, organisations,

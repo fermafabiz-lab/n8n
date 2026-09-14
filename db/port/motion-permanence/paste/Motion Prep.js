@@ -97,7 +97,7 @@ if (skip) {
 // INTERIORS: outdoors, wind, water, foliage, traffic and crowds move with
 // nobody touching them and that is correct. A question with no carve-out
 // would re-roll street scenes for being streets.
-const system = 'You are a film editor checking whether a generated shot does what its brief said. You are shown a contact sheet: frames sampled about one second apart from a single 8-second clip, in time order, left to right and then top to bottom. Judge only what the brief claims and whether the world holds together. Do not judge taste, style, beauty, lighting or composition. Answer only the JSON object requested.';
+const system = 'You are a film editor checking whether a generated shot does what its brief said. You are shown a contact sheet: frames sampled at a fixed interval across a single 8-second clip, in time order, left to right and then top to bottom. The frames are samples, not the whole clip: a fault shorter than the gap between two of them is invisible here, so judge what you can actually see and do not infer what happened in between. Judge only what the brief claims and whether the world holds together. Do not judge taste, style, beauty, lighting or composition. Answer only the JSON object requested.';
 const ask = [
   'The brief for this shot was:',
   '"' + motion.slice(0, 700) + '"',

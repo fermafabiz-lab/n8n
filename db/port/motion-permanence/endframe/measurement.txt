@@ -1,0 +1,26 @@
+scene draw?   dir   why skipped
+1     skip    y     actions=4, camera-moves, held-object
+2     skip    n     actions=4, camera-moves, held-object
+3     skip    y     actions=3, camera-moves, held-object
+4     skip    y     actions=3, camera-moves, held-object
+5     skip    y     actions=3, camera-moves, held-object
+101   skip    n     actions=2, held-object
+102   skip    y     actions=3, camera-moves, held-object
+103   skip    n     actions=3, camera-moves, held-object
+104   skip    y     actions=3, camera-moves, held-object
+105   skip    n     camera-moves, held-object
+106   skip    y     actions=3, camera-moves, held-object
+107   skip    n     actions=4, camera-moves, held-object
+108   skip    y     actions=4, camera-moves, held-object
+109   skip    y     actions=3, camera-moves, held-object
+110   skip    y     actions=2, camera-moves, held-object
+111   skip    y     actions=3, held-object
+
+end frames drawn: 0 / 16
+per-rule skip counts: {'actions': 15, 'camera-moves': 14, 'held-object': 16}
+
+--- each rule ALONE, as a skip test ---
+  actions>=2     would skip 15 / 16
+  camera-moves   would skip 14 / 16
+  return/exit    would skip  0 / 16
+  held-object    would skip 16 / 16

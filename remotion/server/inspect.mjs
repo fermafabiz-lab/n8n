@@ -71,7 +71,25 @@ export function registerInspect(app, {outputDir} = {}) {
 			} else {
 				// Contact sheet: one frame every `interval` seconds, 4 per row,
 				// small enough to travel as base64 through n8n execution data.
-				const iv = Math.max(1, Number(interval) || 3);
+				//
+				// 2026-09-14 — the floor was 1 second, and that made the motion judge
+				// structurally blind to the faults it exists to catch. A Veo clip is
+				// always 8s, so at 1fps the judge saw 8 frames; the producer's café
+				// clip lost a held object between 0.75s and 1.00s and popped a prep
+				// table out and back inside a second, both entirely between samples.
+				//
+				// Halving the interval is free in tile terms, which is the part worth
+				// knowing: the grid is 4x5 = 20 slots and an 8s clip at 1fps fills
+				// only 8 of them. 16 frames still fit, at the SAME 400px per tile, so
+				// density doubles without shrinking a single frame — the sheet just
+				// grows from two rows to four. The cost is gpt-4o input tokens for a
+				// taller image, not resolution.
+				//
+				// The floor stays non-zero (and the ceiling comes from the grid): at
+				// 0.25 an 8s clip would want 32 frames for 20 slots and ffmpeg would
+				// silently drop the tail, so the judge would score the first five
+				// seconds and call it the clip.
+				const iv = Math.min(8, Math.max(0.4, Number(interval) || 3));
 				await run('ffmpeg', ['-y', '-i', input, '-vf',
 					`fps=1/${iv},scale=400:-1,tile=4x5:margin=4:padding=4`,
 					'-frames:v', '1', '-q:v', '5', output]);

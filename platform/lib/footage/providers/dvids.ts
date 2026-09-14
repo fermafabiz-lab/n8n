@@ -179,6 +179,7 @@ export const dvidsProvider: FootageProvider = {
   priority: 90,
   tier: "official",
   categories: ["military", "war", "aviation", "humanitarian", "disaster", "geopolitics", "government"],
+  nameTerms: /\b(dvids|defen[cs]e visual information)\b/i,
   searchCapabilities: { video: true, image: true, recentNews: true, historical: false, directDownload: true },
 
   async search(request: FootageSearchRequest, opts: ProviderSearchOptions) {

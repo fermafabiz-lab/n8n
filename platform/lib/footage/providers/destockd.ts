@@ -281,6 +281,7 @@ export const destockdProvider: FootageProvider = {
   priority: 78,
   tier: "archive",
   categories: ["general", "history", "war", "military", "politics", "events", "places", "people", "science", "technology", "aviation", "space"],
+  nameTerms: /\b(destockd|fedflix)\b/i,
   searchCapabilities: { video: true, image: false, recentNews: false, historical: true, directDownload: true },
 
   /**

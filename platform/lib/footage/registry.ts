@@ -154,6 +154,37 @@ export function requestCategories(r: FootageSearchRequest): string[] {
   return out;
 }
 
+/**
+ * What a provider gets for being NAMED by the scene.
+ *
+ * Big enough to beat the broadest archive's best score — Internet Archive
+ * reached 12 on a scene about NASA's own founding while NASA reached 7, and
+ * NASA was not asked. The category arithmetic cannot fix that on its own: it
+ * rewards a provider for claiming MANY subjects, so a general archive beats a
+ * specialist on the specialist's own subject, every time. Measured on the film
+ * "how nasa was created" 2026-09-14: seven scenes, NASA routed on two, zero
+ * NASA assets offered, on a film whose every scene says the word.
+ *
+ * It is deliberately a bonus and not a forced slot: a named provider that
+ * CANNOT answer (a newsroom asked about 1958 — `tierFit` returns -Infinity)
+ * stays out, and two named bodies still compete on their remaining fit.
+ */
+const NAMED_BONUS = 8;
+
+/** The bodies this request names, by their own name. Cheap, and only on the strong fields. */
+export function namedProviders(r: FootageSearchRequest): Set<ArchiveProvider> {
+  const text = [
+    (r.organizations ?? []).join(" "),
+    r.topic ?? "",
+    r.event ?? "",
+    r.keywords.join(" "),
+    r.narration.slice(0, 600),
+  ].join(" \n ");
+  const out = new Set<ArchiveProvider>();
+  for (const p of PROVIDERS) if (p.nameTerms?.test(text)) out.add(p.id);
+  return out;
+}
+
 export interface RoutedProvider {
   provider: FootageProvider;
   /** How many of the request's categories it claims. */
@@ -214,10 +245,14 @@ export function routeProviders(
 
   const cats = requestCategories(r);
   const historical = opts.historical ?? cats.includes("history");
+  const named = namedProviders(r);
   const scored = candidates.map((provider) => {
     const matches = provider.categories.filter((c) => c !== "general" && cats.includes(c)).length;
     const fit = tierFit(provider.tier, provider, r, historical);
-    const score = fit === -Infinity ? 0 : matches * 2 + fit;
+    // A body the scene NAMES is asked about itself. Enough to clear the
+    // broadest archive on its best day — see NAMED_BONUS.
+    const bonus = fit !== -Infinity && named.has(provider.id) ? NAMED_BONUS : 0;
+    const score = fit === -Infinity ? 0 : matches * 2 + fit + bonus;
     return { provider, matches, score };
   });
   const chosen = scored

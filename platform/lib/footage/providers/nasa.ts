@@ -144,6 +144,9 @@ export const nasaProvider: FootageProvider = {
   priority: 90,
   tier: "official",
   categories: ["space", "science", "technology", "earth", "missions", "aviation"],
+  // NACA is here on purpose: NASA absorbed its laboratories and its film
+  // library in 1958, so a scene about NACA is asking for NASA's archive.
+  nameTerms: /\b(nasa|naca|national aeronautics|jet propulsion laboratory|jpl|goddard|kennedy space cent(?:er|re)|cape canaveral)\b/i,
   searchCapabilities: { video: true, image: true, recentNews: true, historical: true, directDownload: true },
 
   async search(request: FootageSearchRequest, opts: ProviderSearchOptions) {

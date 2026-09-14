@@ -152,6 +152,13 @@ export interface FootageProvider {
   readonly tier: ProviderTier;
   /** The topic strengths the router matches a request against. */
   readonly categories: readonly string[];
+  /**
+   * The institution's own name, as a scene would say it. When a request NAMES
+   * a body, that body is asked about itself whatever the category arithmetic
+   * says — see `namedProviders` in registry.ts for why this had to exist.
+   * Omitted for a provider no narration would ever name (a stock library).
+   */
+  readonly nameTerms?: RegExp;
   readonly searchCapabilities: ProviderSearchCapabilities;
   /** The structured search. Adapters turn the request's queries into their own syntax. */
   search(request: FootageSearchRequest, opts: ProviderSearchOptions): Promise<NormalizedFootageAsset[]>;

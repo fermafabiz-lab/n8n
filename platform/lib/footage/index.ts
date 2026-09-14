@@ -19,7 +19,7 @@
 
 export * from "./types";
 export { buildFootageRequest, generateSearchQueries } from "./request";
-export { allProviders, providerById, providerFilterOptions, requestCategories, routeProviders, searchableProviders, FootageProviderRegistry } from "./registry";
+export { allProviders, namedProviders, providerById, providerFilterOptions, requestCategories, routeProviders, searchableProviders, FootageProviderRegistry } from "./registry";
 // Destockd: the normalizer, the two pure parsers (a page keeps its identity
 // after the `#`, a clip keeps it in the filename) and the self-imposed rate
 // limit, all exported so the checks can pin them.

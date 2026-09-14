@@ -248,6 +248,7 @@ export const internetArchiveProvider: FootageProvider = {
   priority: 85,
   tier: "archive",
   categories: ["general", "history", "war", "politics", "events", "places", "people", "science", "technology", "aviation", "space"],
+  nameTerms: /\b(internet archive|archive\.org|prelinger|universal newsreel)\b/i,
   searchCapabilities: { video: true, image: true, recentNews: false, historical: true, directDownload: true },
 
   async search(request: FootageSearchRequest, opts: ProviderSearchOptions) {

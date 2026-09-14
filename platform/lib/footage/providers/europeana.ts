@@ -187,6 +187,7 @@ export const europeanaProvider: FootageProvider = {
   priority: 85,
   tier: "archive",
   categories: ["history", "europe", "politics", "events", "places", "people", "war", "science", "eu"],
+  nameTerms: /\beuropeana\b/i,
   searchCapabilities: { video: true, image: true, recentNews: false, historical: true, directDownload: true },
 
   async search(request: FootageSearchRequest, opts: ProviderSearchOptions) {

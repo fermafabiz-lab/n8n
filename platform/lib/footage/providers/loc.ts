@@ -201,6 +201,7 @@ export const locProvider: FootageProvider = {
   priority: 80,
   tier: "archive",
   categories: ["history", "politics", "people", "places", "events", "war", "government", "science"],
+  nameTerms: /\b(library of congress|loc\.gov)\b/i,
   searchCapabilities: { video: true, image: true, recentNews: false, historical: true, directDownload: true },
 
   async search(request: FootageSearchRequest, opts: ProviderSearchOptions) {

@@ -140,6 +140,7 @@ export const wellcomeProvider: FootageProvider = {
   priority: 70,
   tier: "archive",
   categories: ["medicine", "science", "history"],
+  nameTerms: /\bwellcome\b/i,
   searchCapabilities: { video: false, image: true, recentNews: false, historical: true, directDownload: true },
 
   async search(request: FootageSearchRequest, opts: ProviderSearchOptions) {

@@ -208,6 +208,7 @@ export const euAvProvider: FootageProvider = {
   priority: 90,
   tier: "official",
   categories: ["europe", "politics", "migration", "government", "eu", "geopolitics", "humanitarian"],
+  nameTerms: /\b(european commission|european parliament|european council|audiovisual service)\b/i,
   searchCapabilities: { video: true, image: true, recentNews: true, historical: false, directDownload: true },
 
   async search(request: FootageSearchRequest, opts: ProviderSearchOptions) {

@@ -81,12 +81,40 @@ routeProviders(request, { only?, max = 4, historical?, skip? }) → [{ provider,
    never thinned, even by `skip`.
 2. Otherwise every searchable provider the caller does not `skip` is scored:
    **2 × the request categories it claims** (`general` excluded) **+ its
-   tier fit** from the table above. A fit of −∞ removes the provider. The
-   engine passes `heldBack` as `skip`, so a provider in its cool-off gives
+   tier fit** from the table above **+ `NAMED_BONUS` (8) when the request
+   names it**. A fit of −∞ removes the provider and takes the bonus with it.
+   The engine passes `heldBack` as `skip`, so a provider in its cool-off gives
    its slot to the next candidate and the report says "held back" rather
    than "not routed for this subject".
 3. Providers scoring above zero are kept, highest first, priority breaking
    ties; the list is cut at `max`.
+
+### A body the scene names is asked about itself
+
+`namedProviders(request)` matches each provider's `nameTerms` against the
+organizations, topic, event, keywords and the first 600 characters of the
+narration. It exists because **the category arithmetic rewards a provider for
+claiming MANY subjects, so a general archive beats a specialist on the
+specialist's own subject, every time.**
+
+The measurement, on the real film *how nasa was created* (2026-09-14): seven
+scenes, every one of them about NASA, and NASA was routed on **two** of them
+and offered **nothing**. On the scene where Eisenhower signs the act creating
+it, NASA scored 7 while the Internet Archive scored 12 — NASA claims six
+narrow categories (space, science, technology, earth, missions, aviation) and
+the scene read as politics + government + history, which NASA does not claim
+at all. Adding Destockd that morning, with its twelve categories, took the
+last slot and pushed NASA out entirely.
+
+`NAMED_BONUS` is 8 — enough to clear the broadest archive on its best day. It
+is a bonus and not a forced slot on purpose: a named body that genuinely
+cannot answer stays out (naming DVIDS in a 1944 scene does not give it a
+historical catalogue), and two named bodies still compete on their remaining
+fit.
+
+NASA's terms include **NACA**, whose laboratories and film library it absorbed
+in 1958: a scene about NACA is asking for NASA's archive by an older name.
+Stock libraries have no `nameTerms` — no narration names Pexels.
 
 Measured in `check-footage.mjs`: European migration → EU AV first with the
 archives along; a military exercise → DVIDS first; an Artemis launch → NASA

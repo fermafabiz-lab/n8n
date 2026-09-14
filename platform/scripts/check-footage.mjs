@@ -221,7 +221,29 @@ check('a 1944 request skips the newsrooms', route(history).includes('dvids') || 
 truthy('and goes to the archives', route(history).includes('wikimedia') && route(history).includes('internet_archive') && route(history).includes('destockd'));
 const plague = F.buildFootageRequest({ id: 's', narration: 'In 1854 cholera swept through Soho and the doctors argued about the pump.', event: 'Broad Street cholera outbreak' });
 truthy('a medical history scene reaches Wellcome', route(plague).includes('wellcome'));
-truthy('never every provider for every scene', [req, military, space, meeting, history, plague].every((r) => route(r).length <= 4));
+// A body the scene NAMES is asked about itself. Without this the category
+// arithmetic rewards a provider for claiming MANY subjects, so a general
+// archive beats a specialist on the specialist's own subject: measured on the
+// real film "how nasa was created", NASA was routed on two of seven scenes and
+// offered nothing, on a film whose every scene says the word.
+const founding = F.buildFootageRequest({
+  id: 's', topic: 'Eisenhower NASA legislation', event: 'Eisenhower sends NASA legislation to Congress',
+  country: 'United States', dateFrom: '1958-04-02', dateTo: '1958-04-02', people: ['Dwight D. Eisenhower'],
+  organizations: ['United States Congress', 'NACA'], keywords: ['Eisenhower', 'Congress', 'legislation', 'civilian space agency', 'NACA'],
+  narration: 'On April 2, Dwight D. Eisenhower initiated legislation and told Congress he wanted a civilian agency built on NACA laboratories.',
+});
+check('a film that NAMES NASA asks NASA, ahead of the broad archives', route(founding)[0], 'nasa');
+truthy('which it was not before: on categories alone it scores below the Internet Archive', F.routeProviders(founding).find((x) => x.provider.id === 'nasa').score - 8 < F.routeProviders(founding).find((x) => x.provider.id === 'internet_archive').score);
+// NASA absorbed NACA's laboratories and film library in 1958, so a scene about
+// NACA is asking for NASA's archive by another name.
+const naca = F.buildFootageRequest({ id: 's', organizations: ['NACA'], dateFrom: '1957', dateTo: '1957', narration: 'In a NACA conference room, Hugh Dryden studied memorandum packets.' });
+check('and NACA reaches it too', route(naca)[0], 'nasa');
+check('the named set is just the bodies the text names', [...F.namedProviders(naca)], ['nasa']);
+// The bonus never resurrects a provider that genuinely cannot answer: DVIDS
+// has no historical search, so naming it in a 1944 scene changes nothing.
+const namedNewsroom = F.buildFootageRequest({ id: 's', organizations: ['DVIDS'], event: 'Normandy landings', dateFrom: '1944', dateTo: '1944', narration: 'In 1944 the Allied armies landed in Normandy; the DVIDS catalogue holds none of it.' });
+truthy('naming a newsroom does not make it able to search 1944', F.namedProviders(namedNewsroom).has('dvids') && !route(namedNewsroom).includes('dvids'));
+truthy('never every provider for every scene', [req, military, space, meeting, history, plague, founding, naca].every((r) => route(r).length <= 4));
 check('an explicit filter is honoured', F.routeProviders(req, { only: ['nasa'] }).map((x) => x.provider.id), ['nasa']);
 // A provider the caller is holding back gives its slot to the next candidate
 // rather than occupying one of the four with a refusal.

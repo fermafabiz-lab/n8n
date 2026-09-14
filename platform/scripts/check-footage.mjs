@@ -54,10 +54,10 @@ globalThis.fetch = async (input, init) => {
   if (!handler) throw new Error(`no route to ${url.hostname}`);
   const out = await handler(url, init);
   if (out instanceof Error) throw out;
-  const [status, body, type] = out;
+  const [status, body, type, extraHeaders] = out;
   return new Response(typeof body === 'string' ? body : JSON.stringify(body), {
     status,
-    headers: { 'content-type': type ?? 'application/json' },
+    headers: { 'content-type': type ?? 'application/json', ...(extraHeaders ?? {}) },
   });
 };
 
@@ -619,6 +619,43 @@ for (let i = 0; i < F.DESTOCKD_MAX_PER_MINUTE; i++) await F.providerById('destoc
 try { await F.providerById('destockd').search(F.buildFootageRequest({ id: 'x', narration: 'Saturn V launch 1969' }), { limit: 1 }); } catch (e) { dRefused = e; }
 truthy('past the self-imposed ceiling it refuses itself', dRefused && /rate limit/i.test(dRefused.message));
 check('and the budget is spent', F.destockdBudget(), 0);
+F.resetDestockdState();
+// Cloudflare sits in front of Destockd in MANAGED mode, which SAMPLES: the
+// same request, same identity, is served 200 once and challenged the next
+// (measured on the live site 2026-09-14). A challenge is therefore a coin
+// toss to retry once, not a verdict to go dark on — which is exactly what
+// the first live search did, reporting "rate limit reached" and holding the
+// provider back for fifteen minutes over one sampled interstitial.
+const CHALLENGE = [403, '<title>Just a moment...</title>', 'text/html', { 'cf-mitigated': 'challenge' }];
+const dSearch = () => F.providerById('destockd').search(F.buildFootageRequest({ id: 'x', narration: 'Saturn V launch 1969' }), { limit: 2 });
+const destockdOk = world['www.destockd.com'];
+let dChallenges = 0;
+world['www.destockd.com'] = async (url, init) => (dChallenges-- > 0 ? CHALLENGE : destockdOk(url, init));
+
+dq.length = 0;
+dChallenges = 1;
+check('one sampled challenge is retried, as ourselves, and the answer is used', [(await dSearch()).length, dq.length], [1, 1]);
+check('and the retry is spent from the same per-minute budget', F.DESTOCKD_MAX_PER_MINUTE - F.destockdBudget(), 2);
+
+F.resetDestockdState();
+dChallenges = 99;
+let dBlocked = null;
+try { await dSearch(); } catch (e) { dBlocked = e; }
+truthy('challenged twice is a no, and it says CHALLENGE', dBlocked && /cloudflare challenge/i.test(dBlocked.message));
+// health.ts reads the words "rate limit" out of a provider's error and holds
+// it back for fifteen minutes instead of its ordinary five. A challenge must
+// not claim them — and the message reaches the admin page verbatim, where
+// "rate limit reached" would say we had been impolite when we had not.
+truthy('but never claims a rate limit it did not hit', dBlocked && !/rate limit/i.test(dBlocked.message));
+check('and it gave up after exactly two asks', F.DESTOCKD_MAX_PER_MINUTE - F.destockdBudget(), 2);
+
+F.resetDestockdState();
+dChallenges = 0;
+world['www.destockd.com'] = async (url) => (url.pathname === '/api/search' ? [429, 'slow down', 'text/plain'] : destockdOk(url));
+let dLimited = null;
+try { await dSearch(); } catch (e) { dLimited = e; }
+truthy('a real 429 is still a rate limit, and holds it back the long way', dLimited && /rate limit/i.test(dLimited.message));
+world['www.destockd.com'] = destockdOk;
 F.resetDestockdState();
 // The import doors.
 imp = await F.importFootageFromUrl('https://clips.destockd.com/clips/The%20Big%20Picture/shot_0042.mp4');

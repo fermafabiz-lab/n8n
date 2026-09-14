@@ -302,9 +302,13 @@ expected and harmless for an app touching only its own Drive.
   in `docs/lessons-pipeline.md` under "Direction: why Veo played the shot
   backwards"). Three changes went live in one afternoon against the
   producer's report that clips contradict their own scene — the contradictory
-  continuity clause is gone, every clip is now made from a start frame AND an
+  continuity clause is gone, every clip was made from a start frame AND an
   end frame, and a gpt-4o judge scores each finished clip and re-rolls it
-  once when it clearly disagrees with its brief. Each was verified at the API
+  once when it clearly disagrees with its brief. **The end frame half was
+  REVERSED on 2026-09-14 and is now opt-in** (`endFrame: true`), because the
+  one real film that ever carried it came back with two of its signature
+  artefacts and a per-shot "draw it only when it helps" rule measured 0 of 16
+  — see the entry below and `db/port/motion-permanence/endframe/`. Each was verified at the API
   level on a throwaway (executions 12930, 12933, 12947) and the one clip that
   exists scored `direction: 1, coherent: 1, morph: false` on exactly the
   reported failure. **None of that is a measurement.** What is owed:
@@ -316,9 +320,13 @@ expected and harmless for an app touching only its own Drive.
   and click "regenerate" on one real clip — the gate's regeneration got the
   same two changes mirrored onto it (`69c992f9`, seven `RG *` nodes) but has
   only had its pieces exercised, never the whole chain; the log lines to look
-  for are `RG ENDFRAME <id>: got …` and `RG MOTION <id>: ok`. The two escape
-  hatches, if a film goes wrong at 2 a.m.: `endFrame: false` and
-  `motionJudge: false` in `Editing Options`.
+  for are `RG ENDFRAME <id>: got …` and `RG MOTION <id>: ok`. The escape
+  hatch, if a film goes wrong at 2 a.m., is `motionJudge: false` in
+  `Editing Options`. **`endFrame` reversed polarity on 2026-09-14**: it used
+  to be `endFrame: false` to switch OFF, it is now `endFrame: true` to switch
+  ON, and the strict boolean is deliberate — there is no UI for the key
+  (`grep -rn endFrame platform/` is empty), so a hand-typed `"true"` stays OFF
+  and the skip log echoes what it actually saw.
 
 - **Documentary mode, what is still owed** (see `docs/lessons-site.md`,
   "Documentary mode — archive footage" and "The Universal Footage Engine"):

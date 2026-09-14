@@ -1434,7 +1434,11 @@ outside the gate cannot get there by driving in. The end frame is drawn by
 the same image model with the approved still as `reference_1`, so only what
 moves has moved; it is scaffolding, never stored or shown. **Its cost is
 queue time** — ~25-30s per scene, two image generations each paying a ~5.5s
-captcha — which is why `endFrame: false` exists.
+captcha — which is why a switch exists at all. **Read this paragraph as
+history: the end frame became opt-in on 2026-09-14 and the switch reversed to
+`endFrame: true`.** The "geometry not rhetoric" argument above did not survive
+contact — it was built on a cause the SAME afternoon's earlier fix had already
+removed, and it is answered in full under "When an end frame helps" below.
 
 **`reference_*` / `character_*` cannot be combined with `startImage` /
 `endImage`** — both trigger R2V (Ingredients) on Veo. So Flow Characters and

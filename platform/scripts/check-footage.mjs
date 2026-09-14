@@ -458,6 +458,20 @@ check('the same page through two doors is one asset', F.dedupeAssets([{ ...eu, p
 check('the same hash is one asset', F.dedupeAssets([{ ...eu, providerAssetId: 'a', sourceUrl: 'https://x/1', downloadUrl: 'https://x/1.mp4', contentHash: 'abc' }, { ...eu, providerAssetId: 'b', sourceUrl: 'https://x/2', downloadUrl: 'https://x/2.mp4', contentHash: 'abc' }]).length, 1);
 check('different assets stay two', F.dedupeAssets([{ ...eu, providerAssetId: 'a', sourceUrl: 'https://x/1', downloadUrl: 'https://x/1.mp4' }, { ...eu, providerAssetId: 'b', sourceUrl: 'https://x/2', downloadUrl: 'https://x/2.mp4' }]).length, 2);
 check('canonical URL drops tracking and mobile hosts', F.canonicalUrl('https://commons.m.wikimedia.org/wiki/File:A.jpg?utm_source=x#y'), 'https://commons.wikimedia.org/wiki/File:A.jpg');
+// A fragment is an anchor inside a page — EXCEPT on a hash-routed SPA, where
+// it is the route. Destockd is one, and dropping it made every asset on the
+// site canonicalise to `https://www.destockd.com/`: the deduper collapsed a
+// whole search into one clip, so the provider could contribute exactly one
+// asset, ever. Seen live before it was seen here (n=8 from the provider, one
+// result on screen) because the Destockd double only returned a single shot.
+check('a hash-router route is part of the identity', F.canonicalUrl('https://www.destockd.com/#/shot/The%20Big%20Picture/shot_0042'), 'https://destockd.com/#/shot/The Big Picture/shot_0042');
+check('a plain anchor still goes', F.canonicalUrl('https://x/a#section-2'), 'https://x/a');
+check('and two spellings of one route are one identity', F.canonicalUrl('https://www.destockd.com/#/shot/The Big Picture/shot_0042'), F.canonicalUrl('https://www.destockd.com/#/shot/The%20Big%20Picture/shot_0042'));
+check('a malformed escape does not throw the canonicalisation away', F.canonicalUrl('https://www.destockd.com/#/shot/100%/x'), 'https://destockd.com/#/shot/100%/x');
+check('two shots of one film are two assets, not one', F.dedupeAssets([
+  { ...eu, provider: 'destockd', providerAssetId: 'F/shot_1', sourceUrl: 'https://www.destockd.com/#/shot/F/shot_1', downloadUrl: 'https://clips.destockd.com/clips/F/shot_1.mp4' },
+  { ...eu, provider: 'destockd', providerAssetId: 'F/shot_2', sourceUrl: 'https://www.destockd.com/#/shot/F/shot_2', downloadUrl: 'https://clips.destockd.com/clips/F/shot_2.mp4' },
+]).length, 2);
 
 // ---------------------------------------------------------------------------
 // The engine end to end: local first, routing, isolation, filtering
@@ -610,6 +624,26 @@ dq.length = 0;
 const dRes = await F.providerById('destockd').search(F.buildFootageRequest({ id: 'x', narration: 'The Saturn V lifts off from Cape Kennedy in July 1969.' }), { limit: 6 });
 check('one search is one request', dq.length, 1);
 check('and it returns the shot', [dRes.length, dRes[0].provider], [1, 'destockd']);
+// The double above returns ONE shot, which is why the fragment bug below
+// survived every check and had to be found on the live site. A real search
+// returns dozens, so ask for several here and follow them all the way
+// through the engine — provider -> rights -> dedupe -> ranked candidates.
+const manyShots = Array.from({ length: 6 }, (_, i) => ({ ...DESTOCKD_SHOT, shot: `shot_10${i}`, keyframe: `/keyframes/A%20Film/shot_10${i}.jpg`, clip: `https://clips.destockd.com/clips/A%20Film/shot_10${i}.mp4` }));
+const destockdOne = world['www.destockd.com'];
+world['www.destockd.com'] = async (url, init) =>
+  url.pathname === '/api/search' ? [200, { query: url.searchParams.get('q'), results: manyShots, page: 1, total: 99, per_page: 48, has_more: true }] : destockdOne(url, init);
+F.resetDestockdState();
+// Earlier engine cases routed Destockd before this section defined its
+// double, so health.ts is holding it back on three "no route" failures. One
+// recorded success is the provider being reachable again, which is the state
+// this case is about.
+await F.recordSearch('destockd', { ok: true, results: 1, ms: 1 });
+const dMany = await F.providerById('destockd').search(F.buildFootageRequest({ id: 'x', narration: 'Saturn V launch 1969' }), { limit: 6 });
+check('six shots come back as six assets', dMany.length, 6);
+const dEngine = await F.searchFootage(F.buildFootageRequest({ id: 'x', narration: 'The Saturn V lifts off from Cape Kennedy in July 1969.' }), { providers: ['destockd'], limit: 6, top: 12, forceProviders: true });
+check('and six survive the engine — they are six pages, not one page six times', dEngine.candidates.length, 6);
+world['www.destockd.com'] = destockdOne;
+F.resetDestockdState();
 truthy('Destockd is routed for a historical subject', F.routeProviders(F.buildFootageRequest({ id: 'y', narration: 'Berlin, August 1961: the Brandenburg Gate.', dateFrom: '1961', dateTo: '1961' })).some((r) => r.provider.id === 'destockd'));
 // The ceiling is the politeness, and it is code: past it the client refuses
 // itself before the request is made.

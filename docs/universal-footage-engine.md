@@ -129,13 +129,25 @@ Secrets and Variables, written into `platform.env` by the deploy.
 `npm run check:footage` (in `platform/`) runs `scripts/check-footage.mjs`
 against the real engine with the network and the database mocked at their
 edges (`scripts/footage-loader.mjs` maps the `@/` alias and swaps
-`lib/data/stock` and `lib/data/postgres` for in-memory doubles). 220 checks:
+`lib/data/stock` and `lib/data/postgres` for in-memory doubles). 227 checks:
 request building, the registry and the tier router, the fourteen
 normalizers (nine of them pinned on real responses saved 2026-09-10, the
 four keyed stock/community ones on the documented shapes), rights,
 provenance, ranking, dedupe, the engine end to end (local-first, isolation,
 hold-back, rate limit), the fallback ladder, URL import and its refusals,
 the legacy door, and the source-watermark contract.
+
+**A provider double that returns ONE result proves almost nothing**, and this
+suite learned it the expensive way. Every Destockd case returned a single
+shot, so all of them passed while the live provider could contribute exactly
+one asset to any search: its `sourceUrl` carries the identity in the URL
+FRAGMENT (`…/#/shot/<film>/<shot>`, a hash-routed SPA), `canonicalUrl`
+stripped the fragment as an anchor, every asset canonicalised to
+`https://destockd.com/`, and `dedupeAssets` — which drops an asset on ANY key
+collision — collapsed the lot. Found only by reading `n=8` from the provider
+beside one result on screen. A normalizer case may return one item; **an
+adapter's search case must return several**, and follow them through the
+engine to `candidates`, or dedupe and ordering are untested.
 
 ## Files
 

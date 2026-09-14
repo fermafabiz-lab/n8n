@@ -15,6 +15,20 @@ These each cost hours. Do not rediscover them.
   snapshot from when it started. Publishing a fix does *not* affect work
   already in flight — only new executions. When a fix "didn't work", check
   whether the execution predates it before assuming the fix is wrong.
+  **This collides with the regenerate buttons, and the collision is silent.**
+  Video regeneration has no webhook of its own: it is the batch's own job
+  (`If Video Regen Pending` → … → `Submit Video Regen`), so while a batch is
+  alive every regenerate click the producer makes is executed by whatever code
+  that batch loaded, however old. On 2026-09-14 a night of prompt fixes was
+  published against a batch that had started 57 minutes before the first of
+  them; the producer regenerated, got a clip with the very artefacts the fixes
+  removed, and reasonably reported that nothing had changed. Nothing in the
+  site or in n8n says which version answered. **Before telling anyone a
+  pipeline fix is live, check `search_executions` for a batch that predates it
+  — and say so in the same breath.** The database half of a fix (a repaired
+  stored prompt) DOES reach such a batch, because prompts are read fresh per
+  submit; only node bodies are frozen. Full account:
+  `db/port/motion-permanence/stale-execution/`.
 - **`waiting` means alive, not idle.** Work paused in a Wait node reports as
   `waiting`. Polling loops spend most of their life there. Treating it as
   "nothing is running" produces duplicate concurrent executions.

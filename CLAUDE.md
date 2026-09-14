@@ -166,6 +166,14 @@ the full entry in the file named:
   unaffected; a transaction-batched node must base64-encode every literal
   instead of dollar-quoting it. Full account: `docs/lessons-n8n.md`, "The
   write mechanism: dollar-quoting, not parameters".
+- **A pipeline fix does not reach a batch that is already running, and the
+  regenerate buttons hide that.** Executions are version-pinned; video regen is
+  the batch's own job, not a webhook. So a producer clicking "regenerate" during
+  a 12-hour-old batch is served 12-hour-old code and is given no sign of it —
+  which looks exactly like "your fix did not work". Repaired STORED PROMPTS do
+  reach it (read fresh per submit); node bodies do not. Check
+  `search_executions` before claiming a fix is live. Full account:
+  `db/port/motion-permanence/stale-execution/` and `docs/lessons-n8n.md`.
 - **`runData` is EMPTY for the whole life of a healthy running execution.**
   You cannot watch progress through the API — wait for it to end.
   `docs/lessons-n8n.md`, "n8n" section.

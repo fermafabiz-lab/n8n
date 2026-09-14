@@ -278,6 +278,25 @@ expected and harmless for an app touching only its own Drive.
 
 ## Open work
 
+- **A MERGE TO THE TRUNK IS A RAILWAY DEPLOY, and nothing in the repo says so.**
+  Railway's service config (project `ee89d76e`, service `651807a9`) watches
+  branch **`claude/hello-7o90qh` — the trunk** — with
+  `watchPatterns: ["/remotion/**"]` and `rootDirectory: /remotion`. So the rule
+  "never push to `remotion/**` while a render is running" is really "never MERGE
+  a branch touching `remotion/**` into the trunk while a render is running", and
+  the second form is the one that catches you, because merging feels like
+  bookkeeping. Check `search_executions` for running Media Generation / Final
+  Assembly work before merging such a branch, exactly as you would before a push.
+  (The site is the other half and behaves differently: `platform/**` deploys
+  through GitHub Actions, also off the trunk.)
+  **Currently held on this rule:** `claude/hello-7o90qh-qxhvos`, two commits,
+  one of which raises the contact sheet's sampling ceiling in
+  `remotion/server/inspect.mjs`. Media Generation `13033` has been at the café
+  film's video gate since 2026-09-13 21:35. Merge when it ends; the n8n half is
+  already live and safe in either order, because it asks for `interval=0.5` and
+  the old server silently clamps to `1`.
+
+
 - **The Veo direction work needs a real film to measure it** (2026-09-13,
   Media Generation `6a79f422`; full account `db/port/veo-direction/`, lessons
   in `docs/lessons-pipeline.md` under "Direction: why Veo played the shot

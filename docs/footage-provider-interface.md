@@ -7,7 +7,7 @@ in the registry.
 
 ```ts
 interface FootageProvider {
-  id: ArchiveProvider;              // one of the fifteen ids in the registry (lib/archive/types.ts)
+  id: ArchiveProvider;              // one of the sixteen ids in the registry (lib/archive/types.ts)
   displayName: string;
   enabled: boolean;                 // a getter where it depends on an env var (a key, a switch)
   disabledReason: string | null;    // names the key that is missing
@@ -91,6 +91,7 @@ The fields that were already there (`provider`, `providerAssetId`,
 | `pexels` | `providers/pexels.ts` | `PEXELS_API_KEY` | video + photos; Pexels License → `other_free`, cleared, no credit |
 | `pixabay` | `providers/pixabay.ts` | `PIXABAY_API_KEY` | video + photos; Pixabay Content License → `other_free`, cleared, no credit |
 | `unsplash` | `providers/unsplash.ts` | `UNSPLASH_ACCESS_KEY` | photos; `attribution_required` ("Photo by X on Unsplash"); `resolveDownload` calls `download_location` |
+| `destockd` | `providers/destockd.ts` | — | **imported from, never searched**: the FedFlix archive cut into 41,000+ shots with CLIP search, whose data endpoints are `Disallow: /api/` in robots.txt. A clip file is filed under `destockd` with the FedFlix rights basis and its own disclaimer; a `#/shot/<film>/<shot>` page is parsed from the FRAGMENT (it never reached a server) and resolved to the FedFlix item on archive.org |
 | `url_import` | `providers/urlImport.ts` | — | local only: searches the library rows an import created |
 | `user_upload` | `providers/upload.ts` | — | local only: searches the library rows an upload created |
 

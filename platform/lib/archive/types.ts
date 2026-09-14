@@ -50,6 +50,7 @@ export type ArchiveProvider =
   | "pexels"
   | "pixabay"
   | "unsplash"
+  | "destockd"
   | "url_import"
   | "user_upload"
   | (string & {});
@@ -69,6 +70,7 @@ export const ARCHIVE_PROVIDERS: readonly ArchiveProvider[] = [
   "pexels",
   "pixabay",
   "unsplash",
+  "destockd",
   "url_import",
   "user_upload",
 ];

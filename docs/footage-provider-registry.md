@@ -14,10 +14,10 @@ PROVIDERS = [
   internetArchive, europeana, loc, wikimedia, wellcome,  // archive
   flickr, openverse,                                     // community
   pexels, pixabay, unsplash,                             // stock
-  urlImport, userUpload,                                 // library
+  destockd, urlImport, userUpload,                       // library
 ]
 
-allProviders()          // the fifteen, in that order
+allProviders()          // the sixteen, in that order
 providerById(id)        // null for anything retired or unknown
 searchableProviders()   // enabled, not localOnly, can search video or image
 providerFilterOptions() // the picker's chips: {id, label, enabled, reason, notice, tier}
@@ -44,7 +44,7 @@ into a fit for the request (`tierFit`).
 | `archive` | Internet Archive, Europeana, LoC, Wikimedia, Wellcome | dated material with a rights statement per item: **+2** on a historical request, **+1** on any named event, and **+2** more for claiming `general`, which makes it the fallback for everything |
 | `community` | Flickr, Openverse | photographs of the day: **+1** on a recent event or a place; on history only if it has some (+0.5), else out |
 | `stock` | Pexels, Pixabay, Unsplash | generic present-day B-roll: **+1** only when the scene names NO event, does not demand one, and wants pictures; **never otherwise** — a real clip of the wrong thing is not real footage of anything |
-| `library` | URL import, uploads | never routed; the engine's library-first pass reads their rows |
+| `library` | Destockd, URL import, uploads | never routed; the engine's library-first pass reads their rows. Destockd is here for a reason of its own — its data endpoints are `Disallow: /api/` in robots.txt, so it may be imported from and never searched (`footage-sources.md`) |
 
 ## Categories
 
@@ -61,6 +61,7 @@ into a fit for the request (`tierFit`).
 | `flickr` | events, places, people, politics, disaster, humanitarian, migration, history | 70 |
 | `openverse` | events, places, people, politics, history, science | 65 |
 | `pexels` / `pixabay` / `unsplash` | stock | 50 / 45 / 40 |
+| `destockd` | general, history, events, places, people, war, science, technology, aviation, space — read by nothing, since it is never routed | 60 |
 
 `requestCategories(request)` derives a request's categories from its
 structured fields (topic, event, place, country, people, organisations,

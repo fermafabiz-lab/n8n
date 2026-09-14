@@ -20,6 +20,9 @@
 export * from "./types";
 export { buildFootageRequest, generateSearchQueries } from "./request";
 export { allProviders, providerById, providerFilterOptions, requestCategories, routeProviders, searchableProviders, FootageProviderRegistry } from "./registry";
+// Destockd's two pure parsers: a page keeps its identity after the `#`, and a
+// clip keeps it in the filename. Exported so both are pinned by the checks.
+export { parseDestockdHash, splitClipFilename, DESTOCKD_RIGHTS_TEXT } from "./providers/destockd";
 export { validateRights, usableAutomatically, usableWithReview, renderable, attributionLine, USAGE_LABELS, FootageRightsValidator } from "./rights";
 export { matchSignals } from "./match";
 export { assessProvenance, baseProvenance, PROVENANCE_WEIGHTS } from "./provenance";

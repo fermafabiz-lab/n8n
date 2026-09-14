@@ -30,6 +30,7 @@ X" on `/admin/footage` and in the picker rather than failing.
 | **Pexels** | `pexels` | stock | generic present-day B-roll, no event | video + image | `PEXELS_API_KEY` | off until keyed; written from the documented shape |
 | **Pixabay** | `pixabay` | stock | generic present-day B-roll, no event | video + image | `PIXABAY_API_KEY` | off until keyed; written from the documented shape |
 | **Unsplash** | `unsplash` | stock | generic present-day photographs | image | `UNSPLASH_ACCESS_KEY` | off until keyed; written from the documented shape |
+| **Destockd** | `destockd` | library | the FedFlix archive cut into 41,000+ individual SHOTS with CLIP visual search: US government films, 1910s–1990s | video | none | **imported from, never searched** — `Disallow: /api/` (below) |
 | URL import | `url_import` | library | any page that states its media and rights | both | — | local only |
 | Manual upload | `user_upload` | library | the producer's own files | both | — | local only |
 
@@ -158,6 +159,70 @@ owed; their licence text rides on every row). Unsplash is
 `resolveDownload` calls the photo's `download_location` first, as those
 guidelines require.
 
+### Destockd — imported from, never searched (2026-09-14)
+
+`https://destockd.com`, an independent project by Elroddd, unaffiliated with
+the Internet Archive, FedFlix or the US government. What it does is worth
+having: it takes the **FedFlix** collection — the US government films
+Public.Resource.Org digitised with the NTIS, which our `internet_archive`
+adapter already searches — **cuts every film into individual shots** and
+indexes each shot with CLIP, so a search reads the picture rather than the
+title. Its own About page states the problem it solves: *"A single archival
+file might contain twenty or thirty minutes of footage with no easy way to
+know what is inside."* 41,000+ shots, free, no account, no watermark, and no
+attribution required by Destockd itself.
+
+**It is not searched by the engine, and that is a decision rather than a
+gap.** Every data endpoint the site has lives under `/api/`, and its
+robots.txt (read 2026-09-14) says:
+
+```
+User-agent: *
+Allow: /
+Disallow: /api/
+```
+
+Keeping crawlers out of JSON is the common reason for that line, and it may
+well be all it means here. But it is the operator's stated instruction to
+automated clients about exactly the endpoints an adapter would call, and
+this engine does not argue with a stated policy — the same rule that keeps
+URL import away from logins, paywalls and signed URLs. **Asking is the way
+in**: the address is published (`contact@destockd.com`), and if the answer
+is yes, the adapter is a short one, because the endpoints are plain
+(`/api/search?q=&page=`, `/api/shot/{film}/{shot}`, `/api/film/{film}`,
+`/api/similar/…`, `/api/collections`, `/api/films`) and the result shape is
+`{film, shot, keyframe, preview, clip}`.
+
+Meanwhile the two doors that already exist do the work:
+
+- **A clip file** — the address behind *Download clip*, or the downloaded
+  file dropped into *Upload*. Filed under `destockd`, titled from the
+  filename (`Film Title - shot_0042.mp4` gives both halves), with the
+  FedFlix rights basis and Destockd's own disclaimer on the card.
+- **A shot or film page** — `https://www.destockd.com/#/shot/<film>/<shot>`.
+  A Destockd page keeps its identity after the `#`, which a browser never
+  sends to a server, so there is no page to read: the fragment is parsed
+  locally, the film is looked up in `collection:FedFlix` **on archive.org**,
+  and the Archive's own item comes back with correct identity, rights and a
+  file the render can fetch. The producer trims to the shot they saw with
+  the start and length controls the picker already has.
+
+**Rights are `pd` held at `manual_review`.** Destockd's legal page is
+explicit: it *"believes all hosted footage to be in the public domain in the
+United States or otherwise unrestricted"* on the FedFlix/government-production
+basis, has *"not independently cleared or verified the copyright status of
+every film, clip, or embedded element"*, and puts verification on the user;
+public-domain status also clears no model, property, trademark or publicity
+rights. That is a collection-wide POLICY, not a licence for one clip, and the
+house rule for a policy default is that a person confirms it per asset — the
+same treatment URL import gives a domain rule. So the suggestion run never
+offers a Destockd clip automatically, and one press of *Use — I accept the
+rights* is the producer taking that decision, recorded.
+
+Note the same footage is already reachable without any of this, at film
+level, through `internet_archive`: FedFlix is one of its `PD_COLLECTIONS`.
+What Destockd adds is the SHOT.
+
 ### EU Audiovisual Service — opt-in, and why
 
 The Commission publishes no developer API. Fetched from n8n, the search page
@@ -235,7 +300,7 @@ left unset.
 - The `Archive Suggestions` prompt (n8n, active `a3278855` since
   2026-09-10) names the new sources and adds the `stockshots` footage type
   for event-less B-roll.
-- `npm run check:footage`: 186 checks, the nine new normalizers pinned on
+- `npm run check:footage`: 205 checks, the nine new normalizers pinned on
   the real responses above (fixtures for the four keyed ones from the
   documented shapes), URL import skipping a provider that is off, both
   Openverse modes with the anonymous budget, and the router's `skip`.

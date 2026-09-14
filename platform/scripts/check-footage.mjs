@@ -186,7 +186,7 @@ truthy('authored queries go first', F.generateSearchQueries({ ...req, queries: [
 // ---------------------------------------------------------------------------
 console.log('\n--- registry & router ---');
 const ids = F.allProviders().map((p) => p.id);
-check('the fifteen providers, in registry order', ids, ['eu_av', 'dvids', 'nasa', 'internet_archive', 'europeana', 'loc', 'wikimedia', 'wellcome', 'flickr', 'openverse', 'pexels', 'pixabay', 'unsplash', 'url_import', 'user_upload']);
+check('the sixteen providers, in registry order', ids, ['eu_av', 'dvids', 'nasa', 'internet_archive', 'europeana', 'loc', 'wikimedia', 'wellcome', 'flickr', 'openverse', 'pexels', 'pixabay', 'unsplash', 'destockd', 'url_import', 'user_upload']);
 check('ARCHIVE_PROVIDERS is the same list', [...archive.ARCHIVE_PROVIDERS], ids);
 truthy('every entry is a real adapter, none a placeholder', F.allProviders().every((p) => typeof p.search === 'function' && typeof p.checkRights === 'function' && p.tier));
 check('an id the registry does not know is not a provider', F.providerById('legacy_archive'), null);
@@ -568,6 +568,43 @@ delete process.env.PEXELS_API_KEY;
 world['www.pexels.com'] = async () => [200, page(''), 'text/html'];
 imp = await F.importFootageFromUrl('https://www.pexels.com/video/a-city-at-night-12345/');
 check('a page from a provider that is off goes through the generic reader', [imp.via === 'provider', imp.asset.provider], [false, 'url_import']);
+
+// Destockd: a shot-level front end over FedFlix whose data endpoints are
+// Disallow: /api/ in robots.txt. Nothing here may reach that path — the clip
+// file is taken directly, and a page is resolved through the Internet
+// Archive, which we are allowed to search.
+const destockdCalls = [];
+world['www.destockd.com'] = async (url) => {
+  destockdCalls.push(url.pathname);
+  if (url.pathname.startsWith('/api/')) return new Error('the engine must never call a Disallow: /api/ path');
+  if (/\.mp4$/.test(url.pathname)) return [206, 'x', 'video/mp4'];
+  return [200, page(''), 'text/html'];
+};
+imp = await F.importFootageFromUrl('https://www.destockd.com/clips/The%20Big%20Picture%20-%20shot_0042.mp4');
+check('a Destockd clip file is filed under Destockd', [imp.via, imp.asset.provider, imp.asset.mediaType], ['provider', 'destockd', 'video']);
+check('and carries the film and the shot from its filename', imp.asset.title, 'The Big Picture — shot_0042');
+check('its rights are the FedFlix basis, held for review, credit not required', [imp.asset.licenseCode, imp.asset.reviewStatus, imp.asset.attributionRequired], ['pd', 'manual_review', false]);
+truthy('and the disclaimer it accepted is on the asset', /not independently verified/i.test(imp.asset.rightsText ?? ''));
+check('a filename with no shot half still names the film', F.splitClipFilename('Apollo%2011.mp4'), { film: 'Apollo 11', shot: null });
+check('the hash is the identity, since the server never sees it', F.parseDestockdHash(new URL('https://www.destockd.com/#/shot/The%20Big%20Picture/shot_0042')), { film: 'The Big Picture', shot: 'shot_0042' });
+check('a film page parses too', F.parseDestockdHash(new URL('https://www.destockd.com/#/film/The%20Big%20Picture')), { film: 'The Big Picture', shot: null });
+check('a page that names no shot or film yields nothing to look up', F.parseDestockdHash(new URL('https://www.destockd.com/#/faq')), null);
+// The page door: resolved to the FedFlix item on archive.org, never to /api/.
+const iaOrig = world['archive.org'];
+world['archive.org'] = async (url) => {
+  if (url.pathname === '/advancedsearch.php') {
+    truthy('the film is looked up inside FedFlix only', /collection:FedFlix/.test(url.searchParams.get('q') ?? ''));
+    return [200, { response: { numFound: 1, docs: [{ identifier: 'LC-44552', title: 'Brandenburg Gate Border Action, Berlin, Germany, 08/14/1961' }] } }];
+  }
+  return iaOrig(url);
+};
+imp = await F.importFootageFromUrl('https://www.destockd.com/#/shot/Brandenburg%20Gate%20Border%20Action%2C%20Berlin%2C%20Germany%2C%2008%2F14%2F1961/shot_7');
+check('a Destockd shot page comes back as the Internet Archive film it was cut from', [imp.via, imp.asset.provider, imp.asset.providerAssetId], ['provider', 'internet_archive', 'LC-44552']);
+truthy('and says which shot to trim to', /shot_7/.test(imp.asset.description ?? ''));
+world['archive.org'] = iaOrig;
+check('no request ever reached a disallowed path', destockdCalls.filter((p) => p.startsWith('/api/')), []);
+check('Destockd is never routed for a search', F.routeProviders(ceutaReq).some((r) => r.provider.id === 'destockd'), false);
+truthy('and it says why on its chip', /robots\.txt/.test(F.providerById('destockd')?.notice ?? ''));
 
 // ---------------------------------------------------------------------------
 // The legacy door, and the retired providers

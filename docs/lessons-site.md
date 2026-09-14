@@ -1106,6 +1106,25 @@ Fetch Scenes (GET, claims) → Build Query Prompt → Query Model → Parse Quer
   where to look**: a display cap, a request field and a model's judgement
   produce the identical symptom, and only re-running it end to end and
   reading what each stage ASKED FOR and was OFFERED tells them apart.
+- **A site with no API still has a door, and the door is the fragment**
+  (Destockd, 2026-09-14). The producer asked for `destockd.com`, a shot-level
+  front end over the FedFlix films our Internet Archive adapter already
+  searches: it cuts each film into shots and indexes them with CLIP, which is
+  exactly the thing the Archive cannot do. Three findings decided the shape.
+  Its robots.txt is `Allow: /` and `Disallow: /api/`, and every data endpoint
+  it has is under `/api/` — so the provider is `localOnly` and the router
+  never asks it; the way in is to email the operator, not to decide the line
+  was meant for someone else. Its pages are a hash router, so the identity of
+  a shot lives after the `#` and **never reaches a server** — which sounds
+  like a dead end and is the opposite: `new URL()` still has it, so a pasted
+  page is parsed locally and the film resolved against `collection:FedFlix`
+  on archive.org, a search we are allowed to run. And its own legal page
+  states a collection-wide public-domain basis while disclaiming per-clip
+  verification, which is a POLICY and not a licence, so the asset is `pd`
+  held at `manual_review` exactly like URL import's domain defaults.
+  **Read robots.txt and the legal page before designing an adapter** — both
+  are public, both are free to fetch, and between them they settled the
+  design before a line was written.
 - **The provider's NAME is the link now.** The card carried a chip saying
   where an asset came through and, separately, a "source ↗" in each
   caller's action row: two controls for one fact, and the one you could
@@ -1388,7 +1407,7 @@ spec. What belongs HERE is what will bite:
   the site's `@/` alias and extensionless imports (`./types` → `types.ts`,
   `@/lib/footage` → `index.ts`) and swaps `lib/data/stock` and
   `lib/data/postgres` for in-memory doubles; `check-footage.mjs` stubs
-  `globalThis.fetch` per hostname. `npm run check:footage`, 186 checks.
+  `globalThis.fetch` per hostname. `npm run check:footage`, 205 checks.
   Anything under `lib/footage/` that grows a new import path needs the
   loader to resolve it — Node knows neither the alias nor the missing
   extension. **A routing fixture must name no subject by accident**: "a

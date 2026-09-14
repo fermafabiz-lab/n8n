@@ -79,6 +79,25 @@ rights it states.
    row is `approved`, `rightsText` gains *Rights confirmed by the producer
    at import*, and `verified_note` says who.
 
+## Destockd: the one provider whose whole point is this door
+
+`destockd.com` is in the registry as a `library` provider that is never
+routed, because its data endpoints are `Disallow: /api/` in robots.txt
+(`footage-sources.md`). Its adapter exists only for imports, and it handles
+two shapes:
+
+- a clip file on its host → filed under `destockd`, titled from the
+  filename (`Film Title - shot_0042.mp4`), FedFlix rights, `manual_review`;
+- `#/shot/<film>/<shot>` → the identity is in the FRAGMENT, which never
+  reaches a server. It is parsed from the URL string, the film is resolved
+  against `collection:FedFlix` on archive.org, and the Archive's own item is
+  what comes back — so the row's provider is `internet_archive`, not
+  `destockd`, because that is genuinely where the media lives.
+
+**`canonicalUrl()` drops the fragment**, which is right for identity
+everywhere else and would erase a Destockd page's whole meaning — the
+adapter reads `url.hash` before anything canonicalises it.
+
 ## Provenance
 
 **An import is never authentic by import** (spec §25). `provenance` is

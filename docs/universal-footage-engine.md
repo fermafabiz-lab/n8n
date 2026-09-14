@@ -128,7 +128,7 @@ Secrets and Variables, written into `platform.env` by the deploy.
 `npm run check:footage` (in `platform/`) runs `scripts/check-footage.mjs`
 against the real engine with the network and the database mocked at their
 edges (`scripts/footage-loader.mjs` maps the `@/` alias and swaps
-`lib/data/stock` and `lib/data/postgres` for in-memory doubles). 186 checks:
+`lib/data/stock` and `lib/data/postgres` for in-memory doubles). 205 checks:
 request building, the registry and the tier router, the thirteen
 normalizers (nine of them pinned on real responses saved 2026-09-10, the
 four keyed stock/community ones on the documented shapes), rights,
@@ -153,7 +153,8 @@ platform/lib/footage/
   engine.ts       searchFootage, judge, fallbackPlan
   auth.ts         footageAuthorized, footageUsable
   providers/      euav, dvids, nasa · internetArchive, europeana, loc, wikimedia, wellcome
-                  · flickr, openverse · pexels, pixabay, unsplash · urlImport, upload
+                  · flickr, openverse · pexels, pixabay, unsplash
+                  · destockd, urlImport, upload
 ```
 
 The sources themselves — what each covers, what was measured on it, which

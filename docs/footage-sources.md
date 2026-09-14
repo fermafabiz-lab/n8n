@@ -209,11 +209,35 @@ told**. So the adapter is a polite client rather than a crawler, in code:
   it back.
 - **A User-Agent that names us and how to reach us**, so a look at their logs
   is enough to ask us to stop.
-- **403 or 429 is "stop", not "retry"** — it becomes a rate limit, which is a
-  fifteen-minute hold.
+- **429, or a 403 that is Destockd's own, is "stop", not "retry"** — it becomes
+  a rate limit, which is a fifteen-minute hold. A Cloudflare challenge is the
+  one exception, below.
 - The engine's own 6-hour cache sits in front of all of it.
 - `FOOTAGE_DESTOCKD=off` switches the search off in one repo Variable, and the
   import doors keep working.
+
+**Cloudflare sits in front of it in MANAGED mode, which SAMPLES — a challenge
+is a coin toss, not a verdict.** The first live search after the deploy came
+back `403` with `cf-mitigated: challenge`, and the adapter called that a rate
+limit and went dark for fifteen minutes. It was not a rate limit. Four
+requests from the same box, in the same minute, with the same identity,
+measured 2026-09-14:
+
+| User-Agent | result |
+|---|---|
+| our own `HouseOfVideos/1.0 (…)` | **200**, 48 clips (×3, one sampled `403`) |
+| n8n's default `axios/…` | **200**, 48 clips |
+| a Chrome-like string | **403**, `cf-mitigated: challenge`, every time |
+
+So **the honest bot User-Agent is both the polite option and the working
+one**, and a browser-shaped one is what gets blocked — do not ever "fix" a
+challenge by pretending to be a browser. `getJson` now retries a challenge
+exactly ONCE, as ourselves, counting the retry against the same per-minute
+budget; twice challenged throws a message that says *challenge* and
+deliberately avoids the words "rate limit", because `health.ts` greps for
+them and would apply the fifteen-minute hold instead of its ordinary five —
+and because that text reaches the admin page verbatim, where "rate limit
+reached" would tell the reader we had been impolite when we had not.
 
 **Still owed: tell the operator.** `contact@destockd.com` is published on the
 About page. One email saying who we are, what we fetch and at what rate is

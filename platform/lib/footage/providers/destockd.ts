@@ -36,8 +36,10 @@
  *     itself, before the request is made, and `health.ts` holds it back.
  *   - A User-Agent that names us and how to reach us, so a look at their
  *     logs is enough to ask us to stop.
- *   - 403 or 429 is treated as "stop", not as "retry": it becomes a rate
- *     limit, which holds the provider back for fifteen minutes.
+ *   - 429, or a 403 that is theirs rather than Cloudflare's, is treated as
+ *     "stop", not as "retry": it becomes a rate limit, which holds the
+ *     provider back for fifteen minutes. A Cloudflare MANAGED challenge is
+ *     the one exception and is retried exactly once — see `getJson`.
  *   - The engine's own 6-hour result cache sits in front of all of it.
  *
  * If the operator says no, `FOOTAGE_DESTOCKD=off` switches the search off in
@@ -219,19 +221,50 @@ export function normalizeDestockdResult(r: DestockdResult): NormalizedFootageAss
   };
 }
 
-async function getJson(url: URL | string, signal?: AbortSignal): Promise<unknown> {
+async function ask(url: URL | string, signal?: AbortSignal): Promise<Response> {
   spend();
-  const res = await fetch(url, {
+  return fetch(url, {
     headers: { "User-Agent": UA, Accept: "application/json" },
     signal: signal ?? AbortSignal.timeout(20_000),
   });
-  // A small site saying no. Not a thing to retry around: `health.ts` holds
-  // the provider back for fifteen minutes on a rate limit.
+}
+
+async function getJson(url: URL | string, signal?: AbortSignal): Promise<unknown> {
+  let res = await ask(url, signal);
+
+  // Destockd sits behind Cloudflare in MANAGED mode, which samples: the same
+  // request, same second, same identity, is served 200 once and answered with
+  // an interstitial the next. Measured 2026-09-14 — three requests from this
+  // box with our own UA returned 48 results each, one returned 403 with
+  // `cf-mitigated: challenge`. So a challenge is a COIN TOSS, not a verdict,
+  // and one honest retry is the right response. We do not solve the challenge,
+  // spoof a browser or change identity — that would be evasion; we simply ask
+  // again as ourselves, and `spend()` counts the retry against the same
+  // per-minute budget. (The measurement also showed a Chrome-like UA is
+  // challenged RELIABLY, while our own bot UA is usually let through — so
+  // honesty is both the polite option and the working one. Do not be tempted
+  // to "fix" this by pretending to be a browser.)
+  if (isChallenge(res)) res = await ask(url, signal);
+
+  // Twice challenged is a no. Say CHALLENGED, not "rate limit": `health.ts`
+  // reads the word "rate limit" out of the message and holds the provider
+  // back for fifteen minutes instead of its ordinary three-strikes five. It
+  // also reaches the admin page and the picker verbatim, and "rate limit
+  // reached" would tell the reader we had been impolite when we had not.
+  if (isChallenge(res)) {
+    throw new Error(`Destockd is behind a Cloudflare challenge right now (HTTP ${res.status})`);
+  }
+  // A genuine rate limit — theirs, not ours. Worth the longer hold-back.
   if (res.status === 429 || res.status === 403) {
     throw new Error(`Destockd rate limit reached (HTTP ${res.status})` + (await describeHttpError(res)));
   }
   if (!res.ok) throw new Error(`Destockd answered HTTP ${res.status}` + (await describeHttpError(res)));
   return res.json();
+}
+
+/** Cloudflare's own marker for an interstitial. Never a real answer from the site. */
+function isChallenge(res: Response): boolean {
+  return res.status === 403 && res.headers.get("cf-mitigated") === "challenge";
 }
 
 export const destockdProvider: FootageProvider = {

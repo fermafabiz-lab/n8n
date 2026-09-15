@@ -103,11 +103,11 @@
 }
 
 .status.err {
-  color: #9b2b1f;
+  color: var(--red-ink);
 }
 
 .status.ok {
-  color: #1f7a45;
+  color: var(--green-ink);
 }
 
 .preview {
@@ -146,19 +146,19 @@
 
 .rightsOk {
   background: color-mix(in srgb, #2e9e5b 12%, transparent);
-  color: #1f7a45;
+  color: var(--green-ink);
   border: 1px solid color-mix(in srgb, #2e9e5b 35%, transparent);
 }
 
 .rightsWarn {
   background: color-mix(in srgb, #d99a1e 14%, transparent);
-  color: #8a5f06;
+  color: var(--amber);
   border: 1px solid color-mix(in srgb, #d99a1e 40%, transparent);
 }
 
 .warn {
   margin: 0;
   font-size: 11.5px;
-  color: #8a5f06;
+  color: var(--amber);
   line-height: 1.45;
 }

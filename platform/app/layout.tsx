@@ -1,9 +1,11 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { IBM_Plex_Mono, Inter, Outfit } from "next/font/google";
 import NavMenu from "@/components/NavMenu";
 import ProductionTicker from "@/components/ProductionTicker";
 import StaleCopyBanner from "@/components/StaleCopyBanner";
+import { parseTheme, THEME_COLOR, THEME_COOKIE, themeAttribute } from "@/lib/theme";
 import "./globals.css";
 
 /**
@@ -56,9 +58,36 @@ export const metadata: Metadata = {
   description: "AI video production, supervised by you.",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+/**
+ * The theme is decided HERE, on the server, from the hov-theme cookie, and
+ * arrives as `data-theme` on <html> — so a dark page is dark on its first
+ * paint, with no script and no flash. "system" stamps nothing and leaves the
+ * decision to `color-scheme: light dark` in globals.css, i.e. the device.
+ * Reading the cookie makes every route dynamic; every page here already was,
+ * and the site sits behind a password anyway. lib/theme.ts owns the rest.
+ */
+async function currentTheme() {
+  return parseTheme((await cookies()).get(THEME_COOKIE)?.value);
+}
+
+/** The browser's own chrome (the tab strip on a phone) follows the choice. */
+export async function generateViewport(): Promise<Viewport> {
+  const theme = await currentTheme();
+  return {
+    themeColor:
+      theme === "system"
+        ? [
+            { media: "(prefers-color-scheme: light)", color: THEME_COLOR.light },
+            { media: "(prefers-color-scheme: dark)", color: THEME_COLOR.dark },
+          ]
+        : THEME_COLOR[theme],
+  };
+}
+
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const theme = await currentTheme();
   return (
-    <html lang="en">
+    <html lang="en" data-theme={themeAttribute(theme)}>
       <body className={`${display.variable} ${ui.variable} ${mono.variable}`}>
         <StaleCopyBanner />
         <div className="glow g1" />

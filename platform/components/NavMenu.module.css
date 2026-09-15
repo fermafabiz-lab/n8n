@@ -41,7 +41,7 @@
   padding: 8px;
   border-radius: var(--r-lg);
   border: 1px solid var(--line);
-  background: rgba(252, 252, 253, 0.96);
+  background: var(--glass-solid);
   backdrop-filter: blur(24px) saturate(1.5);
   box-shadow: var(--shadow-nav);
 }

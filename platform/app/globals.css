@@ -22,59 +22,129 @@
    every use site carries a fallback, so a font failure degrades instead of
    falling back to Times. */
 :root {
+  /* THE THEME LAYER. Every colour token below carries BOTH its values in one
+     light-dark() call, so each token has exactly one owner and there is no
+     second block to keep in lockstep. Which half is used is decided by
+     `color-scheme` on this element: `light dark` follows the device, and the
+     two data-theme values — stamped on <html> by layout.tsx from the
+     hov-theme cookie, chosen at /admin/customize — force one. light-dark()
+     is a <color> function, so it works inside a gradient stop or a shadow
+     colour; what it cannot be is a whole gradient or a shadow list, which is
+     why --card-fill, --shell and the shadows spell their stops out. Floor:
+     Chrome 123 / Safari 17.5 / Firefox 120 (spring 2024) — the same vintage
+     as the :has() and color-mix() this file already leans on.
+
+     A literal colour survives at a call site only where the surface is the
+     SAME in both themes: video overlays, the near-black panels' own
+     internals, the white pill on a dark panel. Anything that sits on the
+     page ground, a card or a chip reads a token. */
+  color-scheme: light dark;
+
   /* Ground. --bg and --card are interpolated INSIDE gradients at a few call
      sites, so both must stay flat colors — the cushioned card gradient is
-     --card-fill, applied where a card wants it. */
-  --bg: #ececed;
-  --bg2: #f7f7f9;
-  --card: #f4f4f7;
-  --card2: #fdfdfe;
-  --card-fill: linear-gradient(160deg, #fbfbfc, #e6e6ea);
-  --shell: radial-gradient(90% 70% at 18% 12%, #fdfdfe 0%, rgba(253, 253, 254, 0) 60%),
-    linear-gradient(154deg, #f2f2f5 0%, #e2e2e8 46%, #d3d3db 72%, #eeeef1 100%);
+     --card-fill, applied where a card wants it. The dark ground carries the
+     same faint violet cast as the ink it is mixed from, so a dark card is a
+     lighter step of the ground rather than a grey on a black. */
+  --bg: light-dark(#ececed, #121216);
+  --bg2: light-dark(#f7f7f9, #18181d);
+  --card: light-dark(#f4f4f7, #1b1b21);
+  --card2: light-dark(#fdfdfe, #232329);
+  --card-fill: linear-gradient(160deg, light-dark(#fbfbfc, #25252c), light-dark(#e6e6ea, #18181d));
+  /* The single light source in the upper left that the shells are lit by
+     (the handoff names it). In the dark it is a lift, not a white. */
+  --light-source: light-dark(#fdfdfe, #23232b);
+  --shell: radial-gradient(90% 70% at 18% 12%, var(--light-source) 0%, transparent 60%),
+    linear-gradient(154deg, light-dark(#f2f2f5, #1d1d23) 0%, light-dark(#e2e2e8, #16161b) 46%,
+      light-dark(#d3d3db, #101014) 72%, light-dark(#eeeef1, #19191f) 100%);
+  /* Recessed text fields, and the fill a list row takes on hover. */
+  --input-fill: light-dark(#f8f8fa, #15151a);
+  --hover-fill: light-dark(#efeef4, #2b2b34);
+  /* The raised thumb of a segmented control. By day it is the white card;
+     at night --card2 sits only one step above the track and the thumb read
+     as flat (seen on the theme picker), so it takes a step of its own. */
+  --raised: light-dark(#fdfdfe, #34343e);
+  /* Frosted pills (the nav, eyebrow bars, the cinema button): a near-white
+     at 86% over a blur. --glass-solid is the phone menu, which must not let
+     the page read through it. --glass-line is the bright top edge those
+     pills carry — it is a white hairline in both themes, and only its
+     strength changes. */
+  --glass: light-dark(rgba(252, 252, 253, 0.86), rgba(26, 26, 32, 0.82));
+  --glass-solid: light-dark(rgba(252, 252, 253, 0.96), rgba(26, 26, 32, 0.97));
+  --glass-line: light-dark(rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.1));
 
-  /* Hairlines, now ink-on-light. */
-  --line: rgba(24, 20, 40, 0.09);
-  --line2: rgba(24, 20, 40, 0.14);
-  --line-soft: rgba(24, 20, 40, 0.06);
+  /* Hairlines and faint fills are the INK at a low alpha — ink-on-light in
+     the day, white-on-dark at night — so every one of them mixes from
+     --tint and flips with it. The three named steps cover most call sites;
+     an odd alpha is written out as color-mix(in srgb, var(--tint) N%,
+     transparent) so the value stays visible where it is used. */
+  --tint: light-dark(#181428, #ffffff);
+  --line: color-mix(in srgb, var(--tint) 9%, transparent);
+  --line2: color-mix(in srgb, var(--tint) 14%, transparent);
+  --line-soft: color-mix(in srgb, var(--tint) 6%, transparent);
 
   /* Ink ramp. --dim is the faintest FUNCTIONAL step and is deliberately
      #63636e, not the #6f6f7c the handoff lists: at 77 call sites it lands on
      the page ground as often as on a white card, and #6f6f7c measures 3.95:1
      there — under 4.5. --faint is that lighter step, for labels that only ever
-     sit on --card2. --disabled is never for functional text. */
-  --ink: #2a2a30;
-  --soft: #55555e;
-  --dim: #63636e;
-  --faint: #6f6f7c;
-  --disabled: #a5a5b0;
+     sit on --card2. --disabled is never for functional text. The dark ramp
+     was measured the same way: --dim reads 6.9:1 on the ground and 5.8:1 on
+     a card, --faint 5.6 and 4.7. */
+  --ink: light-dark(#2a2a30, #ececf0);
+  --soft: light-dark(#55555e, #b4b4be);
+  --dim: light-dark(#63636e, #9c9ca8);
+  --faint: light-dark(#6f6f7c, #8b8b98);
+  --disabled: light-dark(#a5a5b0, #55555f);
+  /* The module stylesheets were written against a --muted that never
+     existed here and fell through to their own grey fallback; it is --dim. */
+  --muted: var(--dim);
 
   /* One hue, three steps: accent, mixed 42% toward #0f0f12, mixed 42% toward
      white. Every tint below is that same hue — reach for a token, never a
-     fresh rgba(). */
-  --accent: #7a4fd6;
+     fresh rgba(). At night the accent itself lifts one step (#7a4fd6 is
+     3.5:1 on the dark ground, too little for the mono labels it colours;
+     #9070e0 is 5.0), while --accent-deep and --accent-lift keep their values
+     because their job is the ends of the panel gradients, which are the same
+     panels in both themes. --accent-ink is the accent used as TEXT on a
+     tinted chip: the deep step by day, a pale one at night. */
+  --accent: light-dark(#7a4fd6, #9070e0);
   --accent-deep: #4d3484;
   --accent-lift: #b299e7;
-  --accent-a08: rgba(122, 79, 214, 0.08);
-  --accent-a12: rgba(122, 79, 214, 0.12);
-  --accent-a16: rgba(122, 79, 214, 0.16);
-  --accent-a22: rgba(122, 79, 214, 0.22);
-  --accent-a28: rgba(122, 79, 214, 0.28);
+  --accent-ink: light-dark(#4d3484, #c3adf0);
+  --accent-a08: light-dark(rgba(122, 79, 214, 0.08), rgba(144, 112, 224, 0.14));
+  --accent-a12: light-dark(rgba(122, 79, 214, 0.12), rgba(144, 112, 224, 0.18));
+  --accent-a16: light-dark(rgba(122, 79, 214, 0.16), rgba(144, 112, 224, 0.22));
+  --accent-a22: light-dark(rgba(122, 79, 214, 0.22), rgba(144, 112, 224, 0.28));
+  --accent-a28: light-dark(rgba(122, 79, 214, 0.28), rgba(144, 112, 224, 0.36));
   --accent-cast: 0 8px 20px rgba(122, 79, 214, 0.34);
 
   /* Status. The dark system's #1f9d63 / #d8483d / #2f6bd6 were tuned to glow
      on black and go chalky on light; these are the same signals at light-ground
-     contrast. */
-  --blue: #2f6bd6;
-  --green: #1f9d63;
-  --red: #d8483d;
+     contrast, and the night values lift them back (5.8 / 7.4 / 6.0 on the
+     ground). The -ink trio is the saturated text a pale chip carries, and the
+     chips are those pale near-opaque fills — pale by day, deep by night, with
+     the text flipping the other way. */
+  --blue: light-dark(#2f6bd6, #5b8ee8);
+  --green: light-dark(#1f9d63, #2fb976);
+  --red: light-dark(#d8483d, #ea6a5f);
+  --amber: light-dark(#8a5c0d, #e6b45a);
+  --green-ink: light-dark(#1f7a45, #5fd39a);
+  --red-ink: light-dark(#9b2b1f, #f08a80);
+  --chip-accent: light-dark(rgba(238, 231, 252, 0.94), rgba(58, 44, 96, 0.94));
+  --chip-green: light-dark(rgba(214, 240, 229, 0.92), rgba(22, 62, 44, 0.94));
+  --chip-red: light-dark(rgba(250, 226, 223, 0.92), rgba(84, 30, 26, 0.94));
+  --chip-amber: light-dark(rgba(250, 238, 214, 0.94), rgba(74, 56, 16, 0.94));
 
-  /* Dark panels — the near-black surfaces that punctuate the light ground. */
-  --panel: radial-gradient(120% 90% at 50% 120%, #4d3484 0%, #1a1a1f 55%, #0f0f12 100%);
+  /* Dark panels — the near-black surfaces that punctuate the light ground.
+     At night they cannot be darker than the ground without reading as holes,
+     so their two gradient ends step UP instead, and the hairline they carry
+     gets a little stronger. */
+  --panel-mid: light-dark(#1a1a1f, #262630);
+  --panel-end: light-dark(#0f0f12, #1b1b22);
+  --panel: radial-gradient(120% 90% at 50% 120%, var(--accent-deep) 0%, var(--panel-mid) 55%, var(--panel-end) 100%);
   --panel-ink: #f7f7f8;
   --panel-body: #b7b7c2;
-  --panel-line: rgba(255, 255, 255, 0.09);
-  --near-black: #17171a;
+  --panel-line: light-dark(rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.13));
+  --near-black: light-dark(#17171a, #2e2e37);
 
   --r-pill: 999px;
   --r-shell: 30px;
@@ -83,12 +153,17 @@
   --r-sm: 10px;
 
   /* Elevation, not darkness. --shadow-btn carries the inset lift highlight
-     that keeps a near-black pill from reading as a hole in the page. */
-  --shadow: 0 12px 28px rgba(24, 20, 40, 0.13);
-  --shadow-lg: 0 16px 38px rgba(24, 20, 40, 0.13);
-  --shadow-sm: 0 6px 16px rgba(24, 20, 40, 0.1);
-  --shadow-nav: 0 10px 30px rgba(24, 20, 40, 0.13);
-  --shadow-btn: 0 12px 26px rgba(23, 23, 26, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+     that keeps a near-black pill from reading as a hole in the page. At
+     night a shadow is cast in black and needs three to four times the alpha
+     to register at all; the per-site two-layer stacks mix their alpha from
+     --shadow-ink instead and keep their day values, because at night a card
+     is lifted by being LIGHTER than the ground, not by what it casts. */
+  --shadow-ink: light-dark(#181428, #000000);
+  --shadow: 0 12px 28px light-dark(rgba(24, 20, 40, 0.13), rgba(0, 0, 0, 0.5));
+  --shadow-lg: 0 16px 38px light-dark(rgba(24, 20, 40, 0.13), rgba(0, 0, 0, 0.55));
+  --shadow-sm: 0 6px 16px light-dark(rgba(24, 20, 40, 0.1), rgba(0, 0, 0, 0.4));
+  --shadow-nav: 0 10px 30px light-dark(rgba(24, 20, 40, 0.13), rgba(0, 0, 0, 0.5));
+  --shadow-btn: 0 12px 26px light-dark(rgba(23, 23, 26, 0.34), rgba(0, 0, 0, 0.6)), inset 0 1px 0 rgba(255, 255, 255, 0.14);
 
   /* One curve for everything that moves. --tr is the standard property set;
      the * reduced-motion rule in this file strips all of it, so anything
@@ -98,6 +173,13 @@
   --tr: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease),
     background var(--dur) var(--ease), color var(--dur) var(--ease),
     border-color var(--dur) var(--ease);
+}
+/* The two forced modes. No attribute means "follow the device". */
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 * {
@@ -302,8 +384,8 @@ body:has(.nb) .navfade {
   z-index: 0;
   background: radial-gradient(
     90% 70% at 18% 12%,
-    #fdfdfe 0%,
-    rgba(253, 253, 254, 0) 60%
+    var(--light-source) 0%,
+    transparent 60%
   );
 }
 
@@ -343,7 +425,7 @@ body:has(.nb) .nav {
   height: 56px;
   border-radius: 999px;
   border: 1px solid var(--line);
-  background: rgba(252, 252, 253, 0.86);
+  background: var(--glass);
   backdrop-filter: blur(24px) saturate(1.5);
   box-shadow: var(--shadow-nav);
 }
@@ -552,8 +634,8 @@ body:has(.nb) .nav {
    the chip has no contrast against the card it sits on. */
 .badge.wait {
   background: var(--accent-a12);
-  color: var(--accent-deep);
-  box-shadow: inset 0 0 0 1px rgba(122, 79, 214, 0.28);
+  color: var(--accent-ink);
+  box-shadow: inset 0 0 0 1px var(--accent-a28);
 }
 .badge.run {
   background: rgba(47, 107, 214, 0.12);
@@ -575,7 +657,7 @@ body:has(.nb) .nav {
    and the purple of the pipeline's own "needs you". */
 .badge.ready {
   background: rgba(176, 118, 20, 0.13);
-  color: #8a5c0d;
+  color: var(--amber);
   box-shadow: inset 0 0 0 1px rgba(176, 118, 20, 0.3);
 }
 .proj:hover .cover {
@@ -608,7 +690,7 @@ body:has(.nb) .nav {
 .track {
   height: 6px;
   border-radius: 6px;
-  background: rgba(24, 20, 40, 0.09);
+  background: var(--line);
   overflow: hidden;
   margin-bottom: 12px;
 }
@@ -745,7 +827,7 @@ body:has(.nb) .nav {
   gap: 7px;
   padding: 4px 12px 4px 10px;
   border-radius: var(--r-pill);
-  background: rgba(252, 252, 253, 0.86);
+  background: var(--glass);
   backdrop-filter: blur(18px);
   border: 1px solid var(--line);
   box-shadow: var(--shadow-sm);
@@ -792,7 +874,7 @@ body:has(.nb) .nav {
   width: 220px;
   height: 6px;
   border-radius: var(--r-pill);
-  background: rgba(24, 20, 40, 0.1);
+  background: color-mix(in srgb, var(--tint) 10%, transparent);
   overflow: hidden;
 }
 .wk-bar i {
@@ -1060,16 +1142,16 @@ body:has(.nb) .nav {
 @keyframes psglow {
   0%,
   100% {
-    box-shadow: 0 0 0 1px var(--accent-a12), 0 0 12px 2px rgba(122, 79, 214, 0.12), var(--shadow-sm);
+    box-shadow: 0 0 0 1px var(--accent-a12), 0 0 12px 2px var(--accent-a12), var(--shadow-sm);
   }
   50% {
-    box-shadow: 0 0 0 1px var(--accent-a28), 0 0 22px 6px rgba(122, 79, 214, 0.28), var(--shadow-sm);
+    box-shadow: 0 0 0 1px var(--accent-a28), 0 0 22px 6px var(--accent-a28), var(--shadow-sm);
   }
 }
 @keyframes psglowdark {
   0%,
   100% {
-    box-shadow: 0 0 0 1px rgba(178, 153, 231, 0.2), 0 0 14px 3px rgba(122, 79, 214, 0.22), var(--shadow-lg);
+    box-shadow: 0 0 0 1px rgba(178, 153, 231, 0.2), 0 0 14px 3px var(--accent-a22), var(--shadow-lg);
   }
   50% {
     box-shadow: 0 0 0 1px rgba(178, 153, 231, 0.42), 0 0 26px 9px rgba(122, 79, 214, 0.42), var(--shadow-lg);
@@ -1109,7 +1191,7 @@ body:has(.nb) .nav {
   color: var(--soft);
 }
 .ps.next .ic {
-  background: rgba(24, 20, 40, 0.06);
+  background: var(--line-soft);
   color: var(--dim);
 }
 
@@ -1263,7 +1345,7 @@ body:has(.nb) .nav {
   transition: var(--tr);
   color: var(--soft);
   background: var(--card2);
-  box-shadow: 0 1px 3px rgba(24, 20, 40, 0.06), 0 6px 16px rgba(24, 20, 40, 0.1);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--shadow-ink) 6%, transparent), 0 6px 16px color-mix(in srgb, var(--shadow-ink) 10%, transparent);
   /* The panel titles' own type: 12px, tracked, uppercase, 650 — the same
      treatment `.card h5` gives INSPECTOR, BULK REVIEW and SCENES. A chapter
      name labels the strip below it exactly as those label their cards, and
@@ -1277,7 +1359,7 @@ body:has(.nb) .nav {
 .fschap button:hover {
   color: var(--ink);
   transform: translateY(-2px);
-  box-shadow: 0 3px 7px rgba(24, 20, 40, 0.08), 0 12px 26px rgba(24, 20, 40, 0.15);
+  box-shadow: 0 3px 7px color-mix(in srgb, var(--shadow-ink) 8%, transparent), 0 12px 26px color-mix(in srgb, var(--shadow-ink) 15%, transparent);
 }
 .fschap button.on {
   color: var(--ink);
@@ -1427,7 +1509,7 @@ body:has(.nb) .nav {
 }
 .chip.wait {
   background: var(--accent-a16);
-  color: var(--accent-deep);
+  color: var(--accent-ink);
 }
 .chip.err {
   background: rgba(216, 72, 61, 0.15);
@@ -1456,7 +1538,7 @@ body:has(.nb) .nav {
   color: var(--soft);
 }
 .setupnote b {
-  color: var(--accent-deep);
+  color: var(--accent-ink);
   font-weight: 650;
 }
 .setupnote code {
@@ -1495,7 +1577,7 @@ body:has(.nb) .nav {
   background: linear-gradient(135deg, #7a4fd6, #4d3484);
   border-color: transparent;
   color: #f7f7f8;
-  box-shadow: 0 4px 18px rgba(122, 79, 214, 0.28);
+  box-shadow: 0 4px 18px var(--accent-a28);
 }
 .btn.gold:hover {
   box-shadow: 0 8px 26px var(--accent-a28);
@@ -1587,7 +1669,7 @@ body:has(.nb) .nav {
 .field select:focus,
 .field textarea:focus {
   border-color: var(--accent-a28);
-  box-shadow: 0 0 0 3px rgba(122, 79, 214, 0.12);
+  box-shadow: 0 0 0 3px var(--accent-a12);
 }
 .formmsg {
   font-size: 13.5px;
@@ -1771,7 +1853,7 @@ body:has(.nb) .nav {
     180deg,
     var(--bg) 0%,
     var(--bg) 86%,
-    rgba(236, 236, 237, 0) 100%
+    transparent 100%
   );
   -webkit-backdrop-filter: blur(9px) saturate(1.1);
   backdrop-filter: blur(9px) saturate(1.1);
@@ -1850,7 +1932,7 @@ body:has(.nb) .nav {
   border-top: 1px solid var(--line);
 }
 .plrow:hover {
-  background: rgba(24, 20, 40, 0.03);
+  background: color-mix(in srgb, var(--tint) 3%, transparent);
 }
 .plrow .th {
   width: 128px;
@@ -1887,11 +1969,11 @@ body:has(.nb) .nav {
   text-transform: uppercase;
   white-space: nowrap;
 }
-.plrow .st.wait { color: var(--accent-deep); }
+.plrow .st.wait { color: var(--accent-ink); }
 .plrow .st.run { color: var(--blue); }
 .plrow .st.done { color: var(--green); }
 .plrow .st.err { color: var(--red); }
-.plrow .st.ready { color: #8a5c0d; }
+.plrow .st.ready { color: var(--amber); }
 .plrow .st.idle { color: var(--dim); }
 
 /* --- collapsed error line --- */
@@ -2125,7 +2207,7 @@ body:has(.nb) .nav {
   transition: background 0.15s;
 }
 .catrow:hover {
-  background: rgba(24, 20, 40, 0.03);
+  background: color-mix(in srgb, var(--tint) 3%, transparent);
 }
 .catrow h4 {
   margin: 0;
@@ -2214,7 +2296,7 @@ body:has(.nb) .nav {
    rather than choice. */
 .pchip {
   background: var(--card2);
-  border: 1px solid rgba(24, 20, 40, 0.07);
+  border: 1px solid color-mix(in srgb, var(--tint) 7%, transparent);
   border-radius: var(--r-pill);
   padding: 10px 17px;
   cursor: pointer;
@@ -2359,13 +2441,13 @@ body:has(.nb) .nav {
      everything else is ground — and a two-layer cast (a tight contact shadow
      plus a wide soft one) is what reads as a card LIFTED off the surface
      rather than a panel tinted onto it. */
-  box-shadow: 0 2px 6px rgba(24, 20, 40, 0.06), 0 18px 44px rgba(24, 20, 40, 0.16);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--shadow-ink) 6%, transparent), 0 18px 44px color-mix(in srgb, var(--shadow-ink) 16%, transparent);
   padding: 30px 34px 34px;
   transition: var(--tr);
 }
 .brief .form > .fsec:hover {
   transform: translateY(-3px);
-  box-shadow: 0 4px 10px rgba(24, 20, 40, 0.07), 0 26px 60px rgba(24, 20, 40, 0.2);
+  box-shadow: 0 4px 10px color-mix(in srgb, var(--shadow-ink) 7%, transparent), 0 26px 60px color-mix(in srgb, var(--shadow-ink) 20%, transparent);
 }
 .brief .form > .fsec > header {
   border-bottom: none;
@@ -2637,9 +2719,9 @@ body:has(.nb) .nav {
 .skel {
   background: linear-gradient(
     100deg,
-    rgba(24, 20, 40, 0.05) 40%,
-    rgba(24, 20, 40, 0.09) 50%,
-    rgba(24, 20, 40, 0.05) 60%
+    color-mix(in srgb, var(--tint) 5%, transparent) 40%,
+    var(--line) 50%,
+    color-mix(in srgb, var(--tint) 5%, transparent) 60%
   );
   background-size: 300% 100%;
   border-radius: 8px;
@@ -2883,64 +2965,6 @@ body:has(.nb) .nav {
 .adminsec {
   margin-top: 44px;
 }
-.sechead.sub h3 {
-  font-family: var(--font-display), sans-serif;
-  font-size: 21px;
-  letter-spacing: -0.01em;
-  margin: 0 0 6px;
-}
-.sechead.sub p {
-  color: var(--soft);
-  font-size: 13.5px;
-  line-height: 1.55;
-  max-width: 68ch;
-  margin: 0;
-}
-.adminlist {
-  margin-top: 16px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  overflow: hidden;
-  background: var(--card);
-}
-.adminrow + .adminrow {
-  border-top: 1px solid var(--line);
-}
-.adminhead {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 13px 16px;
-  background: none;
-  border: 0;
-  color: var(--ink);
-  cursor: pointer;
-  text-align: left;
-  font: inherit;
-}
-.adminhead:hover {
-  background: var(--card2);
-}
-.adminrow.open .adminhead {
-  background: var(--card2);
-}
-.adminhead .chev {
-  color: var(--dim);
-  font-size: 11px;
-  width: 10px;
-}
-.adminhead .atitle {
-  font-weight: 550;
-  font-size: 14.5px;
-}
-.adminhead .asub {
-  color: var(--soft);
-  font-size: 12.5px;
-}
-.adminhead .sp {
-  flex: 1;
-}
 .tag {
   font-size: 11px;
   letter-spacing: 0.03em;
@@ -2957,92 +2981,211 @@ body:has(.nb) .nav {
 .tag.off {
   color: var(--dim);
 }
-.adminform {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  padding: 6px 16px 20px;
-  border-top: 1px solid var(--line);
+
+/* ============================================================
+   Settings — a hub of sections and the panels behind them. The
+   three tables that were here left the site on 2026-09-15; the
+   hub reuses the page head above and adds only these.
+   ============================================================ */
+.settings .sechead {
+  margin-bottom: 26px;
 }
-.adminform .field.wide {
-  grid-column: 1 / -1;
-}
-.adminform .field small {
-  display: block;
-  margin-top: 5px;
+/* The way back to the hub: a small mono link above the title, in the same
+   voice as the eyebrows, so it reads as a location and not as a button. */
+.sback {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0 0 18px -4px;
+  font-family: var(--f-mono), ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
   color: var(--dim);
-  font-size: 11.5px;
-  line-height: 1.45;
+  text-decoration: none;
+  transition: color 0.15s;
 }
-.adminform textarea {
-  resize: vertical;
-  font-family: var(--font-mono), monospace;
-  font-size: 12.5px;
-  line-height: 1.55;
+.sback svg {
+  width: 14px;
+  height: 14px;
 }
-.switchline {
+.sback:hover {
+  color: var(--ink);
+}
+/* The four section cards: the same cushioned object as a pipeline step, at
+   the size of a thing you go INTO rather than a thing you glance at. */
+.sgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 16px;
+}
+.scard {
   display: flex;
   align-items: center;
-  gap: 9px;
-  color: var(--soft);
-  font-size: 13px;
-  padding: 9px 0;
+  gap: 16px;
+  padding: 20px 20px 20px 22px;
+  border-radius: var(--r-lg);
+  background: var(--card-fill);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+  color: var(--ink);
+  text-decoration: none;
+  transition: var(--tr);
 }
-.switchline input {
+.scard:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow);
+}
+.scard:active {
+  transform: translateY(-1px);
+}
+.sicon {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: var(--accent-a12);
+  color: var(--accent);
+}
+.sicon svg {
+  width: 20px;
+  height: 20px;
+}
+.stext {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+.slabel {
+  font-family: var(--f-display), var(--f-ui), sans-serif;
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+/* --soft, not --dim: the note sits on the cushioned gradient, which ends
+   darker than --card2, the only ground --faint is guaranteed on. */
+.snote {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--soft);
+}
+.schev {
+  flex: none;
   width: 16px;
   height: 16px;
-  accent-color: var(--accent);
-}
-.adminactions {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding-top: 4px;
-}
-.adminmsg {
-  font-size: 12.5px;
-}
-.adminmsg.ok {
-  color: var(--green);
-}
-.adminmsg.err {
-  color: var(--red);
-}
-.btn.addgenre {
-  margin-top: 16px;
-}
-.addgenreform {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 16px;
-  flex-wrap: wrap;
-}
-.addgenreform input {
-  flex: 1;
-  min-width: 260px;
-  padding: 10px 13px;
-  border-radius: var(--r-sm);
-  border: 1px solid var(--line2);
-  background: var(--card);
-  color: var(--ink);
-  font: inherit;
-  font-size: 13.5px;
-}
-.admin .empty {
-  padding: 18px 16px;
   color: var(--dim);
-  font-size: 13px;
+  transition: transform var(--dur) var(--ease);
+}
+.scard:hover .schev {
+  transform: translateX(3px);
+}
+
+/* A section with nothing in it says so in the eyebrow voice, on a card that
+   is deliberately quieter than the hub's — a placeholder should not compete
+   with the one panel that works. */
+.sempty {
+  max-width: 560px;
+  padding: 24px 26px 26px;
+  border-radius: var(--r-lg);
+  border: 1px dashed var(--line2);
+  color: var(--soft);
+}
+.sempty .eyebrow {
+  margin-bottom: 10px;
+  color: var(--dim);
+}
+.sempty p {
   margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  max-width: 48ch;
+}
+
+/* One setting: what it is on the left, the control on the right, on the
+   same card object as the hub. Stacks on a phone. */
+.srow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  padding: 24px 26px;
+  border-radius: var(--r-lg);
+  background: var(--card2);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+}
+.srow-text h3 {
+  margin: 0 0 6px;
+  font-family: var(--f-display), var(--f-ui), sans-serif;
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+.srow-text p {
+  margin: 0;
+  color: var(--soft);
+  font-size: 13.5px;
+  line-height: 1.55;
+  max-width: 52ch;
+}
+.themepick {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  flex: none;
+}
+/* The pace control's segmented pill, with an icon in each segment. */
+.themepick .seg button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  white-space: nowrap;
+}
+.themepick .seg button svg {
+  flex: none;
+}
+.themenote {
+  margin: 0;
+  max-width: 34ch;
+  text-align: right;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--dim);
 }
 
 @media (max-width: 720px) {
-  .adminform {
-    grid-template-columns: 1fr;
+  .srow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .themepick {
+    align-items: stretch;
+  }
+  .themepick .seg {
+    align-self: stretch;
+    justify-content: stretch;
+  }
+  /* Sized by their labels, not equal thirds: "Follow device" is twice the
+     width of "Dark", and equal thirds folded it onto two lines at 390px. */
+  .themepick .seg button {
+    flex: 1 1 auto;
+    justify-content: center;
+    padding: 9px 10px;
+    font-size: 13px;
+  }
+  .themenote {
+    text-align: left;
+    max-width: none;
   }
 }
-
 
 /* ============================================================
    The brief's rail (handoff Start screen): dark estimate panel
@@ -3074,8 +3217,8 @@ body:has(.nb) .nav {
   flex-direction: column;
   height: 100%;
   border-radius: 28px;
-  background: radial-gradient(120% 100% at 100% 0%, var(--accent-deep) 0%, #1a1a1f 55%, #0f0f12 100%);
-  box-shadow: 0 2px 6px rgba(24, 20, 40, 0.08), 0 22px 54px rgba(24, 20, 40, 0.26);
+  background: radial-gradient(120% 100% at 100% 0%, var(--accent-deep) 0%, var(--panel-mid) 55%, var(--panel-end) 100%);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--shadow-ink) 8%, transparent), 0 22px 54px color-mix(in srgb, var(--shadow-ink) 26%, transparent);
   padding: 22px 24px 24px;
 }
 .nb-est .dpill {
@@ -3173,7 +3316,7 @@ body:has(.nb) .nav {
   border-radius: var(--r-pill);
   padding: 15px 0;
   transition: var(--tr);
-  color: var(--near-black);
+  color: #17171a;
   background: #fdfdfe;
   box-shadow: 0 12px 26px rgba(0, 0, 0, 0.32);
 }
@@ -3223,7 +3366,7 @@ body:has(.nb) .nav {
   cursor: pointer;
   color: var(--dim);
   background: transparent;
-  border: 1px dashed rgba(24, 20, 40, 0.2);
+  border: 1px dashed color-mix(in srgb, var(--tint) 20%, transparent);
   border-radius: var(--r-pill);
   padding: 7px 13px;
   transition: var(--tr);
@@ -3232,7 +3375,7 @@ body:has(.nb) .nav {
 .sug:hover {
   transform: translateY(-2px);
   color: var(--ink);
-  border-color: rgba(24, 20, 40, 0.34);
+  border-color: color-mix(in srgb, var(--tint) 34%, transparent);
 }
 
 /* The length card: big Outfit readout, a real slider, preset chips. */
@@ -3281,7 +3424,7 @@ body:has(.nb) .nav {
     90deg,
     #a887e6 0%,
     var(--accent) var(--fill, 50%),
-    rgba(24, 20, 40, 0.08) var(--fill, 50%)
+    color-mix(in srgb, var(--tint) 8%, transparent) var(--fill, 50%)
   );
   outline-offset: 6px;
   margin: 18px 0 14px;
@@ -3292,18 +3435,18 @@ body:has(.nb) .nav {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: #fdfdfe;
+  background: var(--card2);
   border: none;
-  box-shadow: 0 6px 16px rgba(122, 79, 214, 0.4), 0 1px 2px rgba(24, 20, 40, 0.2);
+  box-shadow: 0 6px 16px rgba(122, 79, 214, 0.4), 0 1px 2px color-mix(in srgb, var(--shadow-ink) 20%, transparent);
   cursor: grab;
 }
 .lenslider::-moz-range-thumb {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: #fdfdfe;
+  background: var(--card2);
   border: none;
-  box-shadow: 0 6px 16px rgba(122, 79, 214, 0.4), 0 1px 2px rgba(24, 20, 40, 0.2);
+  box-shadow: 0 6px 16px rgba(122, 79, 214, 0.4), 0 1px 2px color-mix(in srgb, var(--shadow-ink) 20%, transparent);
   cursor: grab;
 }
 
@@ -3312,7 +3455,7 @@ body:has(.nb) .nav {
   display: inline-flex;
   gap: 3px;
   padding: 4px;
-  background: rgba(24, 20, 40, 0.05);
+  background: color-mix(in srgb, var(--tint) 5%, transparent);
   border-radius: var(--r-pill);
   align-self: flex-start;
 }
@@ -3329,7 +3472,7 @@ body:has(.nb) .nav {
 }
 .seg button.on {
   color: var(--ink);
-  background: #fdfdfe;
+  background: var(--raised);
   box-shadow: var(--shadow-sm);
 }
 
@@ -3443,9 +3586,9 @@ body:has(.mkt) .vignette {
   display: flex;
   align-items: center;
   gap: 26px;
-  background: rgba(252, 252, 253, 0.86);
+  background: var(--glass);
   backdrop-filter: blur(18px);
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--glass-line);
   border-radius: var(--r-pill);
   padding: 9px 9px 9px 24px;
   box-shadow: var(--shadow-nav);
@@ -3499,8 +3642,8 @@ body:has(.mkt) .vignette {
   font-family: inherit;
   font-size: 14.5px;
   color: var(--ink);
-  background: #fdfdfe;
-  border: 1px solid rgba(24, 20, 40, 0.1);
+  background: var(--card2);
+  border: 1px solid color-mix(in srgb, var(--tint) 10%, transparent);
   border-radius: var(--r-pill);
   padding: 11px 22px;
   cursor: pointer;
@@ -3524,8 +3667,8 @@ body:has(.mkt) .vignette {
   border-radius: var(--r-pill);
   padding: 8px 18px;
   font-size: 13.5px;
-  background: rgba(252, 252, 253, 0.88);
-  border: 1px solid rgba(255, 255, 255, 0.8);
+  background: var(--glass);
+  border: 1px solid var(--glass-line);
   color: var(--accent);
   box-shadow: var(--shadow-sm);
 }
@@ -3661,9 +3804,9 @@ body:has(.mkt) .vignette {
   box-shadow: var(--shadow-btn);
 }
 .mkt-btn.light {
-  background: #fdfdfe;
+  background: var(--card2);
   color: var(--ink);
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--glass-line);
 }
 .mkt-btn.ghost {
   color: #e4e4ea;
@@ -3690,7 +3833,7 @@ body:has(.mkt) .vignette {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: #fdfdfe;
+  background: var(--card2);
   box-shadow: var(--shadow-sm);
   display: flex;
   align-items: center;
@@ -3714,7 +3857,7 @@ body:has(.mkt) .vignette {
   border-radius: var(--r-pill);
   padding: 7px 16px;
   font-size: 13.5px;
-  background: #fdfdfe;
+  background: var(--card2);
   color: var(--accent);
   box-shadow: var(--shadow-sm);
 }
@@ -3797,7 +3940,7 @@ body:has(.mkt) .vignette {
   font-weight: 500;
   letter-spacing: -0.035em;
   line-height: 1.1;
-  color: #6c6c78;
+  color: var(--faint);
   transition: var(--tr);
 }
 .mkt-step .no {
@@ -3808,7 +3951,7 @@ body:has(.mkt) .vignette {
 }
 .mkt-step.open {
   padding: 34px 36px 36px;
-  background: radial-gradient(120% 160% at 100% 0%, var(--accent-deep) 0%, #1a1a1f 52%, #0f0f12 100%);
+  background: radial-gradient(120% 160% at 100% 0%, var(--accent-deep) 0%, var(--panel-mid) 52%, var(--panel-end) 100%);
   box-shadow: var(--shadow-lg);
 }
 .mkt-step.open h3 {
@@ -3952,7 +4095,7 @@ body:has(.mkt) .vignette {
   font-size: clamp(48px, 5.8vw, 74px);
   font-weight: 500;
   letter-spacing: -0.05em;
-  color: rgba(42, 42, 48, 0.13);
+  color: color-mix(in srgb, var(--ink) 13%, transparent);
   line-height: 0.8;
   white-space: nowrap;
 }
@@ -3996,7 +4139,7 @@ body:has(.mkt) .vignette {
 .mkt-close {
   margin: 96px 8px 0;
   border-radius: var(--r-shell);
-  background: radial-gradient(110% 140% at 20% 0%, var(--accent-deep) 0%, #1a1a1f 55%, #0f0f12 100%);
+  background: radial-gradient(110% 140% at 20% 0%, var(--accent-deep) 0%, var(--panel-mid) 55%, var(--panel-end) 100%);
   box-shadow: var(--shadow-lg);
   padding: 76px 60px;
   display: flex;
@@ -4215,7 +4358,7 @@ body:has(.mkt) .vignette {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: #fdfdfe;
+  background: var(--card2);
   color: var(--accent);
   border-radius: var(--r-pill);
   padding: 7px 16px;
@@ -4241,16 +4384,16 @@ body:has(.mkt) .vignette {
   line-height: 1.55;
   color: var(--ink);
   background: var(--card2);
-  border: 1px solid rgba(24, 20, 40, 0.09);
+  border: 1px solid var(--line);
   border-radius: 16px;
   padding: 14px 16px;
-  box-shadow: inset 0 1px 2px rgba(24, 20, 40, 0.05);
+  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--shadow-ink) 5%, transparent);
   transition: var(--tr);
 }
 .nb-ta:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: inset 0 1px 2px rgba(24, 20, 40, 0.05), 0 0 0 3px var(--accent-a12);
+  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--shadow-ink) 5%, transparent), 0 0 0 3px var(--accent-a12);
 }
 .nb-ta::placeholder {
   color: var(--disabled);
@@ -4277,7 +4420,7 @@ body:has(.mkt) .vignette {
   border-radius: 18px;
   transition: var(--tr);
   background: var(--card2);
-  border: 1px solid rgba(24, 20, 40, 0.07);
+  border: 1px solid color-mix(in srgb, var(--tint) 7%, transparent);
   box-shadow: var(--shadow-sm);
 }
 .optcard:hover {
@@ -4285,7 +4428,7 @@ body:has(.mkt) .vignette {
   box-shadow: var(--shadow);
 }
 .optcard.on {
-  background: linear-gradient(160deg, var(--accent-deep), #14141a);
+  background: linear-gradient(160deg, var(--accent-deep), var(--panel-end));
   border-color: transparent;
   box-shadow: var(--shadow-lg);
 }
@@ -4516,7 +4659,7 @@ body:has(.mkt) .vignette {
 .pj-ghost {
   color: var(--ink);
   background: var(--card2);
-  border: 1px solid rgba(24, 20, 40, 0.09);
+  border: 1px solid var(--line);
   padding: 13px 22px;
   font-size: 13.5px;
   box-shadow: var(--shadow-sm);
@@ -4539,7 +4682,7 @@ body:has(.mkt) .vignette {
   padding: 20px 22px 22px;
   display: flex;
   flex-direction: column;
-  background: radial-gradient(130% 100% at 100% 0%, var(--accent-deep) 0%, #1a1a1f 52%, #0f0f12 100%);
+  background: radial-gradient(130% 100% at 100% 0%, var(--accent-deep) 0%, var(--panel-mid) 52%, var(--panel-end) 100%);
   box-shadow: var(--shadow-lg);
 }
 .pj-live .lhead {
@@ -4648,7 +4791,7 @@ body:has(.mkt) .vignette {
   position: relative;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  border-top: 1px solid rgba(24, 20, 40, 0.08);
+  border-top: 1px solid color-mix(in srgb, var(--tint) 8%, transparent);
   gap: 0;
   margin: 0;
 }
@@ -4658,7 +4801,7 @@ body:has(.mkt) .vignette {
   flex-direction: column;
   gap: 8px;
   border: none;
-  border-right: 1px solid rgba(24, 20, 40, 0.08);
+  border-right: 1px solid color-mix(in srgb, var(--tint) 8%, transparent);
   background: none;
   border-radius: 0;
   box-shadow: none;
@@ -4715,9 +4858,9 @@ body:has(.mkt) .vignette {
   padding: 12px 18px;
   border-radius: var(--r-pill);
   border-bottom: none;
-  background: rgba(252, 252, 253, 0.92);
+  background: var(--glass);
   backdrop-filter: blur(18px);
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--glass-line);
   box-shadow: var(--shadow-sm);
 }
 .page.pj .eyebrow.prow .ftabs {
@@ -4769,12 +4912,12 @@ body:has(.mkt) .vignette {
   overflow: hidden;
   background: var(--card-fill);
   border: none;
-  box-shadow: 0 2px 6px rgba(24, 20, 40, 0.06), 0 14px 34px rgba(24, 20, 40, 0.14);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--shadow-ink) 6%, transparent), 0 14px 34px color-mix(in srgb, var(--shadow-ink) 14%, transparent);
   transition: var(--tr);
 }
 .page.pj .proj:hover {
   transform: translateY(-4px);
-  box-shadow: 0 4px 10px rgba(24, 20, 40, 0.07), 0 24px 54px rgba(24, 20, 40, 0.2);
+  box-shadow: 0 4px 10px color-mix(in srgb, var(--shadow-ink) 7%, transparent), 0 24px 54px color-mix(in srgb, var(--shadow-ink) 20%, transparent);
 }
 /* aspect-ratio has to be cleared, not just overridden by height: the base rule
    sets 16/9, and an element with BOTH an aspect-ratio and a fixed height
@@ -4819,23 +4962,23 @@ body:has(.mkt) .vignette {
    chose, so its legibility cannot depend on what is behind it. */
 .page.pj .proj .badge.run,
 .page.pj .proj .badge.wait {
-  background: rgba(238, 231, 252, 0.94);
-  color: var(--accent-deep);
+  background: var(--chip-accent);
+  color: var(--accent-ink);
   box-shadow: none;
 }
 .page.pj .proj .badge.done {
-  background: rgba(214, 240, 229, 0.92);
-  color: #2b6b52;
+  background: var(--chip-green);
+  color: var(--green-ink);
   box-shadow: none;
 }
 .page.pj .proj .badge.err {
-  background: rgba(250, 226, 223, 0.92);
-  color: #a03c33;
+  background: var(--chip-red);
+  color: var(--red-ink);
   box-shadow: none;
 }
 .page.pj .proj .badge.ready {
-  background: rgba(250, 238, 214, 0.94);
-  color: #8a5c0d;
+  background: var(--chip-amber);
+  color: var(--amber);
   box-shadow: none;
 }
 .page.pj .proj .rt {
@@ -4881,7 +5024,7 @@ body:has(.mkt) .vignette {
 .page.pj .proj .track {
   height: 3px;
   border-radius: 3px;
-  background: rgba(24, 20, 40, 0.09);
+  background: var(--line);
   margin: 0;
 }
 .page.pj .proj .stepline {
@@ -4917,7 +5060,7 @@ body:has(.mkt) .vignette {
   padding: 8px 14px;
   border-radius: var(--r-pill);
   background: var(--card2);
-  border: 1px solid rgba(24, 20, 40, 0.09);
+  border: 1px solid var(--line);
   width: 218px;
   flex: none;
   color: var(--faint);
@@ -4943,7 +5086,7 @@ body:has(.mkt) .vignette {
   display: flex;
   border-radius: var(--r-pill);
   overflow: hidden;
-  border: 1px solid rgba(24, 20, 40, 0.09);
+  border: 1px solid var(--line);
   background: var(--card2);
   flex: none;
   gap: 0;
@@ -4991,7 +5134,7 @@ body:has(.mkt) .vignette {
   cursor: pointer;
   color: var(--ink);
   background: var(--card2);
-  border: 1px solid rgba(24, 20, 40, 0.09);
+  border: 1px solid var(--line);
   border-radius: var(--r-pill);
   padding: 9px 16px;
   box-shadow: var(--shadow-sm);
@@ -5126,7 +5269,7 @@ body:has(.mkt) .vignette {
     border-right: none;
   }
   .page.pj .stat:nth-child(n + 3) {
-    border-top: 1px solid rgba(24, 20, 40, 0.08);
+    border-top: 1px solid color-mix(in srgb, var(--tint) 8%, transparent);
   }
   .pgcur {
     display: inline;
@@ -5161,19 +5304,19 @@ body:has(.mkt) .vignette {
   border: none;
   border-radius: 18px;
   padding: 16px 18px !important;
-  box-shadow: 0 2px 5px rgba(24, 20, 40, 0.05), 0 12px 28px rgba(24, 20, 40, 0.12);
+  box-shadow: 0 2px 5px color-mix(in srgb, var(--shadow-ink) 5%, transparent), 0 12px 28px color-mix(in srgb, var(--shadow-ink) 12%, transparent);
   transition: var(--tr);
 }
 .reviewpanel .card.take:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 9px rgba(24, 20, 40, 0.06), 0 20px 44px rgba(24, 20, 40, 0.16);
+  box-shadow: 0 4px 9px color-mix(in srgb, var(--shadow-ink) 6%, transparent), 0 20px 44px color-mix(in srgb, var(--shadow-ink) 16%, transparent);
 }
 /* The playing take keeps the accent ring, but as a halo rather than a hard
    2px outline — the outline sat outside the shadow and cut a square corner
    across the rounded card. */
 .reviewpanel .card.take[style*="outline"] {
   outline: none !important;
-  box-shadow: 0 0 0 2px var(--accent), 0 12px 28px rgba(122, 79, 214, 0.22);
+  box-shadow: 0 0 0 2px var(--accent), 0 12px 28px var(--accent-a22);
 }
 
 /* The take's own controls sit on the white card, so they need a hairline to
@@ -5183,7 +5326,7 @@ body:has(.mkt) .vignette {
    white surface. Caught on a screenshot — "Approve scene" was invisible. */
 .reviewpanel .take .abtn:not(.ok) {
   background: var(--card2);
-  border: 1px solid rgba(24, 20, 40, 0.1);
+  border: 1px solid color-mix(in srgb, var(--tint) 10%, transparent);
   border-radius: var(--r-pill);
   box-shadow: var(--shadow-sm);
   transition: var(--tr);
@@ -5214,8 +5357,8 @@ body:has(.mkt) .vignette {
 /* The narration box inside a take: recessed, so the card reads as the object
    and the text as something set into it. */
 .reviewpanel .take textarea {
-  background: #f8f8fa;
-  border: 1px solid rgba(24, 20, 40, 0.09);
+  background: var(--input-fill);
+  border: 1px solid var(--line);
   border-radius: 12px;
   padding: 12px 14px;
   font-size: 14px;
@@ -5232,7 +5375,7 @@ body:has(.mkt) .vignette {
   padding: 15px 20px;
   border-radius: var(--r-pill);
   background: var(--card2);
-  border: 1px solid rgba(24, 20, 40, 0.09);
+  border: 1px solid var(--line);
   box-shadow: var(--shadow-sm);
   font-size: 14px;
   transition: var(--tr);
@@ -5259,7 +5402,7 @@ body:has(.mkt) .vignette {
 .reviewpanel .btn:not(.gold) {
   border-radius: var(--r-pill);
   background: var(--card2);
-  border: 1px solid rgba(24, 20, 40, 0.09);
+  border: 1px solid var(--line);
   box-shadow: var(--shadow-sm);
   transition: var(--tr);
 }
@@ -5287,13 +5430,13 @@ body:has(.mkt) .vignette {
   resize: vertical;
   font-family: inherit;
   color: var(--ink);
-  background: #f8f8fa;
-  border: 1px solid rgba(24, 20, 40, 0.09);
+  background: var(--input-fill);
+  border: 1px solid var(--line);
   border-radius: 16px;
   padding: 16px 18px;
   font-size: 14.5px;
   line-height: 1.7;
-  box-shadow: inset 0 1px 2px rgba(24, 20, 40, 0.05);
+  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--shadow-ink) 5%, transparent);
 }
 .ascript .btn {
   border-radius: var(--r-pill);
@@ -5323,7 +5466,7 @@ body:has(.mkt) .vignette {
   border: none;
   border-radius: 26px;
   padding: 14px;
-  box-shadow: 0 2px 5px rgba(24, 20, 40, 0.05), 0 16px 38px rgba(24, 20, 40, 0.13);
+  box-shadow: 0 2px 5px color-mix(in srgb, var(--shadow-ink) 5%, transparent), 0 16px 38px color-mix(in srgb, var(--shadow-ink) 13%, transparent);
   overflow: visible;
 }
 /* The frame the asset sits in. overflow:hidden is what rounds the video's
@@ -5431,10 +5574,10 @@ body:has(.mkt) .vignette {
 .stage .fr {
   border: none;
   border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(24, 20, 40, 0.06), 0 6px 16px rgba(24, 20, 40, 0.11);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--shadow-ink) 6%, transparent), 0 6px 16px color-mix(in srgb, var(--shadow-ink) 11%, transparent);
 }
 .stage .fr:hover {
-  box-shadow: 0 3px 7px rgba(24, 20, 40, 0.08), 0 12px 26px rgba(24, 20, 40, 0.16);
+  box-shadow: 0 3px 7px color-mix(in srgb, var(--shadow-ink) 8%, transparent), 0 12px 26px color-mix(in srgb, var(--shadow-ink) 16%, transparent);
 }
 .stage .fr.sel,
 .stage .fr.act {
@@ -5446,14 +5589,14 @@ body:has(.mkt) .vignette {
   background: var(--card2);
   border: none;
   border-radius: 22px;
-  box-shadow: 0 2px 5px rgba(24, 20, 40, 0.05), 0 14px 32px rgba(24, 20, 40, 0.12);
+  box-shadow: 0 2px 5px color-mix(in srgb, var(--shadow-ink) 5%, transparent), 0 14px 32px color-mix(in srgb, var(--shadow-ink) 12%, transparent);
 }
 /* Controls sitting on white need the hairline the grey card used to give
    them — and :not(.ok) so the primary action keeps its accent instead of
    being repainted white with a white label on it. */
 .stage .insp .abtn:not(.ok) {
   background: var(--card2);
-  border: 1px solid rgba(24, 20, 40, 0.1);
+  border: 1px solid color-mix(in srgb, var(--tint) 10%, transparent);
   border-radius: var(--r-pill);
   box-shadow: var(--shadow-sm);
   transition: var(--tr);
@@ -5468,10 +5611,10 @@ body:has(.mkt) .vignette {
 /* The two prompt fields are recessed into the card, like the narration box
    in a take: the card is the object, the text is set into it. */
 .stage .insp textarea {
-  background: #f8f8fa !important;
-  border: 1px solid rgba(24, 20, 40, 0.09) !important;
+  background: var(--input-fill) !important;
+  border: 1px solid var(--line) !important;
   border-radius: 14px !important;
-  box-shadow: inset 0 1px 2px rgba(24, 20, 40, 0.05);
+  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--shadow-ink) 5%, transparent);
 }
 /* A grid item's default `min-width: auto` refuses to shrink below its
    content's min-content width, so on a phone both columns kept their desktop
@@ -5534,7 +5677,7 @@ body:has(.mkt) .vignette {
   letter-spacing: 0;
   color: var(--ink);
   background: var(--card2);
-  border: 1px solid rgba(24, 20, 40, 0.1);
+  border: 1px solid color-mix(in srgb, var(--tint) 10%, transparent);
   box-shadow: var(--shadow-sm);
   transition: var(--tr);
 }
@@ -5602,7 +5745,7 @@ body:has(.mkt) .vignette {
   z-index: 5;
   border: 1px solid var(--line);
   border-radius: var(--r-pill);
-  background: rgba(252, 252, 253, 0.82);
+  background: var(--glass);
   backdrop-filter: blur(14px);
   color: var(--soft);
   font-family: var(--f-mono), ui-monospace, monospace;
@@ -5714,8 +5857,8 @@ body:has(.mkt) .vignette {
   padding: 14px 16px;
   border-radius: 16px;
   background: var(--card2);
-  border: 1px solid rgba(24, 20, 40, 0.09);
-  box-shadow: inset 0 1px 2px rgba(24, 20, 40, 0.05);
+  border: 1px solid var(--line);
+  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--shadow-ink) 5%, transparent);
 }
 .vtrow {
   display: grid;

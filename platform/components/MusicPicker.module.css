@@ -7,7 +7,7 @@
   border-radius: 20px;
   padding: 18px 20px;
   margin-top: 14px;
-  box-shadow: 0 8px 24px rgba(20, 18, 28, 0.05);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--shadow-ink) 5%, transparent);
 }
 
 .head {
@@ -32,7 +32,7 @@
 }
 
 .offNote {
-  color: #8a5c0d;
+  color: var(--amber);
 }
 
 .toggle {
@@ -48,7 +48,7 @@
   transition: background 0.38s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .toggle:hover {
-  background: #efeef4;
+  background: var(--hover-fill);
 }
 
 .body {
@@ -101,7 +101,7 @@
   justify-content: center;
 }
 .play:hover {
-  background: #efeef4;
+  background: var(--hover-fill);
 }
 
 .name {
@@ -131,7 +131,7 @@
   cursor: pointer;
 }
 .pick:hover {
-  background: rgba(122, 79, 214, 0.08);
+  background: var(--accent-a08);
 }
 .pick:disabled {
   opacity: 0.5;

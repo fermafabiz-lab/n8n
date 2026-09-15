@@ -8,8 +8,19 @@ import s from "./NavMenu.module.css";
 const LINKS = [
   { href: "/projects", label: "Projects", note: "the floor" },
   { href: "/admin/footage", label: "Footage", note: "archive library" },
-  { href: "/admin", label: "Settings", note: "genres, voices" },
+  { href: "/admin", label: "Settings", note: "account, appearance" },
 ];
+
+/**
+ * Which link the current path belongs to. Settings owns everything under
+ * /admin EXCEPT the footage library, which has its own link — a plain
+ * prefix test would light both for /admin/footage and neither for
+ * /admin/customize.
+ */
+function isOn(href: string, path: string): boolean {
+  if (href === "/admin") return path === "/admin" || (path.startsWith("/admin/") && !path.startsWith("/admin/footage"));
+  return path === href || path.startsWith(href + "/");
+}
 
 /**
  * The phone's way into the three sections the bar has no room for at 390px
@@ -68,7 +79,7 @@ export default function NavMenu() {
               key={l.href}
               href={l.href}
               role="menuitem"
-              className={`${s.link} ${path === l.href || (l.href !== "/admin" && path.startsWith(l.href)) ? s.on : ""}`}
+              className={`${s.link} ${isOn(l.href, path) ? s.on : ""}`}
               onClick={() => setOpen(false)}
             >
               {l.label}

@@ -212,6 +212,19 @@ the full entry in the file named:
 
 ## Conventions
 
+- **Every colour in `platform/app/globals.css` is one `light-dark()` token**
+  (since 2026-09-15 the site has a dark mode, chosen at `/admin/customize`
+  and carried as the `hov-theme` cookie). A literal colour is allowed only on
+  a surface that is the same in both themes — a video overlay, a near-black
+  panel's own internals — and says so in a comment. Never add a second
+  `[data-theme]` block of overrides: the token carries both values, which is
+  the whole point. `docs/lessons-site.md`, "Settings is a hub, and the site
+  has a night".
+- **The genre profiles, script library and script examples have NO screen
+  since 2026-09-15** (removed at the producer's call; Settings is a hub of
+  Account / Billing / Notifications / Customize now). Claude Scripting still
+  reads `hov.genre_profile` etc. — edit them in Postgres. The screens are in
+  git at `b5150fe` if wanted back.
 - Standalone webhooks over long-lived executions — they don't depend on a
   parent surviving.
 - Flags in Airtable drive UI states like "Regenerating".

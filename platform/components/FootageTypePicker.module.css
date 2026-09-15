@@ -34,13 +34,13 @@
    generated, or real. Everything else is detail. */
 .badge.ai {
   background: color-mix(in srgb, var(--accent) 14%, transparent);
-  color: var(--accent-deep);
+  color: var(--accent-ink);
   border-color: color-mix(in srgb, var(--accent) 38%, transparent);
 }
 
 .badge.real {
   background: color-mix(in srgb, #2e9e5b 14%, transparent);
-  color: #1f7a45;
+  color: var(--green-ink);
   border-color: color-mix(in srgb, #2e9e5b 40%, transparent);
 }
 
@@ -116,9 +116,9 @@
 }
 
 .msg.ok {
-  color: #1f7a45;
+  color: var(--green-ink);
 }
 
 .msg.err {
-  color: #9b2b1f;
+  color: var(--red-ink);
 }

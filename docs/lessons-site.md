@@ -1489,3 +1489,103 @@ spec. What belongs HERE is what will bite:
   quiet border town" was meant as the generic case and matched two
   categories, and the "stock is routed" test failed for the right reason.
 
+
+### Settings is a hub, and the site has a night (2026-09-15)
+
+The producer asked for two things in one breath: Settings should be "a few
+buttons like Account / Billing / Customize" with nothing in them yet, and
+Customize should hold a Dark Mode switch that turns "the whole site" dark.
+Asked before building, they chose: **remove** the three tables that were the
+old Settings page (genre profiles, script library, script examples — against
+my advice, so recorded as their call), the buttons Account / Billing /
+Notifications / Customize, and a three-way Light / Dark / Follow device.
+
+**The three tables have no screen any more.** `hov.genre_profile`,
+`hov.script_library` and `hov.script_example` are still read by Claude
+Scripting exactly as before; they are edited in Postgres now. `AdminRow`,
+`AddGenre` and `app/admin/actions.ts` are in git history (last at `b5150fe`)
+if they are ever wanted back; the data layer's `save*`/`create*` functions
+were left in place, so restoring is the three files plus the CSS block.
+
+**The theme layer is `light-dark()`, and that choice is the whole design.**
+Every colour token in `globals.css` carries both values in one call —
+`--bg: light-dark(#ececed, #121216)` — and which half applies is decided by
+`color-scheme` on `:root`: `light dark` follows the device, and
+`data-theme="light"|"dark"` on `<html>` forces one. So there is exactly ONE
+owner per token and no second block to keep in lockstep, which is the trap
+this file already pays for in three other places. The cost is a browser
+floor of spring 2024 (Chrome 123 / Safari 17.5 / Firefox 120), the same
+vintage as the `:has()` and `color-mix()` the file was already leaning on.
+`light-dark()` is a `<color>`, so it also works inside a gradient stop or a
+shadow colour; a whole gradient or shadow LIST cannot be one, which is why
+`--card-fill`, `--shell` and the five shadow tokens spell their stops out.
+
+**The choice travels as a cookie, and the server stamps it.** `hov-theme`
+(`light` / `dark` / `system`, a year, Lax) is read in `app/layout.tsx`, which
+puts `data-theme` on `<html>` — so a dark page arrives dark on its first
+paint, with no script and no white flash. A `localStorage` flag can only be
+read after the first paint, which IS the flash. Reading the cookie in the
+root layout makes every route dynamic; every page already was. `lib/theme.ts`
+is the single owner of the cookie name, the three values, the parse, and
+`applyTheme()` (attribute + cookie, `Secure` only over https — a Secure
+cookie set over plain http is dropped silently, which would make the toggle
+work everywhere except `next dev`). `generateViewport` sets
+`<meta theme-color>` from the same cookie so the phone's tab strip follows.
+"system" is stored explicitly rather than by deleting the cookie: a producer
+who chose to follow the device is then distinguishable from one who never
+opened the panel.
+
+**What "inverting" actually took, so it is not re-derived.** The Daylight
+header comment said it in 2026-08: an inversion is not a value swap. The
+literal count was the measure — 291 colour literals in `globals.css` and ~100
+across the module sheets — and the pass over them was one auditable script
+(`theme-pass.py` in that session's scratchpad; its rules are what matters):
+
+- **Ink-alpha is the tint, and the tint flips.** Every hairline and faint
+  fill was `rgba(24, 20, 40, α)` — ink on light. They now mix from `--tint`
+  (`light-dark(#181428, #fff)`): the three named steps `--line` / `--line2` /
+  `--line-soft` where the alpha matched, `color-mix(in srgb, var(--tint) N%,
+  transparent)` where it did not, so the value stays visible at the site.
+  **Shadows mix from `--shadow-ink` instead** (`light-dark(#181428, #000)`)
+  and keep their day alphas, because at night a card is lifted by being
+  LIGHTER than the ground, not by what it casts; only the five shadow tokens
+  themselves take a stronger night alpha.
+- **Some tokens have a ROLE, and the role decides the night value.**
+  `--accent-deep` is the deep end of every panel gradient, so it keeps its
+  value — and every `color: var(--accent-deep)` (chip text, 14 sites) moved
+  to a new `--accent-ink`, which is the deep step by day and a pale one at
+  night. Same for the pale near-opaque status chips on the project cards:
+  `--chip-*` flips pale→deep while `--green-ink` / `--red-ink` / `--amber`
+  flip the other way. And the near-black panels cannot be darker than a dark
+  ground without reading as holes, so `--panel-mid` / `--panel-end` step UP
+  at night and `--panel-line` gets stronger.
+- **A literal survives only where the surface is the same in both themes:**
+  video overlays, the near-black panels' internals, the white pill on the
+  brief's dark panel (`.nb-est .go` — its `--near-black` text became the
+  literal `#17171a` for the same reason), the two white tiles on the
+  landing's purple caps. Everything on the ground, a card or a chip reads a
+  token. The favicon tile (`ProductionTicker`) stays dark on purpose and was
+  never a page colour.
+- **The accent lifts one step at night** (`#7a4fd6` → `#9070e0`), measured:
+  the day accent is 3.5:1 on the dark ground, under the 4.5 the mono labels
+  it colours need; the lift reads 5.0. The dark ink ramp was measured the
+  same way (`--dim` 6.9 on the ground, 5.8 on a card). `--muted` now exists
+  as an alias of `--dim` because five module sheets were written against a
+  `--muted` that had never been defined and were falling through to a grey
+  fallback — unreadable on dark, and a silent bug by day.
+- **The segmented control's thumb needed its own token.** `--card2` is one
+  step above the track at night and the thumb read as flat on the theme
+  picker; `--raised` (`light-dark(#fdfdfe, #34343e)`) is that step. Found on
+  a screenshot, like the phone-width wrap of "Follow device" (equal thirds
+  folded it; the segments are sized by their labels under 720px now).
+
+**Verified in a real browser, not by reading CSS**: every screen (landing,
+projects, a project at every stage, the brief, footage, login, the four
+settings pages) at 1200 and 390 in light, dark and device-dark-with-no-cookie,
+and the picker clicked through — set, reload, another page, Follow device,
+then the device flipped under it — with the attribute, the cookie, the
+`color-scheme` and the `theme-color` meta read back at each step.
+
+**Rule from here: a colour literal in `globals.css` or a module sheet needs a
+sentence saying which both-theme surface it sits on.** Anything else is a
+token, and a token is one `light-dark()` — never a second block.

@@ -1551,13 +1551,30 @@ across the module sheets — and the pass over them was one auditable script
 
 - **Ink-alpha is the tint, and the tint flips.** Every hairline and faint
   fill was `rgba(24, 20, 40, α)` — ink on light. They now mix from `--tint`
-  (`light-dark(#181428, #fff)`): the three named steps `--line` / `--line2` /
-  `--line-soft` where the alpha matched, `color-mix(in srgb, var(--tint) N%,
-  transparent)` where it did not, so the value stays visible at the site.
-  **Shadows mix from `--shadow-ink` instead** (`light-dark(#181428, #000)`)
-  and keep their day alphas, because at night a card is lifted by being
-  LIGHTER than the ground, not by what it casts; only the five shadow tokens
-  themselves take a stronger night alpha.
+  (`light-dark(#181428, #fff)`): `color-mix(in srgb, var(--tint) N%,
+  transparent)` at the odd alphas, so the value stays visible at the site,
+  while the three named steps `--line` / `--line2` / `--line-soft` are
+  explicit pairs with a slightly stronger night alpha (11 / 17 / 7%),
+  because a card's edge is most of what says "card" on a dark ground.
+- **Every shadow is a `light-dark()` pair, and the night alpha is 4–5× the
+  day's — this was the third cut, and the producer's report is why.** The
+  first cut kept the day alphas at the ~40 per-site two-layer stacks on the
+  theory that a dark card is lifted by being lighter than the ground; the
+  report was exact — *"little to no contrast, the bubble effect disappears,
+  everything looks flat"*. Measured on the settings cards in composited
+  pixels, which is the only honest way: by day the card is 1.05× its ground
+  and the SHADOW makes the bubble, dipping 13% right under the card. On the
+  first night ground (`#121216`) the same shadow dipped 3%, because a black
+  shadow on a near-black ground has nowhere to go — and that is the whole
+  lesson: **on a dark ground, elevation cannot come from shadows unless the
+  ground leaves room under it.** So the ground is `#1a1a1f` (dark, with
+  room), the cards climb to `#26262d` / `#2e2e36` (1.17× and 1.30× the
+  ground — in perceptual L* the card step is five times the day's), every
+  shadow alpha is written out per theme (`0 18px 44px light-dark(rgba(24,
+  20, 40, .16), rgba(0, 0, 0, .72))`), and the four card shadow tokens carry
+  a one-pixel bright top edge at night (`--edge`, transparent by day) —
+  the other half of what makes a dark surface read as catching light.
+  `--shadow-ink` is gone; it only ever expressed the wrong idea.
 - **Some tokens have a ROLE, and the role decides the night value.**
   `--accent-deep` is the deep end of every panel gradient, so it keeps its
   value — and every `color: var(--accent-deep)` (chip text, 14 sites) moved
@@ -1586,10 +1603,11 @@ across the module sheets — and the pass over them was one auditable script
   landing's purple caps. Everything on the ground, a card or a chip reads a
   token. The favicon tile (`ProductionTicker`) stays dark on purpose and was
   never a page colour.
-- **The accent lifts one step at night** (`#7a4fd6` → `#9070e0`), measured:
+- **The accent lifts one step at night** (`#7a4fd6` → `#9a7ce4`), measured:
   the day accent is 3.5:1 on the dark ground, under the 4.5 the mono labels
-  it colours need; the lift reads 5.0. The dark ink ramp was measured the
-  same way (`--dim` 6.9 on the ground, 5.8 on a card). `--muted` now exists
+  it colours need; the lift reads 5.3 on the ground and 4.1 on a card. The
+  dark ink ramp was measured the same way (`--dim` 6.4 on the ground, 5.0
+  on a card, `--faint` 5.0 on the card it is reserved for). `--muted` now exists
   as an alias of `--dim` because five module sheets were written against a
   `--muted` that had never been defined and were falling through to a grey
   fallback — unreadable on dark, and a silent bug by day.

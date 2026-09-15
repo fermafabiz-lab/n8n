@@ -36,7 +36,7 @@ export function themeAttribute(theme: Theme): Theme {
 }
 
 /** The page ground each choice paints, for the browser's own chrome. */
-export const THEME_COLOR = { light: "#ececed", dark: "#121216" } as const;
+export const THEME_COLOR = { light: "#ececed", dark: "#1a1a1f" } as const;
 
 /**
  * Client only. Flips the page immediately (the attribute) and makes it stick

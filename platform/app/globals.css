@@ -54,43 +54,61 @@
      sites, so both must stay flat colors — the cushioned card gradient is
      --card-fill, applied where a card wants it. The dark ground carries the
      same faint violet cast as the ink it is mixed from, so a dark card is a
-     lighter step of the ground rather than a grey on a black. */
-  --bg: light-dark(#ececed, #121216);
-  --bg2: light-dark(#f7f7f9, #18181d);
-  --card: light-dark(#f4f4f7, #1b1b21);
-  --card2: light-dark(#fdfdfe, #232329);
-  --card-fill: linear-gradient(160deg, light-dark(#fbfbfc, #25252c), light-dark(#e6e6ea, #18181d));
+     lighter step of the ground rather than a grey on a black.
+
+     THE NIGHT LADDER IS WIDE ON PURPOSE. The first cut put the cards four to
+     nine steps above the ground (#121216 → #1b1b21 → #232329) and kept the
+     day shadow alphas, and the producer's report was exact: "little to no
+     contrast, the bubble effect disappears, everything looks flat". A dark
+     surface reads as lifted only when it is clearly lighter than what it
+     sits on AND casts a shadow dark enough to register on a dark ground.
+     Measured on the settings cards, composited pixels: by day the card is
+     1.05x the ground and the SHADOW does the work, dipping 13% right under
+     the card; on a #0f0f12 ground the same shadow dipped 3%, because a
+     black shadow on a near-black ground has nowhere to go. So the ground is
+     #1a1a1f — dark, but with room under it — the cards climb to #26262d /
+     #2e2e36 (1.17x and 1.30x the ground), and every shadow got a night
+     alpha of its own (see the elevation block). */
+  --bg: light-dark(#ececed, #1a1a1f);
+  --bg2: light-dark(#f7f7f9, #202026);
+  --card: light-dark(#f4f4f7, #26262d);
+  --card2: light-dark(#fdfdfe, #2e2e36);
+  --card-fill: linear-gradient(160deg, light-dark(#fbfbfc, #34343e), light-dark(#e6e6ea, #26262d));
   /* The single light source in the upper left that the shells are lit by
      (the handoff names it). In the dark it is a lift, not a white. */
-  --light-source: light-dark(#fdfdfe, #23232b);
+  --light-source: light-dark(#fdfdfe, #2a2a33);
   --shell: radial-gradient(90% 70% at 18% 12%, var(--light-source) 0%, transparent 60%),
-    linear-gradient(154deg, light-dark(#f2f2f5, #1d1d23) 0%, light-dark(#e2e2e8, #16161b) 46%,
-      light-dark(#d3d3db, #101014) 72%, light-dark(#eeeef1, #19191f) 100%);
-  /* Recessed text fields, and the fill a list row takes on hover. */
-  --input-fill: light-dark(#f8f8fa, #15151a);
-  --hover-fill: light-dark(#efeef4, #2b2b34);
+    linear-gradient(154deg, light-dark(#f2f2f5, #2b2b33) 0%, light-dark(#e2e2e8, #23232a) 46%,
+      light-dark(#d3d3db, #1c1c22) 72%, light-dark(#eeeef1, #26262d) 100%);
+  /* Recessed text fields, and the fill a list row takes on hover. A recess
+     at night is DARKER than the card it is set into, one step short of the
+     ground. */
+  --input-fill: light-dark(#f8f8fa, #1e1e24);
+  --hover-fill: light-dark(#efeef4, #383843);
   /* The raised thumb of a segmented control. By day it is the white card;
      at night --card2 sits only one step above the track and the thumb read
      as flat (seen on the theme picker), so it takes a step of its own. */
-  --raised: light-dark(#fdfdfe, #34343e);
+  --raised: light-dark(#fdfdfe, #42424d);
   /* Frosted pills (the nav, eyebrow bars, the cinema button): a near-white
      at 86% over a blur. --glass-solid is the phone menu, which must not let
      the page read through it. --glass-line is the bright top edge those
      pills carry — it is a white hairline in both themes, and only its
      strength changes. */
-  --glass: light-dark(rgba(252, 252, 253, 0.86), rgba(26, 26, 32, 0.82));
-  --glass-solid: light-dark(rgba(252, 252, 253, 0.96), rgba(26, 26, 32, 0.97));
-  --glass-line: light-dark(rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.1));
+  --glass: light-dark(rgba(252, 252, 253, 0.86), rgba(46, 46, 54, 0.86));
+  --glass-solid: light-dark(rgba(252, 252, 253, 0.96), rgba(46, 46, 54, 0.97));
+  --glass-line: light-dark(rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.12));
 
   /* Hairlines and faint fills are the INK at a low alpha — ink-on-light in
      the day, white-on-dark at night — so every one of them mixes from
-     --tint and flips with it. The three named steps cover most call sites;
-     an odd alpha is written out as color-mix(in srgb, var(--tint) N%,
-     transparent) so the value stays visible where it is used. */
+     --tint and flips with it. The three named steps cover most call sites
+     and carry a slightly stronger night alpha, because a card's edge is
+     most of what says "card" on a dark ground; an odd alpha is written out
+     as color-mix(in srgb, var(--tint) N%, transparent) so the value stays
+     visible where it is used. */
   --tint: light-dark(#181428, #ffffff);
-  --line: color-mix(in srgb, var(--tint) 9%, transparent);
-  --line2: color-mix(in srgb, var(--tint) 14%, transparent);
-  --line-soft: color-mix(in srgb, var(--tint) 6%, transparent);
+  --line: light-dark(rgba(24, 20, 40, 0.09), rgba(255, 255, 255, 0.11));
+  --line2: light-dark(rgba(24, 20, 40, 0.14), rgba(255, 255, 255, 0.17));
+  --line-soft: light-dark(rgba(24, 20, 40, 0.06), rgba(255, 255, 255, 0.07));
 
   /* Ink ramp. --dim is the faintest FUNCTIONAL step and is deliberately
      #63636e, not the #6f6f7c the handoff lists: at 77 call sites it lands on
@@ -102,7 +120,7 @@
   --ink: light-dark(#2a2a30, #ececf0);
   --soft: light-dark(#55555e, #b4b4be);
   --dim: light-dark(#63636e, #9c9ca8);
-  --faint: light-dark(#6f6f7c, #8b8b98);
+  --faint: light-dark(#6f6f7c, #9a9cab);
   --disabled: light-dark(#a5a5b0, #55555f);
   /* The module stylesheets were written against a --muted that never
      existed here and fell through to their own grey fallback; it is --dim. */
@@ -116,7 +134,7 @@
      because their job is the ends of the panel gradients, which are the same
      panels in both themes. --accent-ink is the accent used as TEXT on a
      tinted chip: the deep step by day, a pale one at night. */
-  --accent: light-dark(#7a4fd6, #9070e0);
+  --accent: light-dark(#7a4fd6, #9a7ce4);
   --accent-deep: #4d3484;
   --accent-lift: #b299e7;
   --accent-ink: light-dark(#4d3484, #c3adf0);
@@ -183,15 +201,20 @@
 
   /* Elevation, not darkness. --shadow-btn carries the inset lift highlight
      that keeps a near-black pill from reading as a hole in the page. At
-     night a shadow is cast in black and needs three to four times the alpha
-     to register at all; the per-site two-layer stacks mix their alpha from
-     --shadow-ink instead and keep their day values, because at night a card
-     is lifted by being LIGHTER than the ground, not by what it casts. */
-  --shadow-ink: light-dark(#181428, #000000);
-  --shadow: 0 12px 28px light-dark(rgba(24, 20, 40, 0.13), rgba(0, 0, 0, 0.5));
-  --shadow-lg: 0 16px 38px light-dark(rgba(24, 20, 40, 0.13), rgba(0, 0, 0, 0.55));
-  --shadow-sm: 0 6px 16px light-dark(rgba(24, 20, 40, 0.1), rgba(0, 0, 0, 0.4));
-  --shadow-nav: 0 10px 30px light-dark(rgba(24, 20, 40, 0.13), rgba(0, 0, 0, 0.5));
+     night a shadow is cast in black and needs four to five times the day
+     alpha to register at all — that holds for EVERY shadow, the five here
+     and the two-layer stacks written at their sites, which is why each one
+     is a light-dark() pair rather than a day alpha mixed from one ink. The
+     first cut kept day alphas at the sites and the cards went flat. The
+     four card shadows also carry a one-pixel bright top edge at night
+     (--edge), which is the other half of what makes a dark card read as a
+     surface catching light rather than a patch of a slightly different
+     grey; by day it is transparent and costs nothing. */
+  --edge: light-dark(transparent, rgba(255, 255, 255, 0.08));
+  --shadow: 0 12px 28px light-dark(rgba(24, 20, 40, 0.13), rgba(0, 0, 0, 0.65)), inset 0 1px 0 var(--edge);
+  --shadow-lg: 0 16px 38px light-dark(rgba(24, 20, 40, 0.13), rgba(0, 0, 0, 0.7)), inset 0 1px 0 var(--edge);
+  --shadow-sm: 0 6px 16px light-dark(rgba(24, 20, 40, 0.1), rgba(0, 0, 0, 0.6)), inset 0 1px 0 var(--edge);
+  --shadow-nav: 0 10px 30px light-dark(rgba(24, 20, 40, 0.13), rgba(0, 0, 0, 0.65)), inset 0 1px 0 var(--edge);
   --shadow-btn: 0 12px 26px light-dark(rgba(23, 23, 26, 0.34), rgba(0, 0, 0, 0.6)), inset 0 1px 0 rgba(255, 255, 255, 0.14);
 
   /* One curve for everything that moves. --tr is the standard property set;
@@ -1375,7 +1398,7 @@ body:has(.nb) .nav {
   transition: var(--tr);
   color: var(--soft);
   background: var(--card2);
-  box-shadow: 0 1px 3px color-mix(in srgb, var(--shadow-ink) 6%, transparent), 0 6px 16px color-mix(in srgb, var(--shadow-ink) 10%, transparent);
+  box-shadow: 0 1px 3px light-dark(rgba(24, 20, 40, 0.06), rgba(0, 0, 0, 0.27)), 0 6px 16px light-dark(rgba(24, 20, 40, 0.1), rgba(0, 0, 0, 0.45));
   /* The panel titles' own type: 12px, tracked, uppercase, 650 — the same
      treatment `.card h5` gives INSPECTOR, BULK REVIEW and SCENES. A chapter
      name labels the strip below it exactly as those label their cards, and
@@ -1389,7 +1412,7 @@ body:has(.nb) .nav {
 .fschap button:hover {
   color: var(--ink);
   transform: translateY(-2px);
-  box-shadow: 0 3px 7px color-mix(in srgb, var(--shadow-ink) 8%, transparent), 0 12px 26px color-mix(in srgb, var(--shadow-ink) 15%, transparent);
+  box-shadow: 0 3px 7px light-dark(rgba(24, 20, 40, 0.08), rgba(0, 0, 0, 0.36)), 0 12px 26px light-dark(rgba(24, 20, 40, 0.15), rgba(0, 0, 0, 0.67));
 }
 .fschap button.on {
   color: var(--ink);
@@ -2471,13 +2494,13 @@ body:has(.nb) .nav {
      everything else is ground — and a two-layer cast (a tight contact shadow
      plus a wide soft one) is what reads as a card LIFTED off the surface
      rather than a panel tinted onto it. */
-  box-shadow: 0 2px 6px color-mix(in srgb, var(--shadow-ink) 6%, transparent), 0 18px 44px color-mix(in srgb, var(--shadow-ink) 16%, transparent);
+  box-shadow: 0 2px 6px light-dark(rgba(24, 20, 40, 0.06), rgba(0, 0, 0, 0.27)), 0 18px 44px light-dark(rgba(24, 20, 40, 0.16), rgba(0, 0, 0, 0.72));
   padding: 30px 34px 34px;
   transition: var(--tr);
 }
 .brief .form > .fsec:hover {
   transform: translateY(-3px);
-  box-shadow: 0 4px 10px color-mix(in srgb, var(--shadow-ink) 7%, transparent), 0 26px 60px color-mix(in srgb, var(--shadow-ink) 20%, transparent);
+  box-shadow: 0 4px 10px light-dark(rgba(24, 20, 40, 0.07), rgba(0, 0, 0, 0.32)), 0 26px 60px light-dark(rgba(24, 20, 40, 0.2), rgba(0, 0, 0, 0.9));
 }
 .brief .form > .fsec > header {
   border-bottom: none;
@@ -3248,7 +3271,7 @@ body:has(.nb) .nav {
   height: 100%;
   border-radius: 28px;
   background: radial-gradient(120% 100% at 100% 0%, var(--panel-glow) 0%, var(--panel-mid) 55%, var(--panel-end) 100%);
-  box-shadow: 0 2px 6px color-mix(in srgb, var(--shadow-ink) 8%, transparent), 0 22px 54px color-mix(in srgb, var(--shadow-ink) 26%, transparent);
+  box-shadow: 0 2px 6px light-dark(rgba(24, 20, 40, 0.08), rgba(0, 0, 0, 0.36)), 0 22px 54px light-dark(rgba(24, 20, 40, 0.26), rgba(0, 0, 0, 0.9));
   padding: 22px 24px 24px;
 }
 .nb-est .dpill {
@@ -3469,7 +3492,7 @@ body:has(.nb) .nav {
   border-radius: 50%;
   background: var(--card2);
   border: none;
-  box-shadow: 0 6px 16px rgba(122, 79, 214, 0.4), 0 1px 2px color-mix(in srgb, var(--shadow-ink) 20%, transparent);
+  box-shadow: 0 6px 16px rgba(122, 79, 214, 0.4), 0 1px 2px light-dark(rgba(24, 20, 40, 0.2), rgba(0, 0, 0, 0.9));
   cursor: grab;
 }
 .lenslider::-moz-range-thumb {
@@ -3478,7 +3501,7 @@ body:has(.nb) .nav {
   border-radius: 50%;
   background: var(--card2);
   border: none;
-  box-shadow: 0 6px 16px rgba(122, 79, 214, 0.4), 0 1px 2px color-mix(in srgb, var(--shadow-ink) 20%, transparent);
+  box-shadow: 0 6px 16px rgba(122, 79, 214, 0.4), 0 1px 2px light-dark(rgba(24, 20, 40, 0.2), rgba(0, 0, 0, 0.9));
   cursor: grab;
 }
 
@@ -4419,13 +4442,13 @@ body:has(.mkt) .vignette {
   border: 1px solid var(--line);
   border-radius: 16px;
   padding: 14px 16px;
-  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--shadow-ink) 5%, transparent);
+  box-shadow: inset 0 1px 2px light-dark(rgba(24, 20, 40, 0.05), rgba(0, 0, 0, 0.23));
   transition: var(--tr);
 }
 .nb-ta:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--shadow-ink) 5%, transparent), 0 0 0 3px var(--accent-a12);
+  box-shadow: inset 0 1px 2px light-dark(rgba(24, 20, 40, 0.05), rgba(0, 0, 0, 0.23)), 0 0 0 3px var(--accent-a12);
 }
 .nb-ta::placeholder {
   color: var(--disabled);
@@ -4944,12 +4967,12 @@ body:has(.mkt) .vignette {
   overflow: hidden;
   background: var(--card-fill);
   border: none;
-  box-shadow: 0 2px 6px color-mix(in srgb, var(--shadow-ink) 6%, transparent), 0 14px 34px color-mix(in srgb, var(--shadow-ink) 14%, transparent);
+  box-shadow: 0 2px 6px light-dark(rgba(24, 20, 40, 0.06), rgba(0, 0, 0, 0.27)), 0 14px 34px light-dark(rgba(24, 20, 40, 0.14), rgba(0, 0, 0, 0.63));
   transition: var(--tr);
 }
 .page.pj .proj:hover {
   transform: translateY(-4px);
-  box-shadow: 0 4px 10px color-mix(in srgb, var(--shadow-ink) 7%, transparent), 0 24px 54px color-mix(in srgb, var(--shadow-ink) 20%, transparent);
+  box-shadow: 0 4px 10px light-dark(rgba(24, 20, 40, 0.07), rgba(0, 0, 0, 0.32)), 0 24px 54px light-dark(rgba(24, 20, 40, 0.2), rgba(0, 0, 0, 0.9));
 }
 /* aspect-ratio has to be cleared, not just overridden by height: the base rule
    sets 16/9, and an element with BOTH an aspect-ratio and a fixed height
@@ -5336,12 +5359,12 @@ body:has(.mkt) .vignette {
   border: none;
   border-radius: 18px;
   padding: 16px 18px !important;
-  box-shadow: 0 2px 5px color-mix(in srgb, var(--shadow-ink) 5%, transparent), 0 12px 28px color-mix(in srgb, var(--shadow-ink) 12%, transparent);
+  box-shadow: 0 2px 5px light-dark(rgba(24, 20, 40, 0.05), rgba(0, 0, 0, 0.23)), 0 12px 28px light-dark(rgba(24, 20, 40, 0.12), rgba(0, 0, 0, 0.54));
   transition: var(--tr);
 }
 .reviewpanel .card.take:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 9px color-mix(in srgb, var(--shadow-ink) 6%, transparent), 0 20px 44px color-mix(in srgb, var(--shadow-ink) 16%, transparent);
+  box-shadow: 0 4px 9px light-dark(rgba(24, 20, 40, 0.06), rgba(0, 0, 0, 0.27)), 0 20px 44px light-dark(rgba(24, 20, 40, 0.16), rgba(0, 0, 0, 0.72));
 }
 /* The playing take keeps the accent ring, but as a halo rather than a hard
    2px outline — the outline sat outside the shadow and cut a square corner
@@ -5468,7 +5491,7 @@ body:has(.mkt) .vignette {
   padding: 16px 18px;
   font-size: 14.5px;
   line-height: 1.7;
-  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--shadow-ink) 5%, transparent);
+  box-shadow: inset 0 1px 2px light-dark(rgba(24, 20, 40, 0.05), rgba(0, 0, 0, 0.23));
 }
 .ascript .btn {
   border-radius: var(--r-pill);
@@ -5498,7 +5521,7 @@ body:has(.mkt) .vignette {
   border: none;
   border-radius: 26px;
   padding: 14px;
-  box-shadow: 0 2px 5px color-mix(in srgb, var(--shadow-ink) 5%, transparent), 0 16px 38px color-mix(in srgb, var(--shadow-ink) 13%, transparent);
+  box-shadow: 0 2px 5px light-dark(rgba(24, 20, 40, 0.05), rgba(0, 0, 0, 0.23)), 0 16px 38px light-dark(rgba(24, 20, 40, 0.13), rgba(0, 0, 0, 0.58));
   overflow: visible;
 }
 /* The frame the asset sits in. overflow:hidden is what rounds the video's
@@ -5606,10 +5629,10 @@ body:has(.mkt) .vignette {
 .stage .fr {
   border: none;
   border-radius: 12px;
-  box-shadow: 0 1px 3px color-mix(in srgb, var(--shadow-ink) 6%, transparent), 0 6px 16px color-mix(in srgb, var(--shadow-ink) 11%, transparent);
+  box-shadow: 0 1px 3px light-dark(rgba(24, 20, 40, 0.06), rgba(0, 0, 0, 0.27)), 0 6px 16px light-dark(rgba(24, 20, 40, 0.11), rgba(0, 0, 0, 0.49));
 }
 .stage .fr:hover {
-  box-shadow: 0 3px 7px color-mix(in srgb, var(--shadow-ink) 8%, transparent), 0 12px 26px color-mix(in srgb, var(--shadow-ink) 16%, transparent);
+  box-shadow: 0 3px 7px light-dark(rgba(24, 20, 40, 0.08), rgba(0, 0, 0, 0.36)), 0 12px 26px light-dark(rgba(24, 20, 40, 0.16), rgba(0, 0, 0, 0.72));
 }
 .stage .fr.sel,
 .stage .fr.act {
@@ -5621,7 +5644,7 @@ body:has(.mkt) .vignette {
   background: var(--card2);
   border: none;
   border-radius: 22px;
-  box-shadow: 0 2px 5px color-mix(in srgb, var(--shadow-ink) 5%, transparent), 0 14px 32px color-mix(in srgb, var(--shadow-ink) 12%, transparent);
+  box-shadow: 0 2px 5px light-dark(rgba(24, 20, 40, 0.05), rgba(0, 0, 0, 0.23)), 0 14px 32px light-dark(rgba(24, 20, 40, 0.12), rgba(0, 0, 0, 0.54));
 }
 /* Controls sitting on white need the hairline the grey card used to give
    them — and :not(.ok) so the primary action keeps its accent instead of
@@ -5646,7 +5669,7 @@ body:has(.mkt) .vignette {
   background: var(--input-fill) !important;
   border: 1px solid var(--line) !important;
   border-radius: 14px !important;
-  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--shadow-ink) 5%, transparent);
+  box-shadow: inset 0 1px 2px light-dark(rgba(24, 20, 40, 0.05), rgba(0, 0, 0, 0.23));
 }
 /* A grid item's default `min-width: auto` refuses to shrink below its
    content's min-content width, so on a phone both columns kept their desktop
@@ -5890,7 +5913,7 @@ body:has(.mkt) .vignette {
   border-radius: 16px;
   background: var(--card2);
   border: 1px solid var(--line);
-  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--shadow-ink) 5%, transparent);
+  box-shadow: inset 0 1px 2px light-dark(rgba(24, 20, 40, 0.05), rgba(0, 0, 0, 0.23));
 }
 .vtrow {
   display: grid;

@@ -6,7 +6,7 @@
   border-radius: 22px;
   background: var(--card2);
   border: 1px solid var(--line);
-  box-shadow: 0 10px 26px color-mix(in srgb, var(--shadow-ink) 5%, transparent);
+  box-shadow: 0 10px 26px light-dark(rgba(24, 20, 40, 0.05), rgba(0, 0, 0, 0.23));
 }
 
 .head {

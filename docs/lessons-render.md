@@ -1790,6 +1790,14 @@ and the film pins the check.** `check-sar.mjs` was verified by removing
 `setsar` and watching it drop to 3/6 — a check never run against the bug it
 describes is a comment with a test runner attached.
 
+**Verified by the film, the same afternoon.** Railway deploy `b5e04c5e`, then
+the assemble webhook re-fired for `recC5uy63NuUgeHD7`: execution `13615`,
+13:53:28 → 13:59:00, **success in 5m 32s**, where the three before it died at
+37s, 43s and 35s. The project reads `Finalizat` with a `final_video_url`, and
+the render server's own log shows all nine scenes trimmed and the music
+ducked before the join it used to fail at. That is the proof the check
+cannot give.
+
 **2. A wedged upstream execution made the panel lie for hours.**
 `getAssemblyState` returned `upstream` BEFORE it looked for a recent failure,
 so while any worker execution was alive the failure branch was unreachable. A

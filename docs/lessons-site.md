@@ -1436,6 +1436,30 @@ spec. What belongs HERE is what will bite:
   short-circuits every external call; the cache (6 h) is the second
   short-circuit; a provider that fails three times in a row is held back
   five minutes, a 429 fifteen — in memory, per process.
+- **The admin strip's "N used" was a counter nobody incremented, and it read
+  as a verdict on the sources** (2026-09-13). `recordSelection` was written,
+  exported from `lib/footage/index.ts` — and called from nowhere, which a
+  grep for its name settles in one line. `attachStockToScene` marks the
+  ASSET (`stock_media.status = 'used'`); nothing ever told
+  `footage_provider_status.assets_selected`, so every provider on
+  `/admin/footage` read **0 used** while the database held six attached
+  assets and two live scenes. The producer looked at "733 results · 0 used"
+  across fifteen sources and reasonably concluded the archives never deliver
+  anything — and asked for MORE providers, which is the wrong end entirely.
+  Fixed by calling it once in `attachArchiveAsset`, right after the attach
+  transaction: that is the single door both "Use" buttons go through (the
+  picker via `actions.ts`, the suggestions bar and n8n via
+  `/api/archive/use`), verified by grepping every caller of
+  `attachStockToScene` before placing it. **Relevance is passed as `null`
+  on purpose** — the ranker's score is not carried that far, and reaching
+  for some other number in scope (the provenance confidence) would poison an
+  average that means something else; `recordSelection` already counts null
+  into neither sum nor n. **The general shape, and it is the third time this
+  file records it: a number on a dashboard is read as a fact about the
+  world, so a statistic that cannot go up is worse than one that is
+  missing.** Grep a new counter's call sites the day after shipping it, the
+  same way an `onError: continueRegularOutput` write needs its error path
+  checked.
 - **URL import is not a downloader.** Platform hosts (YouTube, Vimeo,
   TikTok, Facebook, Instagram, X, …) yield title and metadata only, no media
   URL, rights manual review by the platform's terms; `.m3u8`/`.mpd` are

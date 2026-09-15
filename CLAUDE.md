@@ -185,9 +185,14 @@ the full entry in the file named:
   motion-prompt tail lived in seven places across three workflows; a fix that
   touched two was reported as done and shipped half-broken. Before calling a
   prompt change complete, grep EVERY workflow JSON for a distinctive phrase from
-  the text you replaced. Guardrails are cheapest composed at submit time, where
-  one node owns them, rather than stored in the database where changing them
-  means a backfill.
+  the text you replaced — **and grep `db/port/*/paste/` too**, which is how the
+  FIFTH copy of the ambient-motion rule (`VP Rewrite AI`, Media Generation) was
+  found on 2026-09-15 after a grep of the two obvious workflows missed it. The
+  rule lives in `Segment Chapter Into Scenes`, `Rewrite Scene Text`, `Rewrite
+  Scene Standalone` (Claude Scripting), `HR Shots Prompt` (Hook Regen) and
+  `VP Rewrite AI` (Media Generation). Guardrails are cheapest composed at submit
+  time, where one node owns them, rather than stored in the database where
+  changing them means a backfill.
 - **Editing Options fields are refuse-then-clamp, never silently coerced** —
   the `normalize*` family in `platform/lib/data/derive.ts`, fixture-tested by
   `npm run check:normalize`. A value stored by the site, read by n8n and
@@ -277,6 +282,17 @@ refresh tokens after 7 days. The "Google hasn't verified this app" warning is
 expected and harmless for an app touching only its own Drive.
 
 ## Open work
+
+- **The sunbeam-dust fix has a mechanism and no outcome yet** (2026-09-15,
+  `db/port/still-air/README.md`, lessons in `docs/lessons-pipeline.md` under
+  "A shaft of light is not a cause"). The producer's "why does it generate these
+  particles" was real and measurable: 73 of 725 scenes across the last 40 films
+  asked for airborne dust, 29-33% on the worst. One sentence is now live in all
+  five copies of the ambient-motion rule. **What is owed is one measurement** —
+  re-run the query in that README on a film written after 2026-09-15; the
+  post-fix bucket should read 0, where it read 3.2% before. It is a prompt
+  change, so existing films keep their motes until those scenes' text is
+  regenerated.
 
 - **The Veo direction work needs a real film to measure it** (2026-09-13,
   Media Generation `6a79f422`; full account `db/port/veo-direction/`, lessons

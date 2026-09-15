@@ -1624,3 +1624,86 @@ would have contradicted a rule three lines above it. And both scene rewriters
 told the model to *"keep the style and mood words the current motion prompt ENDS
 WITH"* — on 368 of 504 rows the prompt ends with the old prohibition list, so
 "the style" it was pointed at was a list of things not to do.
+
+### A shaft of light is not a cause — 2026-09-15, LIVE
+
+The producer, over a frame of a black-and-white conference room with white specks
+hanging in the air: *"I dont understand why it generates this particles. It
+happens really often and it makes no sense."*
+
+Not the render — `FilmLayer.tsx` only adds grain, which is a flat noise field over
+the whole frame, not discrete specks that sit in a beam and drift. We asked for
+them, in words. That frame is scene 102 of the NASA film `recC5uy63NuUgeHD7`,
+whose stored `motion_prompt` reads *"…while **dust motes drift in window light**
+and the rest of the room remains still"*. Scene 1 of the same film manages the
+self-contradiction *"dust motes drifting in **still air**"*.
+
+**Measured before touching anything: 73 of 725 scenes across the last 40 films
+ask for airborne particulate — 10.1%, and 29-33% on the worst.** "Really often"
+was exact. Documentaries are worse than average because rooms, archives and
+hearing chambers are where a window and a shaft of light are.
+
+**The 09-13 ambient-motion rule above already catches most of this** — 10.4%
+before it, 3.2% after — **and the case that walked past it is the instructive
+one.** Café film `recXibIyVuLvMIqy3`, scene 110, written after the fix:
+
+> Slow dolly-in on a figure standing near frame left… **She stays where she is.**
+> Late afternoon sun through the window lies still across the empty tables, **with
+> dust motes turning slowly in the shaft of light. The chairs and tables hold
+> still.**
+
+Read as a report card that is a pass on every rule it was given: one action,
+nothing untouched moves, stated twice. It still put motes in the beam — not by
+ignoring the rule but because **it did not think the rule was about this.** The
+rule says INDOORS THERE IS NO WEATHER and lists paper, cloth, curtains, hanging
+signs and loose sheets. A sunbeam is not weather; it is lighting. And dust in a
+sunbeam is a photography cliché strong enough to survive a rule it does not
+obviously break.
+
+One sentence now closes it, in rule (c) between the weather sentence and *"If
+nothing in the shot is causing motion"*:
+
+> A SHAFT OF LIGHT IS NOT A CAUSE EITHER: "dust motes turning in the window
+> light" is the one piece of invented air movement that survives the sentence
+> above, because it reads as lighting rather than as weather — but motes only
+> move if the air moves, and indoors the air is still. Light falls, lies across a
+> surface and picks out an edge; it carries nothing.
+
+Three deliberate choices in how it is written, all reusable:
+
+- **It quotes the exact phrase the model keeps producing.** That is the only way
+  to close a gap the model does not believe is a gap — a general restatement of
+  the rule it already passed would change nothing. **This is the one place the
+  "never write a negation" rule does not apply**, and the distinction is worth
+  holding on to: that rule is about text reaching **Veo**. This text reaches
+  **gpt-5.4**, which is being asked what to write, not what to draw, and the
+  sentence never leaves the scripting model. Do not "fix" it into a noun list.
+- **It gives the mechanism, not the ban** ("motes only move if the air moves"),
+  so it generalises to smoke, pollen, embers, indoor snow and floating seeds
+  without listing them.
+- **It says what light DOES do**, positively — falls, lies across a surface,
+  picks out an edge — so the writer keeps a way to use the beam. A rule that only
+  takes something away gets routed around.
+
+**There are FIVE live copies of the ambient-motion rule, not four.** The entry
+above found `Segment Chapter Into Scenes`, `HR Shots Prompt`, `Rewrite Scene
+Text` and `Rewrite Scene Standalone`. The fifth is `VP Rewrite AI` in **Media
+Generation** — the content-filter repair — and it matters out of proportion to
+its traffic because it is the only node on that side that WRITES a motion prompt
+back to the database, so without the sentence it launders motes onto scenes the
+segmenter wrote clean. It was found from this repo's `paste/` copies after a grep
+of the two workflows I had open missed it, which is the CLAUDE.md warning landing
+again: **grep the repo's own port directory as well as the live workflows.**
+
+Full apply record, the per-film measurement, the four surviving prompts in full
+and the published version ids: `db/port/still-air/README.md`. Note the byte check
+there — four files grew by exactly 359 bytes and one by 361, because `Rewrite
+Scene Text` escapes its quotes as `\"` where `Rewrite Scene Standalone` writes a
+bare `"`, and the sentence contains one quoted phrase. **Detect each node's
+escaping style programmatically; do not assume the pair matches.**
+
+**Prompt-only, so existing films keep their motes.** The producer's NASA film
+holds its three until those scenes' text is regenerated (which goes through
+copies #2/#3, both fixed). And this is a fix with a mechanism and no outcome
+until a film written after 2026-09-15 is measured — re-run the query in that
+README and the post-fix bucket should read zero, not 3.2%.

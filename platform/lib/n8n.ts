@@ -270,6 +270,14 @@ export interface AssemblyState {
    * it, which is the one thing that actually costs work.
    */
   upstream: ExecutionSummary | null;
+  /**
+   * That upstream execution has been running far longer than any real pass —
+   * it is almost certainly wedged and no hand-over is coming.
+   *
+   * Advisory, deliberately: the panel changes what it SAYS, never what it
+   * does. See the note at the `upstream` branch in getAssemblyState.
+   */
+  upstreamStalled: boolean;
 }
 
 /**
@@ -279,7 +287,7 @@ export interface AssemblyState {
 export async function getAssemblyState(): Promise<AssemblyState> {
   // Can't see n8n at all — no verdict, never "stopped".
   if (!n8nConfigured)
-    return { running: null, failed: null, stopped: false, upstream: null };
+    return { running: null, failed: null, stopped: false, upstream: null, upstreamStalled: false };
   const isAssembly = (e: ExecutionSummary) =>
     e.workflowId === FINAL_ASSEMBLY_WORKFLOW_ID;
   const [runningNow, waitingNow] = await Promise.all([
@@ -298,15 +306,22 @@ export async function getAssemblyState(): Promise<AssemblyState> {
     ),
   ];
   const running = alive.find(isAssembly) ?? null;
-  if (running) return { running, failed: null, stopped: false, upstream: null };
+  if (running)
+    return { running, failed: null, stopped: false, upstream: null, upstreamStalled: false };
 
-  // Production is still upstream: media generation marks the project as
-  // assembling when it reaches the final-settings gate, long before there is
-  // any render to watch. That gap is normal, not a stopped render — but it is
-  // not a render either, so it is returned as itself rather than as silence.
-  const upstream = alive.find((e) => WORKER_WORKFLOWS.has(e.workflowId)) ?? null;
-  if (upstream) return { running: null, failed: null, stopped: false, upstream };
-
+  // A FAILURE OUTRANKS AN UPSTREAM EXECUTION, and the order is the whole
+  // lesson of 2026-09-15. It used to be the other way round: upstream was
+  // checked first and returned immediately, so the failure branch below was
+  // unreachable while ANY worker execution was alive. A Media Generation
+  // execution had been wedged in `running` since the previous evening, which
+  // made it alive forever — and so three Final Assembly executions failed
+  // forty seconds in, one after another, while the panel kept saying
+  // "Nothing is stuck: the render begins once that pass hands over" and
+  // counting the zombie's age up past seventeen hours. The producer waited.
+  //
+  // Nothing about a render that has already died is improved by knowing
+  // something else is running, so the death is reported first.
+  //
   // Only a failure from the last few minutes can belong to the render the
   // page is currently watching — executions carry no project id, so an older
   // one would be attributed to the wrong project.
@@ -315,13 +330,43 @@ export async function getAssemblyState(): Promise<AssemblyState> {
     (await getExecutions("error", 10)).find(
       (e) => isAssembly(e) && new Date(e.startedAt ?? 0).getTime() > recent,
     ) ?? null;
-  if (!failed)
-    return { running: null, failed: null, stopped: true, upstream: null };
+  if (failed)
+    return {
+      running: null,
+      failed: { ...failed, detail: await getExecutionError(failed.id) },
+      stopped: false,
+      upstream: null,
+      upstreamStalled: false,
+    };
+
+  // Production is still upstream: media generation marks the project as
+  // assembling when it reaches the final-settings gate, long before there is
+  // any render to watch. That gap is normal, not a stopped render — but it is
+  // not a render either, so it is returned as itself rather than as silence.
+  //
+  // `upstreamStalled` is reported rather than acted on. Dropping a stalled
+  // execution here would make the panel offer a restart, and firing assemble
+  // while media generation is genuinely still working renders the film short
+  // — with only the scenes approved so far. So the verdict does not change;
+  // what changes is that the panel stops promising a hand-over that is not
+  // coming, and says how long it has been waiting for one. See isStalled for
+  // why AGE is the only signal here that can be trusted.
+  const upstream = alive.find((e) => WORKER_WORKFLOWS.has(e.workflowId)) ?? null;
+  if (upstream)
+    return {
+      running: null,
+      failed: null,
+      stopped: false,
+      upstream,
+      upstreamStalled: isStalled(upstream),
+    };
+
   return {
     running: null,
-    failed: { ...failed, detail: await getExecutionError(failed.id) },
-    stopped: false,
+    failed: null,
+    stopped: true,
     upstream: null,
+    upstreamStalled: false,
   };
 }
 

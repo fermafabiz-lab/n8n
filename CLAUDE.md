@@ -562,6 +562,21 @@ expected and harmless for an app touching only its own Drive.
   `120 + 12 × length` estimate are both conservative in the safe
   direction — but do not re-derive a budget from these numbers without
   measuring first.
+- **Every clip reaching ffmpeg's `concat` must declare square pixels
+  (`setsar=1`), or the render dies at the join.** `concat` compares sample
+  aspect ratio as exact integers, and `scale` preserves a source's oddity
+  rather than squaring it — so a clip at SAR `12735:12736` or an undeclared
+  `0:1` kills a render that is otherwise finished. Invisible until the NASA
+  film (2026-09-15) became the first to MIX archive footage with Veo clips;
+  before that every clip in a film shared one source and one SAR. One owner
+  now, `coverFit()` in `remotion/server/assemble.mjs`, pinned by
+  `npm run check:sar`. Full account: `docs/lessons-render.md`, "The first
+  film to mix sources died at the join".
+- **A status panel's ANSWER ORDER is load-bearing: a failure must outrank
+  "still working".** `getAssemblyState` checked `upstream` before `failed`,
+  so a Media Generation execution wedged since the previous evening made
+  three dead renders read as "Nothing is stuck" for hours. Same file, same
+  entry.
 - **`Resource temporarily unavailable` from ffmpeg is a THREAD limit, not
   memory.** "Error while opening decoder for input stream #118:0" — the 60th
   h264 decoder of a 142-input assemble. Every decoder opens at start with

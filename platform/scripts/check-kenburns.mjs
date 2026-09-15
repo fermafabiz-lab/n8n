@@ -149,6 +149,10 @@ check("the graph supersamples before zoompan", f.includes(`scale=${1280 * S}:${7
 check("x and y are centred on the truncated crop", [f.includes("x='trunc((iw-trunc(iw/zoom))/2)'"), f.includes("y='trunc((ih-trunc(ih/zoom))/2)'")], [true, true]);
 check("a pull-out starts wide and settles at 1", f.includes(`max(${(1 + Z).toFixed(3)}-${Z}*on/192,1)`), true);
 check("and it still hands back the canvas size", f.includes("s=1280x720"), true);
+// A stored clip whose pixel aspect is not square cannot be concat'd with the
+// film's other clips — the failure is at the END of an hour-long render, in
+// ffmpeg's voice, and names no scene. See the NASA film, 2026-09-15.
+check("every frame it writes declares square pixels", f.includes("setsar=1"), true);
 
 console.log(`\n${results.filter(Boolean).length}/${results.length} passed`);
 process.exit(results.every(Boolean) ? 0 : 1);

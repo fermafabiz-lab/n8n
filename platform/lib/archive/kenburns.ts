@@ -71,9 +71,17 @@ export function kenBurnsFilter(
   // own — see (2) above. Free, and it halves the wander at every supersample.
   const x = `trunc((iw-trunc(iw/zoom))/2)`;
   const y = `trunc((ih-trunc(ih/zoom))/2)`;
+  // `setsar=1` for the same reason the assemble's own cover-fit carries one
+  // (remotion/server/assemble.mjs, the vchain comment): a still can declare a
+  // pixel aspect of 0:1 or something a hair off square, `scale` PRESERVES that
+  // rather than squaring it, and ffmpeg's `concat` — which the final render
+  // joins every clip with — refuses inputs whose SAR differs by so much as a
+  // part in twelve thousand. The render normalises again at assemble time, so
+  // this is not what unblocks an existing film; it is what stops a clip being
+  // WRITTEN with a pixel aspect no other clip has.
   return (
     `[0:v]${fit(W * S, H * S)},` +
     `zoompan=z='${z}':d=${frames}:x='${x}':y='${y}':s=${W}x${H}:fps=${fps},` +
-    `format=yuv420p[v]`
+    `setsar=1,format=yuv420p[v]`
   );
 }

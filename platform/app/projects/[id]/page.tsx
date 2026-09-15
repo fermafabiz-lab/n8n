@@ -749,6 +749,7 @@ export default async function ProductionRoom({
                   }
                 : null
             }
+            upstreamStalled={!!assembly?.upstreamStalled}
             n8nUrl={
               assembly?.running || assembly?.failed
                 ? executionUrl(

@@ -1733,3 +1733,84 @@ read, **3.2 seconds total**, 1,410 prompt tokens at `detail: 'high'`.
 `detail: 'low'` is cheaper and is what the still judge uses, but it
 downscales the whole grid to 512 px — which is exactly where the movement
 lives.
+
+### The first film to mix sources died at the join — SAR (2026-09-15)
+
+The producer confirmed Final touches on the NASA film and got a panel reading
+*"Getting ready to assemble · Not started yet — Media Generation is still
+running on this film, for 1040m 18s now. Nothing is stuck."* Nothing was
+rendering, and nothing had been for hours.
+
+**Two independent faults, and the second is why the first went unnoticed.**
+
+**1. The render was firing and dying, forty seconds in, every time.** Three
+Final Assembly executions that day (12:31, 12:52, 13:36), all `error`, all at
+`Render Guard` after six polls. n8n's own error text is useless here — it
+prints the tail of the ffmpeg command line and nothing else, exactly as this
+file's ffmpeg-thread entry warns. The reason is in `Check Render`'s output
+(`error`, ~65 kB), at the very END of it:
+
+```
+[Parsed_concat_167] Input link in0:v0 parameters (size 1280x720, SAR 0:1)
+  do not match the corresponding output link in0:v0 parameters
+  (1280x720, SAR 12735:12736)
+[Parsed_concat_167] Failed to configure output pad
+Error reinitializing filters! ... Conversion failed!
+```
+
+**SAR is the sample (pixel) aspect ratio, and `concat` compares it as exact
+integers.** `12735:12736` is one part in twelve thousand off square — invisible
+to a human, fatal to the filter. `0:1` means "undeclared", which displays
+identically to `1:1` and compares unequal to it. And `scale` does not square
+the SAR: it PRESERVES the source's display aspect by writing whatever output
+SAR makes the arithmetic work, so the cover-fit
+`scale=W:H:force_original_aspect_ratio=increase,crop=W:H` hands a clip's
+oddity straight through to the join.
+
+**It stayed invisible for months because every clip in a film came from the
+same place.** Veo clips, via Drive, all identical. The NASA film was the first
+to MIX — three of its nine clips came from the media store as archive footage,
+six from Drive — and documentary mode is what made that possible. So this is a
+latent fault of the footage engine that only a finished documentary could
+find, which is exactly the "click through it once on a real project" that was
+still owed.
+
+The fix is one filter and it is a visual no-op: after the crop the frame IS
+exactly W×H of square pixels, so `setsar=1` only says so. It lives in an
+exported `coverFit(W, H)` in `remotion/server/assemble.mjs` — a function, not
+an inline string, so `npm run check:sar` can assert on the code that actually
+runs and can also assert the file spells the cover-fit exactly ONCE. Same
+addition in `platform/lib/archive/kenburns.ts`, which writes archive stills:
+that one does not unblock an existing film (the render normalises again at
+assemble time regardless of what is stored), it stops a clip being WRITTEN
+with a pixel aspect no other clip has.
+
+**There is no ffmpeg in a Claude Code web session, so the check pins the graph
+and the film pins the check.** `check-sar.mjs` was verified by removing
+`setsar` and watching it drop to 3/6 — a check never run against the bug it
+describes is a comment with a test runner attached.
+
+**2. A wedged upstream execution made the panel lie for hours.**
+`getAssemblyState` returned `upstream` BEFORE it looked for a recent failure,
+so while any worker execution was alive the failure branch was unreachable. A
+Media Generation execution had been stuck in `running` since the previous
+evening — the zombie this file's own `isStalled` entry describes — so the
+panel printed "Nothing is stuck: the render begins once that pass hands over"
+over three dead renders, and counted the zombie's age up past seventeen hours
+while it did. **A verdict computed in the wrong order is worse than no
+verdict**: the producer waited on a promise the system could not keep.
+
+Now a recent Final Assembly failure outranks any upstream execution, and an
+upstream that is `isStalled` is reported as `upstreamStalled` so the panel
+says *"Media Generation has been running for 17h 22m — far longer than a real
+pass takes, so it is almost certainly wedged"* and points at Restart
+production. **The verdict itself is unchanged on purpose**: dropping a stalled
+execution would make the panel offer a render restart, and firing assemble
+while media generation is genuinely still working renders the film SHORT, with
+only the scenes approved so far. The panel changes what it says, never what it
+does.
+
+**The general rule, which this is the second instance of.** When a status
+panel has several possible answers, the order it tries them in is a design
+decision with teeth: put the reassuring answer first and it will one day be
+printed over the alarming one. Failures rank above "still working", always.

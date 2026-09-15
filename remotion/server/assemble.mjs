@@ -229,6 +229,37 @@ async function hasAudioStream(file) {
 /** Length of the hook riser, in seconds; it ends exactly on the hook boundary. */
 export const HOOK_RISER_SECONDS = 3.2;
 
+/**
+ * Cover-fit a clip to the canvas: scale up to fill, centre-crop the overflow,
+ * and DECLARE SQUARE PIXELS. A 16:9 clip on a 9:16 canvas loses its sides.
+ *
+ * `setsar=1` is the load-bearing part and must stay before every `concat`.
+ * `concat` refuses to join inputs whose sample aspect ratio differs, and
+ * `scale` does not square the SAR — it preserves the source's DISPLAY aspect
+ * by writing whatever output SAR makes the arithmetic come out. So a source
+ * with a hair-off pixel aspect arrives as something like 12735:12736 and one
+ * that declares none arrives as 0:1. Both look identical to a human; ffmpeg
+ * compares them as integers and dies at the join:
+ *
+ *   Input link in0:v0 parameters (size 1280x720, SAR 0:1) do not match the
+ *   corresponding output link in0:v0 parameters (1280x720, SAR 12735:12736)
+ *   Failed to configure output pad ... Conversion failed!
+ *
+ * Every clip was a Veo clip until documentary mode, so every clip shared one
+ * SAR and nothing ever noticed. The NASA film (2026-09-15) was the first to
+ * MIX sources — three archive clips from the media store against six Veo
+ * clips from Drive — and it failed three times in a row, about forty seconds
+ * in, with that message and no scene named. After the crop the frame is
+ * exactly W×H of square pixels, so saying so is both true and invisible.
+ *
+ * Exported so `npm run check:sar` can assert it on the real function rather
+ * than on a copy of the string — there is no ffmpeg in a Claude Code web
+ * session, so the graph is what can be checked here and a finished film is
+ * what proves it.
+ */
+export const coverFit = (W, H) =>
+	`scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1`;
+
 // Synthesize the SFX bank once. Pure ffmpeg — no downloaded assets.
 let sfxReady = null;
 function ensureSfx() {
@@ -804,14 +835,13 @@ export function registerAssemble(app, {jobs, outputDir}) {
 				const labels = [];
 				items.forEach((it, i) => {
 					const d = it.eff.toFixed(6);
-					// Cover-fit to the target canvas: scale up to fill, center-crop
-					// the overflow. A 16:9 clip on a 9:16 canvas crops the sides.
 					const vchain =
-						// Elastic retime: setpts stretches/compresses playback to the
-						// scene's narration-driven length, fps=${OUT_FPS} AFTER it resamples
+						// Cover-fit to the target canvas, then retime elastically:
+						// setpts stretches/compresses playback to the scene's
+						// narration-driven length, fps=${OUT_FPS} AFTER it resamples
 						// frames evenly, and the final trim pins the exact duration
 						// (it also cuts the leftover tail when the speed-up clamped).
-						`scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},` +
+						`${coverFit(W, H)},` +
 						`trim=duration=${it.dur.toFixed(3)},setpts=${it.stretch.toFixed(5)}*(PTS-STARTPTS),fps=${OUT_FPS}`;
 					// What the clip covers once it is stretched as far as it may be.
 					const covered = it.dur * it.stretch;

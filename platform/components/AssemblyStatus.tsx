@@ -117,6 +117,12 @@ export default function AssemblyStatus({
    * Named rather than left blank: see the `upstream` note in lib/n8n.ts.
    */
   upstream = null,
+  /**
+   * That upstream pass has been running far longer than any real one. The
+   * panel says so instead of promising a hand-over — it does not act on it;
+   * see the `upstreamStalled` note in lib/n8n.ts for why not.
+   */
+  upstreamStalled = false,
 }: {
   projectId: string;
   startedAt: string | null;
@@ -125,6 +131,7 @@ export default function AssemblyStatus({
   missing: boolean;
   lengthSeconds?: number | null;
   upstream?: { name: string; startedAt: string | null } | null;
+  upstreamStalled?: boolean;
 }) {
   const now = useNow();
   const elapsed = since(now, startedAt);
@@ -232,6 +239,20 @@ export default function AssemblyStatus({
                   : "This usually takes a few minutes."}{" "}
                 It appears at the top of this page by itself when it&apos;s
                 done.
+              </>
+            ) : upstream && upstreamStalled ? (
+              /* The same fact, told honestly. "Nothing is stuck" was printed
+                 over a Media Generation pass wedged since the previous
+                 evening, while three renders failed behind it. A number the
+                 producer has to interpret is not a warning; this says it. */
+              <>
+                <b>{upstream.name} has been running for {mmss(upstreamFor!)}</b>{" "}
+                — far longer than a real pass takes, so it is almost certainly
+                wedged and the render is not waiting on anything real. Nothing
+                generated is lost: every take, image and clip is already saved,
+                and a restart skips whatever exists. Use{" "}
+                <b>Restart production</b> above to clear it, then start the
+                render again from Final touches.
               </>
             ) : upstream ? (
               <>

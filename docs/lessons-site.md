@@ -876,6 +876,34 @@ picked the asset, not signed it off. Final Assembly receives an ordinary mp4.
   project's canvas; Commons hands out VP9/Opus webm and Theora ogv, which
   nothing downstream plays as-is. `seconds` is clamped 3..20 and `offset`
   never starts past the end.
+- **`zoompan` moves in WHOLE SOURCE PIXELS, and that is why the Ken Burns
+  shook** (2026-09-15, reported as "it zooms out on the archive photos but
+  shakes while it does it"). Every output frame it takes
+  `w = trunc(iw / zoom)` and an integer `x`, crops that, and scales it to the
+  canvas — so the move can only advance a whole source pixel at a time. The
+  still was blown up to **2×** the canvas, making one source pixel half an
+  output pixel, against a move of about 0.38 px per frame: most frames the
+  picture did not move, the rest it jumped half a pixel, irregularly, 24 times
+  a second. **More than half the apparent motion was rounding, not zoom.** A
+  pull-out shows it worst because the frame is being remagnified at the same
+  time, so the stutter is in the size as well as the position.
+  Two fixes, in `lib/archive/kenburns.ts`:
+  **6× supersample** (not a knee — the residue falls as 1/S — but the smallest
+  factor keeping the sideways jump under 0.1 px across every clip length the
+  picker allows, both orientations, both directions), and **`x` derived from
+  the same truncated `w`** (`trunc((iw-trunc(iw/zoom))/2)`) instead of
+  `iw/2-(iw/zoom/2)`, which rounded the width and the offset independently and
+  let the centre wander. Measured: the between-frame jump went 0.28 → 0.093 px
+  and the off-centre drift 0.56 → 0.093 px. The second fix is free and halves
+  the wander at any supersample, so it must not be dropped in favour of "just
+  supersample more".
+  `npm run check:kenburns` simulates zoompan's integer arithmetic frame by
+  frame and asserts both the limits and that **6 is the smallest factor that
+  passes** — which is what stops it being lowered to save encode time and
+  equally what stops it being raised on a hunch. It is a model of ffmpeg, not
+  ffmpeg: this environment has no ffmpeg, so what it pins is the reasoning.
+  The cost is real — a 7680×4320 intermediate frame and a wider downscale
+  filter, so attaching a still takes longer than it did.
 - **The video-regen trap, and three guards for it.** A stock scene has no
   Flow asset to regenerate from, and `Prep Video Regen` THROWS without an
   `Image Media ID` — a throw that kills the whole batch, not the scene. So

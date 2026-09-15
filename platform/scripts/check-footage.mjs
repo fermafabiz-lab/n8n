@@ -772,5 +772,32 @@ check('DVIDS prints its own name', P.providerLabel('dvids'), 'DVIDS');
 check('so do the new archives', ['internet_archive', 'europeana', 'wellcome', 'loc'].map((id) => P.providerLabel(id)), ['Internet Archive', 'Europeana', 'Wellcome Collection', 'Library of Congress']);
 check('and a retired provider still prints something readable', P.providerLabel('legacy_archive'), 'Legacy Archive');
 
+// --- the preview's two mirrors -------------------------------------------
+// `WatermarkPreview` draws the badge from WATERMARK_LAYOUT and sequences it
+// with planWatermarkBands, and BOTH are copies of remotion/src/provenance.ts.
+// A preview that has quietly stopped matching the film is worse than no
+// preview, so the copies are pinned here against the same literals that
+// remotion/scripts/check-watermark.mjs pins the originals against. Change one,
+// change all four places: the two modules and the two checks.
+check('the frame is the render size, not 1080p', [P.WATERMARK_LAYOUT.landscape.frame, P.WATERMARK_LAYOUT.portrait.frame], [{ width: 1280, height: 720 }, { width: 720, height: 1280 }]);
+check('the landscape geometry', P.WATERMARK_LAYOUT.landscape, { frame: { width: 1280, height: 720 }, left: 90, bottom: 30, maxWidth: 700, gap: 3, label: { fontSize: 16, padding: '5px 12px' }, source: { fontSize: 13 }, credit: { fontSize: 12 } });
+check('the portrait geometry, lifted clear of the platform chrome', P.WATERMARK_LAYOUT.portrait, { frame: { width: 720, height: 1280 }, left: 44, bottom: 232, maxWidth: 560, gap: 3, label: { fontSize: 17, padding: '5px 11px' }, source: { fontSize: 14 }, credit: { fontSize: 13 } });
+check('the badge never reaches full opacity', P.WATERMARK_STYLE.peakOpacity, 0.88);
+
+const wmScene = (start, dur, provenance) => ({ startSeconds: start, durationSeconds: dur, provenance });
+const wmAi = { visualOrigin: 'ai_generated' };
+const wmArch = { visualOrigin: 'archival_footage', provider: 'wikimedia', sourceCreator: 'NASA' };
+const wmCredited = { ...wmArch, attributionRequired: true, licenseName: 'CC BY-SA 3.0' };
+// The case that forces the mirror to exist: six archive shots in a row are ONE
+// label on screen, so a preview drawing six would describe a different film.
+check('consecutive identical scenes are one band', P.planWatermarkBands([wmScene(0, 1, wmArch), wmScene(1, 1, wmArch), wmScene(2, 1, wmArch)], { showLabel: true }).length, 1);
+check('and it spans them all', P.planWatermarkBands([wmScene(0, 1, wmArch), wmScene(1, 1, wmArch), wmScene(2, 1, wmArch)], { showLabel: true })[0].endSeconds, 3);
+check('a change of badge starts a new one', P.planWatermarkBands([wmScene(0, 1, wmArch), wmScene(1, 1, wmAi)], { showLabel: true }).map((b) => b.label), ['ARCHIVAL FOOTAGE', 'AI GENERATED']);
+// The sentence the row's prose has to work hardest to explain, and the reason
+// the preview is not gated on the toggle being ON.
+check('switching the label off leaves the licence credit standing', P.planWatermarkBands([wmScene(0, 1, wmCredited)], { showLabel: false }), [{ startSeconds: 0, endSeconds: 1, label: '', source: null, credit: 'NASA · Wikimedia Commons · CC BY-SA 3.0' }]);
+check('while a scene that owes nothing draws nothing at all', P.planWatermarkBands([wmScene(0, 1, wmAi)], { showLabel: false }), []);
+check('a scene with no provenance record is skipped, not labelled blank', P.planWatermarkBands([wmScene(0, 1, null)], { showLabel: true }), []);
+
 console.log(`\n${results.filter(Boolean).length}/${results.length} passed`);
 process.exit(results.every(Boolean) ? 0 : 1);

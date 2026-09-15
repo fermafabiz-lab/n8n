@@ -691,6 +691,20 @@ export default async function ProductionRoom({
               initial={project.editing}
               motifCards={project.motifCards}
               silent={silent}
+              /* Documentary only: every other category is wall-to-wall AI, so
+                 the preview would step through one band reading AI GENERATED
+                 and teach the producer nothing they cannot read in the row. */
+              watermarkScenes={
+                project.category === "documentary"
+                  ? scenes.map((s) => ({
+                      order: s.order,
+                      label: s.label,
+                      imageUrl: s.imageUrl,
+                      provenance: s.provenance,
+                    }))
+                  : []
+              }
+              aspectRatio={project.aspect}
             />
             {/* The cold open, beside Final touches for the same reason the
                 music picker is: rewriting it is a self-saving action that

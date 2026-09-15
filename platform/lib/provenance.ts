@@ -392,6 +392,75 @@ export function formatSourceWatermark(p: VisualProvenance | null | undefined): {
 }
 
 /**
+ * Where the badge sits and how big it is, in FRAME pixels.
+ *
+ * Mirrored from `remotion/src/provenance.ts`, which owns it and whose
+ * `SourceWatermark` consumes it. The site needs it because `WatermarkPreview`
+ * draws the same badge at the same pixel sizes inside a real-sized frame and
+ * scales the whole frame down — a preview that scaled each number by hand
+ * would drift from the film the first time somebody nudged a padding, and the
+ * only thing a preview is for is being trusted.
+ *
+ * The frame is 1280×720 (720×1280 portrait): the render's real size, not
+ * 1080p — see remotion/src/Root.tsx. `npm run check:footage` pins this table
+ * against the same literal `npm run check:watermark` pins the render's.
+ */
+export interface WatermarkGeometry {
+  frame: { width: number; height: number };
+  left: number;
+  bottom: number;
+  maxWidth: number;
+  gap: number;
+  label: { fontSize: number; padding: string };
+  source: { fontSize: number };
+  credit: { fontSize: number };
+}
+
+export const WATERMARK_LAYOUT: { landscape: WatermarkGeometry; portrait: WatermarkGeometry } = {
+  landscape: {
+    frame: { width: 1280, height: 720 },
+    left: 90,
+    bottom: 30,
+    maxWidth: 700,
+    gap: 3,
+    label: { fontSize: 16, padding: "5px 12px" },
+    source: { fontSize: 13 },
+    credit: { fontSize: 12 },
+  },
+  portrait: {
+    frame: { width: 720, height: 1280 },
+    left: 44,
+    bottom: 232,
+    maxWidth: 560,
+    gap: 3,
+    label: { fontSize: 17, padding: "5px 11px" },
+    source: { fontSize: 14 },
+    credit: { fontSize: 13 },
+  },
+};
+
+/** The colours and weights, shared by both orientations. Mirrored with the above. */
+export const WATERMARK_STYLE = {
+  peakOpacity: 0.88,
+  labelWeight: 600,
+  labelLetterSpacing: "0.14em",
+  labelColor: "#FFFFFF",
+  labelBackground: "rgba(0,0,0,0.42)",
+  labelBorder: "1px solid rgba(255,255,255,0.16)",
+  labelRadius: 6,
+  labelLineHeight: 1.2,
+  sourceLetterSpacing: "0.05em",
+  sourceColor: "rgba(255,255,255,0.9)",
+  creditLetterSpacing: "0.04em",
+  creditColor: "rgba(255,255,255,0.82)",
+  lineBackground: "rgba(0,0,0,0.34)",
+  lineRadius: 5,
+  linePadding: "3px 9px",
+  lineLineHeight: 1.25,
+  textShadow: "0 2px 8px rgba(0,0,0,0.75)",
+} as const;
+
+/**
  * The credit a licence obliges us to print, or null.
  *
  * Built only when the licence REQUIRES attribution. A courtesy credit is what
@@ -413,6 +482,65 @@ export function attributionFor(p: VisualProvenance | null | undefined): string |
     String(p.licenseName ?? "").trim(),
   ].filter((v): v is string => Boolean(v));
   return parts.length ? parts.join(" · ") : null;
+}
+
+/**
+ * The scene bands the watermark is drawn over.
+ *
+ * An EXACT mirror of `planWatermarkBands` in `remotion/src/provenance.ts` —
+ * same signature, same output — so the preview can be compared to the render
+ * case for case. Consecutive scenes carrying the same badge merge into one
+ * band, which is the whole reason the site cannot just draw one badge per
+ * scene and call it a preview: a documentary running six archive shots
+ * together shows ONE steady label, and a preview claiming six would be
+ * describing a film nobody is going to watch.
+ *
+ * For a preview the timings do not matter — only the order and the merging —
+ * so the caller may pass unit durations (`startSeconds: i, durationSeconds: 1`)
+ * and read the band boundaries back as scene indices.
+ */
+export interface WatermarkBand {
+  startSeconds: number;
+  endSeconds: number;
+  label: string;
+  source: string | null;
+  credit: string | null;
+}
+
+export function planWatermarkBands(
+  scenes: readonly { startSeconds: number; durationSeconds: number; provenance?: VisualProvenance | null }[],
+  opts: { showLabel: boolean },
+): WatermarkBand[] {
+  const bands: WatermarkBand[] = [];
+  for (const s of scenes) {
+    const p = s.provenance;
+    if (!p) continue;
+    const { label, source } = formatSourceWatermark(p);
+    const credit = attributionFor(p);
+    // With the label switched off only the licence obligation remains, so a
+    // scene that owes nothing draws nothing at all.
+    if (!opts.showLabel && !credit) continue;
+    const band: WatermarkBand = {
+      startSeconds: s.startSeconds,
+      endSeconds: s.startSeconds + s.durationSeconds,
+      label: opts.showLabel ? label : "",
+      source: opts.showLabel ? source : null,
+      credit,
+    };
+    const prev = bands[bands.length - 1];
+    if (
+      prev &&
+      Math.abs(prev.endSeconds - band.startSeconds) < 1e-6 &&
+      prev.label === band.label &&
+      prev.source === band.source &&
+      prev.credit === band.credit
+    ) {
+      prev.endSeconds = band.endSeconds;
+      continue;
+    }
+    bands.push(band);
+  }
+  return bands;
 }
 
 /**

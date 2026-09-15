@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { confirmFinalSettings, type ActionResult } from "@/app/actions";
 import Toggle from "@/components/Toggle";
 import CaptionColorPicker from "@/components/CaptionColorPicker";
+import WatermarkPreview, { type PreviewScene } from "@/components/WatermarkPreview";
 import { useSetPendingStage } from "@/components/StageNav";
 import type { EditingOptions, MotifCard } from "@/lib/data";
 
@@ -168,6 +169,8 @@ export default function FinalSettings({
   initial,
   motifCards = [],
   silent = false,
+  watermarkScenes = [],
+  aspectRatio = null,
 }: {
   projectId: string;
   initial: EditingOptions;
@@ -175,8 +178,19 @@ export default function FinalSettings({
   motifCards?: MotifCard[];
   /** Cinematic: no narration is ever spoken, so some rows have no meaning. */
   silent?: boolean;
+  /**
+   * The film's scenes, for the source-watermark preview. Empty on a film with
+   * no archive step, which is exactly when the preview has nothing to show and
+   * the button is not offered.
+   */
+  watermarkScenes?: PreviewScene[];
+  /** The project's Format, so the preview frame has the film's shape. */
+  aspectRatio?: string | null;
 }) {
   const [opts, setOpts] = useState<EditingOptions>(initial);
+  // Closed by default: this panel's job is one click, and a producer who wants
+  // to see the badge is asking a question rather than passing through.
+  const [showWatermark, setShowWatermark] = useState(false);
   // Kept by index. A dropped card is removed from the project on render, not
   // on the click — see the note on confirmFinalSettings.
   const [dropped, setDropped] = useState<number[]>([]);
@@ -305,6 +319,29 @@ export default function FinalSettings({
                       setOpts((p) => ({ ...p, captionColor: v || null }))
                     }
                   />
+                )}
+                {/* Deliberately NOT gated on `on`. The sentence this row has
+                    to get across is that switching the label off leaves a
+                    credit a licence demands standing, and the only way to make
+                    that believable is to let the producer watch it happen. */}
+                {o.key === "sourceWatermark" && watermarkScenes.length > 0 && (
+                  <div style={{ marginTop: 10 }}>
+                    <button
+                      type="button"
+                      className="abtn"
+                      aria-expanded={showWatermark}
+                      onClick={() => setShowWatermark((v) => !v)}
+                    >
+                      {showWatermark ? "Hide preview" : "👁 Preview on this film"}
+                    </button>
+                    {showWatermark && (
+                      <WatermarkPreview
+                        scenes={watermarkScenes}
+                        aspectRatio={aspectRatio}
+                        showLabel={on}
+                      />
+                    )}
+                  </div>
                 )}
                 {/* Same rule as the brief: the level is only shown while the
                     effects are on, and only the switch can silence them. */}

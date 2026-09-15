@@ -1,7 +1,12 @@
 import React from 'react';
 import {AbsoluteFill, useCurrentFrame, useVideoConfig} from 'remotion';
 import {CURVES, eased} from '../easing';
-import {planWatermarkBands, type VisualProvenance} from '../provenance';
+import {
+	planWatermarkBands,
+	WATERMARK_LAYOUT,
+	WATERMARK_STYLE,
+	type VisualProvenance,
+} from '../provenance';
 import type {StylePreset} from '../style';
 
 /**
@@ -65,7 +70,11 @@ export const SourceWatermark: React.FC<{
 		Math.min(
 			eased(seconds - band.startSeconds, [0, FADE], [0, 1], CURVES.inOutCubic),
 			eased(band.endSeconds - seconds, [0, FADE], [0, 1], CURVES.inOutCubic),
-		) * 0.88;
+		) * WATERMARK_STYLE.peakOpacity;
+
+	// Geometry lives in provenance.ts so the site's preview can mirror ONE
+	// named constant instead of numbers read out of this JSX.
+	const g = portrait ? WATERMARK_LAYOUT.portrait : WATERMARK_LAYOUT.landscape;
 
 	// Bottom-LEFT, on the same left edge the captions keep, and below the band
 	// they occupy: captions are bottom-anchored at 84 (landscape) / 280
@@ -76,13 +85,13 @@ export const SourceWatermark: React.FC<{
 			<div
 				style={{
 					position: 'absolute',
-					left: portrait ? 44 : 90,
-					bottom: portrait ? 232 : 30,
-					maxWidth: portrait ? 560 : 700,
+					left: g.left,
+					bottom: g.bottom,
+					maxWidth: g.maxWidth,
 					opacity,
 					display: 'flex',
 					flexDirection: 'column',
-					gap: 3,
+					gap: g.gap,
 					alignItems: 'flex-start',
 				}}
 			>
@@ -90,16 +99,16 @@ export const SourceWatermark: React.FC<{
 					<span
 						style={{
 							fontFamily: preset.kickerFont,
-							fontSize: portrait ? 17 : 16,
-							fontWeight: 600,
-							letterSpacing: '0.14em',
-							color: '#FFFFFF',
-							background: 'rgba(0,0,0,0.42)',
-							border: '1px solid rgba(255,255,255,0.16)',
-							borderRadius: 6,
-							padding: portrait ? '5px 11px' : '5px 12px',
-							textShadow: '0 2px 8px rgba(0,0,0,0.75)',
-							lineHeight: 1.2,
+							fontSize: g.label.fontSize,
+							fontWeight: WATERMARK_STYLE.labelWeight,
+							letterSpacing: WATERMARK_STYLE.labelLetterSpacing,
+							color: WATERMARK_STYLE.labelColor,
+							background: WATERMARK_STYLE.labelBackground,
+							border: WATERMARK_STYLE.labelBorder,
+							borderRadius: WATERMARK_STYLE.labelRadius,
+							padding: g.label.padding,
+							textShadow: WATERMARK_STYLE.textShadow,
+							lineHeight: WATERMARK_STYLE.labelLineHeight,
 						}}
 					>
 						{band.label}
@@ -109,14 +118,14 @@ export const SourceWatermark: React.FC<{
 					<span
 						style={{
 							fontFamily: preset.kickerFont,
-							fontSize: portrait ? 14 : 13,
-							letterSpacing: '0.05em',
-							color: 'rgba(255,255,255,0.9)',
-							background: 'rgba(0,0,0,0.34)',
-							borderRadius: 5,
-							padding: '3px 9px',
-							textShadow: '0 2px 8px rgba(0,0,0,0.75)',
-							lineHeight: 1.25,
+							fontSize: g.source.fontSize,
+							letterSpacing: WATERMARK_STYLE.sourceLetterSpacing,
+							color: WATERMARK_STYLE.sourceColor,
+							background: WATERMARK_STYLE.lineBackground,
+							borderRadius: WATERMARK_STYLE.lineRadius,
+							padding: WATERMARK_STYLE.linePadding,
+							textShadow: WATERMARK_STYLE.textShadow,
+							lineHeight: WATERMARK_STYLE.lineLineHeight,
 						}}
 					>
 						{band.source}
@@ -129,14 +138,14 @@ export const SourceWatermark: React.FC<{
 					<span
 						style={{
 							fontFamily: preset.kickerFont,
-							fontSize: portrait ? 13 : 12,
-							letterSpacing: '0.04em',
-							color: 'rgba(255,255,255,0.82)',
-							background: 'rgba(0,0,0,0.34)',
-							borderRadius: 5,
-							padding: '3px 9px',
-							textShadow: '0 2px 8px rgba(0,0,0,0.75)',
-							lineHeight: 1.25,
+							fontSize: g.credit.fontSize,
+							letterSpacing: WATERMARK_STYLE.creditLetterSpacing,
+							color: WATERMARK_STYLE.creditColor,
+							background: WATERMARK_STYLE.lineBackground,
+							borderRadius: WATERMARK_STYLE.lineRadius,
+							padding: WATERMARK_STYLE.linePadding,
+							textShadow: WATERMARK_STYLE.textShadow,
+							lineHeight: WATERMARK_STYLE.lineLineHeight,
 						}}
 					>
 						{band.credit}

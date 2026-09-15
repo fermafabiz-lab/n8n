@@ -1,0 +1,124 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+  margin-top: 10px;
+}
+
+/*
+ * The window the scaled frame shows through. `overflow: hidden` is load-bearing:
+ * the frame inside is drawn at its real 1280×720 and then transformed down, so
+ * without this it would paint far outside the card.
+ */
+.viewport {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--line2);
+  border-radius: 8px;
+  background: #0b0b0d;
+  max-width: 100%;
+}
+
+.frame {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: top left;
+  overflow: hidden;
+}
+
+.still {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/*
+ * A film mid-production has no pictures yet, and most of the time this preview
+ * is opened before any exist. A flat dark ground with a quiet note is more
+ * honest than a stock photograph pretending to be the shot — and it is also
+ * the worst case for legibility, which is the right backdrop for judging a
+ * badge that has to read over anything.
+ */
+.noStill {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #17171b 0%, #101014 50%, #17171b 100%);
+  color: rgba(255, 255, 255, 0.28);
+  /* In frame pixels, like everything else inside .frame. */
+  font-size: 22px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* A single chevron is narrower than any button in the app; without this the
+   arrows render as slivers you cannot reliably hit. */
+.bar button {
+  min-width: 34px;
+  justify-content: center;
+}
+
+.count {
+  font-size: 12px;
+  color: var(--dim);
+}
+
+/*
+ * The badge at 1:1. A dark ground because that is what it is drawn over, and
+ * because the label's own translucent black would be invisible on the card.
+ * It scrolls rather than wraps: the source line is one line in the film, and a
+ * preview that wrapped it would invent a shape the render never draws.
+ */
+.actual {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 100%;
+}
+
+.actualCap {
+  font-size: 11px;
+  color: var(--faint);
+  letter-spacing: 0.04em;
+}
+
+.actualBox {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line2);
+  background: linear-gradient(135deg, #17171b 0%, #101014 50%, #17171b 100%);
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--dim);
+  max-width: 420px;
+}
+
+.quiet {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--dim);
+  max-width: 420px;
+}
+
+@media (max-width: 520px) {
+  .viewport {
+    /* The frame is scaled by a fixed factor, so the window is what has to give. */
+    max-width: 100%;
+  }
+}

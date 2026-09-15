@@ -1207,8 +1207,43 @@ belongs here is the load-bearing parts.
   does not raise, it silently produces keys no gate matches. **Any future
   addition to at_scene should wrap the same way.**
 - Tests: `npm run check:provenance` (platform, 58) and `npm run check:watermark`
-  (remotion, 20). Commons returns creators as `Template:Helmut Laux`; both
+  (remotion, 24). Commons returns creators as `Template:Helmut Laux`; both
   formatters strip the prefix, and that is pinned.
+
+#### Previewing it before the render (2026-09-15)
+
+`WatermarkPreview` (documentary only, under the Source watermark row in Final
+touches) shows the badge on THIS film before an hour of Remotion says what it
+looks like. Three decisions in it are worth keeping:
+
+- **The frame is drawn at the render's real size and scaled as one piece.**
+  The badge is 16px inside a 1280×720 box; the box gets
+  `transform: scale(w/1280)`. Every proportion is preserved by construction
+  instead of by a dozen multiplications, each of which would be a chance to be
+  quietly wrong. **The frame is 1280×720, not 1080p** — see
+  `remotion/src/Root.tsx` — and guessing 1920 would have drawn the badge half
+  again too small relative to the picture.
+- **It shows the badge TWICE, and that is the point.** A faithful thumbnail of
+  a 16px badge is four pixels tall and unreadable; enlarging it inside the
+  frame would misrepresent the one thing the preview exists to show. So the
+  frame stays true about WHERE it sits and how much it takes, and the text is
+  repeated underneath at 1:1 where it can be read. This was found by
+  screenshotting the first version and discovering it was illegible — build
+  the thing, then look at it.
+- **It is not gated on the toggle being ON.** Switching the label off leaves a
+  credit CC BY or CC BY-SA demands standing, which is the sentence the row's
+  prose works hardest to explain; letting the producer watch the label vanish
+  while the credit stays does it in one click. On a film with one CC BY-SA
+  shot, switching off collapses the whole film to a single band — which is
+  itself the clearest possible statement of what the switch does.
+
+The geometry moved out of `SourceWatermark.tsx` into `WATERMARK_LAYOUT` /
+`WATERMARK_STYLE` in `remotion/src/provenance.ts`, and `planWatermarkBands` is
+mirrored into `platform/lib/provenance.ts` — the preview must merge bands the
+way the render does, or it describes a film nobody will watch. **Four places
+now carry those numbers**: the two modules and the two checks that pin them
+(`check:watermark` in remotion, `check:footage` on the site). Verified by
+nudging `left: 90` to `92` and watching the render's check fail.
 
 ### The Universal Footage Engine (2026-09-09)
 

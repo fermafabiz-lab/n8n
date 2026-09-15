@@ -157,6 +157,85 @@ export const attributionFor = (p?: VisualProvenance | null): string | null => {
 };
 
 /**
+ * Where the badge sits and how big it is — the one owner of those numbers.
+ *
+ * They lived inline in `SourceWatermark.tsx` until the site grew a PREVIEW of
+ * this overlay (`platform/components/WatermarkPreview.tsx`). A preview whose
+ * geometry is copied out of JSX is a preview that silently stops matching the
+ * film the first time someone nudges a padding, and the whole point of it is
+ * to be trusted. So the numbers are named here, consumed by the component,
+ * and mirrored once in `platform/lib/provenance.ts` — pinned on both sides by
+ * `npm run check:watermark` here and `npm run check:footage` there.
+ *
+ * Every value is in FRAME pixels, and the frame is 1280×720 (or 720×1280
+ * portrait) — the render's real size, not 1080p; see Root.tsx on why. A
+ * preview therefore draws the badge at these exact sizes inside a frame of
+ * `frame`, and scales the whole frame down, rather than scaling each number.
+ */
+export type WatermarkGeometry = {
+	frame: {width: number; height: number};
+	/** Distance from the frame's left edge and bottom edge to the stack. */
+	left: number;
+	bottom: number;
+	maxWidth: number;
+	/** Between the label, the source line and the credit. */
+	gap: number;
+	label: {fontSize: number; padding: string};
+	source: {fontSize: number};
+	credit: {fontSize: number};
+};
+
+export const WATERMARK_LAYOUT: {
+	landscape: WatermarkGeometry;
+	portrait: WatermarkGeometry;
+} = {
+	landscape: {
+		frame: {width: 1280, height: 720},
+		left: 90,
+		bottom: 30,
+		maxWidth: 700,
+		gap: 3,
+		label: {fontSize: 16, padding: '5px 12px'},
+		source: {fontSize: 13},
+		credit: {fontSize: 12},
+	},
+	portrait: {
+		frame: {width: 720, height: 1280},
+		// Lifted clear of the platform's own bottom chrome, and of the captions
+		// that are bottom-anchored at 280.
+		left: 44,
+		bottom: 232,
+		maxWidth: 560,
+		gap: 3,
+		label: {fontSize: 17, padding: '5px 11px'},
+		source: {fontSize: 14},
+		credit: {fontSize: 13},
+	},
+};
+
+/** The colours and weights, shared by both orientations. Mirrored with the above. */
+export const WATERMARK_STYLE = {
+	/** The badge never reaches full opacity — it is a claim, not a headline. */
+	peakOpacity: 0.88,
+	labelWeight: 600,
+	labelLetterSpacing: '0.14em',
+	labelColor: '#FFFFFF',
+	labelBackground: 'rgba(0,0,0,0.42)',
+	labelBorder: '1px solid rgba(255,255,255,0.16)',
+	labelRadius: 6,
+	labelLineHeight: 1.2,
+	sourceLetterSpacing: '0.05em',
+	sourceColor: 'rgba(255,255,255,0.9)',
+	creditLetterSpacing: '0.04em',
+	creditColor: 'rgba(255,255,255,0.82)',
+	lineBackground: 'rgba(0,0,0,0.34)',
+	lineRadius: 5,
+	linePadding: '3px 9px',
+	lineLineHeight: 1.25,
+	textShadow: '0 2px 8px rgba(0,0,0,0.75)',
+} as const;
+
+/**
  * The scene bands the watermark is drawn over.
  *
  * Consecutive scenes carrying the SAME badge are merged into one band, so a

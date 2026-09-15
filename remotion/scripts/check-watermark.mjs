@@ -14,8 +14,16 @@ import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const {ORIGIN_LABELS, attributionFor, formatSourceWatermark, getSourceLabel, planWatermarkBands, providerLabel} =
-	await import(join(root, 'src', 'provenance.ts'));
+const {
+	ORIGIN_LABELS,
+	WATERMARK_LAYOUT,
+	WATERMARK_STYLE,
+	attributionFor,
+	formatSourceWatermark,
+	getSourceLabel,
+	planWatermarkBands,
+	providerLabel,
+} = await import(join(root, 'src', 'provenance.ts'));
 
 const results = [];
 const check = (name, got, want) => {
@@ -131,6 +139,43 @@ check(
 	formatSourceWatermark({visualOrigin: 'archival_photo', sourceCreator: 'Template:Helmut Laux'}).source,
 	'Source: Helmut Laux',
 );
+
+// --- geometry ------------------------------------------------------------
+// These numbers left SourceWatermark.tsx when the site grew a preview of this
+// overlay (platform/components/WatermarkPreview.tsx), which draws the badge at
+// these exact sizes in a real-sized frame and scales the frame. The site keeps
+// its own copy, pinned against the same literals by `npm run check:footage`
+// there — so a nudge here that is not mirrored fails on both sides rather than
+// silently making the preview a liar.
+check('the landscape geometry', WATERMARK_LAYOUT.landscape, {
+	frame: {width: 1280, height: 720},
+	left: 90,
+	bottom: 30,
+	maxWidth: 700,
+	gap: 3,
+	label: {fontSize: 16, padding: '5px 12px'},
+	source: {fontSize: 13},
+	credit: {fontSize: 12},
+});
+check('the portrait geometry, lifted clear of the platform chrome', WATERMARK_LAYOUT.portrait, {
+	frame: {width: 720, height: 1280},
+	left: 44,
+	bottom: 232,
+	maxWidth: 560,
+	gap: 3,
+	label: {fontSize: 17, padding: '5px 11px'},
+	source: {fontSize: 14},
+	credit: {fontSize: 13},
+});
+// The frame is the render's real size and not 1080p (Root.tsx), which is the
+// one thing a preview cannot guess: at 1080p the badge would be drawn half
+// again too small relative to the picture.
+check(
+	'the frame is the render size',
+	[WATERMARK_LAYOUT.landscape.frame, WATERMARK_LAYOUT.portrait.frame],
+	[{width: 1280, height: 720}, {width: 720, height: 1280}],
+);
+check('the badge never reaches full opacity', WATERMARK_STYLE.peakOpacity, 0.88);
 
 console.log(`\n${results.filter(Boolean).length}/${results.length} passed`);
 process.exit(results.every(Boolean) ? 0 : 1);

@@ -214,9 +214,13 @@ the full entry in the file named:
 
 - **Every colour in `platform/app/globals.css` is one `light-dark()` token**
   (since 2026-09-15 the site has a dark mode, chosen at `/admin/customize`
-  and carried as the `hov-theme` cookie). A literal colour is allowed only on
-  a surface that is the same in both themes — a video overlay, a near-black
-  panel's own internals — and says so in a comment. Never add a second
+  and carried as the `hov-theme` cookie; **the default is Light**, the
+  device is followed only when chosen). **The night is an inversion**: what
+  is near-black on the light ground — the "where you are" step card, the
+  pills, the panels — is white on the dark one, and everything written on a
+  panel reads a `--panel-*` token so it flips with it. A literal colour is
+  allowed only on a surface that is the same in both themes — a video
+  overlay, a film preview — and says so in a comment. Never add a second
   `[data-theme]` block of overrides: the token carries both values, which is
   the whole point. `docs/lessons-site.md`, "Settings is a hub, and the site
   has a night".

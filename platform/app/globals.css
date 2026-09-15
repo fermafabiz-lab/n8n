@@ -25,20 +25,30 @@
   /* THE THEME LAYER. Every colour token below carries BOTH its values in one
      light-dark() call, so each token has exactly one owner and there is no
      second block to keep in lockstep. Which half is used is decided by
-     `color-scheme` on this element: `light dark` follows the device, and the
-     two data-theme values — stamped on <html> by layout.tsx from the
-     hov-theme cookie, chosen at /admin/customize — force one. light-dark()
+     `color-scheme` on this element, set by the data-theme layout.tsx stamps
+     on <html> from the hov-theme cookie (chosen at /admin/customize): no
+     attribute or "light" is Daylight — THE DEFAULT, by the producer's
+     choice, whatever the device says — "dark" forces the night, and only
+     "system" hands it to the device with `light dark`. light-dark()
      is a <color> function, so it works inside a gradient stop or a shadow
      colour; what it cannot be is a whole gradient or a shadow list, which is
      why --card-fill, --shell and the shadows spell their stops out. Floor:
      Chrome 123 / Safari 17.5 / Firefox 120 (spring 2024) — the same vintage
      as the :has() and color-mix() this file already leans on.
 
+     THE NIGHT IS AN INVERSION, not a dimming. Where Daylight puts a black
+     surface on the light ground — the "where you are" step card, the
+     near-black pills, the floor panel, the brief's estimate rail, the toasts
+     — the night puts a WHITE one on the dark ground, and everything written
+     on those surfaces flips with them (the --panel-* family). The producer
+     asked for exactly this: "where there is black in Light mode, there
+     should be white in Dark mode".
+
      A literal colour survives at a call site only where the surface is the
-     SAME in both themes: video overlays, the near-black panels' own
-     internals, the white pill on a dark panel. Anything that sits on the
-     page ground, a card or a chip reads a token. */
-  color-scheme: light dark;
+     SAME in both themes: video overlays and the film-emulating previews.
+     Anything that sits on the ground, a card, a chip or a panel reads a
+     token. */
+  color-scheme: light;
 
   /* Ground. --bg and --card are interpolated INSIDE gradients at a few call
      sites, so both must stay flat colors — the cushioned card gradient is
@@ -135,16 +145,35 @@
   --chip-amber: light-dark(rgba(250, 238, 214, 0.94), rgba(74, 56, 16, 0.94));
 
   /* Dark panels — the near-black surfaces that punctuate the light ground.
-     At night they cannot be darker than the ground without reading as holes,
-     so their two gradient ends step UP instead, and the hairline they carry
-     gets a little stronger. */
-  --panel-mid: light-dark(#1a1a1f, #262630);
-  --panel-end: light-dark(#0f0f12, #1b1b22);
-  --panel: radial-gradient(120% 90% at 50% 120%, var(--accent-deep) 0%, var(--panel-mid) 55%, var(--panel-end) 100%);
-  --panel-ink: #f7f7f8;
-  --panel-body: #b7b7c2;
-  --panel-line: light-dark(rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.13));
-  --near-black: light-dark(#17171a, #2e2e37);
+     At night they INVERT: a white panel on the dark ground, lit from the
+     same corner by a pale lilac where the day panel has its deep purple.
+     Everything that sits on a panel reads a --panel-* token, so it flips
+     with the panel: white text on black becomes ink on white, the lifted
+     accent becomes the deep one, the white-alpha hairlines and fills become
+     ink-alpha. --panel-accent is the accent AS IT READS ON A PANEL — the
+     lift on black, the deep on white — never --accent-lift directly. */
+  --panel-glow: light-dark(#4d3484, #cdbaf3);
+  --panel-mid: light-dark(#1a1a1f, #f4f4f7);
+  --panel-end: light-dark(#0f0f12, #fdfdfe);
+  --panel: radial-gradient(120% 90% at 50% 120%, var(--panel-glow) 0%, var(--panel-mid) 55%, var(--panel-end) 100%);
+  --panel-ink: light-dark(#f7f7f8, #17171a);
+  --panel-text: light-dark(#e4e4ea, #2a2a30);
+  --panel-body: light-dark(#b7b7c2, #55555e);
+  --panel-dim: light-dark(#8f8f9c, #6f6f7c);
+  --panel-faint: light-dark(rgba(247, 247, 248, 0.42), rgba(24, 20, 40, 0.42));
+  --panel-line: light-dark(rgba(255, 255, 255, 0.09), rgba(24, 20, 40, 0.1));
+  --panel-line2: light-dark(rgba(255, 255, 255, 0.14), rgba(24, 20, 40, 0.16));
+  --panel-fill: light-dark(rgba(255, 255, 255, 0.08), rgba(24, 20, 40, 0.06));
+  --panel-fill2: light-dark(rgba(255, 255, 255, 0.12), rgba(24, 20, 40, 0.1));
+  --panel-accent: light-dark(#b299e7, #4d3484);
+  --panel-ok: light-dark(#93ebc0, #1f7a45);
+  --panel-err: light-dark(#f5a8a2, #9b2b1f);
+  --panel-ring-a: light-dark(rgba(178, 153, 231, 0.2), rgba(122, 79, 214, 0.12));
+  --panel-ring-b: light-dark(rgba(178, 153, 231, 0.42), rgba(122, 79, 214, 0.28));
+  --panel-ping: light-dark(rgba(178, 153, 231, 0.6), rgba(122, 79, 214, 0.55));
+  /* The near-black pill, which is the near-white pill at night; its label
+     is --panel-ink, which flips the other way. */
+  --near-black: light-dark(#17171a, #f7f7f8);
 
   --r-pill: 999px;
   --r-shell: 30px;
@@ -174,12 +203,13 @@
     background var(--dur) var(--ease), color var(--dur) var(--ease),
     border-color var(--dur) var(--ease);
 }
-/* The two forced modes. No attribute means "follow the device". */
-:root[data-theme="light"] {
-  color-scheme: light;
-}
+/* No attribute, or "light", is the default above. "dark" forces the night;
+   only "system" follows the device. */
 :root[data-theme="dark"] {
   color-scheme: dark;
+}
+:root[data-theme="system"] {
+  color-scheme: light dark;
 }
 
 * {
@@ -1099,11 +1129,11 @@ body:has(.nb) .nav {
   color: var(--panel-ink);
 }
 .pipe .ps.dark .ps-note {
-  color: var(--accent-lift);
+  color: var(--panel-accent);
 }
 .pipe .ps.dark .ic {
-  background: rgba(255, 255, 255, 0.12);
-  color: var(--accent-lift);
+  background: var(--panel-fill2);
+  color: var(--panel-accent);
 }
 /* Scoped under .pipe (0-3-0): a dark card can also be .done or .next, whose
    own name/badge rules sit later in this file at 0-2-0 and were repainting a
@@ -1151,10 +1181,10 @@ body:has(.nb) .nav {
 @keyframes psglowdark {
   0%,
   100% {
-    box-shadow: 0 0 0 1px rgba(178, 153, 231, 0.2), 0 0 14px 3px var(--accent-a22), var(--shadow-lg);
+    box-shadow: 0 0 0 1px var(--panel-ring-a), 0 0 14px 3px var(--accent-a22), var(--shadow-lg);
   }
   50% {
-    box-shadow: 0 0 0 1px rgba(178, 153, 231, 0.42), 0 0 26px 9px rgba(122, 79, 214, 0.42), var(--shadow-lg);
+    box-shadow: 0 0 0 1px var(--panel-ring-b), 0 0 26px 9px rgba(122, 79, 214, 0.42), var(--shadow-lg);
   }
 }
 /* The ring reads against the card behind it, so the dark card gets the
@@ -1175,7 +1205,7 @@ body:has(.nb) .nav {
 }
 @keyframes pspinglift {
   0% {
-    box-shadow: 0 0 0 0 rgba(178, 153, 231, 0.6);
+    box-shadow: 0 0 0 0 var(--panel-ping);
   }
   75% {
     box-shadow: 0 0 0 12px rgba(178, 153, 231, 0);
@@ -3217,7 +3247,7 @@ body:has(.nb) .nav {
   flex-direction: column;
   height: 100%;
   border-radius: 28px;
-  background: radial-gradient(120% 100% at 100% 0%, var(--accent-deep) 0%, var(--panel-mid) 55%, var(--panel-end) 100%);
+  background: radial-gradient(120% 100% at 100% 0%, var(--panel-glow) 0%, var(--panel-mid) 55%, var(--panel-end) 100%);
   box-shadow: 0 2px 6px color-mix(in srgb, var(--shadow-ink) 8%, transparent), 0 22px 54px color-mix(in srgb, var(--shadow-ink) 26%, transparent);
   padding: 22px 24px 24px;
 }
@@ -3225,9 +3255,9 @@ body:has(.nb) .nav {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  color: #e4e4ea;
+  background: var(--panel-fill);
+  border: 1px solid var(--panel-line2);
+  color: var(--panel-text);
   border-radius: var(--r-pill);
   padding: 6px 14px;
   font-size: 12.5px;
@@ -3236,7 +3266,7 @@ body:has(.nb) .nav {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--accent-lift);
+  background: var(--panel-accent);
   display: block;
 }
 /* The live title preview moved here from the old callsheet, and it keeps that
@@ -3255,7 +3285,7 @@ body:has(.nb) .nav {
   overflow: hidden;
 }
 .nb-est .sprev.blank {
-  color: rgba(247, 247, 248, 0.42);
+  color: var(--panel-faint);
 }
 .nb-est .blurb {
   margin: 9px 0 0;
@@ -3287,21 +3317,23 @@ body:has(.nb) .nav {
 .nb-est .rows dt {
   margin: 0;
   font-size: 12.5px;
-  color: #8f8f9c;
+  color: var(--panel-dim);
 }
 .nb-est .rows dd {
   margin: 0;
   font-family: var(--f-mono), ui-monospace, Menlo, monospace;
   font-size: 12.5px;
-  color: #e4e4ea;
+  color: var(--panel-text);
   text-align: right;
 }
 .nb-est .rows dd.off {
-  color: #8f8f9c;
+  color: var(--panel-dim);
 }
 /* The submit lives IN the rail, as the handoff draws it: a white pill on the
-   dark panel. It is still inside the <form> element — the rail is a child of
-   the form — so type=submit works exactly as before. */
+   dark panel — and at night, the inverse, a near-black pill on the white
+   panel, which the two tokens do on their own. It is still inside the <form>
+   element — the rail is a child of the form — so type=submit works exactly
+   as before. */
 .nb-est .go {
   width: 100%;
   /* auto, not a fixed value: this is what absorbs the panel's spare height
@@ -3316,9 +3348,9 @@ body:has(.nb) .nav {
   border-radius: var(--r-pill);
   padding: 15px 0;
   transition: var(--tr);
-  color: #17171a;
-  background: #fdfdfe;
-  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.32);
+  color: var(--near-black);
+  background: var(--panel-ink);
+  box-shadow: 0 12px 26px light-dark(rgba(0, 0, 0, 0.32), rgba(0, 0, 0, 0.5));
 }
 .nb-est .go:hover {
   transform: translateY(-3px);
@@ -3336,7 +3368,7 @@ body:has(.nb) .nav {
   margin: 12px 0 0;
   font-size: 11.5px;
   line-height: 1.5;
-  color: #8f8f9c;
+  color: var(--panel-dim);
   text-align: center;
   text-wrap: pretty;
 }
@@ -3347,10 +3379,10 @@ body:has(.nb) .nav {
   font-size: 13px;
 }
 .nb-est .formmsg.ok {
-  color: #93ebc0;
+  color: var(--panel-ok);
 }
 .nb-est .formmsg.err {
-  color: #f5a8a2;
+  color: var(--panel-err);
 }
 
 /* Dashed suggestion chips under the subject field. */
@@ -3718,7 +3750,7 @@ body:has(.mkt) .vignette {
   top: -14px;
   width: clamp(38px, 4.6vw, 60px);
   height: clamp(38px, 4.6vw, 60px);
-  background: #fdfdfe;
+  background: var(--panel-ink);
   font-family: var(--f-display), sans-serif;
   font-size: 22px;
   color: var(--accent);
@@ -3734,7 +3766,7 @@ body:has(.mkt) .vignette {
   font-size: 10.5px;
   letter-spacing: 0.04em;
   white-space: nowrap;
-  color: var(--accent-lift);
+  color: var(--panel-accent);
   animation: mktbob2 7.4s ease-in-out infinite;
 }
 .mkt-caps .t3 {
@@ -3742,7 +3774,7 @@ body:has(.mkt) .vignette {
   top: -8px;
   width: clamp(34px, 4.2vw, 54px);
   height: clamp(34px, 4.2vw, 54px);
-  background: #fdfdfe;
+  background: var(--panel-ink);
   font-size: 20px;
   color: var(--ink);
   animation: mktbob 8.2s ease-in-out infinite;
@@ -3809,9 +3841,9 @@ body:has(.mkt) .vignette {
   border: 1px solid var(--glass-line);
 }
 .mkt-btn.ghost {
-  color: #e4e4ea;
+  color: var(--panel-text);
   background: var(--accent-a16);
-  border: 1px solid rgba(178, 153, 231, 0.35);
+  border: 1px solid color-mix(in srgb, var(--panel-accent) 35%, transparent);
   box-shadow: none;
 }
 .mkt-scrolltab {
@@ -3951,7 +3983,7 @@ body:has(.mkt) .vignette {
 }
 .mkt-step.open {
   padding: 34px 36px 36px;
-  background: radial-gradient(120% 160% at 100% 0%, var(--accent-deep) 0%, var(--panel-mid) 52%, var(--panel-end) 100%);
+  background: radial-gradient(120% 160% at 100% 0%, var(--panel-glow) 0%, var(--panel-mid) 52%, var(--panel-end) 100%);
   box-shadow: var(--shadow-lg);
 }
 .mkt-step.open h3 {
@@ -3959,7 +3991,7 @@ body:has(.mkt) .vignette {
   font-size: clamp(26px, 3.2vw, 38px);
 }
 .mkt-step.open .no {
-  color: var(--accent-lift);
+  color: var(--panel-accent);
 }
 .mkt-step .body {
   padding-top: 14px;
@@ -3980,9 +4012,9 @@ body:has(.mkt) .vignette {
 }
 .mkt-step .chips span {
   font-size: 13px;
-  color: #e4e4ea;
+  color: var(--panel-text);
   background: var(--accent-a22);
-  border: 1px solid rgba(178, 153, 231, 0.3);
+  border: 1px solid color-mix(in srgb, var(--panel-accent) 30%, transparent);
   border-radius: var(--r-pill);
   padding: 9px 16px;
 }
@@ -4011,9 +4043,9 @@ body:has(.mkt) .vignette {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  color: #e4e4ea;
+  background: var(--panel-fill);
+  border: 1px solid var(--panel-line2);
+  color: var(--panel-text);
   font-size: 13px;
   padding: 7px 16px;
   border-radius: var(--r-pill);
@@ -4022,7 +4054,7 @@ body:has(.mkt) .vignette {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--accent-lift);
+  background: var(--panel-accent);
   display: block;
 }
 .mkt-dark h3 {
@@ -4034,16 +4066,16 @@ body:has(.mkt) .vignette {
   color: var(--panel-ink);
 }
 .mkt-dark h3 .lift {
-  color: var(--accent-lift);
+  color: var(--panel-accent);
 }
 .mkt-dark .dome {
   margin-top: 34px;
   width: min(460px, 90%);
   height: 240px;
   border-radius: 240px 240px 0 0;
-  background: repeating-linear-gradient(112deg, rgba(255, 255, 255, 0.06) 0 5px, rgba(255, 255, 255, 0) 5px 11px),
-    radial-gradient(closest-side, #2b2b33, #121216);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  background: repeating-linear-gradient(112deg, var(--panel-fill) 0 5px, transparent 5px 11px),
+    radial-gradient(closest-side, light-dark(#2b2b33, #e6e6ec), light-dark(#121216, #fdfdfe));
+  box-shadow: inset 0 1px 0 var(--panel-line);
 }
 .mkt-cards {
   display: flex;
@@ -4139,7 +4171,7 @@ body:has(.mkt) .vignette {
 .mkt-close {
   margin: 96px 8px 0;
   border-radius: var(--r-shell);
-  background: radial-gradient(110% 140% at 20% 0%, var(--accent-deep) 0%, var(--panel-mid) 55%, var(--panel-end) 100%);
+  background: radial-gradient(110% 140% at 20% 0%, var(--panel-glow) 0%, var(--panel-mid) 55%, var(--panel-end) 100%);
   box-shadow: var(--shadow-lg);
   padding: 76px 60px;
   display: flex;
@@ -4428,7 +4460,7 @@ body:has(.mkt) .vignette {
   box-shadow: var(--shadow);
 }
 .optcard.on {
-  background: linear-gradient(160deg, var(--accent-deep), var(--panel-end));
+  background: linear-gradient(160deg, var(--panel-glow), var(--panel-end));
   border-color: transparent;
   box-shadow: var(--shadow-lg);
 }
@@ -4445,7 +4477,7 @@ body:has(.mkt) .vignette {
   mask-image: linear-gradient(90deg, #000 0 55%, transparent 100%);
 }
 .optcard.on .wave {
-  background: repeating-linear-gradient(90deg, var(--accent-lift) 0 2px, transparent 2px 7px);
+  background: repeating-linear-gradient(90deg, var(--panel-accent) 0 2px, transparent 2px 7px);
   opacity: 0.9;
 }
 .optcard b {
@@ -4488,8 +4520,8 @@ body:has(.mkt) .vignette {
 /* On the chosen card the ground goes near-black, so the frame has to light
    up with it or it disappears into its own background. */
 .optcard.on .fmtbox {
-  border-color: var(--accent-lift);
-  background: rgba(178, 153, 231, 0.16);
+  border-color: var(--panel-accent);
+  background: color-mix(in srgb, var(--panel-accent) 16%, transparent);
 }
 .optcard:disabled {
   opacity: 0.5;
@@ -4682,7 +4714,7 @@ body:has(.mkt) .vignette {
   padding: 20px 22px 22px;
   display: flex;
   flex-direction: column;
-  background: radial-gradient(130% 100% at 100% 0%, var(--accent-deep) 0%, var(--panel-mid) 52%, var(--panel-end) 100%);
+  background: radial-gradient(130% 100% at 100% 0%, var(--panel-glow) 0%, var(--panel-mid) 52%, var(--panel-end) 100%);
   box-shadow: var(--shadow-lg);
 }
 .pj-live .lhead {
@@ -4696,7 +4728,7 @@ body:has(.mkt) .vignette {
   font-size: 11px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--accent-lift);
+  color: var(--panel-accent);
 }
 .pj-live .lhead .auto {
   font-family: var(--f-mono), ui-monospace, Menlo, monospace;
@@ -4730,7 +4762,7 @@ body:has(.mkt) .vignette {
 .pj-live .lpct {
   font-family: var(--f-mono), ui-monospace, Menlo, monospace;
   font-size: 11.5px;
-  color: var(--accent-lift);
+  color: var(--panel-accent);
   flex: none;
 }
 .pj-live .lbar {
@@ -4738,7 +4770,7 @@ body:has(.mkt) .vignette {
   display: block;
   height: 3px;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--panel-fill2);
   overflow: hidden;
 }
 .pj-live .lbar i {
@@ -4747,7 +4779,7 @@ body:has(.mkt) .vignette {
   top: 0;
   height: 100%;
   border-radius: 3px;
-  background: linear-gradient(90deg, rgba(178, 153, 231, 0.7), var(--accent-lift));
+  background: linear-gradient(90deg, color-mix(in srgb, var(--panel-accent) 70%, transparent), var(--panel-accent));
   display: block;
 }
 /* The sweep is the only thing on the page that says "this is moving right

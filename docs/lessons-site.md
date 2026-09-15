@@ -1499,6 +1499,11 @@ Asked before building, they chose: **remove** the three tables that were the
 old Settings page (genre profiles, script library, script examples — against
 my advice, so recorded as their call), the buttons Account / Billing /
 Notifications / Customize, and a three-way Light / Dark / Follow device.
+**Two corrections came back within the hour and are the current state:**
+the default is **Light**, not the device (no cookie means Daylight whatever
+the phone says; "Follow device" only when chosen), and the night is an
+**inversion** — "where there is black in Light mode, there should be white
+in Dark mode", the step cards being the example — not a dimming.
 
 **The three tables have no screen any more.** `hov.genre_profile`,
 `hov.script_library` and `hov.script_example` are still read by Claude
@@ -1531,9 +1536,12 @@ is the single owner of the cookie name, the three values, the parse, and
 cookie set over plain http is dropped silently, which would make the toggle
 work everywhere except `next dev`). `generateViewport` sets
 `<meta theme-color>` from the same cookie so the phone's tab strip follows.
-"system" is stored explicitly rather than by deleting the cookie: a producer
-who chose to follow the device is then distinguishable from one who never
-opened the panel.
+"system" is stored explicitly rather than by deleting the cookie, and the
+ATTRIBUTE is always stamped: no cookie and "light" both mean
+`color-scheme: light`, "dark" forces the night, only "system" writes
+`light dark`. The first cut had the missing attribute mean "device" — the
+producer wanted a colleague's first visit to be the one look everybody
+knows, so it means Light.
 
 **What "inverting" actually took, so it is not re-derived.** The Daylight
 header comment said it in 2026-08: an inversion is not a value swap. The
@@ -1556,9 +1564,21 @@ across the module sheets — and the pass over them was one auditable script
   to a new `--accent-ink`, which is the deep step by day and a pale one at
   night. Same for the pale near-opaque status chips on the project cards:
   `--chip-*` flips pale→deep while `--green-ink` / `--red-ink` / `--amber`
-  flip the other way. And the near-black panels cannot be darker than a dark
-  ground without reading as holes, so `--panel-mid` / `--panel-end` step UP
-  at night and `--panel-line` gets stronger.
+  flip the other way. **And the near-black panels INVERT** — the "where you
+  are" step card, the floor panel, the brief's estimate rail, the toasts,
+  the near-black pills: white on the dark ground at night, lit from the same
+  corner by a pale lilac (`--panel-glow`) where the day panel has its deep
+  purple. The first cut stepped them UP to a lifted dark instead, on the
+  reasoning that a dark panel on a dark ground reads as a hole; the producer
+  looked at it and asked for the inversion, and it is better — the black
+  card marking "where you are" was invisible as a lifted grey. What made the
+  flip cheap is that everything written on a panel reads a `--panel-*` token
+  (`-ink`, `-text`, `-body`, `-dim`, `-faint`, `-line`, `-line2`, `-fill`,
+  `-fill2`, `-ok`, `-err`, the glow rings), and **`--panel-accent` is the
+  accent as it reads ON A PANEL** — the lift on black, the deep on white.
+  `--accent-lift` itself now appears only in the page arcs. The one
+  literal that had survived on the brief's white submit pill went back to
+  tokens for the same reason: at night that pill is near-black on white.
 - **A literal survives only where the surface is the same in both themes:**
   video overlays, the near-black panels' internals, the white pill on the
   brief's dark panel (`.nb-est .go` — its `--near-black` text became the

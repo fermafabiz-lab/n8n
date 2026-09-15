@@ -52,7 +52,7 @@ Night (2026-09-15 — the site's dark mode; `platform/app/globals.css` is the ow
 - Hairlines are white at the day alphas (9 / 14 / 6%); shadows are black and three to four times the day alpha on the five tokens, day alpha at call sites
 - Accent lifts one step to `#9070e0` (5.0:1 on the ground); deep and lift keep their values because they are the panel gradients' ends; accent-as-text on a chip is `#c3adf0`
 - Status `#5b8ee8` / `#2fb976` / `#ea6a5f`; chip text `#5fd39a` / `#f08a80` / `#e6b45a` on deep chips `rgba(22,62,44,.94)` / `rgba(84,30,26,.94)` / `rgba(74,56,16,.94)` / accent `rgba(58,44,96,.94)`
-- Dark panels step UP, not down: `#262630` → `#1b1b22` with the same purple corner; panel hairline `rgba(255,255,255,.13)`; near-black buttons `#2e2e37`
+- Dark panels INVERT: white `#f4f4f7` → `#fdfdfe` lit by a lilac corner `#cdbaf3` where the day panel has `#4d3484`; on them ink `#17171a` / `#2a2a30` / body `#55555e` / dim `#6f6f7c`, hairline `rgba(24,20,40,.1)`, the accent as deep `#4d3484`; near-black buttons become `#f7f7f8` with `#17171a` labels
 - Glass pills `rgba(26,26,32,.82)` (`.97` for the phone menu) with a `rgba(255,255,255,.1)` top edge
 
 ## Screens / Views

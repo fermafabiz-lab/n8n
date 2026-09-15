@@ -9,11 +9,12 @@
  * mode must never do. Why a cookie and not the database: the site has one
  * shared password and no user, so "my" theme can only mean this browser's.
  *
- * "system" is stored explicitly rather than by deleting the cookie, so a
- * producer who chose to follow the device is distinguishable from one who
- * never opened the panel — the same behaviour today, but the record is
- * honest. The attribute is simply absent for it, and globals.css falls
- * through to `color-scheme: light dark`, which is the device.
+ * THE DEFAULT IS LIGHT, not the device. No cookie — a new browser, a cleared
+ * one — means Daylight, whatever the phone or laptop is set to; the site
+ * follows the device only when "Follow device" was chosen, and that choice
+ * is stored as "system" like the other two. The producer asked for exactly
+ * this on 2026-09-15, so a colleague opening the site for the first time
+ * sees the one look everybody knows.
  */
 export type Theme = "light" | "dark" | "system";
 
@@ -22,12 +23,16 @@ export const THEME_COOKIE = "hov-theme";
 export const THEMES: readonly Theme[] = ["light", "dark", "system"];
 
 export function parseTheme(value: unknown): Theme {
-  return value === "light" || value === "dark" ? value : "system";
+  return value === "dark" || value === "system" ? value : "light";
 }
 
-/** The `data-theme` value for <html>: undefined means "follow the device". */
-export function themeAttribute(theme: Theme): "light" | "dark" | undefined {
-  return theme === "system" ? undefined : theme;
+/**
+ * The `data-theme` value for <html>. Always stamped: globals.css maps
+ * "light" and the missing attribute to `color-scheme: light`, "dark" to
+ * `dark`, and "system" to `light dark`, which is the device.
+ */
+export function themeAttribute(theme: Theme): Theme {
+  return theme;
 }
 
 /** The page ground each choice paints, for the browser's own chrome. */
@@ -40,10 +45,7 @@ export const THEME_COLOR = { light: "#ececed", dark: "#121216" } as const;
  * would make the toggle work everywhere except `next dev`.
  */
 export function applyTheme(theme: Theme): void {
-  const root = document.documentElement;
-  const attr = themeAttribute(theme);
-  if (attr) root.dataset.theme = attr;
-  else delete root.dataset.theme;
+  document.documentElement.dataset.theme = themeAttribute(theme);
   const secure = location.protocol === "https:" ? "; Secure" : "";
   document.cookie = `${THEME_COOKIE}=${theme}; Path=/; Max-Age=${60 * 60 * 24 * 365}; SameSite=Lax${secure}`;
 }

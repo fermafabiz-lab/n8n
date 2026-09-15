@@ -61,10 +61,11 @@ export const metadata: Metadata = {
 /**
  * The theme is decided HERE, on the server, from the hov-theme cookie, and
  * arrives as `data-theme` on <html> — so a dark page is dark on its first
- * paint, with no script and no flash. "system" stamps nothing and leaves the
- * decision to `color-scheme: light dark` in globals.css, i.e. the device.
- * Reading the cookie makes every route dynamic; every page here already was,
- * and the site sits behind a password anyway. lib/theme.ts owns the rest.
+ * paint, with no script and no flash. No cookie is Light (the default, by
+ * the producer's choice); "system" hands the decision to `color-scheme:
+ * light dark` in globals.css, i.e. the device. Reading the cookie makes
+ * every route dynamic; every page here already was, and the site sits
+ * behind a password anyway. lib/theme.ts owns the rest.
  */
 async function currentTheme() {
   return parseTheme((await cookies()).get(THEME_COOKIE)?.value);

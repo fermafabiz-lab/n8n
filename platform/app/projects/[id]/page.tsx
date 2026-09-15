@@ -801,6 +801,26 @@ export default async function ProductionRoom({
             </p>
           </div>
         ) : null}
+
+        {/* Who started this film, at the foot of its page. Nothing reads it —
+            it exists so the four of them can see who made what, and the
+            counts on the projects page are made of these names. Absent on
+            every film from before the brief asked, which is the truth rather
+            than a default: a guessed owner is a wrong entry on somebody's
+            score. */}
+        {project.createdBy && (
+          <p
+            style={{
+              margin: "28px 0 0",
+              paddingTop: 16,
+              borderTop: "1px solid var(--line)",
+              fontSize: 13,
+              color: "var(--dim)",
+            }}
+          >
+            Created by <b style={{ color: "var(--soft)" }}>{project.createdBy}</b>
+          </p>
+        )}
       </div>
       </StageNavProvider>
     </main>

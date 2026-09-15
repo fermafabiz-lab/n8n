@@ -35,6 +35,7 @@ import {
 } from "@/lib/provenance";
 import {
   normalizeCaptionColor,
+  normalizeCreatedBy,
   normalizeMusicLevel,
   normalizeMusicTrack,
   normalizeSfxLevel,
@@ -1999,6 +2000,12 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
   }
 
   const payload = {
+    // Who started it. Whitelisted here AND in the orchestrator's `Normalize
+    // Webhook Input`, which is what writes it into Editing Options — the same
+    // double guard `video_model` carries, for the same reason: this string
+    // crosses a webhook body and a Code node before it reaches a screen.
+    // Posts "" when nothing was picked, which stores nothing at all.
+    created_by: normalizeCreatedBy(formData.get("created_by")) ?? "",
     "Nume Proiect": String(formData.get("name") ?? ""),
     category: String(formData.get("category") ?? "story"),
     category_options: categoryOptions,

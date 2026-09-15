@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { deleteProjects, type ActionResult } from "@/app/actions";
 import ExpandableTitle from "@/components/ExpandableTitle";
 import type { Project, StatusKind } from "@/lib/data";
+import { CREATORS } from "@/lib/data/derive";
 import { mediaSrc } from "@/lib/media";
 
 function badgeLabel(p: Project): string {
@@ -195,6 +196,17 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
         (p.category ?? "").toLowerCase().includes(q) ||
         (p.tone ?? "").toLowerCase().includes(q),
     );
+
+  // The score. Counted over the MATCHED set rather than the whole library, so
+  // it answers whatever question the tabs and the search are already asking —
+  // "who has films in flight", "who made the finished ones" — instead of one
+  // fixed total. Films from before the name existed are counted apart rather
+  // than hidden: a tally that silently drops rows reads as a wrong count.
+  const byCreator = CREATORS.map((who) => ({
+    who,
+    n: matched.filter((p) => p.createdBy === who).length,
+  })).filter((c) => c.n > 0);
+  const unattributed = matched.filter((p) => !p.createdBy).length;
 
   const totalPages = Math.max(1, Math.ceil(matched.length / PAGE_SIZE));
   /**
@@ -456,7 +468,13 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
                   </div>
                 )}
                 <div className="foot">
-                  <span>{agoOf(p.updatedAt) || p.status}</span>
+                  {/* Who made it, on the card itself — the whole point of
+                      recording the name. Older films have none and simply
+                      show the time, exactly as they did before. */}
+                  <span>
+                    {p.createdBy ? `${p.createdBy} · ` : ""}
+                    {agoOf(p.updatedAt) || p.status}
+                  </span>
                   <span className="go">
                     {manage
                       ? selected.has(p.id)
@@ -507,6 +525,7 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
                 <span className="meta">
                   {p.lengthSeconds ? `${p.lengthSeconds}s` : "—"}
                   {p.tone ? ` · ${p.tone}` : ""}
+                  {p.createdBy ? ` · ${p.createdBy}` : ""}
                 </span>
               </span>
               <span className={`st ${badgeClass(p)}`}>{badgeLabel(p)}</span>
@@ -521,6 +540,19 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
             Showing {from + 1}–{from + shown.length} of {matched.length}
             {matched.length !== projects.length ? ` (${projects.length} total)` : ""}
           </span>
+          {/* Who made what, for the set on screen. Absent entirely until at
+              least one film carries a name, so a library of older projects
+              gains no empty row. */}
+          {byCreator.length > 0 && (
+            <span style={{ display: "flex", gap: 12, flexWrap: "wrap", color: "var(--soft)" }}>
+              {byCreator.map((c) => (
+                <span key={c.who}>
+                  {c.who} <b style={{ color: "var(--ink)" }}>{c.n}</b>
+                </span>
+              ))}
+              {unattributed > 0 && <span>unnamed {unattributed}</span>}
+            </span>
+          )}
           {totalPages > 1 && (
             <nav className="pager" aria-label="Projects pages">
               <button

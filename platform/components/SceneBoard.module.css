@@ -41,7 +41,7 @@
    runs — the producer watches this number, not the key list. */
 .left {
   margin-left: auto;
-  color: var(--accent-deep);
+  color: var(--accent-ink);
   font-weight: 600;
 }
 
@@ -57,7 +57,7 @@
   background: none;
   font: inherit;
   font-weight: 600;
-  color: var(--accent-deep);
+  color: var(--accent-ink);
   text-decoration: underline;
   text-underline-offset: 2px;
   cursor: pointer;

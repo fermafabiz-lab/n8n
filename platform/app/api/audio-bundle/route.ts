@@ -21,6 +21,7 @@ import { getProject, getScenes } from "@/lib/data";
 import { driveId, safeFilename } from "@/lib/media";
 import { chapterOf } from "@/lib/chapters";
 import { concatMp3 } from "@/lib/mp3";
+import { AudioBundleQuery, ValidationError, parseQuery } from "@/lib/validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -66,11 +67,15 @@ const hasFfmpeg = (): Promise<boolean> => {
 
 export async function GET(req: Request) {
 	const params = new URL(req.url).searchParams;
-	const projectId = params.get("project") ?? "";
-	const chapter = (params.get("chapter") ?? "all").trim();
-
-	if (!/^rec[A-Za-z0-9]{14}$/.test(projectId)) return bad(400, "invalid project id");
-	if (!/^(all|hook|\d{1,3})$/.test(chapter)) return bad(400, "invalid chapter");
+	let query: ReturnType<typeof AudioBundleQuery.parse>;
+	try {
+		query = parseQuery(params, AudioBundleQuery);
+	} catch (e) {
+		if (e instanceof ValidationError) return bad(e.status, e.message);
+		throw e;
+	}
+	const { chapter } = query;
+	const projectId = query.project;
 
 	const [project, scenes] = await Promise.all([
 		getProject(projectId),

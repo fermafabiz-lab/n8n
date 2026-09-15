@@ -37,11 +37,12 @@ export default function StaleCopyBanner() {
         zIndex: 100,
         padding: "9px 16px",
         // A warning tint, not the accent: this banner must not read as part of
-        // the brand. On the dark ground it was a deep brown carrying pale text;
-        // inverted, the tint stays warm and the text becomes the saturated ink.
-        background: "#fdece7",
+        // the brand. The red chip pair from globals.css — pale ground with the
+        // saturated ink by day, the other way round at night — so it flips
+        // with the theme instead of staying a pink stripe on a dark page.
+        background: "var(--chip-red)",
         borderBottom: "1px solid rgba(216, 72, 61, 0.28)",
-        color: "#8c3323",
+        color: "var(--red-ink)",
         fontSize: 13,
         textAlign: "center",
       }}
@@ -51,7 +52,7 @@ export default function StaleCopyBanner() {
       some features need the live server. Use{" "}
       <a
         href="https://house-of-videos.com"
-        style={{ color: "#5e1f13", fontWeight: 600, textDecoration: "underline" }}
+        style={{ color: "var(--red-ink)", fontWeight: 600, textDecoration: "underline" }}
       >
         house-of-videos.com
       </a>

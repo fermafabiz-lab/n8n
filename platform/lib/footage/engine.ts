@@ -149,11 +149,22 @@ export async function searchFootage(r: FootageSearchRequest, opts: EngineOptions
     return { candidates: orderByScore(merged, r).slice(0, top), providers: reports, source: "cache", queries, ms: Date.now() - started };
   }
 
-  // 2. The router.
-  const routed = routeProviders(r, { only: opts.providers, max: opts.providers ? 6 : 4 });
+  // 2. The router. A provider the health module is holding back is left out
+  //    of the four so its slot goes to the next candidate — and the report
+  //    says why it was left out, not "not routed for this subject".
+  const held = new Map<string, string>();
+  const routed = routeProviders(r, {
+    only: opts.providers,
+    max: opts.providers ? 6 : 4,
+    skip: (p) => {
+      const h = heldBack(p.id);
+      if (h) held.set(p.id, h);
+      return Boolean(h);
+    },
+  });
   const routedIds = new Set(routed.map((x) => x.provider.id));
   for (const p of searchableProviders()) {
-    if (!routedIds.has(p.id)) reports.push({ provider: p.id, displayName: p.displayName, enabled: p.enabled, routed: false, reason: "not routed for this subject", count: 0, ms: 0 });
+    if (!routedIds.has(p.id)) reports.push({ provider: p.id, displayName: p.displayName, enabled: p.enabled, routed: false, reason: held.get(p.id) ?? "not routed for this subject", count: 0, ms: 0 });
   }
 
   // 3. The providers, each on its own.

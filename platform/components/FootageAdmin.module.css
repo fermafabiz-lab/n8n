@@ -36,7 +36,7 @@
 }
 
 .herr {
-  color: #9b2b1f;
+  color: var(--red-ink);
   font-size: 11px;
 }
 
@@ -106,7 +106,7 @@
 
 .doors button[aria-pressed="true"] {
   border-color: var(--accent);
-  color: var(--accent-deep);
+  color: var(--accent-ink);
 }
 
 .count {
@@ -122,11 +122,11 @@
 }
 
 .msg.ok {
-  color: #1f7a45;
+  color: var(--green-ink);
 }
 
 .msg.err {
-  color: #9b2b1f;
+  color: var(--red-ink);
 }
 
 .grid {

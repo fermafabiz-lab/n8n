@@ -96,8 +96,9 @@ export default function PublishingPanel({
   /**
    * Ask /api/yt-kit for the derived description — the film's own opening
    * narration, its chapter markers with timestamps summed from the real
-   * takes, and the research pack's sources. Fills the draft; nothing is
-   * stored until Save, so a bad generation costs one click to discard.
+   * takes, the research pack's sources, and the credits the archive footage
+   * owes. Fills the draft; nothing is stored until Save, so a bad generation
+   * costs one click to discard.
    */
   const generate = async () => {
     setBuilding(true);
@@ -109,6 +110,8 @@ export default function PublishingPanel({
         measured?: boolean;
         chapters?: number;
         sources?: number;
+        credits?: number;
+        creditsRequired?: number;
         error?: string;
       };
       if (!res.ok || !body.description) {
@@ -120,6 +123,13 @@ export default function PublishingPanel({
         `${body.chapters ?? 0} chapters${body.measured ? "" : " (timestamps estimated)"}`,
         `${body.sources ?? 0} sources`,
       ];
+      // Said out loud, and the REQUIRED half named separately: those lines are
+      // a licence condition rather than a nicety, so someone trimming the
+      // description by hand should know which ones cost something to delete.
+      if (body.credits) {
+        const req = body.creditsRequired ?? 0;
+        bits.push(`${body.credits} footage credits${req ? ` (${req} required by licence)` : ""}`);
+      }
       setMsg({ ok: true, message: `Description built — ${bits.join(", ")}. Edit freely, then save.` });
     } catch {
       setMsg({ ok: false, message: "Could not build the description." });

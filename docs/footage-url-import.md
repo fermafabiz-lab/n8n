@@ -43,9 +43,16 @@ page — and takes, in order of trust:
 | duration | ISO 8601 `duration` (`PT1M30S` → 90) or `video:duration` |
 | rights | `rel="license"` link, JSON-LD `license` (creativecommons.org URLs are understood), `copyrightNotice`/`copyright` metas, `copyrightHolder`; then the host's published policy (`DOMAIN_RIGHTS`: europa.eu, nasa.gov, defense.gov/mil sites); else *No licence stated on the page* |
 
-A Wikimedia Commons `File:` page is routed to the Commons adapter instead
-(`matchesUrl` / `importFromUrl` on the provider), so it arrives as a
-`wikimedia` asset with the template's licence.
+A page that belongs to a provider is routed to that provider's own
+importer instead (`matchesUrl` / `importFromUrl` on the adapter): a
+Commons `File:` page arrives as a `wikimedia` asset with the template's
+licence, an `archive.org/details/…` page as an `internet_archive` asset
+with its collection's rights, and likewise Europeana, Library of Congress,
+Wellcome, NASA, DVIDS, EU AV, Flickr, Pexels, Pixabay and Unsplash item
+pages — the provider's catalogue answer, not a scrape of its HTML. A
+provider that is off (no key, or opt-in and not opted in) is skipped, and
+the page goes through the generic reader below like any other, with the
+rights it states.
 
 ## Rights
 
@@ -71,6 +78,24 @@ A Wikimedia Commons `File:` page is routed to the Commons adapter instead
    who confirms `cleared` / `attribution_required` records their act: the
    row is `approved`, `rightsText` gains *Rights confirmed by the producer
    at import*, and `verified_note` says who.
+
+## Destockd: the provider whose pages live in the fragment
+
+`destockd.com` is a searched archive (`footage-sources.md`), but its pages
+are a hash router, so importing one is a special case worth knowing:
+
+- a clip file on `clips.destockd.com` → filed under `destockd`; the
+  directory is the film and the filename the shot;
+- `#/shot/<film>/<shot>` → the identity is in the FRAGMENT, which a browser
+  never sends to a server. It is parsed from the URL string and read through
+  the shot endpoint, which also names the source film on archive.org;
+- `#/film/<film>` → names no shot, so the FedFlix item on archive.org is
+  handed back instead of a guess. That row's provider is `internet_archive`,
+  because that is genuinely where the media lives.
+
+**`canonicalUrl()` drops the fragment**, which is right for identity
+everywhere else and would erase a Destockd page's whole meaning — the
+provider door runs before anything canonicalises, and reads `url.hash`.
 
 ## Provenance
 

@@ -1,0 +1,702 @@
+{
+ "id": "MDYR0J93RJDU8ftf",
+ "name": "Hook Regen",
+ "active": true,
+ "isArchived": false,
+ "versionId": "fde136f7-b7f5-4bae-bfdb-e51271a277db",
+ "activeVersionId": "fde136f7-b7f5-4bae-bfdb-e51271a277db",
+ "triggerCount": 1,
+ "createdAt": "2026-09-11T21:27:37.932Z",
+ "updatedAt": "2026-09-12T09:22:07.148Z",
+ "settings": {
+  "executionOrder": "v1",
+  "availableInMCP": true
+ },
+ "connections": {
+  "Hook Regen Webhook": {
+   "main": [
+    [
+     {
+      "node": "HR Load",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "HR Load": {
+   "main": [
+    [
+     {
+      "node": "HR Prep",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "HR Prep": {
+   "main": [
+    [
+     {
+      "node": "HR Write Hook",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "HR Write Hook": {
+   "main": [
+    [
+     {
+      "node": "HR Guard",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "HR Guard": {
+   "main": [
+    [
+     {
+      "node": "HR Retry?",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "HR Retry?": {
+   "main": [
+    [
+     {
+      "node": "HR Write Hook",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "HR Shots Prompt",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "HR Shots Prompt": {
+   "main": [
+    [
+     {
+      "node": "HR Write Shots",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "HR Write Shots": {
+   "main": [
+    [
+     {
+      "node": "HR Apply",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "HR Apply": {
+   "main": [
+    [
+     {
+      "node": "HR Commit",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "HR Commit": {
+   "main": [
+    null,
+    [
+     {
+      "node": "HR Release Flag",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "nodes": [
+  {
+   "id": "13392586-40ca-4d8e-b501-6ebbcd258d58",
+   "name": "Hook Regen Webhook",
+   "type": "n8n-nodes-base.webhook",
+   "typeVersion": 2.1,
+   "position": [
+    0,
+    80
+   ],
+   "parameters": {
+    "httpMethod": "POST",
+    "path": "hook-regen",
+    "responseMode": "onReceived"
+   },
+   "webhookId": "0a2888fe-96b0-40d1-81de-55aee3150d34"
+  },
+  {
+   "id": "6ce752c9-9510-4d25-85d4-7e98c040bef0",
+   "name": "HR Load",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.6,
+   "position": [
+    224,
+    80
+   ],
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "=select p.id, p.name, p.tone, p.language, p.style, p.aspect, p.story_bible, p.editing_options,\n  (select json_agg(json_build_object('id', c.id, 'ordinal', c.ordinal, 'title', c.title, 'script', c.chapter_script) order by c.ordinal) from hov.chapter c where c.project_id = p.id) as chapters,\n  (select json_agg(s.id) from hov.scene s where s.project_id = p.id and s.scene_order < 100) as hook_scene_ids,\n  (select json_agg(json_build_object('ref', e.ref, 'claim', e.claim, 'source', e.source_name, 'url', e.source_url, 'date', e.source_date) order by e.ref) from hov.evidence e where e.project_id = p.id) as evidence,\n  (select row_to_json(g) from (select g.hook_rule, g.voice, g.format from hov.genre_profile g where g.active and lower(g.tone) = lower(coalesce(p.tone, '')) limit 1) g) as genre\nfrom hov.project p\nwhere p.id = $hov${{ $json.body.project_id }}$hov$",
+    "options": {}
+   },
+   "executeOnce": true
+  },
+  {
+   "id": "5ff94409-5ae6-4cc8-b325-cb1e2d1d2fa8",
+   "name": "HR Prep",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    448,
+    80
+   ],
+   "parameters": {
+    "jsCode": "// Everything the hook writer needs, from one project row — and the rules it\n// must obey, which are the SAME rules Voice Mode gives the scripting run\n// (a second copy, kept in lockstep by hand: change one, change both).\nconst row = $('HR Load').first().json || {};\nconst body = ($('Hook Regen Webhook').first().json || {}).body || {};\nif (!row.id) throw new Error('hook-regen: project not found: ' + String(body.project_id || ''));\n\nlet opts = row.editing_options;\nif (typeof opts === 'string') { try { opts = JSON.parse(opts); } catch (e) { opts = {}; } }\nopts = (opts && typeof opts === 'object') ? opts : {};\nlet bible = {};\ntry { bible = JSON.parse(row.story_bible || '{}') || {}; } catch (e) { bible = {}; }\nconst chapters = (Array.isArray(row.chapters) ? row.chapters : []).filter((c) => Number(c.ordinal) > 0);\nif (!chapters.length) throw new Error('hook-regen: this film has no chapters yet — the hook is written with the script, not before it.');\nconst evidence = Array.isArray(row.evidence) ? row.evidence : [];\nconst genre = (row.genre && typeof row.genre === 'object') ? row.genre : {};\n\nconst category = String(opts.category || '');\nconst cinematic = category === 'cinematic';\nconst kids = category === 'kids';\nconst HOOK_STYLES = ['teaser', 'question', 'figure', 'slate', 'action', 'cliffhanger'];\nconst SILENT = ['slate', 'action', 'cliffhanger'];\nconst wanted = String(body.hook_style || opts.hookStyle || '').trim().toLowerCase();\nlet allowed = HOOK_STYLES.includes(wanted) ? [wanted] : HOOK_STYLES.slice();\nif (cinematic) allowed = allowed.filter((s) => SILENT.includes(s));\nif (kids) allowed = allowed.filter((s) => ['teaser', 'question', 'slate'].includes(s));\nif (!allowed.length) allowed = cinematic ? ['action'] : ['teaser'];\nconst forced = allowed.length === 1;\n\nconst DEFS = {\n  teaser: 'TEASER — 3 to 5 SPOKEN beats of 2-10 words each, one shot per beat. The most dramatic stretch of the story told like a trailer: present tense, concrete, each beat a step further in, and NEVER the outcome — the viewer must not learn how it ends. Example shape for a heist story: \"One student. / A bank with three vaults. / Past the guards, alone. / Out with the money, and nobody suspects him.\" card stays empty.',\n  question: 'QUESTION — 1 or 2 SPOKEN beats (3-12 words each) plus card.line1 = ONE question on screen, 3-12 words, ending with \"?\", that the film answers. card.line2 and card.source empty.',\n  figure: 'FIGURE — 1 or 2 SPOKEN beats plus card.line1 = ONE number the film states (a year, a sum, a count), copied EXACTLY as the narration or the research pack writes it — never a number you computed or remembered; card.line2 = what it measures, at most 8 words; card.source = the evidence ref (E1..E20) when it comes from the research pack, else \"\".',\n  slate: 'SLATE — exactly 1 SILENT shot note (8-25 words): the establishing frame of the story\\'s main location as the bible describes it, no person near the camera, calm, with empty space in the centre of the frame for a title. card.line1 = the PLACE (at most 6 words), card.line2 = the DATE or time as the story states it (at most 6 words; leave \"\" if the story never states one — do not invent a date). Nothing is spoken.',\n  action: 'ACTION — 2 or 3 SILENT shot notes (8-25 words each): the climax IN MOTION — what the protagonist does at the peak, each note one concrete visible action with its sound implied, no faces close to camera. Nothing is spoken; the story starts right after.',\n  cliffhanger: 'CLIFFHANGER — 2 or 3 SILENT shot notes (8-25 words each): the moment BEFORE the catastrophe or the turn, tension rising shot by shot, ending on the frame just before the outcome — never the outcome itself. Nothing is spoken; the film then starts from the beginning.',\n};\nconst styleRules = '\\nHOOK STYLE. ' + (forced\n  ? 'The producer chose the style ' + allowed[0].toUpperCase() + ' — use it and no other.'\n  : 'Choose the ONE style that fits this story best from the list below and name it in \"style\".') +\n  '\\n' + allowed.map((s) => '- ' + DEFS[s]).join('\\n') +\n  '\\nA SPOKEN beat is a line the narrator says. A SILENT shot note is what the camera sees, present tense, never spoken — write it as a shot, not as prose.' +\n  '\\nThe hook may use only Story Bible characters and locations, and must not reveal how the story ends.\\n';\n\nconst language = String(row.language || 'English');\nconst chaptersJson = JSON.stringify(chapters.map((c) => ({ chapter_number: c.ordinal, chapter_title: c.title, narrator_script: c.script })));\nconst claimsList = evidence.map((e) => e.ref + ': ' + String(e.claim || '') + ' | SOURCE: ' + String(e.source || '') + (e.date ? ' | DATE: ' + e.date : '')).join('\\n');\n\nconst system = 'You are a hook writer for ' + String(genre.format || 'documentary') + ' videos. Viewers decide in the FIRST SECONDS whether to keep watching.\\n\\n' +\n  'Write the OPENING HOOK — a short teaser of several fast shots BEFORE chapter 1 begins, in one of the styles defined below. It must create a gap the rest of the video pays off, without giving the ending away. This is a REWRITE asked for by the producer: the story, its chapters and its scenes already exist and stay exactly as they are — only the hook changes.\\n\\n' +\n  (genre.hook_rule ? 'THE HOOK RULE FOR THIS GENRE — follow it exactly:\\n' + genre.hook_rule + '\\n\\n' : '') +\n  (genre.voice ? 'GENRE VOICE — the hook is spoken in the same voice as the rest of the narration:\\n' + genre.voice + '\\n\\n' : '') +\n  'Rules:' + styleRules +\n  '1. style: the style you used, exactly one of the names listed above, lower-case.\\n' +\n  '2. beats: an array with one string per SHOT, in order — spoken lines for a spoken style, shot notes for a silent one, as the style defines. Written in ' + language + ' for spoken beats; shot notes in ENGLISH. Concrete and specific to THIS story — no clichés (\"What if I told you\", \"You won\\'t believe\"), no vague drama, no summary of the whole film. Each beat is its own shot, so each must be a different picture.\\n' +\n  '3. NEVER reveal the ending or the final turn. The hook opens a gap; chapter 1 onward closes it. A number, name or event that appears only in the last chapter does not belong in the hook.\\n' +\n  '4. card: {line1, line2, source} exactly as the style defines; every field you do not use is \"\".\\n' +\n  '5. hook_summary: in ENGLISH, 2-3 sentences describing what the viewer SEES across the hook\\'s shots (use only Story Bible characters/locations).\\n' +\n  (cinematic ? '\\nTHIS FILM HAS NO NARRATION: nothing in the hook is spoken either. Only the SILENT hook styles are available — every beat you write is a shot note the camera performs, never a line a voice reads.\\n' : '') +\n  (kids && !cinematic ? '\\nKIDS STORY: open like a storyteller inviting a child in — warm, curious, direct — never dramatic or ominous.\\n' : '') +\n  '\\nReturn ONLY a raw JSON object: {\"style\": \"...\", \"beats\": [\"...\"], \"card\": {\"line1\": \"\", \"line2\": \"\", \"source\": \"\"}, \"hook_summary\": \"...\"}. No markdown.';\n\nconst user = 'THE FULL NARRATION (chapters JSON — the hook must set up THIS exact story, without spoiling its ending):\\n' + chaptersJson +\n  '\\n\\nSTORY BIBLE (the film\\'s locked world — the hook\\'s visuals may use ONLY these characters and locations):\\n' + JSON.stringify(bible) +\n  (claimsList ? '\\n\\nRESEARCH PACK (sourced claims, by ref):\\n' + claimsList : '') +\n  '\\n\\nTema: ' + String(row.name || '') + '\\nTonalitate: ' + String(row.tone || '') + '\\nLanguage: ' + language;\n\nconst payload = {\n  model: 'gpt-5.4',\n  response_format: { type: 'json_object' },\n  messages: [{ role: 'system', content: system }, { role: 'user', content: user }],\n};\nreturn [{ json: {\n  payload, allowed, forced, wanted: HOOK_STYLES.includes(wanted) ? wanted : 'auto', silentStyles: SILENT,\n  projectId: row.id, language, style: String(row.style || ''), tone: String(row.tone || ''),\n  category, cinematic, kids, bible, chapters, evidenceText: JSON.stringify(evidence),\n  hookChapterId: ((Array.isArray(row.chapters) ? row.chapters : []).find((c) => Number(c.ordinal) === 0) || {}).id || '',\n  oldHookSceneIds: Array.isArray(row.hook_scene_ids) ? row.hook_scene_ids : [],\n  aspect: String(row.aspect || '16:9'),\n} }];\n"
+   }
+  },
+  {
+   "id": "5248c2ae-1ffb-4314-8caf-4d8eb20d4057",
+   "name": "HR Write Hook",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.4,
+   "position": [
+    672,
+    80
+   ],
+   "parameters": {
+    "method": "POST",
+    "url": "https://api.openai.com/v1/chat/completions",
+    "authentication": "predefinedCredentialType",
+    "nodeCredentialType": "openAiApi",
+    "sendBody": true,
+    "contentType": "json",
+    "specifyBody": "json",
+    "jsonBody": "={{ JSON.stringify($json.payload) }}",
+    "options": {
+     "timeout": 120000
+    }
+   },
+   "retryOnFail": true,
+   "maxTries": 3,
+   "waitBetweenTries": 3000
+  },
+  {
+   "id": "8fd552eb-bef2-40ba-9f73-49d3750a24a8",
+   "name": "HR Guard",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    896,
+    0
+   ],
+   "parameters": {
+    "jsCode": "// The same measurable rules Hook Guard applies in the scripting run — beat\n// counts, words per beat, the card fields a style needs, a figure or a date\n// the film actually states, no number that appears only in the last chapter.\n// At most MAX_RETRIES rounds with the reason, then accept anyway: a wrong\n// hook still makes a film, and nothing here may strand the producer.\nconst prep = $('HR Prep').first().json;\nconst MAX_RETRIES = 2;\nconst attempt = $runIndex + 1;\nconst wc = (s) => String(s || '').trim().split(/\\s+/).filter(Boolean).length;\n\nlet raw = String((((($json.choices || [])[0] || {}).message || {}).content) || '').trim();\nraw = raw.replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();\nlet hook = {};\ntry { hook = JSON.parse(raw) || {}; } catch (e) { hook = {}; }\n\nconst allowed = prep.allowed;\nconst SILENT = prep.silentStyles;\nconst style = String(hook.style || '').trim().toLowerCase();\nconst beats = (Array.isArray(hook.beats) ? hook.beats : []).map((b) => String(b || '').replace(/\\s+/g, ' ').trim()).filter(Boolean);\nconst card = hook.card && typeof hook.card === 'object' ? hook.card : {};\nconst line1 = String(card.line1 || '').trim();\nconst line2 = String(card.line2 || '').trim();\nconst source = String(card.source || '').trim();\nconst silent = SILENT.includes(style);\nconst SHAPE = { teaser: [3, 5, 2, 10], question: [1, 2, 3, 12], figure: [1, 2, 3, 12], slate: [1, 1, 8, 25], action: [2, 3, 8, 25], cliffhanger: [2, 3, 8, 25] };\n\nconst problems = [];\nif (!raw || !Object.keys(hook).length) problems.push('the answer was not a JSON object');\nif (!allowed.includes(style)) problems.push('style must be one of: ' + allowed.join(', ') + (style ? ' (got \"' + style + '\")' : ' (none given)'));\nconst shape = SHAPE[style] || SHAPE.teaser;\nif (beats.length < shape[0] || beats.length > shape[1]) problems.push('beats: ' + beats.length + ' given, this style needs ' + (shape[0] === shape[1] ? shape[0] : shape[0] + '-' + shape[1]));\nbeats.forEach((b, i) => { const w = wc(b); if (w < shape[2] || w > shape[3]) problems.push('beat ' + (i + 1) + ' is ' + w + ' words; each beat of this style is ' + shape[2] + '-' + shape[3]); });\n\nconst chapters = prep.chapters || [];\nconst filmText = chapters.map((c) => String(c.script || '')).join('\\n');\nconst evidenceText = String(prep.evidenceText || '');\nconst digits = (s, min) => (String(s || '').match(/\\d[\\d.,\\s]*\\d|\\d/g) || []).map((n) => n.replace(/[^\\d]/g, '')).filter((n) => n.length >= (min || 1));\nconst corpusDigits = new Set(digits(filmText).concat(digits(evidenceText)));\nif (style === 'question') {\n  if (wc(line1) < 3 || wc(line1) > 12 || !/\\?\\s*$/.test(line1)) problems.push('card.line1 must be one on-screen question of 3-12 words ending with \"?\"');\n}\nif (style === 'figure') {\n  const nums = digits(line1);\n  if (!nums.length) problems.push('card.line1 must contain the figure itself (a number)');\n  else if (!nums.every((n) => corpusDigits.has(n))) problems.push('card.line1 shows \"' + line1 + '\", a figure the narration and the research never state — copy a number the film actually says, exactly as written');\n  if (wc(line2) > 8) problems.push('card.line2 is ' + wc(line2) + ' words; at most 8');\n  if (source && !new RegExp('\\\\b' + source.replace(/[^A-Za-z0-9]/g, '') + '\\\\b').test(evidenceText)) problems.push('card.source names ' + source + ', which is not in the research pack — leave it \"\" unless the figure comes from a listed claim');\n}\nif (style === 'slate') {\n  if (!line1 || wc(line1) > 6) problems.push('card.line1 must name the PLACE in at most 6 words');\n  if (wc(line2) > 6) problems.push('card.line2 must be the date or time in at most 6 words, or \"\"');\n}\nif (silent && beats.some((b) => /^\\s*\\[(NARRATOR|CHARACTER)/i.test(b))) problems.push('a silent style carries no speaker tags — beats are shot notes');\nif (chapters.length > 1) {\n  const lastDigits = new Set(digits(chapters[chapters.length - 1].script, 2));\n  const earlier = new Set(digits(chapters.slice(0, -1).map((c) => c.script).join('\\n'), 2));\n  const leaked = digits(beats.join(' ') + ' ' + line1 + ' ' + line2, 2).filter((n) => lastDigits.has(n) && !earlier.has(n));\n  if (leaked.length) problems.push('the hook states ' + leaked.join(', ') + ', which appears only in the LAST chapter — that is the ending; take it out');\n}\n\nif (problems.length && attempt <= MAX_RETRIES) {\n  console.log('HOOK REGEN guard retry ' + attempt + '/' + MAX_RETRIES + ' [' + style + ']: ' + problems.join(' | '));\n  const payload = JSON.parse(JSON.stringify(prep.payload));\n  payload.messages.push({ role: 'user', content: 'THE PREVIOUS ATTEMPT WAS REJECTED — ' + problems.join('; ') + '. Keep the same story, fix exactly these points. Return ONLY the JSON object.' });\n  return [{ json: { retry: true, payload, attempt } }];\n}\nif (!beats.length) throw new Error('hook-regen: the model returned no beats after ' + attempt + ' attempts');\nlet finalStyle = style;\nif (!allowed.includes(finalStyle)) { console.log('HOOK REGEN style \"' + finalStyle + '\" not allowed here, using ' + allowed[0]); finalStyle = allowed[0]; }\nif (problems.length) console.log('HOOK REGEN accepting after ' + MAX_RETRIES + ' retries [' + finalStyle + ']: ' + problems.join(' | '));\nelse console.log('HOOK REGEN guard ok [' + finalStyle + ']: ' + beats.length + ' beats');\nconst finalSilent = SILENT.includes(finalStyle);\nreturn [{ json: {\n  retry: false,\n  hook: {\n    style: finalStyle,\n    silent: finalSilent,\n    beats,\n    card: { line1, line2, source },\n    summary: String(hook.hook_summary || '').trim(),\n    lines: beats.map((b) => (finalSilent ? '[SILENT] ' : '') + b.replace(/^\\s*\\[SILENT\\]\\s*/i, '')),\n  },\n} }];\n"
+   }
+  },
+  {
+   "id": "be711907-12d9-4179-b2a4-946cf1a94b22",
+   "name": "HR Retry?",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2.3,
+   "position": [
+    1120,
+    80
+   ],
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "loose",
+      "version": 3
+     },
+     "conditions": [
+      {
+       "id": "hr-retry",
+       "leftValue": "={{ $json.retry }}",
+       "rightValue": "",
+       "operator": {
+        "type": "boolean",
+        "operation": "true",
+        "singleValue": true
+       }
+      }
+     ],
+     "combinator": "and"
+    }
+   }
+  },
+  {
+   "id": "7e37ae64-8493-4537-8395-8b5a730f5585",
+   "name": "HR Shots Prompt",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    1344,
+    80
+   ],
+   "parameters": {
+    "jsCode": "// One shot per beat — the hook chapter's rules from Voice Mode's\n// hookSegmentRules and the segmenter's image/motion/continuity rules, in a\n// second copy kept in lockstep by hand. The scripting run's segmenter is the\n// original; this asks for the same fields so the scenes it writes are\n// indistinguishable from the ones Save scenes To Airtable1 writes.\nconst prep = $('HR Prep').first().json;\nconst hook = $json.hook;\nconst lines = hook.lines.map((l, i) => (i + 1) + '. ' + l).join('\\n');\nconst style = prep.style || '';\nconst tone = prep.tone || '';\n\nconst system = 'Return ONLY a raw JSON object {\"scenes\": [...]}. No intro, no markdown.\\n\\n' +\n  'You are a film editor and storyboard artist turning the OPENING TEASER of a film into shots. Each numbered line below is exactly ONE shot; output EXACTLY ' + hook.lines.length + ' scenes, in order, one per line.\\n\\n' +\n  'THIS IS THE HOOK CHAPTER — the film\\'s opening teaser, cut FAST. Every numbered line is one SHOT of 2-4 seconds, not an 8-second scene:\\n' +\n  '(a) scene_duration_seconds is 3 for every shot (6 for a shot whose line describes an empty establishing frame with room for a title).\\n' +\n  '(b) Composition for a shot that lasts three seconds: ONE strong subject, high contrast, dramatic light, tight or extreme framing — the kind of frame a trailer cuts to. No wide busy scenes that need time to read.\\n' +\n  '(c) video_motion_prompt: ONE decisive move that reads in a second — a fast push-in, a whip-pan, a hard tracking shot, a crash-zoom — and ONE clear action. Energy over subtlety.\\n' +\n  '(d) A line starting with [SILENT] is a shot note, not narration: copy it VERBATIM as narrator_text (keep the [SILENT] prefix), and build the image and the motion from what it describes. Nothing in it is spoken.\\n' +\n  '(e) A line describing an establishing frame with space for a title: the image is wide, static-feeling, nobody near the camera, the centre of the frame uncluttered; the motion is a slow, steady drift only.\\n' +\n  '(f) Shots must differ hard from one another (location, subject, scale) — a teaser that shows the same frame three times is not a teaser.\\n\\n' +\n  'CRITICAL OUTPUT HYGIENE: image_prompt and video_motion_prompt are sent VERBATIM to an image/video model. NEVER write rule labels or scaffolding words — no \"visual_description\", \"bible\", \"[shot type]\" or any bracketed placeholder. Flowing prose only.\\n\\n' +\n  'CONTENT SAFETY — absolute for image_prompt and video_motion_prompt: (a) NO visible minors — imply a child off-screen (a small shoe, an empty swing); crowds are \"adult men and women\". (b) NO real, named or recognizable people — generic descriptions with \"no resemblance to any real person\". (c) NO graphic violence, gore, wounds or corpses — imply through aftermath, shadows, reactions. A prompt that breaks these gets the shot rejected.\\n\\n' +\n  'Rules:\\n' +\n  '1. narrator_text: copy the numbered line, character for character (keep a [SILENT] prefix).\\n' +\n  '2. Use ONLY characters/locations from the STORY BIBLE and weave their full physical description (age, hair, face, exact clothing, colours) into every image prompt where they appear. Write the light INTO each image_prompt (hour, weather, quality of light, where the shadows fall).\\n' +\n  '3. image_prompt: ONE image per shot — the exact first frame the clip starts from. 60-90 words of flowing prose in English: shot type, the subject in full physical detail, the action frozen at the shot\\'s opening instant, the location in detail, the lighting, the colour palette, the lens/framing, ending with the aesthetic tags (' + style + ', ' + tone + ' tone, cinematic, photorealistic, 8k).\\n' +\n  '4. visual_scene_description: 1-2 sentences of what happens on screen during the shot; something visibly changes.\\n' +\n  '5. video_motion_prompt: the Veo prompt as flowing prose — camera movement, then subject, then action, then context, then style & ambiance, 25-45 words. DIRECTION IS NOT OPTIONAL: whenever anything travels, say WHICH WAY relative to the frame and the camera, agreeing with the still. Everything else that moves travels the SAME way. Style & ambiance: ' + style + ', ' + tone + ' mood, cinematic. Then append exactly: \"Negative: no on-screen text, no subtitles, no captions, no watermark, no logos; characters do not speak — no lip movement, no dialogue; ambient/atmospheric motion only; nothing travels against the flow — no oncoming vehicles, nobody walking or driving the wrong way, no reversed motion; no subject appears, disappears, duplicates or changes identity.\"\\n' +\n  '6. CONTINUITY FIELDS, read by CODE: location = the one bible location this shot is set in, spelled EXACTLY as the bible spells it (\"\" if nowhere in the bible); characters = every bible character visible, exact names (empty list if none); objects = every bible object visible, exact names; time_of_day = one word: dawn, morning, day, afternoon, dusk, night, overcast, storm, or interior.\\n' +\n  (prep.kids ? '\\nKIDS STORY MODE — the film LOOKS like an animated children\\'s film, never like photography: rounded, friendly proportions, no photorealistic humans; keep every movement gentle.\\n' : '') +\n  '\\nEach scene object: scene_number (from 1), scene_duration_seconds, narrator_text, visual_scene_description, image_prompt, video_motion_prompt, location, characters, objects, time_of_day.';\n\nconst user = 'STORY BIBLE:\\n' + JSON.stringify(prep.bible) +\n  '\\n\\nWHAT THE VIEWER SEES ACROSS THE HOOK (the writer\\'s own summary):\\n' + (hook.summary || '(none)') +\n  '\\n\\nTHE SHOTS, one per numbered line:\\n' + lines;\n\nreturn [{ json: { payload: { model: 'gpt-5.4', response_format: { type: 'json_object' }, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }, hook } }];\n"
+   }
+  },
+  {
+   "id": "2982439c-b120-455c-a242-08dea1567ce4",
+   "name": "HR Write Shots",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.4,
+   "position": [
+    1568,
+    80
+   ],
+   "parameters": {
+    "method": "POST",
+    "url": "https://api.openai.com/v1/chat/completions",
+    "authentication": "predefinedCredentialType",
+    "nodeCredentialType": "openAiApi",
+    "sendBody": true,
+    "contentType": "json",
+    "specifyBody": "json",
+    "jsonBody": "={{ JSON.stringify($json.payload) }}",
+    "options": {
+     "timeout": 180000
+    }
+   },
+   "retryOnFail": true,
+   "maxTries": 3,
+   "waitBetweenTries": 3000
+  },
+  {
+   "id": "2bc2bc63-05d8-423e-a7f9-385032e6f9f0",
+   "name": "HR Apply",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    1792,
+    80
+   ],
+   "parameters": {
+    "jsCode": "// Turn the shots into the SQL that replaces the hook, one statement per item\n// so HR Commit can run them inside one transaction: the old chapter-0 scenes\n// go, the new ones are created through hov.at_create with exactly the fields\n// Save scenes To Airtable1 writes, the hook chapter's script is rewritten,\n// and the project's hookPlan is merged while hookRegen is cleared — the flag\n// the site set before firing this run.\nconst prep = $('HR Prep').first().json;\nconst hook = $('HR Shots Prompt').first().json.hook;\nlet raw = String((((($json.choices || [])[0] || {}).message || {}).content) || '').trim();\nraw = raw.replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();\nlet parsed = {};\ntry { parsed = JSON.parse(raw) || {}; } catch (e) { throw new Error('hook-regen: the shot writer did not return JSON'); }\nconst scenes = Array.isArray(parsed.scenes) ? parsed.scenes : (Array.isArray(parsed) ? parsed : []);\nif (scenes.length !== hook.lines.length) throw new Error('hook-regen: asked for ' + hook.lines.length + ' shots, got ' + scenes.length);\n\n// Canonicalise the continuity fields against the bible, diacritic-insensitive,\n// as Validate Evidence Refs does; a name not in the bible is dropped.\nconst norm = (s) => String(s || '').normalize('NFD').replace(/\\p{M}/gu, '').toLowerCase().trim();\nconst names = (list) => (Array.isArray(list) ? list : []).map((e) => String((e && e.name) || '').trim()).filter(Boolean);\nconst bible = prep.bible || {};\nconst canon = (v, pool) => { const n = norm(v); const hit = pool.find((p) => norm(p) === n); return hit || ''; };\nconst locs = names(bible.locations), chars = names(bible.characters), objs = names(bible.objects);\nconst TOD = ['dawn', 'morning', 'day', 'afternoon', 'dusk', 'night', 'overcast', 'storm', 'interior'];\n\n// Every literal is base64 and decoded by Postgres, and that is NOT tidiness —\n// it is the only encoding that survives this node's own transaction.\n//\n// HR Commit runs `queryBatching: transaction`, and in that mode (unlike the\n// default one every other Postgres node here uses) n8n hands the query to\n// pg-promise WITH an empty values array, so pg-promise reads every `$` that\n// is followed by a digit as a positional parameter and refuses the whole\n// statement: \"Variable $321 out of range. Parameters array length: 0\".\n// Dollar-quoting does not help — the closing `$` of `$hr$` in front of a\n// hook beat reading \"321 metres, standing in the Gulf\" IS `$321`, and that\n// is exactly how the first real rewrite died (execution 12490). Nor is a\n// leading digit the only way in: `$1B` inside a sentence fails the same way,\n// and this pipeline writes films about $1B hotels.\n// Base64's alphabet has no `$` in it, so no data can ever form a placeholder.\n// Measured both ways, transaction and default, in execution 12511.\nconst b64 = (s) => {\n  const str = String(s);\n  if (typeof Buffer !== 'undefined') return Buffer.from(str, 'utf8').toString('base64');\n  return btoa(unescape(encodeURIComponent(str)));\n};\nconst q = (s) => \"convert_from(decode('\" + b64(s) + \"','base64'),'UTF8')\";\nconst pid = prep.projectId;\nconst items = [];\nitems.push({ sql: 'delete from hov.scene where project_id = ' + q(pid) + ' and scene_order < 100' });\nif (prep.hookChapterId) {\n  items.push({ sql: 'update hov.chapter set chapter_script = ' + q(hook.lines.join('\\n')) + ' where id = ' + q(prep.hookChapterId) });\n}\nscenes.forEach((s, i) => {\n  const line = hook.lines[i];\n  const silent = /^\\s*\\[SILENT\\]/i.test(line);\n  const dur = Number(s.scene_duration_seconds);\n  const tags = [];\n  const loc = canon(s.location, locs); if (loc) tags.push('loc:' + loc);\n  (Array.isArray(s.characters) ? s.characters : []).forEach((c) => { const n = canon(c, chars); if (n) tags.push('char:' + n); });\n  (Array.isArray(s.objects) ? s.objects : []).forEach((o) => { const n = canon(o, objs); if (n) tags.push('obj:' + n); });\n  const tod = String(s.time_of_day || '').trim().toLowerCase(); if (TOD.includes(tod)) tags.push('tod:' + tod);\n  const fields = {\n    'Durată Scenă (secunde)': (Number.isFinite(dur) && dur >= 2 && dur <= 8) ? dur : 3,\n    'Script Scenă': silent ? '' : line,\n    'Prompt Vizual': String(s.visual_scene_description || ''),\n    'Imagine First Frame': String(s.image_prompt || ''),\n    'Video Scenă URL': String(s.video_motion_prompt || ''),\n    'Aprobare Scenă': false,\n    'Aprobare Voce': prep.cinematic === true || silent,\n    'Status Producție Scenă': 'Generare Script',\n    'Project_ID': pid,\n    'Ordine Scenă': i + 1,\n    'Evidence Ref': '',\n    'Needs Fact Check': false,\n    'Tag-uri Scenă': tags,\n  };\n  if (prep.hookChapterId) fields['Capitol'] = [prep.hookChapterId];\n  items.push({ sql: 'select id from hov.at_create(' + q('scene') + ', ' + q(JSON.stringify(fields)) + '::jsonb)' });\n});\nconst plan = {\n  style: hook.style,\n  silent: hook.silent,\n  beats: hook.beats,\n  card: hook.card,\n  chosenBy: prep.wanted !== 'auto' ? 'producer' : (prep.forced ? 'default' : 'ai'),\n  writtenAt: new Date().toISOString(),\n};\nitems.push({ sql: 'update hov.project set editing_options = coalesce(editing_options, ' + q('{}') + '::jsonb) || ' + q(JSON.stringify({ hookPlan: plan, hookRegen: null, hookStyle: prep.wanted })) + '::jsonb where id = ' + q(pid) });\nconsole.log('HOOK REGEN [' + hook.style + ']: ' + scenes.length + ' shots replace ' + (prep.oldHookSceneIds || []).length + ' on ' + pid);\nreturn items.map((it) => ({ json: it }));"
+   }
+  },
+  {
+   "id": "edc68851-ca8e-4632-8696-2154bc0b1119",
+   "name": "HR Commit",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.6,
+   "position": [
+    2016,
+    80
+   ],
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "={{ $json.sql }}",
+    "options": {
+     "queryBatching": "transaction"
+    }
+   },
+   "onError": "continueErrorOutput"
+  },
+  {
+   "id": "62865987-497a-451f-b14e-176643f0539a",
+   "name": "HR Release Flag",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.6,
+   "position": [
+    2240,
+    240
+   ],
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "=update hov.project\nset editing_options = coalesce(editing_options, '{}'::jsonb) || '{\"hookRegen\": null}'::jsonb\nwhere id = $hr${{ $('HR Prep').first().json.projectId }}$hr$",
+    "options": {}
+   },
+   "notes": "A failed commit rolled the whole rewrite back, so the stored hook is untouched — but the site set editing_options.hookRegen before firing and only this run can clear it. Without this the producer is left watching a spinner with nothing alive behind it. Default batching on purpose: transaction batching is what made $N a hazard in the first place.",
+   "onError": "continueRegularOutput",
+   "alwaysOutputData": true,
+   "executeOnce": true
+  }
+ ],
+ "nodeGroups": [],
+ "activeVersion": {
+  "nodes": [
+   {
+    "id": "13392586-40ca-4d8e-b501-6ebbcd258d58",
+    "name": "Hook Regen Webhook",
+    "type": "n8n-nodes-base.webhook",
+    "typeVersion": 2.1,
+    "position": [
+     0,
+     80
+    ],
+    "parameters": {
+     "httpMethod": "POST",
+     "path": "hook-regen",
+     "responseMode": "onReceived"
+    },
+    "webhookId": "0a2888fe-96b0-40d1-81de-55aee3150d34"
+   },
+   {
+    "id": "6ce752c9-9510-4d25-85d4-7e98c040bef0",
+    "name": "HR Load",
+    "type": "n8n-nodes-base.postgres",
+    "typeVersion": 2.6,
+    "position": [
+     224,
+     80
+    ],
+    "parameters": {
+     "operation": "executeQuery",
+     "query": "=select p.id, p.name, p.tone, p.language, p.style, p.aspect, p.story_bible, p.editing_options,\n  (select json_agg(json_build_object('id', c.id, 'ordinal', c.ordinal, 'title', c.title, 'script', c.chapter_script) order by c.ordinal) from hov.chapter c where c.project_id = p.id) as chapters,\n  (select json_agg(s.id) from hov.scene s where s.project_id = p.id and s.scene_order < 100) as hook_scene_ids,\n  (select json_agg(json_build_object('ref', e.ref, 'claim', e.claim, 'source', e.source_name, 'url', e.source_url, 'date', e.source_date) order by e.ref) from hov.evidence e where e.project_id = p.id) as evidence,\n  (select row_to_json(g) from (select g.hook_rule, g.voice, g.format from hov.genre_profile g where g.active and lower(g.tone) = lower(coalesce(p.tone, '')) limit 1) g) as genre\nfrom hov.project p\nwhere p.id = $hov${{ $json.body.project_id }}$hov$",
+     "options": {}
+    },
+    "executeOnce": true
+   },
+   {
+    "id": "5ff94409-5ae6-4cc8-b325-cb1e2d1d2fa8",
+    "name": "HR Prep",
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     448,
+     80
+    ],
+    "parameters": {
+     "jsCode": "// Everything the hook writer needs, from one project row — and the rules it\n// must obey, which are the SAME rules Voice Mode gives the scripting run\n// (a second copy, kept in lockstep by hand: change one, change both).\nconst row = $('HR Load').first().json || {};\nconst body = ($('Hook Regen Webhook').first().json || {}).body || {};\nif (!row.id) throw new Error('hook-regen: project not found: ' + String(body.project_id || ''));\n\nlet opts = row.editing_options;\nif (typeof opts === 'string') { try { opts = JSON.parse(opts); } catch (e) { opts = {}; } }\nopts = (opts && typeof opts === 'object') ? opts : {};\nlet bible = {};\ntry { bible = JSON.parse(row.story_bible || '{}') || {}; } catch (e) { bible = {}; }\nconst chapters = (Array.isArray(row.chapters) ? row.chapters : []).filter((c) => Number(c.ordinal) > 0);\nif (!chapters.length) throw new Error('hook-regen: this film has no chapters yet — the hook is written with the script, not before it.');\nconst evidence = Array.isArray(row.evidence) ? row.evidence : [];\nconst genre = (row.genre && typeof row.genre === 'object') ? row.genre : {};\n\nconst category = String(opts.category || '');\nconst cinematic = category === 'cinematic';\nconst kids = category === 'kids';\nconst HOOK_STYLES = ['teaser', 'question', 'figure', 'slate', 'action', 'cliffhanger'];\nconst SILENT = ['slate', 'action', 'cliffhanger'];\nconst wanted = String(body.hook_style || opts.hookStyle || '').trim().toLowerCase();\nlet allowed = HOOK_STYLES.includes(wanted) ? [wanted] : HOOK_STYLES.slice();\nif (cinematic) allowed = allowed.filter((s) => SILENT.includes(s));\nif (kids) allowed = allowed.filter((s) => ['teaser', 'question', 'slate'].includes(s));\nif (!allowed.length) allowed = cinematic ? ['action'] : ['teaser'];\nconst forced = allowed.length === 1;\n\nconst DEFS = {\n  teaser: 'TEASER — 3 to 5 SPOKEN beats of 2-10 words each, one shot per beat. The most dramatic stretch of the story told like a trailer: present tense, concrete, each beat a step further in, and NEVER the outcome — the viewer must not learn how it ends. Example shape for a heist story: \"One student. / A bank with three vaults. / Past the guards, alone. / Out with the money, and nobody suspects him.\" card stays empty.',\n  question: 'QUESTION — 1 or 2 SPOKEN beats (3-12 words each) plus card.line1 = ONE question on screen, 3-12 words, ending with \"?\", that the film answers. card.line2 and card.source empty.',\n  figure: 'FIGURE — 1 or 2 SPOKEN beats plus card.line1 = ONE number the film states (a year, a sum, a count), copied EXACTLY as the narration or the research pack writes it — never a number you computed or remembered; card.line2 = what it measures, at most 8 words; card.source = the evidence ref (E1..E20) when it comes from the research pack, else \"\".',\n  slate: 'SLATE — exactly 1 SILENT shot note (8-25 words): the establishing frame of the story\\'s main location as the bible describes it, no person near the camera, calm, with empty space in the centre of the frame for a title. card.line1 = the PLACE (at most 6 words), card.line2 = the DATE or time as the story states it (at most 6 words; leave \"\" if the story never states one — do not invent a date). Nothing is spoken.',\n  action: 'ACTION — 2 or 3 SILENT shot notes (8-25 words each): the climax IN MOTION — what the protagonist does at the peak, each note one concrete visible action with its sound implied, no faces close to camera. Nothing is spoken; the story starts right after.',\n  cliffhanger: 'CLIFFHANGER — 2 or 3 SILENT shot notes (8-25 words each): the moment BEFORE the catastrophe or the turn, tension rising shot by shot, ending on the frame just before the outcome — never the outcome itself. Nothing is spoken; the film then starts from the beginning.',\n};\nconst styleRules = '\\nHOOK STYLE. ' + (forced\n  ? 'The producer chose the style ' + allowed[0].toUpperCase() + ' — use it and no other.'\n  : 'Choose the ONE style that fits this story best from the list below and name it in \"style\".') +\n  '\\n' + allowed.map((s) => '- ' + DEFS[s]).join('\\n') +\n  '\\nA SPOKEN beat is a line the narrator says. A SILENT shot note is what the camera sees, present tense, never spoken — write it as a shot, not as prose.' +\n  '\\nThe hook may use only Story Bible characters and locations, and must not reveal how the story ends.\\n';\n\nconst language = String(row.language || 'English');\nconst chaptersJson = JSON.stringify(chapters.map((c) => ({ chapter_number: c.ordinal, chapter_title: c.title, narrator_script: c.script })));\nconst claimsList = evidence.map((e) => e.ref + ': ' + String(e.claim || '') + ' | SOURCE: ' + String(e.source || '') + (e.date ? ' | DATE: ' + e.date : '')).join('\\n');\n\nconst system = 'You are a hook writer for ' + String(genre.format || 'documentary') + ' videos. Viewers decide in the FIRST SECONDS whether to keep watching.\\n\\n' +\n  'Write the OPENING HOOK — a short teaser of several fast shots BEFORE chapter 1 begins, in one of the styles defined below. It must create a gap the rest of the video pays off, without giving the ending away. This is a REWRITE asked for by the producer: the story, its chapters and its scenes already exist and stay exactly as they are — only the hook changes.\\n\\n' +\n  (genre.hook_rule ? 'THE HOOK RULE FOR THIS GENRE — follow it exactly:\\n' + genre.hook_rule + '\\n\\n' : '') +\n  (genre.voice ? 'GENRE VOICE — the hook is spoken in the same voice as the rest of the narration:\\n' + genre.voice + '\\n\\n' : '') +\n  'Rules:' + styleRules +\n  '1. style: the style you used, exactly one of the names listed above, lower-case.\\n' +\n  '2. beats: an array with one string per SHOT, in order — spoken lines for a spoken style, shot notes for a silent one, as the style defines. Written in ' + language + ' for spoken beats; shot notes in ENGLISH. Concrete and specific to THIS story — no clichés (\"What if I told you\", \"You won\\'t believe\"), no vague drama, no summary of the whole film. Each beat is its own shot, so each must be a different picture.\\n' +\n  '3. NEVER reveal the ending or the final turn. The hook opens a gap; chapter 1 onward closes it. A number, name or event that appears only in the last chapter does not belong in the hook.\\n' +\n  '4. card: {line1, line2, source} exactly as the style defines; every field you do not use is \"\".\\n' +\n  '5. hook_summary: in ENGLISH, 2-3 sentences describing what the viewer SEES across the hook\\'s shots (use only Story Bible characters/locations).\\n' +\n  (cinematic ? '\\nTHIS FILM HAS NO NARRATION: nothing in the hook is spoken either. Only the SILENT hook styles are available — every beat you write is a shot note the camera performs, never a line a voice reads.\\n' : '') +\n  (kids && !cinematic ? '\\nKIDS STORY: open like a storyteller inviting a child in — warm, curious, direct — never dramatic or ominous.\\n' : '') +\n  '\\nReturn ONLY a raw JSON object: {\"style\": \"...\", \"beats\": [\"...\"], \"card\": {\"line1\": \"\", \"line2\": \"\", \"source\": \"\"}, \"hook_summary\": \"...\"}. No markdown.';\n\nconst user = 'THE FULL NARRATION (chapters JSON — the hook must set up THIS exact story, without spoiling its ending):\\n' + chaptersJson +\n  '\\n\\nSTORY BIBLE (the film\\'s locked world — the hook\\'s visuals may use ONLY these characters and locations):\\n' + JSON.stringify(bible) +\n  (claimsList ? '\\n\\nRESEARCH PACK (sourced claims, by ref):\\n' + claimsList : '') +\n  '\\n\\nTema: ' + String(row.name || '') + '\\nTonalitate: ' + String(row.tone || '') + '\\nLanguage: ' + language;\n\nconst payload = {\n  model: 'gpt-5.4',\n  response_format: { type: 'json_object' },\n  messages: [{ role: 'system', content: system }, { role: 'user', content: user }],\n};\nreturn [{ json: {\n  payload, allowed, forced, wanted: HOOK_STYLES.includes(wanted) ? wanted : 'auto', silentStyles: SILENT,\n  projectId: row.id, language, style: String(row.style || ''), tone: String(row.tone || ''),\n  category, cinematic, kids, bible, chapters, evidenceText: JSON.stringify(evidence),\n  hookChapterId: ((Array.isArray(row.chapters) ? row.chapters : []).find((c) => Number(c.ordinal) === 0) || {}).id || '',\n  oldHookSceneIds: Array.isArray(row.hook_scene_ids) ? row.hook_scene_ids : [],\n  aspect: String(row.aspect || '16:9'),\n} }];\n"
+    }
+   },
+   {
+    "id": "5248c2ae-1ffb-4314-8caf-4d8eb20d4057",
+    "name": "HR Write Hook",
+    "type": "n8n-nodes-base.httpRequest",
+    "typeVersion": 4.4,
+    "position": [
+     672,
+     80
+    ],
+    "parameters": {
+     "method": "POST",
+     "url": "https://api.openai.com/v1/chat/completions",
+     "authentication": "predefinedCredentialType",
+     "nodeCredentialType": "openAiApi",
+     "sendBody": true,
+     "contentType": "json",
+     "specifyBody": "json",
+     "jsonBody": "={{ JSON.stringify($json.payload) }}",
+     "options": {
+      "timeout": 120000
+     }
+    },
+    "retryOnFail": true,
+    "maxTries": 3,
+    "waitBetweenTries": 3000
+   },
+   {
+    "id": "8fd552eb-bef2-40ba-9f73-49d3750a24a8",
+    "name": "HR Guard",
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     896,
+     0
+    ],
+    "parameters": {
+     "jsCode": "// The same measurable rules Hook Guard applies in the scripting run — beat\n// counts, words per beat, the card fields a style needs, a figure or a date\n// the film actually states, no number that appears only in the last chapter.\n// At most MAX_RETRIES rounds with the reason, then accept anyway: a wrong\n// hook still makes a film, and nothing here may strand the producer.\nconst prep = $('HR Prep').first().json;\nconst MAX_RETRIES = 2;\nconst attempt = $runIndex + 1;\nconst wc = (s) => String(s || '').trim().split(/\\s+/).filter(Boolean).length;\n\nlet raw = String((((($json.choices || [])[0] || {}).message || {}).content) || '').trim();\nraw = raw.replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();\nlet hook = {};\ntry { hook = JSON.parse(raw) || {}; } catch (e) { hook = {}; }\n\nconst allowed = prep.allowed;\nconst SILENT = prep.silentStyles;\nconst style = String(hook.style || '').trim().toLowerCase();\nconst beats = (Array.isArray(hook.beats) ? hook.beats : []).map((b) => String(b || '').replace(/\\s+/g, ' ').trim()).filter(Boolean);\nconst card = hook.card && typeof hook.card === 'object' ? hook.card : {};\nconst line1 = String(card.line1 || '').trim();\nconst line2 = String(card.line2 || '').trim();\nconst source = String(card.source || '').trim();\nconst silent = SILENT.includes(style);\nconst SHAPE = { teaser: [3, 5, 2, 10], question: [1, 2, 3, 12], figure: [1, 2, 3, 12], slate: [1, 1, 8, 25], action: [2, 3, 8, 25], cliffhanger: [2, 3, 8, 25] };\n\nconst problems = [];\nif (!raw || !Object.keys(hook).length) problems.push('the answer was not a JSON object');\nif (!allowed.includes(style)) problems.push('style must be one of: ' + allowed.join(', ') + (style ? ' (got \"' + style + '\")' : ' (none given)'));\nconst shape = SHAPE[style] || SHAPE.teaser;\nif (beats.length < shape[0] || beats.length > shape[1]) problems.push('beats: ' + beats.length + ' given, this style needs ' + (shape[0] === shape[1] ? shape[0] : shape[0] + '-' + shape[1]));\nbeats.forEach((b, i) => { const w = wc(b); if (w < shape[2] || w > shape[3]) problems.push('beat ' + (i + 1) + ' is ' + w + ' words; each beat of this style is ' + shape[2] + '-' + shape[3]); });\n\nconst chapters = prep.chapters || [];\nconst filmText = chapters.map((c) => String(c.script || '')).join('\\n');\nconst evidenceText = String(prep.evidenceText || '');\nconst digits = (s, min) => (String(s || '').match(/\\d[\\d.,\\s]*\\d|\\d/g) || []).map((n) => n.replace(/[^\\d]/g, '')).filter((n) => n.length >= (min || 1));\nconst corpusDigits = new Set(digits(filmText).concat(digits(evidenceText)));\nif (style === 'question') {\n  if (wc(line1) < 3 || wc(line1) > 12 || !/\\?\\s*$/.test(line1)) problems.push('card.line1 must be one on-screen question of 3-12 words ending with \"?\"');\n}\nif (style === 'figure') {\n  const nums = digits(line1);\n  if (!nums.length) problems.push('card.line1 must contain the figure itself (a number)');\n  else if (!nums.every((n) => corpusDigits.has(n))) problems.push('card.line1 shows \"' + line1 + '\", a figure the narration and the research never state — copy a number the film actually says, exactly as written');\n  if (wc(line2) > 8) problems.push('card.line2 is ' + wc(line2) + ' words; at most 8');\n  if (source && !new RegExp('\\\\b' + source.replace(/[^A-Za-z0-9]/g, '') + '\\\\b').test(evidenceText)) problems.push('card.source names ' + source + ', which is not in the research pack — leave it \"\" unless the figure comes from a listed claim');\n}\nif (style === 'slate') {\n  if (!line1 || wc(line1) > 6) problems.push('card.line1 must name the PLACE in at most 6 words');\n  if (wc(line2) > 6) problems.push('card.line2 must be the date or time in at most 6 words, or \"\"');\n}\nif (silent && beats.some((b) => /^\\s*\\[(NARRATOR|CHARACTER)/i.test(b))) problems.push('a silent style carries no speaker tags — beats are shot notes');\nif (chapters.length > 1) {\n  const lastDigits = new Set(digits(chapters[chapters.length - 1].script, 2));\n  const earlier = new Set(digits(chapters.slice(0, -1).map((c) => c.script).join('\\n'), 2));\n  const leaked = digits(beats.join(' ') + ' ' + line1 + ' ' + line2, 2).filter((n) => lastDigits.has(n) && !earlier.has(n));\n  if (leaked.length) problems.push('the hook states ' + leaked.join(', ') + ', which appears only in the LAST chapter — that is the ending; take it out');\n}\n\nif (problems.length && attempt <= MAX_RETRIES) {\n  console.log('HOOK REGEN guard retry ' + attempt + '/' + MAX_RETRIES + ' [' + style + ']: ' + problems.join(' | '));\n  const payload = JSON.parse(JSON.stringify(prep.payload));\n  payload.messages.push({ role: 'user', content: 'THE PREVIOUS ATTEMPT WAS REJECTED — ' + problems.join('; ') + '. Keep the same story, fix exactly these points. Return ONLY the JSON object.' });\n  return [{ json: { retry: true, payload, attempt } }];\n}\nif (!beats.length) throw new Error('hook-regen: the model returned no beats after ' + attempt + ' attempts');\nlet finalStyle = style;\nif (!allowed.includes(finalStyle)) { console.log('HOOK REGEN style \"' + finalStyle + '\" not allowed here, using ' + allowed[0]); finalStyle = allowed[0]; }\nif (problems.length) console.log('HOOK REGEN accepting after ' + MAX_RETRIES + ' retries [' + finalStyle + ']: ' + problems.join(' | '));\nelse console.log('HOOK REGEN guard ok [' + finalStyle + ']: ' + beats.length + ' beats');\nconst finalSilent = SILENT.includes(finalStyle);\nreturn [{ json: {\n  retry: false,\n  hook: {\n    style: finalStyle,\n    silent: finalSilent,\n    beats,\n    card: { line1, line2, source },\n    summary: String(hook.hook_summary || '').trim(),\n    lines: beats.map((b) => (finalSilent ? '[SILENT] ' : '') + b.replace(/^\\s*\\[SILENT\\]\\s*/i, '')),\n  },\n} }];\n"
+    }
+   },
+   {
+    "id": "be711907-12d9-4179-b2a4-946cf1a94b22",
+    "name": "HR Retry?",
+    "type": "n8n-nodes-base.if",
+    "typeVersion": 2.3,
+    "position": [
+     1120,
+     80
+    ],
+    "parameters": {
+     "conditions": {
+      "options": {
+       "caseSensitive": true,
+       "leftValue": "",
+       "typeValidation": "loose",
+       "version": 3
+      },
+      "conditions": [
+       {
+        "id": "hr-retry",
+        "leftValue": "={{ $json.retry }}",
+        "rightValue": "",
+        "operator": {
+         "type": "boolean",
+         "operation": "true",
+         "singleValue": true
+        }
+       }
+      ],
+      "combinator": "and"
+     }
+    }
+   },
+   {
+    "id": "7e37ae64-8493-4537-8395-8b5a730f5585",
+    "name": "HR Shots Prompt",
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     1344,
+     80
+    ],
+    "parameters": {
+     "jsCode": "// One shot per beat — the hook chapter's rules from Voice Mode's\n// hookSegmentRules and the segmenter's image/motion/continuity rules, in a\n// second copy kept in lockstep by hand. The scripting run's segmenter is the\n// original; this asks for the same fields so the scenes it writes are\n// indistinguishable from the ones Save scenes To Airtable1 writes.\nconst prep = $('HR Prep').first().json;\nconst hook = $json.hook;\nconst lines = hook.lines.map((l, i) => (i + 1) + '. ' + l).join('\\n');\nconst style = prep.style || '';\nconst tone = prep.tone || '';\n\nconst system = 'Return ONLY a raw JSON object {\"scenes\": [...]}. No intro, no markdown.\\n\\n' +\n  'You are a film editor and storyboard artist turning the OPENING TEASER of a film into shots. Each numbered line below is exactly ONE shot; output EXACTLY ' + hook.lines.length + ' scenes, in order, one per line.\\n\\n' +\n  'THIS IS THE HOOK CHAPTER — the film\\'s opening teaser, cut FAST. Every numbered line is one SHOT of 2-4 seconds, not an 8-second scene:\\n' +\n  '(a) scene_duration_seconds is 3 for every shot (6 for a shot whose line describes an empty establishing frame with room for a title).\\n' +\n  '(b) Composition for a shot that lasts three seconds: ONE strong subject, high contrast, dramatic light, tight or extreme framing — the kind of frame a trailer cuts to. No wide busy scenes that need time to read.\\n' +\n  '(c) video_motion_prompt: ONE decisive move that reads in a second — a fast push-in, a whip-pan, a hard tracking shot, a crash-zoom — and ONE clear action. Energy over subtlety.\\n' +\n  '(d) A line starting with [SILENT] is a shot note, not narration: copy it VERBATIM as narrator_text (keep the [SILENT] prefix), and build the image and the motion from what it describes. Nothing in it is spoken.\\n' +\n  '(e) A line describing an establishing frame with space for a title: the image is wide, static-feeling, nobody near the camera, the centre of the frame uncluttered; the motion is a slow, steady drift only.\\n' +\n  '(f) Shots must differ hard from one another (location, subject, scale) — a teaser that shows the same frame three times is not a teaser.\\n\\n' +\n  'CRITICAL OUTPUT HYGIENE: image_prompt and video_motion_prompt are sent VERBATIM to an image/video model. NEVER write rule labels or scaffolding words — no \"visual_description\", \"bible\", \"[shot type]\" or any bracketed placeholder. Flowing prose only.\\n\\n' +\n  'CONTENT SAFETY — absolute for image_prompt and video_motion_prompt: (a) NO visible minors — imply a child off-screen (a small shoe, an empty swing); crowds are \"adult men and women\". (b) NO real, named or recognizable people — generic descriptions with \"no resemblance to any real person\". (c) NO graphic violence, gore, wounds or corpses — imply through aftermath, shadows, reactions. A prompt that breaks these gets the shot rejected.\\n\\n' +\n  'Rules:\\n' +\n  '1. narrator_text: copy the numbered line, character for character (keep a [SILENT] prefix).\\n' +\n  '2. Use ONLY characters/locations from the STORY BIBLE and weave their full physical description (age, hair, face, exact clothing, colours) into every image prompt where they appear. Write the light INTO each image_prompt (hour, weather, quality of light, where the shadows fall).\\n' +\n  '3. image_prompt: ONE image per shot — the exact first frame the clip starts from. 60-90 words of flowing prose in English: shot type, the subject in full physical detail, the action frozen at the shot\\'s opening instant, the location in detail, the lighting, the colour palette, the lens/framing, ending with the aesthetic tags (' + style + ', ' + tone + ' tone, cinematic, photorealistic, 8k).\\n' +\n  '4. visual_scene_description: 1-2 sentences of what happens on screen during the shot; something visibly changes.\\n' +\n  '5. video_motion_prompt: the Veo prompt as flowing prose — camera movement, then subject, then action, then context, then style & ambiance, 25-45 words. DIRECTION IS NOT OPTIONAL: whenever anything travels, say WHICH WAY relative to the frame and the camera, agreeing with the still. Everything else that moves travels the SAME way. Style & ambiance: ' + style + ', ' + tone + ' mood, cinematic. Then append exactly: \"Negative: no on-screen text, no subtitles, no captions, no watermark, no logos; characters do not speak — no lip movement, no dialogue; ambient/atmospheric motion only; nothing travels against the flow — no oncoming vehicles, nobody walking or driving the wrong way, no reversed motion; no subject appears, disappears, duplicates or changes identity.\"\\n' +\n  '6. CONTINUITY FIELDS, read by CODE: location = the one bible location this shot is set in, spelled EXACTLY as the bible spells it (\"\" if nowhere in the bible); characters = every bible character visible, exact names (empty list if none); objects = every bible object visible, exact names; time_of_day = one word: dawn, morning, day, afternoon, dusk, night, overcast, storm, or interior.\\n' +\n  (prep.kids ? '\\nKIDS STORY MODE — the film LOOKS like an animated children\\'s film, never like photography: rounded, friendly proportions, no photorealistic humans; keep every movement gentle.\\n' : '') +\n  '\\nEach scene object: scene_number (from 1), scene_duration_seconds, narrator_text, visual_scene_description, image_prompt, video_motion_prompt, location, characters, objects, time_of_day.';\n\nconst user = 'STORY BIBLE:\\n' + JSON.stringify(prep.bible) +\n  '\\n\\nWHAT THE VIEWER SEES ACROSS THE HOOK (the writer\\'s own summary):\\n' + (hook.summary || '(none)') +\n  '\\n\\nTHE SHOTS, one per numbered line:\\n' + lines;\n\nreturn [{ json: { payload: { model: 'gpt-5.4', response_format: { type: 'json_object' }, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }, hook } }];\n"
+    }
+   },
+   {
+    "id": "2982439c-b120-455c-a242-08dea1567ce4",
+    "name": "HR Write Shots",
+    "type": "n8n-nodes-base.httpRequest",
+    "typeVersion": 4.4,
+    "position": [
+     1568,
+     80
+    ],
+    "parameters": {
+     "method": "POST",
+     "url": "https://api.openai.com/v1/chat/completions",
+     "authentication": "predefinedCredentialType",
+     "nodeCredentialType": "openAiApi",
+     "sendBody": true,
+     "contentType": "json",
+     "specifyBody": "json",
+     "jsonBody": "={{ JSON.stringify($json.payload) }}",
+     "options": {
+      "timeout": 180000
+     }
+    },
+    "retryOnFail": true,
+    "maxTries": 3,
+    "waitBetweenTries": 3000
+   },
+   {
+    "id": "2bc2bc63-05d8-423e-a7f9-385032e6f9f0",
+    "name": "HR Apply",
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     1792,
+     80
+    ],
+    "parameters": {
+     "jsCode": "// Turn the shots into the SQL that replaces the hook, one statement per item\n// so HR Commit can run them inside one transaction: the old chapter-0 scenes\n// go, the new ones are created through hov.at_create with exactly the fields\n// Save scenes To Airtable1 writes, the hook chapter's script is rewritten,\n// and the project's hookPlan is merged while hookRegen is cleared — the flag\n// the site set before firing this run.\nconst prep = $('HR Prep').first().json;\nconst hook = $('HR Shots Prompt').first().json.hook;\nlet raw = String((((($json.choices || [])[0] || {}).message || {}).content) || '').trim();\nraw = raw.replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();\nlet parsed = {};\ntry { parsed = JSON.parse(raw) || {}; } catch (e) { throw new Error('hook-regen: the shot writer did not return JSON'); }\nconst scenes = Array.isArray(parsed.scenes) ? parsed.scenes : (Array.isArray(parsed) ? parsed : []);\nif (scenes.length !== hook.lines.length) throw new Error('hook-regen: asked for ' + hook.lines.length + ' shots, got ' + scenes.length);\n\n// Canonicalise the continuity fields against the bible, diacritic-insensitive,\n// as Validate Evidence Refs does; a name not in the bible is dropped.\nconst norm = (s) => String(s || '').normalize('NFD').replace(/\\p{M}/gu, '').toLowerCase().trim();\nconst names = (list) => (Array.isArray(list) ? list : []).map((e) => String((e && e.name) || '').trim()).filter(Boolean);\nconst bible = prep.bible || {};\nconst canon = (v, pool) => { const n = norm(v); const hit = pool.find((p) => norm(p) === n); return hit || ''; };\nconst locs = names(bible.locations), chars = names(bible.characters), objs = names(bible.objects);\nconst TOD = ['dawn', 'morning', 'day', 'afternoon', 'dusk', 'night', 'overcast', 'storm', 'interior'];\n\n// Every literal is base64 and decoded by Postgres, and that is NOT tidiness —\n// it is the only encoding that survives this node's own transaction.\n//\n// HR Commit runs `queryBatching: transaction`, and in that mode (unlike the\n// default one every other Postgres node here uses) n8n hands the query to\n// pg-promise WITH an empty values array, so pg-promise reads every `$` that\n// is followed by a digit as a positional parameter and refuses the whole\n// statement: \"Variable $321 out of range. Parameters array length: 0\".\n// Dollar-quoting does not help — the closing `$` of `$hr$` in front of a\n// hook beat reading \"321 metres, standing in the Gulf\" IS `$321`, and that\n// is exactly how the first real rewrite died (execution 12490). Nor is a\n// leading digit the only way in: `$1B` inside a sentence fails the same way,\n// and this pipeline writes films about $1B hotels.\n// Base64's alphabet has no `$` in it, so no data can ever form a placeholder.\n// Measured both ways, transaction and default, in execution 12511.\nconst b64 = (s) => {\n  const str = String(s);\n  if (typeof Buffer !== 'undefined') return Buffer.from(str, 'utf8').toString('base64');\n  return btoa(unescape(encodeURIComponent(str)));\n};\nconst q = (s) => \"convert_from(decode('\" + b64(s) + \"','base64'),'UTF8')\";\nconst pid = prep.projectId;\nconst items = [];\nitems.push({ sql: 'delete from hov.scene where project_id = ' + q(pid) + ' and scene_order < 100' });\nif (prep.hookChapterId) {\n  items.push({ sql: 'update hov.chapter set chapter_script = ' + q(hook.lines.join('\\n')) + ' where id = ' + q(prep.hookChapterId) });\n}\nscenes.forEach((s, i) => {\n  const line = hook.lines[i];\n  const silent = /^\\s*\\[SILENT\\]/i.test(line);\n  const dur = Number(s.scene_duration_seconds);\n  const tags = [];\n  const loc = canon(s.location, locs); if (loc) tags.push('loc:' + loc);\n  (Array.isArray(s.characters) ? s.characters : []).forEach((c) => { const n = canon(c, chars); if (n) tags.push('char:' + n); });\n  (Array.isArray(s.objects) ? s.objects : []).forEach((o) => { const n = canon(o, objs); if (n) tags.push('obj:' + n); });\n  const tod = String(s.time_of_day || '').trim().toLowerCase(); if (TOD.includes(tod)) tags.push('tod:' + tod);\n  const fields = {\n    'Durată Scenă (secunde)': (Number.isFinite(dur) && dur >= 2 && dur <= 8) ? dur : 3,\n    'Script Scenă': silent ? '' : line,\n    'Prompt Vizual': String(s.visual_scene_description || ''),\n    'Imagine First Frame': String(s.image_prompt || ''),\n    'Video Scenă URL': String(s.video_motion_prompt || ''),\n    'Aprobare Scenă': false,\n    'Aprobare Voce': prep.cinematic === true || silent,\n    'Status Producție Scenă': 'Generare Script',\n    'Project_ID': pid,\n    'Ordine Scenă': i + 1,\n    'Evidence Ref': '',\n    'Needs Fact Check': false,\n    'Tag-uri Scenă': tags,\n  };\n  if (prep.hookChapterId) fields['Capitol'] = [prep.hookChapterId];\n  items.push({ sql: 'select id from hov.at_create(' + q('scene') + ', ' + q(JSON.stringify(fields)) + '::jsonb)' });\n});\nconst plan = {\n  style: hook.style,\n  silent: hook.silent,\n  beats: hook.beats,\n  card: hook.card,\n  chosenBy: prep.wanted !== 'auto' ? 'producer' : (prep.forced ? 'default' : 'ai'),\n  writtenAt: new Date().toISOString(),\n};\nitems.push({ sql: 'update hov.project set editing_options = coalesce(editing_options, ' + q('{}') + '::jsonb) || ' + q(JSON.stringify({ hookPlan: plan, hookRegen: null, hookStyle: prep.wanted })) + '::jsonb where id = ' + q(pid) });\nconsole.log('HOOK REGEN [' + hook.style + ']: ' + scenes.length + ' shots replace ' + (prep.oldHookSceneIds || []).length + ' on ' + pid);\nreturn items.map((it) => ({ json: it }));"
+    }
+   },
+   {
+    "id": "edc68851-ca8e-4632-8696-2154bc0b1119",
+    "name": "HR Commit",
+    "type": "n8n-nodes-base.postgres",
+    "typeVersion": 2.6,
+    "position": [
+     2016,
+     80
+    ],
+    "parameters": {
+     "operation": "executeQuery",
+     "query": "={{ $json.sql }}",
+     "options": {
+      "queryBatching": "transaction"
+     }
+    },
+    "onError": "continueErrorOutput"
+   },
+   {
+    "id": "62865987-497a-451f-b14e-176643f0539a",
+    "name": "HR Release Flag",
+    "type": "n8n-nodes-base.postgres",
+    "typeVersion": 2.6,
+    "position": [
+     2240,
+     240
+    ],
+    "parameters": {
+     "operation": "executeQuery",
+     "query": "=update hov.project\nset editing_options = coalesce(editing_options, '{}'::jsonb) || '{\"hookRegen\": null}'::jsonb\nwhere id = $hr${{ $('HR Prep').first().json.projectId }}$hr$",
+     "options": {}
+    },
+    "notes": "A failed commit rolled the whole rewrite back, so the stored hook is untouched — but the site set editing_options.hookRegen before firing and only this run can clear it. Without this the producer is left watching a spinner with nothing alive behind it. Default batching on purpose: transaction batching is what made $N a hazard in the first place.",
+    "onError": "continueRegularOutput",
+    "alwaysOutputData": true,
+    "executeOnce": true
+   }
+  ],
+  "connections": {
+   "Hook Regen Webhook": {
+    "main": [
+     [
+      {
+       "node": "HR Load",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "HR Load": {
+    "main": [
+     [
+      {
+       "node": "HR Prep",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "HR Prep": {
+    "main": [
+     [
+      {
+       "node": "HR Write Hook",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "HR Write Hook": {
+    "main": [
+     [
+      {
+       "node": "HR Guard",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "HR Guard": {
+    "main": [
+     [
+      {
+       "node": "HR Retry?",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "HR Retry?": {
+    "main": [
+     [
+      {
+       "node": "HR Write Hook",
+       "type": "main",
+       "index": 0
+      }
+     ],
+     [
+      {
+       "node": "HR Shots Prompt",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "HR Shots Prompt": {
+    "main": [
+     [
+      {
+       "node": "HR Write Shots",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "HR Write Shots": {
+    "main": [
+     [
+      {
+       "node": "HR Apply",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "HR Apply": {
+    "main": [
+     [
+      {
+       "node": "HR Commit",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "HR Commit": {
+    "main": [
+     null,
+     [
+      {
+       "node": "HR Release Flag",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   }
+  },
+  "nodeGroups": []
+ },
+ "tags": [],
+ "meta": {
+  "aiBuilderAssisted": true,
+  "builderVariant": "mcp"
+ },
+ "parentFolderId": null,
+ "description": "Webhook hook-regen {project_id, hook_style}: rewrites the teaser beats (same rules as Claude Scripting's Voice Mode + Hook Guard), writes one shot per beat, replaces the chapter-0 scenes, merges hookPlan and clears hookRegen.",
+ "scopes": [
+  "execution:reveal",
+  "workflow:create",
+  "workflow:delete",
+  "workflow:disableRedaction",
+  "workflow:enableRedaction",
+  "workflow:execute",
+  "workflow:execute-chat",
+  "workflow:export",
+  "workflow:import",
+  "workflow:list",
+  "workflow:move",
+  "workflow:publish",
+  "workflow:read",
+  "workflow:share",
+  "workflow:unpublish",
+  "workflow:unshare",
+  "workflow:update"
+ ],
+ "canExecute": true
+}

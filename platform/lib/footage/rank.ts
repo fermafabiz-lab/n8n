@@ -47,7 +47,19 @@ export const PROVIDER_RELIABILITY: Record<string, number> = {
   dvids: 1,
   nasa: 1,
   eu_av: 0.9,
+  loc: 0.9,
+  europeana: 0.8,
+  wellcome: 0.8,
+  internet_archive: 0.6,
   wikimedia: 0.6,
+  flickr: 0.5,
+  openverse: 0.5,
+  pexels: 0.4,
+  pixabay: 0.4,
+  unsplash: 0.4,
+  // Its metadata is a filename and a collection policy, not a catalogue
+  // record — trusted like the Archive it mirrors, no further.
+  destockd: 0.5,
   url_import: 0.3,
   user_upload: 0.4,
 };
@@ -168,12 +180,35 @@ export function rankOne(
 }
 
 /**
- * Sort candidates best first, with the B-roll ladder as the tie-breaker.
+ * How far a video may be BEHIND a photograph on score and still be offered
+ * first, on the 0–100 scale. A film is moving pictures, so a clip that is
+ * roughly as relevant as a still is the better answer — but relevance still
+ * decides: a photograph that beats a clip by more than this comes first, and
+ * that is the producer's rule in as many words ("if a photo is more relevant
+ * it should be in front of videos that are less relevant").
+ *
+ * It is a SORT bonus, never added to `score`: the number on the card and the
+ * floor `fallbackPlan` compares against both stay the engine's own judgement
+ * of relevance. The same rule is written a second time, on the model's 0–1
+ * scale, in `SUGGEST_SUBSELECT` (lib/data/postgres.ts), which orders the
+ * suggestion bar. Change one, change the other.
+ */
+export const VIDEO_FIRST_BONUS = 15;
+
+/**
+ * Sort candidates best first — videos ahead of photographs of similar
+ * relevance — with the B-roll ladder as the tie-breaker.
+ *
  * Under narration: pictures, then video of no stated kind, then a still,
  * then a talking head — a real photograph of the event beats a press
  * conference about it, because the still can carry the scene and the
  * speaker cannot (§22). A scene that quotes someone inverts the top of the
  * ladder; a scene that asked for a picture puts stills first.
+ *
+ * The video bonus rides on that ladder rather than on the media type alone:
+ * a talking head carries a −15 visual PENALTY in its score, and handing every
+ * video +15 here would cancel it exactly, quietly undoing B-roll-first. Only
+ * the tiers the ladder already calls good for this scene are lifted.
  */
 export function orderByScore<T extends { score: number; asset: NormalizedFootageAsset }>(
   items: T[],
@@ -193,5 +228,10 @@ export function orderByScore<T extends { score: number; asset: NormalizedFootage
     if (a.mediaType !== "video") return 2;
     return PICTURES.has(fmt) ? 0 : SPEAKING.has(fmt) ? 3 : 1;
   };
-  return [...items].sort((x, y) => y.score - x.score || tier(x.asset) - tier(y.asset));
+  // A scene that asked for a still is asking for a still; nothing is lifted.
+  const lift = (a: NormalizedFootageAsset): number =>
+    r.preferredMediaType !== "image" && a.mediaType === "video" && tier(a) <= 1 ? VIDEO_FIRST_BONUS : 0;
+  return [...items].sort(
+    (x, y) => y.score + lift(y.asset) - (x.score + lift(x.asset)) || tier(x.asset) - tier(y.asset),
+  );
 }

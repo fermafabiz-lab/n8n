@@ -4,7 +4,7 @@
 import React from 'react';
 import {AbsoluteFill, Composition, registerRoot} from 'remotion';
 import {Captions} from './components/Captions';
-import {HookTitle} from './components/HookTitle';
+import {HookCard} from './components/HookCard';
 import {ImpactCard} from './components/ImpactCard';
 import {TimelineCard} from './components/TimelineCard';
 import {TextCard} from './components/TextCard';
@@ -44,14 +44,24 @@ const CaptionProbe: React.FC<{portrait: boolean}> = ({portrait}) => (
 	</AbsoluteFill>
 );
 
-const TitleProbe: React.FC<{title: string}> = ({title}) => (
+/**
+ * The hook's card over the bands — one probe per style that draws one. The
+ * question is the retired opening title's successor and is the long case; the
+ * slate and the figure are the two other layouts HookCard holds.
+ */
+const HookProbe: React.FC<{
+	tone: string;
+	style: 'question' | 'figure' | 'slate';
+	line1: string;
+	line2: string;
+}> = ({tone, style, line1, line2}) => (
 	<AbsoluteFill>
 		<Backdrop />
-		<HookTitle
-			title={title}
-			palette={DEFAULT_PALETTE}
-			preset={presetForTone('Documentary')}
-			durationInSeconds={9}
+		<HookCard
+			plan={{style, silent: style === 'slate', beats: [], card: {line1, line2, source: 'E2'}}}
+			seconds={4.2}
+			preset={presetForTone(tone)}
+			evidence={[{ref: 'E2', claim: '', source: 'Federal Reserve Bulletin', date: '1931'}]}
 		/>
 	</AbsoluteFill>
 );
@@ -195,15 +205,45 @@ export const ProbeRoot: React.FC = () => (
 			defaultProps={{portrait: false}}
 		/>
 		<Composition
-			id="TitlePortrait"
-			component={TitleProbe}
-			durationInFrames={300}
+			id="HookQuestionPortrait"
+			component={HookProbe}
+			durationInFrames={126}
 			fps={30}
 			width={720}
 			height={1280}
 			defaultProps={{
-				title:
-					'The current crisis of illegal Marrocan immigrants coming into Spain in 2026 and what it means for the border towns of Ceuta and Melilla across the coming decade of policy',
+				tone: 'Documentary',
+				style: 'question' as const,
+				line1: 'Cum a ieșit un student dintr-o bancă cu banii, neobservat?',
+				line2: '',
+			}}
+		/>
+		<Composition
+			id="HookSlateLandscape"
+			component={HookProbe}
+			durationInFrames={126}
+			fps={30}
+			width={1280}
+			height={720}
+			defaultProps={{
+				tone: 'Dark',
+				style: 'slate' as const,
+				line1: 'Banca Națională, Ploiești',
+				line2: '14 martie 1931',
+			}}
+		/>
+		<Composition
+			id="HookFigureLandscape"
+			component={HookProbe}
+			durationInFrames={126}
+			fps={30}
+			width={1280}
+			height={720}
+			defaultProps={{
+				tone: 'Motivational',
+				style: 'figure' as const,
+				line1: '4 million',
+				line2: 'dollars, carried out in one bag',
 			}}
 		/>
 		<Composition

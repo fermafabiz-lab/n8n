@@ -92,7 +92,7 @@ Everything you put on screen must already be in the film, and the proof travels 
 
 Every word on a card must be lifted from its own quote, unbroken and in that order: a label of "as a dealer" is proved by "arrives in Las Vegas in 1941 as a dealer", and "dealer in Vegas" is not, because the film never puts those words together. Numbers are the one thing you may re-render: "cinci si douazeci" may become "05:20". You may not introduce a fact the film does not contain — a distance, a date or a statistic that is nowhere in the script and nowhere in the research pack is not yours to add.
 
-A card may not use a word the film has not spoken yet: quote only from the card's own scene or an earlier one. Write each string in the film's own words; a card that says "Feribot" while the film has only said "ferry" is wrong even though it means the same.
+A card may not use a word the film has not spoken yet: quote only from the card's own scene or an earlier one. The ONE exception is a route, which is a map of a whole journey — its later stops are places the film reaches after the card is shown, so quote them from wherever they are spoken and place the card where the journey BEGINS, not where it ends. A map shown after the arrival is a summary, not a map. Write each string in the film's own words; a card that says "Feribot" while the film has only said "ferry" is wrong even though it means the same.
 
 Aim for one to three cards on every film. This pipeline wants animations in its videos, so look hard: a journey with named legs, two times set against each other, a run of dates a listener cannot space out in their head, two quantities of the same kind, a sequence of beats across several scenes. Take the best one or two even when neither is spectacular. Note that the last of those, steps, can be drawn from almost any story that goes somewhere — so a film that offers none of the other four usually still offers this one, and returning nothing on such a film is a miss rather than restraint.
 
@@ -161,6 +161,18 @@ const VALIDATE_CODE = `${validatorSource()}
 // The agent is onError:continueRegularOutput — a model that refuses, times out
 // or answers rubbish must never kill a scripting run, so a missing or unusable
 // answer simply means this film has no cards.
+//
+// THE PARSER CAN ALSO FAIL, AND THAT IS NOT THE SAME AS "NO CARDS".
+// When the output parser refuses the model's answer, the agent hands this node
+// \`{error: "Model output doesn't fit required format"}\` instead of cards, and
+// every read below quietly yields an empty array — so the film looks exactly
+// like one the model had nothing to say about. It is not. On 2026-09-13 the
+// model proposed a good route card AND a good steps card for the LEGO chase
+// film, both of which this validator accepts, and the parser threw the pair
+// away. Told apart here, and written down, because it was invisible.
+let parserError = '';
+try { if ($json && $json.error && !$json.output && !$json.cards) parserError = String($json.error); } catch (e) {}
+
 let proposed = [];
 try {
   const out = $json.output ?? $json;
@@ -194,10 +206,29 @@ for (const r of report) {
 if (!accepted.length) {
   let why = '';
   try { why = String(($json.output || {}).none_because || ''); } catch (e) {}
-  console.log(\`MOTIF NONE: \${why || 'the model returned nothing and gave no reason'}\`);
+  if (parserError) {
+    // Loud on purpose: this is the one "no cards" that is a BUG rather than a
+    // judgement, and from the database it reads identically to the others.
+    console.log(\`MOTIF PARSER FAILED — the model answered and the schema refused it: \${parserError}\`);
+    report.push({ verdict: 'parser-error', variant: null, at: 'response', why: parserError, notes: [] });
+  } else {
+    console.log(\`MOTIF NONE: \${why || 'the model returned nothing and gave no reason'}\`);
+  }
 }
 
-return [{ json: { motifCards: accepted, motifReport: report } }];`;
+// Stored beside the cards by \`Save Motif Cards\`, so "why did this film get
+// nothing" is answerable from the database rather than by reading an
+// execution. Trimmed because it rides in Editing Options, which the site
+// parses on every project page render.
+const slim = report.slice(0, 12).map((r) => ({
+  verdict: r.verdict,
+  variant: r.variant ?? null,
+  at: r.at,
+  why: String(r.why || '').slice(0, 300),
+  notes: (r.notes || []).slice(0, 4).map((n) => String(n).slice(0, 200)),
+}));
+
+return [{ json: { motifCards: accepted, motifReport: slim } }];`;
 
 const SAVE_QUERY = `-- A true merge, one statement. Editing Options is shared by the creation form,
 -- the final-settings step and the sound switches, and writing it wholesale is
@@ -206,12 +237,17 @@ const SAVE_QUERY = `-- A true merge, one statement. Editing Options is shared by
 -- has to MERGE into one — the same reason the site's updateEditingOptions is
 -- \`editing_options || $1::jsonb\` instead of a read-modify-write.
 --
+-- motifReport rides along with the cards on purpose. An empty motifCards is
+-- ambiguous from the database — a film the model had nothing to say about and
+-- a film whose answer the parser refused look identical — and reading an
+-- execution to tell them apart is what two investigations have now had to do.
+--
 -- Dollar-quoting, exactly as every other Postgres node here does it: the
 -- expression is interpolated between $hov$ markers, so nothing in a title or a
 -- quoted line can close the string.
 update hov.project
    set editing_options = coalesce(editing_options, '{}'::jsonb)
-     || $hov\${{ JSON.stringify({ motifCards: $json.motifCards }) }}$hov\$::jsonb
+     || $hov\${{ JSON.stringify({ motifCards: $json.motifCards, motifReport: $json.motifReport }) }}$hov\$::jsonb
  where id = $hov\${{ $('Receive Project Data').first().json.Project_ID }}$hov\$
 returning id;`;
 
@@ -283,6 +319,10 @@ const nodes = (baseX, baseY) => [
 								{
 									name: 'Mannheim',
 									source: {kind: 'quote', sceneIndex: 3, from: 'exact words from that scene'},
+								},
+								{
+									name: 'Pforzheim',
+									source: {kind: 'evidence', ref: 'E3'},
 								},
 							],
 						},

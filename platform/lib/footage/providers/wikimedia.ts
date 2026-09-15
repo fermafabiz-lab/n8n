@@ -15,7 +15,7 @@
  */
 
 import { wikimedia } from "@/lib/archive/wikimedia";
-import { generateSearchQueries } from "../request";
+import { generateSearchQueries, describeHttpError } from "../request";
 import { validateRights } from "../rights";
 import type { FootageProvider, FootageSearchRequest, NormalizedFootageAsset, ProviderSearchOptions } from "../types";
 
@@ -36,6 +36,7 @@ export const wikimediaProvider: FootageProvider = {
   enabled: wikimedia.enabled,
   disabledReason: wikimedia.disabledReason,
   priority: 75,
+  tier: "archive",
   categories: ["general", "history", "places", "people", "events", "politics"],
   searchCapabilities: { video: true, image: true, recentNews: false, historical: true, directDownload: true },
 
@@ -91,7 +92,7 @@ export const wikimediaProvider: FootageProvider = {
       headers: { "User-Agent": "HouseOfVideos/1.0 (https://house-of-videos.com; documentary archive research)" },
       signal: opts?.signal ?? AbortSignal.timeout(15_000),
     });
-    if (!res.ok) throw new Error(`Commons answered HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`Commons answered HTTP ${res.status}` + (await describeHttpError(res)));
     const body = (await res.json()) as { query?: { pages?: Array<{ pageid?: number; missing?: boolean }> } };
     const page = body.query?.pages?.[0];
     if (!page || page.missing || !page.pageid) return null;

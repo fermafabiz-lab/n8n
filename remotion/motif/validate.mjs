@@ -486,19 +486,30 @@ export function validateMotifCards(o) {
 			}
 
 			if (src.kind === 'evidence') {
-				const row = byRef.get(String(src.ref));
+				// The ref is read under `ref` OR `from`. The prompt asks for `ref`
+				// and every worked example in it shows a `quote`, whose text lives
+				// in `from` — so a model with no evidence example to copy files the
+				// ref where it has seen one go, and a card whose every string was
+				// true got dropped for citing `undefined`. Measured on the Peking to
+				// Paris film (execution 9952): a four-stop route, three stops quoted
+				// from real scenes and the fourth carrying `{"kind":"evidence",
+				// "from":"E3"}`, refused whole. Same shape as the 2026-09-03 fix that
+				// kept reading the old provenance map as a fallback: the example is
+				// what a model follows, and prose that contradicts it loses.
+				const ref = String(src.ref ?? src.from ?? '');
+				const row = byRef.get(ref);
 				if (!row) {
-					failed = `${key} cites ${src.ref}, which is not in the research pack`;
+					failed = `${key} cites ${ref || 'nothing'}, which is not in the research pack`;
 					break;
 				}
 				if (!String(row.source ?? '').trim()) {
-					failed = `${key} cites ${src.ref}, which carries no source`;
+					failed = `${key} cites ${ref}, which carries no source`;
 					break;
 				}
 				// The pack is sourced, but whether this phrasing follows from that
 				// claim is not a substring question.
 				verdict = 'review';
-				notes.push(`${key}: from ${src.ref} (${row.source})`);
+				notes.push(`${key}: from ${ref} (${row.source})`);
 				continue;
 			}
 
@@ -577,8 +588,19 @@ export function validateMotifCards(o) {
 				break;
 			}
 			const si = Number.isInteger(src.sceneIndex) ? src.sceneIndex : i;
-			if (si > i) {
-				// A card may not print a word the film has not spoken yet.
+			// A card may not print a word the film has not spoken yet — EXCEPT a
+			// route, which is a map of the whole journey and whose stops are by
+			// nature places the film reaches later. Anchored anywhere before its
+			// destination it cites forward; anchored after it, it is a summary of a
+			// trip the viewer has just watched, which is not what a map is for. So
+			// the rule made `route` unsatisfiable in practice: measured on Peking to
+			// Paris (execution 9952), whose four-stop route quoted "rolls into
+			// Paris" from scene 47 while sitting on scene 7, the departure. Naming
+			// the destination on a map is not a spoiler — the film's own title is
+			// "Peking to Paris". Provenance is NOT relaxed with it: every stop must
+			// still be a verbatim line of a real scene, checked immediately below.
+			// Only the ordering is lifted, and only here.
+			if (si > i && card.variant !== 'route') {
 				failed = `${key} quotes scene ${si}, which the film has not reached at scene ${i}`;
 				break;
 			}

@@ -1,9 +1,13 @@
 # Universal Footage Engine — the n8n and database half
 
-Applied 2026-09-09. The site half is `platform/lib/footage/` and is
-documented in `docs/universal-footage-engine.md` and its siblings.
+Applied 2026-09-09, extended 2026-09-10. The site half is
+`platform/lib/footage/` and is documented in
+`docs/universal-footage-engine.md` and its siblings; the sources
+themselves are catalogued in `docs/footage-sources.md`.
 
 ## Database
+
+### db/010 (2026-09-09)
 
 `db/010_universal_footage.sql`, applied through a throwaway n8n workflow
 (`zz apply db/010 universal footage`, `iZR5m5OLnRIr27VA`, execution 11567,
@@ -18,6 +22,17 @@ No `at_*` view changed. The migration is idempotent (`if not exists`
 everywhere, constraints dropped before being re-added), so it can be
 re-run.
 
+### db/011 (2026-09-10)
+
+`db/011_footage_sources.sql` — table and column comments that no longer
+name retired providers, and one index
+`stock_media_provider_media_idx (provider, media_type, created_at desc)`.
+Nothing to migrate: db/010 had already made `provider` a free string, so
+the nine providers added that day file rows with no schema change. Applied
+through the repurposed probe workflow (`zz apply db/011 footage sources`,
+`3J0twb7l79ykDkH3`, execution 11848, archived after); `Verify 011` reads
+both comments and the index back.
+
 ### Rollback
 
 The columns are additive and the site reads them only when
@@ -25,6 +40,7 @@ The columns are additive and the site reads them only when
 
 ```sql
 set search_path to hov, public;
+drop index if exists stock_media_provider_media_idx;
 drop table if exists footage_search_cache;
 drop table if exists footage_provider_status;
 alter table stock_media
@@ -42,26 +58,44 @@ alter table stock_media
 -- the new providers would make it fail, and nothing depends on it.
 ```
 
-Rows filed by the new providers (`eu_av`, `dvids`, `nasa`, `url_import`,
-`user_upload`) survive a schema rollback as plain library rows.
+Rows filed by the newer providers (`eu_av`, `dvids`, `nasa`,
+`internet_archive`, `europeana`, `loc`, `wellcome`, `flickr`, `openverse`,
+`pexels`, `pixabay`, `unsplash`, `url_import`, `user_upload`) survive a
+schema rollback as plain library rows.
 
 ## n8n: `Archive Suggestions` (`Lo78uXXCFYoIH73r`)
 
 | | version |
 |---|---|
-| active since 2026-09-09 | `6b5a1417-2828-4e1d-ae0b-28ea1b6a454a` |
-| previous active (2026-09-07) | `6ac5f5f1-e0b7-4f34-8fd2-b5e50af9062b` |
+| active since 2026-09-14 | `2e370445-dfa1-4225-8e7c-6ea1082d6f9a` |
+| active 2026-09-13 (2) → 09-14 | `788fe2c3-728c-4392-87b7-45af6b1c2e35` |
+| active 2026-09-13 (1) | `916a51d1-62f8-4d0c-b19f-af39ac4a8013` |
+| active 2026-09-10 → 09-13 | `a3278855-7c67-4e1f-960f-5ef7168d1127` |
+| active 2026-09-09 → 09-10 | `6b5a1417-2828-4e1d-ae0b-28ea1b6a454a` |
+| active 2026-09-07 → 09-09 | `6ac5f5f1-e0b7-4f34-8fd2-b5e50af9062b` |
 
-Three Code nodes changed — `Build Query Prompt`, `Parse Queries`,
-`Build Rank Prompts` — and nothing else; the draft was diffed node by node
-against `6ac5f5f1` before publishing. `nodes/` holds the exact `jsCode` of
-each; `dump.mjs` prints them JSON-encoded for pasting into an
-`updateNodeParameters` operation; `verify.mjs <workflow.json>` diffs a
-fetched workflow against them byte for byte.
+09-09 changed three Code nodes — `Build Query Prompt`, `Parse Queries`,
+`Build Rank Prompts`; 09-10 changed `Build Query Prompt` alone (the system
+prompt names the new sources and adds the `stockshots` footage type); 09-13
+changed `Build Rank Prompts` and `Parse Ranks` (up to 16 picks per scene
+instead of 4, and a clip and a still returned together with the clip
+first), then `Build Query Prompt` again an hour later; 09-14 changed `Build Query Prompt` once more, to name Destockd among the sources. Each time the draft was diffed node by node against the active
+version before publishing and only the intended nodes differed. `nodes/`
+holds the exact `jsCode` of each; `dump.mjs` prints them JSON-encoded for
+pasting into an `updateNodeParameters` operation; `verify.mjs
+<workflow.json>` diffs a fetched workflow against them byte for byte.
+
+**16 is the third copy of `MAX_PICKS_PER_SCENE`**, beside the site's store
+stage (`app/api/archive/suggest/route.ts`) and the sentence in the rank
+prompt. Change one, change all three: the prompt asking for more than the
+parser keeps would waste model output, and the parser keeping more than the
+store writes would be a silent drop.
 
 ### Rollback
 
 `restore_workflow_version { workflowId: "Lo78uXXCFYoIH73r", versionId:
-"6ac5f5f1-e0b7-4f34-8fd2-b5e50af9062b" }` then publish it. The site's
-`/api/archive/suggest` accepts the old prompt's `queries[]` shape as well
-as the new `request{}`, so the workflow can be rolled back on its own.
+"a3278855-7c67-4e1f-960f-5ef7168d1127" }` then publish it (or `6b5a1417…` /
+`6ac5f5f1…` for the earlier prompts). The site's `/api/archive/suggest`
+accepts every shape the prompts produce and its own cap is independent, so
+the workflow can be rolled back on its own — a rolled-back prompt simply
+returns at most four picks again.

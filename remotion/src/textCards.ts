@@ -179,7 +179,10 @@ export type BuildCardsOptions = {
 	 * is the same defect as a flash inside a dip.
 	 */
 	chapterCardsOn: boolean;
-	/** Seconds the hook title occupies, so a card never lands under it. */
+	/**
+	 * Seconds the hook occupies — the whole teaser since 2026-09-11 (see
+	 * src/hook.ts), so a card never lands on one of its three-second shots.
+	 */
 	hookSeconds: number;
 	/**
 	 * False on a silent film, where `narratorText` is an unspoken shot note.

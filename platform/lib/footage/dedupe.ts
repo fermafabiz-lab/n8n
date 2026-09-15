@@ -16,7 +16,19 @@ import type { NormalizedFootageAsset } from "./types";
 export function canonicalUrl(raw: string): string {
   try {
     const u = new URL(raw);
-    u.hash = "";
+    // A fragment is normally an anchor INSIDE a document, so two URLs that
+    // differ only by it are one page. On a hash-routed single-page app the
+    // fragment IS the route, and dropping it makes every page on the site the
+    // same URL. Destockd is one (`https://www.destockd.com/#/shot/<film>/<shot>`),
+    // and the cost of getting this wrong was silent and total: all eight clips
+    // of a search canonicalised to `https://www.destockd.com/`, `dedupeAssets`
+    // dropped an asset on ANY key collision, and the provider could contribute
+    // exactly ONE asset to any search, forever. Caught live 2026-09-14 —
+    // `n=8` from the provider, one result on screen — and not by the tests,
+    // whose Destockd double only ever returned a single shot.
+    // `#/` is the hash-router convention and is precisely the case where the
+    // fragment carries identity; a bare `#section` anchor still goes.
+    if (!u.hash.startsWith("#/")) u.hash = "";
     // Tracking and pagination noise. Commons appends utm_source to every
     // file URL; every other provider has its own version of the same.
     for (const k of [...u.searchParams.keys()]) {
@@ -28,7 +40,17 @@ export function canonicalUrl(raw: string): string {
     if (host === "commons.m.wikimedia.org") host = "commons.wikimedia.org";
     const path = u.pathname.replace(/\/+$/, "") || "/";
     const q = u.searchParams.toString();
-    return `${u.protocol}//${host}${path}${q ? `?${q}` : ""}`;
+    // Decoded, so a route pasted as `#/shot/The Big Picture/…` and one built
+    // as `#/shot/The%20Big%20Picture/…` are one identity. A malformed escape
+    // is left as it stands rather than throwing the whole canonicalisation
+    // into the catch below, which would return the raw URL uncanonicalised.
+    let hash = u.hash;
+    try {
+      hash = decodeURI(hash);
+    } catch {
+      /* keep it encoded */
+    }
+    return `${u.protocol}//${host}${path}${q ? `?${q}` : ""}${hash}`;
   } catch {
     return raw.trim();
   }

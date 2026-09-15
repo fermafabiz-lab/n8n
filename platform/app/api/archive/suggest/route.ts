@@ -34,6 +34,7 @@ import { revalidatePath } from "next/cache";
 import { buildFootageRequest, searchFootage, usableAutomatically, type RankedFootage } from "@/lib/footage";
 import { footageAuthorized, footageUsable } from "@/lib/footage/auth";
 import { claimScenesForSuggestion, getSceneForFootage, storeArchiveSuggestions } from "@/lib/data/stock";
+import { ArchiveSuggestQuery, ArchiveSuggestBody, ValidationError, parseQuery, parseJsonBody } from "@/lib/validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,12 +43,33 @@ export const maxDuration = 600;
 const bad = (status: number, error: string) => NextResponse.json({ ok: false, error }, { status });
 const REC = /^rec[0-9A-Za-z]{14}$/;
 
+/**
+ * How many candidates a scene's ranking prompt gets to read, and how many
+ * picks may be stored for it.
+ *
+ * Both were built around "offer a few options in a bar" and the few was FOUR,
+ * in three places at once — here, in the n8n rank prompt, and in that
+ * workflow's Parse Ranks. Four slots filled themselves with photographs and a
+ * clip never reached the producer even when the archives held one, which is
+ * what "it finds mostly photos" was. The bar now shows everything the model
+ * judged relevant; these are sanity bounds on a prompt and a table, not a
+ * number of options anyone chose. `MAX_PICKS_PER_SCENE` is mirrored in the
+ * n8n workflow (prompt text and Parse Ranks) — change one, change all three.
+ */
+const CANDIDATES_PER_SCENE = 16;
+const MAX_PICKS_PER_SCENE = 16;
+
 export async function GET(req: NextRequest) {
   if (!footageAuthorized(req)) return bad(401, "unauthorized");
   if (!footageUsable()) return bad(503, "archive suggestions need the Postgres backend");
-  const project = req.nextUrl.searchParams.get("project") ?? "";
-  if (!REC.test(project)) return bad(400, "bad project");
-  const out = await claimScenesForSuggestion(project);
+  let query: ReturnType<typeof ArchiveSuggestQuery.parse>;
+  try {
+    query = parseQuery(req.nextUrl.searchParams, ArchiveSuggestQuery);
+  } catch (e) {
+    if (e instanceof ValidationError) return bad(e.status, e.message);
+    throw e;
+  }
+  const out = await claimScenesForSuggestion(query.project);
   if (!out.project) return bad(404, "project not found");
   return NextResponse.json({ ok: true, ...out });
 }
@@ -80,16 +102,15 @@ function candidateOf(c: RankedFootage & { asset: { id: string } }) {
 export async function POST(req: NextRequest) {
   if (!footageAuthorized(req)) return bad(401, "unauthorized");
   if (!footageUsable()) return bad(503, "archive suggestions need the Postgres backend");
-  let body: {
-    stage?: string;
-    project?: string;
-    processed?: unknown;
-    scenes?: unknown;
-  };
+  // The two stages carry genuinely different bodies, and an unrecognised
+  // stage is a business-rule 400 (below), not a schema rejection — see
+  // ArchiveSuggestBody's own comment in lib/apiSchemas.ts.
+  let body: { stage: string; project?: string; processed?: unknown[]; scenes?: unknown[] };
   try {
-    body = await req.json();
-  } catch {
-    return bad(400, "body is not JSON");
+    body = await parseJsonBody(req, ArchiveSuggestBody);
+  } catch (e) {
+    if (e instanceof ValidationError) return bad(e.status, e.message);
+    throw e;
   }
 
   if (body.stage === "search") {
@@ -128,7 +149,11 @@ export async function POST(req: NextRequest) {
       if (requests > 0) await new Promise((r) => setTimeout(r, 300));
       requests += 1;
       try {
-        const r = await searchFootage(request, { limit: 6, top: 12, signal: AbortSignal.timeout(60_000) });
+        // `limit` is a provider's page size, not a number of calls, so asking
+        // for more costs nothing extra at the archives; `top` is the ranked
+        // pool the cut below comes out of, and it has to be wider than that
+        // cut or the video-first ordering has nothing left to promote.
+        const r = await searchFootage(request, { limit: 8, top: 30, signal: AbortSignal.timeout(60_000) });
         // Never offer what a run could not place on its own: an automatic
         // path may not pass a review class, so those wait for the picker.
         const usable = r.candidates.filter(
@@ -137,7 +162,7 @@ export async function POST(req: NextRequest) {
         );
         out.push({
           id,
-          candidates: usable.slice(0, 12).map(candidateOf),
+          candidates: usable.slice(0, CANDIDATES_PER_SCENE).map(candidateOf),
           source: r.source,
           providers: r.providers.filter((p) => p.routed && !p.reason).map((p) => p.provider),
         });
@@ -159,7 +184,7 @@ export async function POST(req: NextRequest) {
         id: String(s.id),
         picks: (Array.isArray(s.picks) ? (s.picks as Array<Record<string, unknown>>) : [])
           .filter((p) => REC.test(String(p.id ?? "")))
-          .slice(0, 4)
+          .slice(0, MAX_PICKS_PER_SCENE)
           .map((p) => ({
             stockId: String(p.id),
             relevance: typeof p.relevance === "number" ? p.relevance : null,

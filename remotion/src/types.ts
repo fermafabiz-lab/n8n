@@ -188,13 +188,23 @@ export type FinalVideoProps = {
 	 */
 	montageIntensity?: 0 | 1 | 2;
 	/**
-	 * A hook line written FOR the screen, if Scripting produced one. Falls
-	 * back to the project title — but that field holds a brief far more often
-	 * than a title, so the card judges it before showing anything.
+	 * The cold open Scripting planned — style, beats and the one card the style
+	 * may draw (src/hook.ts). `Editing Options.hookPlan`, passed through by
+	 * Final Assembly's `Build Remotion Props`. Absent on every film made before
+	 * 2026-09-11, which then opens on its footage with no card.
+	 *
+	 * Typed loosely on purpose: it crosses a model, a guard, jsonb and an n8n
+	 * Code node before it lands here, and `normalizeHookPlan` is the one reader.
+	 */
+	hookPlan?: unknown;
+	/**
+	 * RETIRED 2026-09-11 and ignored: the opening title card is gone, replaced
+	 * by the teaser. Both keys are still accepted so an older props file or an
+	 * older `Build Remotion Props` neither fails validation nor changes meaning.
 	 */
 	hookTitle?: string;
-	/** Individual overlay toggles — omitted/true keeps the element. */
 	showHookTitle?: boolean;
+	/** Individual overlay toggles — omitted/true keeps the element. */
 	showChapterCards?: boolean;
 	showEndScreen?: boolean;
 	/** Chapter number -> real chapter title (from the script's [CHAPTER n: title] markers). */

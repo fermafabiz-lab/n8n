@@ -9,10 +9,9 @@
  * report, so a screen can still say "DVIDS: no key" instead of quietly
  * showing fewer results.
  *
- * NARA and Smithsonian are gone from here. They were declared as disabled
- * placeholders for two months and never built; the registry does not list
- * them, no search reaches them, and the rows the library may hold under
- * their names stay readable. See docs/nara-smithsonian-deprecation.md.
+ * The list of who can be searched is the registry's, and only the
+ * registry's: a provider the producer has retired is simply absent here,
+ * and any rows the library holds under its name stay readable.
  */
 
 import { providerById, searchableProviders } from "@/lib/footage/registry";

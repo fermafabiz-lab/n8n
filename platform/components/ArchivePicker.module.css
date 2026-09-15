@@ -89,7 +89,7 @@
 }
 
 .status.err {
-  color: #9b2b1f;
+  color: var(--red-ink);
 }
 
 .doors {
@@ -105,7 +105,7 @@
 
 .doors button[aria-pressed="true"] {
   border-color: var(--accent);
-  color: var(--accent-deep);
+  color: var(--accent-ink);
 }
 
 /* A text link where a button would be one control too many. */

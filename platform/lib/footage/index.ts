@@ -19,11 +19,23 @@
 
 export * from "./types";
 export { buildFootageRequest, generateSearchQueries } from "./request";
-export { allProviders, providerById, providerFilterOptions, requestCategories, routeProviders, searchableProviders, FootageProviderRegistry } from "./registry";
+export { allProviders, namedProviders, providerById, providerFilterOptions, requestCategories, routeProviders, searchableProviders, FootageProviderRegistry } from "./registry";
+// Destockd: the normalizer, the two pure parsers (a page keeps its identity
+// after the `#`, a clip keeps it in the filename) and the self-imposed rate
+// limit, all exported so the checks can pin them.
+export {
+  normalizeDestockdResult,
+  parseDestockdHash,
+  splitClipFilename,
+  destockdBudget,
+  resetDestockdState,
+  MAX_PER_MINUTE as DESTOCKD_MAX_PER_MINUTE,
+  DESTOCKD_RIGHTS_TEXT,
+} from "./providers/destockd";
 export { validateRights, usableAutomatically, usableWithReview, renderable, attributionLine, USAGE_LABELS, FootageRightsValidator } from "./rights";
 export { matchSignals } from "./match";
 export { assessProvenance, baseProvenance, PROVENANCE_WEIGHTS } from "./provenance";
-export { rankOne, orderByScore, visualUsefulness, RANK_WEIGHTS, RANK_PENALTIES, PROVIDER_RELIABILITY } from "./rank";
+export { rankOne, orderByScore, visualUsefulness, RANK_WEIGHTS, RANK_PENALTIES, PROVIDER_RELIABILITY, VIDEO_FIRST_BONUS } from "./rank";
 export { dedupeAssets, canonicalUrl, identityKeys } from "./dedupe";
 export { heldBack, providerStats, recordSearch, recordSelection, recordFailure } from "./health";
 export { importFootageFromUrl, readPage, ImportRefused } from "./urlImport";

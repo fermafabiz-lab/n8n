@@ -24,15 +24,9 @@ import FootageImport from "./FootageImport";
 import FootageUpload from "./FootageUpload";
 import styles from "./FootageAdmin.module.css";
 
-const PROVIDER_FILTERS: Array<{ id: string; label: string }> = [
-  { id: "all", label: "All" },
-  { id: "wikimedia", label: "Wikimedia" },
-  { id: "eu_av", label: "EU Audiovisual" },
-  { id: "dvids", label: "DVIDS" },
-  { id: "nasa", label: "NASA" },
-  { id: "url_import", label: "URL Import" },
-  { id: "user_upload", label: "Manual Upload" },
-];
+// The provider chips are the registry's own list (it arrives as `health`),
+// so a new adapter shows up here the day it lands and nothing is retyped.
+const PROVIDER_FILTERS: Array<{ id: string; label: string }> = [{ id: "all", label: "All" }];
 
 const PROVENANCES = ["actual_footage", "illustrative_footage", "archival_footage", "archival_photo", "real_stock", "unknown"] as const;
 
@@ -46,7 +40,7 @@ export default function FootageAdmin({
   total: number;
   /** Providers the library holds that are not in the fixed filter list (retired ones). */
   extraProviders: Array<{ provider: string; n: number }>;
-  health: Array<{ id: string; displayName: string; enabled: boolean; disabledReason: string | null; heldBack: string | null; searches: number; results: number; selected: number; avgScore: number | null; avgMs: number | null; lastError: string | null }>;
+  health: Array<{ id: string; displayName: string; enabled: boolean; disabledReason: string | null; notice: string | null; heldBack: string | null; searches: number; results: number; selected: number; avgScore: number | null; avgMs: number | null; lastError: string | null }>;
 }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -77,9 +71,13 @@ export default function FootageAdmin({
       {/* Provider health strip — which archives answer, and how well. */}
       <div className={styles.health}>
         {health.map((h) => (
-          <div key={h.id} className={`${styles.hcard} ${!h.enabled ? styles.hoff : h.heldBack ? styles.hheld : ""}`} title={h.disabledReason ?? h.heldBack ?? h.lastError ?? ""}>
+          <div key={h.id} className={`${styles.hcard} ${!h.enabled ? styles.hoff : h.heldBack ? styles.hheld : ""}`} title={h.disabledReason ?? h.heldBack ?? h.notice ?? h.lastError ?? ""}>
             <b>{h.displayName}</b>
-            <span>{!h.enabled ? h.disabledReason ?? "off" : h.heldBack ? "held back" : h.searches ? `${h.searches} searches · ${h.results} results · ${h.selected} used` : "not asked yet"}</span>
+            <span>{!h.enabled ? h.disabledReason ?? "off" : h.heldBack ? "held back" : h.searches ? `${h.searches} searches · ${h.results} results · ${h.selected} used` : h.notice ?? "not asked yet"}</span>
+            {/* An enabled provider with a caveat (anonymous, low quota) says so
+                even once it has been asked — the counts alone would read as a
+                source in full working order. */}
+            {h.enabled && h.notice && h.searches > 0 && <span>{h.notice}</span>}
             {h.enabled && h.searches > 0 && (
               <span>
                 {h.avgScore !== null ? `avg score ${h.avgScore}` : ""}
@@ -93,7 +91,7 @@ export default function FootageAdmin({
 
       <div className={styles.toolbar}>
         <div className={styles.chips} role="group" aria-label="Provider">
-          {PROVIDER_FILTERS.map((p) => (
+          {[...PROVIDER_FILTERS, ...health.map((h) => ({ id: h.id, label: h.displayName }))].map((p) => (
             <button key={p.id} type="button" aria-pressed={get("provider", "all") === p.id} onClick={() => set({ provider: p.id })}>
               {p.label}
             </button>
@@ -200,9 +198,8 @@ export default function FootageAdmin({
                 {a.verifiedAt ? " · verified" : ""}
               </div>
               <div className={actionsClass}>
-                <a href={a.sourceUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
-                  open source ↗
-                </a>
+                {/* The source link is the provider's name on the card itself;
+                    only the preview of the FILE belongs here. */}
                 {a.downloadUrl !== a.sourceUrl && (
                   <a href={a.downloadUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
                     preview ↗

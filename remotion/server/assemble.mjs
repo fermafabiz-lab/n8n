@@ -24,10 +24,19 @@
 //   producer's point of view and ride the site's one music toggle.
 //   musicVolume (0.05..1, default 0.22) is the background track's gain
 //   before the sidechain duck — the site's "Music volume" slider. The
-//   accents keep their own fixed levels.
+//   accents keep their own fixed levels. The track is loudness-MEASURED
+//   and corrected to MUSIC_TARGET_LUFS first, so that one slider position
+//   means one level whichever track the folder handed over, and the bed
+//   ducks by BAND: the speech range steps aside for every spoken syllable
+//   while the bass and the air only lean back. See buildMixGraph.
+//   The HOOK (2026-09-11): a scene may carry holdSeconds / minSeconds /
+//   gapSeconds to be cut as a teaser shot rather than as a narrated scene,
+//   and hookRiser: true places a riser under the last seconds of chapter 0
+//   with a boom on the cut to chapter 1. Both are decided by n8n's Build
+//   Timeline from the project's hookPlan; absent, nothing changes.
 // GET  /assemble/:jobId/status -> { status, outputUrl, verify: {videoSeconds,
-//   audioSeconds, sceneStartsSeconds} } — verify comes from ffprobe on the
-//   result, so callers can confirm alignment numerically.
+//   audioSeconds, sceneStartsSeconds, hookEndSeconds} } — verify comes from
+//   ffprobe on the result, so callers can confirm alignment numerically.
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
@@ -217,6 +226,40 @@ async function hasAudioStream(file) {
 	}
 }
 
+/** Length of the hook riser, in seconds; it ends exactly on the hook boundary. */
+export const HOOK_RISER_SECONDS = 3.2;
+
+/**
+ * Cover-fit a clip to the canvas: scale up to fill, centre-crop the overflow,
+ * and DECLARE SQUARE PIXELS. A 16:9 clip on a 9:16 canvas loses its sides.
+ *
+ * `setsar=1` is the load-bearing part and must stay before every `concat`.
+ * `concat` refuses to join inputs whose sample aspect ratio differs, and
+ * `scale` does not square the SAR — it preserves the source's DISPLAY aspect
+ * by writing whatever output SAR makes the arithmetic come out. So a source
+ * with a hair-off pixel aspect arrives as something like 12735:12736 and one
+ * that declares none arrives as 0:1. Both look identical to a human; ffmpeg
+ * compares them as integers and dies at the join:
+ *
+ *   Input link in0:v0 parameters (size 1280x720, SAR 0:1) do not match the
+ *   corresponding output link in0:v0 parameters (1280x720, SAR 12735:12736)
+ *   Failed to configure output pad ... Conversion failed!
+ *
+ * Every clip was a Veo clip until documentary mode, so every clip shared one
+ * SAR and nothing ever noticed. The NASA film (2026-09-15) was the first to
+ * MIX sources — three archive clips from the media store against six Veo
+ * clips from Drive — and it failed three times in a row, about forty seconds
+ * in, with that message and no scene named. After the crop the frame is
+ * exactly W×H of square pixels, so saying so is both true and invisible.
+ *
+ * Exported so `npm run check:sar` can assert it on the real function rather
+ * than on a copy of the string — there is no ffmpeg in a Claude Code web
+ * session, so the graph is what can be checked here and a finished film is
+ * what proves it.
+ */
+export const coverFit = (W, H) =>
+	`scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1`;
+
 // Synthesize the SFX bank once. Pure ffmpeg — no downloaded assets.
 let sfxReady = null;
 function ensureSfx() {
@@ -238,13 +281,243 @@ function ensureSfx() {
 				await run('ffmpeg', ['-y', '-f', 'lavfi', '-i', 'anoisesrc=color=brown:duration=2.2:amplitude=0.8',
 					'-af', 'highpass=f=200,afade=t=in:d=1.9,afade=t=out:st=1.9:d=0.3,aformat=sample_rates=44100:channel_layouts=mono', riser]);
 			}
-			return {whoosh, boom, riser};
+			// The hook's riser: longer and brighter than the end-screen one, so
+			// it reads as tension building under the teaser's last shots rather
+			// than as a sign-off. HOOK_RISER_SECONDS is what the mix graph
+			// subtracts from the hook boundary to land its end ON the cut.
+			const hookRiser = path.join(SFX_DIR, 'hookriser.wav');
+			if (!fs.existsSync(hookRiser)) {
+				await run('ffmpeg', ['-y', '-f', 'lavfi', '-i', `anoisesrc=color=pink:duration=${HOOK_RISER_SECONDS}:amplitude=0.8`,
+					'-af', `highpass=f=160,lowpass=f=6500,afade=t=in:d=${(HOOK_RISER_SECONDS - 0.25).toFixed(2)},afade=t=out:st=${(HOOK_RISER_SECONDS - 0.25).toFixed(2)}:d=0.25,aformat=sample_rates=44100:channel_layouts=mono`, hookRiser]);
+			}
+			return {whoosh, boom, riser, hookRiser};
 		})();
 	}
 	return sfxReady;
 }
 
 const MONO = 'aformat=sample_rates=44100:channel_layouts=mono';
+
+/**
+ * Where a voice lives.
+ *
+ * Speech carries almost all of its intelligibility between roughly 300 Hz and
+ * 4 kHz; below that is body, above it is air. A music bed that keeps its bass
+ * and its sparkle but steps out of THAT window is the "simple parametric EQ"
+ * move an editor makes by hand — the music stays full and the words stay
+ * clear, instead of the whole track pumping up and down.
+ */
+const SPEECH_BAND_LOW = 300;
+const SPEECH_BAND_HIGH = 3800;
+
+/**
+ * The loudness every music bed is brought to before the producer's slider is
+ * applied.
+ *
+ * Without this the slider means a different thing on every track: the `Muzica`
+ * folder holds everything from a quiet ambient bed to a commercially mastered
+ * cue, and those differ by more than 10 dB. At a fixed gain of 0.22 the first
+ * is inaudible and the second is blaring — which is exactly the complaint the
+ * measurement fixes. Normalized first, 0.22 is one level on every film.
+ *
+ * -20 LUFS is below typical library music (-14 to -16), so the bed also sits
+ * QUIETER than it used to on an average track. That is deliberate and it is
+ * the number to change if the balance still is not right — one constant, not
+ * a slider default in four places.
+ */
+const MUSIC_TARGET_LUFS = -20;
+/** Never trust a measurement enough to swing the bed further than this. */
+const MUSIC_GAIN_LIMIT_DB = 12;
+
+/**
+ * Is this ffmpeg build carrying a given filter?
+ *
+ * The band-split duck below needs `acrossover`, which every ffmpeg since 4.3
+ * has (the image is bookworm, so 5.1) — but a filtergraph naming a filter that
+ * is not there fails the WHOLE render, and a render is minutes of work. So it
+ * is asked rather than assumed, once per process, and the flat fallback keeps
+ * films rendering on a build that lacks it.
+ */
+const filterCache = new Map();
+async function hasFilter(name) {
+	if (filterCache.has(name)) return filterCache.get(name);
+	let present = false;
+	try {
+		const {stdout} = await run('ffmpeg', ['-hide_banner', '-filters']);
+		present = new RegExp(`^\\s*\\S+\\s+${name}\\s`, 'm').test(String(stdout));
+	} catch (e) {
+		console.warn(`ffmpeg -filters failed (${e.message}) — assuming no ${name}`);
+	}
+	filterCache.set(name, present);
+	return present;
+}
+
+/**
+ * A track's integrated loudness in LUFS, or null when it cannot be measured.
+ *
+ * `loudnorm` in analysis mode rather than in its normalizing mode on purpose:
+ * what comes back is a NUMBER, which is then applied as one constant `volume`.
+ * Loudnorm's own dynamic mode rides the gain as it goes, which would fight the
+ * sidechain duck underneath it and pump the bed — the one thing this whole
+ * section exists to stop.
+ */
+async function measureLoudness(file) {
+	const {stderr} = await run('ffmpeg', [
+		'-hide_banner', '-nostats',
+		'-i', file,
+		'-af', 'loudnorm=print_format=json',
+		'-f', 'null', '-',
+	]);
+	const m = String(stderr).match(/"input_i"\s*:\s*"(-?[\d.]+)"/);
+	const lufs = m ? parseFloat(m[1]) : NaN;
+	// Digital silence measures -inf and parses as a huge negative number; a
+	// correction derived from it would be a 100 dB boost of nothing.
+	if (!Number.isFinite(lufs) || lufs < -70) return null;
+	return lufs;
+}
+
+/**
+ * The audio mix bus, as a list of filtergraph parts.
+ *
+ * Pure and exported for the same reason `parseSpeechBounds` is: this box has
+ * no ffmpeg to rehearse a graph against, and the failure this shape produces
+ * is total — a pad produced and never consumed, or consumed and never
+ * produced, and ffmpeg refuses the whole render minutes into the job. Built
+ * as data it can at least be checked for that (`npm run check:mix`), across
+ * every combination of switches, without an encoder.
+ *
+ * Returns the parts; the caller owns `parts` and the input indices.
+ */
+export function buildMixGraph({
+	nativeOn,
+	nativeVolume,
+	music,
+	musicDuck,
+	musicGainDb,
+	musicVolume,
+	musicIdx,
+	totalDur,
+	stingers,
+	boomIdx,
+	whooshIdx,
+	riserIdx,
+	chapterBoundaries,
+	hookRiser = false,
+	hookRiserIdx = -1,
+	hookBoomIdx = -1,
+	hookEndSeconds = 0,
+}) {
+	const out = [];
+	// Mix bus: narration first (defines length), then ducked music, then SFX.
+	//
+	// The voice is split into one copy for the mix plus one KEY per thing
+	// that ducks against it. The count is derived rather than fixed at
+	// three: an unused branch has to be sunk explicitly or the graph
+	// stalls, and the band-split music below needs three keys of its own.
+	const mixInputs = [];
+	const sideCount = (nativeOn ? 1 : 0) + (music ? (musicDuck === 'bands' ? 3 : 1) : 0);
+	const keys = Array.from({length: sideCount}, (_, i) => `[vk${i}]`);
+	// Nothing ducks against the voice (no music, no ambience), so there is no
+	// split to make. `asplit=1` is legal and this is one filter fewer to be
+	// wrong about; the format filter is a no-op the graph already uses.
+	out.push(
+		sideCount === 0
+			? `[voiceraw]${MONO}[vmain]`
+			: `[voiceraw]asplit=${1 + sideCount}[vmain]${keys.join('')}`,
+	);
+	mixInputs.push('[vmain]');
+	let nextKey = 0;
+	if (nativeOn) {
+		// Ambience sits under the narration the same way the music does:
+		// ducked by the voice so it never competes with a spoken line,
+		// but audible in the gaps between them.
+		out.push(`[natraw]${MONO},volume=${nativeVolume}[natlvl]`);
+		out.push(
+			`[natlvl]${keys[nextKey++]}sidechaincompress=threshold=0.05:ratio=8:attack=10:release=350:makeup=1[natduck]`,
+		);
+		mixInputs.push('[natduck]');
+	}
+	if (music) {
+		const fadeStart = Math.max(0, totalDur - 2.5).toFixed(3);
+		// The measured correction comes FIRST, so the producer's slider
+		// rides on a bed that is already the same loudness on every film.
+		const level = musicGainDb ? `volume=${musicGainDb.toFixed(2)}dB,` : '';
+		out.push(
+			`[${musicIdx}:a]${MONO},aloop=loop=-1:size=2000000000,atrim=duration=${totalDur.toFixed(3)},` +
+				`${level}volume=${musicVolume},afade=t=out:st=${fadeStart}:d=2.5[mus]`,
+		);
+		if (musicDuck === 'bands') {
+			// Two crossovers rather than one with a two-value `split`: each
+			// takes a single frequency, so there is no list syntax to get
+			// wrong, and Linkwitz-Riley bands sum back flat either way.
+			out.push(`[mus]acrossover=split=${SPEECH_BAND_LOW}[mlo][mrest]`);
+			out.push(`[mrest]acrossover=split=${SPEECH_BAND_HIGH}[mmid][mhi]`);
+			// The speech band gets out of the way properly — a low
+			// threshold so any spoken syllable triggers it, a hard ratio,
+			// and a slow release so it does NOT surge back in the 0.35s
+			// between two scenes. It recovers over a chapter gap, which is
+			// long enough to be heard as a breath rather than a pump.
+			out.push(
+				`[mmid]${keys[nextKey++]}sidechaincompress=threshold=0.02:ratio=20:attack=5:release=900:makeup=1[mmidd]`,
+			);
+			// Body and air only lean back. This is the whole point: the bed
+			// keeps sounding like music while the words are being said.
+			out.push(
+				`[mlo]${keys[nextKey++]}sidechaincompress=threshold=0.05:ratio=4:attack=20:release=700:makeup=1[mlod]`,
+			);
+			out.push(
+				`[mhi]${keys[nextKey++]}sidechaincompress=threshold=0.05:ratio=4:attack=20:release=700:makeup=1[mhid]`,
+			);
+			out.push(`[mlod][mmidd][mhid]amix=inputs=3:duration=longest:normalize=0[mduck]`);
+		} else {
+			// No crossover in this build: carve the speech band out
+			// statically — the plain parametric-EQ cut — and duck the rest
+			// broadband. Costs the bed some presence even in the pauses,
+			// which is why it is the fallback and not the design.
+			out.push(`[mus]equalizer=f=1600:t=q:w=1.1:g=-7[muscut]`);
+			out.push(
+				`[muscut]${keys[nextKey++]}sidechaincompress=threshold=0.03:ratio=10:attack=8:release=700:makeup=1[mduck]`,
+			);
+		}
+		mixInputs.push('[mduck]');
+	}
+	if (stingers) {
+		// Boom under the hook title.
+		out.push(`[${boomIdx}:a]adelay=150|150,volume=0.45[sfxboom]`);
+		mixInputs.push('[sfxboom]');
+		// Whoosh at every chapter boundary (one input, split as needed).
+		if (chapterBoundaries.length) {
+			const n = chapterBoundaries.length;
+			out.push(`[${whooshIdx}:a]asplit=${n}${chapterBoundaries.map((_, i) => `[w${i}]`).join('')}`);
+			chapterBoundaries.forEach((b, i) => {
+				const ms = Math.max(0, Math.round((b - 0.45) * 1000));
+				out.push(`[w${i}]adelay=${ms}|${ms},volume=0.4[sw${i}]`);
+				mixInputs.push(`[sw${i}]`);
+			});
+		}
+		// Riser into the last two seconds (leads into the end screen).
+		const riserMs = Math.max(0, Math.round((totalDur - 2.4) * 1000));
+		out.push(`[${riserIdx}:a]adelay=${riserMs}|${riserMs},volume=0.35[sfxriser]`);
+		mixInputs.push('[sfxriser]');
+	}
+	if (hookRiser && hookEndSeconds > 0) {
+		// Tension under the teaser's last shots, ending ON the cut to the story,
+		// and a boom on that cut. The riser's own length is subtracted so its
+		// peak and the boundary are the same instant; a hook shorter than the
+		// riser simply starts it at zero.
+		const riserMs = Math.max(0, Math.round((hookEndSeconds - HOOK_RISER_SECONDS) * 1000));
+		out.push(`[${hookRiserIdx}:a]adelay=${riserMs}|${riserMs},volume=0.42[hookriser]`);
+		mixInputs.push('[hookriser]');
+		const boomMs = Math.max(0, Math.round(hookEndSeconds * 1000));
+		out.push(`[${hookBoomIdx}:a]adelay=${boomMs}|${boomMs},volume=0.5[hookboom]`);
+		mixInputs.push('[hookboom]');
+	}
+
+	out.push(
+		`${mixInputs.join('')}amix=inputs=${mixInputs.length}:duration=first:normalize=0,alimiter=limit=0.95[outa]`,
+	);
+	return out;
+}
 
 export function registerAssemble(app, {jobs, outputDir}) {
 	app.post('/assemble', (req, res) => {
@@ -302,6 +575,34 @@ export function registerAssemble(app, {jobs, outputDir}) {
 			const n = Number(req.body && req.body.sceneGap);
 			return Number.isFinite(n) && n >= 0.2 && n <= 2 ? n : 0.35;
 		})();
+		// Per-scene overrides, for the HOOK (2026-09-11). A teaser is cut fast:
+		// its shots are three seconds, not eight, its gap is on the last word,
+		// not a breath after it, and a SILENT shot has no narration to take its
+		// length from at all. So a scene may carry, each optional and each
+		// clamped on its own:
+		//   holdSeconds  the length of a scene with NO voice (else the clip's own)
+		//   minSeconds   the floor for a scene WITH voice (a two-word beat still
+		//                needs long enough for the picture to register)
+		//   gapSeconds   this scene's breath after its narration, replacing sceneGap
+		// Absent, every scene times exactly as it always has.
+		const sceneOverride = (s) => {
+			const num = (v, lo, hi) => {
+				const n = Number(v);
+				return Number.isFinite(n) && n >= lo && n <= hi ? n : null;
+			};
+			return {
+				hold: num(s && s.holdSeconds, 0.5, 20),
+				min: num(s && s.minSeconds, 0.5, 20),
+				gap: num(s && s.gapSeconds, 0, 2),
+			};
+		};
+		// A riser under the last seconds of the hook and a boom on its boundary
+		// — asked for by the cliffhanger and action styles, whose whole point is
+		// tension that breaks on the cut. Independent of `stingers`: those are
+		// music-like accents unrelated to the picture, this one is what the
+		// shots themselves are doing. Only meaningful when the film HAS a hook
+		// (a chapter-0 run followed by chapter 1); otherwise it is ignored.
+		const hookRiser = Boolean(req.body && req.body.hookRiser);
 		const hd = String((req.body && req.body.resolution) || '720p').toLowerCase() === '1080p';
 		const W = portrait ? (hd ? 1080 : 720) : (hd ? 1920 : 1280);
 		const H = portrait ? (hd ? 1920 : 1280) : (hd ? 1080 : 720);
@@ -319,7 +620,7 @@ export function registerAssemble(app, {jobs, outputDir}) {
 		(async () => {
 			const work = fs.mkdtempSync(path.join(os.tmpdir(), 'assemble-'));
 			try {
-				const sfx = stingers ? await ensureSfx() : null;
+				const sfx = stingers || hookRiser ? await ensureSfx() : null;
 
 				// 1. Download everything and measure each clip's real video length.
 				const items = [];
@@ -384,8 +685,18 @@ export function registerAssemble(app, {jobs, outputDir}) {
 					let eff = dur;
 					let stretch = 1;
 					let freeze = 0;
+					const over = sceneOverride(scenes[i]);
+					if (!voiceDur && over.hold !== null) {
+						// A silent hook shot: the plan says how long it is held. The
+						// clip is retimed to it exactly as a voiced scene is to its
+						// narration — a three-second hold on an eight-second clip
+						// plays at 1.54x and cuts, which is the pace a teaser wants.
+						eff = over.hold;
+						stretch = Math.max(STRETCH_MIN, Math.min(STRETCH_MAX, eff / dur));
+						if (eff > dur * STRETCH_MAX) freeze = eff - dur * STRETCH_MAX;
+					}
 					if (voiceDur) {
-						eff = voiceDur + sceneGap;
+						eff = Math.max(voiceDur + (over.gap !== null ? over.gap : sceneGap), over.min ?? 0);
 						stretch = eff / dur;
 						if (stretch > STRETCH_MAX) {
 							// Even at max slow-motion the clip can't cover the voice —
@@ -429,9 +740,33 @@ export function registerAssemble(app, {jobs, outputDir}) {
 					if (job) job.progress = 0.35 * ((i + 1) / scenes.length);
 				}
 				let music = null;
+				/** The track's own loudness, and the correction applied for it. */
+				let musicLufs = null;
+				let musicGainDb = 0;
+				/** 'bands' = the speech band ducks on its own; 'flat' = the whole bed. */
+				let musicDuck = null;
 				if (musicUrl) {
 					music = path.join(work, 'music.audio');
 					await download(musicUrl, music);
+					// Measured, never assumed — and never fatal. A track that cannot
+					// be analysed plays at its own level, which is exactly the old
+					// behaviour, rather than costing the film its render.
+					musicLufs = await measureLoudness(music).catch((e) => {
+						console.warn(`music: loudness not measured — ${e.message}`);
+						return null;
+					});
+					if (musicLufs !== null) {
+						musicGainDb = Math.max(
+							-MUSIC_GAIN_LIMIT_DB,
+							Math.min(MUSIC_GAIN_LIMIT_DB, MUSIC_TARGET_LUFS - musicLufs),
+						);
+						console.log(
+							`music: ${musicLufs.toFixed(1)} LUFS → ${musicGainDb >= 0 ? '+' : ''}` +
+								`${musicGainDb.toFixed(1)} dB to reach ${MUSIC_TARGET_LUFS}`,
+						);
+					}
+					musicDuck = (await hasFilter('acrossover')) ? 'bands' : 'flat';
+					console.log(`music: ducking the ${musicDuck === 'bands' ? 'speech band only' : 'whole bed'}`);
 				}
 
 				// Scene timing + chapter boundary times (for whooshes).
@@ -451,6 +786,19 @@ export function registerAssemble(app, {jobs, outputDir}) {
 						chapterBoundaries.push(sceneStartsSeconds[i]);
 					}
 				}
+				// Where the hook ends: the first story scene's start, when the film
+				// opens on chapter 0. Zero means no hook — nothing is placed off it.
+				// Reported in `verify` so the graphics pass and the site read the
+				// same number the mix used, rather than deriving their own.
+				const hookEndSeconds = (() => {
+					if ((sceneChapters[0] ?? 0) !== 0) return 0;
+					for (let i = 1; i < items.length; i++) {
+						if ((sceneChapters[i] ?? 0) >= 1) return sceneStartsSeconds[i];
+					}
+					return 0;
+				})();
+				const hookRiserOn = hookRiser && hookEndSeconds > 0;
+				if (hookRiser && !hookRiserOn) console.log('hook riser asked for, but this film has no hook — skipped');
 
 				// 2. One ffmpeg pass: normalize video, trim+silence-pad each voice
 				// to its scene's exact duration, concat, then layer music + SFX.
@@ -472,26 +820,28 @@ export function registerAssemble(app, {jobs, outputDir}) {
 				const boomIdx = stingers ? idx++ : -1;
 				const whooshIdx = stingers ? idx++ : -1;
 				const riserIdx = stingers ? idx++ : -1;
+				const hookRiserIdx = hookRiserOn ? idx++ : -1;
+				const hookBoomIdx = hookRiserOn ? idx++ : -1;
 				// concat wants the same stream count from every segment, so scenes
 				// without usable clip audio borrow silence from here.
 				const nativeOn = items.some((it) => it.nativeAudio);
 				const silenceIdx = nativeOn ? idx++ : -1;
 				if (music) args.push('-i', music);
 				if (stingers) args.push('-i', sfx.boom, '-i', sfx.whoosh, '-i', sfx.riser);
+				if (hookRiserOn) args.push('-i', sfx.hookRiser, '-i', sfx.boom);
 				if (nativeOn) args.push('-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=mono');
 
 				const parts = [];
 				const labels = [];
 				items.forEach((it, i) => {
 					const d = it.eff.toFixed(6);
-					// Cover-fit to the target canvas: scale up to fill, center-crop
-					// the overflow. A 16:9 clip on a 9:16 canvas crops the sides.
 					const vchain =
-						// Elastic retime: setpts stretches/compresses playback to the
-						// scene's narration-driven length, fps=${OUT_FPS} AFTER it resamples
+						// Cover-fit to the target canvas, then retime elastically:
+						// setpts stretches/compresses playback to the scene's
+						// narration-driven length, fps=${OUT_FPS} AFTER it resamples
 						// frames evenly, and the final trim pins the exact duration
 						// (it also cuts the leftover tail when the speed-up clamped).
-						`scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},` +
+						`${coverFit(W, H)},` +
 						`trim=duration=${it.dur.toFixed(3)},setpts=${it.stretch.toFixed(5)}*(PTS-STARTPTS),fps=${OUT_FPS}`;
 					// What the clip covers once it is stretched as far as it may be.
 					const covered = it.dur * it.stretch;
@@ -569,56 +919,26 @@ export function registerAssemble(app, {jobs, outputDir}) {
 						: `${labels.join('')}concat=n=${items.length}:v=1:a=1[outv][voiceraw]`,
 				);
 
-				// Mix bus: narration first (defines length), then ducked music, then SFX.
-				const mixInputs = [];
-				parts.push(`[voiceraw]asplit=3[vmain][vside][vsidenat]`);
-				mixInputs.push('[vmain]');
-				if (nativeOn) {
-					// Ambience sits under the narration the same way the music does:
-					// ducked by the voice so it never competes with a spoken line,
-					// but audible in the gaps between them.
-					parts.push(`[natraw]${MONO},volume=${nativeVolume}[natlvl]`);
-					parts.push(
-						`[natlvl][vsidenat]sidechaincompress=threshold=0.05:ratio=8:attack=10:release=350:makeup=1[natduck]`,
-					);
-					mixInputs.push('[natduck]');
-				} else {
-					parts.push(`[vsidenat]anullsink`);
-				}
-				if (music) {
-					const fadeStart = Math.max(0, totalDur - 2.5).toFixed(3);
-					parts.push(
-						`[${musicIdx}:a]${MONO},aloop=loop=-1:size=2000000000,atrim=duration=${totalDur.toFixed(3)},volume=${musicVolume},afade=t=out:st=${fadeStart}:d=2.5[mus]`,
-					);
-					parts.push(
-						`[mus][vside]sidechaincompress=threshold=0.03:ratio=10:attack=8:release=450:makeup=1[mduck]`,
-					);
-					mixInputs.push('[mduck]');
-				} else {
-					parts.push(`[vside]anullsink`);
-				}
-				if (stingers) {
-					// Boom under the hook title.
-					parts.push(`[${boomIdx}:a]adelay=150|150,volume=0.45[sfxboom]`);
-					mixInputs.push('[sfxboom]');
-					// Whoosh at every chapter boundary (one input, split as needed).
-					if (chapterBoundaries.length) {
-						const n = chapterBoundaries.length;
-						parts.push(`[${whooshIdx}:a]asplit=${n}${chapterBoundaries.map((_, i) => `[w${i}]`).join('')}`);
-						chapterBoundaries.forEach((b, i) => {
-							const ms = Math.max(0, Math.round((b - 0.45) * 1000));
-							parts.push(`[w${i}]adelay=${ms}|${ms},volume=0.4[sw${i}]`);
-							mixInputs.push(`[sw${i}]`);
-						});
-					}
-					// Riser into the last two seconds (leads into the end screen).
-					const riserMs = Math.max(0, Math.round((totalDur - 2.4) * 1000));
-					parts.push(`[${riserIdx}:a]adelay=${riserMs}|${riserMs},volume=0.35[sfxriser]`);
-					mixInputs.push('[sfxriser]');
-				}
-
 				parts.push(
-					`${mixInputs.join('')}amix=inputs=${mixInputs.length}:duration=first:normalize=0,alimiter=limit=0.95[outa]`,
+					...buildMixGraph({
+						nativeOn,
+						nativeVolume,
+						music: Boolean(music),
+						musicDuck,
+						musicGainDb,
+						musicVolume,
+						musicIdx,
+						totalDur,
+						stingers,
+						boomIdx,
+						whooshIdx,
+						riserIdx,
+						chapterBoundaries,
+						hookRiser: hookRiserOn,
+						hookRiserIdx,
+						hookBoomIdx,
+						hookEndSeconds,
+					}),
 				);
 
 				const outputFile = `${jobId}.mp4`;
@@ -658,6 +978,18 @@ export function registerAssemble(app, {jobs, outputDir}) {
 						// means the trim ran and found nothing, or every take failed
 						// analysis and kept its original — the log line says which.
 						breathTrimmedSeconds: Number(trimmedTotal.toFixed(2)),
+						// What the music bed was measured at, what was done about it,
+						// and which duck ran. The one place to look when someone says
+						// the music is too loud on a particular film.
+						musicLufs: musicLufs === null ? null : Number(musicLufs.toFixed(1)),
+						musicGainDb: music ? Number(musicGainDb.toFixed(2)) : null,
+						musicVolume: music ? musicVolume : null,
+						musicDuck,
+						// Where the teaser ends (0 = no hook), and whether the riser
+						// was placed under it. The graphics pass derives the same
+						// boundary from the scenes; this is the number to compare it to.
+						hookEndSeconds: Number(hookEndSeconds.toFixed(6)),
+						hookRiser: hookRiserOn,
 					},
 				});
 			} catch (err) {

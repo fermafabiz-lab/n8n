@@ -51,6 +51,8 @@ interface ProviderOption {
   displayName: string;
   enabled: boolean;
   disabledReason: string | null;
+  /** A caveat on an enabled provider — anonymous mode, a low quota. */
+  notice?: string | null;
   heldBack: string | null;
 }
 
@@ -227,7 +229,7 @@ export default function ArchivePicker({
                   type="button"
                   aria-pressed={only === p.id}
                   disabled={!p.enabled}
-                  title={p.disabledReason ?? p.heldBack ?? ""}
+                  title={p.disabledReason ?? p.heldBack ?? p.notice ?? ""}
                   onClick={() => { setOnly(p.id); if (searched) void search(q, kind, p.id); }}
                 >
                   {p.displayName}
@@ -330,9 +332,8 @@ export default function ArchivePicker({
                         >
                           {a.usage === "manual_review" || a.usage === "editorial_only" ? "Use — I accept the rights" : "Use for this scene"}
                         </button>
-                        <a href={a.sourceUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
-                          source ↗
-                        </a>
+                        {/* No "source ↗" here: the provider's name on the
+                            card is that link, and it says where it goes. */}
                       </div>
                     </ArchiveCard>
                   );

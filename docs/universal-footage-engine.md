@@ -105,23 +105,49 @@ used merely to avoid a generated picture (spec §32).
 
 | Variable | Needed for |
 |---|---|
-| `DVIDS_API_KEY` | DVIDS. Absent → the provider reads as *off* in the registry and is never routed; the deploy prints a warning, not an error |
-| `EU_AV_API_BASE` | EU Audiovisual Service base URL; defaults to `https://audiovisual.ec.europa.eu/api` |
+| `DVIDS_API_KEY` | DVIDS |
+| `EUROPEANA_API_KEY` | Europeana — the documented demo key `api2demo` is the default and is rate-limited |
+| `FLICKR_API_KEY` | Flickr |
+| `PEXELS_API_KEY` | Pexels |
+| `PIXABAY_API_KEY` | Pixabay |
+| `UNSPLASH_ACCESS_KEY` | Unsplash |
+| `OPENVERSE_CLIENT_ID` + `OPENVERSE_CLIENT_SECRET` | Openverse's full quota (OAuth2 client credentials, 10,000 requests a day); without them Openverse still runs, anonymously, at 5 requests an hour |
+| `FOOTAGE_ENABLE_LOC` | `1` switches the Library of Congress on; off by default because the box is Cloudflare-challenged |
+| `FOOTAGE_DESTOCKD` | `off` stops searching Destockd; on by default, and the import doors work either way |
+| `EU_AV_API_BASE` | the EU Audiovisual Service, opt-in; no default — the service has no public API (`footage-sources.md`) |
 | `MEDIA_INGEST_KEY` | already existed — the `x-hov-key` header n8n uses against `/api/footage/*` and `/api/archive/*` |
 
-Nothing else. NASA and Wikimedia are keyless. `NARA_API_KEY` and
-`SMITHSONIAN_API_KEY` are not read anywhere (`nara-smithsonian-deprecation.md`).
+Every key is a WARNING in the deploy gate, never an error: absent, the
+provider reads as *off* with its reason in the registry, the picker and the
+admin page, and the router never asks it — except Openverse, which runs
+anonymously at its low quota and carries a `notice` instead. Wikimedia,
+NASA, the Internet Archive and Wellcome are keyless. The keys and switches are GitHub repo
+Secrets and Variables, written into `platform.env` by the deploy.
 
 ## Tests
 
 `npm run check:footage` (in `platform/`) runs `scripts/check-footage.mjs`
 against the real engine with the network and the database mocked at their
 edges (`scripts/footage-loader.mjs` maps the `@/` alias and swaps
-`lib/data/stock` and `lib/data/postgres` for in-memory doubles). 125 checks:
-request building, routing, the four normalizers, rights, provenance,
-ranking, dedupe, the engine end to end (local-first, isolation, hold-back,
-rate limit), the fallback ladder, URL import and its refusals, the legacy
-door, and the source-watermark contract.
+`lib/data/stock` and `lib/data/postgres` for in-memory doubles). 242 checks:
+request building, the registry and the tier router, the fourteen
+normalizers (nine of them pinned on real responses saved 2026-09-10, the
+four keyed stock/community ones on the documented shapes), rights,
+provenance, ranking, dedupe, the engine end to end (local-first, isolation,
+hold-back, rate limit), the fallback ladder, URL import and its refusals,
+the legacy door, and the source-watermark contract.
+
+**A provider double that returns ONE result proves almost nothing**, and this
+suite learned it the expensive way. Every Destockd case returned a single
+shot, so all of them passed while the live provider could contribute exactly
+one asset to any search: its `sourceUrl` carries the identity in the URL
+FRAGMENT (`…/#/shot/<film>/<shot>`, a hash-routed SPA), `canonicalUrl`
+stripped the fragment as an anchor, every asset canonicalised to
+`https://destockd.com/`, and `dedupeAssets` — which drops an asset on ANY key
+collision — collapsed the lot. Found only by reading `n=8` from the provider
+beside one result on screen. A normalizer case may return one item; **an
+adapter's search case must return several**, and follow them through the
+engine to `candidates`, or dedupe and ordering are untested.
 
 ## Files
 
@@ -129,7 +155,7 @@ door, and the source-watermark contract.
 platform/lib/footage/
   types.ts        FootageSearchRequest, FootageProvider, RightsResult, RankedFootage…
   request.ts      buildFootageRequest, generateSearchQueries
-  registry.ts     the providers, requestCategories, routeProviders
+  registry.ts     the providers in five tiers, requestCategories, tierFit, routeProviders
   rights.ts       validateRights, usableAutomatically, usableWithReview, renderable
   match.ts        matchSignals — the tri-valued event/date/place/people signals
   provenance.ts   assessProvenance, baseProvenance
@@ -139,5 +165,10 @@ platform/lib/footage/
   urlImport.ts    readPage, importFootageFromUrl
   engine.ts       searchFootage, judge, fallbackPlan
   auth.ts         footageAuthorized, footageUsable
-  providers/      wikimedia, euav, dvids, nasa, urlImport, upload
+  providers/      euav, dvids, nasa · destockd, internetArchive, europeana, loc,
+                  wikimedia, wellcome · flickr, openverse
+                  · pexels, pixabay, unsplash · urlImport, upload
 ```
+
+The sources themselves — what each covers, what was measured on it, which
+key unlocks it — are catalogued in `footage-sources.md`.

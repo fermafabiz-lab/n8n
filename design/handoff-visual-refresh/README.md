@@ -46,6 +46,15 @@ Motion
 Signature background element — "the lit arc"
 - An oversized blurred ring bleeding off a corner: `radial-gradient(closest-side, transparent 0 52%, deep 63%, accent 76%, lift 86%, rgba(20,18,28,0.3) 94%, transparent 100%)`, `filter: blur(18–22px)`, opacity ~0.9, slow drift. Keep its lit band clear of any text column; a dimmer counter-phase echo may sit on the opposite corner.
 
+Night (2026-09-15 — the site's dark mode; `platform/app/globals.css` is the owner, every token is one `light-dark(day, night)`)
+- Ground `#1a1a1f` — dark with room under it for a shadow to register, which is the whole elevation story at night; `--bg2` `#202026`, card `#26262d`, inner card `#2e2e36`, card fill `linear-gradient(160deg, #34343e, #26262d)`, raised thumb `#42424d`, recessed field `#1e1e24`, light source `#2a2a33`
+- Ink: headings `#ececf0`, body `#b4b4be`, muted `#9c9ca8`, faint `#9a9cab`, disabled `#55555f` (muted measures 6.4:1 on the ground, 5.0 on a card)
+- Hairlines are white at 11 / 17 / 7%; every shadow is black at four to five times its day alpha, on the tokens and at every call site, plus a one-pixel `rgba(255,255,255,.08)` top edge on the card shadows
+- Accent lifts one step to `#9a7ce4` (5.3:1 on the ground); deep and lift keep their values because they are the panel gradients' ends; accent-as-text on a chip is `#c3adf0`
+- Status `#5b8ee8` / `#2fb976` / `#ea6a5f`; chip text `#5fd39a` / `#f08a80` / `#e6b45a` on deep chips `rgba(22,62,44,.94)` / `rgba(84,30,26,.94)` / `rgba(74,56,16,.94)` / accent `rgba(58,44,96,.94)`
+- Dark panels INVERT: white `#f4f4f7` → `#fdfdfe` lit by a lilac corner `#cdbaf3` where the day panel has `#4d3484`; on them ink `#17171a` / `#2a2a30` / body `#55555e` / dim `#6f6f7c`, hairline `rgba(24,20,40,.1)`, the accent as deep `#4d3484`; near-black buttons become `#f7f7f8` with `#17171a` labels
+- Glass pills `rgba(46,46,54,.86)` (`.97` for the phone menu) with a `rgba(255,255,255,.12)` top edge
+
 ## Screens / Views
 
 ### 1. Landing (`House of Videos Landing.dc.html`)

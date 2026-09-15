@@ -18,20 +18,40 @@ Suggest Webhook → Fetch Scenes (GET /api/archive/suggest?project=…, claims s
   → Store Suggestions (POST /api/archive/suggest stage=store)
 ```
 
-**Published 2026-09-09, version `6b5a1417-2828-4e1d-ae0b-28ea1b6a454a`**
-(previous active `6ac5f5f1-e0b7-4f34-8fd2-b5e50af9062b`, 2026-09-07). Three
-Code nodes changed; the repo copies are in
-`db/port/footage-engine/nodes/` and `verify.mjs` there diffs a fetched
-workflow against them.
+**Active version `a3278855-7c67-4e1f-960f-5ef7168d1127` since 2026-09-10**
+(before it `6b5a1417-2828-4e1d-ae0b-28ea1b6a454a`, 2026-09-09, and
+`6ac5f5f1-e0b7-4f34-8fd2-b5e50af9062b`, 2026-09-07). The 09-09 publish
+changed three Code nodes; the 09-10 one changed only `Build Query Prompt`.
+The repo copies are in `db/port/footage-engine/nodes/` and `verify.mjs`
+there diffs a fetched workflow against them.
 
 - **`Build Query Prompt`** asks the model, per scene, for a structured
   request — `topic, event, location, country, dateFrom, dateTo, people,
   organizations, keywords, preferredMediaType, preferredFootageType,
   requireExactEvent` — plus 3–6 short catalogue queries, and tells it which
-  providers exist (Wikimedia, EU Audiovisual Service, DVIDS, NASA) and
-  what each is for. It forbids invention in as many words: *never invent a
-  date, a place, a person or an event the narration does not support; leave
-  the field null instead.* NARA and the Smithsonian are no longer named.
+  sources exist and what each is for: the public archives (Wikimedia
+  Commons, the Internet Archive's newsreels and government films, Europeana,
+  the Library of Congress, the Wellcome Collection), the official services
+  (EU Audiovisual Service, DVIDS, NASA), the photo communities (Flickr,
+  Openverse) and, for generic present-day B-roll only, the stock libraries
+  (Pexels, Pixabay, Unsplash) — that last case is the `stockshots` footage
+  type, with `event` null. It forbids invention in as many words: *never
+  invent a date, a place, a person or an event the narration does not
+  support; leave the field null instead.* The prompt names sources, never
+  keys: which of them are actually reachable is the site's registry's
+  business, and a scene asking for a source that is off simply gets the
+  others.
+- **Video is the DEFAULT media type (2026-09-13, version `788fe2c3`).** The
+  prompt used to offer `preferredMediaType` as a free choice between
+  "video" and "image", and on the NASA film the model chose image for five
+  scenes out of seven. That is the quietest way to get a bar full of
+  photographs: the engine then prefers stills AND the site's video-first
+  lift switches off, because a scene that asked for a still is asking for a
+  still. The same subjects returned twelve clips out of twelve when asked
+  for video. The prompt now says video is the right answer for almost every
+  scene and reserves image for subjects that survive only as a still: a
+  document, a signature, a map, a painting, a portrait of someone never
+  filmed, or a scene set before cinema.
 - **`Parse Queries`** sanitises the answer (types, lengths, ISO dates,
   the footage-type vocabulary) and emits `{ id, request, queries, why }`.
   It still accepts the old `years: [from, to]` as a fallback for the date
@@ -47,9 +67,18 @@ workflow against them.
   provenance and its rights class, and tells it what the provenance words
   mean, to prefer B-roll under narration, and not to rank a candidate over
   a higher engine score without a concrete reason from the text.
-- `Parse Ranks` and `Store Suggestions` are unchanged. A pick must name a
-  candidate the batch offered; the store drops any id the library does not
-  hold.
+- **How many picks, and clips first (2026-09-13, version `916a51d1`).** The
+  prompt used to end "Up to 4 picks per scene" and `Parse Ranks` enforced
+  the same four, so a scene whose archives held one clip and three
+  photographs offered the producer four photographs — reported as "it finds
+  mostly photos". Both now allow **16**, the third copy of
+  `MAX_PICKS_PER_SCENE` in the site's store stage, and it is a sanity bound
+  on a prompt and a table rather than a number of options anyone chose. The
+  prompt also asks for a clip and a still to be returned TOGETHER with the
+  clip first, and the site orders the bar the same way — see
+  `VIDEO_FIRST_BONUS` in `footage-ranking.md`.
+- `Store Suggestions` is unchanged. A pick must name a candidate the batch
+  offered; the store drops any id the library does not hold.
 
 Three properties carried over from the first version and still true:
 every Code node emits at least one item so `Store Suggestions` always runs
@@ -92,8 +121,10 @@ HTTP node against that route.
 - Site: the `HOV Media Ingest` header credential (`8kpY42LmZaBYBzfY`) on
   every call into `web:3000` — `middleware.ts` opens `/api/archive/*` and
   `/api/footage/*` to that key.
-- Provider keys (`DVIDS_API_KEY`) live on the SITE (`platform.env`), not in
-  n8n: the providers are called from the site's engine.
+- Provider keys (`DVIDS_API_KEY`, `EUROPEANA_API_KEY`, `FLICKR_API_KEY`,
+  the stock keys, the Openverse client) live on the SITE (`platform.env`,
+  from GitHub Secrets), not in n8n: the providers are called from the
+  site's engine.
 
 ## Applying an edit here
 

@@ -206,6 +206,6 @@
   border-radius: 999px;
   font-family: var(--f-mono, ui-monospace, Menlo, monospace);
   font-size: 10.5px;
-  color: var(--accent-deep);
+  color: var(--accent-ink);
   background: var(--accent-a12);
 }

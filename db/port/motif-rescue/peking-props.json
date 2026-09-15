@@ -1,0 +1,303 @@
+{
+ "projectTitle": "Peking to Paris, 1907",
+ "tone": "Documentary",
+ "showChapterCards": true,
+ "evidence": [
+  {
+   "ref": "E3",
+   "claim": "The 1907 race started in Peking on 10 June.",
+   "source": "Le Matin, 1907",
+   "url": "https://example.org/lematin"
+  }
+ ],
+ "scenes": [
+  {
+   "narratorText": "",
+   "startSeconds": 0.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 8.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 16.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 24.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 32.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 40.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 48.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "The Itala pulls away from the gate in Peking and turns west.",
+   "startSeconds": 56.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "On the open steppe the wheels sink to the axle and the crew digs.",
+   "startSeconds": 64.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 72.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 80.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 88.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 96.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 104.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 112.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 120.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "They reach a broad gray river with no bridge across it.",
+   "startSeconds": 128.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 136.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 144.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 152.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 160.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 168.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 176.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 184.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 192.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 200.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 208.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 216.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 224.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 232.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 240.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 248.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 256.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 264.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 272.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 280.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 288.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 296.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 304.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 312.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 320.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 328.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 336.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 344.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 352.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 360.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "",
+   "startSeconds": 368.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  },
+  {
+   "narratorText": "On 10 August 1907, the dust-caked Itala rolls into Paris.",
+   "startSeconds": 376.0,
+   "durationSeconds": 8.0,
+   "chapter": 1
+  }
+ ]
+}

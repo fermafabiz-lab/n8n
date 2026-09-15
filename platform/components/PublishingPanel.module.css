@@ -36,7 +36,7 @@
 }
 .copybtn:hover:not(:disabled) {
   border-color: var(--accent-a28);
-  color: var(--accent-deep);
+  color: var(--accent-ink);
 }
 .copybtn:disabled {
   opacity: 0.6;
@@ -73,7 +73,7 @@
 .field input:focus,
 .field textarea:focus {
   border-color: var(--accent-a28);
-  box-shadow: 0 0 0 3px rgba(122, 79, 214, 0.12);
+  box-shadow: 0 0 0 3px var(--accent-a12);
 }
 .warn {
   display: block;

@@ -1,8 +1,8 @@
 import React, {useMemo} from 'react';
 import {AbsoluteFill, Sequence, useCurrentFrame, useVideoConfig} from 'remotion';
-import {HookTitle} from './components/HookTitle';
 import {IMPACT_CARD_SECONDS, ImpactCard, keyLineFor} from './components/ImpactCard';
-import {isTitleLike} from './components/HookTitle';
+import {HookCard} from './components/HookCard';
+import {hookCardWindow, hookEndSeconds, normalizeHookPlan} from './hook';
 import {FLASH_LEAD} from './components/LightLeak';
 import {OutroCard} from './components/OutroCard';
 import {Captions} from './components/Captions';
@@ -31,13 +31,11 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 	subscribeText,
 	tone,
 	outroDurationInSeconds,
-	hookTitleDurationInSeconds,
 	aspectRatio,
 	showCaptions,
 	captionColor,
 	montageIntensity,
-	showHookTitle = true,
-	hookTitle = '',
+	hookPlan,
 	showChapterCards = true,
 	showEndScreen = true,
 	chapterTitles = {},
@@ -55,48 +53,17 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 	// here bisects, and there is one accent for the whole film.
 	const captionAccent = useMemo(() => resolveCaptionAccent(captionColor), [captionColor]);
 
-	// Titles come from a free-text form field, and people paste entire
-	// prompts into it (seen in production: a ~3000-char master prompt became
-	// the title, which stretched the hook past the whole video and
-	// suppressed every caption). But the old 72-char excerpt cut real titles
-	// mid-sentence ("...COMING INTO SPAIN IN…"), which reads worse than small
-	// type. The card now shows the whole title and shrinks to fit; this
-	// excerpt only guards the pathological paste, an order of magnitude
-	// longer than any real title.
-	const displayTitle = (() => {
-		// A written hook line always wins: if Scripting produced one, it was
-		// authored to be a title and needs no rescuing.
-		const raw = (hookTitle || projectTitle).split(/\r?\n/)[0].trim();
-		if (raw.length <= 200) return raw;
-		const cut = raw.slice(0, 200);
-		return cut.slice(0, Math.max(60, cut.lastIndexOf(' '))) + '…';
-	})();
-
-	// The statement card only works on a real title. A Tema field holding a
-	// brief ("A man and a woman talking about equality") opens clean instead —
-	// a description set 100px tall is worse than no card at all.
-	const titleWorks = Boolean(hookTitle) || isTitleLike(displayTitle);
-	const wantsHook = showHookTitle && titleWorks && displayTitle.length > 0;
-
-	// A longer title needs longer on screen to be read, but the hook must
-	// never eat the film — hence a ceiling that only rises to 9s for titles
-	// that genuinely need it. HookTitle paces its own typing to whatever
-	// window it gets, so the text always finishes regardless of this cap.
-	// Disabled hook = no title window at all (captions start immediately).
-	// No typing to wait for any more — the whole title is up within a second.
-	// The window only has to be long enough to read it, so it scales with the
-	// word count rather than the character count, and stays well short of
-	// eating the film.
-	const hookSeconds = wantsHook
-		? Math.min(
-				6.5,
-				Math.max(
-					2.8,
-					hookTitleDurationInSeconds,
-					1.9 + displayTitle.split(/\s+/).filter(Boolean).length * 0.32,
-				),
-			)
-		: 0;
+	// The cold open. The film used to open with the project's name set as a
+	// statement over the first eight-second scene — retired 2026-09-11, when
+	// the hook became a TEASER of several fast shots planned by Scripting
+	// (src/hook.ts). The render now knows two things about it: where it ends
+	// (the first story scene's start, derived from the scenes and never from
+	// the plan) and whether the style asks for a card over it. A film without
+	// a plan — everything made before this — simply opens on its footage.
+	const plan = useMemo(() => normalizeHookPlan(hookPlan), [hookPlan]);
+	const hookEnd = useMemo(() => hookEndSeconds(scenes), [scenes]);
+	const hookCard = useMemo(() => hookCardWindow(plan, hookEnd), [plan, hookEnd]);
+	const hookCardUp = hookCard !== null && seconds >= hookCard.from && seconds < hookCard.to;
 
 	const videoDurationSeconds = scenes.length
 		? scenes[scenes.length - 1].startSeconds + scenes[scenes.length - 1].durationSeconds
@@ -133,7 +100,9 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 						evidence,
 						explicit: textCards,
 						chapterCardsOn: showChapterCards,
-						hookSeconds,
+						// The whole teaser, not a title window: a motif card cut into
+						// three-second shots would be the fourth picture in nine seconds.
+						hookSeconds: hookEnd,
 						narrationIsSpoken,
 					})
 				: [],
@@ -143,7 +112,7 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 			textCards,
 			showTextCards,
 			showChapterCards,
-			hookSeconds,
+			hookEnd,
 			narrationIsSpoken,
 		],
 	);
@@ -282,12 +251,14 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 					    the whole reason a card earns its place is that it shows what
 					    the narration is NOT saying — printing the spoken line over it
 					    would put three copies of one sentence on screen. */}
-					{showCaptions && !activeCard && !chapterCardUp && (
+					{/* A spoken teaser IS captioned — its beats are narration, and a
+					    viewer with the sound off is exactly who a hook has to win. Only
+					    the hook's own card takes the frame from them, like every card. */}
+					{showCaptions && !activeCard && !chapterCardUp && !hookCardUp && (
 						<Captions
 							scenes={scenes}
 							accent={captionAccent}
 							preset={preset}
-							suppressUntilSeconds={hookSeconds - 0.4}
 							portrait={aspectRatio === '9:16'}
 						/>
 					)}
@@ -300,13 +271,12 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 					    Rendered whatever `showSourceWatermark` says: the switch owns
 					    the LABEL, and a licence that demands a credit is not a style
 					    choice. A scene owing neither draws nothing. */}
-					{!activeCard && !chapterCardUp && (
+					{!activeCard && !chapterCardUp && !hookCardUp && (
 						<SourceWatermark
 							scenes={scenes}
 							preset={preset}
 							showLabel={showSourceWatermark}
 							portrait={aspectRatio === '9:16'}
-							suppressUntilSeconds={hookSeconds}
 						/>
 					)}
 					{/* Text cards. Each gets its own Sequence so the component's clock
@@ -375,13 +345,19 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 								/>
 							</Sequence>
 						))}
-					{wantsHook && (
-						<Sequence from={0} durationInFrames={Math.round(hookSeconds * fps)}>
-							<HookTitle
-								title={displayTitle}
-								palette={palette}
+					{/* The hook's card, when its style has one: a question, a figure or
+					    a slate over the teaser. Its window ends before the first story
+					    frame, where the chapter card's flare already owns the cut. */}
+					{plan && hookCard && (
+						<Sequence
+							from={Math.round(hookCard.from * fps)}
+							durationInFrames={Math.max(1, Math.round((hookCard.to - hookCard.from) * fps))}
+						>
+							<HookCard
+								plan={plan}
+								seconds={hookCard.to - hookCard.from}
 								preset={preset}
-								durationInSeconds={hookSeconds}
+								evidence={evidence}
 							/>
 						</Sequence>
 					)}

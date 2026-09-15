@@ -149,9 +149,35 @@ so it is given up by the minimum rather than abandoned at the first collision.
     ],
     "note": "34 de ani",
     "noteSource": {"kind": "arithmetic"}
+  },
+  {
+    "sceneIndex": 12,
+    "variant": "route",
+    "priority": 2,
+    "why": "one line: what this shows that the voice and the shot do not",
+    "label": "westbound",
+    "stops": [
+      {
+        "name": "Peking",
+        "source": {"kind": "evidence", "ref": "E3"}
+      },
+      {
+        "name": "the open steppe",
+        "source": {"kind": "quote", "sceneIndex": 8, "from": "On the open steppe"}
+      },
+      {
+        "name": "Paris",
+        "source": {"kind": "quote", "sceneIndex": 47, "from": "rolls into Paris"}
+      }
+    ]
   }
 ]
 ```
+
+Note the second card's first stop: an `evidence` source names its row in **`ref`**,
+never in `from`. `from` is the quote's own words and means nothing here. A card
+mixes the two kinds freely — one stop proved by the research pack, the next by a
+line the film speaks — and each stop is judged on its own.
 
 **Provenance travels with the thing it proves.** Every stop, row and mark
 carries its own `source`; a note is justified by `noteSource` beside it. It was

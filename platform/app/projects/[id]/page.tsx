@@ -8,6 +8,7 @@ import ScriptReview from "@/components/ScriptReview";
 import SceneReview from "@/components/SceneReview";
 import AudioReview from "@/components/AudioReview";
 import FinalSettings from "@/components/FinalSettings";
+import HookPanel from "@/components/HookPanel";
 import AutoRefresh from "@/components/AutoRefresh";
 import MediaPlayer from "@/components/MediaPlayer";
 import StageChime, { NotifyChip } from "@/components/StageChime";
@@ -219,6 +220,45 @@ export default async function ProductionRoom({
   // above is worse than no bar. Silent films have six stages, not seven, so
   // the denominator is the list's own length.
   const stepsDone = steps.filter((s) => s.state === "done").length;
+
+  /**
+   * The cold open panel's props, and the two steps that normally carry it.
+   *
+   * Hoisted because a rewrite in flight must be able to reach its own way
+   * out from ANY step. `hookRegen` is the stranded-flag shape this repo
+   * keeps paying for: the site sets it, the n8n run clears it, and a run
+   * that dies leaves it set with nobody left to clear it — while the panel
+   * shows a spinner instead of the buttons. Both of its exits live on that
+   * panel, so a producer who moved on to Final touches and then to the
+   * render found the spinner gone from the screen it was on and no way to
+   * cancel it anywhere. Whatever step is open, a rewrite that is in flight
+   * brings the panel with it.
+   */
+  const hookPanel = {
+    projectId: id,
+    plan: project.hookPlan,
+    regen: project.hookRegen,
+    hookStyle: project.editing.hookStyle,
+    category: project.category,
+    hookShots: scenes.filter((s) => s.order < 100).length,
+    hookAssets: scenes.some((s) => s.order < 100 && (s.imageUrl || s.videoUrl)),
+  };
+  const hookOnScenesStep =
+    scenes.length > 0 && showing("scenes", scenes.some((s) => !s.sceneApproved));
+  const hookOnFinalStep = showing("final", project.awaitingFinalSettings);
+
+  /**
+   * Approved scenes that still owe a clip — the same test `ProductionActivity`
+   * calls `isPending`, and the n8n batch's own rule: checkboxes and assets,
+   * never the status text.
+   *
+   * It exists because production work can come BACK to a film that already
+   * handed over to Final touches, and until 2026-09-12 nothing on the page
+   * could express that.
+   */
+  const outstandingShots = scenes.filter(
+    (s) => s.sceneApproved && !s.videoUrl && !s.videoApproved,
+  ).length;
 
   // Whether the voice gate is on the page. Computed once because SceneBoard
   // needs the same answer: it owns the image and video steps only, and may
@@ -628,6 +668,12 @@ export default async function ProductionRoom({
           )
         )}
 
+        {/* A hook rewrite that is in flight follows the producer, because
+            the only two ways to cancel or re-send it are on this panel. */}
+        {project.hookRegen && !hookOnScenesStep && !hookOnFinalStep && (
+          <HookPanel {...hookPanel} />
+        )}
+
         {showing("script", !!script) && script && (
           <ScriptReview
             projectId={id}
@@ -645,7 +691,25 @@ export default async function ProductionRoom({
               initial={project.editing}
               motifCards={project.motifCards}
               silent={silent}
+              /* Documentary only: every other category is wall-to-wall AI, so
+                 the preview would step through one band reading AI GENERATED
+                 and teach the producer nothing they cannot read in the row. */
+              watermarkScenes={
+                project.category === "documentary"
+                  ? scenes.map((s) => ({
+                      order: s.order,
+                      label: s.label,
+                      imageUrl: s.imageUrl,
+                      provenance: s.provenance,
+                    }))
+                  : []
+              }
+              aspectRatio={project.aspect}
             />
+            {/* The cold open, beside Final touches for the same reason the
+                music picker is: rewriting it is a self-saving action that
+                must not arm the render button. Here it also costs new shots. */}
+            <HookPanel {...hookPanel} />
             {/* Deliberately beside FinalSettings, not a row inside it: that
                 panel batches choices into one confirm that also STARTS the
                 render, while pinning a track is a self-saving audition. */}
@@ -676,6 +740,16 @@ export default async function ProductionRoom({
             // no-verdict answer — which is what kept the false restart
             // button on screen.
             missing={!!assembly?.stopped}
+            // Why there is no render, when there is none and that is fine.
+            upstream={
+              assembly?.upstream
+                ? {
+                    name: assembly.upstream.workflowName,
+                    startedAt: assembly.upstream.startedAt,
+                  }
+                : null
+            }
+            upstreamStalled={!!assembly?.upstreamStalled}
             n8nUrl={
               assembly?.running || assembly?.failed
                 ? executionUrl(
@@ -711,11 +785,21 @@ export default async function ProductionRoom({
             7" along with it — that is the state of the whole film, not of the
             panel you opened. The failure list below stays on every step on
             purpose: a broken generation is worth seeing wherever you are. */}
+        {/* Handing over to final settings hides this panel — UNLESS the film
+            has production work outstanding again. A hook rewrite is the way
+            that happens: it deletes the chapter-0 scenes and writes new ones
+            with no picture and no clip, onto a film that had already reached
+            Final touches. The status then reads `Setări Finale` or
+            `Asamblare`, which hid the one panel carrying Resume and Restart,
+            so the five new shots could never be made and nothing on screen
+            said why. Every normal film has a clip on every approved scene by
+            the time it hands over, so `outstanding` is 0 there and this reads
+            exactly as it always did. */}
         {!viewing &&
           scenes.length > 0 &&
           scenes.every((s) => s.sceneApproved) &&
-          !project.awaitingFinalSettings &&
-          !assembling &&
+          (outstandingShots > 0 ||
+            (!project.awaitingFinalSettings && !assembling)) &&
           project.statusKind !== "done" && (
             <ProductionActivity
               projectId={id}
@@ -760,8 +844,13 @@ export default async function ProductionRoom({
         {scenes.length > 0 &&
         showing("scenes", scenes.some((s) => !s.sceneApproved)) ? (
           // Scene text review phase: scripts are split into scenes but not
-          // all approved yet — media generation hasn't started.
-          <SceneReview projectId={id} scenes={scenes} />
+          // all approved yet — media generation hasn't started. The cold open
+          // is shown first: this is the one moment a rewrite costs only a
+          // model call, before any of its shots has a picture.
+          <>
+            <HookPanel {...hookPanel} />
+            <SceneReview projectId={id} scenes={scenes} />
+          </>
         ) : scenes.length > 0 &&
           (!viewing || viewing === "images" || viewing === "video") ? (
           <SceneBoard

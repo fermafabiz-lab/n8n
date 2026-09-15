@@ -111,6 +111,25 @@ export interface ProviderSearchOptions {
 }
 
 /**
+ * What KIND of source a provider is — the router's second axis after the
+ * subject categories, and the reason "never every provider for every scene"
+ * survives a registry of a dozen:
+ *
+ *   official   a body publishing its own footage of its own events (EU AV,
+ *              DVIDS, NASA): asked first on their subjects, never on history
+ *   archive    a catalogue of dated historical material (Internet Archive,
+ *              Library of Congress, Europeana, Wellcome, Wikimedia): asked on
+ *              history and on named events, and as the general fallback
+ *   community  photographs people licensed openly (Flickr, Openverse): asked
+ *              on recent events and places, after official sources
+ *   stock      generic B-roll with a blanket licence (Pexels, Pixabay,
+ *              Unsplash): asked only when the scene names NO event — a real
+ *              clip of the wrong thing is not "real footage" of anything
+ *   library    answers from our own rows (uploads, URL imports): never routed
+ */
+export type ProviderTier = "official" | "archive" | "community" | "stock" | "library";
+
+/**
  * One source of real footage. Everything the engine needs from an adapter and
  * nothing it does not: the shape is deliberately small so a new archive is an
  * afternoon, not a project.
@@ -121,10 +140,25 @@ export interface FootageProvider {
   /** False when a key or a base URL the adapter needs is not in the environment. */
   readonly enabled: boolean;
   readonly disabledReason: string | null;
+  /**
+   * A caveat on a provider that IS enabled — "anonymous, five requests an
+   * hour" — for the admin strip and the picker's chips. Null when there is
+   * nothing to say. Distinct from `disabledReason`: a provider with a notice
+   * is still routed.
+   */
+  readonly notice?: string | null;
   /** Router weight, 0–100. Ties between matching providers break on this. */
   readonly priority: number;
+  readonly tier: ProviderTier;
   /** The topic strengths the router matches a request against. */
   readonly categories: readonly string[];
+  /**
+   * The institution's own name, as a scene would say it. When a request NAMES
+   * a body, that body is asked about itself whatever the category arithmetic
+   * says — see `namedProviders` in registry.ts for why this had to exist.
+   * Omitted for a provider no narration would ever name (a stock library).
+   */
+  readonly nameTerms?: RegExp;
   readonly searchCapabilities: ProviderSearchCapabilities;
   /** The structured search. Adapters turn the request's queries into their own syntax. */
   search(request: FootageSearchRequest, opts: ProviderSearchOptions): Promise<NormalizedFootageAsset[]>;

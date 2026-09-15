@@ -28,6 +28,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { searchArchives, type ArchiveMediaType, type ArchiveProvider, ARCHIVE_PROVIDERS } from "@/lib/archive";
 import { saveStockCandidates, searchStockLibrary } from "@/lib/data/stock";
 import { isConfigured as pgConfigured } from "@/lib/data/postgres";
+import { ArchiveSearchQuery, ValidationError, parseQuery } from "@/lib/validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,21 +46,21 @@ function authorized(req: NextRequest): boolean {
 export async function GET(req: NextRequest) {
   if (!authorized(req)) return bad(401, "unauthorized");
 
-  const p = req.nextUrl.searchParams;
-  const q = (p.get("q") ?? "").trim().replace(/\s+/g, " ");
-  if (q.length < 2) return bad(400, "q must be at least 2 characters");
-  if (q.length > 200) return bad(400, "q is too long");
-
-  const typeRaw = p.get("type") ?? "any";
-  const mediaType: ArchiveMediaType | "any" =
-    typeRaw === "video" || typeRaw === "image" ? typeRaw : "any";
-  const limit = Math.min(Math.max(Number(p.get("limit")) || 12, 1), 40);
-  const providers = (p.get("providers") ?? "")
+  let query: ReturnType<typeof ArchiveSearchQuery.parse>;
+  try {
+    query = parseQuery(req.nextUrl.searchParams, ArchiveSearchQuery);
+  } catch (e) {
+    if (e instanceof ValidationError) return bad(e.status, e.message);
+    throw e;
+  }
+  const { q, limit } = query;
+  const mediaType: ArchiveMediaType | "any" = query.type;
+  const providers = query.providers
     .split(",")
     .map((s) => s.trim())
     .filter((s): s is ArchiveProvider => (ARCHIVE_PROVIDERS as readonly string[]).includes(s));
 
-  const useLibrary = p.get("library") === "1";
+  const useLibrary = query.library === "1";
   const usePg = pgConfigured && process.env.DATA_BACKEND === "postgres";
 
   if (useLibrary) {

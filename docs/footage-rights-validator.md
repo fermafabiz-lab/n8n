@@ -61,9 +61,25 @@ validator layers the provider's own rights words on top, in this order:
 ## Licence URLs
 
 `classifyLicense()` understands a licence given as its creativecommons.org
-URL (`/licenses/by-nc-sa/4.0/`, `/publicdomain/zero/1.0/`), which is how a
-web page's `rel="license"` link or JSON-LD `license` states it. The NC/ND
-tests still come first, so `by-nc-sa` is refused before `by` is seen.
+URL (`/licenses/by-nc-sa/4.0/`, `/publicdomain/zero/1.0/`,
+`/publicdomain/mark/1.0/`, and the old `/licenses/publicdomain/` some
+Internet Archive items carry), which is how a web page's `rel="license"`
+link, JSON-LD `license`, an Archive `licenseurl` or a Europeana `rights[0]`
+states it. The NC/ND tests still come first, so `by-nc-sa` is refused
+before `by` is seen.
+
+## What each source's rights look like
+
+| Source | How the class is reached |
+|---|---|
+| Internet Archive | an item from a public-domain collection is PD; a `licenseurl` is classified like any CC URL; an uploader-declared licence outside those collections by a non-institutional creator is `manual_review` — a licence typed into an upload form is a claim, not the archive's statement |
+| Europeana | `reusability=open` means only PDM / CC0 / BY / BY-SA ever arrive; `rights[0]` is the URL |
+| Library of Congress | rights are prose per item; only "no known restrictions" / "public domain" reads as PD, everything else `manual_review` with the Library's sentence as `rightsText` |
+| Wellcome | licence id per image (`cc-by`, `pdm`, `cc0`, `cc-by-nc`…) |
+| Flickr | only licence ids 4 (BY), 5 (BY-SA), 7 (no known restrictions), 8 (US Government), 9 (CC0), 10 (PDM) are requested, so NC/ND never come back |
+| Openverse | `license` + `license_version` codes on every row |
+| Pexels, Pixabay | their own free licences → `rightsStatus: other_free`, `cleared`, no credit; the licence text (no unaltered resale, no implied endorsement) rides on the row as `rightsText` |
+| Unsplash | `attribution_required` by the API guidelines: the render prints "Photo by <name> on Unsplash" |
 
 ## Attribution versus the watermark
 

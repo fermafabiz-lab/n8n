@@ -72,6 +72,19 @@
   color: var(--soft);
 }
 
+/* The same chip, when it is the link to the asset's page. It has to read as
+   clickable without becoming a second button next to "Use", so it lifts on
+   hover rather than wearing an underline at 10.5px. */
+.provLink {
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.provLink:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .pv {
   display: inline-block;
   padding: 1px 7px;
@@ -80,13 +93,13 @@
   letter-spacing: 0.05em;
   border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
-  color: var(--accent-deep);
+  color: var(--accent-ink);
 }
 
 .pvActual {
   border-color: color-mix(in srgb, #2e9e5b 40%, transparent);
   background: color-mix(in srgb, #2e9e5b 14%, transparent);
-  color: #1f7a45;
+  color: var(--green-ink);
 }
 
 .pvUnknown {
@@ -146,19 +159,19 @@
 
 .lic.ok {
   background: color-mix(in srgb, #2e9e5b 14%, transparent);
-  color: #1f7a45;
+  color: var(--green-ink);
   border-color: color-mix(in srgb, #2e9e5b 40%, transparent);
 }
 
 .lic.warn {
   background: color-mix(in srgb, #d99a1e 16%, transparent);
-  color: #8a5f06;
+  color: var(--amber);
   border-color: color-mix(in srgb, #d99a1e 45%, transparent);
 }
 
 .lic.bad {
   background: color-mix(in srgb, #c0392b 14%, transparent);
-  color: #9b2b1f;
+  color: var(--red-ink);
   border-color: color-mix(in srgb, #c0392b 40%, transparent);
 }
 

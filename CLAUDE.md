@@ -323,7 +323,11 @@ expected and harmless for an app touching only its own Drive.
   medium. Same branch: Kids story now visibly selects George as narrator
   and the "Storyteller" tone preset on the brief (`STORYTELLER_TONE`, one
   owner in `derive.ts`) — the tone had been a silent server-side default
-  since 09-08, which the producer read as "no storyteller voice".
+  since 09-08, which the producer read as "no storyteller voice". And the
+  brief has a **Childish** tone (`db/port/childish-tone/`): a
+  `hov.genre_profile` row `recpa1ZmZmXFnGjDi` — the writing profile of a
+  bedtime story — that Kids story selects by itself; the profile's five
+  beats are what to read the first Childish outline against.
 
 - **The sunbeam-dust fix has a mechanism and no outcome yet** (2026-09-15,
   `db/port/still-air/README.md`, lessons in `docs/lessons-pipeline.md` under

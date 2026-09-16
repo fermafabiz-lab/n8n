@@ -881,6 +881,49 @@ image. Backtested on those six films plus three controls before shipping.
 **It reaches films written from now on only** — a film whose script exists keeps
 the ending it has. Full account and rollback: `db/port/story-ending/`.
 
+### The story ends on a resolution, not on its climax (2026-09-16)
+
+Four days after the entry above, the producer again: *"nu prea au concluzie,
+mai ales povestile se termina brusc."* Measured on the four Story / Kids
+films written after the 09-12 fix: two land, **two end ON the climax** — the
+Lego chase on the arrest, the kids' clay-builders film with two of three
+characters shut inside a house. Both pass the 09-12 guard, which tests the
+SHAPE of the last sentence; nothing asked for what comes AFTER the last
+turning point. **The classical structure has five parts and the pipeline
+planned four**: every genre's `structure` maps onto exposition / inciting
+incident / rising action / climax / resolution, but writer rule 15 let "the
+last event and its consequence" be one clause glued to the climax, and the
+last scene cut 0.35 s after the last word.
+
+Two things made it worse for kids. The genre `structure` shapes the OUTLINE
+while kids rule (e) ("a warm ending with a gentle lesson") only reaches the
+WRITER — and both kids films so far ran under the Dark profile, whose beat 5
+is *"Aftermath, not resolution. Something remains."* The structure won.
+**A rule that only reaches a later node loses to a rule that shaped the plan.**
+
+Live as Claude Scripting `31e37b3c` and Final Assembly `450fa910`
+(`db/port/story-close/`): a Story or Kids story (category absent counts as
+story; documentary and cinematic untouched) plans a RESOLUTION beat — the
+final situation of the characters, set later in time than the climax — as a
+third `RESOLVES WITH:` line on the last chapter; the writer puts it as the
+LAST PARAGRAPH of the last chapter (rule 17, 2–3 sentences, 18–45 words,
+naming the protagonist); the editor writes it if missing (4c); `Narration
+Guard` checks the paragraph is there, separate, and names the protagonist
+(feedback into the same retry, never a hard failure); `Plan Scene Splits`
+cuts that paragraph off before chunking so it is its own last scene; the
+segmenter stages it as a settled, wider shot; and `Build Timeline` holds the
+last voiced scene 1.5 s (2 s kids) after the narration. For kids the
+resolution *"REPLACES beat 5 of the dramatic structure above whatever it
+says"* — the override lives where the structure lives. One owner for all of
+it: `Voice Mode`, which every consumer reads. Verified on two disposable
+60-second films, the kids one deliberately under Dark: *"A little later, the
+cold has settled, but Marn, Pip, and Tilla are safe in the same shelter."*
+
+Known trade-off: the guard allows 45 words, a scene carries 32, so a 33–45
+word resolution is two settled shots (the story test film did that). Owed:
+hear the hold on a real render, and the `Rewrite Script` path still carries
+none of these rules.
+
 ### The same lesson, three more times — inventory, the excerpt, the hook (2026-09-04)
 
 Asked what would make the SCRIPTS better, the answer came out of measuring five

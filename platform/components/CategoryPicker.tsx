@@ -244,6 +244,7 @@ export default function CategoryPicker({
           {(mode === "off" || withNarrator) && (
             <VoicePicker
               language={language}
+              preferred={cat.narratorVoice}
               label={
                 mode === "off"
                   ? "Narrator voice — press ▶ to listen"

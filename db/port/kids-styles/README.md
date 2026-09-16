@@ -54,8 +54,10 @@ parses this file and asserts the choices equal the table's keys in order —
 the fourth copy of the list, kept in lockstep by a check rather than by
 memory.
 
-**The site deploys from the trunk** (`claude/hello-7o90qh`), so the choices
-reach the producer only once this branch is merged there.
+**Merged into the trunk** (`claude/hello-7o90qh`) as `4c2c6c9` on 2026-09-16,
+after waiting out a Media Generation run and the render that followed it —
+a deploy restarts the container that four Media Generation nodes read the
+project through.
 
 ## What is owed
 

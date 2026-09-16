@@ -4,8 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import {
   approveAllOfKind,
   backToAiImage,
+  cancelImageRegen,
   cancelVideoRegen,
   reopenStep,
+  restartImageRegen,
   restartVideoRegen,
   restoreSceneVersion,
   saveImagePrompt,
@@ -897,7 +899,34 @@ export default function SceneBoard({
                     </div>
                   )}
                 {active.regenImage ? (
-                  <RegenBadge label="Regenerating image…" note={active.note} />
+                  <>
+                    <RegenBadge label="Regenerating image…" note={active.note} />
+                    {/*
+                      The same trap as the rewrite and the clip, one field
+                      along: `Regenerează Imagine` is cleared from inside the
+                      n8n run — by the write-back when a picture lands, by the
+                      rewrite ladder when Flow refuses for good — and this
+                      badge replaces the whole button row. A run that dies
+                      between the two leaves a scene that cannot be approved,
+                      re-asked for, or let go. These two are the way out.
+                    */}
+                    <div className="abtns" style={{ marginTop: 10 }}>
+                      <button
+                        className="abtn"
+                        disabled={pending}
+                        onClick={() => run(() => restartImageRegen(projectId, active.id))}
+                      >
+                        ⟳ Send it again
+                      </button>
+                      <button
+                        className="abtn"
+                        disabled={pending}
+                        onClick={() => run(() => cancelImageRegen(projectId, active.id))}
+                      >
+                        Cancel — keep this picture
+                      </button>
+                    </div>
+                  </>
                 ) : (
                 <div className="abtns">
                   <button

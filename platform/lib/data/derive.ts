@@ -244,6 +244,22 @@ export interface VoiceTone {
 }
 
 /**
+ * The storyteller read a kids film gets unless the producer picks otherwise:
+ * warm and a little playful, more movement than a documentary narrator and
+ * less than a theatrical one. ONE owner for three readers — the brief
+ * selects it the moment "Kids story" is chosen (visibly, in the Voice
+ * character control), `createProject` falls back to it when the form posts no
+ * tone for a kids film, and the picker offers it as the "Storyteller" preset
+ * so the audio step shows the name rather than "custom".
+ */
+export const STORYTELLER_TONE: VoiceTone = {
+  stability: 0.35,
+  similarity: 0.75,
+  style: 0.4,
+  speakerBoost: true,
+};
+
+/**
  * Read stored voice settings, or null when there is nothing usable.
  *
  * Mirrored by `normalizeVoiceTone()` in remotion/server/tts.mjs and by the

@@ -37,6 +37,7 @@ import path from "node:path";
 import { attachStockToScene, getSceneForFootage, getStockMedia, setStockStatus, type StockMedia } from "@/lib/data/stock";
 import { mediaPublicUrl, storeMediaBytes } from "@/lib/media-store";
 import { classifyVisualOrigin } from "@/lib/provenance";
+import { recordSelection } from "@/lib/footage/health";
 import { assessProvenance } from "@/lib/footage/provenance";
 import { buildFootageRequest } from "@/lib/footage/request";
 import { renderable, usableAutomatically, validateRights } from "@/lib/footage/rights";
@@ -327,6 +328,25 @@ export async function attachArchiveAsset(input: AttachInput): Promise<AttachResu
       location: stock.location ?? stock.country ?? null,
       filmingDate: stock.filmingDate ?? null,
     });
+
+    /**
+     * The provider's own scoreboard, and the one write that was missing.
+     * `attachStockToScene` marks the ASSET used; nothing ever told the health
+     * table, so `footage_provider_status.assets_selected` read 0 for every
+     * provider while six assets had really been attached — and a counter that
+     * cannot go up reads as "this source never gives me anything usable",
+     * which is the exact opposite of what the admin strip exists to say.
+     *
+     * Relevance is deliberately null. The ranker's score is not carried this
+     * far (the picker has it, the attach path does not), and passing some
+     * other number that happens to be in scope — the provenance confidence,
+     * say — would quietly poison an average that means something else.
+     * `recordSelection` already counts a null into neither sum nor n.
+     *
+     * Bookkeeping must never cost an attach: the function swallows its own
+     * errors and this catch is the second line of the same rule.
+     */
+    await recordSelection(stock.provider, null).catch(() => {});
 
     return {
       mediaType: stock.mediaType,

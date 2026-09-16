@@ -463,6 +463,38 @@ skipped` in the log). Re-hosting sheets through the media store is the fix
 when it matters. And **two sheets per shot is the cap**, the photo counting as
 one; the previous frame is the first thing dropped when slots run out.
 
+### The reference sheets were photorealistic on a drawn film (2026-09-16)
+
+The consistency chain above makes every character, object and location a
+reference picture and lets a judge re-roll any frame that disagrees with it
+(`STRICT MATCH`, "the references win"). All three sheet prompts ended,
+hard-coded, in **"Photorealistic, … sharp focus."** — and the kids category
+puts ONE mandatory style prefix at the head of every scene's `image_prompt`.
+So on a kids film the identity anchor of every character was a photograph
+and every scene was asked to be watercolour: the sheet pulls the frame toward
+photography, and a frame drawn correctly scores low against a photographic
+sheet and is re-rolled toward it. **A reference is a stronger instruction
+than any sentence in the prompt, so it must be in the film's medium.**
+Fixed in Media Generation `0f418e8e` (`Cast Sheet Prep`, `Set Plate Prep`):
+both resolve `Editing Options.category` / `categoryOptions.visual_style`
+exactly as `Voice Mode` does, open every sheet and plate prompt with the same
+prefix every scene opens with, and swap the photorealistic finish for "drawn
+in exactly that style, the same medium as every frame of the film". Every
+other category emits byte-identical requests, proved offline by
+`db/port/sheet-style/check.mjs` against a stubbed film. Found by reading the
+node, not by watching a film — whether a kids film had gone through the chain
+is unknown, and one kids film through Media Generation is the measurement
+owed. Full record: `db/port/sheet-style/README.md`.
+
+**The `KIDS_STYLES` table now has three copies** — `Voice Mode` (Claude
+Scripting), `Cast Sheet Prep`, `Set Plate Prep` — and `check.mjs` asserts
+the two in Media Generation match the Voice Mode body kept beside them. The
+strings were copied from Claude Scripting's then-parked draft `6e21cddc` —
+the eight-style table (illustrated, crayon, papercut, cel, cartoon3d, brick,
+clay, felt) plus a stop-motion motion clause — **published later the same
+day**, with the site's choices added in `categories.ts` and a fourth
+lockstep assertion in the same check; see `db/port/kids-styles/README.md`.
+
 ### The batch cap
 
 **Since 2026-09-01 a pass is the WHOLE film: `CAP = 200`.** Every take, then
@@ -1355,6 +1387,36 @@ until a first test film is judged. How each piece works:
   usual "absent = each voice's own settings", which stays the rule everywhere
   else.
 - **No length cap** — the producer refused one explicitly.
+- **Eight styles since 2026-09-16, one flat list** (`db/port/kids-styles/`):
+  the two originals plus crayon, papercut, cel (2D) and brick, clay, felt
+  (3D), each a POSITIVE noun phrase, never a brand. Not medium × technique —
+  "2D claymation" and "3D watercolour" are not things, so each label carries
+  its own dimension. Stop motion is a CADENCE, not a texture: Veo renders
+  smooth 24 fps whatever the still looks like, so for clay/brick/felt the
+  segmenter gets a fourth rule asking for small deliberate steps and a
+  pose-to-pose snap in every motion prompt. Unverified on a real clip. The
+  prefix also heads every cast sheet and set plate (see the sheet entry
+  under consistency), which is why the list lives in four places.
+- **The storyteller was a silent server-side default, and the producer
+  could not see it (2026-09-16).** "When I click Kids story it used to pick a
+  voice" — it never did. Since 09-08 `createProject` added a storyteller
+  `voice_tone` only when the form posted none, so nothing on the brief
+  changed when the category did, and the numbers matched no preset, so the
+  audio step showed "custom". Now one owner, `STORYTELLER_TONE` in
+  `derive.ts`, read by three places: the brief SELECTS it in the Voice
+  character control the moment Kids story is chosen (and clears it on the
+  way out — only an untouched control moves), the picker offers it as the
+  "Storyteller" preset so the audio step names it, and `createProject` keeps
+  it as the backstop for a form that never rendered the control. The
+  NARRATOR moves too: `Category.narratorVoice` (kids: George,
+  `elevenlabs_JBFqnCBsd6RMkjVDRZzb`, ElevenLabs' own "Warm, Captivating
+  Storyteller" and the one English voice labelled `narrative_story` in the
+  account's library of 22) is followed by the form's single picker until the
+  producer clicks a voice. A Romanian kids film still gets the language's
+  own list — the picker's existing "selection must be in the list" rule
+  swaps George for the first Romanian voice, which today is Mihai, also
+  `narrative_story`. A default the producer cannot see is a default they
+  will report as missing.
 
 ### The hook is a teaser — six styles, one shot per beat, a plan the site can rewrite (2026-09-11)
 

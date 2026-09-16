@@ -192,7 +192,10 @@ the full entry in the file named:
   Scene Standalone` (Claude Scripting), `HR Shots Prompt` (Hook Regen) and
   `VP Rewrite AI` (Media Generation). Guardrails are cheapest composed at submit
   time, where one node owns them, rather than stored in the database where
-  changing them means a backfill.
+  changing them means a backfill. The same rule now covers a TABLE: the
+  eight kids style prefixes (`KIDS_STYLES`) live in `Voice Mode` (Claude
+  Scripting), `Cast Sheet Prep` and `Set Plate Prep` (Media Generation) —
+  change one, change all three, and run `node db/port/sheet-style/check.mjs`.
 - **Editing Options fields are refuse-then-clamp, never silently coerced** —
   the `normalize*` family in `platform/lib/data/derive.ts`, fixture-tested by
   `npm run check:normalize`. A value stored by the site, read by n8n and
@@ -299,6 +302,28 @@ refresh tokens after 7 days. The "Google hasn't verified this app" warning is
 expected and harmless for an app touching only its own Drive.
 
 ## Open work
+
+- **The eight kids styles are live end to end since 2026-09-16 ~12:55 UTC**
+  (`db/port/kids-styles/README.md` and
+  `db/port/sheet-style/README.md`). Claude Scripting `6e21cddc` (`Voice
+  Mode`: `KIDS_STYLES` with eight keys — illustrated, crayon, papercut, cel,
+  cartoon3d, brick, clay, felt — and a stop-motion motion clause for
+  clay/brick/felt) and Media Generation `0f418e8e` (cast sheets and set
+  plates drawn in the film's style instead of hard-coded photorealistic)
+  are both published, and the site half reached the trunk in merge
+  `4c2c6c9` (pushed only after Media Generation `13887` and the render
+  `13900` that followed it had finished — the deploy restarts the
+  container four Media Generation nodes talk to). The list has four
+  copies (Voice Mode, Cast Sheet Prep, Set Plate Prep, categories.ts) and
+  `node db/port/sheet-style/check.mjs` asserts all four agree. **What is
+  owed**: the first film in each new style — `clay` for whether the
+  stop-motion clause reads as stop motion rather than smooth CGI over a
+  clay-looking still, `brick` for content refusals — and one kids film's
+  `castSheets` / `locationPlates` opened to confirm they are in the film's
+  medium. Same branch: Kids story now visibly selects George as narrator
+  and the "Storyteller" tone preset on the brief (`STORYTELLER_TONE`, one
+  owner in `derive.ts`) — the tone had been a silent server-side default
+  since 09-08, which the producer read as "no storyteller voice".
 
 - **The sunbeam-dust fix has a mechanism and no outcome yet** (2026-09-15,
   `db/port/still-air/README.md`, lessons in `docs/lessons-pipeline.md` under

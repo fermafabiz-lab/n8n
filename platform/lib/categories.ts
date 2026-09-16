@@ -31,6 +31,16 @@ export interface Category {
   /** No spoken words at all: no narrator picker, no TTS, captions forced
    *  off — the film carries only its own sound effects. */
   noNarration?: boolean;
+  /**
+   * The narrator this category picks by itself, as the prefixed id the
+   * picker stores — selected on screen the moment the category is chosen,
+   * so the producer sees who will read and can change it like any other
+   * voice. Only an untouched picker follows it. Absent = the picker's own
+   * default. A film in another language still gets the language's own
+   * list: a voice that does not speak it is replaced by the first that
+   * does, exactly as the picker already does for a typed choice.
+   */
+  narratorVoice?: string;
   options: CategoryOption[];
 }
 
@@ -114,6 +124,11 @@ export const CATEGORIES: Category[] = [
     description:
       "A story written and drawn for young children: picture-book visuals, a warm storyteller voice, slower narration with longer breaths between scenes.",
     ready: true,
+    // George — ElevenLabs' own "Warm, Captivating Storyteller", the one voice
+    // in the library labelled narrative_story in English. Read with the
+    // Storyteller tone (STORYTELLER_TONE in derive.ts), which the brief
+    // selects alongside it.
+    narratorVoice: "elevenlabs_JBFqnCBsd6RMkjVDRZzb",
     options: [
       {
         name: "narration_pace",
@@ -129,11 +144,23 @@ export const CATEGORIES: Category[] = [
       {
         name: "visual_style",
         label: "Visual style",
-        hint: "Storybook is soft watercolor illustration, like a picture book. 3D animation is the rounder, more realistic look of modern animated films for kids — realistic visually, never in the story.",
+        hint: "The look of every frame — every scene, character sheet and set plate opens with it. Storybook is soft watercolour like a picture book; 3D animation is the rounder look of modern animated films — realistic visually, never in the story. Brick, clay and felt are animated as stop motion: small deliberate steps rather than smooth glides.",
         type: "select",
+        // One flat list, not medium × technique: "2D claymation" and "3D
+        // watercolour" are not things. The values are the keys of
+        // KIDS_STYLES in Claude Scripting's Voice Mode (and its two copies
+        // in Media Generation) — db/port/sheet-style/check.mjs asserts this
+        // list matches them, so add a style there first. No brand is ever
+        // named: "brick-built" is the toy, not the company.
         choices: [
-          { value: "illustrated", label: "Storybook — illustrated" },
+          { value: "illustrated", label: "Storybook — soft watercolour" },
+          { value: "crayon", label: "Crayon and chalk — drawn by a child" },
+          { value: "papercut", label: "Paper cut-out — layered collage" },
+          { value: "cel", label: "Classic 2D — hand-painted cel animation" },
           { value: "cartoon3d", label: "3D animation — more realistic" },
+          { value: "brick", label: "Brick-built — plastic toy bricks" },
+          { value: "clay", label: "Clay stop-motion — plasticine" },
+          { value: "felt", label: "Felt and wool — soft toys" },
         ],
         default: "illustrated",
       },

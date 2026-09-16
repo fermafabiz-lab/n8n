@@ -2,6 +2,8 @@ import {
   executionUrl,
   getExecutionError,
   getExecutions,
+  getWorkflowMeta,
+  isManualStop,
   n8nConfigured,
   getAliveProduction,
   getStalledProduction,
@@ -16,6 +18,16 @@ function ago(iso: string | null): string {
   if (mins < 60) return `${mins} min ago`;
   const h = Math.floor(mins / 60);
   return h < 24 ? `${h}h ago` : `${Math.floor(h / 24)}d ago`;
+}
+
+/** Split the failure list on n8n's "cancelled manually" wording, tagging each row. */
+function withStop<T extends { error: { message: string } | null }>(
+  rows: T[],
+  stoppedByHand: boolean,
+): (T & { stoppedByHand: boolean })[] {
+  return rows
+    .filter((f) => isManualStop(f.error?.message) === stoppedByHand)
+    .map((f) => ({ ...f, stoppedByHand }));
 }
 
 /**
@@ -77,6 +89,28 @@ export default async function OpsPanel({
       error: await getExecutionError(f.id).catch(() => null),
     })),
   );
+  // Names for the single-purpose workflows the static map does not carry,
+  // and the throwaways hidden: a "zz …" workflow a session created, ran once
+  // and archived is not production, and its one failed run was standing in
+  // this list as a raw id nobody could place. An id the lookup cannot
+  // resolve stays, shown as the id — unknown is never hidden.
+  const named = (
+    await Promise.all(
+      withErrors.map(async (f) => {
+        const meta = await getWorkflowMeta(f.workflowId).catch(() => null);
+        if (meta?.throwaway) return null;
+        return meta ? { ...f, workflowName: meta.name } : f;
+      }),
+    )
+  ).filter((f): f is NonNullable<typeof f> => f !== null);
+  // A stop by hand is not a failure. Pause, Stop and Delete on the site, and
+  // n8n's own Stop button, end an execution with "cancelled manually" — and
+  // the orchestrator that was waiting on it ends with status error and the
+  // same words. Listed, because the producer may want to know something was
+  // stopped, but neither red nor counted.
+  const failures = withStop(named, false);
+  const stopped = withStop(named, true);
+  const rows = [...failures, ...stopped];
 
   if (apiError) {
     return (
@@ -87,7 +121,7 @@ export default async function OpsPanel({
     );
   }
 
-  if (running.length === 0 && stalled.length === 0 && withErrors.length === 0) return null;
+  if (running.length === 0 && stalled.length === 0 && rows.length === 0) return null;
 
   return (
     <div style={{ marginBottom: 36, display: "flex", flexDirection: "column", gap: 14 }}>
@@ -155,7 +189,7 @@ export default async function OpsPanel({
         </div>
       )}
 
-      {withErrors.length > 0 && (
+      {rows.length > 0 && (
         // Collapsed to one hairline by default: failures are usually already
         // dealt with, and the full red panel stood between the producer and
         // their projects on every visit.
@@ -163,14 +197,16 @@ export default async function OpsPanel({
           storageKey={errorsOnly ? "errors-project" : "errors-dash"}
           summary={
             <>
-              <span className="tdot red" />
-              {withErrors.length} failure{withErrors.length === 1 ? "" : "s"} in the
-              last 24h
+              <span className={failures.length ? "tdot red" : "tdot"} />
+              {failures.length
+                ? `${failures.length} failure${failures.length === 1 ? "" : "s"} in the last 24h`
+                : "No failures in the last 24h"}
+              {stopped.length > 0 && ` · ${stopped.length} stopped by hand`}
             </>
           }
         >
-        <div className="card errcard">
-          {withErrors.map((f) => (
+        <div className={failures.length ? "card errcard" : "card"}>
+          {rows.map((f) => (
             <div className="kv" key={f.id} style={{ alignItems: "flex-start" }}>
               <span style={{ maxWidth: "75%" }}>
                 <b style={{ color: "var(--ink)" }}>{f.workflowName}</b>
@@ -195,11 +231,15 @@ export default async function OpsPanel({
                 · {ago(f.stoppedAt)}
                 <br />
                 <span style={{ fontSize: 12.5 }}>
-                  {f.error?.message ?? "No details — open the execution in n8n."}
+                  {f.stoppedByHand
+                    ? "Stopped by hand — Pause, Stop or Delete on the site, or Stop in n8n. Not a failure: Resume picks the film up where it left off."
+                    : (f.error?.message ?? "No details — open the execution in n8n.")}
                 </span>
               </span>
               <span style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                <span className="chip err">failed</span>
+                <span className={f.stoppedByHand ? "chip off" : "chip err"}>
+                  {f.stoppedByHand ? "stopped" : "failed"}
+                </span>
                 {executionUrl(f.workflowId, f.id) && (
                   <a
                     className="abtn"

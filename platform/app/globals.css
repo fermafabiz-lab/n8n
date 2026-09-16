@@ -1568,6 +1568,13 @@ body:has(.nb) .nav {
   background: rgba(216, 72, 61, 0.15);
   color: var(--red);
 }
+/* A stop by hand (Pause / Stop / Delete) in the failure list. Not red,
+   because it is not a failure: --line and --dim are the tokens the idle
+   ticker dot uses, so it reads as "nothing to do here" in both themes. */
+.chip.off {
+  background: var(--line);
+  color: var(--dim);
+}
 
 .empty {
   padding: 80px 0;

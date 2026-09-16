@@ -21,7 +21,65 @@ const WORKFLOW_NAMES: Record<string, string> = {
   gkEtGMecv4TC3ZHp: "Scripting",
   yHG4DBCDjR3RJzav: "Media Generation",
   BY22Vlhh20Xdkr5Z: "Final Assembly",
+  // The single-purpose webhooks (CLAUDE.md, "Webhooks the site calls"). A
+  // failure of one of these is a real failure the producer should see by
+  // name; an id they cannot place reads as noise.
+  NPES1DrI2d3lifQp: "Expand Brief",
+  MDYR0J93RJDU8ftf: "Hook Regen",
+  Lo78uXXCFYoIH73r: "Archive Suggestions",
+  xBRdtrArbbi89yvX: "Music Library",
+  Il5pFIbVwFwxHsIM: "YT Scene Titles",
+  QBb1a3UpTyJi8ybk: "Upscale Film",
+  "4jVkQjpr7terqQhY": "Series Recap",
 };
+
+/**
+ * n8n's own wording when an execution is stopped by hand. The site's Pause,
+ * Stop and Delete all go through POST /executions/{id}/stop, and the n8n
+ * editor's Stop button writes the same text. The PARENT of a stopped
+ * sub-workflow (the orchestrator waiting in Execute Workflow) then ends with
+ * status "error" and this same message — so every Pause → Resume used to put
+ * two red "failed" rows in the health panel, and the producer read them as
+ * something broken.
+ */
+export function isManualStop(message: string | null | undefined): boolean {
+  return /cancell?ed manually|was cancell?ed|was stopped/i.test(String(message ?? ""));
+}
+
+export interface WorkflowMeta {
+  name: string;
+  /** Archived, or named "zz …" — the convention every probe and diag workflow follows (create → run once → archive). */
+  throwaway: boolean;
+}
+
+const metaCache = new Map<string, { at: number; meta: WorkflowMeta | null }>();
+
+/**
+ * Name (and throwaway-ness) for a workflow id the static map does not know,
+ * from GET /workflows/{id}. Cached ten minutes per process. Any failure —
+ * network, 403, a missing name — answers null, and the caller shows the raw
+ * id as before: an unknown workflow is never HIDDEN, only a throwaway is.
+ */
+export async function getWorkflowMeta(id: string): Promise<WorkflowMeta | null> {
+  if (!n8nConfigured) return null;
+  const known = WORKFLOW_NAMES[id];
+  if (known) return { name: known, throwaway: false };
+  const hit = metaCache.get(id);
+  if (hit && Date.now() - hit.at < 10 * 60 * 1000) return hit.meta;
+  let meta: WorkflowMeta | null = null;
+  try {
+    const res = await api(`/workflows/${id}?excludePinnedData=true`);
+    if (res.ok) {
+      const w = (await res.json()) as { name?: string; isArchived?: boolean };
+      const name = String(w.name ?? "").trim();
+      if (name) meta = { name, throwaway: Boolean(w.isArchived) || /^zz\b/i.test(name) };
+    }
+  } catch {
+    meta = null;
+  }
+  metaCache.set(id, { at: Date.now(), meta });
+  return meta;
+}
 
 export interface ExecutionSummary {
   id: string;

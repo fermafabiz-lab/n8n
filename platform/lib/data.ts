@@ -1455,3 +1455,11 @@ export async function getSheetMediaUrls(flowIds: string[]) {
   needPg("getSheetMediaUrls");
   return pgBackend.getSheetMediaUrls(flowIds);
 }
+export async function updateSeriesBible(id: string, bible: import("@/lib/series").SeriesBible) {
+  needPg("updateSeriesBible");
+  return pgBackend.updateSeriesBible(id, bible);
+}
+export async function getSeriesRefsUnion(seriesId: string) {
+  needPg("getSeriesRefsUnion");
+  return pgBackend.getSeriesRefsUnion(seriesId);
+}

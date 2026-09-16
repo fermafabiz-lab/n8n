@@ -115,7 +115,9 @@ Webhooks the site calls: `new-project`, `resume-project`, `restart-scripting`
 (all three on the Master Orchestrator), `scene-text-regen`,
 `scene-image-regen`, `scene-voice-regen` (all three on Claude Scripting),
 `assemble`, and the single-purpose ones — `expand-brief`, `yt-scene-titles`,
-`upscale-film`, `list-music`/`share-music`, `archive-suggest`, `hook-regen`. The site derives all of them from `N8N_NEW_PROJECT_WEBHOOK_URL`
+`upscale-film`, `list-music`/`share-music`, `archive-suggest`, `hook-regen`,
+`series-recap` (its own workflow `4jVkQjpr7terqQhY`, fired by `approveScript`
+for an episode of a series — `db/port/series-recap/`). The site derives all of them from `N8N_NEW_PROJECT_WEBHOOK_URL`
 by string-replacing the last path segment, so they must live on the same host
 — and each new one must be a plain `path` with no path parameters, or the
 derived URL will not resolve.
@@ -337,6 +339,19 @@ expected and harmless for an app touching only its own Drive.
   owed**: one real episode — read its Story Bible against the series page
   (same names, same descriptions) and check `SHEET PLAN` says the cast was
   skipped, not drawn again.
+  **The bookkeeping after each episode is automatic since the same
+  evening** (`db/port/series/README.md`, "What happens by itself"): when
+  an episode's script is approved, the site re-keys the episode's sheets
+  to the bible's spelling of each name, writes new characters / places /
+  objects back to the show, and POSTs the project to the `series-recap`
+  webhook (workflow `4jVkQjpr7terqQhY`, `db/port/series-recap/`), which
+  has gpt-5.4 write the `Episode N — Title: …` line onto
+  `series.previously` — replace-or-append, verified on a throwaway
+  episode (execution 13951). The next episode reads the UNION of the
+  show's sheets and every episode's. **Note for the next debugger**:
+  `project.full_narrator_script` / `edited_narrator_script` are EMPTY on
+  every film since the cutover — the approved narration is the newest
+  `hov.script` row, which is what `Load Episode` reads.
 
 - **The eight kids styles are live end to end since 2026-09-16 ~12:55 UTC**
   (`db/port/kids-styles/README.md` and

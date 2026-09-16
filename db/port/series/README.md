@@ -65,15 +65,45 @@ until it is live, a show shows initials where its faces will be, and says
 so. The sheets themselves are still reused by the pipeline through their
 Flow ids; only the picture on the site is missing.
 
-## What a series does NOT do yet
+## What happens by itself after every episode (since 2026-09-16, evening)
 
-- It does not stop `Generate Story Bible` from rewriting a character. Lore
-  is a strong instruction, not a lock; if a name changes, the sheet for it
-  is simply not attached and the character is drawn from text. Watch the
-  first episode's bible against the series page.
-- New characters an episode invents are not written back to the show.
-- The recap is the producer's to write, one line per episode.
+The producer asked for none of this to be manual. All three happen at ONE
+moment — when the episode's script is approved (`approveScript` →
+`onEpisodeScriptApproved` in `platform/app/actions.ts`), which is after the
+Story Bible exists and before Media Generation reads the references. The
+human's Approve and hands-off mode both go through `approveScript`.
+
+1. **Names are reconciled.** Lore is a strong instruction, not a lock:
+   the writer is told `USE EXACTLY THESE NAMES` and may still write "Pip
+   the Fox" for "Pip". The sheets are keyed by name, so a respelling would
+   draw a second face. `reconcileRefsToBible()` (`platform/lib/series.ts`)
+   re-keys the episode's `castRefs` / `castSheets` / `objectRefs` /
+   `locationRefs` / `locationPlates` to the bible's spelling where the
+   match is unambiguous — exact, unique whole-word containment, or a
+   unique given name of three letters or more — and writes Editing Options
+   only when something changed. A name it cannot match is left alone and
+   drawn from text, as before.
+2. **New characters, places and objects are written back to the show.**
+   `mergeBibles()` adds what the episode's bible introduces and the series
+   does not know; a respelling is not new. The series page and the next
+   episode's Lore read the union of the show's sheets and every episode's
+   (`getSeriesRefsUnion`, earlier episode wins), so a face drawn in
+   episode 3 anchors episode 4 without anyone copying it.
+3. **The recap is written by the pipeline.** The site POSTs `{project_id}`
+   to the `series-recap` webhook (workflow `4jVkQjpr7terqQhY`,
+   `db/port/series-recap/`), which summarises the approved narration in
+   two sentences and replaces-or-appends the `Episode N — Title: …` line
+   on `series.previously`. The producer can still edit the text.
+
+`npm run check:series` pins the matching rules (11 fixtures).
+
+## What a series still does NOT do
+
 - The end screen does not print the channel name (the field exists).
+- Reconciliation cannot fix a writer that renames a character to something
+  unrelated ("Pip" → "Rusty"): that is a new character to it, drawn from
+  text, and added to the show as new. The Lore's exact-names line is what
+  keeps that rare.
 
 ## What is owed
 

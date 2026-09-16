@@ -1745,3 +1745,57 @@ has the whole mechanism). What the site learned building it:
   the refs and the settings; a later change to that film changes nothing in
   the show. Editing a character's description on the series page rewrites
   the copy, which is what the next episode reads.
+- **The copy keeps itself in step, since the same evening.** The producer's
+  one condition for the whole feature was "nothing manual after an episode",
+  and the three things that would have been manual all hang off ONE moment:
+  script approval (`approveScript` → `onEpisodeScriptApproved`), which is
+  after the Story Bible exists and before Media Generation reads the
+  references. (1) Names: Lore says `USE EXACTLY THESE NAMES` and the writer
+  still sometimes writes "Pip the Fox" for "Pip"; the sheets are keyed by
+  name, so the episode's refs are re-keyed to the bible's spelling where the
+  match is unambiguous (`reconcileRefsToBible`: exact, unique whole-word
+  containment, unique given name of 3+ letters — `check:series` pins the
+  rules). (2) New characters / places / objects go back to the show
+  (`mergeBibles`; a respelling is not new), and both the series page and the
+  next episode read the union of every episode's sheets
+  (`getSeriesRefsUnion`, earlier wins). (3) The recap is written by n8n
+  (`series-recap`, `db/port/series-recap/`), one replace-or-append line per
+  episode; the site only fires the webhook and never waits. What the site
+  learned: **fit a growing text into a capped prompt from the NEWEST end**
+  — `composeSeriesLore` used to cut the Lore at 8000 from the end, which is
+  exactly where the recap sits, so a long-running show would have lost its
+  latest episodes first. It now drops the oldest lines instead.
+
+### The failure list: a stop by hand is not a failure (2026-09-16)
+
+The producer sent a screenshot of the health panel with three red "failed"
+rows and asked for them to be fixed. None was a failure. Two were
+`Master Orchestrator · Execute Media Generation (Resume/Batch) · The
+execution was cancelled manually` — the trace of their own Pause → Resume:
+`pauseProduction` stops the children first, and the orchestrator that was
+waiting in Execute Workflow then ends with status `error` and n8n's
+"cancelled manually" text. The third was `18x6ub9yUvj7H7fy · Probe Series ·
+relation "webhook_entity" does not exist` — a session's throwaway probe,
+already archived, listed by raw id because the panel only knew the four
+production workflows by name.
+
+- **`isManualStop()` (`lib/n8n.ts`) splits the list.** A row whose message
+  matches "cancelled manually" is shown with a grey `stopped` chip and the
+  sentence "Stopped by hand … Not a failure: Resume picks the film up where
+  it left off", is NOT counted in the summary, and does not turn the card
+  red. The summary reads "No failures in the last 24h · 2 stopped by hand"
+  with the idle grey dot. Still listed, because a stop the producer did not
+  press is worth a look; just not an alert.
+- **Throwaways are hidden, unknowns are not.** `getWorkflowMeta()` resolves
+  an id the static map does not know through `GET /workflows/{id}` (cached
+  ten minutes) and drops the row when the workflow is archived or named
+  `zz …` — the convention every probe follows (create → run once →
+  archive). A lookup that fails answers null and the row stays, by id: an
+  unknown workflow is never hidden. The static map now also names the seven
+  single-purpose workflows (Expand Brief, Hook Regen, Archive Suggestions,
+  Music Library, YT Scene Titles, Upscale Film, Series Recap), because a
+  failure there is real and deserves a name.
+- **What the panel cannot do**: delete an execution. The n8n MCP connector
+  has no delete, and the site's API key is not reachable from a web session,
+  so a probe's failed run stays in n8n's own list until it ages out of the
+  24-hour window. Naming probes `zz …` is what keeps them off the site.

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getSeries, getSeriesEpisodes, getSheetMediaUrls } from "@/lib/data";
+import { getSeries, getSeriesEpisodes, getSeriesRefsUnion, getSheetMediaUrls } from "@/lib/data";
 import { getCategory } from "@/lib/categories";
 import SeriesCharacter from "@/components/SeriesCharacter";
 import SeriesNotes from "@/components/SeriesNotes";
@@ -25,6 +25,9 @@ export default async function SeriesPage({ params }: { params: Promise<{ id: str
   const series = await getSeries(id);
   if (!series) notFound();
   const episodes = await getSeriesEpisodes(id);
+  // The show's own references plus what later episodes drew for the cast
+  // they introduced — so a character added in episode 3 has a face too.
+  series.refs = await getSeriesRefsUnion(id);
   const flowIds = [
     ...Object.values(series.refs.castSheets).map((c) => c.id),
     ...Object.values(series.refs.locationPlates).map((p) => p.id),

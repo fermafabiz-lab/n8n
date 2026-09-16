@@ -36,4 +36,21 @@ Three things are load-bearing:
   `/api/media/ingest` rejects `field: "sheets"` with 400 — harmless
   (continue-on-error), but no faces.
 
-Rollback: `restore_workflow_version` to the "was active" id below.
+## The apply record
+
+| | version |
+|---|---|
+| was active (built on) | `0f418e8e-cb4b-4289-a1b0-2c1642d8c064` — `Media Generation.before.json` |
+| staged draft | `71b42624-f8a8-4001-adc9-f6919a861293` — `Media Generation.draft.json` |
+
+Both Code bodies read back byte-identical to `paste/`; `diff-workflow.mjs
+--expect` the six names `--allow-connections`: added 6, removed 0, changed
+0, the edge diff exactly the two removed and ten added lines in
+`nodes.json`, all twelve Drive nodes intact, no dangling references. The
+two HTTP nodes carry `onError: continueRegularOutput` and were bound to
+`HOV Media Ingest` with `setNodeCredential` (the API redacts the binding
+on every node, the control `Write Scene Image` included, so binding it is
+the only evidence available). Published only after the site deploy that
+carries `field: "sheets"`, with no Media Generation execution running.
+
+Rollback: `restore_workflow_version` to `0f418e8e`.

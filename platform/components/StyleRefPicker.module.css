@@ -1,0 +1,116 @@
+/* The brief's reference-script picker. Own stylesheet per the house rule:
+   globals.css is closed to new components. */
+.box {
+  border: 1px solid var(--line2);
+  border-radius: 14px;
+  background: var(--card);
+  padding: 10px;
+}
+.search {
+  width: 100%;
+  font: inherit;
+  font-size: 13px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line2);
+  background: var(--card2);
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+.list {
+  max-height: 232px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+.row:hover {
+  background: var(--card2);
+}
+.row.on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--card));
+}
+.row:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.mark {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  border-radius: 6px;
+  border: 1.5px solid var(--line2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--accent);
+}
+.row.on .mark {
+  border-color: var(--accent);
+}
+.title {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.meta {
+  flex: 0 0 auto;
+  font-size: 11.5px;
+  color: var(--dim);
+}
+.fit {
+  font-size: 10.5px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  flex: 0 0 auto;
+}
+.foot {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--dim);
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.chosen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.chip {
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--card));
+  color: var(--ink);
+  cursor: pointer;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

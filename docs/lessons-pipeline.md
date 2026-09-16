@@ -948,6 +948,132 @@ demand of the text.
 
 Rollback, the check script and the full measurements: `db/port/script-quality/`.
 
+### Sharper scripts, and pictures that change — the library was reachable and useless (2026-09-10)
+
+The producer's report on the 86-scene Burj Al Arab film: "the scripting and
+the AI visuals feel bland and repetitive … until BAM the finished building
+appears from almost nothing … does the AI still have access to the library
+I made?" The answer was yes, and that was the problem. Full account, measured
+numbers and rollback: `db/port/script-voice/README.md`. What bites:
+
+- **`Fetch Style Card` matched the library on the film's TONE STRING and took
+  the first three rows by insertion order.** For `Educativ` that was a
+  Moroccan McDonald's vlog in broken English and a YouTube Shorts tutorial,
+  while the producer's own Burj Al Arab transcript sat in the library as tone
+  "Corporate" / category "Educational" and never matched. Now the rows come
+  from **`GET /api/style-refs?project=…`** (site, keyed for n8n): the
+  producer's PINNED references first (`Editing Options.styleRefs`, chosen on
+  `/new` under Tone by `StyleRefPicker`, up to three), then tone-family
+  matches (`toneFamily()` in `lib/style-refs.ts`: Educativ = Educational,
+  Funny = Fun …), then category/Look matches; newer and excerptable first.
+  `pickStyleRefs` is pure — `npm run check:style-refs`. The scripting log now
+  prints `STYLE REFS: "…" [tone/category; pinned by producer]`, which is the
+  line that answers the producer's question in one second.
+- **All 63 active transcripts are SRT files and nothing ever stripped the
+  cues**, so for seven weeks the "REAL EXCERPT" the writer imitated read
+  «67 00:02:39,360 --> 00:02:41,670 Marrakesh…». `cleanTranscript` (site) and
+  an identical copy in `Prepare Style Block` remove cue numbers, timecodes,
+  `[music]`, `>>` and `\h`. **Two copies; change both.** The excerpt
+  measurements in the entry above ("8.0 sentences, 825 characters") were
+  taken with the timecodes inside them.
+- **The Educativ genre profile ASKED for the glossary** ("Define a term before
+  using it. One new idea per beat."), and the writer prompt says GENRE VOICE
+  beats the style reference — so "A pile is a long structural element…" was
+  the pipeline obeying its configuration. All 11 profiles are rewritten
+  (`db/port/script-voice/genre_profiles.sql`, rollback beside it): no
+  definitions, no meta, no signposting, every `visual` demands the light
+  change between chapters. **The profile is a pipeline configuration**; read
+  it before the prompts when a film sounds wrong, the same lesson as the
+  Motivational essay.
+- **Three more things are COUNTED now, in `Narration Guard`**, thresholds
+  measured over the 14 most recent films first: glossary sentences (fires
+  above 1; Burj had 4, every other film 0–1), meta lines ("the camera enters
+  the atrium", "this is turning point four", "this chapter unveils" — fires
+  at 1, because every one found in 14 films was a defect), and steering
+  openers ("Now the work shifts", "So the question is" — fires at ≥10% of
+  sentences and ≥8; Burj 11.9%, the good films 0–6.8%). Same feedback path,
+  same `MAX_RETRIES = 2`. The writer has rules 9–14 to match and the editor
+  5b/5c.
+- **A place that changes over the story is one bible entry PER STATE** —
+  `"<Place> — <stage>"` in chronological order, up to 4 states, 8 entries in
+  all — and the segmenter picks the state the chapter has reached, never a
+  later one. The Burj bible had one tower, "at Completion", so the frame-
+  rising chapter anchored to the finished plate and scene 108 spoiled the
+  ending; a construction film has to be ABLE to show half-built.
+  `Set Plate Prep` makes up to 10 plates (was 6) to cover it. The assembler,
+  tags and judge needed no change: a state is just another location name.
+- **Lighting is a PROGRESSION in the bible now, and the segmenter moves it**:
+  3–5 named conditions with the chapters they belong to, at least two per
+  chapter, never more than five consecutive scenes in one `time_of_day`, no
+  two chapters opening in the same light; `time_of_day` gains `overcast` and
+  `storm`. `Validate Evidence Refs` logs `TOD MONOTONY` / `LOCATION
+  MONOTONY` per chapter — it cannot send a chapter back, but 75 of 86 scenes
+  reading "day" must never pass unlogged again.
+- **The first run after publishing died on OpenAI credits, not on the
+  change** (2026-09-10 19:04 UTC, scripting 12022: "You have no credits
+  remaining"). Everything before the model call was verified — `styleRefs`
+  stored and read back, the new profile fetched, the route's absence degraded
+  cleanly — and nothing after it has run yet. The prompts are published and
+  byte-verified, unproven on a film; the disposable test project
+  `recTdqIxXei94goJF` (Educativ, 32 s, pinned Burj reference) is the one to
+  `restart-scripting` after the top-up. **Check the date on this note before
+  repeating it as a live blocker.**
+- **Wiring order that matters**: `Fetch Style Card` is `continueRegularOutput`
+  + `alwaysOutputData`, so until the site carrying `/api/style-refs` is
+  deployed the node answers a 404 and Scripting falls back to the genre voice
+  alone — degraded, never dead. Publish the site before expecting pinned
+  references to reach a film.
+
+### The voice says what the picture cannot (2026-09-13)
+
+The producer: "AI-ul bagă mult din descrierea vizuală a scenei și în scriptul
+audio … noi nu scriem o carte." Measured, not argued: in the fiction films a
+THIRD of the narration's content words are the same words as that scene's own
+shot description (Lego chase, Peking, Senate: 33% median; documentaries
+6–14%), and the Lego chase carried 1.6 texture words per hundred against
+**0.0 in nine real scripts from the producer's own library**. Full account,
+numbers and rollback: `db/port/narration-voice/README.md`. What bites:
+
+- **Four causes, and the fourth is this file's oldest lesson again.** The
+  writer and the outline were handed the WHOLE Story Bible (1,530 words of
+  wardrobe and geometry for a 404-word script); the outline's chapter plan
+  was itself a shot list; the 09-10 profiles ASKED for it ("The sentence is a
+  SHOT", "hands, objects, weather") — the Lego film, the only one written
+  under them, has the worst numbers; and `Narration Guard`'s length FLOOR
+  (90%) sent thin drafts back to be lengthened once repetition, inventories,
+  glossary and meta were all counted, so the padding went to the one outlet
+  still unmeasured. **A guard that measures length gets length, through
+  whatever it does not measure.**
+- **The two writing prompts see a STRIPPED bible** — WHO AND WHERE: names,
+  roles, place names, object names, logline, era. Nothing visual. The full
+  bible still reaches the segmenter and every image path untouched; only
+  `Generate Outline` and `Write Full Narration` lost it.
+- **Writer rule 16 / editor rule 2b / the SHARED clause in all 11 profiles**
+  say the same thing: the voice carries intent, stake, cost, cause,
+  consequence, number; a place or time may be NAMED, never described. The
+  segmenter's rule 5 now DECIDES the shot from the event a line is about,
+  because the line no longer tells it what to draw. A silent film is the
+  exception, said in words inside `Voice Mode`'s cinematic block.
+- **Length is a CEILING now.** Writer "AT MOST 1.1×", editor "at most 1.12×
+  … otherwise LEAVE IT SHORT", guard floor 0.9 → **0.55** (only a broken
+  draft goes back for length). A film shorter than ordered is the right
+  outcome — the producer's decision, 2026-09-13.
+- **Description is COUNTED** in `Narration Guard`: texture words ≥ 0.4/100
+  and ≥ 4, or camera words ≥ 2, or ≥ 12% of sentences opening on scenery.
+  Verified on the seven films before publishing: fires on the Lego chase and
+  on Burj (all three of its hits are real — "silhouette against sea and sky",
+  "the camera enters"), silent on the documentaries and Peking.
+- **Check `guardcheck.mjs` after touching the regexes** — it reads them out
+  of the guard body, so the test and the node cannot drift. The first test
+  film found `mist\w*` matching "mistimes" (hence "mistake", "mister"); a
+  `\w*` suffix on a texture word is a false positive waiting for a story.
+- **Measured on the first film after publishing** (Claude Scripting active
+  `d5972f17`; disposable `recDNqlXH2h1A19TY`, same tone and settings as the
+  Lego chase): narration/shot overlap 33% → 21% (what remains is the
+  characters' and objects' NAMES, which are in the frame by construction),
+  texture words 1.5/100 → 0.0, scenery openers 25% → 0%, and the script came
+  in at 263 words against a 308 target — shorter than ordered, as decided.
+
 ### Evidence retrieval (Claude Scripting)
 
 Scripts on researched topics are written against a pack of sourced claims,

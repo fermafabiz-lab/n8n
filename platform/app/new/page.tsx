@@ -11,8 +11,9 @@ import { languageByCode } from "@/lib/languages";
 import { toneType } from "@/lib/tone-type";
 import SpeedPicker from "@/components/SpeedPicker";
 import VoiceTonePicker from "@/components/VoiceTonePicker";
+import StyleRefPicker from "@/components/StyleRefPicker";
 import type { HookStyleChoice, VoiceTone } from "@/lib/data/derive";
-import { HOOK_STYLES, SPEED_BY_PACE, STORYTELLER_TONE } from "@/lib/data/derive";
+import { CREATORS, HOOK_STYLES, SPEED_BY_PACE, STORYTELLER_TONE } from "@/lib/data/derive";
 
 async function submit(_prev: ActionResult | null, formData: FormData) {
   return createProject(formData);
@@ -264,6 +265,10 @@ const VOICE_LABELS: Record<string, string> = {
  */
 export default function NewVideo() {
   const [state, formAction, pending] = useActionState(submit, null);
+  // Who on the team is starting this film. Not an account — the site has one
+  // shared password — just the name that goes on the project so the four of
+  // them can see who made what.
+  const [createdBy, setCreatedBy] = useState("");
   const [name, setName] = useState("");
   const [tone, setTone] = useState("Dark");
   const [length, setLength] = useState(60);
@@ -273,6 +278,35 @@ export default function NewVideo() {
   // and a project that only ever carried "Slow" still resolves the same way.
   const [speed, setSpeed] = useState(SPEED_BY_PACE.normal);
   const pace = speed < 1 ? "Slow" : speed > 1 ? "Fast" : "Normal";
+
+  // The same person usually starts several films in a row from the same
+  // machine, so the last choice comes back pre-selected — otherwise this is
+  // one more click on every brief and the honest outcome is that nobody
+  // bothers and the score is empty. Read AFTER mount, never in the state
+  // initializer: localStorage does not exist on the server, and seeding from
+  // it there would make the first paint disagree with the hydration.
+  //
+  // It is remembered, not assumed: the chips sit at the top of the form with
+  // the current name lit, so somebody else at the same desk sees a name that
+  // is not theirs before they type a word.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("hov-created-by");
+      if (saved && (CREATORS as readonly string[]).includes(saved)) setCreatedBy(saved);
+    } catch {
+      // A private window or blocked site data: the picker simply starts empty.
+    }
+  }, []);
+
+  const pickCreator = (who: string) => {
+    setCreatedBy(who);
+    try {
+      localStorage.setItem("hov-created-by", who);
+    } catch {
+      // Not remembering is survivable; not recording it on the project is not,
+      // and that goes through the form, not through here.
+    }
+  };
   // The language as an ISO code — the picker's own currency. What n8n gets
   // is the English name, below.
   const [language, setLanguage] = useState("en");
@@ -429,6 +463,38 @@ export default function NewVideo() {
                   Everything after this happens without you — until the script
                   and the scenes come back for approval.
                 </p>
+
+                {/* Before anything about the film: who is making it. It sits
+                    above the brief rather than inside a numbered section
+                    because it is not a property of the video — it is the
+                    person at the keyboard, and it is asked once, first.
+
+                    The posted name is the whole feature: it rides the webhook
+                    into Editing Options and comes back on every card, so the
+                    four of them can see who made what. Nothing downstream
+                    reads it — no prompt, no render, no gate. */}
+                <input type="hidden" name="created_by" value={createdBy} />
+                <div className="field" style={{ marginTop: 22 }}>
+                  <label htmlFor="created_by_group">Who is making this</label>
+                  <div className="chiprow" id="created_by_group" role="group" aria-label="Who is making this">
+                    {CREATORS.map((who) => (
+                      <button
+                        type="button"
+                        key={who}
+                        className={`pchip ${createdBy === who ? "on" : ""}`}
+                        aria-pressed={createdBy === who}
+                        onClick={() => pickCreator(who)}
+                      >
+                        {who}
+                      </button>
+                    ))}
+                  </div>
+                  <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--dim)" }}>
+                    {createdBy
+                      ? `This film goes on ${createdBy}'s name. Remembered on this computer — change it if it is not you.`
+                      : "Pick your name before starting — it is what the count on the projects page is made of."}
+                  </p>
+                </div>
               </div>
 
               <section className="fsec">
@@ -559,6 +625,15 @@ export default function NewVideo() {
                       </button>
                     ))}
                   </div>
+                </div>
+                <div className="field" style={{ marginTop: 18 }}>
+                  <label>
+                    Reference scripts{" "}
+                    <span className="fhint">
+                      optional — up to 3 from your library; the writer imitates their rhythm and voice
+                    </span>
+                  </label>
+                  <StyleRefPicker tone={tone} />
                 </div>
                 <div className="field" style={{ marginTop: 18 }}>
                   <label htmlFor="style">Look</label>
@@ -1106,11 +1181,18 @@ export default function NewVideo() {
                 {/* The only way to start a film. Explicitly type="submit" —
                     the form deliberately blocks Enter, so the one control that
                     IS meant to submit should say so where a reader sees it. */}
-                <button type="submit" className="go" disabled={pending}>
+                {/* Blocked until somebody owns the film. A name that can be
+                    skipped is a name that gets skipped, and a scoreboard with
+                    holes in it is not one — so this is a gate rather than a
+                    nudge. The reason is stated right here, under the one
+                    control it stops, because the chips are a screen away. */}
+                <button type="submit" className="go" disabled={pending || !createdBy}>
                   {pending ? "Starting…" : "Start production"}
                 </button>
                 <span className="csnote">
-                  You approve the script before a single frame is rendered.
+                  {createdBy
+                    ? "You approve the script before a single frame is rendered."
+                    : "Pick who is making this at the top of the brief first."}
                 </span>
               </div>
             </aside>

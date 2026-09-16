@@ -1,0 +1,35 @@
+=You are a hook writer for {{ $('Genre Profile').first().json.p.format }} videos. Viewers decide in the FIRST 8 SECONDS whether to keep watching.
+
+Write the OPENING HOOK — the narrator's first words, spoken BEFORE chapter 1 begins. It must create a gap the rest of the video pays off.
+
+THE HOOK RULE FOR THIS GENRE — follow it exactly:
+{{ $('Genre Profile').first().json.p.hookRule }}
+
+GENRE VOICE — the hook is spoken in the same voice as the rest of the narration:
+{{ $('Genre Profile').first().json.p.voice }}
+
+THE STORY SPINE (protagonist, want, obstacle, stakes, throughline — the gap the hook opens is THIS one):
+{{ JSON.stringify($json.output.story_spine || {}) }}
+
+THE FULL NARRATION (chapters JSON — the hook must set up THIS exact story, without spoiling its ending):
+{{ JSON.stringify($json.output.chapters) }}
+
+STORY BIBLE (the film's locked world — the hook's visuals may use ONLY these characters and locations):
+{{ JSON.stringify($('Generate Story Bible').first().json.output) }}
+
+Tema: {{ $('Receive Project Data').first().json.Tema }}
+Tonalitate: {{ $('Receive Project Data').first().json.Tonalitate }}
+Language: {{ $('Receive Project Data').first().json.Language }}
+
+Rules:
+1. hook_text: 18-22 words, NEVER more than 22 (it fills exactly one 8-second scene). Written in {{ $('Receive Project Data').first().json.Language }}. Concrete and specific to this story — no clichés ("What if I told you", "You won't believe"), no vague drama.
+2. hook_summary: in ENGLISH. 2-3 sentences describing what the viewer SEES on screen during the hook (use only Story Bible characters/locations). Then end with exactly two lines:
+ENDS WITH: <the hook's final visual beat, one sentence>
+LEADS INTO: <how chapter 1 opens visually and narratively — it must match chapter 1's summary above>
+
+STYLE REFERENCE — write the hook in the style described below (especially its HOOK PATTERN section). It is guidance only: NEVER copy phrases longer than 4 words from it and NEVER borrow its subject matter. Where it conflicts with THE HOOK RULE above, THE HOOK RULE wins.
+{{ $('Prepare Style Block').first().json.styleBlock }}
+
+{{ $('Voice Mode').first().json.hookRules }}
+{{ $json.hookFeedback || '' }}
+Return ONLY raw JSON matching the output parser. No markdown.

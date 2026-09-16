@@ -35,6 +35,7 @@ import {
 } from "@/lib/provenance";
 import {
   normalizeCaptionColor,
+  normalizeCreatedBy,
   normalizeHookStyle,
   normalizeMusicLevel,
   normalizeMusicTrack,
@@ -53,6 +54,7 @@ import {
   stopExecution,
 } from "@/lib/n8n";
 import { getCategory } from "@/lib/categories";
+import { normalizeStyleRefs } from "@/lib/style-refs";
 import { attachArchiveAsset, DEFAULT_SECONDS } from "@/lib/archive/attach";
 import { detachStockFromScene, resetArchiveSuggestions } from "@/lib/data/stock";
 
@@ -2069,6 +2071,12 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
   }
 
   const payload = {
+    // Who started it. Whitelisted here AND in the orchestrator's `Normalize
+    // Webhook Input`, which is what writes it into Editing Options — the same
+    // double guard `video_model` carries, for the same reason: this string
+    // crosses a webhook body and a Code node before it reaches a screen.
+    // Posts "" when nothing was picked, which stores nothing at all.
+    created_by: normalizeCreatedBy(formData.get("created_by")) ?? "",
     "Nume Proiect": String(formData.get("name") ?? ""),
     category: String(formData.get("category") ?? "story"),
     category_options: categoryOptions,
@@ -2133,6 +2141,11 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     // the mixer takes, like sfx_level. Stored by `Normalize Webhook Input`
     // as Editing Options.musicLevel and read by Build Timeline at render.
     music_level: normalizeMusicLevel(formData.get("music_level")),
+    // Library scripts chosen as WRITING references, record ids in the order
+    // picked. Stored by Normalize as Editing Options.styleRefs and read
+    // first by /api/style-refs when Claude Scripting fetches its style rows;
+    // empty keeps the tone match the pipeline always did.
+    style_refs: normalizeStyleRefs(formData.get("style_refs")),
     // NOTE: `source_watermark` is deliberately NOT in this payload. It is the
     // one finish the site stores itself — see the write after the record is
     // confirmed, below, and the note there for why.

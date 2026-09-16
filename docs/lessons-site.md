@@ -51,6 +51,42 @@ The banner is always visible while the mode is on, because an automation that
 approves things unseen must never itself be invisible; Turn off is one click
 and every already-given approval stays.
 
+### Who made this film (2026-09-15)
+
+`Editing Options.createdBy` — one of **Alex, Dan, David, Iustin**, chosen on
+the brief above section 01 and shown at the foot of the project page, on every
+library card, in the index row, and as a per-person count under the library
+list. A scoreboard, not a user system: nobody logs in, the site has one shared
+password. **Nothing in the pipeline reads it** — no prompt, no gate, no render.
+Full account: `db/port/created-by/README.md`.
+
+- **It is stored by `Normalize Webhook Input`, NOT by a site write after
+  creation — and the reason is a live defect.** `Merge Ref Image` rebuilds the
+  WHOLE Editing Options from normalize-time state and PATCHes it back seconds
+  after the webhook answers, so anything the site merges in between is
+  overwritten. That is why `createdBy` rides the webhook body.
+  **`sourceWatermark` IS written the site way, so a film created with a
+  reference photo silently loses a refused watermark.** Not fixed: the cure is
+  making that node re-read the record instead of rebuilding. Any new key the
+  site merges right after creation has the same hole.
+- **The four names are whitelisted TWICE** — `CREATORS` in
+  `platform/lib/data/derive.ts` and the same array in the orchestrator's
+  Normalize node — because the value crosses a webhook body, a Code node and a
+  jsonb column before it reaches a card. Absent or unrecognised reads as
+  "nobody said", which is what every film made before today is.
+  **A drift between the two copies fails silently** (the brief posts a name,
+  n8n drops it, the project comes back unnamed), so
+  `npm run check:created-by` parses the whitelist out of
+  `db/port/created-by/code/orch-Normalize_Webhook_Input.js` and asserts it
+  equals `CREATORS`. 25 checks over the real derive.ts.
+- **Remembered on the computer, and the submit is GATED on it.** The last pick
+  comes back pre-selected (localStorage, read after mount — never in the state
+  initializer, or the server render and the hydration disagree), so the common
+  case is one click already made; Start production stays disabled until a name
+  is chosen, with the reason printed under the button, because a name that can
+  be skipped is a name that gets skipped and a scoreboard with holes is not
+  one.
+
 ### The site
 
 - The project page auto-refreshes every 10s, which remounts components. Drafts
@@ -338,7 +374,7 @@ and every already-given approval stays.
   (≤7 words, ≤46 chars), so a brief simply opens the film clean.
 - **The /new form's field names are a frozen contract.** `createProject()`
   posts `name, category, cat_*, cast_voices, language, length, tone, pace,
-  speed,
+  speed, created_by,
   style, voice_id, aspect, captions/hook_title/chapter_cards/end_screen/sfx
   (yes|no)` to the n8n webhook. Any redesign keeps those names and value
   vocabularies byte-identical — the 2026-08 editorial rebuild moved them into

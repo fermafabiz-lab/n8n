@@ -1,0 +1,62 @@
+// Evidence refs come from a model, so they are claims until proven: keep only
+// refs that exist in the project's evidence pack, and flag scenes that made a
+// factual claim the pack cannot back. With no research pack (fiction genres)
+// every scene is forced to no-ref/unflagged.
+const known = new Set($('Extract Claims').first().json.refs || []);
+const items = $input.all();
+// Under-delivery guard: Plan Scene Splits decided the scene count in code, so
+// a shortfall here means the segmenter dropped narration on the floor (it did
+// exactly that before the split moved into code). Nothing to auto-repair —
+// the visuals only exist for the scenes it returned — but never let it pass
+// unlogged the way it did in execution 877.
+try {
+  const planned = $('Plan Scene Splits').all().reduce((n, it) => n + (it.json.sceneCount || 0), 0);
+  if (planned && items.length < planned) {
+    console.log(`SCENE SHORTFALL: planned ${planned} scenes, segmenter returned ${items.length}. Narration was dropped.`);
+  }
+} catch (e) {}
+for (const item of items) {
+  const j = item.json;
+  const required = j.evidence_required === true && known.size > 0;
+  const cited = String(j.evidence_ref || '')
+    .toUpperCase()
+    .split(/[^E0-9]+/)
+    .filter((r) => /^E\d+$/.test(r));
+  const valid = [...new Set(cited)].filter((r) => known.has(r));
+  j.evidence_required = required;
+  j.evidence_ref = required ? valid.join(', ') : '';
+  // Required but nothing real to cite -> the model invented or omitted its
+  // source. The scene still ships; the flag routes it to human review.
+  j.needs_fact_check = required && valid.length === 0;
+}
+// Continuity fields come from the model too: a location or character name
+// that is not in the bible would attach no sheet and no plate, and the image
+// pipeline must be able to trust a tag it finds. Keep only exact bible names
+// (case- and diacritic-insensitive), drop the rest.
+try {
+  const bible = ($('Choose Bible').first().json || {}).bible || {};
+  const norm = (s) => String(s ?? '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim();
+  const canon = (list) => { const m = {}; (Array.isArray(list) ? list : []).forEach((e) => { const n = String((e || {}).name || '').trim(); if (n) m[norm(n)] = n; }); return m; };
+  const chars = canon(bible.characters), objs = canon(bible.objects), locs = canon(bible.locations);
+  const pick = (m, v) => m[norm(v)] || '';
+  for (const item of items) {
+    const j = item.json;
+    j.location = pick(locs, j.location);
+    j.characters = [...new Set((Array.isArray(j.characters) ? j.characters : []).map((c) => pick(chars, c)).filter(Boolean))];
+    j.objects = [...new Set((Array.isArray(j.objects) ? j.objects : []).map((o) => pick(objs, o)).filter(Boolean))];
+    j.time_of_day = /^(dawn|morning|day|afternoon|dusk|night|overcast|storm|interior)$/i.test(String(j.time_of_day || '')) ? String(j.time_of_day).toLowerCase() : '';
+  }
+  // Monotony, logged: 75 of the Burj Al Arab film's 86 scenes were "day" and
+  // 46 sat on one location, which is what "extremely repetitive" looked like
+  // from the inside. Nothing here can send a chapter back (the segmenter has
+  // no retry loop), but the number must not pass unlogged.
+  try {
+    const tally = (key) => { const m = {}; for (const it of items) { const v = String(it.json[key] || '') || '(none)'; m[v] = (m[v] || 0) + 1; } return Object.entries(m).sort((a, b) => b[1] - a[1]); };
+    if (items.length >= 8) {
+      const [todTop] = tally('time_of_day'), [locTop] = tally('location');
+      if (todTop && todTop[1] / items.length > 0.8) console.log('TOD MONOTONY: ' + todTop[1] + ' of ' + items.length + ' scenes in this chapter are "' + todTop[0] + '"');
+      if (locTop && locTop[0] !== '(none)' && locTop[1] / items.length > 0.9 && items.length >= 12) console.log('LOCATION MONOTONY: ' + locTop[1] + ' of ' + items.length + ' scenes on "' + locTop[0] + '"');
+    }
+  } catch (e) {}
+} catch (e) { console.log('continuity tags: bible unreadable, tags dropped — ' + e.message); for (const item of items) { item.json.location = ''; item.json.characters = []; item.json.objects = []; item.json.time_of_day = ''; } }
+return items;

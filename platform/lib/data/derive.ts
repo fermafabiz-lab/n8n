@@ -15,6 +15,7 @@
  * once.
  */
 
+import { normalizeStyleRefs } from "@/lib/style-refs";
 import type { DocumentaryVisualSource } from "@/lib/archive/types";
 import { parseEditingOptionsShape } from "@/lib/editingOptionsShape";
 import {
@@ -109,6 +110,16 @@ export interface EditingOptions {
    *  boom/whoosh/riser accents keep their own fixed levels. Meaningless
    *  while `music` is off; the switch owns silence, like sfx/sfxLevel. */
   musicLevel: number;
+  /**
+   * Library scripts the producer chose as the film's WRITING references —
+   * `hov.script_library` record ids, in the order they were picked, at most
+   * three. `/api/style-refs` puts these first when it builds the rows
+   * Claude Scripting's `Fetch Style Card` reads; empty means "match the
+   * library on the film's tone", which is all the pipeline ever did before
+   * and is why the producer's own Burj Al Arab transcript was never used
+   * for the Burj Al Arab film (it sat under a different tone label).
+   */
+  styleRefs: string[];
   /**
    * Whether the pipeline may put drawn cards in this film at all.
    *
@@ -450,6 +461,12 @@ export interface Project {
   awaitingFinalSettings: boolean;
   /** Video category id (lib/categories.ts); older projects have none. */
   category: string | null;
+  /**
+   * Which of the four team members started this project, or null when
+   * nobody said — every film made before 2026-09-15, and any row whose
+   * stored name is not on the list.
+   */
+  createdBy: Creator | null;
   /** Spoken language ("Română", "English", …) — narrows every voice picker. */
   language: string;
   /** The project's main narrator voice id (empty when none was picked). */
@@ -751,6 +768,29 @@ export interface Publishing {
 export const PUBLISHING_STATES = ["review", "ready", "posted"] as const;
 
 /**
+ * Who on the team started a film. Four names, because there are four people —
+ * this is a scoreboard, not a user system: nobody logs in, the site has one
+ * shared password, and the honest thing it can record is which of them said
+ * they were at the keyboard.
+ *
+ * A CLOSED list on purpose. It reaches the screen on every project card, and
+ * the value arrives through a webhook body, an n8n Code node and a jsonb
+ * column before it gets there — so anything that is not one of these four
+ * reads as "nobody said", exactly like every film made before today. The same
+ * four names are whitelisted in the orchestrator's `Normalize Webhook Input`,
+ * which is what actually writes the key; change one, change both.
+ */
+export const CREATORS = ["Alex", "Dan", "David", "Iustin"] as const;
+export type Creator = (typeof CREATORS)[number];
+
+/** One of the four, or null — an unknown name is not shown, never repaired. */
+export function normalizeCreatedBy(raw: unknown): Creator | null {
+  if (typeof raw !== "string") return null;
+  const v = raw.trim();
+  return (CREATORS as readonly string[]).includes(v) ? (v as Creator) : null;
+}
+
+/**
  * The Veo tiers a film may choose, with what each 8s clip costs in useapi
  * credits — measured on the account (25,050/month, no rollover), not quoted.
  * The model string reaches `Current Scene` in Media Generation verbatim, so
@@ -989,6 +1029,7 @@ export function buildProject(r: RawProject): Project {
       music: opts.music === true,
       musicTrack: normalizeMusicTrack(opts.musicTrack),
       musicLevel: normalizeMusicLevel(opts.musicLevel),
+      styleRefs: normalizeStyleRefs(opts.styleRefs),
       // On unless refused, like the other overlays: a film the pipeline found
       // nothing worth drawing in simply gets an empty list.
       drawnCards: opts.drawnCards !== false,
@@ -1028,6 +1069,9 @@ export function buildProject(r: RawProject): Project {
     },
     awaitingFinalSettings: /setari finale/.test(normalizeStatus(r.statusRaw)),
     category: typeof opts.category === "string" ? opts.category : null,
+    // Absent on every older project, which is the truthful answer rather than
+    // a default: guessing an owner would put a wrong name on somebody's score.
+    createdBy: normalizeCreatedBy(opts.createdBy),
     language: r.language,
     narratorVoice: r.voiceId,
     multiVoiceMode: typeof opts.multiVoiceMode === "string" ? opts.multiVoiceMode : "off",

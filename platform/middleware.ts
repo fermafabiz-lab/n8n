@@ -21,7 +21,10 @@ export function middleware(req: NextRequest) {
   // request carrying the right key skips the login redirect here; the route
   // checks both credentials again itself, so this is a door, not the lock.
   if (
-    (req.nextUrl.pathname.startsWith("/api/archive/") || req.nextUrl.pathname.startsWith("/api/footage/")) &&
+    (req.nextUrl.pathname.startsWith("/api/archive/") ||
+      req.nextUrl.pathname.startsWith("/api/footage/") ||
+      // Claude Scripting's `Fetch Style Card` reads its library rows here.
+      req.nextUrl.pathname === "/api/style-refs") &&
     process.env.MEDIA_INGEST_KEY &&
     req.headers.get("x-hov-key") === process.env.MEDIA_INGEST_KEY
   ) {

@@ -1,0 +1,1 @@
+{"url":"={{ 'http://web:3000/api/at/Genre%20Profiles?maxRecords=1&filterByFormula=' + encodeURIComponent(\"AND({Active}=1, LOWER({Tone})='\" + String($('Receive Project Data').first().json.Tonalitate || 'Documentary').trim().toLowerCase().replace(/'/g, \"\\\\'\") + \"')\") }}","authentication":"genericCredentialType","options":{"timeout":15000},"genericAuthType":"httpHeaderAuth"}

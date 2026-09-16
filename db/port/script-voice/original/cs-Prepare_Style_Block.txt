@@ -1,0 +1,77 @@
+// Distilled style card + a short VERBATIM excerpt from the real transcript.
+// A model imitates a real paragraph far better than a description of one:
+// descriptions produce averages, examples produce voices. Missing table, no
+// match or HTTP error all degrade to a neutral notice (the genre profile
+// carries the voice on its own).
+let block = 'No style reference available — rely on the GENRE VOICE and DRAMATIC STRUCTURE rules alone.';
+
+// The excerpt is the strongest lever there is on rhythm, and it was being cut
+// badly. Measured over all 63 active library rows as the old slice actually
+// cut them — a fixed 450-character window at 20% into the transcript, trimmed
+// back to the nearest full stops: it averaged 3.2 sentences and 323 characters,
+// 36 of the 57 usable rows produced FEWER THAN FOUR sentences, six produced
+// nothing at all, and four produced a passage more than twice as fragmentary
+// as the script it came from. One of those four is a Motivational row whose
+// excerpt runs at 25% one-to-three-word sentences against 6% for the whole
+// transcript — so the writer was shown, as this genre's voice, the single
+// paragraph least like it. The next Motivational film came back at 24.9%.
+//
+// Two rules replace the fixed window, both stated in the code below: an
+// excerpt is made of WHOLE SENTENCES and must be long enough to carry a
+// rhythm, and it must be REPRESENTATIVE of the script it is quoted from.
+// Same measurement after: 8.0 sentences and 825 characters on average, 60 of
+// 63 rows usable, none unrepresentative, none under five sentences.
+const SENTENCE = /(?<=[.!?…])\s+/;
+const wordsIn = (s) => String(s || '').split(/\s+/).filter(Boolean).length;
+const fragShare = (ss) => (ss.length ? ss.filter((s) => wordsIn(s) <= 3).length / ss.length : 0);
+const excerptOf = (raw) => {
+  const all = String(raw || '').replace(/\s+/g, ' ').trim().split(SENTENCE).map((s) => s.trim()).filter(Boolean);
+  // Under twenty sentences it is not a script we can sample: one library row
+  // is 3,407 words of unpunctuated auto-caption, which the old slice happily
+  // cut mid-clause and offered as a model of good writing.
+  if (all.length < 20) return '';
+  const baseline = fragShare(all);
+  const MAX_CHARS = 900, MIN_CHARS = 300, MIN_SENTENCES = 5;
+  let fallback = '';
+  for (let i = Math.floor(all.length * 0.2); i < all.length - MIN_SENTENCES; i += 2) {
+    const win = [];
+    let chars = 0;
+    for (let k = i; k < all.length && chars + all[k].length + 1 <= MAX_CHARS; k++) { win.push(all[k]); chars += all[k].length + 1; }
+    if (win.length < MIN_SENTENCES || chars < MIN_CHARS) continue;
+    const joined = win.join(' ');
+    // The first window that fits is kept only if nothing better turns up: an
+    // excerpt is still worth more than none, and refusing every window would
+    // silently drop a whole genre back to the description-only prompt.
+    if (!fallback) fallback = joined;
+    if (fragShare(win) <= baseline * 2 + 0.05) return joined;
+  }
+  return fallback;
+};
+
+try {
+  const j = $input.first().json || {};
+  const recs = (j.records || []).filter(r => r && r.fields);
+  if (recs.length) {
+    const f = recs[0].fields;
+    if (f['Style Card']) {
+      block = f['Style Card'];
+      if (f['Pacing WPM']) {
+        block += '\nTARGET PACING: ' + f['Pacing WPM'] + ' words per minute overall' + (f['Hook WPM'] ? (', ' + f['Hook WPM'] + ' WPM in the opening 30 seconds.') : '.');
+      }
+    }
+    // Few-shot: up to two verbatim excerpts from real transcripts of this
+    // genre. Every fetched row is a candidate rather than only the first two,
+    // because a row can now decline to produce one and the second-best row is
+    // worth more than a missing example.
+    const excerpts = [];
+    for (const r of recs) {
+      if (excerpts.length >= 2) break;
+      const e = excerptOf(r.fields['Raw Transcript']);
+      if (e) excerpts.push(e);
+    }
+    if (excerpts.length) {
+      block += '\n\nREAL EXCERPTS from scripts in this genre — match their rhythm, sentence length and directness. NEVER copy their phrases or subject matter:\n' + excerpts.map((e, i) => '«' + e + '»').join('\n---\n');
+    }
+  }
+} catch (e) {}
+return [{ json: { styleBlock: block } }];

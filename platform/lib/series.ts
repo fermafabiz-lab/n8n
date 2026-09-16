@@ -229,6 +229,12 @@ export function composeSeriesLore(s: Series, episodeNo: number, extra = ""): str
       `the same places with the same layout; the same visual style. Invent only what this episode needs, ` +
       `and give any NEW character or place a full description of its own.`,
   );
+  if (s.bible.characters.length) {
+    lines.push(
+      `USE EXACTLY THESE NAMES, spelled exactly so, for the returning cast: ${s.bible.characters.map((c) => c.name).join("; ")}.` +
+        (s.bible.locations.length ? ` And these places: ${s.bible.locations.map((l) => l.name).join("; ")}.` : ""),
+    );
+  }
   if (s.premise) lines.push(`\nTHE SHOW: ${s.premise}`);
   else if (s.bible.logline) lines.push(`\nTHE SHOW: ${s.bible.logline}`);
   if (s.bible.characters.length) {
@@ -303,5 +309,132 @@ export function seriesPrefill(s: Series, episodeNo: number): SeriesPrefill {
     speed: s.settings.speed,
     hookStyle: s.settings.hookStyle,
     videoModel: s.settings.videoModel,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Keeping a show in step with its episodes — the automatic half.
+//
+// Three things used to be the producer's to do by hand after every episode,
+// and all three happen at ONE moment now: when the episode's script is
+// approved (the bible exists, Media Generation has not started). See
+// `onEpisodeScriptApproved` in app/actions.ts.
+//   1. The writer may spell a name differently ("Pip the Fox" for "Pip").
+//      The sheets are matched by name, so the episode's references are
+//      re-keyed to the new bible's spelling where the match is unambiguous.
+//   2. A character, place or object the episode invented is added to the
+//      show, so the next episode keeps it too.
+//   3. The recap is written by the pipeline (the `series-recap` webhook).
+// ---------------------------------------------------------------------------
+
+/** Diacritics off, case off, punctuation off — for comparing names, never for showing them. */
+export const normName = (s: string): string =>
+  s
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+
+/**
+ * The one candidate a name means, or null. Exact first; then the name
+ * contained in a candidate (or containing it) as whole words, if exactly one;
+ * then the same given name, if unique on the candidate side. Anything
+ * ambiguous is null on purpose — "Boyd" must not pick one of three Boyds.
+ */
+export function matchName(want: string, candidates: string[]): string | null {
+  const w = normName(want);
+  if (!w) return null;
+  const exact = candidates.find((c) => normName(c) === w);
+  if (exact) return exact;
+  const contains = candidates.filter((c) => {
+    const n = normName(c);
+    return n.length > 2 && (` ${n} `.includes(` ${w} `) || ` ${w} `.includes(` ${n} `));
+  });
+  if (contains.length === 1) return contains[0];
+  const given = w.split(" ")[0];
+  if (given.length < 3) return null;
+  const sameGiven = candidates.filter((c) => normName(c).split(" ")[0] === given);
+  return sameGiven.length === 1 ? sameGiven[0] : null;
+}
+
+const rekey = <V,>(map: Record<string, V>, names: string[], renamed: Array<{ from: string; to: string }>): Record<string, V> => {
+  const out: Record<string, V> = {};
+  for (const [key, v] of Object.entries(map)) {
+    const to = names.includes(key) ? key : matchName(key, names);
+    // An unmatched name keeps its key: harmless (never attached) and honest.
+    const k = to ?? key;
+    if (k !== key && !(k in map)) renamed.push({ from: key, to: k });
+    if (!(k in out)) out[k] = v;
+  }
+  return out;
+};
+
+/** The episode's references re-keyed to its own bible's spelling of the names. */
+export function reconcileRefsToBible(
+  refs: SeriesRefs,
+  bible: SeriesBible,
+): { refs: SeriesRefs; renamed: Array<{ from: string; to: string }> } {
+  const renamed: Array<{ from: string; to: string }> = [];
+  const chars = bible.characters.map((c) => c.name);
+  const objs = bible.objects.map((o) => o.name);
+  const locs = bible.locations.map((l) => l.name);
+  const out: SeriesRefs = {
+    castRefs: rekey(refs.castRefs, chars, renamed),
+    castSheets: rekey(refs.castSheets, chars, []),
+    objectRefs: rekey(refs.objectRefs, objs, renamed),
+    locationRefs: rekey(refs.locationRefs, locs, renamed),
+    locationPlates: rekey(refs.locationPlates, locs, []),
+  };
+  return { refs: out, renamed };
+}
+
+/** The show's bible plus whatever this episode's bible introduced. */
+export function mergeBibles(
+  base: SeriesBible,
+  add: SeriesBible,
+): { bible: SeriesBible; added: { characters: string[]; objects: string[]; locations: string[] } } {
+  const added = { characters: [] as string[], objects: [] as string[], locations: [] as string[] };
+  const characters = [...base.characters];
+  for (const c of add.characters) {
+    if (matchName(c.name, characters.map((x) => x.name))) continue;
+    characters.push(c);
+    added.characters.push(c.name);
+  }
+  const objects = [...base.objects];
+  for (const o of add.objects) {
+    if (matchName(o.name, objects.map((x) => x.name))) continue;
+    objects.push(o);
+    added.objects.push(o.name);
+  }
+  const locations = [...base.locations];
+  for (const l of add.locations) {
+    if (matchName(l.name, locations.map((x) => x.name))) continue;
+    locations.push(l);
+    added.locations.push(l.name);
+  }
+  return {
+    bible: {
+      logline: base.logline || add.logline,
+      characters,
+      objects,
+      locations,
+      visualStyle: Object.keys(base.visualStyle).length ? base.visualStyle : add.visualStyle,
+      continuityRules: base.continuityRules.length ? base.continuityRules : add.continuityRules,
+    },
+    added,
+  };
+}
+
+/** Earlier references win: the show's own, then each episode's in order. */
+export function mergeRefs(base: SeriesRefs, add: SeriesRefs): SeriesRefs {
+  const m = <V,>(a: Record<string, V>, b: Record<string, V>) => ({ ...b, ...a });
+  return {
+    castRefs: m(base.castRefs, add.castRefs),
+    castSheets: m(base.castSheets, add.castSheets),
+    objectRefs: m(base.objectRefs, add.objectRefs),
+    locationRefs: m(base.locationRefs, add.locationRefs),
+    locationPlates: m(base.locationPlates, add.locationPlates),
   };
 }

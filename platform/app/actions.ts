@@ -34,6 +34,8 @@ import {
   insertSeries,
   updateSeriesNotes,
   updateSeriesCharacter,
+  updateSeriesBible,
+  getSeriesRefsUnion,
 } from "@/lib/data";
 import {
   composeSeriesLore,
@@ -41,6 +43,8 @@ import {
   normalizeSeriesRefs,
   normalizeSeriesSettings,
   hasAnyRefs,
+  reconcileRefsToBible,
+  mergeBibles,
   type Series,
 } from "@/lib/series";
 import {
@@ -1820,6 +1824,12 @@ export async function approveScript(
       fields["Script Content"] = content;
     }
     await writeScriptFields(scriptId, fields);
+    // An episode of a series: keep the show in step with what was just
+    // approved — before Media Generation reads the references. Never fails
+    // the approval: the show is bookkeeping, the film is the work.
+    await onEpisodeScriptApproved(projectId).catch((e) =>
+      console.warn(`series bookkeeping after approval: ${(e as Error).message}`),
+    );
     revalidatePath(`/projects/${projectId}`);
     return { ok: true, message: "Script approved — production continues." };
   } catch (e) {
@@ -2222,7 +2232,12 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     if (!series) return { ok: false, message: "That series no longer exists — start the episode from the Series page." };
     episodeNo = await nextEpisodeNo(series.id);
     payload.lore = composeSeriesLore(series, episodeNo, payload.lore);
-    (payload as Record<string, unknown>).series = { id: series.id, refs: series.refs };
+    // Every sheet the show can reuse — its own plus what later episodes drew
+    // for the characters they introduced.
+    const found: Series = series;
+    const refs = await getSeriesRefsUnion(found.id).catch(() => found.refs);
+    series = { ...found, refs };
+    (payload as Record<string, unknown>).series = { id: found.id, refs };
   }
   const projectName = payload["Nume Proiect"];
   let newProjectId: string | null = null;
@@ -2639,4 +2654,61 @@ export async function saveSeriesCharacter(
   }
   revalidatePath(`/series/${seriesId}`);
   return { ok: true, message: "Saved." };
+}
+
+/**
+ * The moment a show catches up with an episode — its script just got
+ * approved, so the Story Bible exists and Media Generation has not run.
+ *
+ * 1. RECONCILE. The sheets are attached by character name, and the writer
+ *    was told the exact names but may still have written "Pip the Fox".
+ *    Where the episode's bible spells a name differently and the match is
+ *    unambiguous, the references are re-keyed to the bible's spelling —
+ *    so Cast Sheet Prep finds them and skips drawing a new face.
+ * 2. WRITE BACK. A character, place or object this episode invented is
+ *    added to the show's bible, so the next episode keeps it. (Its sheet,
+ *    drawn later by Media Generation, is picked up by getSeriesRefsUnion.)
+ * 3. RECAP. The pipeline writes "what has happened so far" itself — the
+ *    `series-recap` webhook summarises the approved narration and appends
+ *    one dated line to the show. Fire-and-forget: the site never waits on
+ *    a model.
+ * Runs for the human's Approve and for hands-off mode alike: both go
+ * through approveScript.
+ */
+async function onEpisodeScriptApproved(projectId: string): Promise<void> {
+  const src = await getProjectSeriesSource(projectId);
+  if (!src?.seriesId) return;
+  const series = await getSeries(src.seriesId);
+  if (!series) return;
+  const bible = normalizeSeriesBible(src.storyBible);
+  if (bible.characters.length === 0 && bible.locations.length === 0) return;
+
+  const current = normalizeSeriesRefs(src.editingOptions);
+  const { refs, renamed } = reconcileRefsToBible(current, bible);
+  if (renamed.length) {
+    await updateEditingOptions(projectId, { ...refs });
+    console.log(`series ${series.id}: references re-keyed for episode ${projectId}: ${renamed.map((r) => `${r.from} → ${r.to}`).join(", ")}`);
+  }
+
+  const merged = mergeBibles(series.bible, bible);
+  const addedAny = merged.added.characters.length + merged.added.objects.length + merged.added.locations.length > 0;
+  if (addedAny) {
+    await updateSeriesBible(series.id, merged.bible);
+    console.log(`series ${series.id}: episode ${projectId} added ${JSON.stringify(merged.added)}`);
+    revalidatePath(`/series/${series.id}`);
+  }
+
+  try {
+    const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
+    const webhook = newProject?.replace(/new-project\/?$/, "series-recap");
+    if (!webhook?.includes("series-recap")) return;
+    await fetch(webhook, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project_id: projectId }),
+      signal: AbortSignal.timeout(8000),
+    });
+  } catch (e) {
+    console.warn(`series-recap webhook: ${(e as Error).message}`);
+  }
 }

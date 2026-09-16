@@ -1418,6 +1418,7 @@ export const saveScriptExample = (id: string, patch: Record<string, unknown>) =>
 // ---------------------------------------------------------------------------
 
 import {
+  mergeRefs,
   normalizeSeriesBible,
   normalizeSeriesRefs,
   normalizeSeriesSettings,
@@ -1676,4 +1677,27 @@ export async function upsertSheetMedia(m: {
        size_bytes = excluded.size_bytes, source_url = excluded.source_url`,
     [m.projectId, m.kind, m.name, m.flowId, m.path, m.contentType, m.sizeBytes, m.sourceUrl],
   );
+}
+
+/** The whole bible of a show rewritten — the write-back after an episode adds to it. */
+export async function updateSeriesBible(id: string, bible: SeriesBible): Promise<void> {
+  await query(`update hov.series set bible = $1::jsonb where id = $2`, [JSON.stringify(seriesBibleToStored(bible)), id]);
+}
+
+/**
+ * Every reference a show can reuse: its own frozen copy first, then what each
+ * episode's Media Generation drew for the characters, places and objects that
+ * episode introduced — earlier wins, so a face never changes once it exists.
+ * Computed on read rather than written back, so nothing can go stale.
+ */
+export async function getSeriesRefsUnion(seriesId: string): Promise<SeriesRefs> {
+  const s = await getSeries(seriesId);
+  if (!s) return normalizeSeriesRefs({});
+  const rows = await query<{ editing_options: unknown }>(
+    `select editing_options from hov.project where series_id = $1 order by episode_no nulls last, created_at`,
+    [seriesId],
+  );
+  let refs = s.refs;
+  for (const r of rows) refs = mergeRefs(refs, normalizeSeriesRefs(r.editing_options));
+  return refs;
 }

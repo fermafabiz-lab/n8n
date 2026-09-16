@@ -192,7 +192,10 @@ the full entry in the file named:
   Scene Standalone` (Claude Scripting), `HR Shots Prompt` (Hook Regen) and
   `VP Rewrite AI` (Media Generation). Guardrails are cheapest composed at submit
   time, where one node owns them, rather than stored in the database where
-  changing them means a backfill.
+  changing them means a backfill. The same rule now covers a TABLE: the
+  eight kids style prefixes (`KIDS_STYLES`) live in `Voice Mode` (Claude
+  Scripting), `Cast Sheet Prep` and `Set Plate Prep` (Media Generation) —
+  change one, change all three, and run `node db/port/sheet-style/check.mjs`.
 - **Editing Options fields are refuse-then-clamp, never silently coerced** —
   the `normalize*` family in `platform/lib/data/derive.ts`, fixture-tested by
   `npm run check:normalize`. A value stored by the site, read by n8n and
@@ -299,6 +302,21 @@ refresh tokens after 7 days. The "Google hasn't verified this app" warning is
 expected and harmless for an app touching only its own Drive.
 
 ## Open work
+
+- **The eight kids styles are half-shipped, and a kids film owes one look**
+  (2026-09-16, `db/port/sheet-style/README.md`). Claude Scripting carries a
+  parked draft `6e21cddc` whose only change is `Voice Mode`: the two-key
+  style prefix becomes `KIDS_STYLES` with eight keys (illustrated, crayon,
+  papercut, cel, cartoon3d, brick, clay, felt) plus a stop-motion motion
+  clause. **The site half does not exist** — `categories.ts` still offers
+  two choices, on every branch — so publishing the draft alone changes
+  nothing a producer can pick; `Voice Mode` has to be published and the
+  site choices added together. The cast sheets and set plates are already
+  drawn in the film's style (Media Generation `0f418e8e`, live) for all
+  eight keys; before that they were hard-coded photorealistic on every
+  film, including watercolour ones. **What is owed**: one kids film through
+  Media Generation — open the `castSheets` / `locationPlates` ids and
+  confirm they are in the film's medium, and count the judge's re-rolls.
 
 - **The sunbeam-dust fix has a mechanism and no outcome yet** (2026-09-15,
   `db/port/still-air/README.md`, lessons in `docs/lessons-pipeline.md` under

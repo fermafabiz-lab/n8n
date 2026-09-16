@@ -463,6 +463,38 @@ skipped` in the log). Re-hosting sheets through the media store is the fix
 when it matters. And **two sheets per shot is the cap**, the photo counting as
 one; the previous frame is the first thing dropped when slots run out.
 
+### The reference sheets were photorealistic on a drawn film (2026-09-16)
+
+The consistency chain above makes every character, object and location a
+reference picture and lets a judge re-roll any frame that disagrees with it
+(`STRICT MATCH`, "the references win"). All three sheet prompts ended,
+hard-coded, in **"Photorealistic, … sharp focus."** — and the kids category
+puts ONE mandatory style prefix at the head of every scene's `image_prompt`.
+So on a kids film the identity anchor of every character was a photograph
+and every scene was asked to be watercolour: the sheet pulls the frame toward
+photography, and a frame drawn correctly scores low against a photographic
+sheet and is re-rolled toward it. **A reference is a stronger instruction
+than any sentence in the prompt, so it must be in the film's medium.**
+Fixed in Media Generation `0f418e8e` (`Cast Sheet Prep`, `Set Plate Prep`):
+both resolve `Editing Options.category` / `categoryOptions.visual_style`
+exactly as `Voice Mode` does, open every sheet and plate prompt with the same
+prefix every scene opens with, and swap the photorealistic finish for "drawn
+in exactly that style, the same medium as every frame of the film". Every
+other category emits byte-identical requests, proved offline by
+`db/port/sheet-style/check.mjs` against a stubbed film. Found by reading the
+node, not by watching a film — whether a kids film had gone through the chain
+is unknown, and one kids film through Media Generation is the measurement
+owed. Full record: `db/port/sheet-style/README.md`.
+
+**The `KIDS_STYLES` table now has three copies** — `Voice Mode` (Claude
+Scripting), `Cast Sheet Prep`, `Set Plate Prep` — and `check.mjs` asserts
+the two in Media Generation match the Voice Mode body kept beside them. The
+strings were copied from Claude Scripting's **parked draft `6e21cddc`**, which
+carries the eight-style table (illustrated, crayon, papercut, cel, cartoon3d,
+brick, clay, felt) and a stop-motion motion clause and changes nothing else;
+the live `d0f07af5` still has the two-key version. Its site half
+(`categories.ts` choices) does not exist on any branch.
+
 ### The batch cap
 
 **Since 2026-09-01 a pass is the WHOLE film: `CAP = 200`.** Every take, then

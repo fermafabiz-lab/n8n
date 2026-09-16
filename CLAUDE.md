@@ -303,6 +303,16 @@ expected and harmless for an app touching only its own Drive.
 
 ## Open work
 
+- **Story and Kids films end on a resolution since 2026-09-16 14:03 UTC**
+  (`db/port/story-close/README.md`, lesson in `docs/lessons-pipeline.md`
+  under "The story ends on a resolution, not on its climax"). Claude
+  Scripting `31e37b3c` + Final Assembly `450fa910`: a fifth beat after the
+  climax, its own last scene, a 1.5 s / 2 s hold before the end screen; for
+  kids it is warm and overrides the tone's beat 5. Verified on two disposable
+  scripts (`recZHr8go7vcYiQZp`, `rec78haMNefc8xaWs` — delete them).
+  **Owed**: the hold has never been heard on a render, and the
+  `Rewrite Script` path (producer rejects with feedback) still carries
+  neither the spine nor these rules.
 - **The eight kids styles are live end to end since 2026-09-16 ~12:55 UTC**
   (`db/port/kids-styles/README.md` and
   `db/port/sheet-style/README.md`). Claude Scripting `6e21cddc` (`Voice

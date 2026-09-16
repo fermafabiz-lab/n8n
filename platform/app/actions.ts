@@ -301,19 +301,7 @@ export async function sceneAction(
     // a live media-generation execution being alive to notice the flag.
     // Video still rides the batch loop (it needs Flow + the mux server).
     if (action === "regenerate" && kind === "image") {
-      const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
-      const webhook =
-        process.env.N8N_IMAGE_REGEN_WEBHOOK_URL ??
-        newProject?.replace(/new-project\/?$/, "scene-image-regen");
-      if (webhook?.includes("scene-image-regen")) {
-        const res = await fetch(webhook, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ scene_id: sceneId }),
-          signal: AbortSignal.timeout(15000),
-        });
-        if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
-      }
+      await fireImageRegenWebhook(sceneId);
     }
     // Approving a picture that already has a clip means the clip is now made
     // from an image nobody approved. Nothing downstream ever compares the two
@@ -355,25 +343,9 @@ export async function regenerateVoice(
     // the scene-text rewrite: relying on a long-lived media-generation
     // execution to notice the flag means the feature dies the moment that
     // execution is stopped or finishes.
-    const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
-    const webhook =
-      process.env.N8N_VOICE_REGEN_WEBHOOK_URL ??
-      newProject?.replace(/new-project\/?$/, "scene-voice-regen");
-    if (webhook?.includes("scene-voice-regen")) {
-      const res = await fetch(webhook, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        // voice_id, when present, overrides the mode's voice rule in n8n for
-        // this one synthesis — it's the audio panel's per-scene voice choice.
-        body: JSON.stringify(
-          voiceId && voiceId.includes("_")
-            ? { scene_id: sceneId, voice_id: voiceId }
-            : { scene_id: sceneId },
-        ),
-        signal: AbortSignal.timeout(15000),
-      });
-      if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
-    }
+    // voice_id, when present, overrides the mode's voice rule in n8n for this
+    // one synthesis — it's the audio panel's per-scene voice choice.
+    await fireVoiceRegenWebhook(sceneId, voiceId);
 
     revalidatePath(`/projects/${projectId}`);
     return {
@@ -684,6 +656,66 @@ async function fireSceneRewriteWebhook(sceneId: string): Promise<void> {
     signal: AbortSignal.timeout(15000),
   });
   if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
+}
+
+/**
+ * Fire the standalone image regeneration webhook.
+ *
+ * Given one owner because the restart button below is a second caller, and a
+ * second copy of a derived-webhook rule is exactly how this family drifts:
+ * every one of them is a string-replacement of the last path segment of
+ * `N8N_NEW_PROJECT_WEBHOOK_URL`, so a copy that spells that segment
+ * differently fails against a host that answers 404.
+ *
+ * "off" means nothing is configured to receive it. The flag is written
+ * either way, and the caller says which happened rather than reporting a
+ * send that never left.
+ */
+async function fireImageRegenWebhook(sceneId: string): Promise<"sent" | "off"> {
+  const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
+  const webhook =
+    process.env.N8N_IMAGE_REGEN_WEBHOOK_URL ??
+    newProject?.replace(/new-project\/?$/, "scene-image-regen");
+  if (!webhook?.includes("scene-image-regen")) return "off";
+  const res = await fetch(webhook, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scene_id: sceneId }),
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
+  return "sent";
+}
+
+/**
+ * Fire the standalone voice re-synthesis webhook.
+ *
+ * `voiceId` is the audio panel's per-scene pin, which `VR Pick Voice` lets
+ * beat every mode rule for this one synthesis. The `_` test is the shape of a
+ * stored voice id (`elevenlabs_EXAVITQu4vr4xnSDxMaL`); anything else is a
+ * placeholder from the select and is better omitted than sent as a voice.
+ */
+async function fireVoiceRegenWebhook(
+  sceneId: string,
+  voiceId?: string,
+): Promise<"sent" | "off"> {
+  const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
+  const webhook =
+    process.env.N8N_VOICE_REGEN_WEBHOOK_URL ??
+    newProject?.replace(/new-project\/?$/, "scene-voice-regen");
+  if (!webhook?.includes("scene-voice-regen")) return "off";
+  const res = await fetch(webhook, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(
+      voiceId && voiceId.includes("_")
+        ? { scene_id: sceneId, voice_id: voiceId }
+        : { scene_id: sceneId },
+    ),
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
+  return "sent";
 }
 
 /**
@@ -1025,6 +1057,140 @@ export async function cancelVideoRegen(
     return {
       ok: true,
       message: "Cancelled — the scene keeps its current clip and is back in review.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/**
+ * Re-fire an image regeneration that never came back.
+ *
+ * Third in the family after `restartSceneRewrite` and `restartVideoRegen`,
+ * and it exists for the reason all three do: `Regenerează Imagine` is cleared
+ * from INSIDE the n8n run — by the write-back when a picture lands, by the
+ * rewrite ladder when Flow refuses for good — so a run that dies between the
+ * two strands the flag with nobody left to clear it.
+ *
+ * Re-posting is safe: the regeneration reads the scene fresh and overwrites
+ * the picture at the end, so a duplicate run costs one image and the last
+ * writer wins.
+ */
+export async function restartImageRegen(
+  projectId: string,
+  sceneId: string,
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    // Whatever is on screen right now is about to be replaced — including a
+    // picture a half-finished run already landed.
+    await autoKeep(sceneId, "image");
+    // Re-arm rather than assume: a run that got partway may have cleared the
+    // flag before dying, and the flag is what n8n matches on.
+    await writeSceneApproval(sceneId, "image", "regenerate");
+    const sent = await fireImageRegenWebhook(sceneId);
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message:
+        sent === "sent"
+          ? "Sent again — a fresh picture lands here in ~30s."
+          : "Flag re-armed, but no scene-image-regen webhook is configured here, so only a running batch can pick it up.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/**
+ * Give up on a stuck image regeneration and keep the picture that exists.
+ *
+ * Approval is deliberately NOT restored, exactly as in `cancelVideoRegen`:
+ * clearing the flag hands the scene back to review, and whether the picture
+ * on screen is good enough is the producer's call rather than this button's.
+ */
+export async function cancelImageRegen(
+  projectId: string,
+  sceneId: string,
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    // Only the flag. Unlike the video twin there is no status to rewind —
+    // `writeSceneApproval` never moves `Status Producție Scenă` for an image,
+    // and the board derives what it shows from the checkboxes anyway.
+    await writeSceneFields(sceneId, { "Regenerează Imagine": false });
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message: "Cancelled — the scene keeps its current picture and is back in review.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/**
+ * Re-fire a voice re-synthesis that never came back.
+ *
+ * `voiceId` carries the panel's per-scene pin forward: the select the
+ * producer chose before pressing Regenerate is still on screen beside this
+ * button, and dropping it on the retry would quietly hand the line back to
+ * the mode's default voice — a different narrator for one scene, which is the
+ * kind of thing only a full listen catches.
+ *
+ * The narration is deliberately NOT re-sent. It is already stored, and every
+ * writer of `Script Scenă` has to invalidate the take that was recorded from
+ * it — a restart changes nothing about the line, so it must not become a
+ * fourth writer of one.
+ */
+export async function restartVoiceRegen(
+  projectId: string,
+  sceneId: string,
+  voiceId?: string,
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    await requestVoiceRegen(sceneId);
+    const sent = await fireVoiceRegenWebhook(sceneId, voiceId);
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message:
+        sent === "sent"
+          ? "Sent again — a new take is synthesized in ~30-60s (the page refreshes itself)."
+          : "Flag re-armed, but no scene-voice-regen webhook is configured here, so only a running batch can pick it up.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/**
+ * Give up on a stuck re-synthesis and keep the take that exists.
+ *
+ * Only the in-flight flag is cleared. Asking for the regeneration also
+ * withdrew the voice and video approvals (`requestVoiceRegen`), and those
+ * stay withdrawn: the take is listened to and signed off, or asked for again.
+ */
+export async function cancelVoiceRegen(
+  projectId: string,
+  sceneId: string,
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    await writeSceneFields(sceneId, { "Regenerează Voce": false });
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message: "Cancelled — the scene keeps its current take and is back in review.",
     };
   } catch (e) {
     return { ok: false, message: friendlyError(e) };

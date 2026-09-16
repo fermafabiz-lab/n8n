@@ -356,9 +356,11 @@ the winner depend on row order.
 
 The site sets a regen flag, n8n clears it from inside the execution, and any
 death in between strands it — with the UI showing the in-flight state *instead
-of* the button row. Each flag needed a hand-built escape hatch and two still
-have none. Every flag now has a `*_at` timestamp, so staleness is one rule for
-all of them, including ones added later:
+of* the button row. Each flag needed a hand-built escape hatch, and since
+2026-09-16 all five have one (the table is in `CLAUDE.md`). The query stays
+worth having: an exit only helps the producer who is looking at that scene,
+and this finds the ones nobody opened. Every flag has a `*_at` timestamp, so
+staleness is one rule for all of them, including ones added later:
 
 ```sql
 where regen_image and regen_image_at < now() - interval '10 minutes'

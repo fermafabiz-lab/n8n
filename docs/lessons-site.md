@@ -872,6 +872,33 @@ Full account: `db/port/created-by/README.md`.
   add a state whose exit is written by someone else, ask not only whether it
   HAS a local exit but whether that exit is on screen at the moment it is
   needed.
+- **The escape hatches are a family now, and it is closed** (2026-09-16). The
+  image and voice badges were the last two dead ends: `RegenBadge` replaces
+  the whole button row, so a stranded `Regenerează Imagine` hid Approve, Save
+  draft, Regenerate and the archive picker, and a stranded `Regenerează Voce`
+  hid Approve, the per-scene voice select and Regenerate. Both now render the
+  badge and the same pair every other in-flight state carries — "⟳ Send it
+  again" / "Cancel — keep this picture|take" (`restartImageRegen` /
+  `cancelImageRegen`, `restartVoiceRegen` / `cancelVoiceRegen`). Three things
+  are worth copying into the sixth one:
+  - **Re-arm the flag, do not assume it.** A run that got partway may have
+    cleared it before dying, and the flag is what n8n's loop matches on. The
+    restart writes it again, then fires the webhook.
+  - **Carry the pin.** The voice retry passes `voiceSel[s.id]` back, because
+    the producer's per-scene voice choice is on screen right beside the
+    button and a retry that dropped it would bring the line back in the
+    mode's default voice — a different narrator for one scene, which only a
+    full listen catches.
+  - **The restart says which of the two things happened.** A derived webhook
+    that is not configured is not a send, so the action returns "sent" or
+    "off" and the message tells the truth rather than promising a run that
+    never left. Same honesty as `restartVideoRegen`'s three-way message.
+  Both webhook URLs also got ONE owner each (`fireImageRegenWebhook`,
+  `fireVoiceRegenWebhook` in `actions.ts`) rather than a second inline copy
+  of the string-replacement rule — the seven site webhooks are all derived
+  from `N8N_NEW_PROJECT_WEBHOOK_URL` by swapping the last path segment, and a
+  copy that spells that segment differently fails silently against a host
+  that answers 404.
 - `ProductionActivity` (project page) mirrors the batch rule from `Sort & Cap
   Scenes`: a scene is done for the batch once its clip exists, pending scenes
   sort first, and `MEDIA_BATCH_CAP` in `platform/lib/n8n.ts` is a display

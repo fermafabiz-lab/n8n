@@ -20,6 +20,18 @@ const vm = table(read('paste/Voice Mode.cs-draft-6e21cddc.js'));
 for (const n of ['Cast Sheet Prep', 'Set Plate Prep']) assert.equal(table(read(`paste/${n}.after.js`)), vm, `${n}: KIDS_STYLES differs from Voice Mode`);
 console.log('KIDS_STYLES: identical in Voice Mode, Cast Sheet Prep, Set Plate Prep (' + (vm.match(/^\s+\w+: /gm) || []).length + ' keys)');
 
+// --- and the site offers exactly those keys, in that order ---
+// (the fourth copy: a value the producer can pick that Voice Mode does not
+// know falls back to illustrated silently, and a key Voice Mode knows that
+// the site cannot pick is dead weight)
+const tableKeys = (vm.match(/^\s+(\w+): /gm) || []).map((m) => m.trim().replace(/:.*$/, ''));
+const site = readFileSync(join(here, '../../../platform/lib/categories.ts'), 'utf8');
+const block = site.match(/name: "visual_style",[\s\S]*?choices: \[([\s\S]*?)\]/);
+assert.ok(block, 'categories.ts: visual_style choices not found');
+const siteKeys = [...block[1].matchAll(/value: "(\w+)"/g)].map((m) => m[1]);
+assert.deepEqual(siteKeys, tableKeys, 'categories.ts visual_style choices differ from KIDS_STYLES keys');
+console.log('categories.ts: visual_style offers the same ' + siteKeys.length + ' keys in the same order');
+
 // --- a stub of what the nodes read ---
 const bible = { characters: [
   { name: 'Sam Boyd', role: 'protagonist', visual_description: 'a tall man in a grey coat' },

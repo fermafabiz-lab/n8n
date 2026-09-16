@@ -129,11 +129,23 @@ export const CATEGORIES: Category[] = [
       {
         name: "visual_style",
         label: "Visual style",
-        hint: "Storybook is soft watercolor illustration, like a picture book. 3D animation is the rounder, more realistic look of modern animated films for kids — realistic visually, never in the story.",
+        hint: "The look of every frame — every scene, character sheet and set plate opens with it. Storybook is soft watercolour like a picture book; 3D animation is the rounder look of modern animated films — realistic visually, never in the story. Brick, clay and felt are animated as stop motion: small deliberate steps rather than smooth glides.",
         type: "select",
+        // One flat list, not medium × technique: "2D claymation" and "3D
+        // watercolour" are not things. The values are the keys of
+        // KIDS_STYLES in Claude Scripting's Voice Mode (and its two copies
+        // in Media Generation) — db/port/sheet-style/check.mjs asserts this
+        // list matches them, so add a style there first. No brand is ever
+        // named: "brick-built" is the toy, not the company.
         choices: [
-          { value: "illustrated", label: "Storybook — illustrated" },
+          { value: "illustrated", label: "Storybook — soft watercolour" },
+          { value: "crayon", label: "Crayon and chalk — drawn by a child" },
+          { value: "papercut", label: "Paper cut-out — layered collage" },
+          { value: "cel", label: "Classic 2D — hand-painted cel animation" },
           { value: "cartoon3d", label: "3D animation — more realistic" },
+          { value: "brick", label: "Brick-built — plastic toy bricks" },
+          { value: "clay", label: "Clay stop-motion — plasticine" },
+          { value: "felt", label: "Felt and wool — soft toys" },
         ],
         default: "illustrated",
       },

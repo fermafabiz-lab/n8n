@@ -303,20 +303,23 @@ expected and harmless for an app touching only its own Drive.
 
 ## Open work
 
-- **The eight kids styles are half-shipped, and a kids film owes one look**
-  (2026-09-16, `db/port/sheet-style/README.md`). Claude Scripting carries a
-  parked draft `6e21cddc` whose only change is `Voice Mode`: the two-key
-  style prefix becomes `KIDS_STYLES` with eight keys (illustrated, crayon,
-  papercut, cel, cartoon3d, brick, clay, felt) plus a stop-motion motion
-  clause. **The site half does not exist** — `categories.ts` still offers
-  two choices, on every branch — so publishing the draft alone changes
-  nothing a producer can pick; `Voice Mode` has to be published and the
-  site choices added together. The cast sheets and set plates are already
-  drawn in the film's style (Media Generation `0f418e8e`, live) for all
-  eight keys; before that they were hard-coded photorealistic on every
-  film, including watercolour ones. **What is owed**: one kids film through
-  Media Generation — open the `castSheets` / `locationPlates` ids and
-  confirm they are in the film's medium, and count the judge's re-rolls.
+- **The eight kids styles are live in n8n; the site half waits on the trunk**
+  (2026-09-16, `db/port/kids-styles/README.md` and
+  `db/port/sheet-style/README.md`). Claude Scripting `6e21cddc` (`Voice
+  Mode`: `KIDS_STYLES` with eight keys — illustrated, crayon, papercut, cel,
+  cartoon3d, brick, clay, felt — and a stop-motion motion clause for
+  clay/brick/felt) and Media Generation `0f418e8e` (cast sheets and set
+  plates drawn in the film's style instead of hard-coded photorealistic)
+  are both published. `platform/lib/categories.ts` offers the eight choices
+  on `claude/intelligent-dirac-1w5gbx`; **until that is merged into
+  `claude/hello-7o90qh` the producer still sees two.** The list has four
+  copies (Voice Mode, Cast Sheet Prep, Set Plate Prep, categories.ts) and
+  `node db/port/sheet-style/check.mjs` asserts all four agree. **What is
+  owed**: the first film in each new style — `clay` for whether the
+  stop-motion clause reads as stop motion rather than smooth CGI over a
+  clay-looking still, `brick` for content refusals — and one kids film's
+  `castSheets` / `locationPlates` opened to confirm they are in the film's
+  medium.
 
 - **The sunbeam-dust fix has a mechanism and no outcome yet** (2026-09-15,
   `db/port/still-air/README.md`, lessons in `docs/lessons-pipeline.md` under

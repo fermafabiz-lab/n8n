@@ -489,11 +489,11 @@ owed. Full record: `db/port/sheet-style/README.md`.
 **The `KIDS_STYLES` table now has three copies** — `Voice Mode` (Claude
 Scripting), `Cast Sheet Prep`, `Set Plate Prep` — and `check.mjs` asserts
 the two in Media Generation match the Voice Mode body kept beside them. The
-strings were copied from Claude Scripting's **parked draft `6e21cddc`**, which
-carries the eight-style table (illustrated, crayon, papercut, cel, cartoon3d,
-brick, clay, felt) and a stop-motion motion clause and changes nothing else;
-the live `d0f07af5` still has the two-key version. Its site half
-(`categories.ts` choices) does not exist on any branch.
+strings were copied from Claude Scripting's then-parked draft `6e21cddc` —
+the eight-style table (illustrated, crayon, papercut, cel, cartoon3d, brick,
+clay, felt) plus a stop-motion motion clause — **published later the same
+day**, with the site's choices added in `categories.ts` and a fourth
+lockstep assertion in the same check; see `db/port/kids-styles/README.md`.
 
 ### The batch cap
 
@@ -1261,6 +1261,16 @@ until a first test film is judged. How each piece works:
   usual "absent = each voice's own settings", which stays the rule everywhere
   else.
 - **No length cap** — the producer refused one explicitly.
+- **Eight styles since 2026-09-16, one flat list** (`db/port/kids-styles/`):
+  the two originals plus crayon, papercut, cel (2D) and brick, clay, felt
+  (3D), each a POSITIVE noun phrase, never a brand. Not medium × technique —
+  "2D claymation" and "3D watercolour" are not things, so each label carries
+  its own dimension. Stop motion is a CADENCE, not a texture: Veo renders
+  smooth 24 fps whatever the still looks like, so for clay/brick/felt the
+  segmenter gets a fourth rule asking for small deliberate steps and a
+  pose-to-pose snap in every motion prompt. Unverified on a real clip. The
+  prefix also heads every cast sheet and set plate (see the sheet entry
+  under consistency), which is why the list lives in four places.
 
 ### The hook is a teaser — six styles, one shot per beat, a plan the site can rewrite (2026-09-11)
 

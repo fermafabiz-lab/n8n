@@ -31,6 +31,16 @@ export interface Category {
   /** No spoken words at all: no narrator picker, no TTS, captions forced
    *  off — the film carries only its own sound effects. */
   noNarration?: boolean;
+  /**
+   * The narrator this category picks by itself, as the prefixed id the
+   * picker stores — selected on screen the moment the category is chosen,
+   * so the producer sees who will read and can change it like any other
+   * voice. Only an untouched picker follows it. Absent = the picker's own
+   * default. A film in another language still gets the language's own
+   * list: a voice that does not speak it is replaced by the first that
+   * does, exactly as the picker already does for a typed choice.
+   */
+  narratorVoice?: string;
   options: CategoryOption[];
 }
 
@@ -114,6 +124,11 @@ export const CATEGORIES: Category[] = [
     description:
       "A story written and drawn for young children: picture-book visuals, a warm storyteller voice, slower narration with longer breaths between scenes.",
     ready: true,
+    // George — ElevenLabs' own "Warm, Captivating Storyteller", the one voice
+    // in the library labelled narrative_story in English. Read with the
+    // Storyteller tone (STORYTELLER_TONE in derive.ts), which the brief
+    // selects alongside it.
+    narratorVoice: "elevenlabs_JBFqnCBsd6RMkjVDRZzb",
     options: [
       {
         name: "narration_pace",

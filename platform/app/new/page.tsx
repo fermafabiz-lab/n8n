@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { createProject, type ActionResult } from "@/app/actions";
 import CategoryPicker, { type CategoryMeta } from "@/components/CategoryPicker";
 import { DEFAULT_CATEGORY, getCategory } from "@/lib/categories";
@@ -12,7 +12,7 @@ import { toneType } from "@/lib/tone-type";
 import SpeedPicker from "@/components/SpeedPicker";
 import VoiceTonePicker from "@/components/VoiceTonePicker";
 import type { HookStyleChoice, VoiceTone } from "@/lib/data/derive";
-import { HOOK_STYLES, SPEED_BY_PACE } from "@/lib/data/derive";
+import { HOOK_STYLES, SPEED_BY_PACE, STORYTELLER_TONE } from "@/lib/data/derive";
 
 async function submit(_prev: ActionResult | null, formData: FormData) {
   return createProject(formData);
@@ -315,6 +315,23 @@ export default function NewVideo() {
   /** How the narrator reads. `null` — the default — sends nothing and leaves
    *  whatever voice is picked reading as it already does. */
   const [voiceTone, setVoiceTone] = useState<VoiceTone | null>(null);
+  // Kids story reads like a storyteller by default — and says so. Choosing
+  // the category selects the Storyteller preset in the control below, where
+  // the producer can see it and change it; leaving the category puts the
+  // control back to "Voice default". Only an untouched control moves either
+  // way: a tone the producer chose is theirs, whatever the category does.
+  // `createProject` keeps the same default as a backstop for a form that
+  // never rendered the control, from the same constant.
+  useEffect(() => {
+    const isStoryteller = (t: VoiceTone | null) =>
+      !!t && t.stability === STORYTELLER_TONE.stability && t.similarity === STORYTELLER_TONE.similarity &&
+      t.style === STORYTELLER_TONE.style && t.speakerBoost === STORYTELLER_TONE.speakerBoost;
+    if (category === "kids" && voiceTone === null) setVoiceTone(STORYTELLER_TONE);
+    else if (category !== "kids" && isStoryteller(voiceTone)) setVoiceTone(null);
+    // Runs on the category, not on the tone: a producer switching the tone
+    // away and back must not be fought by this effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category]);
   const [catMeta, setCatMeta] = useState<CategoryMeta>({
     category: DEFAULT_CATEGORY,
     categoryLabel: getCategory(DEFAULT_CATEGORY).label,

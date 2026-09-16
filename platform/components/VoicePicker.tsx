@@ -28,6 +28,9 @@ interface Voice {
  * no longer shows: a control that cannot change the outcome reads as a
  * decision, and this one read as a wrong one.
  */
+/** Bella — the narrator every form has opened on since the picker existed. */
+const DEFAULT_VOICE = "elevenlabs_hpp4J3VqNfWAUOO0d1Us";
+
 export default function VoicePicker({
   name = "voice_id",
   label = "Narrator voice — press ▶ to listen",
@@ -41,6 +44,7 @@ export default function VoicePicker({
   onToggle,
   chipLabel = "cast",
   language = "",
+  preferred,
 }: {
   name?: string;
   label?: string;
@@ -59,16 +63,34 @@ export default function VoicePicker({
    * language to offer gets.
    */
   language?: string;
+  /**
+   * The voice the current category would like — Kids story asks for its
+   * storyteller. Followed only while the producer has not clicked a voice
+   * themselves, and only by the form's own uncontrolled single picker; an
+   * empty value hands the picker back its historical default.
+   */
+  preferred?: string;
 }) {
   const [q, setQ] = useState("");
   const [voices, setVoices] = useState<Voice[]>([]);
-  const [internal, setInternal] = useState("elevenlabs_hpp4J3VqNfWAUOO0d1Us");
+  const [internal, setInternal] = useState(DEFAULT_VOICE);
   const controlled = onChange !== undefined;
   const selected = controlled ? (value ?? "") : internal;
+  /** True once the producer has clicked a voice: from then on the category's
+   *  preference is advice they have already overruled. */
+  const touched = useRef(false);
   const setSelected = (id: string) => {
     if (multi) return onToggle?.(id);
+    touched.current = true;
     return controlled ? onChange!(id) : setInternal(id);
   };
+  // The category's own narrator, until the producer picks one. Switching to
+  // Kids story selects the storyteller; switching away returns the default —
+  // and a voice the producer clicked stays whatever the category does.
+  useEffect(() => {
+    if (controlled || multi || touched.current) return;
+    setInternal(preferred || DEFAULT_VOICE);
+  }, [preferred, controlled, multi]);
   const isSelected = (id: string) =>
     multi ? (selectedIds ?? []).includes(id) : selected === id;
   const [playing, setPlaying] = useState<string | null>(null);

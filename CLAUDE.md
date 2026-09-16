@@ -319,7 +319,10 @@ expected and harmless for an app touching only its own Drive.
   stop-motion clause reads as stop motion rather than smooth CGI over a
   clay-looking still, `brick` for content refusals — and one kids film's
   `castSheets` / `locationPlates` opened to confirm they are in the film's
-  medium.
+  medium. Same branch: Kids story now visibly selects George as narrator
+  and the "Storyteller" tone preset on the brief (`STORYTELLER_TONE`, one
+  owner in `derive.ts`) — the tone had been a silent server-side default
+  since 09-08, which the producer read as "no storyteller voice".
 
 - **The sunbeam-dust fix has a mechanism and no outcome yet** (2026-09-15,
   `db/port/still-air/README.md`, lessons in `docs/lessons-pipeline.md` under

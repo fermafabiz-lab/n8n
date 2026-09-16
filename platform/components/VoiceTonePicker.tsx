@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { VoiceTone } from "@/lib/data/derive";
+import { STORYTELLER_TONE, type VoiceTone } from "@/lib/data/derive";
 
 /**
  * How the narrator reads — ElevenLabs' generation settings, as a choice a
@@ -78,6 +78,12 @@ const PRESETS: { key: string; label: string; note: string; tone: VoiceTone | nul
     label: "Expressive",
     note: "more colour and movement; occasional surprises",
     tone: { stability: 0.3, similarity: 0.75, style: 0.35, speakerBoost: true },
+  },
+  {
+    key: "storyteller",
+    label: "Storyteller",
+    note: "warm and a little playful — a bedtime read for young children; what Kids story picks by itself",
+    tone: STORYTELLER_TONE,
   },
   {
     key: "theatrical",

@@ -1271,6 +1271,26 @@ until a first test film is judged. How each piece works:
   pose-to-pose snap in every motion prompt. Unverified on a real clip. The
   prefix also heads every cast sheet and set plate (see the sheet entry
   under consistency), which is why the list lives in four places.
+- **The storyteller was a silent server-side default, and the producer
+  could not see it (2026-09-16).** "When I click Kids story it used to pick a
+  voice" — it never did. Since 09-08 `createProject` added a storyteller
+  `voice_tone` only when the form posted none, so nothing on the brief
+  changed when the category did, and the numbers matched no preset, so the
+  audio step showed "custom". Now one owner, `STORYTELLER_TONE` in
+  `derive.ts`, read by three places: the brief SELECTS it in the Voice
+  character control the moment Kids story is chosen (and clears it on the
+  way out — only an untouched control moves), the picker offers it as the
+  "Storyteller" preset so the audio step names it, and `createProject` keeps
+  it as the backstop for a form that never rendered the control. The
+  NARRATOR moves too: `Category.narratorVoice` (kids: George,
+  `elevenlabs_JBFqnCBsd6RMkjVDRZzb`, ElevenLabs' own "Warm, Captivating
+  Storyteller" and the one English voice labelled `narrative_story` in the
+  account's library of 22) is followed by the form's single picker until the
+  producer clicks a voice. A Romanian kids film still gets the language's
+  own list — the picker's existing "selection must be in the list" rule
+  swaps George for the first Romanian voice, which today is Mihai, also
+  `narrative_story`. A default the producer cannot see is a default they
+  will report as missing.
 
 ### The hook is a teaser — six styles, one shot per beat, a plan the site can rewrite (2026-09-11)
 

@@ -42,6 +42,7 @@ import {
   normalizeSpeed,
   normalizeVideoModel,
   normalizeVoiceTone,
+  STORYTELLER_TONE,
   type VoiceTone,
 } from "@/lib/data/derive";
 import {
@@ -2154,16 +2155,13 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
       payload.speed = categoryOptions.narration_pace === "very_slow" ? 0.8 : 0.9;
       payload.Pace = "Slow";
     }
-    // A warm storyteller default for the voice, only when the producer left
-    // the tone on "Voice default" — visible and changeable at the audio step
-    // like any chosen tone, unlike the silent absence it replaces.
+    // The storyteller read, when the form posted no tone for a kids film.
+    // The brief already selects it on screen the moment Kids story is chosen,
+    // so this is the backstop for a form that never rendered the control —
+    // the same numbers, from the same owner, so the audio step still names
+    // it "Storyteller" rather than "custom".
     if (!voiceTone) {
-      (payload as { voice_tone?: VoiceTone }).voice_tone = {
-        stability: 0.35,
-        similarity: 0.75,
-        style: 0.4,
-        speakerBoost: true,
-      };
+      (payload as { voice_tone?: VoiceTone }).voice_tone = STORYTELLER_TONE;
     }
   }
   // A no-narration category has nothing to speak and nothing to caption —

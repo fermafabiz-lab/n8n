@@ -216,12 +216,26 @@ export const FootageSearchBody = z.object({
 });
 
 // app/api/media/ingest
-export const MediaIngestBody = z.object({
-  sceneId: RecordId,
-  field: z.enum(["image", "video", "image_version"]),
-  url: z.string().regex(/^https?:\/\//i, "bad url"),
-  fields: z.record(z.string(), z.unknown()).optional(),
-});
+export const MediaIngestBody = z.discriminatedUnion("field", [
+  z.object({
+    sceneId: RecordId,
+    field: z.enum(["image", "video", "image_version"]),
+    url: z.string().regex(/^https?:\/\//i, "bad url"),
+    fields: z.record(z.string(), z.unknown()).optional(),
+  }),
+  // A reference sheet (a character turnaround or portrait, an object sheet, a
+  // set plate) — bound to a PROJECT and a name, not a scene, and keyed by the
+  // Flow id it carries in Editing Options. Media Generation posts one right
+  // after making it, while Flow's signed URL is still alive (db/012).
+  z.object({
+    field: z.literal("sheet"),
+    projectId: RecordId,
+    kind: z.enum(["cast", "object", "location"]),
+    name: z.string().trim().min(1).max(200),
+    flowId: z.string().trim().min(6).max(200),
+    url: z.string().regex(/^https?:\/\//i, "bad url"),
+  }),
+]);
 
 // app/api/media
 export const MediaQuery = z.object({

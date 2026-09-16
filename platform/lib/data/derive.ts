@@ -466,6 +466,10 @@ export interface Project {
    * cast voice, which is how every project behaved before this existed.
    */
   chapterVoices: Record<string, string>;
+  /** The show this film is an episode of, or null (lib/series.ts). */
+  seriesId: string | null;
+  /** Its number in that show; 1 is the film the series was started from. */
+  episodeNo: number | null;
 }
 
 /**
@@ -583,6 +587,9 @@ export interface RawProject {
   /** The creation form's PACE choice ("Slow" | "Normal" | "Fast"). It is the
    *  DEFAULT for editing.speed — see the fallback in buildProject. */
   paceRaw?: unknown;
+  /** The show this film is an episode of (db/012), and its number in it. */
+  seriesId?: string | null;
+  episodeNo?: number | null;
 }
 
 export interface RawScene {
@@ -974,6 +981,8 @@ export function buildProject(r: RawProject): Project {
     aspect: r.aspectRaw === "9:16" ? "9:16" : "16:9",
     updatedAt: r.createdAt,
     coverUrl: r.coverUrl ?? null,
+    seriesId: r.seriesId ?? null,
+    episodeNo: Number.isInteger(r.episodeNo) && (r.episodeNo as number) > 0 ? (r.episodeNo as number) : null,
     editing: {
       captions: r.noCaptions !== true,
       hookStyle: normalizeHookStyle(opts.hookStyle),

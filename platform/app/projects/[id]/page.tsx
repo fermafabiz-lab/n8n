@@ -477,6 +477,14 @@ export default async function ProductionRoom({
               <div className="eyebrow" style={{ marginBottom: 16 }}>
                 <Link href="/projects">Projects</Link>
                 <span style={{ color: "var(--dim)" }}>/</span>
+                {project.seriesId && (
+                  <>
+                    <Link href={`/series/${project.seriesId}`}>
+                      Series{project.episodeNo ? ` · episode ${project.episodeNo}` : ""}
+                    </Link>
+                    <span style={{ color: "var(--dim)" }}>/</span>
+                  </>
+                )}
                 {/* The status as a pill with a dot that pulses only while
                     something is moving. It replaced a bare ● in the crumb
                     line: same information, but it now reads as the state of
@@ -513,6 +521,13 @@ export default async function ProductionRoom({
                   at the very bottom. */}
               <RoughCutButton scenes={scenes} portrait={project.aspect === "9:16"} />
               <NotifyChip />
+              {/* A finished film can become episode 1 of a show — its bible
+                  and its reference sheets are what a series is made of. */}
+              {!project.seriesId && project.statusKind === "done" && (
+                <Link href={`/series?from=${id}`} className="pj-ghost">
+                  Start a series from this film
+                </Link>
+              )}
               {/* Counted off the same pipeline() states the stepper draws, so
                   the bar can never claim a stage the cards do not show as
                   done. Only shown once there are scenes: before that every

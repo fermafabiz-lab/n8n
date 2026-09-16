@@ -1651,3 +1651,34 @@ then the device flipped under it — with the attribute, the cookie, the
 **Rule from here: a colour literal in `globals.css` or a module sheet needs a
 sentence saying which both-theme surface it sits on.** Anything else is a
 token, and a token is one `light-dark()` — never a second block.
+
+### Series — the same cast, film after film (2026-09-16)
+
+A series is a film's Story Bible and its consistency references hoisted above
+the project and copied back down on each episode (`db/port/series/README.md`
+has the whole mechanism). What the site learned building it:
+
+- **Nothing in n8n knows what a series is, on purpose.** The bible rides to
+  Claude Scripting as Lore — the canon input `Generate Story Bible` already
+  treats as ground truth — and the reference sheets ride as the five Editing
+  Options keys `Cast Sheet Prep` / `Set Plate Prep` already skip. One
+  orchestrator node (`Normalize Webhook Input`) stores them from the payload.
+- **A key the site writes after creation is not safe on a film with a
+  reference photo**: `Merge Ref Into Options` rebuilds the whole blob from
+  Normalize's value. `createdBy` learned this first; series refs are stored
+  by Normalize for the same reason, and the site's post-create merge is only
+  a backstop.
+- **A face needs bytes.** `castSheets[name].url` is a signed Flow link that
+  dies within hours, so the series page can only show a portrait we copied
+  while it was alive — `hov.sheet_media`, via `/api/media/ingest` with
+  `field: "sheet"`. Until Media Generation posts each new sheet there, a show
+  shows initials and says why.
+- **`/new` is a server page with a client form now** (`page.tsx` reads
+  `?series=` and passes a plain `SeriesPrefill`; the old page is
+  `NewVideoForm.tsx`, unchanged in what it posts). Every posted field name is
+  the same; `series_id` is the one addition, and it is read only by
+  `createProject`.
+- **The series is a COPY, frozen.** Starting it from a film copies the bible,
+  the refs and the settings; a later change to that film changes nothing in
+  the show. Editing a character's description on the series page rewrites
+  the copy, which is what the next episode reads.

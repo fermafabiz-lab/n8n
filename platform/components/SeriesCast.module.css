@@ -1,0 +1,255 @@
+/* The cast of a show — portraits first, because a face is what a series is.
+   Every colour is a token from globals.css, so the night flips it. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.portrait {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  background: var(--card2);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+/* A turnaround is four views in a row — show it whole, not one face cropped
+   out of the middle of it. */
+.portrait.wide img {
+  object-fit: contain;
+  background: var(--card2);
+}
+.initials {
+  font-family: var(--f-display), Georgia, serif;
+  font-size: 44px;
+  color: var(--dim);
+  letter-spacing: 0.02em;
+}
+.body {
+  padding: 14px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.name {
+  font-family: var(--f-display), Georgia, serif;
+  font-size: 19px;
+  margin: 0;
+  line-height: 1.15;
+}
+.role {
+  font-family: var(--f-mono), ui-monospace, Menlo, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.desc {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--soft);
+  margin: 4px 0 0;
+}
+.kind {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  font-family: var(--f-mono), ui-monospace, Menlo, monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  color: var(--dim);
+}
+.edit {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.edit textarea, .edit input {
+  width: 100%;
+  font: inherit;
+  font-size: 13px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card2);
+  color: var(--ink);
+  resize: vertical;
+}
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.linkish {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--dim);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.plates {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+.plate {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+.plate .portrait {
+  aspect-ratio: 16 / 9;
+}
+.episodes {
+  display: flex;
+  flex-direction: column;
+}
+.episode {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 12px 2px;
+  border-bottom: 1px solid var(--line);
+  color: inherit;
+  text-decoration: none;
+}
+.episode:first-child { border-top: 1px solid var(--line); }
+.episode .thumb {
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  background: var(--card2);
+  overflow: hidden;
+}
+.episode .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.episode .no {
+  font-family: var(--f-mono), ui-monospace, Menlo, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.episode .title { font-size: 15px; margin: 2px 0 0; }
+.notes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+.notes label {
+  display: block;
+  font-family: var(--f-mono), ui-monospace, Menlo, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 6px;
+}
+.notes textarea, .notes input {
+  width: 100%;
+  font: inherit;
+  font-size: 13.5px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink);
+  resize: vertical;
+}
+.seriesgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 18px;
+}
+.seriescard {
+  display: block;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 18px 18px 16px;
+  color: inherit;
+  text-decoration: none;
+  transition: transform 0.15s;
+}
+.seriescard:hover { transform: translateY(-3px); }
+.faces {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.faces .face {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--card2);
+  border: 1px solid var(--line);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  font-family: var(--f-display), Georgia, serif;
+  font-size: 17px;
+  color: var(--dim);
+}
+.faces .face img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.starter {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 20px;
+  display: grid;
+  gap: 12px;
+}
+.starter select, .starter input {
+  width: 100%;
+  font: inherit;
+  font-size: 13.5px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card2);
+  color: var(--ink);
+}
+.hint {
+  font-size: 12.5px;
+  color: var(--dim);
+  line-height: 1.5;
+  margin: 0;
+}
+.banner {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: 14px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--card2);
+  margin-bottom: 22px;
+}
+.banner b { font-family: var(--f-display), Georgia, serif; font-weight: 500; font-size: 17px; }
+.banner p { margin: 2px 0 0; font-size: 12.5px; color: var(--dim); }

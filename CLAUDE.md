@@ -303,16 +303,17 @@ expected and harmless for an app touching only its own Drive.
 
 ## Open work
 
-- **The eight kids styles are live in n8n; the site half waits on the trunk**
-  (2026-09-16, `db/port/kids-styles/README.md` and
+- **The eight kids styles are live end to end since 2026-09-16 ~12:55 UTC**
+  (`db/port/kids-styles/README.md` and
   `db/port/sheet-style/README.md`). Claude Scripting `6e21cddc` (`Voice
   Mode`: `KIDS_STYLES` with eight keys — illustrated, crayon, papercut, cel,
   cartoon3d, brick, clay, felt — and a stop-motion motion clause for
   clay/brick/felt) and Media Generation `0f418e8e` (cast sheets and set
   plates drawn in the film's style instead of hard-coded photorealistic)
-  are both published. `platform/lib/categories.ts` offers the eight choices
-  on `claude/intelligent-dirac-1w5gbx`; **until that is merged into
-  `claude/hello-7o90qh` the producer still sees two.** The list has four
+  are both published, and the site half reached the trunk in merge
+  `4c2c6c9` (pushed only after Media Generation `13887` and the render
+  `13900` that followed it had finished — the deploy restarts the
+  container four Media Generation nodes talk to). The list has four
   copies (Voice Mode, Cast Sheet Prep, Set Plate Prep, categories.ts) and
   `node db/port/sheet-style/check.mjs` asserts all four agree. **What is
   owed**: the first film in each new style — `clay` for whether the

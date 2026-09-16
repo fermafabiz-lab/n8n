@@ -41,6 +41,7 @@ export default function CategoryPicker({
   onMeta,
   language = "",
   part = "all",
+  preferredVoice = "",
   selected,
   onSelected,
   values,
@@ -56,6 +57,9 @@ export default function CategoryPicker({
   language?: string;
   /** Which half to draw. "all" keeps the original single-block behaviour. */
   part?: "all" | "category" | "voices";
+  /** A narrator the caller wants ahead of the category's own — an episode
+   *  of a series keeps its show's voice. */
+  preferredVoice?: string;
   selected: string;
   onSelected: (id: string) => void;
   values: Record<string, string | boolean>;
@@ -244,7 +248,7 @@ export default function CategoryPicker({
           {(mode === "off" || withNarrator) && (
             <VoicePicker
               language={language}
-              preferred={cat.narratorVoice}
+              preferred={preferredVoice || cat.narratorVoice}
               label={
                 mode === "off"
                   ? "Narrator voice — press ▶ to listen"

@@ -7,6 +7,7 @@ import s from "./NavMenu.module.css";
 
 const LINKS = [
   { href: "/projects", label: "Projects", note: "the floor" },
+  { href: "/series", label: "Series", note: "the shows" },
   { href: "/admin/footage", label: "Footage", note: "archive library" },
   { href: "/admin", label: "Settings", note: "account, appearance" },
 ];

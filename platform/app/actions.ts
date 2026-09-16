@@ -27,7 +27,22 @@ import {
   normalizePublishing,
   refreshSceneVisualOrigin,
   setSceneProvenance,
+  getSeries,
+  nextEpisodeNo,
+  setProjectSeries,
+  getProjectSeriesSource,
+  insertSeries,
+  updateSeriesNotes,
+  updateSeriesCharacter,
 } from "@/lib/data";
+import {
+  composeSeriesLore,
+  normalizeSeriesBible,
+  normalizeSeriesRefs,
+  normalizeSeriesSettings,
+  hasAnyRefs,
+  type Series,
+} from "@/lib/series";
 import {
   normalizeVisualOrigin,
   refuseFootageType,
@@ -2188,6 +2203,27 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     // n8n not to write it at all.
     delete (payload as { voice_tone?: VoiceTone }).voice_tone;
   }
+  /*
+   * An episode of a series. The series rides to n8n two ways, both through
+   * inputs the pipeline already has: its bible becomes LORE — the canon
+   * mechanism `Generate Story Bible` treats as ground truth, so the cast keeps
+   * its names and looks — and its reference sheets ride as `series.refs`,
+   * which `Normalize Webhook Input` copies into Editing Options so
+   * `Cast Sheet Prep` and `Set Plate Prep` skip every name that already has
+   * one. The link itself (series_id, episode_no) is written by the site after
+   * the record exists — a column, not an Editing Options key, so the
+   * orchestrator's ref-image rebuild cannot wipe it.
+   */
+  const seriesIdRaw = String(formData.get("series_id") ?? "").trim();
+  let series: Series | null = null;
+  let episodeNo: number | null = null;
+  if (/^rec[A-Za-z0-9]{14}$/.test(seriesIdRaw)) {
+    series = await getSeries(seriesIdRaw).catch(() => null);
+    if (!series) return { ok: false, message: "That series no longer exists — start the episode from the Series page." };
+    episodeNo = await nextEpisodeNo(series.id);
+    payload.lore = composeSeriesLore(series, episodeNo, payload.lore);
+    (payload as Record<string, unknown>).series = { id: series.id, refs: series.refs };
+  }
   const projectName = payload["Nume Proiect"];
   let newProjectId: string | null = null;
   let webhookError: string | null = null;
@@ -2258,6 +2294,15 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
    */
   if (newProjectId && String(formData.get("source_watermark") ?? "yes") === "no") {
     await updateEditingOptions(newProjectId, { sourceWatermark: false }).catch(() => {});
+  }
+  if (newProjectId && series) {
+    await setProjectSeries(newProjectId, series.id, episodeNo).catch(() => {});
+    // Belt and braces for the sheets: Normalize Webhook Input stores them from
+    // the payload, and this merge repeats the same keys — harmless when the
+    // orchestrator did its part, and the only copy on an orchestrator that
+    // has not been updated yet. Lost only on a film with a reference photo,
+    // whose options the orchestrator rebuilds (see its Normalize node).
+    await updateEditingOptions(newProjectId, { seriesId: series.id, ...series.refs }).catch(() => {});
   }
 
   revalidatePath("/");
@@ -2514,4 +2559,84 @@ export async function login(formData: FormData): Promise<ActionResult> {
     path: "/",
   });
   redirect("/");
+}
+
+// ---------------------------------------------------------------------------
+// Series — a show made from a film (lib/series.ts, db/012)
+// ---------------------------------------------------------------------------
+
+/**
+ * Turn a film into episode 1 of a new show. Everything is a COPY of what the
+ * film already carries: the Story Bible's characters, places, objects, look
+ * and rules; the consistency references in its Editing Options (the Flow ids
+ * of every sheet and plate the pipeline drew); the brief's settings. A film
+ * without a bible cannot start a series — there would be nothing to keep.
+ */
+export async function createSeriesFromProject(formData: FormData): Promise<void> {
+  const projectId = String(formData.get("project_id") ?? "").trim();
+  const name = String(formData.get("name") ?? "").trim().slice(0, 140);
+  const premise = String(formData.get("premise") ?? "").trim().slice(0, 1200);
+  if (!/^rec[A-Za-z0-9]{14}$/.test(projectId) || !name) redirect("/series");
+  const src = await getProjectSeriesSource(projectId);
+  if (!src) redirect("/series");
+  if (src.seriesId) redirect(`/series/${src.seriesId}`);
+  const bible = normalizeSeriesBible(src.storyBible);
+  if (bible.characters.length === 0 && bible.locations.length === 0) redirect("/series?from=" + projectId);
+  const refs = normalizeSeriesRefs(src.editingOptions);
+  const settings = normalizeSeriesSettings(src.editingOptions);
+  const opts = (src.editingOptions && typeof src.editingOptions === "object") ? (src.editingOptions as Record<string, unknown>) : {};
+  const id = await insertSeries({
+    name,
+    premise: premise || bible.logline,
+    channelName: "",
+    category: typeof opts.category === "string" && opts.category ? opts.category : "story",
+    tone: src.tone,
+    language: src.language || "English",
+    aspect: src.aspect === "9:16" ? "9:16" : "16:9",
+    voiceId: src.voiceId,
+    settings,
+    bible,
+    refs: hasAnyRefs(refs) ? refs : refs,
+    sourceProjectId: src.id,
+  });
+  await setProjectSeries(src.id, id, 1);
+  revalidatePath("/series");
+  revalidatePath(`/projects/${src.id}`);
+  redirect(`/series/${id}`);
+}
+
+export async function saveSeriesNotes(
+  seriesId: string,
+  patch: { name?: string; premise?: string; previously?: string; channelName?: string },
+): Promise<ActionResult> {
+  if (!/^rec[A-Za-z0-9]{14}$/.test(seriesId)) return { ok: false, message: "Not a series." };
+  const clean = {
+    ...(typeof patch.name === "string" && patch.name.trim() ? { name: patch.name.trim().slice(0, 140) } : {}),
+    ...(typeof patch.premise === "string" ? { premise: patch.premise.trim().slice(0, 1200) } : {}),
+    ...(typeof patch.previously === "string" ? { previously: patch.previously.trim().slice(0, 4000) } : {}),
+    ...(typeof patch.channelName === "string" ? { channelName: patch.channelName.trim().slice(0, 140) } : {}),
+  };
+  try {
+    await updateSeriesNotes(seriesId, clean);
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+  revalidatePath(`/series/${seriesId}`);
+  revalidatePath("/series");
+  return { ok: true, message: "Saved." };
+}
+
+export async function saveSeriesCharacter(
+  seriesId: string,
+  name: string,
+  patch: { role?: string; description?: string },
+): Promise<ActionResult> {
+  if (!/^rec[A-Za-z0-9]{14}$/.test(seriesId) || !name) return { ok: false, message: "Not a series character." };
+  try {
+    await updateSeriesCharacter(seriesId, name, patch);
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+  revalidatePath(`/series/${seriesId}`);
+  return { ok: true, message: "Saved." };
 }

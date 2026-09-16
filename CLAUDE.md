@@ -313,6 +313,20 @@ expected and harmless for an app touching only its own Drive.
   **Owed**: the hold has never been heard on a render, and the
   `Rewrite Script` path (producer rejects with feedback) still carries
   neither the spine nor these rules.
+- **Series exist since 2026-09-16** (`db/port/series/README.md`; lessons in
+  `docs/lessons-site.md` under "Series — the same cast, film after film").
+  `/series` lists the shows, a show is started from any film with a Story
+  Bible, `/series/<id>` shows the cast with their sheets and the episodes,
+  `/new?series=<id>` opens the brief as the next episode. The bible rides
+  to Scripting as Lore, the sheets as Editing Options (orchestrator
+  `1bde883f`, `Normalize Webhook Input`); no other node changed. **Faces
+  are missing until `db/port/sheet-ingest/` is live** — Media Generation
+  has to post each new sheet to `/api/media/ingest` (`field: "sheet"`)
+  while Flow's signed URL is alive; the table and the route exist. **What is
+  owed**: one real episode — read its Story Bible against the series page
+  (same names, same descriptions) and check `SHEET PLAN` says the cast was
+  skipped, not drawn again.
+
 - **The eight kids styles are live end to end since 2026-09-16 ~12:55 UTC**
   (`db/port/kids-styles/README.md` and
   `db/port/sheet-style/README.md`). Claude Scripting `6e21cddc` (`Voice

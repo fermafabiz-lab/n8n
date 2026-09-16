@@ -127,11 +127,13 @@ interface ProjectRow {
   pace: string | null;
   created_at: Date | null;
   cover_path?: string | null;
+  series_id?: string | null;
+  episode_no?: number | null;
 }
 
 const PROJECT_COLS = `p.id, p.name, p.tone, p.aspect, p.no_captions, p.length_seconds,
                       p.status, p.final_video_url, p.editing_options, p.language,
-                      p.voice_id, p.pace, p.created_at`;
+                      p.voice_id, p.pace, p.created_at, p.series_id, p.episode_no`;
 
 function toRawProject(r: ProjectRow): RawProject {
   return {
@@ -149,6 +151,8 @@ function toRawProject(r: ProjectRow): RawProject {
     paceRaw: r.pace,
     createdAt: r.created_at ? r.created_at.toISOString() : null,
     coverUrl: mediaUrl(r.cover_path ?? null),
+    seriesId: r.series_id ?? null,
+    episodeNo: r.episode_no ?? null,
   };
 }
 
@@ -1408,3 +1412,268 @@ export async function getScriptExamples(): Promise<ScriptExample[]> {
 
 export const saveScriptExample = (id: string, patch: Record<string, unknown>) =>
   patchRow("script_example", EXAMPLE_COLS, id, patch);
+
+// ---------------------------------------------------------------------------
+// Series (db/012) — a show, and the films that are its episodes
+// ---------------------------------------------------------------------------
+
+import {
+  normalizeSeriesBible,
+  normalizeSeriesRefs,
+  normalizeSeriesSettings,
+  type Series,
+  type SeriesBible,
+  type SeriesRefs,
+  type SeriesSettings,
+} from "@/lib/series";
+
+interface SeriesRow {
+  id: string;
+  name: string;
+  premise: string;
+  previously: string;
+  channel_name: string;
+  category: string;
+  tone: string | null;
+  language: string;
+  aspect: string;
+  voice_id: string;
+  settings: unknown;
+  bible: unknown;
+  refs: unknown;
+  source_project_id: string | null;
+  created_at: Date | null;
+  updated_at: Date | null;
+  episode_count?: string | number | null;
+}
+
+const SERIES_COLS = `s.id, s.name, s.premise, s.previously, s.channel_name, s.category, s.tone,
+                     s.language, s.aspect, s.voice_id, s.settings, s.bible, s.refs,
+                     s.source_project_id, s.created_at, s.updated_at`;
+
+function toSeries(r: SeriesRow): Series {
+  return {
+    id: r.id,
+    name: r.name,
+    premise: r.premise ?? "",
+    previously: r.previously ?? "",
+    channelName: r.channel_name ?? "",
+    category: r.category || "kids",
+    tone: r.tone,
+    language: r.language || "English",
+    aspect: r.aspect === "9:16" ? "9:16" : "16:9",
+    voiceId: r.voice_id ?? "",
+    settings: normalizeSeriesSettings(r.settings),
+    bible: normalizeSeriesBible(r.bible),
+    refs: normalizeSeriesRefs(r.refs),
+    sourceProjectId: r.source_project_id,
+    createdAt: r.created_at ? r.created_at.toISOString() : null,
+    updatedAt: r.updated_at ? r.updated_at.toISOString() : null,
+    ...(r.episode_count !== undefined && r.episode_count !== null
+      ? { episodeCount: Number(r.episode_count) || 0 }
+      : {}),
+  };
+}
+
+export async function getSeriesList(): Promise<Series[]> {
+  const rows = await query<SeriesRow>(`
+    select ${SERIES_COLS},
+      (select count(*) from hov.project p where p.series_id = s.id) as episode_count
+    from hov.series s
+    order by s.updated_at desc`);
+  return rows.map(toSeries);
+}
+
+export async function getSeries(id: string): Promise<Series | null> {
+  const rows = await query<SeriesRow>(
+    `select ${SERIES_COLS},
+       (select count(*) from hov.project p where p.series_id = s.id) as episode_count
+     from hov.series s where s.id = $1`,
+    [id],
+  );
+  return rows[0] ? toSeries(rows[0]) : null;
+}
+
+/** The episodes of a show, in order — the same Project shape the library uses. */
+export async function getSeriesEpisodes(seriesId: string): Promise<Project[]> {
+  const rows = await query<ProjectRow>(
+    `select ${PROJECT_COLS},
+      (select a.path
+         from hov.scene s
+         join hov.attachment a on a.scene_id = s.id and a.field = 'image'
+        where s.project_id = p.id
+        order by s.scene_order
+        limit 1) as cover_path
+     from hov.project p
+     where p.series_id = $1
+     order by p.episode_no nulls last, p.created_at`,
+    [seriesId],
+  );
+  return rows.map((r) => buildProject(toRawProject(r)));
+}
+
+/** The number the next episode of a show gets. */
+export async function nextEpisodeNo(seriesId: string): Promise<number> {
+  const rows = await query<{ n: string | number | null }>(
+    `select coalesce(max(episode_no), 0) + 1 as n from hov.project where series_id = $1`,
+    [seriesId],
+  );
+  return Math.max(1, Number(rows[0]?.n) || 1);
+}
+
+/**
+ * What a film carries that a series is made of: its Story Bible, the
+ * consistency references in its Editing Options, and the brief's settings.
+ * Read raw here; `lib/series.ts` decides what of it is a series.
+ */
+export async function getProjectSeriesSource(projectId: string): Promise<{
+  id: string;
+  name: string;
+  tone: string | null;
+  language: string;
+  aspect: string;
+  voiceId: string;
+  storyBible: unknown;
+  editingOptions: unknown;
+  seriesId: string | null;
+} | null> {
+  const rows = await query<{
+    id: string; name: string; tone: string | null; language: string; aspect: string;
+    voice_id: string; story_bible: string | null; editing_options: unknown; series_id: string | null;
+  }>(
+    `select id, name, tone, language, aspect, voice_id, story_bible, editing_options, series_id
+       from hov.project where id = $1`,
+    [projectId],
+  );
+  const r = rows[0];
+  if (!r) return null;
+  return {
+    id: r.id, name: r.name, tone: r.tone, language: r.language ?? "", aspect: r.aspect,
+    voiceId: r.voice_id ?? "", storyBible: r.story_bible, editingOptions: r.editing_options,
+    seriesId: r.series_id,
+  };
+}
+
+/** Films a series could be started from: they have a Story Bible and belong to no show yet. */
+export async function getSeriesCandidates(): Promise<Array<{ id: string; name: string; status: string; createdAt: string | null }>> {
+  const rows = await query<{ id: string; name: string; status: string; created_at: Date | null }>(`
+    select id, name, status, created_at
+      from hov.project
+     where series_id is null
+       and story_bible is not null and story_bible <> ''
+     order by created_at desc
+     limit 200`);
+  return rows.map((r) => ({ id: r.id, name: r.name, status: r.status ?? "", createdAt: r.created_at ? r.created_at.toISOString() : null }));
+}
+
+export async function insertSeries(s: {
+  name: string;
+  premise: string;
+  channelName: string;
+  category: string;
+  tone: string | null;
+  language: string;
+  aspect: "16:9" | "9:16";
+  voiceId: string;
+  settings: SeriesSettings;
+  bible: SeriesBible;
+  refs: SeriesRefs;
+  sourceProjectId: string | null;
+}): Promise<string> {
+  const rows = await query<{ id: string }>(
+    `insert into hov.series
+       (name, premise, channel_name, category, tone, language, aspect, voice_id, settings, bible, refs, source_project_id)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11::jsonb, $12)
+     returning id`,
+    [
+      s.name, s.premise, s.channelName, s.category, s.tone, s.language, s.aspect, s.voiceId,
+      JSON.stringify(s.settings), JSON.stringify(seriesBibleToStored(s.bible)), JSON.stringify(s.refs), s.sourceProjectId,
+    ],
+  );
+  return rows[0].id;
+}
+
+/** The bible column keeps the Story Bible's own key names, so a row reads like the film's. */
+function seriesBibleToStored(b: SeriesBible): Record<string, unknown> {
+  return {
+    logline: b.logline,
+    characters: b.characters.map((c) => ({ name: c.name, role: c.role, visual_description: c.description })),
+    objects: b.objects.map((o) => ({ name: o.name, visual_description: o.description })),
+    locations: b.locations.map((l) => ({ name: l.name, visual_description: l.description })),
+    visual_style: b.visualStyle,
+    continuity_rules: b.continuityRules,
+  };
+}
+
+export async function updateSeriesNotes(
+  id: string,
+  patch: { name?: string; premise?: string; previously?: string; channelName?: string },
+): Promise<void> {
+  const sets: string[] = [];
+  const params: unknown[] = [];
+  const add = (col: string, v: unknown) => { params.push(v); sets.push(`${col} = $${params.length}`); };
+  if (typeof patch.name === "string") add("name", patch.name);
+  if (typeof patch.premise === "string") add("premise", patch.premise);
+  if (typeof patch.previously === "string") add("previously", patch.previously);
+  if (typeof patch.channelName === "string") add("channel_name", patch.channelName);
+  if (!sets.length) return;
+  params.push(id);
+  await query(`update hov.series set ${sets.join(", ")} where id = $${params.length}`, params);
+}
+
+/** A character's description, edited on the series page: the bible's own entry is rewritten in place. */
+export async function updateSeriesCharacter(
+  seriesId: string,
+  name: string,
+  patch: { role?: string; description?: string },
+): Promise<void> {
+  const cur = await getSeries(seriesId);
+  if (!cur) return;
+  const bible = cur.bible;
+  const c = bible.characters.find((x) => x.name === name);
+  if (!c) return;
+  if (typeof patch.role === "string") c.role = patch.role.trim().slice(0, 200);
+  if (typeof patch.description === "string") c.description = patch.description.trim().slice(0, 2000);
+  await query(`update hov.series set bible = $1::jsonb where id = $2`, [JSON.stringify(seriesBibleToStored(bible)), seriesId]);
+}
+
+export async function setProjectSeries(projectId: string, seriesId: string | null, episodeNo: number | null): Promise<void> {
+  await query(`update hov.project set series_id = $1, episode_no = $2 where id = $3`, [seriesId, episodeNo, projectId]);
+}
+
+/** Our stored copies of reference sheets, by Flow id — url per id, for those we have. */
+export async function getSheetMediaUrls(flowIds: string[]): Promise<Record<string, string>> {
+  const ids = [...new Set(flowIds.filter(Boolean))];
+  if (!ids.length) return {};
+  const rows = await query<{ flow_id: string; path: string }>(
+    `select flow_id, path from hov.sheet_media where flow_id = any($1::text[])`,
+    [ids],
+  );
+  const out: Record<string, string> = {};
+  for (const r of rows) {
+    const u = mediaUrl(r.path);
+    if (u) out[r.flow_id] = u;
+  }
+  return out;
+}
+
+/** Record a sheet's bytes (the ingest route already wrote the file). One row per Flow id. */
+export async function upsertSheetMedia(m: {
+  projectId: string;
+  kind: "cast" | "object" | "location";
+  name: string;
+  flowId: string;
+  path: string;
+  contentType: string | null;
+  sizeBytes: number;
+  sourceUrl: string;
+}): Promise<void> {
+  await query(
+    `insert into hov.sheet_media (project_id, kind, name, flow_id, path, content_type, size_bytes, source_url)
+     values ($1, $2, $3, $4, $5, $6, $7, $8)
+     on conflict (flow_id) do update set
+       path = excluded.path, content_type = excluded.content_type,
+       size_bytes = excluded.size_bytes, source_url = excluded.source_url`,
+    [m.projectId, m.kind, m.name, m.flowId, m.path, m.contentType, m.sizeBytes, m.sourceUrl],
+  );
+}

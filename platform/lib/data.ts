@@ -471,6 +471,8 @@ const DEMO_PROJECTS: Project[] = [
     cast: [],
     castAssign: {},
     chapterVoices: {},
+    seriesId: null,
+    episodeNo: null,
     motifCards: [],
     hookPlan: null,
     hookRegen: null,
@@ -497,6 +499,8 @@ const DEMO_PROJECTS: Project[] = [
     cast: [],
     castAssign: {},
     chapterVoices: {},
+    seriesId: null,
+    episodeNo: null,
     motifCards: [],
     hookPlan: null,
     hookRegen: null,
@@ -523,6 +527,8 @@ const DEMO_PROJECTS: Project[] = [
     cast: [],
     castAssign: {},
     chapterVoices: {},
+    seriesId: null,
+    episodeNo: null,
     motifCards: [],
     hookPlan: null,
     hookRegen: null,
@@ -549,6 +555,8 @@ const DEMO_PROJECTS: Project[] = [
     cast: [],
     castAssign: {},
     chapterVoices: {},
+    seriesId: null,
+    episodeNo: null,
     motifCards: [],
     hookPlan: null,
     hookRegen: null,
@@ -1389,4 +1397,61 @@ export async function saveScriptExample(
 ): Promise<void> {
   if (USE_PG) return pgBackend.saveScriptExample(id, patch);
   await airtablePatch(EXAMPLES_TABLE, id, toAirtablePatch(EXAMPLE_AT, patch));
+}
+
+// ---------------------------------------------------------------------------
+// Series (db/012). Postgres only: the Airtable adapter predates series and
+// never gets them — a series call on a non-PG deployment is a configuration
+// error, not something to emulate.
+// ---------------------------------------------------------------------------
+
+const needPg = (what: string) => {
+  if (!USE_PG) throw new Error(`${what} needs the Postgres backend (DATABASE_URL)`);
+};
+
+export type { Series } from "@/lib/series";
+
+export async function getSeriesList() {
+  needPg("getSeriesList");
+  return pgBackend.getSeriesList();
+}
+export async function getSeries(id: string) {
+  needPg("getSeries");
+  return pgBackend.getSeries(id);
+}
+export async function getSeriesEpisodes(seriesId: string) {
+  needPg("getSeriesEpisodes");
+  return pgBackend.getSeriesEpisodes(seriesId);
+}
+export async function nextEpisodeNo(seriesId: string) {
+  needPg("nextEpisodeNo");
+  return pgBackend.nextEpisodeNo(seriesId);
+}
+export async function getProjectSeriesSource(projectId: string) {
+  needPg("getProjectSeriesSource");
+  return pgBackend.getProjectSeriesSource(projectId);
+}
+export async function getSeriesCandidates() {
+  needPg("getSeriesCandidates");
+  return pgBackend.getSeriesCandidates();
+}
+export const insertSeries: typeof pgBackend.insertSeries = (s) => {
+  needPg("insertSeries");
+  return pgBackend.insertSeries(s);
+};
+export const updateSeriesNotes: typeof pgBackend.updateSeriesNotes = (id, patch) => {
+  needPg("updateSeriesNotes");
+  return pgBackend.updateSeriesNotes(id, patch);
+};
+export const updateSeriesCharacter: typeof pgBackend.updateSeriesCharacter = (id, name, patch) => {
+  needPg("updateSeriesCharacter");
+  return pgBackend.updateSeriesCharacter(id, name, patch);
+};
+export async function setProjectSeries(projectId: string, seriesId: string | null, episodeNo: number | null) {
+  needPg("setProjectSeries");
+  return pgBackend.setProjectSeries(projectId, seriesId, episodeNo);
+}
+export async function getSheetMediaUrls(flowIds: string[]) {
+  needPg("getSheetMediaUrls");
+  return pgBackend.getSheetMediaUrls(flowIds);
 }

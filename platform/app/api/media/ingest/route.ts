@@ -18,7 +18,7 @@
  * browser session — and authenticates with a shared secret instead.
  */
 
-import { attachMedia } from "@/lib/data/postgres";
+import { attachMedia, upsertSheetMedia } from "@/lib/data/postgres";
 import { storeMediaBytes } from "@/lib/media-store";
 import { MediaIngestBody, ValidationError, parseJsonBody } from "@/lib/validation";
 
@@ -49,6 +49,11 @@ export async function POST(req: Request) {
     if (e instanceof ValidationError) return bad(e.status, e.message);
     throw e;
   }
+  // A reference sheet is the other shape of this endpoint: no scene, a
+  // project + a name + the Flow id. Same download, same content-addressed
+  // store (under the project's id), its own table.
+  if (body.field === "sheet") return ingestSheet(body);
+  if (body.field === "sheets") return ingestSheets(body);
   const { sceneId, url } = body;
   const field: Field = body.field;
 
@@ -107,4 +112,58 @@ export async function POST(req: Request) {
     ok: true,
     media: { path, url: `${base}/${path}`, bytes: buf.length },
   });
+}
+
+type SheetBody = Extract<ReturnType<typeof MediaIngestBody.parse>, { field: "sheet" }>;
+type SheetsBody = Extract<ReturnType<typeof MediaIngestBody.parse>, { field: "sheets" }>;
+
+/** Several sheets, one answer: each is kept or reported, and the request succeeds either way. */
+async function ingestSheets(body: SheetsBody) {
+  const results: Array<{ name: string; kind: string; flowId: string; ok: boolean; error?: string; path?: string }> = [];
+  for (const it of body.items) {
+    const res = await ingestSheet({ field: "sheet", projectId: body.projectId, ...it });
+    let data: { ok?: boolean; error?: string; media?: { path?: string } } = {};
+    try {
+      data = (await res.json()) as typeof data;
+    } catch {
+      data = {};
+    }
+    results.push({
+      name: it.name, kind: it.kind, flowId: it.flowId,
+      ok: res.ok && data.ok === true,
+      ...(res.ok && data.ok ? { path: data.media?.path } : { error: data.error ?? `HTTP ${res.status}` }),
+    });
+  }
+  return Response.json({ ok: true, kept: results.filter((r) => r.ok).length, results });
+}
+
+async function ingestSheet(body: SheetBody) {
+  const { projectId, kind, name, flowId, url } = body;
+  let buf: Buffer;
+  let contentType: string | null;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(120_000) });
+    if (!res.ok) return bad(502, `source answered HTTP ${res.status}`);
+    buf = Buffer.from(await res.arrayBuffer());
+    contentType = res.headers.get("content-type");
+  } catch (e) {
+    return bad(502, `download failed: ${(e as Error).message}`);
+  }
+  if (!buf.length) return bad(502, "source returned an empty body");
+  let stored: Awaited<ReturnType<typeof storeMediaBytes>>;
+  try {
+    stored = await storeMediaBytes(projectId, "sheet", buf, { url, contentType });
+  } catch (e) {
+    return bad(500, `could not write the file: ${(e as Error).message}`);
+  }
+  try {
+    await upsertSheetMedia({
+      projectId, kind, name, flowId,
+      path: stored.path, contentType, sizeBytes: buf.length, sourceUrl: url,
+    });
+  } catch (e) {
+    return bad(500, `database write failed: ${(e as Error).message}`);
+  }
+  const base = (process.env.MEDIA_BASE_URL ?? "").replace(/\/+$/, "");
+  return Response.json({ ok: true, sheet: { projectId, kind, name, flowId }, media: { path: stored.path, url: `${base}/${stored.path}`, bytes: buf.length } });
 }

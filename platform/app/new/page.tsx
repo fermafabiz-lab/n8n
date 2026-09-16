@@ -19,7 +19,9 @@ async function submit(_prev: ActionResult | null, formData: FormData) {
   return createProject(formData);
 }
 
-// Same option set as the n8n form — the site fully replaces it.
+// Same option set as the n8n form — the site fully replaces it. Every name
+// here has a row in hov.genre_profile (matched case-insensitively) — a tone
+// without one is written with Scripting's built-in DOCUMENTARY fallback.
 const TONES = [
   "Epic",
   "Educativ",
@@ -32,7 +34,10 @@ const TONES = [
   "Dramatic",
   "Documentary",
   "Motivational",
+  "Childish",
 ];
+/** The tone a producer lands on before touching the row. */
+const DEFAULT_TONE = "Dark";
 
 
 /** Dashed suggestion chips under the subject — one click fills the field. */
@@ -270,7 +275,7 @@ export default function NewVideo() {
   // them can see who made what.
   const [createdBy, setCreatedBy] = useState("");
   const [name, setName] = useState("");
-  const [tone, setTone] = useState("Dark");
+  const [tone, setTone] = useState(DEFAULT_TONE);
   const [length, setLength] = useState(60);
   const [aspect, setAspect] = useState<"16:9" | "9:16">("16:9");
   // The rate is the state; the WORD the webhook wants is derived from it.
@@ -362,6 +367,11 @@ export default function NewVideo() {
       t.style === STORYTELLER_TONE.style && t.speakerBoost === STORYTELLER_TONE.speakerBoost;
     if (category === "kids" && voiceTone === null) setVoiceTone(STORYTELLER_TONE);
     else if (category !== "kids" && isStoryteller(voiceTone)) setVoiceTone(null);
+    // The tone moves with the category the same way: Kids story writes as a
+    // children's story (the Childish genre profile), and leaving it returns
+    // the default — unless the producer clicked a tone themselves.
+    if (category === "kids" && tone === DEFAULT_TONE) setTone("Childish");
+    else if (category !== "kids" && tone === "Childish") setTone(DEFAULT_TONE);
     // Runs on the category, not on the tone: a producer switching the tone
     // away and back must not be fought by this effect.
     // eslint-disable-next-line react-hooks/exhaustive-deps

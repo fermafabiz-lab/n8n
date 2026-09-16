@@ -1,0 +1,73 @@
+# Series Recap — the pipeline writes "what has happened so far"
+
+**Workflow `4jVkQjpr7terqQhY` "Series Recap", published 2026-09-16 15:07 UTC,
+active version `f47a18c0`.** Webhook `POST /webhook/series-recap`, body
+`{ project_id }`. Fired by `approveScript` in `platform/app/actions.ts`
+(through `onEpisodeScriptApproved`) for a project that is an episode of a
+series — fire-and-forget, 8 s timeout, the site never waits on it. Same
+host as `new-project`, plain path, so the site's derive-by-last-segment rule
+finds it.
+
+## Why
+
+A series (`db/012`, `platform/lib/series.ts`) carries `previously`: the
+running recap the next episode's writer is told not to contradict and not
+to retell. Until today the producer had to type a line after every
+episode. Now the line is written the moment the script is approved.
+
+## The chain
+
+```
+Recap Webhook → Load Episode → Build Recap Prompt → Recap Model → Parse Recap → Append Recap
+```
+
+| Node | What it does |
+|---|---|
+| `Load Episode` (Postgres) | One row when the project has `series_id`, none otherwise — an ordinary film stops here. The narration is the NEWEST `hov.script` row, the same rule as `getProjectScriptInfo`. **Not** `project.full_narrator_script` / `edited_narrator_script`: both are empty on all 81 films since the cutover; nothing writes them. |
+| `Build Recap Prompt` (Code) | gpt-5.4, two sentences, at most 60 words, past tense, in the film's language, names spelled as the narration spells them. Script capped at 30,000 chars. Returns `[]` (chain stops) when there is no script, no episode number or no series. |
+| `Recap Model` (HTTP) | Mirror of `Brief Model` in Expand Brief: `api.openai.com/v1/chat/completions`, `openAiApi` credential `oPGuXelJ6pnDePIs`, `onError: continueRegularOutput`, 120 s timeout. |
+| `Parse Recap` (Code) | Collapses whitespace, strips quotes, builds `Episode N — Title: summary` and base64-encodes it. Also emits the LIKE pattern `Episode N —%`. |
+| `Append Recap` (Postgres) | One statement: every existing line for THIS episode number is dropped, blank lines are dropped, the new line is appended. So approving twice REPLACES rather than doubles, and two episodes approved in the same minute cannot lose each other's line. |
+
+Bodies live in `paste/`; `gen.mjs` composes `series-recap.workflow.js` from
+them for `validate_workflow` + `create_workflow_from_code`. Change a paste
+file, regenerate, apply through `setNodeParameter`, byte-compare the
+read-back, publish with the explicit `versionId`.
+
+## Verified
+
+Execution `13951` (manual, 2.4 s) on a throwaway episode
+(`recksVlE6Qax2JfoN`, series `recB1vUbnVeJNfY5c`, script copied from the
+clay-builders test film `rec78haMNefc8xaWs`, seeded with two lines:
+`Episode 1 — Old line…` and `Episode 10 — Other line…`):
+
+- `Load Episode` returned the 1,030-character script from `hov.script`.
+- `Recap Model` answered with `gpt-5.4-2026-03-05`, 97 completion tokens.
+- `Parse Recap` produced `Episode 1 — zz recap test episode: At dusk in the
+  Clay Builders' Yard, Marn abandoned three separate houses…`.
+- `Append Recap` returned `previously_length: 493` = the new line (447) +
+  the untouched `Episode 10` line (45) + one newline: **the old `Episode 1`
+  line was replaced, `Episode 10` stayed** — `Episode 1 —%` does not match
+  `Episode 10 —`.
+
+Both throwaway rows were deleted afterwards (cleanup workflow), so
+`hov.series` is back to whatever real shows exist.
+
+## Where the recap goes
+
+`composeSeriesLore` (`platform/lib/series.ts`) puts the recap LAST in the
+Lore and fits it into the 8,000-character cap that `Normalize Webhook
+Input` applies, newest line first — so when a show has more episodes than
+fit, it is the OLDEST lines that fall off, never the newest. The producer
+can still edit or condense the text on the series page (`SeriesNotes`,
+8,000 chars).
+
+## Known limits
+
+- The line is keyed by episode NUMBER. Two projects in one series with the
+  same `episode_no` (only possible by hand — `nextEpisodeNo` is max+1)
+  would replace each other's line.
+- Recap in the film's language (`project.language`, then the series', then
+  English). A bilingual show gets a bilingual recap.
+- `approveScript` in demo mode (`isConfigured` false) does nothing, so no
+  recap either.

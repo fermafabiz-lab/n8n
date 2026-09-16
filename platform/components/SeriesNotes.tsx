@@ -50,7 +50,7 @@ export default function SeriesNotes({
         </div>
         <div style={{ gridColumn: "1 / -1" }}>
           <label>What has happened so far</label>
-          <textarea rows={5} value={v.previously} onChange={(e) => setV({ ...v, previously: e.target.value })} maxLength={4000} placeholder="A running recap. The next episode is told not to contradict it and not to retell it — add a line after each episode." />
+          <textarea rows={5} value={v.previously} onChange={(e) => setV({ ...v, previously: e.target.value })} maxLength={8000} placeholder="A running recap, one line per episode. The pipeline adds the line itself when an episode's script is approved; edit or trim it here whenever you like. The next episode is told not to contradict it and not to retell it." />
         </div>
       </div>
       <div className={s.row} style={{ marginTop: 12 }}>

@@ -90,8 +90,21 @@ ok('lore: the exact names come first, the recap last, under 8000 chars', () => {
   assert.ok(l.indexOf('USE EXACTLY THESE NAMES') < l.indexOf('CHARACTERS'));
   assert.ok(l.includes('Pip the Fox; Momo; Zed'));
   assert.ok(l.indexOf('WHAT HAS HAPPENED') > l.indexOf('CONTINUITY') || !l.includes('CONTINUITY'));
-  assert.ok(l.endsWith('extra canon'));
+  assert.ok(l.indexOf('WHAT HAS HAPPENED') > l.indexOf('extra canon'));
+  assert.ok(l.endsWith('Ep1: it rained.'));
   assert.ok(l.length <= 8000);
+});
+
+ok('lore: a recap too long for the budget loses its OLDEST lines, never the newest', () => {
+  const previously = Array.from({ length: 40 }, (_, i) => `Episode ${i + 1} — Title ${i + 1}: ${'x'.repeat(300)}`).join('\n');
+  const s = { id: 'recAAAAAAAAAAAAA1', name: 'Pip', premise: 'A fox.', previously, channelName: '', category: 'kids', tone: null, language: 'English', aspect: '16:9', voiceId: '', settings: S.normalizeSeriesSettings({}), bible, refs, sourceProjectId: null, createdAt: null, updatedAt: null };
+  const l = S.composeSeriesLore(s, 41, '');
+  assert.ok(l.length <= 8000);
+  assert.ok(l.includes('Episode 40 — Title 40'));
+  assert.ok(!l.includes('Episode 1 — Title 1:'));
+  assert.ok(l.endsWith('x'.repeat(300)));
+  // and the canon above it is whole
+  assert.ok(l.includes('CHARACTERS') && l.includes('Pip the Fox; Momo; Zed'));
 });
 
 console.log(`${n}/${n} passed`);

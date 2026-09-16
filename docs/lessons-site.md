@@ -1718,3 +1718,23 @@ has the whole mechanism). What the site learned building it:
   the refs and the settings; a later change to that film changes nothing in
   the show. Editing a character's description on the series page rewrites
   the copy, which is what the next episode reads.
+- **The copy keeps itself in step, since the same evening.** The producer's
+  one condition for the whole feature was "nothing manual after an episode",
+  and the three things that would have been manual all hang off ONE moment:
+  script approval (`approveScript` → `onEpisodeScriptApproved`), which is
+  after the Story Bible exists and before Media Generation reads the
+  references. (1) Names: Lore says `USE EXACTLY THESE NAMES` and the writer
+  still sometimes writes "Pip the Fox" for "Pip"; the sheets are keyed by
+  name, so the episode's refs are re-keyed to the bible's spelling where the
+  match is unambiguous (`reconcileRefsToBible`: exact, unique whole-word
+  containment, unique given name of 3+ letters — `check:series` pins the
+  rules). (2) New characters / places / objects go back to the show
+  (`mergeBibles`; a respelling is not new), and both the series page and the
+  next episode read the union of every episode's sheets
+  (`getSeriesRefsUnion`, earlier wins). (3) The recap is written by n8n
+  (`series-recap`, `db/port/series-recap/`), one replace-or-append line per
+  episode; the site only fires the webhook and never waits. What the site
+  learned: **fit a growing text into a capped prompt from the NEWEST end**
+  — `composeSeriesLore` used to cut the Lore at 8000 from the end, which is
+  exactly where the recap sits, so a long-running show would have lost its
+  latest episodes first. It now drops the oldest lines instead.

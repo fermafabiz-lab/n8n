@@ -221,6 +221,9 @@ export function normalizeSeriesSettings(raw: unknown): SeriesSettings {
  * ordered so what matters most survives a cut: the cast first, the recap
  * last.
  */
+/** Normalize Webhook Input keeps the first 8000 characters of Lore — the same number, in the orchestrator. */
+const LORE_CAP = 8000;
+
 export function composeSeriesLore(s: Series, episodeNo: number, extra = ""): string {
   const lines: string[] = [];
   lines.push(
@@ -260,9 +263,25 @@ export function composeSeriesLore(s: Series, episodeNo: number, extra = ""): str
     lines.push("\nCONTINUITY RULES:");
     for (const r of s.bible.continuityRules) lines.push(`- ${r}`);
   }
-  if (s.previously) lines.push(`\nWHAT HAS HAPPENED IN EARLIER EPISODES (do not contradict it; do not retell it):\n${s.previously}`);
   if (extra.trim()) lines.push(`\nMORE CANON FOR THIS EPISODE:\n${extra.trim()}`);
-  return lines.join("\n").slice(0, 8000);
+  // The recap grows by one line per episode (the series-recap webhook), and
+  // Lore is cut at 8000 characters by Normalize Webhook Input. A cut from the
+  // END would lose the NEWEST episodes, which are the ones the next film must
+  // not contradict — so the recap is fitted into whatever room the canon
+  // leaves, newest line first, and it is the OLDEST lines that fall off.
+  const fixed = lines.join("\n");
+  if (s.previously.trim()) {
+    const header = "\nWHAT HAS HAPPENED IN EARLIER EPISODES (do not contradict it; do not retell it):\n";
+    let room = LORE_CAP - fixed.length - header.length - 1;
+    const kept: string[] = [];
+    for (const line of s.previously.split("\n").map((l) => l.trim()).filter(Boolean).reverse()) {
+      if (line.length + 1 > room) break;
+      kept.unshift(line);
+      room -= line.length + 1;
+    }
+    if (kept.length) return `${fixed}\n${header}${kept.join("\n")}`.slice(0, LORE_CAP);
+  }
+  return fixed.slice(0, LORE_CAP);
 }
 
 /** Two letters for a character without a portrait. */

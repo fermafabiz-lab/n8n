@@ -235,6 +235,26 @@ export const MediaIngestBody = z.discriminatedUnion("field", [
     flowId: z.string().trim().min(6).max(200),
     url: z.string().regex(/^https?:\/\//i, "bad url"),
   }),
+  // The same, several at once: one pass of Media Generation makes up to six
+  // cast sheets and up to ten plates, and one request per pass keeps the
+  // batch's item count at one for the node that follows. A sheet that fails
+  // is reported in the answer, never a failed request — the batch must not
+  // die over a picture we merely wanted to keep.
+  z.object({
+    field: z.literal("sheets"),
+    projectId: RecordId,
+    items: z
+      .array(
+        z.object({
+          kind: z.enum(["cast", "object", "location"]),
+          name: z.string().trim().min(1).max(200),
+          flowId: z.string().trim().min(6).max(200),
+          url: z.string().regex(/^https?:\/\//i, "bad url"),
+        }),
+      )
+      .min(1)
+      .max(24),
+  }),
 ]);
 
 // app/api/media

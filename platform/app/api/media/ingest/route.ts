@@ -53,6 +53,7 @@ export async function POST(req: Request) {
   // project + a name + the Flow id. Same download, same content-addressed
   // store (under the project's id), its own table.
   if (body.field === "sheet") return ingestSheet(body);
+  if (body.field === "sheets") return ingestSheets(body);
   const { sceneId, url } = body;
   const field: Field = body.field;
 
@@ -114,6 +115,27 @@ export async function POST(req: Request) {
 }
 
 type SheetBody = Extract<ReturnType<typeof MediaIngestBody.parse>, { field: "sheet" }>;
+type SheetsBody = Extract<ReturnType<typeof MediaIngestBody.parse>, { field: "sheets" }>;
+
+/** Several sheets, one answer: each is kept or reported, and the request succeeds either way. */
+async function ingestSheets(body: SheetsBody) {
+  const results: Array<{ name: string; kind: string; flowId: string; ok: boolean; error?: string; path?: string }> = [];
+  for (const it of body.items) {
+    const res = await ingestSheet({ field: "sheet", projectId: body.projectId, ...it });
+    let data: { ok?: boolean; error?: string; media?: { path?: string } } = {};
+    try {
+      data = (await res.json()) as typeof data;
+    } catch {
+      data = {};
+    }
+    results.push({
+      name: it.name, kind: it.kind, flowId: it.flowId,
+      ok: res.ok && data.ok === true,
+      ...(res.ok && data.ok ? { path: data.media?.path } : { error: data.error ?? `HTTP ${res.status}` }),
+    });
+  }
+  return Response.json({ ok: true, kept: results.filter((r) => r.ok).length, results });
+}
 
 async function ingestSheet(body: SheetBody) {
   const { projectId, kind, name, flowId, url } = body;

@@ -9,7 +9,8 @@ import { preload } from "react-dom";
  * Layout (see globals.css): a 200vh section with a sticky 100vh stage. The
  * frame index is the section's scroll progress mapped onto 0..FRAME_COUNT-1.
  *
- * Loading: frames 1..PRELOAD_COUNT are fetched in parallel; the canvas takes
+ * Loading: the poster is one more file in the frame directory. Frames
+ * 1..PRELOAD_COUNT are fetched in parallel; the canvas takes
  * over from the poster only after the first of them has been drawn. The rest
  * load one at a time, in order, in the background. A scroll position whose
  * frame is not here yet shows the highest loaded frame below it, so the
@@ -31,7 +32,10 @@ import { preload } from "react-dom";
 const FRAME_COUNT = 100;
 const PRELOAD_COUNT = 20;
 const MAX_DPR = 2;
-const POSTER_SRC = "/poster.webp";
+// Lives beside the frames, and is served the same way: from Caddy's disk on
+// the box, from public/ locally. Nothing about the poster is in the image, so
+// a new sequence is an upload rather than a rebuild.
+const POSTER_SRC = "/frames/poster.webp";
 
 const HINT_IDLE_MS = 2000;
 const HINT_FRAMES = 4;

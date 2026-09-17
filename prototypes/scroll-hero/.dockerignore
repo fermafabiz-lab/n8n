@@ -1,6 +1,8 @@
-# The frames are served by Caddy from the host, not by Next from public/.
-# Leaving them out of the build context is what keeps them out of the image.
-public/frames
+# The frames and the poster are served by Caddy from the host, not by Next
+# from public/. Leaving the whole directory out of the build context is what
+# keeps them out of the image — and the Dockerfile therefore has no
+# `COPY public`, because the directory will not exist here.
+public
 
 node_modules
 .next

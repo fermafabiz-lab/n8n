@@ -11,7 +11,7 @@ under `platform/**` or `remotion/**`, so pushing it deploys nothing.
 ```
 cd prototypes/scroll-hero
 npm install
-npm run frames      # regenerates public/frames/*.webp + public/poster.webp
+npm run frames      # regenerates public/frames/*.webp, poster included
 npm run build && npm run start
 ```
 
@@ -37,8 +37,8 @@ npm run build && npm run start
 
 - **Canvas, not `<video>`** — frames are `HTMLImageElement`s decoded with
   `img.decode()` and drawn with `drawImage` in object-fit: cover geometry.
-- **Poster first, then 20 frames, then the rest** — `poster.webp` is in the
-  server-rendered HTML with `fetchpriority="high"` and a `<link rel="preload">`.
+- **Poster first, then 20 frames, then the rest** — `/frames/poster.webp` is
+  in the server-rendered HTML with `fetchpriority="high"` and a `<link rel="preload">`.
   Frames 1–20 fetch in parallel; the canvas becomes visible only in the same
   animation frame as its first draw, so there is no blank canvas between the
   poster and the sequence. Frames 21–100 load one at a time, in order.
@@ -90,8 +90,16 @@ the lever if it is over.
 
 | run | perf | a11y | best practices | SEO | FCP | LCP | TBT | CLS |
 |---|---|---|---|---|---|---|---|---|
-| mobile (Lighthouse default: slow 4G, 4× CPU, 412px → poster-only path) | 100 | 100 | 96 | 100 | 0.76 s | 1.78 s | 64 ms | 0 |
-| desktop screen + same slow-4G simulation (canvas path, all 100 frames) | 87 | 100 | 100 | 100 | 0.75 s | 2.29 s | 74 ms | 0 |
+| mobile (Lighthouse default: slow 4G, 4× CPU, 412px → poster-only path) | 100 | 100 | 96 | 100 | 0.76 s | 1.77 s | 56 ms | 0 |
+| desktop screen + same slow-4G simulation (canvas path, all 100 frames) | 87 | 100 | 100 | 100 | 0.75 s | 2.29 s | 64 ms | 0 |
+
+Measured with Caddy in front, the shape the box runs: frames and poster off
+disk, everything else proxied to Next. **Expect noise on the desktop run.**
+Of two consecutive runs one came back 87 with 64 ms of blocking time and the
+other 76 with 285 ms, on identical code — Lighthouse, the server and Caddy
+share one small box here. LCP and CLS were stable across both (2.29 s /
+2.31 s, 0). Take the blocking-time figure as "tens of ms, sometimes a
+few hundred", and re-run before believing a single number.
 
 LCP is the poster `<img>` in both. The desktop-4G LCP is bound by the
 simulated round trips (HTML → CSS → poster at 150 ms RTT), not by the
@@ -110,22 +118,52 @@ Same recipe as the producer's site, one size down:
 |---|---|
 | Image | `Dockerfile` here → `ghcr.io/fermafabiz-lab/n8n/site-dev`, built by `.github/workflows/deploy-site-dev.yml` (trunk pushes touching `prototypes/scroll-hero/**`, or **Run workflow** by hand from any branch). The box never builds. |
 | Service | `site-dev` in `/opt/n8n/docker-compose.yml` (mirror: `infra/docker-compose.yml`). `container_name: site-dev`, port 3000 on `n8n_net`, **no host port**. |
-| Frames | **Not in the image** (`.dockerignore` drops `public/frames`). The workflow copies them to `/opt/n8n/frames`; Caddy mounts that read-only at `/srv/frames` and answers `/frames/*` from it with `handle_path`, before anything reaches Next. The code asks for `/frames/frame_0001.webp` either way — locally Next serves them from `public/`, on the box Caddy does. |
-| Poster | Stays in the image (`public/poster.webp`, 12 kB). It has to match frame 1, so a new sequence on the box needs a rebuild with a matching poster — or move `POSTER_SRC` to `/frames/poster.webp` and copy it with the frames. |
+| Frames **and poster** | **Not in the image.** `.dockerignore` drops the whole of `public/`, and the Dockerfile therefore has no `COPY public` — the directory does not exist in the build context. Caddy mounts `/opt/n8n/frames` read-only at `/srv/frames` and answers `/frames/*` from it with `handle_path`, before anything reaches Next. The code asks for `/frames/frame_0001.webp` and `/frames/poster.webp` either way — locally Next serves them from `public/frames`, on the box Caddy does. |
+| Who puts them there | **A person, with `scp`. No deploy touches them.** The sequence is content, not code: `scp prototypes/scroll-hero/public/frames/*.webp root@<box>:/opt/n8n/frames/`. The workflow used to copy the repo's placeholders on every run, which overwrote the real ones; that step is gone and must not come back. |
 | Caddy | `{$SITE_DEV_HOST}` block in `infra/Caddyfile`; `SITE_DEV_HOST` comes from `/opt/n8n/.env` through the caddy service's environment. |
 
-On the box, after the compose file and Caddyfile carry the change:
+### Live at https://dev.house-of-videos.com (2026-09-17 22:39 UTC)
 
-```
-cd /opt/n8n
-docker compose up -d caddy      # new mount + env var: a reload is not enough
-docker compose up -d site-dev   # once the workflow has pushed an image
-```
+Run #1 of the workflow went green end to end and created the container.
+The box's compose file already carried a `site-dev` service, which this
+repo's mirror did not know — see `infra/README.md` before editing it.
 
-Without the frames on disk the page still works: poster shows, the frame
-requests 404, the canvas never appears (state stays `loading`) and the
-section is still a 200vh track. That is the "never blank" rule holding, not
-a bug — check `/opt/n8n/frames` and the caddy mount.
+Verified from n8n (throwaway workflows, archived), inside the network and
+then over the public URL:
+
+| Request | Answer |
+|---|---|
+| `http://site-dev:3000/` | 200, the hero markup |
+| `https://dev.house-of-videos.com/` | 200, same markup, `via: 1.1 Caddy` |
+| `/frames/frame_0001.webp` | 200, `image/webp`, 11,766 B, immutable |
+| `/frames/frame_0100.webp` | 200, `image/webp`, 12,492 B, immutable |
+| `/frames/frame_0999.webp` | 404 from Caddy, **no** cache header |
+| `/frames/frame_0001.webp` on the container itself | 404 — the frames are not in the image, by design |
+
+The last two are the ones worth keeping: a missing frame is not cached for
+a year, so a visit made before the frames landed does not keep failing
+afterwards; and the container's own 404 proves `.dockerignore` kept the
+frames out of the build context, so Caddy is what serves them.
+
+### What is on the box right now (checked 2026-09-17 23:11 UTC)
+
+The poster move needs no upload — **the real poster is already there**:
+
+| File on the box | Size | Modified | What it is |
+|---|---|---|---|
+| `frames/poster.webp` | 42,804 B | 23:03 | a real image, uploaded by hand |
+| `frames/frame_0001.webp` | 11,766 B | 22:36 | still this repo's placeholder |
+| `frames/frame_0050.webp` | 13,514 B | 22:36 | still this repo's placeholder |
+| `frames/frame_0100.webp` | 12,492 B | 22:36 | still this repo's placeholder |
+
+So deploying this change is safe: the page stops asking the container for a
+poster and starts asking Caddy, which already answers with the real one.
+
+**Expect a mismatch in the meantime.** Until the real sequence is uploaded
+next to that poster, the hero opens on a real image and then scrubs through
+synthetic gradients. Nothing is broken; the two just come from different
+places. Uploading the frames is what finishes it, and no deploy will
+overwrite them.
 
 ## Notes for moving it into the site
 
@@ -136,5 +174,6 @@ a bug — check `/opt/n8n/frames` and the caddy mount.
 - The sticky stage is `100vh`, not `100svh`/`100dvh`; on iOS the bottom of
   the stage sits under the toolbar until it collapses. Mobile never scrubs,
   so this only affects how the poster is cropped.
-- `Cache-Control: immutable` for `/frames/*` and `/poster.webp` is set in
-  `next.config.mjs`; keep it wherever the files end up (Caddy, GHCR image).
+- `Cache-Control: immutable` for `/frames/*` (the poster included) is set in
+  `next.config.mjs` for local runs and by Caddy on the box. Keep the rule that
+  only an existing file gets it, so a 404 is never cached for a year.

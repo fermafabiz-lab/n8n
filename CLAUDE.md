@@ -303,23 +303,25 @@ expected and harmless for an app touching only its own Drive.
   anywhere in n8n. Keep the rule; the example is history.
 
 
-- **`POST /v1/google-flow/assets?email=<x>` does not reliably upload to `<x>`, and
-  that is what blocks parallel generation** (2026-09-17,
-  `db/port/parallel-accounts/README.md`, "The real blocker"). Three uploads of one
-  file with the address written LITERALLY into the URL — no expression involved —
-  put two of them on the wrong account, and not on the default one either, so it
-  reads as an arbitrary pick from the linked set. **Generation is NOT affected**:
-  `email` travels in the BODY for `/videos` and `/images`, and useapi rejects a
-  mismatched pair with `Email mismatch`, which proves that field is honoured. So
-  Etapa 1 works and only Etapa 2's replication is broken. The fix is to stop
-  trusting the address: upload, read from the RETURNED id which account actually
-  received it, and repeat until every target holds a copy — the returned id is
-  already treated as the authority, so only the repeat is missing. Check first
-  whether useapi offers an upload that binds to an account (another endpoint, a
-  body field, or a per-account token; the current bearer covers all three
-  accounts, which fits a server that picks freely). **Until then `flowAccounts`
-  above 1 buys nothing, and it fails safely** — no account reaches full coverage,
-  so the guard drops to one and films generate as before.
+- **The upload address is a PATH segment, and sending it as a query parameter
+  silently load-balances across accounts** (2026-09-17, fixed in Media Generation
+  `8c4ef1bf`; full account `db/port/parallel-accounts/README.md`, "The real
+  blocker"). useapi's endpoint is **`POST /v1/google-flow/assets/{email}`**, and
+  its own spec says that OMITTING the email "triggers automatic load balancing
+  […] to select the healthiest account". Both our callers sent
+  `assets?email=…`, which that endpoint reads as no email at all. **With one
+  account linked this was invisible for months**, because the balancer had
+  nothing to choose from; the day a second and third account were linked, every
+  asset upload started going wherever it liked — including
+  `Upload Asset To Flow`, which carries the producer's own reference picture, so
+  it was never only a parallel-generation problem. Measured both ways on the same
+  file: query form 1 of 3 landed on the account asked for, path form 3 of 3.
+  **The general lesson: a REST parameter in the wrong position does not error, it
+  defaults** — and a default that is "pick something sensible" is the hardest
+  kind to notice. `scripts/check-n8n.mjs` block 7 checks account health but
+  cannot see this; only the returned `mediaGenerationId`'s hex-encoded owner can,
+  which is why `Collect Replicated` files every copy by it.
+
 
 - ~~**`houseofvideos01@gmail.com` is signed out at Google and must be reconnected**~~
   **Reconnected 2026-09-17 21:59** and all three accounts read `health: OK`. The

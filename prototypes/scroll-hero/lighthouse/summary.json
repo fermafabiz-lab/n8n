@@ -5,11 +5,11 @@
     "accessibility": 100,
     "best-practices": 96,
     "seo": 100,
-    "FCP": "762 ms",
-    "LCP": "1776 ms",
-    "TBT": "64 ms",
+    "FCP": "764 ms",
+    "LCP": "1770 ms",
+    "TBT": "56 ms",
     "CLS": "0",
-    "Speed Index": "762 ms",
+    "Speed Index": "764 ms",
     "LCP element": "n/a",
     "total bytes": "122 kB"
   },
@@ -19,12 +19,12 @@
     "accessibility": 100,
     "best-practices": 100,
     "seo": 100,
-    "FCP": "752 ms",
-    "LCP": "2288 ms",
-    "TBT": "74 ms",
+    "FCP": "751 ms",
+    "LCP": "2294 ms",
+    "TBT": "64 ms",
     "CLS": "0",
-    "Speed Index": "1205 ms",
+    "Speed Index": "1156 ms",
     "LCP element": "n/a",
-    "total bytes": "1436 kB"
+    "total bytes": "1441 kB"
   }
 ]

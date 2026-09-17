@@ -136,8 +136,12 @@ site:
 3. **`resumeProject` must stop recommending it.** "Use Pause first, then
    Resume" is the correct cure for a wedged execution and the wrong one for a
    slow regeneration, and the message does not distinguish them.
-4. **The image and voice regen badges still have no local exit** (video got
-   one; CLAUDE.md has carried this note since the video pair was added).
+4. ~~The image and voice regen badges still have no local exit.~~ **Done by
+   a colleague the same day** (`cd2b8d1` on the trunk): `restartImageRegen` /
+   `cancelImageRegen` / `restartVoiceRegen` / `cancelVoiceRegen`. Note what
+   that does and does not buy — an exit lets the producer leave the state,
+   which is worth having, but it does not tell them whether waiting would
+   have worked. Points 1 to 3 are still the ones that decide that.
 
 Until 1–3 exist, the practical advice is the one thing that actually works:
 **after asking for a video regeneration, do not press Pause.** Leave it; the

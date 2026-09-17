@@ -3,11 +3,13 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
   approveVoices,
+  cancelVoiceRegen,
   changeProjectVoice,
   regenerateVoice,
   reopenStep,
   reopenPlaybackSpeed,
   rerecordVoices,
+  restartVoiceRegen,
   savePlaybackSpeed,
   saveVoiceSettings,
   saveCastAssignments,
@@ -1720,7 +1722,43 @@ export default function AudioReview({
                     }}
                   />
                   {s.regenVoice ? (
-                    <RegenBadge label="Re-synthesizing…" note={s.note} />
+                    <>
+                      <RegenBadge label="Re-synthesizing…" note={s.note} />
+                      {/*
+                        The third copy of the trap the rewrite and the clip
+                        already carry an exit for: `Regenerează Voce` is
+                        cleared from inside the n8n run, and this badge
+                        replaces the whole row — Approve, the voice select and
+                        Regenerate all go with it — so a run that dies leaves
+                        a take nobody can sign off. The pin chosen in the
+                        select above rides along with the retry, or the scene
+                        would quietly come back in the mode's default voice.
+                      */}
+                      <div className="abtns" style={{ marginTop: 8 }}>
+                        <button
+                          className="abtn"
+                          disabled={pending}
+                          onClick={() =>
+                            run(() =>
+                              restartVoiceRegen(
+                                projectId,
+                                s.id,
+                                voiceSel[s.id] || undefined,
+                              ),
+                            )
+                          }
+                        >
+                          ⟳ Send it again
+                        </button>
+                        <button
+                          className="abtn"
+                          disabled={pending}
+                          onClick={() => run(() => cancelVoiceRegen(projectId, s.id))}
+                        >
+                          Cancel — keep this take
+                        </button>
+                      </div>
+                    </>
                   ) : (
                     <div className="abtns" style={{ marginTop: 8 }}>
                       {!s.voiceApproved && s.voiceUrl && (

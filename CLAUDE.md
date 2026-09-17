@@ -87,14 +87,25 @@ refusal. Both live INSIDE the execution, so any death before either one
 and then never runs) strands the flag with nobody left to clear it. That
 alone would be survivable; what makes it a dead end is that the UI shows the
 in-flight state **instead of** the button row, so the stranded scene cannot
-be approved, edited, or retried. Per-scene rewrite now carries its own way
-out — "⟳ Send the rewrite again" and "Cancel — keep this text"
-(`restartSceneRewrite` / `cancelSceneRewrite`). Video regen now has the same
-pair (`restartVideoRegen` / `cancelVideoRegen`) because approving an image
-queues one automatically — see below. The image and voice regen states in
-`SceneBoard` still have the identical shape and no escape yet.
+be approved, edited, or retried. **Every one of the five now carries its own
+way out**, a re-send and a keep-what-exists, and they are deliberately worded
+the same so the pair is recognisable wherever it appears:
+
+| Flag | Where the pair lives | Actions |
+|---|---|---|
+| scene text (`Regenerare Text`) | `SceneReview` | `restartSceneRewrite` / `cancelSceneRewrite` |
+| `Regenerează Imagine` | `SceneBoard` (Images step) | `restartImageRegen` / `cancelImageRegen` |
+| `Regenerează Voce` | `AudioReview` | `restartVoiceRegen` / `cancelVoiceRegen` |
+| `Regenerează Video` | `SceneBoard` (Video step) | `restartVideoRegen` / `cancelVideoRegen` |
+| `hookRegen` (Editing Options) | `HookPanel`, on whatever step is open | `regenerateHook` / `cancelHookRegen` |
+
+The last two of those (image, voice) landed 2026-09-16; before that the two
+states were dead ends. **Cancel never restores an approval** — it clears the
+in-flight flag and hands the scene back to review, because whether the asset
+that survived is good enough is the producer's call, not the button's.
 **When you add a state whose exit is written by someone else, give it a
-local exit too.**
+local exit too** — and see `docs/lessons-site.md` for the second half of the
+rule, that the exit has to be on screen at the moment it is needed.
 
 There is also an inactive legacy `2. Scripting Sub-Workflow`
 (`5YWpycnnL6OaDWIx`) — superseded by Claude Scripting, referenced by nothing.
@@ -104,7 +115,9 @@ Webhooks the site calls: `new-project`, `resume-project`, `restart-scripting`
 (all three on the Master Orchestrator), `scene-text-regen`,
 `scene-image-regen`, `scene-voice-regen` (all three on Claude Scripting),
 `assemble`, and the single-purpose ones — `expand-brief`, `yt-scene-titles`,
-`upscale-film`, `list-music`/`share-music`, `archive-suggest`, `hook-regen`. The site derives all of them from `N8N_NEW_PROJECT_WEBHOOK_URL`
+`upscale-film`, `list-music`/`share-music`, `archive-suggest`, `hook-regen`,
+`series-recap` (its own workflow `4jVkQjpr7terqQhY`, fired by `approveScript`
+for an episode of a series — `db/port/series-recap/`). The site derives all of them from `N8N_NEW_PROJECT_WEBHOOK_URL`
 by string-replacing the last path segment, so they must live on the same host
 — and each new one must be a plain `path` with no path parameters, or the
 derived URL will not resolve.
@@ -325,6 +338,36 @@ expected and harmless for an app touching only its own Drive.
   **Owed**: the hold has never been heard on a render, and the
   `Rewrite Script` path (producer rejects with feedback) still carries
   neither the spine nor these rules.
+- **Series exist since 2026-09-16** (`db/port/series/README.md`; lessons in
+  `docs/lessons-site.md` under "Series — the same cast, film after film").
+  `/series` lists the shows, a show is started from any film with a Story
+  Bible, `/series/<id>` shows the cast with their sheets and the episodes,
+  `/new?series=<id>` opens the brief as the next episode. The bible rides
+  to Scripting as Lore, the sheets as Editing Options (orchestrator
+  `1bde883f`, `Normalize Webhook Input`); no other node changed. **Sheet
+  ingest is live since 2026-09-17 11:33 UTC** (Media Generation
+  `71b42624`, `db/port/sheet-ingest/`): every new cast sheet and set plate
+  is posted to `/api/media/ingest` (`field: "sheets"`) while Flow's signed
+  URL is alive, so the series page shows faces for anything drawn from
+  then on; sheets drawn before that stay initials. **What is owed**: one
+  real episode — read its Story Bible against the series page (same
+  names, same descriptions), check `SHEET PLAN` says the cast was skipped,
+  not drawn again, and `SHEET KEEP` in the log of the first film that
+  draws a sheet.
+  **The bookkeeping after each episode is automatic since the same
+  evening** (`db/port/series/README.md`, "What happens by itself"): when
+  an episode's script is approved, the site re-keys the episode's sheets
+  to the bible's spelling of each name, writes new characters / places /
+  objects back to the show, and POSTs the project to the `series-recap`
+  webhook (workflow `4jVkQjpr7terqQhY`, `db/port/series-recap/`), which
+  has gpt-5.4 write the `Episode N — Title: …` line onto
+  `series.previously` — replace-or-append, verified on a throwaway
+  episode (execution 13951). The next episode reads the UNION of the
+  show's sheets and every episode's. **Note for the next debugger**:
+  `project.full_narrator_script` / `edited_narrator_script` are EMPTY on
+  every film since the cutover — the approved narration is the newest
+  `hov.script` row, which is what `Load Episode` reads.
+
 - **The eight kids styles are live end to end since 2026-09-16 ~12:55 UTC**
   (`db/port/kids-styles/README.md` and
   `db/port/sheet-style/README.md`). Claude Scripting `6e21cddc` (`Voice
@@ -345,7 +388,11 @@ expected and harmless for an app touching only its own Drive.
   medium. Same branch: Kids story now visibly selects George as narrator
   and the "Storyteller" tone preset on the brief (`STORYTELLER_TONE`, one
   owner in `derive.ts`) — the tone had been a silent server-side default
-  since 09-08, which the producer read as "no storyteller voice".
+  since 09-08, which the producer read as "no storyteller voice". And the
+  brief has a **Childish** tone (`db/port/childish-tone/`): a
+  `hov.genre_profile` row `recpa1ZmZmXFnGjDi` — the writing profile of a
+  bedtime story — that Kids story selects by itself; the profile's five
+  beats are what to read the first Childish outline against.
 
 - **The sunbeam-dust fix has a mechanism and no outcome yet** (2026-09-15,
   `db/port/still-air/README.md`, lessons in `docs/lessons-pipeline.md` under

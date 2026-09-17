@@ -27,7 +27,26 @@ import {
   normalizePublishing,
   refreshSceneVisualOrigin,
   setSceneProvenance,
+  getSeries,
+  nextEpisodeNo,
+  setProjectSeries,
+  getProjectSeriesSource,
+  insertSeries,
+  updateSeriesNotes,
+  updateSeriesCharacter,
+  updateSeriesBible,
+  getSeriesRefsUnion,
 } from "@/lib/data";
+import {
+  composeSeriesLore,
+  normalizeSeriesBible,
+  normalizeSeriesRefs,
+  normalizeSeriesSettings,
+  hasAnyRefs,
+  reconcileRefsToBible,
+  mergeBibles,
+  type Series,
+} from "@/lib/series";
 import {
   normalizeVisualOrigin,
   refuseFootageType,
@@ -286,19 +305,7 @@ export async function sceneAction(
     // a live media-generation execution being alive to notice the flag.
     // Video still rides the batch loop (it needs Flow + the mux server).
     if (action === "regenerate" && kind === "image") {
-      const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
-      const webhook =
-        process.env.N8N_IMAGE_REGEN_WEBHOOK_URL ??
-        newProject?.replace(/new-project\/?$/, "scene-image-regen");
-      if (webhook?.includes("scene-image-regen")) {
-        const res = await fetch(webhook, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ scene_id: sceneId }),
-          signal: AbortSignal.timeout(15000),
-        });
-        if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
-      }
+      await fireImageRegenWebhook(sceneId);
     }
     // Approving a picture that already has a clip means the clip is now made
     // from an image nobody approved. Nothing downstream ever compares the two
@@ -340,25 +347,9 @@ export async function regenerateVoice(
     // the scene-text rewrite: relying on a long-lived media-generation
     // execution to notice the flag means the feature dies the moment that
     // execution is stopped or finishes.
-    const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
-    const webhook =
-      process.env.N8N_VOICE_REGEN_WEBHOOK_URL ??
-      newProject?.replace(/new-project\/?$/, "scene-voice-regen");
-    if (webhook?.includes("scene-voice-regen")) {
-      const res = await fetch(webhook, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        // voice_id, when present, overrides the mode's voice rule in n8n for
-        // this one synthesis — it's the audio panel's per-scene voice choice.
-        body: JSON.stringify(
-          voiceId && voiceId.includes("_")
-            ? { scene_id: sceneId, voice_id: voiceId }
-            : { scene_id: sceneId },
-        ),
-        signal: AbortSignal.timeout(15000),
-      });
-      if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
-    }
+    // voice_id, when present, overrides the mode's voice rule in n8n for this
+    // one synthesis — it's the audio panel's per-scene voice choice.
+    await fireVoiceRegenWebhook(sceneId, voiceId);
 
     revalidatePath(`/projects/${projectId}`);
     return {
@@ -669,6 +660,66 @@ async function fireSceneRewriteWebhook(sceneId: string): Promise<void> {
     signal: AbortSignal.timeout(15000),
   });
   if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
+}
+
+/**
+ * Fire the standalone image regeneration webhook.
+ *
+ * Given one owner because the restart button below is a second caller, and a
+ * second copy of a derived-webhook rule is exactly how this family drifts:
+ * every one of them is a string-replacement of the last path segment of
+ * `N8N_NEW_PROJECT_WEBHOOK_URL`, so a copy that spells that segment
+ * differently fails against a host that answers 404.
+ *
+ * "off" means nothing is configured to receive it. The flag is written
+ * either way, and the caller says which happened rather than reporting a
+ * send that never left.
+ */
+async function fireImageRegenWebhook(sceneId: string): Promise<"sent" | "off"> {
+  const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
+  const webhook =
+    process.env.N8N_IMAGE_REGEN_WEBHOOK_URL ??
+    newProject?.replace(/new-project\/?$/, "scene-image-regen");
+  if (!webhook?.includes("scene-image-regen")) return "off";
+  const res = await fetch(webhook, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scene_id: sceneId }),
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
+  return "sent";
+}
+
+/**
+ * Fire the standalone voice re-synthesis webhook.
+ *
+ * `voiceId` is the audio panel's per-scene pin, which `VR Pick Voice` lets
+ * beat every mode rule for this one synthesis. The `_` test is the shape of a
+ * stored voice id (`elevenlabs_EXAVITQu4vr4xnSDxMaL`); anything else is a
+ * placeholder from the select and is better omitted than sent as a voice.
+ */
+async function fireVoiceRegenWebhook(
+  sceneId: string,
+  voiceId?: string,
+): Promise<"sent" | "off"> {
+  const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
+  const webhook =
+    process.env.N8N_VOICE_REGEN_WEBHOOK_URL ??
+    newProject?.replace(/new-project\/?$/, "scene-voice-regen");
+  if (!webhook?.includes("scene-voice-regen")) return "off";
+  const res = await fetch(webhook, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(
+      voiceId && voiceId.includes("_")
+        ? { scene_id: sceneId, voice_id: voiceId }
+        : { scene_id: sceneId },
+    ),
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
+  return "sent";
 }
 
 /**
@@ -1010,6 +1061,140 @@ export async function cancelVideoRegen(
     return {
       ok: true,
       message: "Cancelled — the scene keeps its current clip and is back in review.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/**
+ * Re-fire an image regeneration that never came back.
+ *
+ * Third in the family after `restartSceneRewrite` and `restartVideoRegen`,
+ * and it exists for the reason all three do: `Regenerează Imagine` is cleared
+ * from INSIDE the n8n run — by the write-back when a picture lands, by the
+ * rewrite ladder when Flow refuses for good — so a run that dies between the
+ * two strands the flag with nobody left to clear it.
+ *
+ * Re-posting is safe: the regeneration reads the scene fresh and overwrites
+ * the picture at the end, so a duplicate run costs one image and the last
+ * writer wins.
+ */
+export async function restartImageRegen(
+  projectId: string,
+  sceneId: string,
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    // Whatever is on screen right now is about to be replaced — including a
+    // picture a half-finished run already landed.
+    await autoKeep(sceneId, "image");
+    // Re-arm rather than assume: a run that got partway may have cleared the
+    // flag before dying, and the flag is what n8n matches on.
+    await writeSceneApproval(sceneId, "image", "regenerate");
+    const sent = await fireImageRegenWebhook(sceneId);
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message:
+        sent === "sent"
+          ? "Sent again — a fresh picture lands here in ~30s."
+          : "Flag re-armed, but no scene-image-regen webhook is configured here, so only a running batch can pick it up.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/**
+ * Give up on a stuck image regeneration and keep the picture that exists.
+ *
+ * Approval is deliberately NOT restored, exactly as in `cancelVideoRegen`:
+ * clearing the flag hands the scene back to review, and whether the picture
+ * on screen is good enough is the producer's call rather than this button's.
+ */
+export async function cancelImageRegen(
+  projectId: string,
+  sceneId: string,
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    // Only the flag. Unlike the video twin there is no status to rewind —
+    // `writeSceneApproval` never moves `Status Producție Scenă` for an image,
+    // and the board derives what it shows from the checkboxes anyway.
+    await writeSceneFields(sceneId, { "Regenerează Imagine": false });
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message: "Cancelled — the scene keeps its current picture and is back in review.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/**
+ * Re-fire a voice re-synthesis that never came back.
+ *
+ * `voiceId` carries the panel's per-scene pin forward: the select the
+ * producer chose before pressing Regenerate is still on screen beside this
+ * button, and dropping it on the retry would quietly hand the line back to
+ * the mode's default voice — a different narrator for one scene, which is the
+ * kind of thing only a full listen catches.
+ *
+ * The narration is deliberately NOT re-sent. It is already stored, and every
+ * writer of `Script Scenă` has to invalidate the take that was recorded from
+ * it — a restart changes nothing about the line, so it must not become a
+ * fourth writer of one.
+ */
+export async function restartVoiceRegen(
+  projectId: string,
+  sceneId: string,
+  voiceId?: string,
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    await requestVoiceRegen(sceneId);
+    const sent = await fireVoiceRegenWebhook(sceneId, voiceId);
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message:
+        sent === "sent"
+          ? "Sent again — a new take is synthesized in ~30-60s (the page refreshes itself)."
+          : "Flag re-armed, but no scene-voice-regen webhook is configured here, so only a running batch can pick it up.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/**
+ * Give up on a stuck re-synthesis and keep the take that exists.
+ *
+ * Only the in-flight flag is cleared. Asking for the regeneration also
+ * withdrew the voice and video approvals (`requestVoiceRegen`), and those
+ * stay withdrawn: the take is listened to and signed off, or asked for again.
+ */
+export async function cancelVoiceRegen(
+  projectId: string,
+  sceneId: string,
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    await writeSceneFields(sceneId, { "Regenerează Voce": false });
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message: "Cancelled — the scene keeps its current take and is back in review.",
     };
   } catch (e) {
     return { ok: false, message: friendlyError(e) };
@@ -1805,6 +1990,12 @@ export async function approveScript(
       fields["Script Content"] = content;
     }
     await writeScriptFields(scriptId, fields);
+    // An episode of a series: keep the show in step with what was just
+    // approved — before Media Generation reads the references. Never fails
+    // the approval: the show is bookkeeping, the film is the work.
+    await onEpisodeScriptApproved(projectId).catch((e) =>
+      console.warn(`series bookkeeping after approval: ${(e as Error).message}`),
+    );
     revalidatePath(`/projects/${projectId}`);
     return { ok: true, message: "Script approved — production continues." };
   } catch (e) {
@@ -2188,6 +2379,32 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     // n8n not to write it at all.
     delete (payload as { voice_tone?: VoiceTone }).voice_tone;
   }
+  /*
+   * An episode of a series. The series rides to n8n two ways, both through
+   * inputs the pipeline already has: its bible becomes LORE — the canon
+   * mechanism `Generate Story Bible` treats as ground truth, so the cast keeps
+   * its names and looks — and its reference sheets ride as `series.refs`,
+   * which `Normalize Webhook Input` copies into Editing Options so
+   * `Cast Sheet Prep` and `Set Plate Prep` skip every name that already has
+   * one. The link itself (series_id, episode_no) is written by the site after
+   * the record exists — a column, not an Editing Options key, so the
+   * orchestrator's ref-image rebuild cannot wipe it.
+   */
+  const seriesIdRaw = String(formData.get("series_id") ?? "").trim();
+  let series: Series | null = null;
+  let episodeNo: number | null = null;
+  if (/^rec[A-Za-z0-9]{14}$/.test(seriesIdRaw)) {
+    series = await getSeries(seriesIdRaw).catch(() => null);
+    if (!series) return { ok: false, message: "That series no longer exists — start the episode from the Series page." };
+    episodeNo = await nextEpisodeNo(series.id);
+    payload.lore = composeSeriesLore(series, episodeNo, payload.lore);
+    // Every sheet the show can reuse — its own plus what later episodes drew
+    // for the characters they introduced.
+    const found: Series = series;
+    const refs = await getSeriesRefsUnion(found.id).catch(() => found.refs);
+    series = { ...found, refs };
+    (payload as Record<string, unknown>).series = { id: found.id, refs };
+  }
   const projectName = payload["Nume Proiect"];
   let newProjectId: string | null = null;
   let webhookError: string | null = null;
@@ -2258,6 +2475,15 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
    */
   if (newProjectId && String(formData.get("source_watermark") ?? "yes") === "no") {
     await updateEditingOptions(newProjectId, { sourceWatermark: false }).catch(() => {});
+  }
+  if (newProjectId && series) {
+    await setProjectSeries(newProjectId, series.id, episodeNo).catch(() => {});
+    // Belt and braces for the sheets: Normalize Webhook Input stores them from
+    // the payload, and this merge repeats the same keys — harmless when the
+    // orchestrator did its part, and the only copy on an orchestrator that
+    // has not been updated yet. Lost only on a film with a reference photo,
+    // whose options the orchestrator rebuilds (see its Normalize node).
+    await updateEditingOptions(newProjectId, { seriesId: series.id, ...series.refs }).catch(() => {});
   }
 
   revalidatePath("/");
@@ -2514,4 +2740,141 @@ export async function login(formData: FormData): Promise<ActionResult> {
     path: "/",
   });
   redirect("/");
+}
+
+// ---------------------------------------------------------------------------
+// Series — a show made from a film (lib/series.ts, db/012)
+// ---------------------------------------------------------------------------
+
+/**
+ * Turn a film into episode 1 of a new show. Everything is a COPY of what the
+ * film already carries: the Story Bible's characters, places, objects, look
+ * and rules; the consistency references in its Editing Options (the Flow ids
+ * of every sheet and plate the pipeline drew); the brief's settings. A film
+ * without a bible cannot start a series — there would be nothing to keep.
+ */
+export async function createSeriesFromProject(formData: FormData): Promise<void> {
+  const projectId = String(formData.get("project_id") ?? "").trim();
+  const name = String(formData.get("name") ?? "").trim().slice(0, 140);
+  const premise = String(formData.get("premise") ?? "").trim().slice(0, 1200);
+  if (!/^rec[A-Za-z0-9]{14}$/.test(projectId) || !name) redirect("/series");
+  const src = await getProjectSeriesSource(projectId);
+  if (!src) redirect("/series");
+  if (src.seriesId) redirect(`/series/${src.seriesId}`);
+  const bible = normalizeSeriesBible(src.storyBible);
+  if (bible.characters.length === 0 && bible.locations.length === 0) redirect("/series?from=" + projectId);
+  const refs = normalizeSeriesRefs(src.editingOptions);
+  const settings = normalizeSeriesSettings(src.editingOptions);
+  const opts = (src.editingOptions && typeof src.editingOptions === "object") ? (src.editingOptions as Record<string, unknown>) : {};
+  const id = await insertSeries({
+    name,
+    premise: premise || bible.logline,
+    channelName: "",
+    category: typeof opts.category === "string" && opts.category ? opts.category : "story",
+    tone: src.tone,
+    language: src.language || "English",
+    aspect: src.aspect === "9:16" ? "9:16" : "16:9",
+    voiceId: src.voiceId,
+    settings,
+    bible,
+    refs: hasAnyRefs(refs) ? refs : refs,
+    sourceProjectId: src.id,
+  });
+  await setProjectSeries(src.id, id, 1);
+  revalidatePath("/series");
+  revalidatePath(`/projects/${src.id}`);
+  redirect(`/series/${id}`);
+}
+
+export async function saveSeriesNotes(
+  seriesId: string,
+  patch: { name?: string; premise?: string; previously?: string; channelName?: string },
+): Promise<ActionResult> {
+  if (!/^rec[A-Za-z0-9]{14}$/.test(seriesId)) return { ok: false, message: "Not a series." };
+  const clean = {
+    ...(typeof patch.name === "string" && patch.name.trim() ? { name: patch.name.trim().slice(0, 140) } : {}),
+    ...(typeof patch.premise === "string" ? { premise: patch.premise.trim().slice(0, 1200) } : {}),
+    ...(typeof patch.previously === "string" ? { previously: patch.previously.trim().slice(0, 4000) } : {}),
+    ...(typeof patch.channelName === "string" ? { channelName: patch.channelName.trim().slice(0, 140) } : {}),
+  };
+  try {
+    await updateSeriesNotes(seriesId, clean);
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+  revalidatePath(`/series/${seriesId}`);
+  revalidatePath("/series");
+  return { ok: true, message: "Saved." };
+}
+
+export async function saveSeriesCharacter(
+  seriesId: string,
+  name: string,
+  patch: { role?: string; description?: string },
+): Promise<ActionResult> {
+  if (!/^rec[A-Za-z0-9]{14}$/.test(seriesId) || !name) return { ok: false, message: "Not a series character." };
+  try {
+    await updateSeriesCharacter(seriesId, name, patch);
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+  revalidatePath(`/series/${seriesId}`);
+  return { ok: true, message: "Saved." };
+}
+
+/**
+ * The moment a show catches up with an episode — its script just got
+ * approved, so the Story Bible exists and Media Generation has not run.
+ *
+ * 1. RECONCILE. The sheets are attached by character name, and the writer
+ *    was told the exact names but may still have written "Pip the Fox".
+ *    Where the episode's bible spells a name differently and the match is
+ *    unambiguous, the references are re-keyed to the bible's spelling —
+ *    so Cast Sheet Prep finds them and skips drawing a new face.
+ * 2. WRITE BACK. A character, place or object this episode invented is
+ *    added to the show's bible, so the next episode keeps it. (Its sheet,
+ *    drawn later by Media Generation, is picked up by getSeriesRefsUnion.)
+ * 3. RECAP. The pipeline writes "what has happened so far" itself — the
+ *    `series-recap` webhook summarises the approved narration and appends
+ *    one dated line to the show. Fire-and-forget: the site never waits on
+ *    a model.
+ * Runs for the human's Approve and for hands-off mode alike: both go
+ * through approveScript.
+ */
+async function onEpisodeScriptApproved(projectId: string): Promise<void> {
+  const src = await getProjectSeriesSource(projectId);
+  if (!src?.seriesId) return;
+  const series = await getSeries(src.seriesId);
+  if (!series) return;
+  const bible = normalizeSeriesBible(src.storyBible);
+  if (bible.characters.length === 0 && bible.locations.length === 0) return;
+
+  const current = normalizeSeriesRefs(src.editingOptions);
+  const { refs, renamed } = reconcileRefsToBible(current, bible);
+  if (renamed.length) {
+    await updateEditingOptions(projectId, { ...refs });
+    console.log(`series ${series.id}: references re-keyed for episode ${projectId}: ${renamed.map((r) => `${r.from} → ${r.to}`).join(", ")}`);
+  }
+
+  const merged = mergeBibles(series.bible, bible);
+  const addedAny = merged.added.characters.length + merged.added.objects.length + merged.added.locations.length > 0;
+  if (addedAny) {
+    await updateSeriesBible(series.id, merged.bible);
+    console.log(`series ${series.id}: episode ${projectId} added ${JSON.stringify(merged.added)}`);
+    revalidatePath(`/series/${series.id}`);
+  }
+
+  try {
+    const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
+    const webhook = newProject?.replace(/new-project\/?$/, "series-recap");
+    if (!webhook?.includes("series-recap")) return;
+    await fetch(webhook, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project_id: projectId }),
+      signal: AbortSignal.timeout(8000),
+    });
+  } catch (e) {
+    console.warn(`series-recap webhook: ${(e as Error).message}`);
+  }
 }

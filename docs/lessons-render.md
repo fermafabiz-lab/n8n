@@ -324,7 +324,8 @@ on the brief (section 03) and again at the audio step, and sent as
   account's five-concurrent limit and the sixth came back 429; `VR Write Voice`
   never ran, so that scene's `Regenerează Voce` stayed set and the UI showed a
   re-synthesis with nothing left alive to finish it (the stranded-flag shape
-  again, and voice regen still has no local exit). Fixed with `retryOnFail`
+  again; since 2026-09-16 the take carries its own way out, `restartVoiceRegen`
+  / `cancelVoiceRegen` on the badge in `AudioReview`). Fixed with `retryOnFail`
   (5 tries, 5s apart) on `AB Speak`, `Speak VR` and `VR Speak`, which covers
   every source of concurrency; the site's stagger past the fourth scene is
   only a second line of defence.

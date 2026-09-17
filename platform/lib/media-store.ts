@@ -17,7 +17,8 @@ import { mkdir, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 export const MEDIA_ROOT = process.env.MEDIA_ROOT || "/media";
-export type MediaField = "image" | "video" | "image_version";
+/** `sheet` is a reference sheet (db/012 sheet_media) — the "scene" in its path is the PROJECT id. */
+export type MediaField = "image" | "video" | "image_version" | "sheet";
 
 export interface StoredFile {
   /** Relative to the store; what attachment rows hold. */

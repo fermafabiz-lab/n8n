@@ -1493,6 +1493,19 @@ until a first test film is judged. How each piece works:
   swaps George for the first Romanian voice, which today is Mihai, also
   `narrative_story`. A default the producer cannot see is a default they
   will report as missing.
+- **"Childish" is a TONE, i.e. a genre profile (2026-09-16,
+  `db/port/childish-tone/`).** Tone selects the row of `hov.genre_profile`
+  that shapes the outline and the narration, and a chip with no row is
+  silently written as a DOCUMENTARY (the built-in fallback's fallback). So
+  the tone the producer asked for is one row — no research, invention
+  required, hero → small problem → tries with friends → the brave-small
+  thing works → home and a goodnight; storyteller voice at 110 wpm,
+  montage intensity 0 — plus one chip. Kids story selects it while the
+  tone is untouched, the same way it selects George and the Storyteller
+  preset; it composes with Voice Mode's KIDS STORY MODE rather than
+  repeating it. Both title-typeface maps (`tone-type.ts`, `presetForTone`)
+  fall to their default for it, in lockstep; a picture-book card look is a
+  render change not yet made.
 
 ### The hook is a teaser — six styles, one shot per beat, a plan the site can rewrite (2026-09-11)
 

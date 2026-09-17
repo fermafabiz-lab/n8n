@@ -1,0 +1,25 @@
+{
+  "why": "Keep the bytes of every reference sheet and set plate while Flow's signed URL is alive, so a series page can show the faces the pipeline reuses (db/012 sheet_media, /api/media/ingest field=sheets). Six nodes, two per chain: Prep (Code, one item out always) -> ? (IF, !skip) -> Ingest (HTTP, onError continueRegularOutput, one request for the whole pass).",
+  "nodes": [
+    { "name": "Sheet Ingest Prep", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [-720, 96], "parameters": { "jsCode": "<paste/Sheet Ingest Prep.js>" } },
+    { "name": "Sheet Ingest?", "type": "n8n-nodes-base.if", "typeVersion": 2.3, "position": [-560, 96],
+      "parameters": { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 3 }, "conditions": [ { "id": "sheet-ingest-has-work", "leftValue": "={{ !$json.skip }}", "rightValue": "", "operator": { "type": "boolean", "operation": "true", "singleValue": true } } ], "combinator": "and" }, "options": {} } },
+    { "name": "Ingest Sheets", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [-400, 96], "onError": "continueRegularOutput",
+      "credentials": { "httpHeaderAuth": { "id": "8kpY42LmZaBYBzfY", "name": "HOV Media Ingest" } },
+      "parameters": { "method": "POST", "url": "http://web:3000/api/media/ingest", "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth", "sendBody": true, "specifyBody": "json", "jsonBody": "={{ JSON.stringify({ field: \"sheets\", projectId: $json.projectId, items: $json.items }) }}", "options": { "timeout": 180000 } } },
+    { "name": "Plate Ingest Prep", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [-560, -160], "parameters": { "jsCode": "<paste/Plate Ingest Prep.js>" } },
+    { "name": "Plate Ingest?", "type": "n8n-nodes-base.if", "typeVersion": 2.3, "position": [-400, -160],
+      "parameters": { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 3 }, "conditions": [ { "id": "plate-ingest-has-work", "leftValue": "={{ !$json.skip }}", "rightValue": "", "operator": { "type": "boolean", "operation": "true", "singleValue": true } } ], "combinator": "and" }, "options": {} } },
+    { "name": "Ingest Plates", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [-240, -160], "onError": "continueRegularOutput",
+      "credentials": { "httpHeaderAuth": { "id": "8kpY42LmZaBYBzfY", "name": "HOV Media Ingest" } },
+      "parameters": { "method": "POST", "url": "http://web:3000/api/media/ingest", "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth", "sendBody": true, "specifyBody": "json", "jsonBody": "={{ JSON.stringify({ field: \"sheets\", projectId: $json.projectId, items: $json.items }) }}", "options": { "timeout": 180000 } } }
+  ],
+  "connections": {
+    "removed": [ "Save Cast Refs -> Set Plate Prep", "Save Set Plates -> Find Audio Folder" ],
+    "added": [
+      "Save Cast Refs -> Sheet Ingest Prep", "Sheet Ingest Prep -> Sheet Ingest?", "Sheet Ingest? [true] -> Ingest Sheets", "Sheet Ingest? [false] -> Set Plate Prep", "Ingest Sheets -> Set Plate Prep",
+      "Save Set Plates -> Plate Ingest Prep", "Plate Ingest Prep -> Plate Ingest?", "Plate Ingest? [true] -> Ingest Plates", "Plate Ingest? [false] -> Find Audio Folder", "Ingest Plates -> Find Audio Folder"
+    ],
+    "unchanged": [ "Cast Sheet? [false] -> Set Plate Prep", "Set Plate? [false] -> Find Audio Folder" ]
+  }
+}

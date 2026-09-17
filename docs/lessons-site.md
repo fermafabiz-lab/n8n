@@ -872,6 +872,33 @@ Full account: `db/port/created-by/README.md`.
   add a state whose exit is written by someone else, ask not only whether it
   HAS a local exit but whether that exit is on screen at the moment it is
   needed.
+- **The escape hatches are a family now, and it is closed** (2026-09-16). The
+  image and voice badges were the last two dead ends: `RegenBadge` replaces
+  the whole button row, so a stranded `Regenerează Imagine` hid Approve, Save
+  draft, Regenerate and the archive picker, and a stranded `Regenerează Voce`
+  hid Approve, the per-scene voice select and Regenerate. Both now render the
+  badge and the same pair every other in-flight state carries — "⟳ Send it
+  again" / "Cancel — keep this picture|take" (`restartImageRegen` /
+  `cancelImageRegen`, `restartVoiceRegen` / `cancelVoiceRegen`). Three things
+  are worth copying into the sixth one:
+  - **Re-arm the flag, do not assume it.** A run that got partway may have
+    cleared it before dying, and the flag is what n8n's loop matches on. The
+    restart writes it again, then fires the webhook.
+  - **Carry the pin.** The voice retry passes `voiceSel[s.id]` back, because
+    the producer's per-scene voice choice is on screen right beside the
+    button and a retry that dropped it would bring the line back in the
+    mode's default voice — a different narrator for one scene, which only a
+    full listen catches.
+  - **The restart says which of the two things happened.** A derived webhook
+    that is not configured is not a send, so the action returns "sent" or
+    "off" and the message tells the truth rather than promising a run that
+    never left. Same honesty as `restartVideoRegen`'s three-way message.
+  Both webhook URLs also got ONE owner each (`fireImageRegenWebhook`,
+  `fireVoiceRegenWebhook` in `actions.ts`) rather than a second inline copy
+  of the string-replacement rule — the seven site webhooks are all derived
+  from `N8N_NEW_PROJECT_WEBHOOK_URL` by swapping the last path segment, and a
+  copy that spells that segment differently fails silently against a host
+  that answers 404.
 - `ProductionActivity` (project page) mirrors the batch rule from `Sort & Cap
   Scenes`: a scene is done for the batch once its clip exists, pending scenes
   sort first, and `MEDIA_BATCH_CAP` in `platform/lib/n8n.ts` is a display
@@ -1715,3 +1742,88 @@ then the device flipped under it — with the attribute, the cookie, the
 **Rule from here: a colour literal in `globals.css` or a module sheet needs a
 sentence saying which both-theme surface it sits on.** Anything else is a
 token, and a token is one `light-dark()` — never a second block.
+
+### Series — the same cast, film after film (2026-09-16)
+
+A series is a film's Story Bible and its consistency references hoisted above
+the project and copied back down on each episode (`db/port/series/README.md`
+has the whole mechanism). What the site learned building it:
+
+- **Nothing in n8n knows what a series is, on purpose.** The bible rides to
+  Claude Scripting as Lore — the canon input `Generate Story Bible` already
+  treats as ground truth — and the reference sheets ride as the five Editing
+  Options keys `Cast Sheet Prep` / `Set Plate Prep` already skip. One
+  orchestrator node (`Normalize Webhook Input`) stores them from the payload.
+- **A key the site writes after creation is not safe on a film with a
+  reference photo**: `Merge Ref Into Options` rebuilds the whole blob from
+  Normalize's value. `createdBy` learned this first; series refs are stored
+  by Normalize for the same reason, and the site's post-create merge is only
+  a backstop.
+- **A face needs bytes.** `castSheets[name].url` is a signed Flow link that
+  dies within hours, so the series page can only show a portrait we copied
+  while it was alive — `hov.sheet_media`, via `/api/media/ingest` with
+  `field: "sheet"`. Until Media Generation posts each new sheet there, a show
+  shows initials and says why.
+- **`/new` is a server page with a client form now** (`page.tsx` reads
+  `?series=` and passes a plain `SeriesPrefill`; the old page is
+  `NewVideoForm.tsx`, unchanged in what it posts). Every posted field name is
+  the same; `series_id` is the one addition, and it is read only by
+  `createProject`.
+- **The series is a COPY, frozen.** Starting it from a film copies the bible,
+  the refs and the settings; a later change to that film changes nothing in
+  the show. Editing a character's description on the series page rewrites
+  the copy, which is what the next episode reads.
+- **The copy keeps itself in step, since the same evening.** The producer's
+  one condition for the whole feature was "nothing manual after an episode",
+  and the three things that would have been manual all hang off ONE moment:
+  script approval (`approveScript` → `onEpisodeScriptApproved`), which is
+  after the Story Bible exists and before Media Generation reads the
+  references. (1) Names: Lore says `USE EXACTLY THESE NAMES` and the writer
+  still sometimes writes "Pip the Fox" for "Pip"; the sheets are keyed by
+  name, so the episode's refs are re-keyed to the bible's spelling where the
+  match is unambiguous (`reconcileRefsToBible`: exact, unique whole-word
+  containment, unique given name of 3+ letters — `check:series` pins the
+  rules). (2) New characters / places / objects go back to the show
+  (`mergeBibles`; a respelling is not new), and both the series page and the
+  next episode read the union of every episode's sheets
+  (`getSeriesRefsUnion`, earlier wins). (3) The recap is written by n8n
+  (`series-recap`, `db/port/series-recap/`), one replace-or-append line per
+  episode; the site only fires the webhook and never waits. What the site
+  learned: **fit a growing text into a capped prompt from the NEWEST end**
+  — `composeSeriesLore` used to cut the Lore at 8000 from the end, which is
+  exactly where the recap sits, so a long-running show would have lost its
+  latest episodes first. It now drops the oldest lines instead.
+
+### The failure list: a stop by hand is not a failure (2026-09-16)
+
+The producer sent a screenshot of the health panel with three red "failed"
+rows and asked for them to be fixed. None was a failure. Two were
+`Master Orchestrator · Execute Media Generation (Resume/Batch) · The
+execution was cancelled manually` — the trace of their own Pause → Resume:
+`pauseProduction` stops the children first, and the orchestrator that was
+waiting in Execute Workflow then ends with status `error` and n8n's
+"cancelled manually" text. The third was `18x6ub9yUvj7H7fy · Probe Series ·
+relation "webhook_entity" does not exist` — a session's throwaway probe,
+already archived, listed by raw id because the panel only knew the four
+production workflows by name.
+
+- **`isManualStop()` (`lib/n8n.ts`) splits the list.** A row whose message
+  matches "cancelled manually" is shown with a grey `stopped` chip and the
+  sentence "Stopped by hand … Not a failure: Resume picks the film up where
+  it left off", is NOT counted in the summary, and does not turn the card
+  red. The summary reads "No failures in the last 24h · 2 stopped by hand"
+  with the idle grey dot. Still listed, because a stop the producer did not
+  press is worth a look; just not an alert.
+- **Throwaways are hidden, unknowns are not.** `getWorkflowMeta()` resolves
+  an id the static map does not know through `GET /workflows/{id}` (cached
+  ten minutes) and drops the row when the workflow is archived or named
+  `zz …` — the convention every probe follows (create → run once →
+  archive). A lookup that fails answers null and the row stays, by id: an
+  unknown workflow is never hidden. The static map now also names the seven
+  single-purpose workflows (Expand Brief, Hook Regen, Archive Suggestions,
+  Music Library, YT Scene Titles, Upscale Film, Series Recap), because a
+  failure there is real and deserves a name.
+- **What the panel cannot do**: delete an execution. The n8n MCP connector
+  has no delete, and the site's API key is not reachable from a web session,
+  so a probe's failed run stays in n8n's own list until it ages out of the
+  24-hour window. Naming probes `zz …` is what keeps them off the site.

@@ -152,3 +152,45 @@ A door may be marked `planned` when its route is not built yet — `hatch_boiler
 is, pointing at `/admin/ops`, which would give `OpsPanel` a room of its own
 instead of the foot of `/projects`. The check asserts a planned route does
 **not** resolve, so the day someone builds it, it says to flip the door to live.
+
+## The façade on /login
+
+The house stands at dusk behind the password form, and its windows are lit by
+what is actually happening: blue in production, amber waiting on you, red
+failed. You can read the state of the factory from the street before you have
+typed anything.
+
+`/login` is the one page the middleware lets through unauthenticated, so what
+it discloses is a real decision, and the answer is **counts only** — no titles,
+no ids, no totals. `lib/facade.ts` owns which windows are lit: failures are
+placed first and running projects last, so on a day with more projects than
+windows it is never a failure that goes unlit.
+
+The lighting is drawn twice — once in WebGL, once as a plain CSS grid — from
+that one function, because the readout is the idea and it should survive the
+absence of a GPU. `components/Facade.tsx` decides between them: the form and a
+painted dusk render immediately from the server, and the WebGL house arrives
+afterwards in its own chunk, only when there is a WebGL context and the visitor
+has not asked for reduced motion.
+
+**`prefers-reduced-motion` means no canvas at all, not a frozen one.** The
+global `animation: none` rule in `globals.css` cannot reach a
+`requestAnimationFrame` loop, and a still 3D house is just a worse version of
+the painted one underneath.
+
+It is plain three.js, not react-three-fiber: R3F 9's stable line peers on
+`react@">=19 <19.3"` while this app floats to 19.3, and it pulls an optional
+expo/react-native peer graph that has no business in a Next app. A reconciler
+earns its keep when a scene mounts and unmounts components; this one is a dozen
+meshes that never change shape. `three` is the only dependency added, and it
+stays out of `/login`'s first load — check the build output if that ever
+changes.
+
+    npm i --no-save playwright-core
+    npx next build && PORT=3100 node .next/standalone/server.js &
+    node scripts/shoot-house.mjs          # writes to .house-shots/
+
+screenshots the page in both themes, at phone width, and with reduced motion,
+and asserts the canvas is present or absent as it should be. Note `next start`
+does **not** work with this project's `output: standalone` — run the standalone
+server, and copy `.next/static` into `.next/standalone/.next/` first.

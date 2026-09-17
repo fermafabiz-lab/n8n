@@ -1768,11 +1768,41 @@ body:has(.nb) .nav {
   font-weight: 650;
 }
 
-/* login */
+/* login — the house at dusk stands behind the form, so the app chrome comes
+   off the same way the marketing page takes it off: every link in that nav
+   needs the session you have not got yet. The façade itself is fixed and
+   full-bleed behind `.page`, which already carries `z-index: 1`. */
+body:has(.login-page) .nav,
+body:has(.login-page) .navfade,
+body:has(.login-page) .glow,
+body:has(.login-page) .vignette {
+  display: none;
+}
+.login-page {
+  min-height: 100vh;
+  display: grid;
+  align-content: center;
+}
+/* Wide enough to show the house AND the form: the card takes the left of the
+   frame and the building stands to the right of it. Narrower than this there
+   is only room for one of them, so the card re-centres and the house becomes
+   a backdrop. */
+@media (min-width: 900px) {
+  .login-page {
+    justify-items: start;
+    padding-left: clamp(28px, 7vw, 120px);
+  }
+}
 .login {
   min-height: 70vh;
   display: grid;
   place-items: center;
+  /* The façade is positioned, so an unpositioned card paints UNDERNEATH it
+     even though the façade's z-index is lower — positioned elements win over
+     non-positioned content inside the same stacking context. Costs the whole
+     form if you forget it. */
+  position: relative;
+  z-index: 1;
 }
 .login .card {
   width: 360px;

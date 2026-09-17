@@ -24,6 +24,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { WINDOWS, windowStates } from "@/lib/facade.ts";
 import { BENCH, HOTSPOTS, MESH_NAME, MESH_PREFIXES, NOT_A_DOOR } from "@/lib/house.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -157,6 +158,63 @@ if (block) {
     JSON.stringify(stages) === JSON.stringify(benchStages)
       ? `${stages.length} stages: ${stages.join(" -> ")}`
       : `pipeline ${JSON.stringify(stages)} vs bench ${JSON.stringify(benchStages)}`,
+  );
+}
+
+// --- the façade's lighting ------------------------------------------------
+// Drawn twice — WebGL and a CSS grid — from this one function, so it is worth
+// pinning. The interesting case is the overflow: on a busy day there are more
+// projects than windows, and what gets dropped matters.
+{
+  const tally = (a) => a.reduce((m, s) => ({ ...m, [s]: (m[s] ?? 0) + 1 }), {});
+
+  const none = windowStates(null);
+  check(
+    "no counts lights nothing",
+    none.length === WINDOWS && none.every((s) => s === "dark"),
+    `${none.length} windows, all dark`,
+  );
+
+  const some = windowStates({ run: 3, wait: 2, err: 1 });
+  const t = tally(some);
+  check(
+    "each project lights exactly one window",
+    some.length === WINDOWS && t.run === 3 && t.wait === 2 && t.err === 1 && t.dark === WINDOWS - 6,
+    JSON.stringify(t),
+  );
+
+  // The scatter is what stops the building reading as a progress bar.
+  const lit = some.map((s, i) => (s === "dark" ? -1 : i)).filter((i) => i >= 0);
+  const contiguous = lit.every((v, i) => i === 0 || v === lit[i - 1] + 1);
+  check("lit windows are scattered, not a run", !contiguous, `indices ${lit.join(",")}`);
+
+  // Deterministic, because the server and the client both render this and a
+  // random scatter would be a hydration mismatch.
+  check(
+    "the same counts light the same windows",
+    JSON.stringify(windowStates({ run: 3, wait: 2, err: 1 })) === JSON.stringify(some),
+    "stable across calls",
+  );
+
+  // 542 projects, 24 windows. Failures are placed first and running projects
+  // last, so what gets dropped is the least urgent thing: every failure is
+  // still lit, the rest of the grid goes to what is waiting, and "running"
+  // loses its windows entirely.
+  const flood = tally(windowStates({ run: 500, wait: 40, err: 2 }));
+  check(
+    "more projects than windows never loses a failure",
+    (flood.dark ?? 0) === 0 &&
+      flood.err === 2 &&
+      flood.wait === WINDOWS - 2 &&
+      (flood.run ?? 0) === 0,
+    JSON.stringify(flood),
+  );
+
+  const negative = windowStates({ run: -5, wait: 0, err: 0 });
+  check(
+    "a nonsense count cannot break the grid",
+    negative.length === WINDOWS && negative.every((s) => s === "dark"),
+    "clamped",
   );
 }
 

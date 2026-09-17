@@ -141,11 +141,37 @@ no equivalent here. Within a single execution the image phase stays serial;
 parallelising it would need separate executions, with the static-data problem
 above.
 
-### P2 — concurrent jobs per account
+### P2 — concurrent jobs per account (execution 14298, 2026-09-17)
 
-Not run, and moot until the tier question below is resolved: there is no point
-measuring how many jobs a free-tier account will accept when it cannot generate
-at all on the model the pipeline uses.
+Three `veo-3.1-lite-low-priority` i2v submissions to `fermafabiz@gmail.com`,
+back to back with no wait between them, from one real start image.
+
+**One of three was accepted. The other two came back HTTP 429.**
+
+| job | started | took | result |
+|---|---|---|---|
+| 1 | 16:09:15 | 7.2 s | `429` — "Try spacing your requests out" |
+| 2 | 16:09:22 | 12.5 s | accepted, `jobid j0917160923…` |
+| 3 | 16:09:35 | 7.7 s | `429` |
+
+Note the spacing was not tight: n8n ran them serially, so submits were already
+7-13 s apart, and two still bounced. The accepted one echoed
+`videoModelName: veo_3_1_i2v_lite_low_priority`, `tier: PAYGATE_TIER_TWO`,
+`remainingCredits: 23330` — unchanged from before the run, confirming the
+low-priority model really is free — and burned one CapSolver captcha (5.4 s).
+
+**What this settles:** the SUBMIT path is rate-limited per account, hard enough
+that a pool cannot fill its window from one account. Spreading submissions
+across accounts is not an optimisation, it is the way past the 429 — which is
+exactly what the contiguous-block design provides. Etapa 1's account assignment
+and Etapa 2's per-account reference sets are therefore both required, not
+optional.
+
+**What this does NOT settle:** whether one account can have two or more clips
+*generating* at once when the submissions are spaced far enough apart. The
+probe never got that far, because two of them never reached Google. That needs
+a slower probe — submit, wait 60 s, submit again, then compare completion
+times — before the pool's per-account window is set above 1.
 
 ### P3 — is account A's media id refused on account B? (execution 14274)
 

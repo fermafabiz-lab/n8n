@@ -1,0 +1,79 @@
+/* Mechanics only: no brand, no type scale. Just enough to see the hero work. */
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: #000;
+  color: #ddd;
+  font-family: system-ui, sans-serif;
+}
+
+/* The section is the scroll track: 200vh tall, of which the sticky stage
+   pins 100vh, so the sequence scrubs across exactly one viewport of scroll.
+   After that the stage unpins and scroll is ordinary again. */
+.hero {
+  position: relative;
+  height: 200vh;
+}
+
+.hero__stage {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: hidden;
+  background: #000;
+}
+
+.hero__poster,
+.hero__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.hero__poster {
+  object-fit: cover;
+}
+
+/* The canvas exists in the DOM from the first paint but stays hidden until
+   the component has drawn its first frame; the poster then steps back. Both
+   toggles hang off one attribute so they flip in the same frame. */
+.hero__canvas {
+  visibility: hidden;
+}
+
+.hero[data-state="ready"] .hero__canvas {
+  visibility: visible;
+}
+
+.hero[data-state="ready"] .hero__poster {
+  visibility: hidden;
+}
+
+/* Reduced motion and narrow screens: no scroll track, no canvas, only the
+   poster at one viewport. The CSS decides the layout so nothing shifts when
+   the script arrives and reaches the same verdict. */
+@media (max-width: 767px), (prefers-reduced-motion: reduce) {
+  .hero {
+    height: 100vh;
+  }
+
+  .hero__canvas,
+  .hero[data-state="ready"] .hero__canvas {
+    display: none;
+  }
+
+  .hero[data-state="ready"] .hero__poster {
+    visibility: visible;
+  }
+}
+
+.test-section {
+  height: 100vh;
+  display: grid;
+  place-items: center;
+  border-top: 1px dashed #444;
+}

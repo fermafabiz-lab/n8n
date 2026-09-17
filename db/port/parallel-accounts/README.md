@@ -1,16 +1,56 @@
 # Parallel generation across three Google Flow accounts
 
-Status: **Etapa 1 APPLIED and LIVE since 2026-09-17 ~15:55, and it is a NO-OP
-until someone sets `Editing Options.flowAccounts`.**
+Status: **Etapa 1 and the regen-path fix are APPLIED and LIVE. Both are a
+NO-OP until someone sets `Editing Options.flowAccounts`.**
 
-| Workflow | now active | was active (saved here as `Media Generation.original.json`) |
+| Applied | version | built on |
 |---|---|---|
-| 3. Media Generation `yHG4DBCDjR3RJzav` | `4ecc8330` | `6735a96a` |
+| Etapa 1 — per-scene account assignment | `4ecc8330` (2026-09-17 ~15:55) | `6735a96a` |
+| Regen paths derive their account from the start frame | `62ebd784` (~16:45) | `549d982d` |
 
-Rollback is `restore_workflow_version` to `6735a96a`.
+Rollback is `restore_workflow_version` to the "built on" id.
+
+**A second author works on this workflow.** Between the two entries above, Dan's
+session published eight versions (16:28-16:36) including a whole new standalone
+`Video Regen Webhook` chain — `VRW Load Scene`, `VRW Build Regen`,
+`VRW Can Regen?`, `VRW Refuse?`, `VRW Video Done?`, `VRW Filtered Done?`,
+`VRW Refuse`, `VRW End`. Etapa 1 survived intact (checked node by node), because
+MCP operations apply to the current draft rather than replacing it. Always
+re-fetch the baseline before editing; the snapshot in this folder goes stale
+within the hour.
 
 All three accounts read `PAYGATE_TIER_TWO` / `G1_TIER2` with 89 video models and
 all 11 `_low_priority` (cost 0) keys — see "P5 follow-up".
+
+## The regen-path fix (version `62ebd784`)
+
+Dan's new `Video Regen Webhook` made this urgent. `Submit Video Regen` hardcoded
+`email: 'fermafabiz@gmail.com'` while taking `startImage: $json.imageId` — so
+once a film is split across accounts, regenerating a scene whose image lives on
+account B would send account A's email with account B's reference and die on
+`Email mismatch`.
+
+It cannot be fixed the way Etapa 1 fixed the batch path, because **the webhook
+path never runs `Assign Accounts`**, so a `$('Assign Accounts')` lookup would
+throw there. Instead both regen submitters now decode the account out of the
+media id they are already referencing — it is hex-encoded between `-email:` and
+`-image:`:
+
+- `Submit Video Regen` reads it from `r.startImage`
+- `RG Generate End Frame` reads it from `r.reference_1` (the scene's start frame)
+
+Verified against real ids before shipping: `6665726d…` → `fermafabiz@gmail.com`,
+`686f7573…` → `houseofvideos01@gmail.com`, and an empty / malformed / odd-length
+id leaves the email untouched rather than throwing. The diff was `changed 2`,
+only the expected nodes, connections identical, and the long motion prompt inside
+`Submit Video Regen` is character-identical on both sides — the only textual
+difference is the inserted derivation.
+
+**Still hardcoded, and therefore still to do in Etapa 2:** `Regenerate Scene
+Image` (its body comes from `Evaluate Image Approval`) and the per-film sheet
+generators (`Generate Cast Sheet`, `Generate Set Plate`, `Upload Asset To Flow`).
+Those all carry `reference_N` ids from `Editing Options`, so they need the
+translation table rather than a decode.
 
 ## Etapa 1 — what was applied
 

@@ -119,3 +119,36 @@ nature, racing, space, underwater, war, scifi-city, history, coast,
 cyberpunk, mountains, rally, orbit, desert, horror, kids, documentary.
 Nothing else changes; a genre whose still is missing falls back to its
 gradient, and `HAS_STILLS` turns the whole image layer off at once.
+
+## The house — the 3D shell's routing contract
+
+The planned 3D shell navigates the way `basement.studio`'s does: one canvas
+that is never unmounted, and a clickable object in the scene is a **named mesh
+from the GLB** bound to a route. That makes the geometry's node names
+load-bearing — rename `door_new` in Blender and the brief stops being
+reachable, with nothing in the type system to notice, because a GLB is data and
+a route is a directory on disk.
+
+`lib/house.ts` is the one owner of those names: the hall's doors, the hotspots
+inside the office and the writing room, the seven stations on the edit bench,
+and the routes that are deliberately *not* doors (each with its reason). The
+modelling brief, the scene and the check all read it; nothing restates a mesh
+name.
+
+    npm run check:house
+
+asserts it in both directions — no door onto a route that does not exist, and
+no route that nothing reaches. The second is the one that actually happens:
+`/series` has no link in the desktop nav today, only in the phone menu, and a
+check that looked only at meshes would have been perfectly happy about that.
+It also reads `STAGE_KEYS` out of `app/projects/[id]/page.tsx`, so adding a
+stage to the pipeline fails the check until the bench grows a station for it.
+
+Camera positions are deliberately absent until the model exists: a
+plausible-looking placeholder coordinate is worse than an absent one, because
+it reads as measured.
+
+A door may be marked `planned` when its route is not built yet — `hatch_boiler`
+is, pointing at `/admin/ops`, which would give `OpsPanel` a room of its own
+instead of the foot of `/projects`. The check asserts a planned route does
+**not** resolve, so the day someone builds it, it says to flip the door to live.

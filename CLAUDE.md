@@ -114,7 +114,10 @@ Leave it alone or archive it; do not repoint anything at it.
 Webhooks the site calls: `new-project`, `resume-project`, `restart-scripting`
 (all three on the Master Orchestrator), `scene-text-regen`,
 `scene-image-regen`, `scene-voice-regen` (all three on Claude Scripting),
-`assemble`, and the single-purpose ones — `expand-brief`, `yt-scene-titles`,
+`scene-video-regen` (on **Media Generation** — the odd one out, because the
+`RG *` tail it runs lives there; it is also the only webhook that answers
+`onReceived` rather than at the end of the run, since a Veo generation
+outlives the site's 15-second fetch), `assemble`, and the single-purpose ones — `expand-brief`, `yt-scene-titles`,
 `upscale-film`, `list-music`/`share-music`, `archive-suggest`, `hook-regen`,
 `series-recap` (its own workflow `4jVkQjpr7terqQhY`, fired by `approveScript`
 for an episode of a series — `db/port/series-recap/`). The site derives all of them from `N8N_NEW_PROJECT_WEBHOOK_URL`
@@ -179,6 +182,16 @@ the full entry in the file named:
   unaffected; a transaction-batched node must base64-encode every literal
   instead of dollar-quoting it. Full account: `docs/lessons-n8n.md`, "The
   write mechanism: dollar-quoting, not parameters".
+- **An n8n MCP `addConnection` accepts `sourceOutput: 1` and silently ignores
+  it — the key is `sourceIndex`.** Every edge then lands on output 0, which on
+  an If node fires BOTH branches on `true`, and nothing complains: the
+  workflow validates clean. Caught on 2026-09-17 only by diffing the published
+  draft against a simulated one edge for edge. Never trust a branch index you
+  did not read back. (`from`/`to`/`fromOutput` is rejected outright, so that
+  spelling is safe.) Related, and in the other direction:
+  `updateNodeParameters` MERGES rather than replaces, which is what lets one
+  key be edited without re-sending a node's unredacted API tokens. Full
+  account: `db/port/video-regen-webhook/README.md`.
 - **`runData` is EMPTY for the whole life of a healthy running execution.**
   You cannot watch progress through the API — wait for it to end.
   `docs/lessons-n8n.md`, "n8n" section.
@@ -330,13 +343,17 @@ expected and harmless for an app touching only its own Drive.
   four hours, each 4-7 minutes in, none long enough for a Veo generation.
   Nothing was broken; every attempt was working and every attempt was
   stopped. Pause now arms first ("⏸ Throw the regeneration away — sure?").
-  **The structural fix is unbuilt**: video regen is the only regeneration
-  with no webhook of its own — the other three start in seconds and ignore
-  the batch entirely — so it alone must ride a full pass. Giving it its own
-  webhook and its own `RG *` tail (the restart-scripting precedent) is what
-  removes the class. **Also still owed: one measurement** — no real video
-  regeneration has yet been watched from click to new clip. See `docs/lessons-site.md`, "Pause is the button that destroys a
-  regeneration".
+  **The structural fix shipped the same evening** — `scene-video-regen`,
+  Media Generation `549d982d`, `db/port/video-regen-webhook/README.md`. Video
+  regen was the only regeneration without a webhook of its own; it now has
+  one, and **Pause no longer stops it** (`pauseProduction` spares a `webhook`
+  run on Media Generation or Claude Scripting — one scene's work is not the
+  film's production). **The measurement is done too**: execution 14316,
+  16:38:28 → 16:41:25, click to new clip in **2 min 57 s** on its own run,
+  with the refusal path and the "flag already clear" path verified beside it.
+  What is still owed is one regeneration driven from the browser rather than
+  from a webhook fired by hand. See `docs/lessons-site.md`, "Pause is the
+  button that destroys a regeneration".
 - **Story and Kids films end on a resolution since 2026-09-16 14:03 UTC**
   (`db/port/story-close/README.md`, lesson in `docs/lessons-pipeline.md`
   under "The story ends on a resolution, not on its climax"). Claude

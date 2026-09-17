@@ -914,6 +914,8 @@ export default function SceneBoard({
                       note={active.note}
                       since={active.regenSince}
                       alive={productionAlive}
+                      standalone
+                      takes="under a minute"
                     />
                     {/*
                       The same trap as the rewrite and the clip, one field
@@ -1246,6 +1248,8 @@ export default function SceneBoard({
                     note={active.note}
                     since={active.regenSince}
                     alive={productionAlive}
+                    standalone
+                    takes="a couple of minutes"
                   />
                   {/*
                     This state is cleared from inside a media-generation run,

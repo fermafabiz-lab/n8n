@@ -40,6 +40,8 @@ export default function RegenBadge({
   note,
   since = null,
   alive = null,
+  standalone = false,
+  takes,
 }: {
   label?: string;
   note?: string | null;
@@ -48,9 +50,23 @@ export default function RegenBadge({
   /**
    * Is a media-generation batch alive in n8n right now?
    * `null` = the n8n API did not answer, which is NOT the same as "nothing is
-   * running" and must not be reported as it.
+   * running" and must not be reported as it. Ignored when `standalone`.
    */
   alive?: boolean | null;
+  /**
+   * Does this regeneration run on its own webhook?
+   *
+   * Since 2026-09-17 all four do — scene text, image and voice have had one
+   * for a while and video finally got `scene-video-regen`. A standalone
+   * regeneration does not care whether production is running, is not waiting
+   * for a batch to reach it, and is no longer destroyed by Pause. Saying so
+   * is the point: everything below used to be advice about a batch, and for
+   * video that advice was what sent the producer to the one button that
+   * threw the work away.
+   */
+  standalone?: boolean;
+  /** Roughly how long this kind of regeneration takes, e.g. "a couple of minutes". */
+  takes?: string;
 }) {
   // n8n writes rejections into the same notes field the reviewer writes
   // feedback into; only the rejection half is worth surfacing here.
@@ -85,19 +101,29 @@ export default function RegenBadge({
         {label}
         {waited && <span style={{ opacity: 0.75 }}>· {waited}</span>}
       </span>
-      {alive === true && (
+      {standalone ? (
         <p style={{ margin: "8px 0 0", fontSize: 12, lineHeight: 1.5, color: "var(--dim)" }}>
-          Production is running — leave it. Pausing now throws this generation
-          away and the next run has to cross the whole film again before it can
-          pick the request back up.
+          This runs on its own job{takes ? ` and takes ${takes}` : ""} — it
+          started the moment you asked and does not wait for anything else.
+          You can leave the page; Pause does not touch it.
         </p>
-      )}
-      {alive === false && (
-        <p style={{ margin: "8px 0 0", fontSize: 12, lineHeight: 1.5, color: "var(--dim)" }}>
-          Nothing is running in n8n, so this is not moving on its own — a
-          regeneration is only ever picked up by a live production run. Use “⟳
-          Send it again” below to start one.
-        </p>
+      ) : (
+        <>
+          {alive === true && (
+            <p style={{ margin: "8px 0 0", fontSize: 12, lineHeight: 1.5, color: "var(--dim)" }}>
+              Production is running — leave it. Pausing now throws this
+              generation away and the next run has to cross the whole film
+              again before it can pick the request back up.
+            </p>
+          )}
+          {alive === false && (
+            <p style={{ margin: "8px 0 0", fontSize: 12, lineHeight: 1.5, color: "var(--dim)" }}>
+              Nothing is running in n8n, so this is not moving on its own — a
+              regeneration is only ever picked up by a live production run. Use
+              “⟳ Send it again” below to start one.
+            </p>
+          )}
+        </>
       )}
       {rejection && (
         <p

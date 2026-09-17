@@ -34,23 +34,45 @@ if (typeof raw === 'number' && Number.isInteger(raw) && raw >= 1 && raw <= ACCOU
   console.log('FLOW ACCOUNTS: refusing flowAccounts=' + JSON.stringify(raw) + ', using 1');
 }
 
-// THE GUARD THAT MAKES THIS SAFE TO SHIP AHEAD OF ITS OTHER HALF.
-// castRefs / objectRefs / locationRefs / refImageMediaId are Flow media ids,
-// and a media id belongs to the account that minted it. They are all made on
-// the primary account today. Splitting scenes across accounts before those
-// sheets are replicated per account would send primary-account reference ids
-// with a different `email` — every scene outside block 0 would fail on Email
-// mismatch. So until that exists, a project that HAS such references stays on
-// one account no matter what the flag says.
-const hasAccountScopedRefs = !!(
-  (opts.castRefs && Object.keys(opts.castRefs).length) ||
-  (opts.objectRefs && Object.keys(opts.objectRefs).length) ||
-  (opts.locationRefs && Object.keys(opts.locationRefs).length) ||
-  opts.refImageMediaId
-);
-if (n > 1 && hasAccountScopedRefs) {
-  console.log('FLOW ACCOUNTS: project carries account-scoped references (cast/object/location/user ref) — staying on one account until they are replicated per account');
-  n = 1;
+// THE GUARD. castRefs / objectRefs / locationRefs / refImageMediaId are Flow
+// media ids, and a media id belongs to the account that minted it. A block
+// running on another account can only use them once they have been copied
+// there and recorded in `flowRefs` by the replication chain (Replicate Prep ->
+// Save Flow Refs). Until that exists for an account, sending its scenes would
+// fail every one of them on `Email mismatch`, so the film stays on however many
+// accounts ARE fully covered.
+const scoped = [];
+for (const k of ['castRefs', 'objectRefs', 'locationRefs']) {
+  const o = opts[k];
+  if (o && typeof o === 'object') for (const name of Object.keys(o)) if (o[name]) scoped.push(String(o[name]));
+}
+if (opts.refImageMediaId) scoped.push(String(opts.refImageMediaId));
+
+// Fresh table from this pass first, stored table second — on the pass that
+// creates them, `IMG Load Project` was read before `Save Flow Refs` wrote.
+let flowRefs = {};
+if (opts.flowRefs && typeof opts.flowRefs === 'object') {
+  for (const a of Object.keys(opts.flowRefs)) flowRefs[a] = Object.assign({}, opts.flowRefs[a]);
+}
+try {
+  const fresh = ($('Build Flow Refs').first().json || {}).flowRefs || {};
+  for (const a of Object.keys(fresh)) flowRefs[a] = Object.assign({}, flowRefs[a] || {}, fresh[a]);
+} catch (e) {}
+
+if (n > 1 && scoped.length) {
+  let allowed = 1;
+  for (let k = 1; k < n; k++) {
+    const acct = ACCOUNTS[k];
+    const have = flowRefs[acct] || {};
+    const missing = scoped.filter(function (id) { return !have[id]; });
+    if (missing.length) {
+      console.log('FLOW ACCOUNTS: ' + acct + ' is missing ' + missing.length + ' of ' + scoped.length + ' reference image(s), so it is not used');
+      break;
+    }
+    allowed = k + 1;
+  }
+  if (allowed < n) console.log('FLOW ACCOUNTS: asked for ' + n + ', using ' + allowed);
+  n = allowed;
 }
 
 const items = $input.all();

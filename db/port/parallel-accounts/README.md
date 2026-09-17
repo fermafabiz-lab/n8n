@@ -1,12 +1,14 @@
 # Parallel generation across three Google Flow accounts
 
-Status: **Etapa 1 and the regen-path fix are APPLIED and LIVE. Both are a
-NO-OP until someone sets `Editing Options.flowAccounts`.**
+Status: **Etapa 1 and 2 are APPLIED and LIVE. All of it is a NO-OP until
+someone sets `Editing Options.flowAccounts` to 2 or 3.**
 
 | Applied | version | built on |
 |---|---|---|
 | Etapa 1 — per-scene account assignment | `4ecc8330` (2026-09-17 ~15:55) | `6735a96a` |
 | Regen paths derive their account from the start frame | `62ebd784` (~16:45) | `549d982d` |
+| Etapa 2 — replicate reference sheets per account | `ad877d02` (~17:05) | `62ebd784` |
+| Etapa 2 consumer — scenes use their own account's copies | `649aca23` (~17:10) | `ad877d02` |
 
 Rollback is `restore_workflow_version` to the "built on" id.
 
@@ -51,6 +53,48 @@ Image` (its body comes from `Evaluate Image Approval`) and the per-film sheet
 generators (`Generate Cast Sheet`, `Generate Set Plate`, `Upload Asset To Flow`).
 Those all carry `reference_N` ids from `Editing Options`, so they need the
 translation table rather than a decode.
+
+## Etapa 2 — what was applied
+
+A ten-node chain between the sheet generators and `Find Audio Folder`:
+
+```
+Set Plate? (no plates) ─┐
+Plate Ingest? (skipped) ─┼→ Load Sheet Media → Replicate Prep → Replicate Any?
+Ingest Plates ──────────┘                                        ├ skip → Find Audio Folder
+                                                                 └ work → Loop Replicate
+    Loop Replicate ─ each → Download Sheet → Upload Sheet To Account → Collect Replicated ─┐
+                   └ done → Build Flow Refs → Refs To Save? → Save Flow Refs → Find Audio Folder
+```
+
+- **The bytes come from `hov.sheet_media`, not Flow's `fifeUrl`.** That was the
+  design's worst constraint and it turned out not to exist: the sheet ingest
+  chain (`Sheet Ingest Prep` → `Ingest Sheets`, and the plate pair) already
+  keeps a durable copy of every sheet keyed by its Flow id. So replication works
+  on any pass, including one that draws no sheets at all. The site route that
+  accepts that shape lives on the trunk, not on this branch.
+- **`Editing Options.flowRefs[account][primaryId] = thatAccountId`** is the
+  translation table, merged in with jsonb `||` under DEFAULT query batching —
+  transaction batching would read every `$` followed by a digit as a positional
+  parameter.
+- **`Generate Scene Image` swaps each `reference_N`** for the block account's
+  copy, drops any reference minted on a different account that has no copy, and
+  **renumbers what survives** so there are no gaps in the sequence. Tested
+  offline first: the primary block passes all three references through, and a
+  block-B scene keeps its remapped cast and place while losing only the
+  cross-account palette reference.
+- **`Assign Accounts`' guard became a coverage check.** Instead of refusing to
+  split any project that has account-scoped references, it now uses as many
+  accounts as `flowRefs` fully covers and logs which one fell short.
+- **`Replicate Prep` skips images already copied**, so a second pass does not
+  mint duplicate assets.
+
+The trap that shaped the wiring: **a node returning zero items stops everything
+downstream of it**, and the whole rest of the batch hangs off this chain. So
+`Replicate Prep` and `Build Flow Refs` always emit exactly one item, and IF
+nodes route past the loop — the same shape as the existing `Plate Ingest?`.
+Before publishing, every node in the new chain was checked for reachability to
+`Find Audio Folder` by walking the graph, not by eye.
 
 ## Etapa 1 — what was applied
 

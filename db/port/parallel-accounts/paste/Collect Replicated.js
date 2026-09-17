@@ -1,7 +1,7 @@
 // Accumulate one account's copy of a reference image, keyed by the id the
 // PRIMARY account knows it as. The result is a translation table:
 //
-//   flowRefs['houseofvideos01@gmail.com'].idMap[<primary id>] = <that account's id>
+//   flowRefs['houseofvideos01@gmail.com'][<primary id>] = <that account's id>
 //
 // which is what lets `Generate Scene Image` keep using whatever
 // `Build Image Request` decided the references should be — that node is 12 kB

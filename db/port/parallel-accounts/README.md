@@ -9,6 +9,16 @@ someone sets `Editing Options.flowAccounts` to 2 or 3.**
 | Regen paths derive their account from the start frame | `62ebd784` (~16:45) | `549d982d` |
 | Etapa 2 — replicate reference sheets per account | `ad877d02` (~17:05) | `62ebd784` |
 | Etapa 2 consumer — scenes use their own account's copies | `649aca23` (~17:10) | `ad877d02` |
+| Image regen from the gate uses the scene's account | `008ad2bc` (~17:15) | `649aca23` |
+
+**Every submitter is now account-correct.** The three that looked hardcoded and
+are NOT a gap: `Generate Cast Sheet`, `Generate Set Plate` and
+`Upload Asset To Flow` create the PRIMARY copies, the ones replication copies
+out, so staying on the primary account is the design rather than an oversight.
+The only real gap was `Regenerate Scene Image`, which built its request from the
+project's primary-account reference ids; it now takes the block account from
+`Assign Accounts` and runs the same `flowRefs` swap, drop and renumber as
+`Generate Scene Image`.
 
 Rollback is `restore_workflow_version` to the "built on" id.
 

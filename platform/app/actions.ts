@@ -229,6 +229,15 @@ async function chainVideoRegen(
   const outcome = await flagStaleClip(sceneId);
   if (outcome === "none") return null;
   if (outcome === "blocked") return BLOCKED_NOTE;
+  // Since 2026-09-17 this no longer has to restart a whole production pass:
+  // `scene-video-regen` runs the re-shoot on its own execution and starts in
+  // about a tenth of a second. `nudgeProduction` stays as the fallback for a
+  // deployment where the webhook is not configured — it is what the site did
+  // for months, and a batch really does pick the flag up eventually.
+  const sent = await fireVideoRegenWebhook(sceneId).catch(() => "off" as const);
+  if (sent === "sent") {
+    return " The clip was built from the old picture, so it is being re-shot now — a couple of minutes.";
+  }
   const where = await nudgeProduction(projectId);
   return where === "started"
     ? " The clip was built from the old picture, so a new one was queued and production restarted to pick it up."
@@ -301,11 +310,14 @@ export async function sceneAction(
     // reconstruction rather than an invention.
     if (kind === "image" && action === "approve") await classifyScene(sceneId);
 
-    // Image regeneration runs on its own webhook, so it no longer depends on
-    // a live media-generation execution being alive to notice the flag.
-    // Video still rides the batch loop (it needs Flow + the mux server).
-    if (action === "regenerate" && kind === "image") {
-      await fireImageRegenWebhook(sceneId);
+    // Both regenerations run on their own webhook now, so neither depends on
+    // a live media-generation execution being alive to notice the flag. Video
+    // was the last one to get one (2026-09-17) and the reason the whole
+    // family exists: riding the batch loop is what made it look like
+    // regenerate did nothing.
+    if (action === "regenerate") {
+      if (kind === "image") await fireImageRegenWebhook(sceneId);
+      if (kind === "video") await fireVideoRegenWebhook(sceneId);
     }
     // Approving a picture that already has a clip means the clip is now made
     // from an image nobody approved. Nothing downstream ever compares the two
@@ -322,7 +334,9 @@ export async function sceneAction(
       message:
         (action === "approve"
           ? `${kind === "image" ? "Image" : "Video"} approved.`
-          : `Regeneration queued — n8n picks it up within ~15s.`) + (chained ?? ""),
+          : kind === "video"
+            ? "Re-shooting this clip — Veo takes a couple of minutes, and the page refreshes itself."
+            : "Regeneration queued — n8n picks it up within ~15s.") + (chained ?? ""),
     };
   } catch (e) {
     return { ok: false, message: friendlyError(e) };
@@ -723,6 +737,43 @@ async function fireVoiceRegenWebhook(
 }
 
 /**
+ * Fire the standalone video re-shoot webhook.
+ *
+ * The last of the four regenerations to get one, and the one that needed it
+ * most. Until 2026-09-17 a clip could only be re-shot by a live media-
+ * generation batch noticing `Regenerează Video` from inside its video gate —
+ * after that batch had walked the whole film. So it was slow to start
+ * (minutes, not seconds), invisible while it waited, and destroyed by
+ * anything that stopped the batch. The producer's reading was that regenerate
+ * does nothing and always had; every attempt had in fact been working, and
+ * every attempt had been stopped (db/port/regen-unstick/README.md).
+ *
+ * `scene-video-regen` runs the same `RG *` tail on its own execution, so a
+ * click now starts a Veo generation in about a tenth of a second instead of
+ * waiting for a pass over the film.
+ *
+ * Fire-and-forget on purpose. The webhook answers `onReceived` — the n8n run
+ * carries on for the minutes a Veo generation takes — so a 200 here means the
+ * request was ACCEPTED, never that a clip exists. The flag is what says it is
+ * in flight, and n8n is what clears it.
+ */
+async function fireVideoRegenWebhook(sceneId: string): Promise<"sent" | "off"> {
+  const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
+  const webhook =
+    process.env.N8N_VIDEO_REGEN_WEBHOOK_URL ??
+    newProject?.replace(/new-project\/?$/, "scene-video-regen");
+  if (!webhook?.includes("scene-video-regen")) return "off";
+  const res = await fetch(webhook, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scene_id: sceneId }),
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
+  return "sent";
+}
+
+/**
  * Replace what the clip DOES — the direction Veo is given.
  *
  * This is the field that decides the video, and until now it was invisible:
@@ -1001,13 +1052,18 @@ export async function cancelSceneRewrite(
 /**
  * Re-fire a video regeneration that nothing ever picked up.
  *
- * Video regen is the only regeneration with no webhook of its own — the flag
- * is noticed solely by `Evaluate Video Approval`, polling from inside a live
- * media-generation execution. So it strands in more ways than its siblings:
- * no batch alive, a batch already past the video gate, another project's run
- * making `getAliveProduction()` answer "alive", or the scene falling outside
- * `Sort & Cap Scenes`. Re-arming the flag and nudging production is the
- * cheapest thing that fixes all four.
+ * Written when video regen was the only regeneration with no webhook of its
+ * own, and it stranded in four different ways: no batch alive, a batch
+ * already past the video gate, another project's run making
+ * `getAliveProduction()` answer "alive", or the scene falling outside
+ * `Sort & Cap Scenes`. Since 2026-09-17 `scene-video-regen` removes all four
+ * — a re-send is now its own execution, starting in about a tenth of a
+ * second — so this button re-arms the flag and fires that, falling back to
+ * nudging production only where the webhook is not configured.
+ *
+ * It is worth keeping even so. A flag can still be stranded by the ways a
+ * run dies mid-flight, and "send it again" is the local exit that lets the
+ * producer leave the state without waiting for anyone.
  */
 export async function restartVideoRegen(
   projectId: string,
@@ -1021,6 +1077,14 @@ export async function restartVideoRegen(
     // about to be replaced, before anything can overwrite it.
     await autoKeep(sceneId, "video");
     await writeSceneApproval(sceneId, "video", "regenerate");
+    const sent = await fireVideoRegenWebhook(sceneId).catch(() => "off" as const);
+    if (sent === "sent") {
+      revalidatePath(`/projects/${projectId}`);
+      return {
+        ok: true,
+        message: "Sent again — this clip is being re-shot right now, on its own run. Veo takes a couple of minutes.",
+      };
+    }
     const where = await nudgeProduction(projectId);
     revalidatePath(`/projects/${projectId}`);
     return {
@@ -2675,10 +2739,46 @@ export async function pauseProduction(projectId: string): Promise<ActionResult> 
     if (running.length === 0) {
       return { ok: false, message: "Nothing is running right now." };
     }
+    // A SINGLE SCENE'S RE-SHOOT IS NOT THE FILM'S PRODUCTION, and since
+    // 2026-09-17 the two are finally distinguishable: the batch reaches Media
+    // Generation as `integrated` (the orchestrator called it), while
+    // `scene-video-regen` reaches it as `webhook`. Pause used to stop
+    // everything, so the button the producer pressed when a regeneration
+    // looked stuck was guaranteed to kill the regeneration — which is the
+    // whole of "regenerate does nothing, and it always has"
+    // (db/port/regen-unstick/README.md). Giving video its own webhook only
+    // removes that if Pause then leaves it alone.
+    //
+    // The same is true one workflow over: every webhook on Claude Scripting is
+    // a single scene's regeneration (`scene-text-regen`, `scene-image-regen`,
+    // `scene-voice-regen`), while the film's own scripting arrives there as a
+    // sub-workflow call. So the rule is one rule — a webhook run on either of
+    // those two workflows is one scene's work, not the film's.
+    //
+    // Deliberately narrow everywhere else. Final Assembly's `assemble`
+    // webhook is a render of the whole film and Pause should still stop it,
+    // and the orchestrator's webhooks start whole projects. A run whose mode
+    // is unknown is treated as production: stopping too much is exactly the
+    // old behaviour, while stopping too little would leave a flag set with
+    // nobody coming.
+    const isSceneRegen = (r: (typeof running)[number]) =>
+      (r.workflowName === "Media Generation" || r.workflowName === "Scripting") &&
+      r.mode === "webhook";
+    const spared = running.filter(isSceneRegen);
+    const toStop = running.filter((r) => !isSceneRegen(r));
+    if (toStop.length === 0) {
+      return {
+        ok: false,
+        message:
+          spared.length === 1
+            ? "Nothing to pause — the only thing running is one scene's re-shoot, which finishes on its own in a couple of minutes. Use “Keep this clip” on the scene if you want to stop waiting for it."
+            : `Nothing to pause — the only things running are ${spared.length} scene re-shoots, which finish on their own.`,
+      };
+    }
     const inFlight = (await getScenes(projectId).catch(() => []))
       .filter((s) => s.regenImage || s.regenVideo || s.regenVoice);
     const order = ["Media Generation", "Final Assembly", "Scripting", "Master Orchestrator"];
-    const sorted = [...running].sort(
+    const sorted = [...toStop].sort(
       (a, b) => order.indexOf(a.workflowName) - order.indexOf(b.workflowName),
     );
     let stopped = 0;
@@ -2695,9 +2795,13 @@ export async function pauseProduction(projectId: string): Promise<ActionResult> 
             .slice(0, 4)
             .join(", ")}${inFlight.length > 4 ? "…" : ""}) — that work is thrown away, not paused. Resume starts the film's pass again and re-requests them from scratch.`
         : "";
+    const kept =
+      spared.length > 0
+        ? ` ${spared.length} scene re-shoot${spared.length === 1 ? "" : "s"} left running — those are their own jobs and finish on their own.`
+        : "";
     return {
       ok: true,
-      message: `Paused — stopped ${stopped} running execution${stopped === 1 ? "" : "s"}. Press Resume to continue from where it left off.${lost}`,
+      message: `Paused — stopped ${stopped} running execution${stopped === 1 ? "" : "s"}. Press Resume to continue from where it left off.${lost}${kept}`,
     };
   } catch (e) {
     return { ok: false, message: friendlyError(e) };

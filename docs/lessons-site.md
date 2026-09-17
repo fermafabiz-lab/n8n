@@ -1002,6 +1002,35 @@ picked the asset, not signed it off. Final Assembly receives an ordinary mp4.
   columns were already in the row — worth knowing before designing a migration
   for anything else the scene table already holds. `npm run check:regen-wait`.
   Full account: `db/port/regen-unstick/README.md`.
+- **The real fix was to stop Pause being the only lever, and that took a
+  webhook (2026-09-17 evening).** Legibility made the wait readable and did
+  not make it shorter; the entry above is the diagnosis, this is the cure.
+  Video was the ONLY regeneration without a webhook of its own — text, image
+  and voice each have one on Claude Scripting — so it alone had to ride a
+  full Media Generation pass. `scene-video-regen` now runs the same `RG *`
+  tail on its own execution: measured click to new clip in **2 min 57 s**
+  (execution 14316), against a batch that had to walk 48 scenes first.
+  **Three things had to move together, and any one alone would have been
+  half a fix.** (1) The webhook, which is n8n's half. (2)
+  `fireVideoRegenWebhook`, fired from all three places that set the flag —
+  `approveScene(video, regenerate)`, the clip queued when an approved image
+  made it stale, and the ⟳ re-send — each falling back to `nudgeProduction`
+  where the webhook is not configured, so a deployment without it behaves
+  exactly as before. (3) **`pauseProduction` had to stop killing it.** Pause
+  stopped every running execution, so the button the producer reaches for
+  when a regeneration looks stuck was guaranteed to destroy the
+  regeneration; giving video its own run only removes that if Pause then
+  leaves it alone. The rule reads the execution's `mode`, newly carried on
+  `ExecutionSummary`: a `webhook` run on Media Generation or Claude Scripting
+  is ONE SCENE'S work, everything else is the film's. Deliberately narrow —
+  Final Assembly's `assemble` webhook is a whole render and Pause still stops
+  it, and an unknown mode is treated as production, because stopping too much
+  is the old behaviour while stopping too little strands a flag. `RegenBadge`
+  gained `standalone` for the same reason: its old copy told the producer a
+  regeneration is "only ever picked up by a live production run", which was
+  true when written and was, for video, the sentence that sent them to the
+  destructive button. Full account:
+  `db/port/video-regen-webhook/README.md`.
 - **The video-regen trap, and three guards for it.** A stock scene has no
   Flow asset to regenerate from, and `Prep Video Regen` THROWS without an
   `Image Media ID` — a throw that kills the whole batch, not the scene. So

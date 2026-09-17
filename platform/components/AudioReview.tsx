@@ -1731,6 +1731,8 @@ export default function AudioReview({
                         note={s.note}
                         since={s.regenSince}
                         alive={productionAlive}
+                        standalone
+                        takes="30-60 seconds"
                       />
                       {/*
                         The third copy of the trap the rewrite and the clip

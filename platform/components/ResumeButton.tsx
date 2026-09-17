@@ -104,7 +104,7 @@ export default function ResumeButton({
           {needsConfirmPause
             ? `${regenInFlight} scene${regenInFlight === 1 ? "" : "s"} ${
                 regenInFlight === 1 ? "is" : "are"
-              } mid-regeneration. Pausing does not hold that work — it throws it away, and the next run has to cross the whole film again before it can even ask for it. Click again if you mean to.`
+              } mid-regeneration. A re-shoot running on its own job survives this — Pause leaves those alone since 2026-09-17 — but anything the batch itself picked up is thrown away, not held. Click again if you mean to.`
             : "This rewrites the script and every scene. Click again to confirm."}
         </span>
       )}

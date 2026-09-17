@@ -1,0 +1,9 @@
+# Full workflow exports: 600 kB each, and a live useapi bearer token sits in
+# `Submit Video*`'s header PARAMETERS, where the API does not redact it (only
+# credential bindings come back as None). They are build inputs — regenerate
+# them with get_workflow_details / get_workflow_version when this is next
+# touched. `paste/`, `original/`, `ops.json` and the checks are the record.
+mg.live.json
+mg.before.json
+mg.expected.json
+mg.draft.json

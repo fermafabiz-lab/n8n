@@ -1228,3 +1228,45 @@ because the guards re-feed `Prep Video Regen`'s original output. So a value
 that must survive a cooldown or a resubmit has to be read back by node
 reference with a scene-id guard (`$('RG Attach End Frame').first()`), exactly
 as the batch path does — not off `$json`.
+
+## Two entry points into one tail, without copying the tail (2026-09-17)
+
+CLAUDE.md's restart-scripting rule — *"any third entry point needs its own
+tail"* — is about a real mechanic: `$('Some Node')` throws when that node did
+not execute on this path, so a tail whose nodes reach back to the first entry
+point's head cannot be reached from a second one.
+
+The rule names the symptom. `db/port/video-regen-webhook/` is the case where
+treating the CAUSE was cheaper and safer than obeying the rule literally.
+Adding `scene-video-regen` meant reaching a thirty-node `RG *` tail whose
+nodes between them named three outside nodes. Copying thirty nodes would have
+created a third copy of the motion judge's 700-word question and a sixth copy
+of the world-consistency guardrail — precisely the "a prompt fragment lives in
+more copies than the one you found" trap. Instead:
+
+* ONE node in the tail (`Prep Video Regen`, its single entry) was made
+  door-aware, with `try { $('X').isExecuted } catch` — an idiom Media
+  Generation already used sixteen times — and it now carries the context it
+  resolves (`opts`, `aspectRatio`, `viaWebhook`) in its output.
+* The other three readers take that context off `Prep Video Regen`, which is
+  inside the tail and therefore always executed.
+
+Net: nine nodes added, four bodies edited, zero prompt duplication, and the
+tail left with exactly one guarded outside reference instead of three
+unguarded ones. **The rule still holds** — a fourth entry point must feed
+`Prep Video Regen` — it is just cheaper to obey now. Where a tail's terminals
+loop back into the first path (here `Wait Video Approval`, which reads
+`$('Sort & Cap Scenes')`), each terminal needs a path switch, not a copy.
+
+Two API traps found doing it, both documented in that README and the first in
+CLAUDE.md's cross-cutting list:
+
+* **`addConnection` accepts `sourceOutput: 1` and silently ignores it** — the
+  key is `sourceIndex`, and with the wrong one every edge lands on output 0,
+  putting BOTH branches of an If on `true`. It validates clean. The only thing
+  that caught it was diffing the published draft against an offline simulation
+  of the same operations, edge for edge.
+* **`updateNodeParameters` merges rather than replaces.** Useful: a node whose
+  other parameters hold an unredacted API token can be edited by sending only
+  the key that changed. `addNode`, by contrast, drops node-level settings like
+  `alwaysOutputData` — set those with `setNodeSettings` and read them back.

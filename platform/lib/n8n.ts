@@ -90,11 +90,24 @@ export interface ExecutionSummary {
   stoppedAt: string | null;
   errorMessage: string | null;
   waitTill: string | null;
+  /**
+   * How the run was started: "integrated" (a sub-workflow the orchestrator
+   * called), "webhook", "manual", "trigger", …
+   *
+   * Carried since 2026-09-17 for one reason: on Media Generation it is the
+   * only thing that separates the FILM's production pass (integrated, started
+   * by the orchestrator) from a single scene's video re-shoot (webhook,
+   * `scene-video-regen`). Pause has to stop the first and must not stop the
+   * second — killing it is exactly the thing the webhook was built to stop
+   * happening. Unknown on an older n8n, hence null rather than a default.
+   */
+  mode: string | null;
 }
 
 interface RawExecution {
   id: number | string;
   workflowId: string;
+  mode?: string;
   status?: string;
   startedAt?: string;
   stoppedAt?: string;
@@ -124,6 +137,7 @@ function toSummary(r: RawExecution): ExecutionSummary {
     stoppedAt: r.stoppedAt ?? null,
     errorMessage: null,
     waitTill: r.waitTill ?? null,
+    mode: r.mode ?? null,
   };
 }
 

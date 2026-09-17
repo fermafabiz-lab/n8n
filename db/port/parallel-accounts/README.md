@@ -621,3 +621,72 @@ was what repaired the table.
 4. `scripts/check-n8n.mjs` now has a block 7 that fails on any account whose
    `health` is not `OK`. It needs `USEAPI_TOKEN` in the environment and a
    machine that can reach useapi — not a Claude Code web session.
+
+## The real blocker: `POST /assets?email=` does not route (2026-09-17 22:21)
+
+All three accounts healthy, film reset, `flowRefs` rebuilt from nothing
+(execution 14446). The table came out **11 entries, 11 correctly owned, three
+accounts** — the ownership-based filing is sound. But the coverage was not:
+
+| source sheet | 01 | 02 | landed on the primary instead |
+|---|---|---|---|
+| location 1 | — | ✓ | ✓ |
+| location 3 | ✓ | ✓ | — |
+| lanterns | — | ✓ | ✓ |
+| Mira | — | ✓ | ✓ |
+| pole | ✓ | — | ✓ |
+| location 2 | ✓ | — | — |
+
+Six references x two targets = twelve uploads; **four landed on the primary**,
+which is never a target (`targets = ACCOUNTS.slice(1, n)`), and one produced
+nothing.
+
+**The probe that settles it.** Three uploads of the same file with the address
+written LITERALLY into the URL — no expression, no `$runIndex`, nothing of ours
+between the constant and the request:
+
+| asked for | the returned id belongs to |
+|---|---|
+| `houseofvideos01@gmail.com` | `houseofvideos01@gmail.com` |
+| `houseofvideos01@gmail.com` | **`houseofvideos02@gmail.com`** |
+| `houseofvideos02@gmail.com` | **`houseofvideos01@gmail.com`** |
+
+**`POST /v1/google-flow/assets?email=<x>` does not reliably upload to `<x>`.**
+Two of three went to the wrong account with the parameter spelled out by hand.
+Note the wrong landings here went to the OTHER SECONDARY, not to the primary, so
+this is not "falls back to the default account" — it looks like an arbitrary
+pick from the linked set.
+
+**Two corrections to earlier entries in this file.**
+
+1. The sign-out of `houseofvideos01` does NOT explain the misrouted copies. The
+   same misrouting happens with every account healthy. The sign-out was real and
+   worth fixing, but it was a second fault sitting on top of this one.
+2. The `.first()`-versus-`$runIndex` indexing is NOT the cause either. The probe
+   used no expression at all.
+
+**What this does and does not break.** It is the ASSET UPLOAD that will not
+route. Generation still routes: `email` travels in the BODY of `/videos` and
+`/images`, and useapi rejects a mismatched pair with `Email mismatch`, which is
+proof the body field is honoured. So Etapa 1 (a scene block generating on its
+own account) is unaffected; only Etapa 2's replication is.
+
+**The shape of the fix, and why the current design cannot work.** Replication is
+written as "one upload per (sheet, target account)" and trusts the address. It
+has to become **coverage-driven**: upload a sheet, read from the RETURNED id
+which account actually received it, record that, and repeat until every target
+account holds a copy. The returned id is already the authority — `Collect
+Replicated` files by it — so what is missing is the repeat, not the bookkeeping.
+With an arbitrary pick among three accounts, covering two specific targets costs
+roughly four to five uploads per sheet rather than two, so about 30 uploads for
+a six-reference film. Uploads are seconds each; this is affordable.
+
+Worth checking first, because it would make the loop unnecessary: whether useapi
+exposes an upload that DOES bind to an account (a different endpoint, a body
+field rather than a query parameter, or a per-account token). The current bearer
+is one token covering all three accounts, which is consistent with the server
+picking whichever account it likes.
+
+**Until then `flowAccounts` above 1 buys nothing**, and it fails safely: no
+target ever reaches full coverage, so `Assign Accounts` drops back to a single
+account and films generate exactly as before.

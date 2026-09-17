@@ -455,7 +455,28 @@ expected and harmless for an app touching only its own Drive.
   n8n. Keep the rule; the example is history.
 
 
-- **`houseofvideos01@gmail.com` is signed out at Google and must be reconnected**
+- **`POST /v1/google-flow/assets?email=<x>` does not reliably upload to `<x>`, and
+  that is what blocks parallel generation** (2026-09-17,
+  `db/port/parallel-accounts/README.md`, "The real blocker"). Three uploads of one
+  file with the address written LITERALLY into the URL — no expression involved —
+  put two of them on the wrong account, and not on the default one either, so it
+  reads as an arbitrary pick from the linked set. **Generation is NOT affected**:
+  `email` travels in the BODY for `/videos` and `/images`, and useapi rejects a
+  mismatched pair with `Email mismatch`, which proves that field is honoured. So
+  Etapa 1 works and only Etapa 2's replication is broken. The fix is to stop
+  trusting the address: upload, read from the RETURNED id which account actually
+  received it, and repeat until every target holds a copy — the returned id is
+  already treated as the authority, so only the repeat is missing. Check first
+  whether useapi offers an upload that binds to an account (another endpoint, a
+  body field, or a per-account token; the current bearer covers all three
+  accounts, which fits a server that picks freely). **Until then `flowAccounts`
+  above 1 buys nothing, and it fails safely** — no account reaches full coverage,
+  so the guard drops to one and films generate as before.
+
+- ~~**`houseofvideos01@gmail.com` is signed out at Google and must be reconnected**~~
+  **Reconnected 2026-09-17 21:59** and all three accounts read `health: OK`. The
+  lesson below is the durable part; the misrouting it was blamed for turned out to
+  be the separate, larger fault in the bullet above.
   (2026-09-17, `db/port/parallel-accounts/README.md`, "The fixed chain, run on a
   film"). Only the producer can do it, at
   `https://useapi.net/docs/start-here/setup-google-flow`, and **nothing

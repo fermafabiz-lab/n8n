@@ -750,3 +750,39 @@ should stay even now that the address works.
 **Still owed:** a film run with the path form live, to see `flowRefs` reach
 6 x 2 = 12 copies with full coverage and `Assign Accounts` actually split into
 three blocks. Everything above is an endpoint measurement, not a film.
+
+## Confirmed on a film (2026-09-17 23:34, execution 14479, Media Generation `8c4ef1bf`)
+
+Same film, `flowRefs` and all nine images cleared first, three accounts healthy.
+
+**Replication: 12 of 12, full coverage, nothing misrouted.**
+
+| account | ids | correctly owned |
+|---|---|---|
+| `houseofvideos01@gmail.com` | 6 | 6 |
+| `houseofvideos02@gmail.com` | 6 | 6 |
+
+No entry under `fermafabiz@gmail.com` at all — which is the point, since the
+primary is never a target. Compare the run before the fix: 11 entries, four of
+them filed under the primary, and 3/6 and 4/6 coverage.
+
+**The block split is real.** `Assign Accounts` kept `flowAccounts` at 3 instead
+of falling back, and the scenes came out in contiguous blocks, each image minted
+on its block's account:
+
+| account | scenes |
+|---|---|
+| `fermafabiz@gmail.com` | 1-3 |
+| `houseofvideos01@gmail.com` | 4-6 |
+| `houseofvideos02@gmail.com` | 7-9 (last still generating at the time of the audit) |
+
+So Etapa 1 and Etapa 2 are both verified end to end, and the single change that
+made the difference was `assets?email=` → `assets/{email}`.
+
+**What this does NOT yet show.** Images are serial by necessity (`POST /images`
+refuses `async`), so a three-way split of the IMAGE phase buys nothing in wall
+clock; it only puts each scene's reference on the account that will generate its
+clip. The speedup is Etapa 3 — the pool that keeps several Veo jobs in flight —
+and it remains unbuilt and unmeasured. What is now true is that the ground it
+needs is correct: every scene's start frame lives on the account its clip will be
+submitted to.

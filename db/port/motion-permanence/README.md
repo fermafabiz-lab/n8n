@@ -299,3 +299,163 @@ rules 1-6 still numbered 1-6.
 **This fixes new films only.** A bible already in `hov.project.story_bible` keeps its
 ambiguous string, and nothing re-reads the rule for it. The café film's own apron stays
 ambiguous unless its bible row is edited by hand.
+
+## 2026-09-14 — a re-roll was a new seed against a byte-identical brief
+
+The judge scored six signals, `Motion Verdict` wrote its prose under
+`sd.motionNotes` — and **nothing in either workflow has ever read that key.**
+It was not reset by `Sort & Cap Scenes` either, unlike `sd.consistencyNotes`,
+so it accumulated across films purely as dead weight. (That half is fixed as of
+2026-09-14: `Sort & Cap Scenes` now prunes both `sd.motionRerolls` and
+`sd.motionNotes` on every pass, batch keys only. The key is still write-only —
+the correction below is built from the GATE list in `problems`, never from the
+judge's prose.) A clip rejected because
+a held object left the subject's hands was sent back to Veo with the exact
+sentence that produced it, differing in `seed` and — on a `morph` verdict —
+in the absence of `endImage`. Nothing the judge learned reached the model.
+
+### The correction is restated as a positive requirement, by a literal map
+
+The judge writes **faults**: *"the sleeve stack disappears from her hands"*.
+Quoting that into a Veo prompt is the anti-pattern the whole of 2026-09-13 was
+spent removing — our own tail saying *"nothing appears, disappears or
+duplicates"* is what produced a disappearing object. Two shapes were on the
+table and **(a), the fixed map, was chosen**:
+
+- **(b) a second model call** rewriting each fault into a positive requirement
+  is more faithful to the specific fault, and it puts a generative step between
+  the judge and Veo exactly where a leaked negation is invisible until a
+  producer watches the film, adds a call that can time out inside what is
+  already a retry, and spends latency saying what the fault CATEGORY implies.
+- **(a) SIGNAL → positive clause.** The signals are a closed set of six written
+  by `Motion Verdict` two nodes upstream, and each names a failure MODE, not an
+  incident: `permanence` is always "something stopped being there", whatever the
+  thing was. So the clause is authored once, by hand, in WORLD_RULES' own
+  positive voice — and **being a literal it cannot smuggle a negation**, which
+  is the only property that matters here. It gives up specificity ("whatever the
+  subject is holding" rather than "the sleeve stack"); Veo is handed the start
+  frame, so the thing is in front of it anyway.
+
+A runtime `UNSAFE` regex withholds and logs any clause carrying an instructive
+negation or a fault noun, so the rule is executable rather than a promise in a
+comment — the next session adding a seventh signal edits a plain object literal.
+All six clauses pass today, 26–39 words each (permanence 39, untouched 33, direction 32, coherence 29, morph 29, loop 26), capped at **3 per re-roll**
+(~107 words; the café clip's own count was three: permanence, untouched, loop).
+The cap is the knob if re-rolls come back worse.
+
+**The key names lie, and that matters here.** `Motion Verdict` sends
+`problems: bad` — the GATE list (`['permanence 0.3', 'untouched 0.4']`), not the
+judge's prose. Both resubmit nodes read the FIRST WORD of each entry and nothing
+else, and re-check `morph`/`loop` off their own booleans so a partial or older
+verdict payload still corrects what it can.
+
+### Four nodes, and the two paths compose the prompt in different places
+
+| node | file | what changed |
+|---|---|---|
+| `Motion Resubmit` | `paste/Motion Resubmit.js` | composes the whole replacement prompt; emits `prompt`, `basePrompt`, `correction` |
+| `Submit Video` | `paste/Submit Video.txt` | one added clause inside the existing `$('Motion Resubmit')` try-block |
+| `RG Motion Resubmit` | `paste/RG Motion Resubmit.js` | overrides `motionPrompt` on the payload; emits `baseMotion`, `correction` |
+| `Submit Video Regen` | `paste/Submit Video Regen.txt` | the motion-prompt source becomes a resolver |
+
+`Current Scene` composes the batch prompt ONCE into `videoRequest.prompt` and
+freezes it, and `Submit Video` copies that object wholesale and has never read a
+prompt from anywhere else — so the batch correction has to be a whole
+replacement prompt plus a one-line override there. **Without the `Submit Video`
+edit, `Motion Resubmit` is a no-op**: the seed and the end-frame drop still work,
+the correction is composed, logged and thrown away.
+
+`Submit Video Regen` composes its guardrails itself on every submit around
+`$json.motionPrompt`, so the regen correction only joins the ACTION — landing in
+the same slot the producer's `ADJUSTMENT REQUEST — the new video MUST follow
+this: …` lands in from `Evaluate Video Approval`, which it preserves. **No fourth
+copy of WORLD_RULES appears anywhere.**
+
+**The correction is INSERTED at the first `Negative:` boundary, never appended.**
+Appending would put it inside the trailing noun list — the same mistake
+`Evaluate Video Approval` made with the producer's note. The boundary is read as
+an index so everything from that token on survives byte for byte. It sits after
+WORLD_RULES rather than beside the action deliberately: the action/WORLD_RULES
+seam is only findable by matching `Current Scene`'s literal wording, a silent
+coupling to a string that changes, while `Negative:` is a token every composer
+here already agrees on. A head of nothing (a bare legacy tail) falls back to
+today's behaviour — new seed, prompt untouched — rather than submitting a
+correction with no shot attached.
+
+### Two staleness guards, because both submit nodes read with `.first()`
+
+`.first()` returns a node's LATEST run, not the run belonging to the item in
+hand, and the scene id alone is not enough to tell those apart:
+
+- **batch** — `Current Scene` runs a SECOND time for the same scene when
+  `VP Reload Scene` re-enters it after the video filter refuses a prompt. Scene-id
+  matching alone would resurrect a correction built on the REFUSED prompt and undo
+  the rewrite that exists to get past the filter. `Submit Video` therefore applies
+  the override only when `m.basePrompt === r.prompt`.
+- **regen** — `Regen Resubmit Guard` and `Regen Cooldown Guard` both re-feed
+  `Prep Video Regen`'s payload, so a filter refusal or a 429 after the re-roll
+  arrives carrying the UNCORRECTED prompt while still picking the new seed out of
+  `RG Motion Resubmit`. The resolver prefers the corrected prompt when
+  `$json.motionPrompt` still equals the base it was built from — which is also
+  what stops a LATER, separate regeneration of the same scene (a fresh producer
+  note) from being overwritten by the stale correction.
+
+`m.seed` and `m.dropEndFrame` keep their existing scene-id-only guards; that
+pre-existing looseness is untouched on purpose.
+
+### Kept exactly as they were
+
+`MAX_REROLLS = 1` (it lives in `Motion Prep`/`Motion Verdict`, not here), both
+seed derivations, `dropEndFrame` on `morph` only, `sd.polls[sceneId] = 0` /
+`sd.regenPolls[p.id] = 0`, the `Object.assign({}, p, …)` passthrough, every
+`$('Prep Video Regen')` reference, and both `resubmitting with seed …` log lines
+byte for byte. One log line is ADDED per path — `MOTION <ord>: correction
+(permanence, untouched, loop), 1131 chars` / `RG MOTION <id>: correction …` —
+printed on EVERY re-roll, empty correction included, for the same reason
+`Motion Verdict` prints all six signals on every path: the open-work item is to
+watch one real film and count, and one `grep 'MOTION '` has to answer "did the
+correction ride along, and which clauses" without re-running anything.
+
+`sd.motionNotes` stays write-only and is deliberately still not read: its content
+is prose faults, which is the one thing that must not reach a prompt.
+
+**`CLAUSES` / `SIGNAL_ORDER` / `MAX_CLAUSES` / `LEAD_IN` / `UNSAFE` are a
+LOCKSTEP PAIR** — byte-identical in the two Code nodes (1,563 chars), verified.
+n8n has no shared module; publish both or neither, or a rescued clip obeys a
+different director from its neighbours.
+
+### Verification (no network; snapshot `255ef29c` is the live version)
+
+- `node --check` passes on both `.js`.
+- `check-expression.mjs` on both `.txt` reports the same shape as the live body
+  (`Submit Video`: `seed`; `Submit Video Regen`: the same nine keys and the same
+  1,244-char prompt under stubs).
+- Prefix/suffix byte-identical either side of the single replaced span in each
+  `.txt`. Measured as the maximal common prefix and suffix against the live
+  parameter, so a future session can reproduce them: `Submit Video` 533 / 36
+  chars (569 -> 633, +64); `Submit Video Regen` 281 / 1697 chars
+  (1996 -> 2202, +206).
+- Both Code bodies executed in a sandbox with stubbed `$`, `$json` and
+  `$getWorkflowStaticData`: the action, WORLD_RULES and the `Negative:` tail all
+  survive byte for byte, the correction lands before `Negative:`, the producer's
+  `ADJUSTMENT REQUEST` is preserved, the guard re-feed recovers the correction, a
+  later regen of the same scene is not overwritten, a post-VP-rewrite prompt
+  rejects the stale correction, and the three degenerate inputs (no signals,
+  tail-only stored prompt, `$('Current Scene')` unavailable) all fall back to
+  seed-only.
+- No node reference is dangling; no new node name is referenced by
+  `Submit Video`/`Submit Video Regen`, and `Motion Resubmit`'s new
+  `$('Current Scene')` is the node `Motion Prep` two steps upstream already reads.
+
+Both `.txt` files carry NO trailing newline (the parameter value verbatim,
+leading `=` included) — `paste/Submit Video Regen.txt` used to carry one and no
+longer does. Originals for the three nodes that had none are now in `original/`;
+`original/Submit Video Regen.txt` is still the PRE-2026-09-13 body, so diff that
+node against the snapshot, not against `original/`.
+
+**Not measured.** No film has been re-rolled with a correction attached. What is
+owed is the same debt as the judge itself: watch one real film, `grep 'MOTION '`
+the execution, and see which clauses ride along and whether the second take is
+better than the first. If corrections make re-rolls WORSE, `MAX_CLAUSES` is the
+first knob and the clause wording is the second — the threshold lesson from
+2026-09-13 applies here too: the wording is the first line of defence.

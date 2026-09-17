@@ -1,0 +1,1 @@
+={{ $('RG End Frame Prompt').first().json.efRequest }}

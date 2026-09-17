@@ -39,7 +39,10 @@ sd.motionRerolls = sd.motionRerolls || {};
 
 // Keyed 'regen:<id>' the way the cooldown counters already are, so a scene
 // that used its batch re-roll still gets one here — these are different
-// takes, judged against different briefs.
+// takes, judged against different briefs. `Sort & Cap Scenes` deliberately
+// does NOT clear these keys when it resets the batch ones, because it runs on
+// every regen cycle and a wholesale reset would make MAX_REROLLS meaningless
+// here.
 const key = 'regen:' + p.id;
 const MAX_REROLLS = 1;
 let opts = {};
@@ -72,7 +75,7 @@ if (skip) {
 }
 
 // Word for word the batch path's question. The two must keep agreeing.
-const system = 'You are a film editor checking whether a generated shot does what its brief said. You are shown a contact sheet: frames sampled about one second apart from a single 8-second clip, in time order, left to right and then top to bottom. Judge only what the brief claims and whether the world holds together. Do not judge taste, style, beauty, lighting or composition. Answer only the JSON object requested.';
+const system = 'You are a film editor checking whether a generated shot does what its brief said. You are shown a contact sheet: frames sampled at a fixed interval across a single 8-second clip, in time order, left to right and then top to bottom. The frames are samples, not the whole clip: a fault shorter than the gap between two of them is invisible here, so judge what you can actually see and do not infer what happened in between. Judge only what the brief claims and whether the world holds together. Do not judge taste, style, beauty, lighting or composition. Answer only the JSON object requested.';
 const ask = [
   'The brief for this shot was:',
   '"' + motion.slice(0, 700) + '"',

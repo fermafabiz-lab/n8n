@@ -1863,3 +1863,47 @@ production workflows by name.
   has no delete, and the site's API key is not reachable from a web session,
   so a probe's failed run stays in n8n's own list until it ages out of the
   24-hour window. Naming probes `zz …` is what keeps them off the site.
+### What was stopping production: the site's own restart button (2026-09-17)
+
+Three multi-account test runs died within minutes of starting, and the producer
+said it was not them. It was the site — `⟳ Restart this pass` in
+`ProductionActivity`.
+
+**How the cause was established, since executions carry no actor.** Only three
+code paths ever stop a Media Generation execution, and all three are behind a
+click: `pauseProduction` (Pause), `deleteProjects` (Delete), `restartProduction`
+(this button). There is no cron, no API route and no effect that fires any of
+them — `restart` is bound to `onClick` and nothing else.
+
+n8n's own record then says WHICH button, from the timing alone. The cancelled
+runs come in pairs where the next execution starts **1.7-5.3 s** after the
+previous one is stopped: `14215`→`14246` (1.8 s), `13033`→`13215` (5.3 s),
+`14371`→`14374` (1.7 s). That gap is machine-tight and is exactly
+`restartProduction`'s shape — pause, poll up to 6×1 s for the alive list to
+clear, fire `resume-project`. A human pressing Pause and then Resume cannot
+produce 1.7 s. And `14199` and `13978` were stopped in the **same 130 ms**
+(10:55:49.405 / .535) although `13978` had been running since the previous
+afternoon on a different project, which is the `pauseProduction` loop over the
+whole `running` list.
+
+**Why it kept happening with nobody meaning to.** `FROZEN_MIN` was 12 minutes.
+A real media pass runs for the best part of an hour — `lib/n8n.ts` says so in
+`STALL_AGE_MS`, which is **45**. So the panel offered the restart on every
+healthy pass, over copy asserting *"If nothing new has appeared in that time, it
+is wedged"*. Two constants making the same judgment disagreed by 4×, and the
+lower one was the one the producer read. `FROZEN_MIN` is now 45 and carries a
+comment naming its twin; **they must move together.**
+
+Two things the copy did not say and now does: the restart stops **every**
+execution n8n has running, another project's included, because the public API
+cannot map an execution to a project; and while saved assets are kept, anything
+mid-generation at Google is abandoned and made again — which on a long pass is
+most of the work the click was meant to rescue.
+
+**The dead guard, worth knowing before trusting it.** `nudgeProduction`,
+`resumeProject` and `restartScripting` each sweep `getStalledProduction()` and
+stop what it returns. That loop can never run: all three return early when
+`getAliveProduction()` is non-empty, and a stalled execution is by definition
+`running`, so it is always in the alive list first. The automatic stall-killer
+reads as a live safety net and is unreachable code. That is the safe direction
+to fail — but do not count it as protection that exists.

@@ -1,8 +1,9 @@
 # Parallel generation across three Google Flow accounts
 
 Status: **Etapa 1 and 2 are APPLIED and LIVE and still a NO-OP at
-`flowAccounts: 1`. DO NOT set it to 2 or 3 yet — the first real run found a bug
-in the translation table. See "The first real run" at the bottom.**
+`flowAccounts: 1`. The table bug the first real run exposed is FIXED
+(`4bb6847c`), but the fix has not itself been run on a film yet — see "The first
+real run" and "The fix" at the bottom.**
 
 | Applied | version | built on |
 |---|---|---|
@@ -513,3 +514,40 @@ SITE (`stopExecution` in `platform/lib/n8n.ts`, used by `pauseProduction` and
 `restartProduction`). The producer says it was not them. A cancel followed ~6 s
 later by a fresh run is the exact signature of `restartProduction()`. Worth
 finding out what is calling it before running another timed test.
+
+
+## The fix (version `4bb6847c`)
+
+Three changes, and the important one is a change of principle rather than of
+index arithmetic.
+
+**`Collect Replicated` files each copy under the account decoded from the id
+Flow actually returned**, not the account the upload asked for. The account is
+hex-encoded between `-email:` and `-image:`, so the returned id is the authority
+on where the copy landed; when the two disagree it logs
+`REPLICATE MISROUTED … asked for X, Flow answered an id on Y` and files it under
+Y. A table that lies here cannot be detected until scenes start failing hours
+later, so it is made correct by construction instead.
+
+**Both loop nodes take their work item by `$runIndex`** into
+`$('Replicate Prep').all()` rather than `$('Loop Replicate').first()`.
+`.first()` is a node's LATEST run, which is not the same as the current loop
+item — the documented trap in this codebase, and the only thing that explains an
+inversion where the account processed FIRST ended up with FEWER correct entries.
+
+**`Assign Accounts`' guard verifies ownership, not presence.** Each mapped id is
+decoded and counted as missing unless it really belongs to the account it is
+filed under. Tested against the exact shape the broken run produced: a correct
+table reports 0 missing, the mis-filed one reports all of them, an absent entry
+reports all of them.
+
+The broken `flowRefs` was dropped from `rec1rkfxvBeMCFDRj` so the next pass
+rebuilds it from scratch — `Replicate Prep` skips what is already recorded, so a
+partial table would otherwise have preserved its own error.
+
+**Still owed:** a run of the fixed chain on a film. Everything above is
+reasoning plus offline tests; none of it has been exercised end to end. Watch
+for `REPLICATE MISROUTED` — if it appears, the uploads really are being routed
+somewhere other than the requested account and the cause is on useapi's side
+rather than in the indexing, which would be worth knowing before trusting the
+window at more than one job per account.

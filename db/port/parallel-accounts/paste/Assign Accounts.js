@@ -64,7 +64,20 @@ if (n > 1 && scoped.length) {
   for (let k = 1; k < n; k++) {
     const acct = ACCOUNTS[k];
     const have = flowRefs[acct] || {};
-    const missing = scoped.filter(function (id) { return !have[id]; });
+    // Presence is NOT correctness. The first real run wrote a table whose
+    // account-01 entry held five ids all minted on account 02; a presence-only
+    // check passed it, and every scene in that block would then have died on
+    // `Email mismatch`. So each mapped id is decoded — the account is hex
+    // between `-email:` and `-image:` — and counted as missing unless it really
+    // belongs to the account it is filed under.
+    const missing = scoped.filter(function (id) {
+      const v = have[id];
+      if (!v) return true;
+      let owner = '';
+      const hx = String(v).match(/-email:([0-9a-f]+)-/i);
+      if (hx) { for (let i = 0; i < hx[1].length; i += 2) owner += String.fromCharCode(parseInt(hx[1].substr(i, 2), 16)); }
+      return owner !== acct;
+    });
     if (missing.length) {
       console.log('FLOW ACCOUNTS: ' + acct + ' is missing ' + missing.length + ' of ' + scoped.length + ' reference image(s), so it is not used');
       break;

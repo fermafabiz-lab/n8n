@@ -2618,7 +2618,14 @@ export async function resumeProject(projectId: string): Promise<ActionResult> {
       return {
         ok: false,
         message:
-          "Production is already running (an execution is active in n8n) — nothing was restarted. The page refreshes itself; if it looks stuck for more than a few minutes, use Pause first, then Resume.",
+          // This used to end "if it looks stuck for more than a few minutes,
+          // use Pause first, then Resume" — advice that is right for a wedged
+          // execution and catastrophic for a slow one. A regeneration is
+          // legitimately slow (a Veo generation, minutes, sometimes far
+          // longer) and Pause destroys it; see pauseProduction. The scene's
+          // own badge now says whether anything is working on it, which is
+          // the question this sentence was standing in for.
+          "Production is already running (an execution is active in n8n) — nothing was restarted. The page refreshes itself. A scene that says it is regenerating is being worked on by that run, so give it time: Pause would throw the generation away and start the whole pass over.",
       };
     }
     // Clear out executions n8n created but never ran. They report as running
@@ -2647,12 +2654,29 @@ export async function resumeProject(projectId: string): Promise<ActionResult> {
 export async function pauseProduction(projectId: string): Promise<ActionResult> {
   try {
     // Stop children before the orchestrator so nothing re-spawns work.
-    // Nothing is lost: every finished asset is already in Airtable/Drive,
-    // and Resume picks up exactly where this left off.
+    //
+    // "Nothing is lost" is what this used to promise, and for finished assets
+    // it is true — they are in Postgres and on Drive before anything here
+    // runs. It is FALSE for a regeneration in flight (2026-09-17). A
+    // regeneration has no webhook of its own: the flag is noticed only by a
+    // live batch that has already walked the whole film, and the Veo
+    // generation it then submits writes nothing until it finishes. Stopping
+    // the execution throws that generation away, and Resume does not pick it
+    // up — it restarts the pass from the top and has to cross the film again
+    // before it can even see the flag.
+    //
+    // Which matters because this button is what the producer reaches for when
+    // a regeneration looks stuck, and the badge gave them no way to tell a
+    // working one from a dead one. It does now (RegenBadge), and this message
+    // stops claiming otherwise: it counts what is actually in flight and says
+    // so. It does NOT refuse — a wedged execution is real and Pause is still
+    // the cure; the producer just gets to know the price first.
     const running = await getExecutions("running", 20);
     if (running.length === 0) {
       return { ok: false, message: "Nothing is running right now." };
     }
+    const inFlight = (await getScenes(projectId).catch(() => []))
+      .filter((s) => s.regenImage || s.regenVideo || s.regenVoice);
     const order = ["Media Generation", "Final Assembly", "Scripting", "Master Orchestrator"];
     const sorted = [...running].sort(
       (a, b) => order.indexOf(a.workflowName) - order.indexOf(b.workflowName),
@@ -2664,9 +2688,16 @@ export async function pauseProduction(projectId: string): Promise<ActionResult> 
     }
     revalidatePath(`/projects/${projectId}`);
     revalidatePath("/");
+    const lost =
+      inFlight.length > 0
+        ? ` ${inFlight.length} scene${inFlight.length === 1 ? "" : "s"} had a regeneration in flight (${inFlight
+            .map((s) => s.label)
+            .slice(0, 4)
+            .join(", ")}${inFlight.length > 4 ? "…" : ""}) — that work is thrown away, not paused. Resume starts the film's pass again and re-requests them from scratch.`
+        : "";
     return {
       ok: true,
-      message: `Paused — stopped ${stopped} running execution${stopped === 1 ? "" : "s"}. Press Resume to continue from where it left off.`,
+      message: `Paused — stopped ${stopped} running execution${stopped === 1 ? "" : "s"}. Press Resume to continue from where it left off.${lost}`,
     };
   } catch (e) {
     return { ok: false, message: friendlyError(e) };

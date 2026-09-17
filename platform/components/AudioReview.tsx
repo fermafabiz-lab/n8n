@@ -219,8 +219,11 @@ export default function AudioReview({
   speed = 1,
   speedLocked = false,
   voiceTone = null,
+  productionAlive = null,
 }: {
   projectId: string;
+  /** See SceneBoard: null = n8n did not answer, never "nothing is running". */
+  productionAlive?: boolean | null;
   scenes: Scene[];
   /** How the narrator reads, or null for each voice's own settings. Resolved
    *  by buildProject, like the pace, so this panel and the synthesis can never
@@ -1723,7 +1726,12 @@ export default function AudioReview({
                   />
                   {s.regenVoice ? (
                     <>
-                      <RegenBadge label="Re-synthesizing…" note={s.note} />
+                      <RegenBadge
+                        label="Re-synthesizing…"
+                        note={s.note}
+                        since={s.regenSince}
+                        alive={productionAlive}
+                      />
                       {/*
                         The third copy of the trap the rewrite and the clip
                         already carry an exit for: `Regenerează Voce` is

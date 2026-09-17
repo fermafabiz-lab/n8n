@@ -118,24 +118,30 @@ published draft (`node-body.mjs` + `cmp`), `diff-workflow.mjs --expect` clean
 (only those four nodes differ, only those two nodes' edges changed, 12 Drive
 nodes keep `resource`/`operation`, no dangling `$('…')`).
 
-## What is still owed — and it is the bigger half
+## What is still owed
+
+The site half below was built the same day, once the producer paused production
+and authorised a deploy.
 
 The n8n fix stops the film dying. It does **not** fix cause 2, which needs the
 site:
 
-1. **A regeneration must be legible.** The badge should say whether a batch is
-   alive and how long the flag has been set. `regen_video_at`,
-   `regen_image_at` and `regen_voice_at` exist for exactly this — `db/001`
-   says so in as many words ("the `*_at` columns make staleness a query …
-   One rule covers every flag, including the ones added later") — but
-   `hov.at_scene` does not emit them and `RawScene` has no field for them, so
-   the site cannot see them yet. That is the one schema change this needs.
-2. **Pause must stop lying.** `pauseProduction` should count the scenes
-   carrying a regen flag before it stops anything and say plainly that a
-   regeneration in flight will start over.
-3. **`resumeProject` must stop recommending it.** "Use Pause first, then
-   Resume" is the correct cure for a wedged execution and the wrong one for a
-   slow regeneration, and the message does not distinguish them.
+1. ~~A regeneration must be legible.~~ **Done** — and it needed **no schema
+   change at all**, which the first draft of this README got wrong. The site
+   reads `hov.scene` directly (`SCENE_SELECT` is `select s.*`), not the
+   `at_scene` view, so `regen_image_at` / `regen_video_at` / `regen_voice_at`
+   were already in the row and only had to be declared and carried.
+   `regenSinceOf` in `derive.ts` is the one rule `db/001` asked for — the
+   OLDEST set flag wins, and a flag with no timestamp says nothing rather
+   than "just now" — and `RegenBadge` now shows the age and whether a batch
+   is alive. Pinned by `npm run check:regen-wait` (17 checks).
+2. ~~Pause must stop lying.~~ **Done** — `pauseProduction` counts the scenes
+   with a regeneration in flight, names them, and says the work is thrown
+   away rather than paused. It still stops: a wedged execution is real and
+   Pause is its cure. The producer just gets the price first.
+3. ~~`resumeProject` must stop recommending it.~~ **Done** — the message no
+   longer says "if it looks stuck, use Pause first, then Resume"; it says a
+   scene that reads as regenerating is being worked on by that run.
 4. ~~The image and voice regen badges still have no local exit.~~ **Done by
    a colleague the same day** (`cd2b8d1` on the trunk): `restartImageRegen` /
    `cancelImageRegen` / `restartVoiceRegen` / `cancelVoiceRegen`. Note what
@@ -143,9 +149,10 @@ site:
    which is worth having, but it does not tell them whether waiting would
    have worked. Points 1 to 3 are still the ones that decide that.
 
-Until 1–3 exist, the practical advice is the one thing that actually works:
-**after asking for a video regeneration, do not press Pause.** Leave it; the
-batch reaches the video gate on its own.
+What is genuinely still owed is one measurement: **watch a real video
+regeneration land.** Every part of this was verified against recorded data
+and unit-level tests, and none of it has yet been seen to carry one
+regeneration from click to new clip on the producer's screen.
 
 ## Rollback
 

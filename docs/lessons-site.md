@@ -990,11 +990,18 @@ picked the asset, not signed it off. Final Assembly receives an ordinary mp4.
   whole of the producer's "regen does nothing, and it has always been like
   this". **A state whose only honest reading is "wait" must say how long it has
   been waiting and whether anything is working on it**, or the producer's only
-  available action becomes the one that guarantees failure. Owed, and the
-  schema already designed it (`db/001`: the `*_at` columns "make staleness a
-  query … One rule covers every flag"): `hov.at_scene` does not emit
-  `regen_*_at` and `RawScene` has no field for them, so the site cannot see
-  them yet. Full account: `db/port/regen-unstick/README.md`.
+  available action becomes the one that guarantees failure. Fixed the same
+  day: `regenSinceOf` in `derive.ts` is the one rule `db/001` asked for (the
+  OLDEST set flag wins — a wait that resets every time a second request lands
+  never looks old enough to question — and a flag with no timestamp says
+  nothing rather than "just now"), `RegenBadge` shows the age and whether a
+  batch is alive, `pauseProduction` counts what is in flight and says the work
+  is thrown away rather than paused, and `resumeProject` stopped recommending
+  Pause. **It needed no schema change**: the site reads `hov.scene` directly
+  (`SCENE_SELECT` is `select s.*`), not the `at_scene` view, so the three
+  columns were already in the row — worth knowing before designing a migration
+  for anything else the scene table already holds. `npm run check:regen-wait`.
+  Full account: `db/port/regen-unstick/README.md`.
 - **The video-regen trap, and three guards for it.** A stock scene has no
   Flow asset to regenerate from, and `Prep Video Regen` THROWS without an
   `Image Media ID` — a throw that kills the whole batch, not the scene. So

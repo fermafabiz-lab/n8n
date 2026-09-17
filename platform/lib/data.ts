@@ -591,6 +591,7 @@ const DEMO_SCENES: Scene[] = Array.from({ length: 8 }, (_, i) => {
     regenImage: false,
     regenVideo: false,
     regenVoice: false,
+    regenSince: null,
     note: null,
     evidenceRef: i === 1 ? "E1, E2" : null,
     needsFactCheck: false,

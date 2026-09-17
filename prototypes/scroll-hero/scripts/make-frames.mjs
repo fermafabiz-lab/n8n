@@ -1,5 +1,10 @@
 // Generates the placeholder frame sequence for the prototype:
-//   public/frames/frame_0001.webp … frame_0100.webp  and  public/poster.webp
+//   public/frames/frame_0001.webp … frame_0100.webp  and  public/frames/poster.webp
+//
+// The poster sits IN the frame directory on purpose. Neither it nor the frames
+// are in the container image; both are served off disk (by Caddy on the box,
+// by Next from public/ locally), so one directory is the whole upload and a
+// new sequence never needs a rebuild.
 //
 // The content is deliberately synthetic and self-describing: every frame
 // prints its own number and moves a marker along a path, so a screenshot of
@@ -17,7 +22,7 @@ import sharp from "sharp";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const outDir = path.join(root, "public", "frames");
-const posterPath = path.join(root, "public", "poster.webp");
+const posterPath = path.join(outDir, "poster.webp");
 
 const COUNT = 100;
 const W = 1600;
@@ -75,8 +80,8 @@ for (let i = 0; i < COUNT; i++) {
 total += await render(svgFor(0), posterPath, 72);
 
 const posterSize = (await stat(posterPath)).size;
-console.log(`frames: ${COUNT} × ${W}×${H}`);
-console.log(`poster: ${(posterSize / 1024).toFixed(1)} kB`);
+console.log(`frames: ${COUNT} × ${W}×${H} in ${path.relative(root, outDir)}`);
+console.log(`poster: ${(posterSize / 1024).toFixed(1)} kB (same directory)`);
 console.log(`total assets: ${(total / 1024 / 1024).toFixed(2)} MB (budget ${(BUDGET_BYTES / 1024 / 1024).toFixed(1)} MB)`);
 if (total > BUDGET_BYTES) {
   console.error("over budget");

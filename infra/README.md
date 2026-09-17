@@ -41,12 +41,18 @@ block is also a guess at the box's, not a copy of it.
 Verified live the same evening by HTTP probes from n8n (throwaway
 workflows, archived), inside the network and over the public URL:
 `http://site-dev:3000/` and `https://dev.house-of-videos.com/` both answer
-200 with the hero markup, the second through Caddy; `/poster.webp`,
+200 with the hero markup, the second through Caddy;
 `/frames/frame_0001.webp` and `/frames/frame_0100.webp` answer 200 as
-`image/webp` (11,766 / 11,766 / 12,492 bytes) with
+`image/webp` (11,766 / 12,492 bytes) with
 `cache-control: public, max-age=31536000, immutable`; and
 `/frames/frame_0999.webp` answers a plain 404 from Caddy with **no** cache
 header, which is the behaviour to preserve — a frame that is missing when
 someone visits must not be cached as missing for a year.
+
+**`/opt/n8n/frames` is hand-managed content, not deploy output.** The
+poster moved in beside the frames and left the container image, and the
+deploy workflow no longer copies anything there — it used to overwrite the
+real sequence with this repo's placeholders on every run. Treat the
+directory as the producer's, and never add a step that writes to it.
 
 A change to either file needs `docker compose up -d caddy`, not a reload.

@@ -1,14 +1,15 @@
 # The scroll-hero prototype as the `site-dev` container: same recipe as
-# deploy-platform.yml, smaller. Build the image here, copy the frame
-# sequence to the box, tell the box to pull.
+# deploy-platform.yml, smaller. Build the image here, tell the box to pull.
 #
 # Runs on trunk pushes that touch the prototype, or by hand from any branch
 # (Actions -> Deploy site-dev -> Run workflow, pick the branch). The manual
 # path is how a feature branch reaches site-dev without going through the
 # trunk first — that is what a dev site is for.
 #
-# The frames go to /opt/n8n/frames on the box, which Caddy serves as
-# /frames/* — they are deliberately not in the image (see the Dockerfile).
+# It ships CODE ONLY. The WebP sequence and the poster live in
+# /opt/n8n/frames, are put there by hand, and are never touched by a deploy;
+# Caddy serves them as /frames/*. Neither is in the image, so replacing the
+# sequence needs no build and a build never replaces the sequence.
 
 name: Deploy site-dev
 
@@ -71,18 +72,15 @@ jobs:
           cache-from: type=gha,scope=site-dev
           cache-to: type=gha,mode=max,scope=site-dev
 
-      # The frames live next to the compose file, not in the image. Caddy
-      # mounts ./frames read-only and answers /frames/* from it.
-      - name: Copy frames to Hetzner
-        uses: appleboy/scp-action@v1
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          source: "prototypes/scroll-hero/public/frames/*.webp"
-          target: /opt/n8n/frames
-          strip_components: 4
-          overwrite: true
+      # NOTHING here writes /opt/n8n/frames. The real WebP sequence and its
+      # poster are uploaded by hand and must survive every deploy:
+      #
+      #     scp prototypes/scroll-hero/public/frames/*.webp \
+      #         root@<box>:/opt/n8n/frames/
+      #
+      # This workflow used to scp the placeholder frames from the repo on each
+      # run, which overwrote the real ones. Do not put that step back — a
+      # deploy is a code deploy, and the sequence is content.
 
       - name: Pull and restart on Hetzner
         uses: appleboy/ssh-action@v1

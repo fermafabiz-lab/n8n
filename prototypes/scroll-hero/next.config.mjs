@@ -11,9 +11,10 @@ const nextConfig = {
     return [
       {
         // Frames and poster never change once generated; let the browser and
-        // any CDN keep them for a year. Only affects `next start`, but that is
-        // what the Playwright and Lighthouse runs use.
-        source: "/:path(frames/.*|poster\\.webp)",
+        // any CDN keep them for a year. Only affects `next start` — on the box
+        // these paths never reach Next, Caddy answers them — but that is what
+        // the Playwright and Lighthouse runs use.
+        source: "/frames/:path*",
         headers: [
           { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
         ],

@@ -5,6 +5,11 @@ const SHOTS = path.resolve(__dirname, "..", "shots");
 const FRAME_COUNT = 100;
 const CHECKPOINTS = [0, 25, 50, 75, 99];
 const BUDGET_BYTES = 3 * 1024 * 1024;
+const POSTER_PATH = "/frames/poster.webp";
+
+// Matches a numbered frame and NOT the poster beside it. The opt-out tests
+// assert that no frame is fetched, while the poster still must be.
+const isFrameRequest = (url: string) => /\/frames\/frame_\d+\.webp/.test(url);
 
 const hero = (page: Page) => page.locator("section.hero");
 
@@ -42,8 +47,10 @@ function trackBytes(page: Page) {
     let poster = 0;
     let code = 0;
     for (const [p, n] of seen) {
-      if (p.startsWith("/frames/")) frames += n;
-      else if (p === "/poster.webp") poster += n;
+      // The poster lives in the frame directory now, so it has to be taken
+      // out before the frames are counted, not after.
+      if (p === POSTER_PATH) poster += n;
+      else if (p.startsWith("/frames/")) frames += n;
       else code += n;
     }
     return { frames, poster, code, total: frames + poster + code, requests: seen.size };
@@ -168,13 +175,17 @@ test.describe("opt-outs", () => {
     });
     const page = await context.newPage();
     const frameRequests: string[] = [];
+    const posterRequests: string[] = [];
     page.on("request", (r) => {
-      if (r.url().includes("/frames/")) frameRequests.push(r.url());
+      if (isFrameRequest(r.url())) frameRequests.push(r.url());
+      else if (r.url().endsWith(POSTER_PATH)) posterRequests.push(r.url());
     });
     await page.goto("/", { waitUntil: "networkidle" });
     await page.waitForTimeout(1_500);
 
     expect(frameRequests).toEqual([]);
+    // The poster is the one thing a narrow viewport must fetch.
+    expect(posterRequests.length).toBeGreaterThan(0);
     await expect(hero(page)).toHaveAttribute("data-state", "static");
     await expect(page.locator("canvas.hero__canvas")).toBeHidden();
     await expect(page.locator("img.hero__poster")).toBeVisible();
@@ -194,13 +205,16 @@ test.describe("opt-outs", () => {
     });
     const page = await context.newPage();
     const frameRequests: string[] = [];
+    const posterRequests: string[] = [];
     page.on("request", (r) => {
-      if (r.url().includes("/frames/")) frameRequests.push(r.url());
+      if (isFrameRequest(r.url())) frameRequests.push(r.url());
+      else if (r.url().endsWith(POSTER_PATH)) posterRequests.push(r.url());
     });
     await page.goto("/", { waitUntil: "networkidle" });
     await page.waitForTimeout(1_500);
 
     expect(frameRequests).toEqual([]);
+    expect(posterRequests.length).toBeGreaterThan(0);
     await expect(hero(page)).toHaveAttribute("data-state", "static");
     await expect(page.locator("canvas.hero__canvas")).toBeHidden();
     const heights = await page.evaluate(() => ({

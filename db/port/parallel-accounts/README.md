@@ -1,11 +1,10 @@
 # Parallel generation across three Google Flow accounts
 
-Status: **BLOCKED on account tier. Etapa 0 complete, nothing applied to production.**
+Status: **Etapa 0 complete and UNBLOCKED. Nothing applied to production yet.**
 
-The parallelization MECHANISM is proven to work. The two family accounts are on
-`PAYGATE_TIER_NOT_PAID` / `G1_FREEMIUM` with 50 credits each and no access to
-the free low-priority Veo model, so they cannot do the work until that changes.
-See "P5" below.
+The parallelization mechanism is proven to work, and as of 2026-09-17 ~15:30 all
+three accounts read `PAYGATE_TIER_TWO` / `G1_TIER2` with 89 video models and all
+11 `_low_priority` (cost 0) keys available — see "P5 follow-up".
 
 Two Google family accounts were connected to useapi on 2026-09-17
 (`houseofvideos01@gmail.com` 14:06, `houseofvideos02@gmail.com` 14:16), beside
@@ -67,17 +66,22 @@ is literally part of the identifier. It follows that `castRefs`,
 `Editing Options` belong to whichever account minted them, and a block running
 on another account cannot use them.
 
-**It took 83.9 s, not the 23.6 s recorded in `docs/lessons-pipeline.md`.**
-If that is representative rather than a slow minute, an 80-scene film is about
-112 minutes of image generation, not 32 — which makes the image phase a much
-larger share of the run than the design assumed. Worth re-measuring before
-sizing anything against it.
+**It took 83.9 s against the 23.6 s recorded in `docs/lessons-pipeline.md`** —
+but see the retraction below; this was probably the refusal path, so do not size
+anything against it yet.
 
-**`fifeUrl` came back empty.** `docs/lessons-pipeline.md` says the response
-carries "BOTH the signed `fifeUrl` … and the `mediaGenerationId`". It carried
-only the id. Not blocking — our own media store has the bytes, and that is
-what the cross-account upload probe uses — but any design that plans to fetch
-bytes from `fifeUrl` is building on something that is not always there.
+**`fifeUrl` came back empty — and this was almost certainly a silent refusal,
+not a documentation error.** Retracted as a finding. Another session published
+two fixes to this very workflow at 14:14 the same day
+(`db/port/regen-unstick/`, versions `90eb723e` and `6735a96a`) whose stated
+subject is exactly this: "Flow refuses an image in two ways: an HTTP error and
+an HTTP 200 whose generatedImage carries a prompt and a seed but no fifeUrl."
+That is the response P1a got. So the probe image was likely refused rather than
+generated, `docs/lessons-pipeline.md` is probably right that a real generation
+carries the `fifeUrl`, and **the 83.9 s timing above is suspect for the same
+reason** — it may be the refusal path, not a normal generation. Both need
+re-measuring with a prompt that is known to pass before either is treated as
+fact.
 
 Each image also costs a CapSolver captcha solve (5.6 s, one attempt, on this
 request).
@@ -191,6 +195,71 @@ options are: pay for two more Ultra subscriptions (the scaling lever
 `docs/lessons-pipeline.md` actually names), accept today's speed, or spend
 credits on the primary account rather than wall-clock — none of which is a code
 change.
+
+## P5 follow-up — unblocked (execution 14291, 2026-09-17 ~15:30)
+
+After the producer activated family sharing in Google One, all three accounts
+read identically:
+
+| | `fermafabiz@` | `houseofvideos01@` | `houseofvideos02@` |
+|---|---|---|---|
+| `userPaygateTier` | `PAYGATE_TIER_TWO` | `PAYGATE_TIER_TWO` | `PAYGATE_TIER_TWO` |
+| `sku` | `G1_TIER2` | `G1_TIER2` | `G1_TIER2` |
+| video models | 89 | 89 | 89 |
+| `_low_priority` keys | 11 | 11 | 11 |
+| credits | 23,330 | 23,380 | 23,380 |
+
+Two things worth recording:
+
+- **No re-linking was needed.** The accounts' `updated` timestamps are unchanged
+  (14:06 and 14:16), so useapi is serving the same stored session it captured at
+  setup. The earlier hypothesis here — that the session predated the sharing and
+  had to be re-captured — was wrong. What was missing was the entitlement at
+  Google's end, and it reached Flow through the existing session.
+- **Credits are pooled, not multiplied.** All three read ~23.3k rather than three
+  separate 25k allowances, which matches Google's documentation that Flow credits
+  are shared across the family group while feature and model limits are per
+  member. This costs us nothing, because the default model is `creditCost: 0`;
+  it only bounds the paid exceptions (the Quality hook, rescues), which do not
+  grow with scene count.
+
+## The edit surface for Etapa 1
+
+The account override must NOT go in the Code nodes that build the requests.
+Those are 7-13 kB (`Build Image Request` 12,370; `End Frame Prompt` 13,122;
+`Evaluate Image Approval` 12,418; `Current Scene` 7,774) and `CLAUDE.md` is
+explicit that a body that size cannot be rewritten from a web session without
+transcribing it, which is a real risk rather than a nuisance.
+
+The HTTP nodes that SEND those requests are tiny, and that is where the override
+belongs:
+
+| node | body today |
+|---|---|
+| `Generate Scene Image` | 56 chars — `={{ $('Build Image Request').first().json.requestBody }}` |
+| `Generate End Frame` | 53 chars |
+| `RG Generate End Frame` | 54 chars |
+| `Regenerate Scene Image` | 24 chars |
+| `Generate Cast Sheet` / `Generate Set Plate` | 24 chars each |
+| `Submit Video` | 633 chars |
+| `Upload Asset To Flow` | email is in the URL query string only |
+
+For video, the override may not even be needed: P3 showed useapi routes by the
+reference, so dropping `email` from `Submit Video` / `Submit Video Regen` lets
+the clip follow its own `startImage` automatically.
+
+## ⚠ Another session is editing this workflow
+
+`get_workflow_history` on `yHG4DBCDjR3RJzav` shows two versions published at
+14:14 on 2026-09-17 by a different session, under a feature folder
+(`db/port/regen-unstick/`) that **does not exist in this working tree**. The
+live workflow is therefore ahead of every snapshot in `db/port/`, including
+`motion-permanence/Media Generation.after.json` (2026-09-14), which must not be
+used as a diff baseline any more.
+
+Staging a draft while another session is mid-change is the "whatever is parked
+goes live with your change" trap in its most dangerous form, with two authors.
+Agree who owns the workflow before applying Etapa 1.
 
 ## Notes for whoever picks this up
 

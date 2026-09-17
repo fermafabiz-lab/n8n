@@ -1,7 +1,8 @@
 # Parallel generation across three Google Flow accounts
 
-Status: **Etapa 1 and 2 are APPLIED and LIVE. All of it is a NO-OP until
-someone sets `Editing Options.flowAccounts` to 2 or 3.**
+Status: **Etapa 1 and 2 are APPLIED and LIVE and still a NO-OP at
+`flowAccounts: 1`. DO NOT set it to 2 or 3 yet — the first real run found a bug
+in the translation table. See "The first real run" at the bottom.**
 
 | Applied | version | built on |
 |---|---|---|
@@ -437,3 +438,78 @@ Agree who owns the workflow before applying Etapa 1.
 - `scripts/check-n8n.mjs` does not touch useapi at all. A block 7 checking all
   three accounts' `health` belongs there, modelled on the existing Railway
   block (warning-only, since a throttle is transient).
+
+
+## The first real run (2026-09-17 evening) — replication works, the table is wrong
+
+A disposable film was created for this: `rec1rkfxvBeMCFDRj`, "TEST disposable
+(multi-account) — Mira and the three lanterns", 40 s, hands-off, one NAMED
+character so a cast sheet would actually be drawn. `flowAccounts: 3` was merged
+into its Editing Options straight from the id the `new-project` webhook returns,
+because the flag cannot ride the brief — `Normalize Webhook Input` builds Editing
+Options from a fixed list of keys.
+
+### What worked
+
+Scripting produced 9 scenes, all approved, and **Dan's sheet ingest populated
+`hov.sheet_media` for the first time** — six rows for this film:
+
+| kind | name | bytes |
+|---|---|---|
+| cast | Mira | 609,463 |
+| location | Canal path — first lantern stretch | 974,935 |
+| location | Canal path — second lantern stretch | 1,046,114 |
+| location | Canal path — third lantern stretch | 956,503 |
+| object | Canal lanterns | 625,426 |
+| object | Lamplighter's pole | 404,877 |
+
+all keyed by a primary-account `flow_id`. So the durable-copy premise Etapa 2
+rests on is real, not assumed.
+
+**The replication chain then ran and wrote `Editing Options.flowRefs`** — eleven
+ids mapped across two accounts, on a real film, before the execution was stopped.
+That is Etapa 2 working end to end.
+
+### The bug
+
+Auditing what it wrote, by decoding the account out of each mapped id:
+
+| account entry | ids mapped | ids actually minted on that account |
+|---|---|---|
+| `houseofvideos01@gmail.com` | 5 | **0** |
+| `houseofvideos02@gmail.com` | 6 | 6 |
+
+Every key is a primary-account id, which is right. But **all five values filed
+under account 01 are ids belonging to account 02.** Account 02's six are correct.
+
+Turned on, that means block 1 would be handed references minted on account 02
+while submitting as account 01, and every scene in that block would die on
+`Email mismatch` — the exact failure the whole design exists to avoid.
+
+**The guard does not catch this**, and that is a second finding:
+`Assign Accounts` only checks that each scoped id is PRESENT in
+`flowRefs[account]`, never that the mapped value belongs to that account. It
+should verify ownership by decoding the hex, the same way `Submit Video Regen`
+does. Presence is not correctness.
+
+Cause not yet established. The suspects, in order: `Collect Replicated` reads the
+account with `$('Loop Replicate').first().json.account` and `.first()` is a
+node's LATEST run, which is the documented trap in this codebase; or
+`Upload Sheet To Account` resolved its `?email=` from a different iteration than
+the one `Collect Replicated` recorded. Both are reachable by a controlled re-run
+with the loop logging its own iteration.
+
+### Why there is no execution log
+
+Three runs were stopped mid-flight (17:22, 17:24, 17:29) and **a CANCELLED
+execution keeps no `runData` at all** — unlike an ERRORED one, which keeps the
+lot. `14340` (error) gave the full node-by-node trace; `14344` (canceled, 3m40s
+of real work) returned `runData: {}`. Everything above was reconstructed from
+what the run left in Postgres instead.
+
+The stop came through `POST /executions/{id}/stop` on the public REST API —
+`executionHandlers.stopExecution` in the stack — which in this system is the
+SITE (`stopExecution` in `platform/lib/n8n.ts`, used by `pauseProduction` and
+`restartProduction`). The producer says it was not them. A cancel followed ~6 s
+later by a fresh run is the exact signature of `restartProduction()`. Worth
+finding out what is calling it before running another timed test.

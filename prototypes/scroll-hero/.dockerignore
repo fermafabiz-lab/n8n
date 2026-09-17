@@ -1,0 +1,16 @@
+# The frames are served by Caddy from the host, not by Next from public/.
+# Leaving them out of the build context is what keeps them out of the image.
+public/frames
+
+node_modules
+.next
+test-results
+shots
+lighthouse
+tests
+playwright.config.ts
+scripts/lighthouse.mjs
+README.md
+.gitignore
+Dockerfile
+.dockerignore

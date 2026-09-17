@@ -1,7 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Standalone prototype: no parent lockfile lookups, no image optimizer
-  // (the frames are served as plain static files from /public).
+  // (the frames are plain static files: from /public locally, from Caddy on
+  // the box — see Dockerfile).
+  // `standalone` is what the Dockerfile's runner stage copies; without it
+  // the image would need the whole node_modules tree.
+  output: "standalone",
   outputFileTracingRoot: import.meta.dirname,
   async headers() {
     return [

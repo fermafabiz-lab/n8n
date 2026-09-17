@@ -102,6 +102,31 @@ main thread at the moment of the LCP paint. Best-practices 96 on mobile is
 Lighthouse flagging the missing `Content-Security-Policy` / HSTS headers,
 which the prototype does not set.
 
+## Deploy: the `site-dev` container on Hetzner
+
+Same recipe as the producer's site, one size down:
+
+| Piece | Where |
+|---|---|
+| Image | `Dockerfile` here → `ghcr.io/fermafabiz-lab/n8n/site-dev`, built by `.github/workflows/deploy-site-dev.yml` (trunk pushes touching `prototypes/scroll-hero/**`, or **Run workflow** by hand from any branch). The box never builds. |
+| Service | `site-dev` in `/opt/n8n/docker-compose.yml` (mirror: `infra/docker-compose.yml`). `container_name: site-dev`, port 3000 on `n8n_net`, **no host port**. |
+| Frames | **Not in the image** (`.dockerignore` drops `public/frames`). The workflow copies them to `/opt/n8n/frames`; Caddy mounts that read-only at `/srv/frames` and answers `/frames/*` from it with `handle_path`, before anything reaches Next. The code asks for `/frames/frame_0001.webp` either way — locally Next serves them from `public/`, on the box Caddy does. |
+| Poster | Stays in the image (`public/poster.webp`, 12 kB). It has to match frame 1, so a new sequence on the box needs a rebuild with a matching poster — or move `POSTER_SRC` to `/frames/poster.webp` and copy it with the frames. |
+| Caddy | `{$SITE_DEV_HOST}` block in `infra/Caddyfile`; `SITE_DEV_HOST` comes from `/opt/n8n/.env` through the caddy service's environment. |
+
+On the box, after the compose file and Caddyfile carry the change:
+
+```
+cd /opt/n8n
+docker compose up -d caddy      # new mount + env var: a reload is not enough
+docker compose up -d site-dev   # once the workflow has pushed an image
+```
+
+Without the frames on disk the page still works: poster shows, the frame
+requests 404, the canvas never appears (state stays `loading`) and the
+section is still a 200vh track. That is the "never blank" rule holding, not
+a bug — check `/opt/n8n/frames` and the caddy mount.
+
 ## Notes for moving it into the site
 
 - Frames stay as `HTMLImageElement`s on purpose. `createImageBitmap` would

@@ -455,6 +455,19 @@ expected and harmless for an app touching only its own Drive.
   n8n. Keep the rule; the example is history.
 
 
+- **`houseofvideos01@gmail.com` is signed out at Google and must be reconnected**
+  (2026-09-17, `db/port/parallel-accounts/README.md`, "The fixed chain, run on a
+  film"). Only the producer can do it, at
+  `https://useapi.net/docs/start-here/setup-google-flow`, and **nothing
+  multi-account can be measured until it is done** — the coverage guard
+  correctly falls back to a single account, so films still finish, just with no
+  speedup. **The lesson is that a dead Flow account is SILENT**: tier, credits
+  and the model list all still read fine, useapi keeps answering 2xx, and an
+  upload addressed to the dead account comes back with an id minted on a
+  DIFFERENT account, which looks entirely ordinary. The only signal is `health`
+  in `GET /v1/google-flow/accounts`. `scripts/check-n8n.mjs` block 7 now fails
+  on it (needs `USEAPI_TOKEN`, and a machine that can reach useapi).
+
 - **The Veo direction work needs a real film to measure it** (2026-09-13,
   Media Generation `6a79f422`; full account `db/port/veo-direction/`, lessons
   in `docs/lessons-pipeline.md` under "Direction: why Veo played the shot

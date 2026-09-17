@@ -193,6 +193,43 @@ async function main() {
 		warnings.push(`Render server unreachable from here: ${e.message}`);
 	}
 
+	// 7. The Google Flow accounts behind parallel generation.
+	//
+	// Worth a block of its own because a dead account here is SILENT: useapi
+	// keeps answering, and an upload addressed to a signed-out account comes
+	// back with an id minted on a different account. On 2026-09-17
+	// houseofvideos01 had been signed out by Google for hours while every
+	// other signal — tier, credits, models — still read fine, and the only
+	// thing that showed it was this endpoint's `health`.
+	//
+	// The token is read from the environment on purpose. It is already
+	// hardcoded in the workflow nodes and committed in db/port snapshots, and
+	// a copy here would be one more place to miss when it is finally rotated.
+	if (!process.env.USEAPI_TOKEN) {
+		warnings.push('USEAPI_TOKEN not set — skipped the Google Flow account health check.');
+	} else {
+		try {
+			const res = await fetch('https://api.useapi.net/v1/google-flow/accounts', {
+				headers: {Authorization: `Bearer ${process.env.USEAPI_TOKEN}`},
+				signal: AbortSignal.timeout(15000),
+			});
+			if (!res.ok) {
+				warnings.push(`useapi answered HTTP ${res.status} for the account list.`);
+			} else {
+				const accounts = await res.json();
+				const names = Object.keys(accounts ?? {});
+				if (names.length === 0) problems.push('useapi holds no Google Flow accounts at all.');
+				for (const name of names) {
+					const health = accounts[name]?.health ?? accounts[name]?.error ?? 'unknown';
+					if (health === 'OK') ok.push(`Flow account ${name} healthy.`);
+					else problems.push(`Flow account ${name} is NOT usable: ${health}`);
+				}
+			}
+		} catch (e) {
+			warnings.push(`useapi unreachable from here: ${e.message}`);
+		}
+	}
+
 	const line = (s, mark) => console.log(`${mark} ${s}`);
 	console.log('');
 	ok.forEach((s) => line(s, '✓'));

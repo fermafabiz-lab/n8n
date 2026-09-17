@@ -297,12 +297,10 @@ expected and harmless for an app touching only its own Drive.
   Assembly work before merging such a branch, exactly as you would before a push.
   (The site is the other half and behaves differently: `platform/**` deploys
   through GitHub Actions, also off the trunk.)
-  **Currently held on this rule:** `claude/hello-7o90qh-qxhvos`, two commits,
-  one of which raises the contact sheet's sampling ceiling in
-  `remotion/server/inspect.mjs`. Media Generation `13033` has been at the café
-  film's video gate since 2026-09-13 21:35. Merge when it ends; the n8n half is
-  already live and safe in either order, because it asks for `interval=0.5` and
-  the old server silently clamps to `1`.
+  The hold this entry used to name is **released** (2026-09-17): the contact
+  sheet's sampling ceiling in `remotion/server/inspect.mjs` waited on Media
+  Generation `13033`, which ended on 09-14, and it merged with nothing running
+  anywhere in n8n. Keep the rule; the example is history.
 
 
 - **`POST /v1/google-flow/assets?email=<x>` does not reliably upload to `<x>`, and
@@ -326,13 +324,11 @@ expected and harmless for an app touching only its own Drive.
 - ~~**`houseofvideos01@gmail.com` is signed out at Google and must be reconnected**~~
   **Reconnected 2026-09-17 21:59** and all three accounts read `health: OK`. The
   lesson below is the durable part; the misrouting it was blamed for turned out to
-  be the separate, larger fault in the bullet above.
-  (2026-09-17, `db/port/parallel-accounts/README.md`, "The fixed chain, run on a
-  film"). Only the producer can do it, at
-  `https://useapi.net/docs/start-here/setup-google-flow`, and **nothing
-  multi-account can be measured until it is done** — the coverage guard
-  correctly falls back to a single account, so films still finish, just with no
-  speedup. **The lesson is that a dead Flow account is SILENT**: tier, credits
+  be the separate, larger fault in the bullet above
+  (`db/port/parallel-accounts/README.md`, "The fixed chain, run on a film").
+  Reconnecting is something only the producer can do, at
+  `https://useapi.net/docs/start-here/setup-google-flow`.
+  **The lesson that outlives it is that a dead Flow account is SILENT**: tier, credits
   and the model list all still read fine, useapi keeps answering 2xx, and an
   upload addressed to the dead account comes back with an id minted on a
   DIFFERENT account, which looks entirely ordinary. The only signal is `health`

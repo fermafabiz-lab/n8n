@@ -551,3 +551,73 @@ for `REPLICATE MISROUTED` — if it appears, the uploads really are being routed
 somewhere other than the requested account and the cause is on useapi's side
 rather than in the indexing, which would be worth knowing before trusting the
 window at more than one job per account.
+
+## The fixed chain, run on a film (2026-09-17 21:31, execution 14421)
+
+`rec1rkfxvBeMCFDRj`, 9 approved scenes, 0 images, 6 sheets in `hov.sheet_media`,
+`flowAccounts: 3`, `flowRefs` deleted beforehand so the table was rebuilt from
+nothing.
+
+**The table came out truthful: 8 ids, 8 correctly owned.** The previous run's
+signature failure — 5 ids filed under an account that owned none of them — is
+gone.
+
+| filed under | ids | correctly owned | identity maps |
+|---|---|---|---|
+| `fermafabiz@gmail.com` | 5 | 5 | 0 |
+| `houseofvideos02@gmail.com` | 3 | 3 | 0 |
+
+**And it immediately earned its keep, because those five entries should not
+exist.** `Replicate Prep` builds `targets = ACCOUNTS.slice(1, n)` — the primary
+is deliberately never a target, so nothing was ever requested for
+`fermafabiz@gmail.com`. Those five are uploads addressed to
+`houseofvideos01@gmail.com` that Flow answered with ids minted on the PRIMARY,
+and `Collect Replicated` filed them under their real owner instead of lying
+that 01 held them.
+
+**The cause, from `GET /v1/google-flow/accounts`:**
+
+```
+houseofvideos01@gmail.com
+  error:  "Google has signed your account out. Reconnect at
+           https://useapi.net/docs/start-here/setup-google-flow"
+  health: same
+  (no nextRefresh, unlike the two healthy accounts)
+```
+
+`fermafabiz@gmail.com` and `houseofvideos02@gmail.com` both read `health: OK`
+with a `nextRefresh` scheduled. So **a signed-out account is silent**: the tier,
+the credits and the model list all still read fine (that is what P5 measured),
+useapi keeps answering 2xx, and the only place the truth appears is `health`.
+An upload addressed to it lands somewhere else and comes back looking ordinary.
+
+**What the guard then did, correctly.** With 01 at 0 copies and 02 at 3 of 6, no
+account is fully covered, so `Assign Accounts` fell back to one account and the
+film generated on the primary — all 7 images so far are `fermafabiz` ids. No
+crash, no `Email mismatch`, no speedup. Honest degradation, which is what the
+coverage check was built for.
+
+**A correction to the previous entry.** The 5/6 inversion was attributed to the
+`.first()`-versus-`$runIndex` indexing bug. That bug is real and worth fixing on
+its own — `.first()` is a node's LATEST run, not the current loop item — but the
+"0 of 5 correctly owned" figure is far better explained by 01 being signed out,
+and the sign-out cannot be dated from the API (01's `updated` never moved past
+its creation at 14:06). So which of the two produced those numbers is not
+established, and this entry should not be read as proof that the indexing fix
+was what repaired the table.
+
+**What is owed now:**
+
+1. **Reconnect `houseofvideos01@gmail.com` at useapi** — a manual step, and
+   nothing multi-account can be measured until it is done.
+2. Then clear `flowRefs` on the film again and re-run, so the table is built
+   with all three accounts live. Expect 6 x 2 = 12 copies and three accounts in
+   the table.
+3. `houseofvideos02@gmail.com` took only 3 of its 6 — worth reading the finished
+   execution's log for `REPLICATE MISROUTED` and for upload failures, since a
+   partially-covered account is what keeps the guard at one account even after
+   01 is healthy. (`runData` is empty while an execution runs, and a CANCELLED
+   one keeps none at all, so this has to wait for 14421 to finish on its own.)
+4. `scripts/check-n8n.mjs` now has a block 7 that fails on any account whose
+   `health` is not `OK`. It needs `USEAPI_TOKEN` in the environment and a
+   machine that can reach useapi — not a Claude Code web session.

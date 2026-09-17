@@ -319,15 +319,15 @@ expected and harmless for an app touching only its own Drive.
 - **A Flow refusal that arrives as HTTP 200 no longer kills the film**
   (2026-09-17, Media Generation `6735a96a`, `db/port/regen-unstick/README.md`,
   lesson in `docs/lessons-pipeline.md` under "Flow refuses twice"). **What is
-  still owed is the bigger half, and it is on the site**: a video
-  regeneration has no webhook, so its badge looks the same whether a batch is
-  working on it or nothing is — and the site answers "if it looks stuck, use
-  Pause first, then Resume", while Pause kills the in-flight Veo generation
-  and Resume starts the whole pass again. Until the badge can say how long it
-  has waited and whether anything is alive (it needs `regen_*_at` in
-  `hov.at_scene` and `RawScene`), the working advice is: **after asking for a
-  video regeneration, do not press Pause.** See `docs/lessons-site.md`,
-  "Pause is the button that destroys a regeneration".
+  the site half went live the same day**: the badge now says how long a
+  regeneration has been waiting and whether a batch is alive, Pause counts
+  what is in flight and admits it is thrown away rather than paused, and
+  Resume stopped recommending Pause. It needed no schema change — the site
+  reads `hov.scene` directly, so `regen_*_at` was already in the row.
+  `npm run check:regen-wait`. **Owed: one measurement** — no real video
+  regeneration has yet been watched from click to new clip with any of this
+  on screen. See `docs/lessons-site.md`, "Pause is the button that destroys a
+  regeneration".
 - **Story and Kids films end on a resolution since 2026-09-16 14:03 UTC**
   (`db/port/story-close/README.md`, lesson in `docs/lessons-pipeline.md`
   under "The story ends on a resolution, not on its climax"). Claude

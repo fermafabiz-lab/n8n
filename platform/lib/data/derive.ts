@@ -543,6 +543,18 @@ export interface Scene {
   regenImage: boolean;
   regenVideo: boolean;
   regenVoice: boolean;
+  /**
+   * WHEN the regeneration above was asked for — ISO, or null when none is in
+   * flight (or the row predates the timestamps).
+   *
+   * The flags alone cannot tell a producer anything: "Regenerating…" reads
+   * the same in second one and in minute forty, and that is what made the
+   * badge a dead end. `db/001` added the `*_at` columns for exactly this and
+   * said so — "the `*_at` columns make staleness a query … One rule covers
+   * every flag, including the ones added later" — and this is that one rule,
+   * derived once here rather than three times on screen.
+   */
+  regenSince: string | null;
   /** "Observații Scenă" — reviewer feedback in, rejection reasons back out. */
   note: string | null;
   /** Refs (E1, E3…) of the Evidence claims backing this scene's narration.
@@ -628,6 +640,14 @@ export interface RawScene {
   regenImage: boolean;
   regenVideo: boolean;
   regenVoice: boolean;
+  /**
+   * Postgres only (db/001), and absent reads as "no timestamp": the Airtable
+   * adapter has no such columns, and neither do rows written before the
+   * stamping trigger existed. `buildScene` degrades to null for both.
+   */
+  regenImageAt?: string | null;
+  regenVideoAt?: string | null;
+  regenVoiceAt?: string | null;
   note: string | null;
   evidenceRef: string | null;
   needsFactCheck: boolean;
@@ -1144,6 +1164,44 @@ function buildProvenance(r: RawScene): VisualProvenance {
   };
 }
 
+/**
+ * When the regeneration in flight on this scene was asked for.
+ *
+ * One rule for all three flags, which is what `db/001` prescribes and what
+ * keeps a fourth flag from needing a fourth copy. Two decisions worth
+ * knowing:
+ *
+ *  - **The EARLIEST of the set flags wins.** A scene can carry more than one
+ *    (approving a picture queues a clip while a voice regen is still out),
+ *    and the honest answer to "how long has this been waiting" is the oldest
+ *    one, not the newest. Reporting the newest would restart the clock every
+ *    time a second request landed — the exact shape of a wait that never
+ *    looks old enough to question.
+ *  - **A set flag with no timestamp reads as null, not as "just now".** Rows
+ *    written before the stamping trigger, and every Airtable-era row, have
+ *    none; claiming they started this instant would be a fabricated
+ *    reassurance, and the badge simply says nothing about the age instead.
+ */
+export function regenSinceOf(r: {
+  regenImage: boolean;
+  regenVideo: boolean;
+  regenVoice: boolean;
+  regenImageAt?: string | null;
+  regenVideoAt?: string | null;
+  regenVoiceAt?: string | null;
+}): string | null {
+  const stamps: string[] = [];
+  if (r.regenImage && r.regenImageAt) stamps.push(r.regenImageAt);
+  if (r.regenVideo && r.regenVideoAt) stamps.push(r.regenVideoAt);
+  if (r.regenVoice && r.regenVoiceAt) stamps.push(r.regenVoiceAt);
+  if (!stamps.length) return null;
+  const oldest = stamps
+    .map((s) => ({ s, t: new Date(s).getTime() }))
+    .filter((x) => Number.isFinite(x.t))
+    .sort((a, b) => a.t - b.t)[0];
+  return oldest ? oldest.s : null;
+}
+
 export function buildScene(r: RawScene, index: number): Scene {
   const rawStatus = r.statusRaw || "—";
   const norm = normalizeStatus(rawStatus);
@@ -1242,6 +1300,7 @@ export function buildScene(r: RawScene, index: number): Scene {
     regenImage: r.regenImage,
     regenVideo: r.regenVideo,
     regenVoice: r.regenVoice,
+    regenSince: regenSinceOf(r),
     note: r.note,
     evidenceRef: r.evidenceRef || null,
     needsFactCheck: r.needsFactCheck,

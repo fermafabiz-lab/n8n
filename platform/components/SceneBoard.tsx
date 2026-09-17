@@ -170,6 +170,7 @@ export default function SceneBoard({
   focus = null,
   audioPanel = false,
   archive = false,
+  productionAlive = null,
 }: {
   projectId: string;
   /** Only used to name downloaded clips, so files from different films
@@ -177,6 +178,14 @@ export default function SceneBoard({
   projectName?: string;
   scenes: Scene[];
   portrait?: boolean;
+  /**
+   * Is a media-generation batch alive in n8n? Passed down so a regeneration
+   * badge can say whether anything is working on it — the difference between
+   * "wait" and "nothing will happen", which the badge could not express and
+   * which is why Pause became the producer's reflex. `null` = n8n did not
+   * answer, and is NOT reported as "nothing is running".
+   */
+  productionAlive?: boolean | null;
   /**
    * The step being looked at, when the producer stepped back to one.
    *
@@ -900,7 +909,12 @@ export default function SceneBoard({
                   )}
                 {active.regenImage ? (
                   <>
-                    <RegenBadge label="Regenerating image…" note={active.note} />
+                    <RegenBadge
+                      label="Regenerating image…"
+                      note={active.note}
+                      since={active.regenSince}
+                      alive={productionAlive}
+                    />
                     {/*
                       The same trap as the rewrite and the clip, one field
                       along: `Regenerează Imagine` is cleared from inside the
@@ -1227,7 +1241,12 @@ export default function SceneBoard({
             {videoControls && (
               active.regenVideo ? (
                 <>
-                  <RegenBadge label="Regenerating video…" note={active.note} />
+                  <RegenBadge
+                    label="Regenerating video…"
+                    note={active.note}
+                    since={active.regenSince}
+                    alive={productionAlive}
+                  />
                   {/*
                     This state is cleared from inside a media-generation run,
                     and video regen is the one regeneration with no webhook of

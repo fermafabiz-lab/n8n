@@ -853,6 +853,7 @@ export default async function ProductionRoom({
             speed={project.editing.speed}
             speedLocked={project.editing.speedLocked}
             voiceTone={project.editing.voice}
+            productionAlive={aliveNow === null ? null : aliveNow.length > 0}
           />
         )}
 
@@ -885,6 +886,13 @@ export default async function ProductionRoom({
             // footage; the picker is the board's, the permission is the
             // category's.
             archive={project.category === "documentary"}
+            // Whether a regeneration in flight has anything working on it.
+            // `aliveNow` is null when the n8n API did not answer, and that
+            // must stay distinct from "nothing is running": telling a
+            // producer nothing is running when we simply could not ask is
+            // what sends them to Pause, which is the one action that loses
+            // the generation. See RegenBadge.
+            productionAlive={aliveNow === null ? null : aliveNow.length > 0}
           />
         ) : null}
 

@@ -171,6 +171,10 @@ interface SceneRow {
   regen_image: boolean;
   regen_video: boolean;
   regen_voice: boolean;
+  /** db/001: stamped by hov.at_write whenever the flag beside it is set. */
+  regen_image_at: Date | null;
+  regen_video_at: Date | null;
+  regen_voice_at: Date | null;
   note: string | null;
   evidence_ref: string | null;
   needs_fact_check: boolean;
@@ -369,6 +373,13 @@ function toRawScene(r: SceneRow): RawScene & { createdAt: string | null } {
     regenImage: r.regen_image,
     regenVideo: r.regen_video,
     regenVoice: r.regen_voice,
+    // db/001 stamps these whenever the flag above is SET (hov.at_write), so
+    // they are already in `select s.*` and cost nothing to carry. The site
+    // could not see them until now, which is why "Regenerating…" could never
+    // say how long it had been saying it.
+    regenImageAt: r.regen_image_at ? r.regen_image_at.toISOString() : null,
+    regenVideoAt: r.regen_video_at ? r.regen_video_at.toISOString() : null,
+    regenVoiceAt: r.regen_voice_at ? r.regen_voice_at.toISOString() : null,
     note: r.note,
     evidenceRef: r.evidence_ref,
     needsFactCheck: r.needs_fact_check,

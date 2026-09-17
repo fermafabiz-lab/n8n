@@ -1781,20 +1781,14 @@ body:has(.login-page) .vignette {
 .login-page {
   min-height: 100vh;
   display: grid;
-  align-content: center;
-}
-/* Wide enough to show the house AND the form: the card takes the left of the
-   frame and the building stands to the right of it. Narrower than this there
-   is only room for one of them, so the card re-centres and the house becomes
-   a backdrop. */
-@media (min-width: 900px) {
-  .login-page {
-    justify-items: start;
-    padding-left: clamp(28px, 7vw, 120px);
-  }
+  /* At the foot of the frame, over the doorway. Centred would put the card in
+     the middle of the glazing and hide part of the readout — and the readout is
+     the whole reason the facade is lit. */
+  align-content: end;
+  padding-bottom: clamp(24px, 9vh, 96px);
 }
 .login {
-  min-height: 70vh;
+  min-height: 0;
   display: grid;
   place-items: center;
   /* The façade is positioned, so an unpositioned card paints UNDERNEATH it

@@ -59,7 +59,9 @@ async function shot(name, { path = "/login", theme, reduce = false, width = 1280
 
   const page = await ctx.newPage();
   const errors = [];
+  let modelOk = false;
   page.on("pageerror", (e) => errors.push(e.message));
+  page.on("response", (r) => /\.glb(\?|$)/.test(r.url()) && r.status() === 200 && (modelOk = true));
   // A bare console error says "Failed to load resource" and names nothing, so
   // failed responses are recorded from the network side, with their URL.
   page.on("response", (r) => r.status() >= 400 && errors.push(`HTTP ${r.status()} ${r.url()}`));
@@ -69,13 +71,14 @@ async function shot(name, { path = "/login", theme, reduce = false, width = 1280
     (m) => m.type() === "error" && !/Failed to load resource/.test(m.text()) && errors.push(m.text()),
   );
 
-  await page.goto(BASE + path, { waitUntil: "networkidle" });
-  // The scene is dynamically imported, so it lands a tick after the page.
-  await page.waitForTimeout(2500);
+  // Not `networkidle`: a page that keeps a WebGL loop running never reliably
+  // reaches it, and Playwright discourages it for exactly this reason. Wait for
+  // the document, then give the dynamically-imported scene time to load its
+  // model and draw a few frames.
+  await page.goto(BASE + path, { waitUntil: "load", timeout: 20000 });
+  await page.waitForTimeout(4000);
 
   const canvas = (await page.locator(".facade-gl canvas").count()) > 0;
-  const windows = await page.locator("[class*='windows'] i").count();
-  const lit = await page.locator("[class*='windows'] i:not([data-lit='dark'])").count();
   const readout = (await page.locator("p[class*='sr']").first().textContent().catch(() => "")) || "";
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
@@ -86,12 +89,14 @@ async function shot(name, { path = "/login", theme, reduce = false, width = 1280
   await ctx.close();
 
   const want = expect.canvas;
-  const ok = (want === undefined || canvas === want) && errors.length === 0;
+  // When the canvas is meant to be there, the model has to have loaded too.
+  const ok =
+    (want === undefined || canvas === want) && errors.length === 0 && (want !== true || modelOk);
   results.push(ok);
   console.log(
     `${ok ? "OK  " : "FAIL"} ${name.padEnd(16)} canvas=${canvas}${
       want === undefined ? "" : ` (want ${want})`
-    } windows=${windows} lit=${lit} errors=${errors.length}  "${readout.trim()}"`,
+    } model=${modelOk} errors=${errors.length}  "${readout.trim()}"`,
   );
   if (errors.length) for (const e of errors.slice(0, 3)) console.log(`       ! ${e}`);
 }

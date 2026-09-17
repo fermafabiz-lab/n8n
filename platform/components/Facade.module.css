@@ -32,102 +32,12 @@
 .painted {
   position: absolute;
   inset: 0;
-  display: grid;
-  place-items: end center;
-}
-
-/* Matches the WebGL house, which stands right of the card for the same
-   reason: a lit window behind the form is a readout nobody can read. */
-@media (min-width: 900px) {
-  .painted {
-    justify-items: end;
-    padding-right: clamp(24px, 9vw, 180px);
-  }
-}
-
-.house {
-  position: relative;
-  width: min(460px, 76vw);
-  height: min(330px, 46vh);
-  margin-bottom: max(8vh, 40px);
-  background: #232733;
-  border-radius: 3px 3px 0 0;
-}
-
-/* A hipped roof, as two borders meeting. */
-.roof {
-  position: absolute;
-  left: 50%;
-  top: 0;
-  width: 0;
-  height: 0;
-  transform: translate(-50%, -100%);
-  border-left: min(268px, 44vw) solid transparent;
-  border-right: min(268px, 44vw) solid transparent;
-  border-bottom: min(96px, 13vh) solid #1a1d27;
-}
-
-.windows {
-  position: absolute;
-  inset: 12% 10% 26%;
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  grid-auto-rows: 1fr;
-  gap: 7% 6%;
-}
-
-.windows i {
-  border-radius: 1px;
-  background: #11131a;
-  transition: background 600ms ease;
-}
-
-/* The three lit states. Amber breathes, because it is the one that wants you. */
-.windows i[data-lit="run"] {
-  background: #5b8ee8;
-  box-shadow: 0 0 14px rgba(91, 142, 232, 0.5);
-}
-.windows i[data-lit="err"] {
-  background: #ea6a5f;
-  box-shadow: 0 0 14px rgba(234, 106, 95, 0.5);
-}
-.windows i[data-lit="wait"] {
-  background: #e6b45a;
-  box-shadow: 0 0 16px rgba(230, 180, 90, 0.55);
-  animation: breathe 3.6s ease-in-out infinite;
-}
-
-@keyframes breathe {
-  0%,
-  100% {
-    opacity: 0.72;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
-.door {
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  width: 13%;
-  height: 22%;
-  transform: translateX(-50%);
-  background: #ffb95e;
-  border-radius: 2px 2px 0 0;
-  box-shadow: 0 0 30px 6px rgba(255, 185, 94, 0.28);
-}
-
-/*
- * globals.css already stops every animation under reduced motion, but that
- * rule cannot reach a WebGL loop — Facade.tsx handles that half by not
- * mounting the scene at all. This keeps the painted half honest on its own.
- */
-@media (prefers-reduced-motion: reduce) {
-  .windows i[data-lit="wait"] {
-    animation: none;
-  }
+  /* No WebGL: an honest dusk rather than a drawn imitation of the model. The
+     readout still reaches anyone here through the spoken line below — and a
+     rendered poster of the real building belongs here once there is one. */
+  background:
+    radial-gradient(120% 80% at 50% 92%, rgba(255, 180, 99, 0.16) 0%, transparent 62%),
+    linear-gradient(to bottom, #0a0d16 0%, #141a2e 58%, #2a2440 100%);
 }
 
 /* Visually hidden, but the readout is real information, so it is spoken. */

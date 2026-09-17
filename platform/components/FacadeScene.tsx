@@ -1,41 +1,65 @@
 "use client";
 
 /**
- * The house at dusk, drawn in WebGL.
+ * The House of Videos entrance, at dusk.
+ *
+ * The building is a real model — `platform/public/house/entrance.glb`, built in
+ * Blender by `platform/scripts/house/build_house.py` and committed. It is
+ * constructed the way a building is: concrete piers and spandrels in front,
+ * glazing set back behind them, so the reveals are geometry rather than
+ * painted-on shading. An earlier pass at this was a box with a cone on top and
+ * it looked like exactly that.
+ *
+ * The model carries no baked lighting — the `bpy` wheel ships EEVEE only, so
+ * Cycles lightmaps are not available — which is why the light is all made here:
+ * image-based lighting from `RoomEnvironment` (procedural, nothing to
+ * download), a low warm key inside the entrance, a cool moon, and a bloom pass
+ * so the lit windows read as light rather than as coloured rectangles.
  *
  * Loaded only by Facade.tsx, and only when there is a WebGL context and the
- * visitor has not asked for reduced motion — which is also what keeps three.js
- * out of the first load of /login, the one page outside the password gate.
+ * visitor has not asked for reduced motion — which is what keeps three.js and
+ * the model out of the first load of /login, the one page outside the password
+ * gate.
  *
  * Plain three, not react-three-fiber: R3F 9's stable line peers on
- * `react@">=19 <19.3"` and this app floats to 19.3, and it pulls an optional
- * expo/react-native peer graph that has no business in a Next web app. A
- * reconciler earns its keep when a scene is built out of components that mount
- * and unmount; this one is a dozen meshes that never change shape, so the
- * whole scene is built once here and only the window colours and the camera
- * move afterwards.
+ * `react@">=19 <19.3"` while this app floats to 19.3, and it pulls an optional
+ * expo/react-native peer graph that has no business in a Next app.
  *
- * Every colour below is a literal. The convention in globals.css allows that
- * on a surface that is the same in both themes, and says to name the reason:
- * this is a picture of a building at dusk. It does not invert at night any
- * more than a photograph would. The login card in front of it is themed
- * normally.
+ * Every colour below is a literal. The convention in globals.css allows that on
+ * a surface that is the same in both themes, and says to name the reason: this
+ * is a picture of a building at dusk. It does not invert at night any more than
+ * a photograph would. The login card in front of it is themed normally.
+ *
+ * **The mesh names are load-bearing.** `bay_00`… are the window bays in the
+ * order `windowStates()` returns them (left to right, top row first), and
+ * `door_front` is the hotspot `lib/house.ts` binds to. Rename either in the
+ * Blender script and this stops finding them.
  */
 
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 
-import { WINDOWS, type WindowState } from "@/lib/facade";
+import type { WindowState } from "@/lib/facade";
+
+const MODEL = "/house/entrance.glb";
 
 /** Window light colours, and how brightly each one burns. */
-const LIGHT: Record<Exclude<WindowState, "dark">, { color: number; intensity: number }> = {
-  run: { color: 0x5b8ee8, intensity: 0.85 }, // working
-  wait: { color: 0xe6b45a, intensity: 1.0 }, // waiting on you — this one pulses
-  err: { color: 0xea6a5f, intensity: 0.95 }, // failed
+const LIGHT: Record<Exclude<WindowState, "dark">, { color: number; power: number }> = {
+  // Tuned against the render, not guessed: above about 1.4 the bloom blows the
+  // pane to white and floods the frame with its colour, which loses both the
+  // window and the building behind it.
+  run: { color: 0x5b8ee8, power: 1.05 }, // working
+  wait: { color: 0xe6b45a, power: 1.25 }, // waiting on you — this one breathes
+  err: { color: 0xea6a5f, power: 1.1 }, // failed
 };
-const DARK = 0x11131a;
-
-const COLS = 6;
+/** Unlit glass: dark, but still catching a little of the sky. */
+const GLASS = 0x1a2338;
 
 export default function FacadeScene({ lights }: { lights: WindowState[] }) {
   const host = useRef<HTMLDivElement>(null);
@@ -46,195 +70,151 @@ export default function FacadeScene({ lights }: { lights: WindowState[] }) {
   useEffect(() => {
     const mount = host.current;
     if (!mount) return;
+    let disposed = false;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
     renderer.setSize(mount.clientWidth, mount.clientHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    // Shadows and contact occlusion are most of what separates a lit model from
+    // a flat one: without them every surface meets its neighbour with no
+    // darkening, which is the giveaway that nothing is really touching.
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     mount.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x232840, 22, 60);
+    scene.background = new THREE.Color(0x0a0d16);
+    scene.fog = new THREE.Fog(0x141a2e, 40, 120);
 
-    const camera = new THREE.PerspectiveCamera(38, mount.clientWidth / mount.clientHeight, 0.1, 120);
-    // Far enough back, and high enough, that the whole elevation and its roof
-    // sit inside the frame with sky above and street below. Closer than this
-    // and the house stops reading as a house and becomes a wall of lit
-    // rectangles.
-    camera.position.set(0, 5.2, 24);
-    camera.lookAt(0, 4.6, 0);
+    const camera = new THREE.PerspectiveCamera(42, mount.clientWidth / mount.clientHeight, 0.1, 400);
 
-    // --- the sky: one gradient plane behind everything ---------------------
-    const sky = new THREE.Mesh(
-      new THREE.PlaneGeometry(120, 60),
-      new THREE.ShaderMaterial({
-        depthWrite: false,
-        uniforms: {
-          top: { value: new THREE.Color(0x121626) },
-          bottom: { value: new THREE.Color(0x5a4470) },
-        },
-        vertexShader: `varying float h;
-          void main(){ h = uv.y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-        fragmentShader: `varying float h; uniform vec3 top; uniform vec3 bottom;
-          void main(){ gl_FragColor = vec4(mix(bottom, top, smoothstep(0.0,1.0,h)), 1.0); }`,
-      }),
-    );
-    sky.position.set(0, 6, -22);
-    scene.add(sky);
+    // Image-based lighting, generated rather than downloaded — no texture
+    // library is reachable from this environment, and a scene lit by two
+    // directional lights alone reads as plastic.
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    scene.environment = env;
+    scene.environmentIntensity = 0.34;
 
-    // --- the house ---------------------------------------------------------
-    const house = new THREE.Group();
-    scene.add(house);
-
-    // Off-centre on a wide screen, because the login card sits in the left of
-    // the frame and a lit window hidden behind it is a readout nobody can
-    // read. On a narrow one the card re-centres and the house is only a
-    // backdrop, so it re-centres too — a building sliding off one edge looks
-    // like a mistake, cropped evenly looks deliberate.
-    const placeHouse = () => {
-      const portrait = mount.clientWidth / mount.clientHeight < 1.1;
-      house.position.x = portrait ? 0 : 3.2;
-    };
-    placeHouse();
-
-    const wall = new THREE.MeshStandardMaterial({ color: 0x2b3040, roughness: 0.95, metalness: 0 });
-    const body = new THREE.Mesh(new THREE.BoxGeometry(9, 8, 6), wall);
-    body.position.y = 4;
-    house.add(body);
-
-    // A four-sided cone is a hipped roof, and costs one geometry.
-    const roof = new THREE.Mesh(
-      new THREE.ConeGeometry(7.1, 2.5, 4),
-      new THREE.MeshStandardMaterial({ color: 0x1a1d27, roughness: 1, metalness: 0 }),
-    );
-    roof.position.y = 9.25;
-    roof.rotation.y = Math.PI / 4;
-    house.add(roof);
-
-    // --- the windows -------------------------------------------------------
-    // One shared geometry, one material each, because each pane carries its
-    // own colour and the amber ones breathe independently.
-    const paneGeo = new THREE.PlaneGeometry(0.82, 1.05);
-    // A bigger, additive plane sitting just proud of each pane. Without it a
-    // lit window is a flat swatch — the painted fallback gets its glow from a
-    // box-shadow, and the two renderers should agree about what "lit" looks
-    // like. Cheaper than a bloom pass, which would mean another dependency.
-    const haloGeo = new THREE.PlaneGeometry(2.6, 2.9);
-    // A flat additive plane is just a bigger rectangle — it has to fall off
-    // from the centre or the "glow" reads as a blocky square around the pane.
-    const haloShader = {
-      vertexShader: `varying vec2 vUv;
-        void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-      fragmentShader: `varying vec2 vUv; uniform vec3 uColor; uniform float uAlpha;
-        void main(){
-          float d = length(vUv - 0.5) * 2.0;
-          float a = smoothstep(1.0, 0.0, d);
-          gl_FragColor = vec4(uColor, a * a * uAlpha);
-        }`,
-    };
-    const panes: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>[] = [];
-    const halos: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>[] = [];
-    for (let i = 0; i < WINDOWS; i++) {
-      const col = i % COLS;
-      const row = Math.floor(i / COLS);
-      const x = (col - (COLS - 1) / 2) * 1.42;
-      const y = 6.9 - row * 1.3;
-
-      const halo = new THREE.Mesh(
-        haloGeo,
-        new THREE.ShaderMaterial({
-          ...haloShader,
-          uniforms: { uColor: { value: new THREE.Color(DARK) }, uAlpha: { value: 0 } },
-          transparent: true,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false,
-        }),
-      );
-      halo.position.set(x, y, 3.005);
-      house.add(halo);
-      halos.push(halo);
-
-      const m = new THREE.Mesh(paneGeo, new THREE.MeshBasicMaterial({ color: DARK }));
-      m.position.set(x, y, 3.01);
-      house.add(m);
-      panes.push(m);
-    }
-
-    // --- the door: always warm, it is the way in ---------------------------
-    const door = new THREE.Mesh(
-      new THREE.PlaneGeometry(1.15, 2.2),
-      new THREE.MeshBasicMaterial({ color: 0xffb95e }),
-    );
-    door.position.set(0, 1.1, 3.02);
-    house.add(door);
-
-    const spill = new THREE.Mesh(
-      new THREE.PlaneGeometry(4.2, 0.9),
-      new THREE.MeshBasicMaterial({ color: 0xffb95e, transparent: true, opacity: 0.16 }),
-    );
-    spill.rotation.x = -Math.PI / 2;
-    spill.position.set(0, 0.02, 4.3);
-    house.add(spill);
-
-    // Two unlit neighbours. Without them the house floats in fog; with them
-    // it stands in a row, which is what makes it a street.
-    const neighbour = new THREE.MeshStandardMaterial({ color: 0x242836, roughness: 1 });
-    for (const [x, w, h] of [
-      [-10.5, 7.5, 9.5],
-      [10.8, 8, 10.6],
-    ] as const) {
-      const n = new THREE.Mesh(new THREE.BoxGeometry(w, h, 5.5), neighbour);
-      // Set back behind the house's front face, so they read as the rest of
-      // the street rather than as slabs standing beside it.
-      n.position.set(x, h / 2, -3.2);
-      house.add(n);
-    }
-
-    const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(120, 60),
-      new THREE.MeshStandardMaterial({ color: 0x191c26, roughness: 1 }),
-    );
-    ground.rotation.x = -Math.PI / 2;
-    scene.add(ground);
-
-    scene.add(new THREE.AmbientLight(0x585276, 1.5));
-    const moon = new THREE.DirectionalLight(0x9aa6d0, 0.95);
-    moon.position.set(-6, 9, 7);
+    scene.add(new THREE.AmbientLight(0x2a3358, 0.95));
+    const moon = new THREE.DirectionalLight(0x8fa2d8, 1.35);
+    moon.position.set(-18, 26, 16);
+    moon.castShadow = true;
+    moon.shadow.mapSize.set(2048, 2048);
+    moon.shadow.camera.near = 1;
+    moon.shadow.camera.far = 90;
+    const ext = 28;
+    moon.shadow.camera.left = -ext;
+    moon.shadow.camera.right = ext;
+    moon.shadow.camera.top = ext;
+    moon.shadow.camera.bottom = -ext;
+    moon.shadow.bias = -0.0006;
     scene.add(moon);
 
-    // --- the loop ----------------------------------------------------------
+    // The warm light spilling out of the entrance. It is what makes the door
+    // read as the way in.
+    const doorGlow = new THREE.PointLight(0xffb463, 85, 30, 2);
+    doorGlow.position.set(0, 2.4, 1.2);
+    scene.add(doorGlow);
+
+    // --- post ---------------------------------------------------------------
+    const composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    // Ambient occlusion was tried here and removed: on glazing recessed behind
+    // deep reveals it is physically right and visually wrong — it crushed every
+    // unlit pane to flat black, so the facade read as holes punched in concrete
+    // rather than as windows. The shadow map gives the depth cue that actually
+    // mattered, at a fraction of the cost on software GL.
+    const bloom = new UnrealBloomPass(
+      new THREE.Vector2(mount.clientWidth, mount.clientHeight),
+      0.48, // strength
+      0.72, // radius
+      0.62, // threshold — the lit windows and the doorway, nothing else
+    );
+    composer.addPass(bloom);
+    composer.addPass(new OutputPass());
+
+    // --- the model ----------------------------------------------------------
+    const bays: THREE.MeshStandardMaterial[] = [];
     let raf = 0;
     const clock = new THREE.Clock();
+
+    new GLTFLoader().load(MODEL, (gltf) => {
+      if (disposed) return;
+      const model = gltf.scene;
+
+      // Each bay gets its own material so it can be lit independently. The
+      // model ships them sharing one glass material; sharing it here would
+      // light every window at once.
+      const found: { i: number; mesh: THREE.Mesh }[] = [];
+      model.traverse((o) => {
+        if (!(o instanceof THREE.Mesh)) return;
+        const m = /^bay_(\d+)$/.exec(o.name);
+        if (m) found.push({ i: Number(m[1]), mesh: o });
+      });
+      found.sort((a, b) => a.i - b.i);
+      for (const { mesh } of found) {
+        const mat = new THREE.MeshStandardMaterial({
+          color: GLASS,
+          roughness: 0.05,
+          metalness: 0.7,
+          emissive: new THREE.Color(0x000000),
+          emissiveIntensity: 1,
+        });
+        mesh.material = mat;
+        bays.push(mat);
+      }
+
+      model.traverse((o) => {
+        if (o instanceof THREE.Mesh) {
+          o.castShadow = true;
+          o.receiveShadow = true;
+        }
+      });
+      scene.add(model);
+      draw();
+    });
+
+    // --- camera: standing at the foot of the steps -------------------------
+    // Close enough that the doorway is the subject and the login card has the
+    // entrance to sit in front of, far enough back that the glazed floors above
+    // still read as a building.
+    const place = () => {
+      const portrait = mount.clientWidth / mount.clientHeight < 1.1;
+      camera.position.set(0, portrait ? 8.5 : 7.2, portrait ? 46 : 32);
+      camera.lookAt(0, portrait ? 10 : 9.2, 0);
+    };
+    place();
 
     const draw = () => {
       const t = clock.getElapsedTime();
 
-      for (let i = 0; i < panes.length; i++) {
+      for (let i = 0; i < bays.length; i++) {
         const state = lightsRef.current[i] ?? "dark";
-        const mat = panes[i].material;
-        const halo = halos[i].material.uniforms;
+        const mat = bays[i];
         if (state === "dark") {
-          mat.color.setHex(DARK);
-          halo.uAlpha.value = 0;
+          mat.emissive.setHex(0x000000);
+          mat.color.setHex(GLASS);
           continue;
         }
-        const { color, intensity } = LIGHT[state];
+        const { color, power } = LIGHT[state];
         // Amber breathes: the window that wants you is the one that moves.
-        const k = state === "wait" ? intensity * (0.72 + 0.28 * Math.sin(t * 1.6 + i)) : intensity;
-        mat.color.setHex(color).multiplyScalar(k);
-        halo.uColor.value.setHex(color);
-        halo.uAlpha.value = 0.85 * k;
+        const k = state === "wait" ? power * (0.72 + 0.28 * Math.sin(t * 1.5 + i)) : power;
+        mat.emissive.setHex(color);
+        mat.emissiveIntensity = k;
+        mat.color.setHex(color);
       }
 
       // A slow drift, so the street feels inhabited rather than paused.
-      camera.position.x = Math.sin(t * 0.08) * 1.1;
-      camera.position.y = 5.2 + Math.sin(t * 0.06) * 0.15;
-      camera.position.z = 24;
-      camera.lookAt(0, 4.6, 0);
+      camera.position.x = Math.sin(t * 0.07) * 1.4;
+      camera.position.y += Math.sin(t * 0.055) * 0.0015;
+      camera.lookAt(0, mount.clientWidth / mount.clientHeight < 1.1 ? 10 : 9.2, 0);
 
-      renderer.render(scene, camera);
+      composer.render();
       raf = requestAnimationFrame(draw);
     };
-    draw();
 
     // The pause rule: a hidden tab paints nothing, so it should not be drawing
     // sixty times a second to do it.
@@ -242,8 +222,8 @@ export default function FacadeScene({ lights }: { lights: WindowState[] }) {
       if (document.hidden) {
         cancelAnimationFrame(raf);
         raf = 0;
-      } else if (!raf) {
-        clock.getDelta(); // drop the gap so the pulse does not jump on return
+      } else if (!raf && bays.length) {
+        clock.getDelta();
         draw();
       }
     };
@@ -251,25 +231,30 @@ export default function FacadeScene({ lights }: { lights: WindowState[] }) {
 
     const resize = () => {
       if (!mount.clientWidth || !mount.clientHeight) return;
-      placeHouse();
+      place();
       camera.aspect = mount.clientWidth / mount.clientHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(mount.clientWidth, mount.clientHeight);
+      composer.setSize(mount.clientWidth, mount.clientHeight);
     };
     const ro = new ResizeObserver(resize);
     ro.observe(mount);
 
     return () => {
+      disposed = true;
       cancelAnimationFrame(raf);
       document.removeEventListener("visibilitychange", visibility);
       ro.disconnect();
-      // A WebGL context is not garbage collected on unmount; browsers cap how
-      // many may exist at once, so this has to be explicit.
+      // A WebGL context is not garbage collected on unmount and browsers cap
+      // how many may exist at once, so this has to be explicit.
       scene.traverse((o) => {
         if (!(o instanceof THREE.Mesh)) return;
         o.geometry.dispose();
         for (const m of Array.isArray(o.material) ? o.material : [o.material]) m.dispose();
       });
+      env.dispose();
+      pmrem.dispose();
+      composer.dispose();
       renderer.dispose();
       renderer.domElement.remove();
     };

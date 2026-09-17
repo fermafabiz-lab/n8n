@@ -60,17 +60,7 @@ export default function Facade({
 
   return (
     <div className={styles.facade}>
-      <div className={styles.painted} aria-hidden="true">
-        <div className={styles.house}>
-          <div className={styles.roof} />
-          <div className={styles.windows}>
-            {lights.map((state, i) => (
-              <i key={i} data-lit={state} />
-            ))}
-          </div>
-          <div className={styles.door} />
-        </div>
-      </div>
+      <div className={styles.painted} aria-hidden="true" />
 
       {gl && <FacadeScene lights={lights} />}
 

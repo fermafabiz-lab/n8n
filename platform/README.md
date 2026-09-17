@@ -178,6 +178,46 @@ global `animation: none` rule in `globals.css` cannot reach a
 `requestAnimationFrame` loop, and a still 3D house is just a worse version of
 the painted one underneath.
 
+### The building is real Blender
+
+`platform/scripts/house/build_house.py` builds it with **`bpy`** — Blender
+itself, driven headlessly — and exports `public/house/entrance.glb`. Install it
+with `python3 -m venv ~/bpyenv && ~/bpyenv/bin/pip install bpy==4.2.0`, then:
+
+    ~/bpyenv/bin/python platform/scripts/house/build_house.py
+
+An earlier pass built the facade from three.js primitives and it looked exactly
+like what it was — a box with a cone on top. The model is constructed the way a
+building is: concrete piers and spandrels in front, glazing set back behind
+them, so the reveals are geometry. That is what makes it read as architecture.
+
+Three constraints of the `bpy` wheel, worked within rather than around:
+
+- **EEVEE only, no Cycles**, so lightmaps cannot be baked. All the light is made
+  at runtime in three: `RoomEnvironment` image-based lighting (procedural —
+  nothing to download, and no texture library is reachable from a web session),
+  a shadow-casting moon, a warm point light in the entrance, and bloom.
+- **EEVEE needs EGL**, which a container has not got, so Blender cannot render
+  previews here at all. Look at it in the browser instead — that is what
+  `scripts/shoot-house.mjs` is for.
+- **No Draco**, so the GLB is uncompressed. At 400 KB that does not matter yet.
+
+Materials are image textures generated with numpy inside the script, not
+procedural node graphs: glTF can only carry images, and a procedural graph
+exports as a flat colour.
+
+**Mesh names are load-bearing.** `door_front` is the hotspot `lib/house.ts`
+binds to, and `bay_00`…`bay_23` are the window bays in the order
+`windowStates()` returns them — left to right, top row first. Rename either in
+the Blender script and the scene stops finding them.
+
+Ambient occlusion was tried and removed: on glazing recessed behind deep
+reveals it is physically right and visually wrong, crushing every unlit pane to
+flat black so the facade read as holes punched in concrete. The shadow map gives
+the depth cue that actually mattered, far cheaper.
+
+### three, not react-three-fiber
+
 It is plain three.js, not react-three-fiber: R3F 9's stable line peers on
 `react@">=19 <19.3"` while this app floats to 19.3, and it pulls an optional
 expo/react-native peer graph that has no business in a Next app. A reconciler
@@ -187,10 +227,16 @@ stays out of `/login`'s first load — check the build output if that ever
 changes.
 
     npm i --no-save playwright-core
-    npx next build && PORT=3100 node .next/standalone/server.js &
-    node scripts/shoot-house.mjs          # writes to .house-shots/
+    scripts/serve-standalone.sh 3100 &     # build + BOTH asset copies + serve
+    node scripts/shoot-house.mjs           # writes to .house-shots/
 
 screenshots the page in both themes, at phone width, and with reduced motion,
-and asserts the canvas is present or absent as it should be. Note `next start`
-does **not** work with this project's `output: standalone` — run the standalone
-server, and copy `.next/static` into `.next/standalone/.next/` first.
+and asserts the canvas is present or absent as it should be — and that the GLB
+actually loaded, because a 404 there is a blank screen with a working password
+box.
+
+Use `scripts/serve-standalone.sh`. `next start` does **not** work with this
+project's `output: standalone`, and `next build` rewrites `.next/standalone`
+*without* `static/` or `public/` in it, so a plain build-and-run serves the page
+and 404s every asset — which looks exactly like a broken component. That script
+does both copies in the right order.

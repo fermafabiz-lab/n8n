@@ -690,3 +690,63 @@ picking whichever account it likes.
 **Until then `flowAccounts` above 1 buys nothing**, and it fails safely: no
 target ever reaches full coverage, so `Assign Accounts` drops back to a single
 account and films generate exactly as before.
+
+## It was our URL: `email` is a path segment (fixed, Media Generation `8c4ef1bf`)
+
+The section above blamed useapi. That was wrong, and the correction matters more
+than the finding did.
+
+useapi's machine-readable spec — reachable only through n8n, since this
+environment's proxy blocks `useapi.net` — documents the endpoint as:
+
+> **`POST https://api.useapi.net/v1/google-flow/assets/{email}`**
+>
+> ### Path Parameters
+> `email` is optional. […] With multiple accounts configured, **omitting the
+> email parameter triggers automatic load balancing** based on image generation
+> job statistics to select the healthiest account.
+
+Both of our callers sent `assets?email=…`. That endpoint has no `email` QUERY
+parameter, so every one of our uploads read as "no email given" and was
+load-balanced. The arbitrary-looking account assignment was the balancer doing
+exactly what it documents.
+
+**How to find a spec from inside a blocked session:** ask the API for a path it
+does not have. `GET /v1/google-flow` answers `Endpoint not found` and hands back
+`hint.llm_docs` — `https://useapi.net/assets/aibot/api-google-flow-v1.txt`, the
+whole API as one 453 kB text file. Fetch it with a throwaway HTTP node and slice
+out the section between its `=== URL: … ===` markers; returning the whole thing
+through `get_execution` exceeds the token limit.
+
+**Measured both ways, same file, same minute:**
+
+| URL form | landed on the account asked for |
+|---|---|
+| `assets?email=<x>` | 1 of 3 |
+| `assets/<x>` | **3 of 3** |
+
+**The blast radius was never limited to replication.** `Upload Asset To Flow`
+carries the producer's own reference picture and has used the query form since it
+was written. It worked for months because **only one account was linked**, so the
+balancer had a single choice; it started misrouting the moment the second and
+third accounts were added, which is the same day this was found. An ordinary film
+whose reference lands on the wrong account loses that reference — the scene
+generates without it rather than failing loudly.
+
+**Applied:** `Upload Asset To Flow` → `assets/fermafabiz%40gmail.com`,
+`Upload Sheet To Account` → `assets/{{ encodeURIComponent(…account) }}`. Diff was
+225 → 225 nodes, connections identical, added 0, removed 0, changed exactly 2,
+both only their `url`, both byte-identical to their `paste/` files. Neither
+Media Generation nor Claude Scripting had a parked draft, so the publish carried
+nothing else. Claude Scripting has no `/assets` caller left at all.
+
+**The lesson worth keeping: a REST parameter in the wrong position does not
+error, it defaults.** Nothing in any response said `email` was being ignored —
+the uploads succeeded, returned well-formed ids, and only the hex-encoded owner
+inside `mediaGenerationId` disagreed. That is why `Collect Replicated` files
+every copy by the returned id rather than by the one it asked for, and that guard
+should stay even now that the address works.
+
+**Still owed:** a film run with the path form live, to see `flowRefs` reach
+6 x 2 = 12 copies with full coverage and `Assign Accounts` actually split into
+three blocks. Everything above is an endpoint measurement, not a film.

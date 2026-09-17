@@ -156,8 +156,14 @@ The poster move needs no upload — **the real poster is already there**:
 | `frames/frame_0050.webp` | 13,514 B | 22:36 | still this repo's placeholder |
 | `frames/frame_0100.webp` | 12,492 B | 22:36 | still this repo's placeholder |
 
-So deploying this change is safe: the page stops asking the container for a
-poster and starts asking Caddy, which already answers with the real one.
+**Deployed at 23:19 UTC and re-checked at 23:22 — the guarantee holds.**
+Every file above came back byte-identical with its original timestamp, so
+the deploy wrote nothing into that directory. And `/poster.webp`, which the
+image used to answer, now returns 404 from Next: the poster really has left
+the image, and the real one on disk is what the page loads.
+
+That 404 is the check worth repeating after any change here. If the old
+path ever answers 200 again, something put the poster back in the image.
 
 **Expect a mismatch in the meantime.** Until the real sequence is uploaded
 next to that poster, the hero opens on a real image and then scrubs through

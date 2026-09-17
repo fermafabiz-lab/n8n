@@ -476,13 +476,11 @@ expected and harmless for an app touching only its own Drive.
 - ~~**`houseofvideos01@gmail.com` is signed out at Google and must be reconnected**~~
   **Reconnected 2026-09-17 21:59** and all three accounts read `health: OK`. The
   lesson below is the durable part; the misrouting it was blamed for turned out to
-  be the separate, larger fault in the bullet above.
-  (2026-09-17, `db/port/parallel-accounts/README.md`, "The fixed chain, run on a
-  film"). Only the producer can do it, at
-  `https://useapi.net/docs/start-here/setup-google-flow`, and **nothing
-  multi-account can be measured until it is done** — the coverage guard
-  correctly falls back to a single account, so films still finish, just with no
-  speedup. **The lesson is that a dead Flow account is SILENT**: tier, credits
+  be the separate, larger fault in the bullet above
+  (`db/port/parallel-accounts/README.md`, "The fixed chain, run on a film").
+  Reconnecting is something only the producer can do, at
+  `https://useapi.net/docs/start-here/setup-google-flow`.
+  **The lesson that outlives it is that a dead Flow account is SILENT**: tier, credits
   and the model list all still read fine, useapi keeps answering 2xx, and an
   upload addressed to the dead account comes back with an id minted on a
   DIFFERENT account, which looks entirely ordinary. The only signal is `health`

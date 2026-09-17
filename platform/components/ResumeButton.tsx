@@ -26,6 +26,7 @@ export default function ResumeButton({
   running,
   phase = "production",
   hasScenes = false,
+  regenInFlight = 0,
 }: {
   projectId: string;
   running: boolean;
@@ -33,6 +34,17 @@ export default function ResumeButton({
   phase?: "scripting" | "production";
   /** Scenes already exist — restarting the writing would replace them. */
   hasScenes?: boolean;
+  /**
+   * How many scenes are waiting on a regeneration right now.
+   *
+   * Pause stops the only thing that can deliver one, and the Veo generation
+   * in flight dies with it — see `pauseProduction`. Measured 2026-09-17 on
+   * one film: four batches in four hours, each stopped four to seven minutes
+   * in, one of them 42 seconds after it had written to the very scene the
+   * producer was waiting on. Nothing on screen made that press look
+   * expensive, so it stopped being one.
+   */
+  regenInFlight?: number;
 }) {
   const [msg, setMsg] = useState<ActionResult | null>(null);
   const [armed, setArmed] = useState(false);
@@ -43,7 +55,13 @@ export default function ResumeButton({
   // is exactly what a half-finished split needs, but it would also throw away
   // text the producer had already edited — so once scenes exist the button
   // asks once before doing it.
-  const needsConfirm = scripting && hasScenes && !running;
+  const needsConfirmRestart = scripting && hasScenes && !running;
+  // Pausing while a regeneration is out is the expensive press, and the one a
+  // producer makes by reflex when a badge has looked unchanged for minutes.
+  // Two-step rather than refused: a genuinely wedged run still has to be
+  // stoppable, and Pause is its only cure.
+  const needsConfirmPause = running && regenInFlight > 0;
+  const needsConfirm = needsConfirmRestart || needsConfirmPause;
 
   const act = () => {
     if (needsConfirm && !armed) {
@@ -83,7 +101,11 @@ export default function ResumeButton({
       </button>
       {armed && !msg && (
         <span className="formmsg" style={{ margin: 0 }}>
-          This rewrites the script and every scene. Click again to confirm.
+          {needsConfirmPause
+            ? `${regenInFlight} scene${regenInFlight === 1 ? "" : "s"} ${
+                regenInFlight === 1 ? "is" : "are"
+              } mid-regeneration. Pausing does not hold that work — it throws it away, and the next run has to cross the whole film again before it can even ask for it. Click again if you mean to.`
+            : "This rewrites the script and every scene. Click again to confirm."}
         </span>
       )}
       {msg && (

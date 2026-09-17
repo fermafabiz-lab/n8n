@@ -549,6 +549,11 @@ export default async function ProductionRoom({
                   running={hasRunning}
                   phase={writing ? "scripting" : "production"}
                   hasScenes={scenes.length > 0}
+                  // Pause stops the only thing that can finish a
+                  // regeneration; the button asks twice when one is out.
+                  regenInFlight={
+                    scenes.filter((s) => s.regenImage || s.regenVideo || s.regenVoice).length
+                  }
                 />
               )}
             </div>

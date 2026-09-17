@@ -967,6 +967,34 @@ picked the asset, not signed it off. Final Assembly receives an ordinary mp4.
   ffmpeg: this environment has no ffmpeg, so what it pins is the reasoning.
   The cost is real — a 7680×4320 intermediate frame and a wider downscale
   filter, so attaching a still takes longer than it did.
+- **Pause is the button that destroys a regeneration, and the site tells the
+  producer to press it (2026-09-17).** A video regeneration has no webhook of
+  its own: the flag is noticed only by `Evaluate Video Approval`, polling every
+  15s from inside a live batch that has already walked the whole film, and the
+  work that follows is a Veo submit plus a poll loop whose result reaches the
+  database only when it finishes. So the badge reads "Regenerating video…" and
+  looks **identical at second one and at minute forty**, whether a batch is
+  working on it or nothing is running at all. `resumeProject` answers with
+  "if it looks stuck for more than a few minutes, use Pause first, then
+  Resume", and `pauseProduction` stops every running execution while promising
+  "Nothing is lost: every finished asset is already in Airtable/Drive, and
+  Resume picks up exactly where this left off". **That promise is false for a
+  regeneration in flight**: a submitted Veo generation is not a finished asset,
+  it dies with the execution, and Resume restarts the pass from the top and
+  must cross the whole film again before it can even see the flag. Measured on
+  `recqbPJ7aZu0a21mt`: the flags were set at 13:47 while the batch that had
+  produced all 48 clips sat at the video gate; it was stopped at 13:52:16 and a
+  fresh one started at 13:52:17. Do that once and the regeneration is lost; do
+  it whenever the badge looks stuck — which is always, because the badge cannot
+  look like anything else — and a regeneration can never finish. That is the
+  whole of the producer's "regen does nothing, and it has always been like
+  this". **A state whose only honest reading is "wait" must say how long it has
+  been waiting and whether anything is working on it**, or the producer's only
+  available action becomes the one that guarantees failure. Owed, and the
+  schema already designed it (`db/001`: the `*_at` columns "make staleness a
+  query … One rule covers every flag"): `hov.at_scene` does not emit
+  `regen_*_at` and `RawScene` has no field for them, so the site cannot see
+  them yet. Full account: `db/port/regen-unstick/README.md`.
 - **The video-regen trap, and three guards for it.** A stock scene has no
   Flow asset to regenerate from, and `Prep Video Regen` THROWS without an
   `Image Media ID` — a throw that kills the whole batch, not the scene. So

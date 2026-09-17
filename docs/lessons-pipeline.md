@@ -1185,6 +1185,39 @@ check that before putting anything else in that chain. It is
 `onError: continueRegularOutput`: a failed bible write must never kill a
 scripting run.
 
+### Flow refuses twice, and only one refusal was handled (2026-09-17)
+
+Google Flow says no to an image in two different ways, and the pipeline only
+ever knew about one. The LOUD refusal is an HTTP error, and
+`Generate Scene Image` routes it down its error output into a real ladder —
+`IMG Error Router` sorts it, `Prep Flow Reject` builds a brief, `Rewrite
+Prompt AI` rewrites the prompt, four attempts, then a human. The QUIET one is
+**HTTP 200 with a `generatedImage` that carries the prompt and the seed and
+nothing else**: no `fifeUrl`, no `mediaGenerationId`. The job ran, the filter
+ate the picture, and the only evidence is an absence.
+
+The HTTP node calls that success, so the ladder never saw it, and
+`Decode Scene Image`'s `throw` was uncaught — **and an uncaught throw in
+Media Generation ends the entire execution**: the image loop, the audio loop,
+the video loop and both gates, for every scene in the film. Measured
+2026-09-17 on a 48-scene film: executions 14202 and 14208 died there, both on
+the same scene, whose prompt opened "Reference image 1 is a character sheet of
+Lazarus shown from several angles" — the cast sheet was what the filter
+objected to.
+
+Live as `6735a96a`: the throw carries the marker `FLOW_NO_IMAGE`, the node
+carries an error output into the ladder, and `IMG Error Router` matches the
+marker FIRST and calls it a refusal. **Never a throttle** — the throttle
+branch holds a minute and re-asks the byte-identical prompt, twenty times, and
+a content filter's verdict does not change on a re-ask. `Decode Regen Image`
+got the same treatment into `Mark Image Regen Rejected`. Full account and the
+37-check harness: `db/port/regen-unstick/`.
+
+**The generalisation worth keeping: a success status is not a success.** Any
+node that reads a field out of a 200 and throws when it is missing is a node
+that can end the film, and the ladder built for the loud failure is exactly
+where the quiet one belongs.
+
 ### Images are made on Google Flow, not fal (2026-09-02)
 
 `Generate Scene Image` (batch loop), `Regenerate Scene Image` (the gate's

@@ -324,9 +324,18 @@ expected and harmless for an app touching only its own Drive.
   what is in flight and admits it is thrown away rather than paused, and
   Resume stopped recommending Pause. It needed no schema change — the site
   reads `hov.scene` directly, so `regen_*_at` was already in the row.
-  `npm run check:regen-wait`. **Owed: one measurement** — no real video
-  regeneration has yet been watched from click to new clip with any of this
-  on screen. See `docs/lessons-site.md`, "Pause is the button that destroys a
+  `npm run check:regen-wait`. **And then it was watched, which changed the
+  answer**: a batch started 14:54:23 wrote to the flagged scene at 14:56:24
+  and was stopped through the site at 14:58:47 — the fourth such cycle in
+  four hours, each 4-7 minutes in, none long enough for a Veo generation.
+  Nothing was broken; every attempt was working and every attempt was
+  stopped. Pause now arms first ("⏸ Throw the regeneration away — sure?").
+  **The structural fix is unbuilt**: video regen is the only regeneration
+  with no webhook of its own — the other three start in seconds and ignore
+  the batch entirely — so it alone must ride a full pass. Giving it its own
+  webhook and its own `RG *` tail (the restart-scripting precedent) is what
+  removes the class. **Also still owed: one measurement** — no real video
+  regeneration has yet been watched from click to new clip. See `docs/lessons-site.md`, "Pause is the button that destroys a
   regeneration".
 - **Story and Kids films end on a resolution since 2026-09-16 14:03 UTC**
   (`db/port/story-close/README.md`, lesson in `docs/lessons-pipeline.md`

@@ -118,6 +118,50 @@ published draft (`node-body.mjs` + `cmp`), `diff-workflow.mjs --expect` clean
 (only those four nodes differ, only those two nodes' edges changed, 12 Drive
 nodes keep `resource`/`operation`, no dangling `$('…')`).
 
+## Then it was watched, and the answer was neither of those (2026-09-17, 15:00)
+
+The producer, after both fixes were live: *"tot e blocat si nu isi da
+regenerate!"* — with a screenshot of the new badge reading **1 h 3 min**. So
+the badge worked and the regeneration still had not happened.
+
+**A hypothesis that was wrong, and the control that killed it.** Executions
+14246 and 14264 both showed `runData: {}` with the node stack still holding
+`Receive Batch Input` — the signature CLAUDE.md describes for an execution n8n
+creates and never runs. But 14215, which demonstrably produced every clip in
+the film between 12:14 and 13:40, shows **the identical saved shape**. n8n
+simply does not persist progress for a cancelled execution. The shape carries
+no signal; do not read it as one.
+
+**What was actually happening, measured.** A batch was started at 14:54:23.
+It wrote to scene 2 — one of the two the producer was waiting on — at
+**14:56:24**, and to scene 5 at **14:58:05**. It was stopped through the
+public API at **14:58:47**: forty-two seconds after it had touched the exact
+scene being waited on, four and a half minutes after it started.
+
+That was the fourth such cycle in four hours (stops at 13:52, 14:26, 14:51,
+14:58), each four to seven minutes in. **A video regeneration is a Veo
+generation plus a poll loop and cannot finish in that window.** Nothing was
+broken and nothing was stranded: every attempt was working and every attempt
+was stopped, and the producer's reading — that regenerate does nothing — was
+the only one the screen supported.
+
+So the two fixes above were both real and both insufficient: one stopped the
+film dying, the other made the wait legible. Neither made the reflex press
+expensive. `ResumeButton` now arms on Pause whenever a scene carries a regen
+flag — *"⏸ Throw the regeneration away — sure?"* — two-step rather than
+refused, because a genuinely wedged run still has to be stoppable.
+
+**The structural fix is still unbuilt, and it is the one that removes the
+class.** Video regeneration is the ONLY regeneration without a webhook of its
+own: scene text, image and voice each have one on Claude Scripting
+(`scene-text-regen`, `scene-image-regen`, `scene-voice-regen`) and start in
+seconds, independent of any batch. Video regen can only ride a full Media
+Generation pass, which is why it is slow to start, invisible while it waits,
+and destroyed by anything that stops the batch. Giving it its own webhook —
+its own copy of the `RG *` tail, per the restart-scripting precedent that any
+new entry point needs its own tail — would make it behave like its three
+siblings. That is the real answer to "repar-o nu numai temporar".
+
 ## What is still owed
 
 The site half below was built the same day, once the producer paused production

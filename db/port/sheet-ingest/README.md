@@ -42,6 +42,7 @@ Three things are load-bearing:
 |---|---|
 | was active (built on) | `0f418e8e-cb4b-4289-a1b0-2c1642d8c064` — `Media Generation.before.json` |
 | staged draft | `71b42624-f8a8-4001-adc9-f6919a861293` — `Media Generation.draft.json` |
+| **published** | `71b42624` on **2026-09-17 11:33 UTC**, with no Media Generation execution running, right after the deploy of trunk `a7805dc` (which carries `field: "sheets"`) started — the draft had sat unchanged since 09-16 14:27, re-read before publishing |
 
 Both Code bodies read back byte-identical to `paste/`; `diff-workflow.mjs
 --expect` the six names `--allow-connections`: added 6, removed 0, changed
@@ -54,3 +55,7 @@ the only evidence available). Published only after the site deploy that
 carries `field: "sheets"`, with no Media Generation execution running.
 
 Rollback: `restore_workflow_version` to `0f418e8e`.
+
+**What is owed**: the first film to draw a sheet after 11:33 UTC — read
+`SHEET KEEP` / `PLATE KEEP` in its Media Generation log, then open the
+series page of a show started from it and see faces instead of initials.

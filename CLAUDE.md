@@ -332,13 +332,16 @@ expected and harmless for an app touching only its own Drive.
   Bible, `/series/<id>` shows the cast with their sheets and the episodes,
   `/new?series=<id>` opens the brief as the next episode. The bible rides
   to Scripting as Lore, the sheets as Editing Options (orchestrator
-  `1bde883f`, `Normalize Webhook Input`); no other node changed. **Faces
-  are missing until `db/port/sheet-ingest/` is live** — Media Generation
-  has to post each new sheet to `/api/media/ingest` (`field: "sheet"`)
-  while Flow's signed URL is alive; the table and the route exist. **What is
-  owed**: one real episode — read its Story Bible against the series page
-  (same names, same descriptions) and check `SHEET PLAN` says the cast was
-  skipped, not drawn again.
+  `1bde883f`, `Normalize Webhook Input`); no other node changed. **Sheet
+  ingest is live since 2026-09-17 11:33 UTC** (Media Generation
+  `71b42624`, `db/port/sheet-ingest/`): every new cast sheet and set plate
+  is posted to `/api/media/ingest` (`field: "sheets"`) while Flow's signed
+  URL is alive, so the series page shows faces for anything drawn from
+  then on; sheets drawn before that stay initials. **What is owed**: one
+  real episode — read its Story Bible against the series page (same
+  names, same descriptions), check `SHEET PLAN` says the cast was skipped,
+  not drawn again, and `SHEET KEEP` in the log of the first film that
+  draws a sheet.
   **The bookkeeping after each episode is automatic since the same
   evening** (`db/port/series/README.md`, "What happens by itself"): when
   an episode's script is approved, the site re-keys the episode's sheets

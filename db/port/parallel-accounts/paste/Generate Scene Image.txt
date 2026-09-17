@@ -1,0 +1,1 @@
+={{ (() => { const src = $('Build Image Request').first().json; const r = Object.assign({}, src.requestBody); try { const m = $('Assign Accounts').all().find((x) => x.json.id === src.sceneId); if (m && m.json.flowEmail) r.email = m.json.flowEmail; } catch (err) {} return r; })() }}

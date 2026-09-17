@@ -1,10 +1,53 @@
 # Parallel generation across three Google Flow accounts
 
-Status: **Etapa 0 complete and UNBLOCKED. Nothing applied to production yet.**
+Status: **Etapa 1 APPLIED and LIVE since 2026-09-17 ~15:55, and it is a NO-OP
+until someone sets `Editing Options.flowAccounts`.**
 
-The parallelization mechanism is proven to work, and as of 2026-09-17 ~15:30 all
-three accounts read `PAYGATE_TIER_TWO` / `G1_TIER2` with 89 video models and all
-11 `_low_priority` (cost 0) keys available — see "P5 follow-up".
+| Workflow | now active | was active (saved here as `Media Generation.original.json`) |
+|---|---|---|
+| 3. Media Generation `yHG4DBCDjR3RJzav` | `4ecc8330` | `6735a96a` |
+
+Rollback is `restore_workflow_version` to `6735a96a`.
+
+All three accounts read `PAYGATE_TIER_TWO` / `G1_TIER2` with 89 video models and
+all 11 `_low_priority` (cost 0) keys — see "P5 follow-up".
+
+## Etapa 1 — what was applied
+
+One node added and three changed, all in Media Generation:
+
+- **`Assign Accounts`** (new, between `Sort & Cap Scenes` and
+  `Refetch Scenes For Audio`) cuts the sorted scene list into contiguous blocks,
+  one per account, and tags each scene with `flowEmail` / `flowBlock`.
+- **`Generate Scene Image`**, **`Generate End Frame`**, **`Submit Video`** now
+  look the scene up in `$('Assign Accounts')` and override `email` with its
+  block's account.
+
+The override deliberately lives in those three HTTP nodes (24-633 chars) rather
+than in the Code nodes that build the requests (`Build Image Request` 12,370
+chars, `End Frame Prompt` 13,122), because `CLAUDE.md` is explicit that a body
+that size cannot be rewritten from a web session without transcribing it.
+
+**It changes nothing until switched on**, twice over: `flowAccounts` defaults to
+1, and even at 2 or 3 the node refuses to split a project that carries
+account-scoped references (`castRefs`, `objectRefs`, `locationRefs`,
+`refImageMediaId`) because those media ids belong to the account that minted
+them — sending them with a different `email` would fail every scene outside
+block 0 on `Email mismatch`. That guard is what makes it safe to ship ahead of
+Etapa 2.
+
+How it was verified before publishing: the draft was diffed node-by-node against
+the live baseline (`added 1, changed 3`, only the expected names, connection
+delta limited to `Sort & Cap Scenes`' outgoing edge plus the new source, 12
+Google Drive nodes still carrying `resource`/`operation`, no dangling `$('…')`
+references), and all four bodies were byte-compared against their files in
+`paste/`. `publish_workflow` was then called with the draft's explicit
+`versionId`.
+
+**Note the diff tool needs a normalised snapshot.** Fed the raw
+`get_workflow_details` envelope it reports `before 0 nodes (?) → after 0 nodes`
+and then prints `RESULT: OK` — a false pass. Extract `{nodes, connections}`
+first.
 
 Two Google family accounts were connected to useapi on 2026-09-17
 (`houseofvideos01@gmail.com` 14:06, `houseofvideos02@gmail.com` 14:16), beside

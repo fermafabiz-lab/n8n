@@ -33,21 +33,20 @@ lack it. The two may differ in image tag, healthcheck or mount. **Re-sync
 from the box before trusting this file**, with the `scp` above, and delete
 this section once it matches.
 
-Verified live on the box the same evening, by an HTTP probe from n8n on
-`n8n_net` (throwaway workflow, archived): `http://site-dev:3000/` answers
-200 with the hero markup, and `/poster.webp` answers 200 as
-`image/webp`, 11,766 bytes, immutable.
+The same applies to the `{$SITE_DEV_HOST}` block written into the
+`Caddyfile` here: **the box already serves that host**, at
+`dev.house-of-videos.com`, and it serves `/frames/*` off disk too. So this
+block is also a guess at the box's, not a copy of it.
 
-**One link is still unverified**: whether Caddy answers `/frames/*` from
-`/opt/n8n/frames`, where the deploy workflow puts the WebP sequence. That
-needs the `handle_path /frames/*` block in the box's Caddyfile AND the
-`./frames:/srv/frames:ro` mount on the box's `caddy` service — both are in
-this mirror, neither could be read on the box from here. The container
-itself answers 404 for `/frames/frame_0001.webp` by design (the frames are
-not in the image), so if Caddy does not serve them the hero shows only its
-poster and the canvas never appears. Check with a browser, or from the box:
-
-    docker compose exec caddy ls /srv/frames | head
-    curl -sI https://<site-dev-host>/frames/frame_0001.webp
+Verified live the same evening by HTTP probes from n8n (throwaway
+workflows, archived), inside the network and over the public URL:
+`http://site-dev:3000/` and `https://dev.house-of-videos.com/` both answer
+200 with the hero markup, the second through Caddy; `/poster.webp`,
+`/frames/frame_0001.webp` and `/frames/frame_0100.webp` answer 200 as
+`image/webp` (11,766 / 11,766 / 12,492 bytes) with
+`cache-control: public, max-age=31536000, immutable`; and
+`/frames/frame_0999.webp` answers a plain 404 from Caddy with **no** cache
+header, which is the behaviour to preserve — a frame that is missing when
+someone visits must not be cached as missing for a year.
 
 A change to either file needs `docker compose up -d caddy`, not a reload.

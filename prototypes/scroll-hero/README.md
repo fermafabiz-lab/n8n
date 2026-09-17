@@ -114,22 +114,29 @@ Same recipe as the producer's site, one size down:
 | Poster | Stays in the image (`public/poster.webp`, 12 kB). It has to match frame 1, so a new sequence on the box needs a rebuild with a matching poster — or move `POSTER_SRC` to `/frames/poster.webp` and copy it with the frames. |
 | Caddy | `{$SITE_DEV_HOST}` block in `infra/Caddyfile`; `SITE_DEV_HOST` comes from `/opt/n8n/.env` through the caddy service's environment. |
 
-### State as of the first deploy (2026-09-17 22:39 UTC)
+### Live at https://dev.house-of-videos.com (2026-09-17 22:39 UTC)
 
-Run #1 of the workflow went green end to end and created the container:
-the box's compose file already carried a `site-dev` service, which this
-repo's mirror did not know (see `infra/README.md`). Probed from n8n on the
-same Docker network, `http://site-dev:3000/` answers 200 with the hero
-markup and `/poster.webp` answers 200 as `image/webp`, 11,766 bytes.
+Run #1 of the workflow went green end to end and created the container.
+The box's compose file already carried a `site-dev` service, which this
+repo's mirror did not know — see `infra/README.md` before editing it.
 
-**Unverified: whether Caddy serves `/frames/*`.** It needs the
-`handle_path` block and the `./frames:/srv/frames:ro` mount to exist in the
-box's own Caddyfile and compose file, which cannot be read from a web
-session. Without them the page still renders: the poster shows, the frame
-requests 404, the canvas never appears (state stays `loading`), and the
-section is still a 200vh track. That is the "never blank" rule holding,
-not a bug — check `/opt/n8n/frames` and the caddy mount, then
-`docker compose up -d caddy` (a reload does not pick up a new mount).
+Verified from n8n (throwaway workflows, archived), inside the network and
+then over the public URL:
+
+| Request | Answer |
+|---|---|
+| `http://site-dev:3000/` | 200, the hero markup |
+| `https://dev.house-of-videos.com/` | 200, same markup, `via: 1.1 Caddy` |
+| `/poster.webp` | 200, `image/webp`, 11,766 B |
+| `/frames/frame_0001.webp` | 200, `image/webp`, 11,766 B, immutable |
+| `/frames/frame_0100.webp` | 200, `image/webp`, 12,492 B, immutable |
+| `/frames/frame_0999.webp` | 404 from Caddy, **no** cache header |
+| `/frames/frame_0001.webp` on the container itself | 404 — the frames are not in the image, by design |
+
+The last two are the ones worth keeping: a missing frame is not cached for
+a year, so a visit made before the frames landed does not keep failing
+afterwards; and the container's own 404 proves `.dockerignore` kept
+`public/frames` out of the build context, so Caddy is what serves them.
 
 ## Notes for moving it into the site
 

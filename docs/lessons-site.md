@@ -943,6 +943,36 @@ Full account: `db/port/created-by/README.md`.
   state. Verified in a real browser (Playwright against the demo backend):
   the param is consumed, the toast navigates, the row is ringed, and × does
   NOT travel.
+- **`.pj-shell` is a hero CARD, not a page wrapper — and using it as one
+  produces two faults that look unrelated** (2026-09-18, both series pages).
+  The producer reported them separately: "titlul e sus nu se vede, e sub
+  aceea bara de blur" and "marginea din stanga si cea din dreapta sunt
+  conturate urat". One cause. `.pj-shell` carries a 30px radius, a
+  background and `overflow: clip` — and **no padding**: every screen that
+  uses it supplies its own inner box (`.pj-hero` at 44px on the library,
+  `.wk-head` at 34px on the workspace) and keeps the rest of the page
+  OUTSIDE the card. `/series` and `/series/[id]` wrapped their whole
+  document in one instead, so:
+  - the shell began 82px down the page and its first line of text with it,
+    which is under the fixed 100px `.navfade` blur band. Measured, not
+    guessed: `h1` at y=120 before, y=192 after — the workspace's is 202.
+  - every horizontal rule ran flush into a rounded corner. There are more of
+    them than you would think: `.specs` has a border top AND bottom, and
+    `.fsec > header` one underneath, so a page of sections inside a clipped
+    card is a stack of lines dying into the radius. That is the whole of
+    "conturate urât".
+  Both pages now compose exactly like `/projects/[id]`: `.room` (44px top,
+  which is what clears the blur) → `.wk-shell` with `.arc wk-arc` and a
+  `.wk-head` → the `fsec` sections after it, on the page ground. Nothing
+  about the content changed. **The general rule: before reaching for a shell
+  class, find the padded box the screens that already use it put inside.**
+  Verified in a real browser at 1440 and 390: no horizontal overflow, the
+  title inset from the card on both, and the header now reads pixel-for-pixel
+  like the workspace's — including the lit band, which crosses the card the
+  same way there (checked, so it is the site's look and not a new fault).
+  There is no automated check for this one and that is deliberate: it is
+  visible the moment the page is opened, which is exactly what the checks in
+  this repo exist to substitute for when a fault is NOT.
 - **A link to the page you are already on is the hardest dead button to
   see** (2026-09-18, `lib/library-filters.ts`). The producer's read of the
   library hero was "butonul ăsta mi se pare cam useless", and it was worse

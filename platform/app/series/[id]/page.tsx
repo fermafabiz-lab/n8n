@@ -39,27 +39,49 @@ export default async function SeriesPage({ params }: { params: Promise<{ id: str
 
   return (
     <main className="page">
-      <div className="pj-shell">
-        <div className="eyebrow" style={{ marginBottom: 8 }}>
-          <Link href="/series">Series</Link>
-          <span style={{ color: "var(--dim)" }}>/</span>
-          <span>{series.name}</span>
-        </div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 20, flexWrap: "wrap" }}>
-          <div>
-            <h1 style={{ margin: 0 }}>{series.name}</h1>
-            <div className="specs" style={{ marginTop: 10 }}>
-              <span>{cat.label}</span>
-              {style && <span>{style}</span>}
-              {series.tone && <span>{series.tone}</span>}
-              <span>{series.language}</span>
-              <span>{series.aspect}</span>
-              <span>{episodes.length} episode{episodes.length === 1 ? "" : "s"}</span>
+      {/*
+        The same header card the workspace wears, and for the same reason the
+        workspace wears it: `.pj-shell` is a HERO CARD, not a page wrapper.
+        This page used to put its whole document inside one — every section,
+        every rule, right out to the shell's edges, because the shell carries
+        no padding of its own. Two faults came out of that single mistake and
+        the producer reported both: the title sat under the fixed 100px
+        `.navfade` blur (the shell began 82px down the page and the first line
+        of text with it), and every horizontal rule — `.specs` has one above
+        and below, `.fsec > header` one under it — ran flush into a 30px
+        rounded corner, which is what "marginile sunt conturate urât" is.
+
+        `.room` supplies the 44px that clears the blur, `.wk-head` the 34px
+        that keeps text off the edges, and the sections now sit OUTSIDE the
+        card on the page ground, exactly as they do on /projects and
+        /projects/[id]. Nothing about the content changed.
+      */}
+      <div className="room">
+        <div className="wk-shell">
+          <div className="arc wk-arc" aria-hidden />
+          <div className="wk-head">
+            <div className="wk-id">
+              <div className="eyebrow" style={{ marginBottom: 16 }}>
+                <Link href="/series">Series</Link>
+                <span style={{ color: "var(--dim)" }}>/</span>
+                <span>{series.name}</span>
+              </div>
+              <h1 style={{ margin: 0 }}>{series.name}</h1>
+              <div className="specs" style={{ marginTop: 10 }}>
+                <span>{cat.label}</span>
+                {style && <span>{style}</span>}
+                {series.tone && <span>{series.tone}</span>}
+                <span>{series.language}</span>
+                <span>{series.aspect}</span>
+                <span>{episodes.length} episode{episodes.length === 1 ? "" : "s"}</span>
+              </div>
+            </div>
+            <div className="wk-side">
+              <Link href={`/new?series=${series.id}`} className="pj-cta">
+                New episode →
+              </Link>
             </div>
           </div>
-          <Link href={`/new?series=${series.id}`} className="pj-cta">
-            New episode →
-          </Link>
         </div>
 
         <section className="fsec">

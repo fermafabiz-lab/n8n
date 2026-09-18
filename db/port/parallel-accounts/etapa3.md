@@ -180,3 +180,55 @@ below has been exercised even once.
 3. Wall clock against the same film with the flag off.
 4. Only then the probe for whether one account holds two generations at once,
    before `videoPoolPerAccount` goes above 1.
+
+## First pool run: execution 14618 (2026-09-18 09:54 → 10:20)
+
+`rec1rkfxvBeMCFDRj`, `videoPool: true`, `flowAccounts: 3`, one job per account.
+
+**What the pool got right.**
+
+- Ten ticks, two clips written, and **every clip minted on the account that owns
+  its own scene's image** — 4 of 4 across the film, counting the two from the
+  earlier serial run. The failure this design was most exposed to, a tick reading
+  another tick's `Current Scene` and writing a clip to the wrong scene, did not
+  happen.
+- Three submits went out before the first clip came back, on three different
+  accounts. That is the concurrency, and it is impossible in the serial loop.
+- Two clips landed 26 seconds apart on different accounts.
+
+**What killed it, and it was not the pool.** The run ended `error` at tick 10:
+
+```
+400 Email mismatch: body has 'houseofvideos01@gmail.com',
+                    references have 'houseofvideos02@gmail.com'
+```
+
+`Submit Video` turns out to be written carefully — every one of its stale-run
+lookups (`Attach End Frame`, `Submit Cooldown Guard`, `Motion Resubmit`) is
+already guarded by `sceneId === cs.id`, so no cross-tick contamination was
+possible there. The disagreement came from `Assign Accounts`.
+
+**The latent Etapa 1 defect the pool exposed.** `Assign Accounts` assigned the
+account purely by POSITION in the list it receives. That list is not the same
+between passes: `Sort & Cap Scenes` puts scenes that already have a clip at the
+BACK. So on a second pass over a partly-finished film — this film had two clips
+from the earlier run — every block boundary moves, and a scene whose image was
+minted on account 02 is handed account 01. Every such scene then dies on
+`Email mismatch`.
+
+**This was never about the pool.** The serial loop would fail identically on any
+second pass of a multi-account film; it had simply never had one. `flowAccounts`
+defaults to 1, so no production film was exposed.
+
+**The fix (Media Generation `2d3f0f86`, rollback `98e7b4b0`).** The IMAGE is the
+anchor, not the position: a scene that already has an `Image Media ID` stays on
+whatever account minted it, and position decides only for scenes with no image
+yet. It costs nothing in balance — a scene with an image no longer needs image
+generation, which is the only phase the block split exists to spread — and it
+makes the assignment stable across passes instead of drifting with the sort.
+Diff: 234 → 234 nodes, added 0, removed 0, changed 1, connections identical,
+body byte-identical to `paste/Assign Accounts.js`.
+
+**Still owed:** a pool run that reaches the end of a film. Nothing above shows
+the pool finishing; it shows it working for ten ticks and then hitting a bug in
+a node it does not own.

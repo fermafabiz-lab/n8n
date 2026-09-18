@@ -2015,3 +2015,37 @@ stop what it returns. That loop can never run: all three return early when
 `running`, so it is always in the alive list first. The automatic stall-killer
 reads as a live safety net and is unreachable code. That is the safe direction
 to fail — but do not count it as protection that exists.
+
+### The fact-check panel — a warning with no button
+
+`FactCheckPanel` sits above `ScriptReview`, reads `hov.fact_check` through
+`getFactCheck`, and has no controls at all. That is deliberate and it was the
+producer's call: *warn loudly, never block*. The script gate works exactly as
+it did; this panel only tells the producer what the checker made of the text
+they are about to approve. Full account of the n8n side:
+`db/port/fact-check/README.md`, and `docs/lessons-pipeline.md` under "The
+script is checked against its own research".
+
+**Null draws nothing, and that is the important case.** Every film written
+before 2026-09-18 has no row, and so does every project on the frozen Airtable
+backend. "We never checked this" must not render as "this passed" — so a null
+report produces no panel, and a report that ran and found nothing produces one
+green line. Those are different pieces of news and the component keeps them
+apart, along with two more: `skipped` (fiction, or no research pack — said in
+its own words so it cannot read as a pass) and `overwhelmed` (too much
+unsupported for a correction to be safe, so nothing was changed).
+
+**The one that has to be said out loud is `corrected`.** The rewrite happens
+before segmentation, so by the time the producer sees the script gate the text
+in the box is not the text that was written. Nothing else on the page would
+ever tell them. The panel says it in bold, and each finding shows the sentence
+**as it stood**, since the new wording is already in the textarea below — the
+old one is the only way to see what moved.
+
+**The reader is deliberately permissive.** `FactCheckReport` has no required
+fields and `getFactCheck` passes the stored jsonb through without validating
+it. A report written by last month's version of the workflow has to render in
+today's panel: a reader that insists on a shape is how an old row becomes a
+crash on the page the producer needs. The query is also guarded by
+`tableReady`, like the stock tables — before `db/012` is applied an unguarded
+read would abort the transaction and take the whole project page with it.

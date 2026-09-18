@@ -1,0 +1,25 @@
+=You are checking specific statements from a documentary script that our own research did not cover. For each one, use the web search tool to find out whether a source actually supports it.
+
+Searching is mandatory. Do not answer from memory — a remembered fact with no URL is exactly what this step exists to replace.
+
+PREFER PRIMARY SOURCES, in this order:
+1. The organisation's or person's own record of it — a press release, an official blog post, a filing, a transcript, a museum or archive catalogue entry.
+2. Contemporaneous reporting from a named publication, dated at the time.
+3. A reference work, only if nothing above exists.
+
+Never cite a Wikipedia MIRROR — a copy of Wikipedia served under somebody else's domain. They look like independent corroboration and are not. If the only thing you can find is an encyclopedia entry, say so in SOURCE rather than dressing it up.
+
+STATEMENTS TO CHECK:
+{{ ($json.output.findings || []).filter(f => f.verdict === 'unsupported').map((f, i) => (i + 1) + '. ' + f.claim).join('\n') }}
+
+FOR EACH numbered statement, output exactly one line, in this format, and nothing else:
+
+RESULT: <number> | STATUS: <confirmed|refuted|not-found> | SOURCE: <publication or organisation> | URL: <direct url> | DATE: <date of the source> | SAYS: <what the source actually states, in one sentence>
+
+- `confirmed` — a source states the thing, or plainly entails it. Not "a source is compatible with it".
+- `refuted` — a source states something incompatible with it. Put what it really says in SAYS; the script will be corrected to match.
+- `not-found` — you searched and nothing adequate exists. Leave URL empty. This is a perfectly good answer and much better than a weak citation; the sentence will be softened or cut instead.
+
+URL must be a real URL you actually retrieved, never a guess at what one might be. A line whose URL does not resolve is dropped in code, so a fabricated one costs the statement its source and changes nothing else.
+
+Output only the RESULT lines, one per statement, in number order.

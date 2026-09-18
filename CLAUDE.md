@@ -134,7 +134,11 @@ verify all of the above in one shot — ids, active state, webhooks, every
 
 **It has to be run from a machine that can reach `wf7.house-of-videos.com`.**
 Claude Code web sessions egress through a proxy that answers 403 to that host,
-so the script cannot run there — the n8n MCP connector still works, and is the
+so the script cannot run there. `node scripts/check-fact-check.mjs` is the
+opposite kind of check and runs anywhere: it executes the fact-check chain's
+committed Code-node bodies against fixtures with no n8n and no network, which
+is how the `RESULT:` parser was caught matching nothing before it ever ran.
+The n8n MCP connector still works, and is the
 way to check things from inside such a session.
 
 ## Where the lessons live
@@ -148,7 +152,7 @@ pipeline is not forced to hold all of it in context:
 | `docs/lessons-n8n.md` | n8n as a platform — execution/draft/publish mechanics, Airtable field-writing traps, gate wiring, the whole Airtable → Postgres cutover |
 | `docs/lessons-render.md` | Everything downstream of "the clip exists" — TTS, breath trim, speed, the montage, text cards, captions, the sound mix, the Remotion render pipeline |
 | `docs/lessons-site.md` | `platform/` (Next.js) — review UI, pickers, hands-off mode, documentary mode, the footage engine, the source watermark |
-| `docs/lessons-pipeline.md` | What Claude Scripting and Media Generation WRITE and CHOOSE — story structure, evidence, consistency, the hook, genre rules, model choice, the batch cap |
+| `docs/lessons-pipeline.md` | What Claude Scripting and Media Generation WRITE and CHOOSE — story structure, evidence, consistency, the hook, genre rules, model choice, the batch cap, the fact check |
 
 **Read this file always.** Then read the file (or files) for the area the
 task actually touches. If a task crosses areas — and most non-trivial ones
@@ -233,6 +237,12 @@ the full entry in the file named:
   eight kids style prefixes (`KIDS_STYLES`) live in `Voice Mode` (Claude
   Scripting), `Cast Sheet Prep` and `Set Plate Prep` (Media Generation) —
   change one, change all three, and run `node db/port/sheet-style/check.mjs`.
+- **A gate that tells two kinds of film apart must not trust `category`.**
+  `story` is the site's DEFAULT, so genuine documentaries carry it — of eleven
+  researched films in the database only three say `documentary`, and the Burj
+  Al Arab, Peking to Paris and Tupac films are all filed as `story`. The
+  fact-check chain asks the narration itself instead. Full account:
+  `docs/lessons-pipeline.md`, "The script is checked against its own research".
 - **A button has to GO somewhere, and nothing tells you when one stops.**
   Two of them had: the chime's toast and system notification did nothing at
   all on click, and the library hero's "Everything waiting on me" pointed at
@@ -352,6 +362,24 @@ expected and harmless for an app touching only its own Drive.
 
 ## Open work
 
+- **The fact check is live and has never run inside a real scripting run**
+  (2026-09-18, Claude Scripting `ea076103`; full account
+  `db/port/fact-check/README.md`, lessons in `docs/lessons-pipeline.md` under
+  "The script is checked against its own research" and `docs/lessons-site.md`
+  under "The fact-check panel"). Thirteen nodes between `If Narration Retry`[1]
+  and `Combine Chapters` read the narration against the film's own research
+  pack, look up what the pack does not cover, rewrite what nothing can back,
+  and write `hov.fact_check` for the panel above the script gate. It was
+  exercised end to end on the Burj Al Arab film's real narration and pack
+  through a throwaway (execution 14764: 47 statements, 16 looked up, 8
+  corrected, 0 left flagged, rewrite accepted, every chapter within a few words
+  of its length), and `node scripts/check-fact-check.mjs` holds 60 assertions
+  over the committed node bodies including every refusal branch. **What is
+  owed is one real researched documentary**: read its `hov.fact_check` row and
+  READ THE PROSE — the length checks all pass by construction, and nobody has
+  yet judged whether a corrected sentence reads as well as the one it replaced.
+  The escape hatch if a film goes wrong: publish `b9f95221`, the version this
+  was built on; the chain is purely additive.
 - **A Flow refusal that arrives as HTTP 200 no longer kills the film**
   (2026-09-17, Media Generation `6735a96a`, `db/port/regen-unstick/README.md`,
   lesson in `docs/lessons-pipeline.md` under "Flow refuses twice"). **What is

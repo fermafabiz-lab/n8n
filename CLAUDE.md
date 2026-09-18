@@ -488,7 +488,9 @@ expected and harmless for an app touching only its own Drive.
   dead steady. The pool (`videoPool: true`) delivered 9 of 9 on the right
   accounts in **10m05** against a serial extrapolation of **13m12**. The gap
   between that and the 3x the three accounts suggest has two causes. One is bad
-  luck: a single motion re-roll on one clip cost 6m31 against a 2m10 norm, and
+  luck: one clip took 6m31 against a 2m10 norm **for reasons that are not known**
+  (it was not a motion re-roll — no scene on the film has a second
+  `media_versions.video` entry), and
   **with a pool the slowest account IS the film** — the serial loop spreads that
   exposure, the pool concentrates it. The other is structural and was NOT
   predicted: a pooled clip takes **2m10 per account where a serial one takes

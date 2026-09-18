@@ -336,8 +336,14 @@ other — the pool holds exactly three in flight, one per account, as designed.
 
 **1.31x. Not 3x.** Two things eat the difference, and they are different in kind.
 
-**The one that is an accident:** scene 104 took 6m31 against a 2m10 norm — almost
-certainly a motion re-roll, which resubmits the job from inside a poll tick.
+**The one that is an accident:** scene 104 took 6m31 against a 2m10 norm.
+**Why is unknown.** The first guess was a motion re-roll, and it is wrong: no
+scene on this film carries an extra `media_versions.video` entry, and the only
+note anywhere is on scene 3 — an `AUTO-REWRITE-VIDEO` from Google's content
+filter — which is the wrong scene AND carries no timestamp, so it cannot even be
+attributed to this run. Scene 3 landed on its account's cadence to the second
+(12:49:30 / 12:51:38 / 12:53:46, gaps of 2m08 and 2m08), so whatever that
+rewrite cost, it was not six minutes. The 104 outlier stays unexplained.
 Without it account 02 would have finished around 12:54 with the other two, for a
 total near 7 minutes. **With three accounts the slowest account IS the film**, so
 a single re-roll costs the whole run its margin. The serial arm has the same

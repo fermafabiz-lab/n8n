@@ -230,6 +230,13 @@ the full entry in the file named:
   eight kids style prefixes (`KIDS_STYLES`) live in `Voice Mode` (Claude
   Scripting), `Cast Sheet Prep` and `Set Plate Prep` (Media Generation) —
   change one, change all three, and run `node db/port/sheet-style/check.mjs`.
+- **A notification has to GO somewhere.** The chime's toast and its system
+  notification both carry an `href` built by `platform/lib/deep-link.ts` —
+  one owner for the gate→step map, the `?scene=` param and the reading of
+  it, because the same vocabulary spelled two ways produces a link that
+  navigates and then selects nothing, which looks like success. Pinned by
+  `npm run check:deeplink`. Full account: `docs/lessons-site.md`, "A
+  notification that says what happened but does not GO there".
 - **Editing Options fields are refuse-then-clamp, never silently coerced** —
   the `normalize*` family in `platform/lib/data/derive.ts`, fixture-tested by
   `npm run check:normalize`. A value stored by the site, read by n8n and

@@ -106,7 +106,15 @@ const Mark: React.FC<{
 	const [textWidth, setTextWidth] = React.useState(0);
 	const [handle] = React.useState(() => delayRender(`watermark label: ${label}`));
 	React.useLayoutEffect(() => {
-		setTextWidth(textRef.current?.getBoundingClientRect().width ?? 0);
+		// `offsetWidth`, NOT `getBoundingClientRect().width`: the rect is the
+		// VISUAL box, so any CSS transform on an ancestor multiplies it. Put
+		// this badge inside a scaled container — a magnified preview, a
+		// picture-in-picture — and the measured label comes back k times too
+		// wide, the pill is computed k times too wide in layout pixels, and it
+		// is then scaled AGAIN. Found exactly that way on a 2.8× review reel:
+		// the capsule ran off the frame. `offsetWidth` is layout-based and
+		// ignores transforms, at the cost of rounding to whole pixels.
+		setTextWidth(textRef.current?.offsetWidth ?? 0);
 		continueRender(handle);
 	}, [handle]);
 

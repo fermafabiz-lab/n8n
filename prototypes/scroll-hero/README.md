@@ -11,7 +11,7 @@ under `platform/**` or `remotion/**`, so pushing it deploys nothing.
 ```
 cd prototypes/scroll-hero
 npm install
-npm run frames      # regenerates the sequence (72 frames, poster, manifest)
+npm run frames      # regenerates the sequence (110 frames, poster, manifest)
 npm run frames -- 48   # …or any other length
 npm run build && npm run start
 ```
@@ -29,7 +29,7 @@ npm run build && npm run start
 | File | What |
 |---|---|
 | `components/ScrollHero.tsx` | The whole mechanic. Client component, one `useEffect`. |
-| `app/globals.css` | 260vh track + sticky 100vh stage (100vh scrubs, 60vh opens the door); the opt-outs collapse it to 100vh in CSS. |
+| `app/globals.css` | 200vh track + sticky 100vh stage; the opt-outs collapse it to 100vh in CSS. |
 | `app/page.tsx` | Hero + the empty test section. |
 | `scripts/make-frames.mjs` | Synthetic frames that print their own number (sharp), plus the poster and `manifest.json`. Takes the count: `npm run frames -- 48`. Swap in real frames with the same names. |
 | `tests/hero.spec.ts` | Playwright checks listed above. |
@@ -70,28 +70,24 @@ npm run build && npm run start
   that scrubs away should still leave a way out. The fade is written in the
   same rAF tick that draws, before the frame-index dedupe, so it eases
   continuously instead of stepping once per frame.
-- **Walking through the door** — past the last frame, a div sized and placed
-  over the lit doorway grows until it fills the stage, and the section below
-  carries the same colour, so the hero does not end — it becomes the page.
-  The rectangle is measured off the real footage and lives in the manifest
-  (`door`), mapped through the canvas's own cover transform so it stays on
-  the doorway at any viewport aspect. Scroll writes nothing but `transform`
-  and `opacity`; the div's box is set on resize only, and the tick makes one
-  layout read (`getBoundingClientRect`) and then only writes. Scale is
-  exponential rather than linear, so apparent size grows at an even rate
-  instead of crawling then lurching.
+- **The outro** — over the last 10% of the scrub the film crossfades into
+  the colour the first content section is painted in, so that section arrives
+  out of the film rather than after it. One opacity on one full-stage
+  overlay: no transform, nothing to lay out, nothing to scale. The colour has
+  a single owner, `--content-bg` on `:root`, read by both the overlay and the
+  section, so the join cannot drift into a visible seam.
 - **Typeface** — Bricolage Grotesque, variable, one family for everything,
   self-hosted by `next/font` at build time into `.next/static`. No runtime
   request to Google and no layout shift. The `latin-ext` subset is not
   optional: without it "temă" and "platformă" break mid-word to a fallback.
-- **The length is not compiled in** — `/frames/manifest.json` (`{"count": 72}`)
+- **The length is not compiled in** — `/frames/manifest.json` (`{"count": 110}`)
   is uploaded with the frames and read at startup, so re-cutting the sequence
   needs no rebuild. The request starts in parallel with the poster and is
   awaited inside the poster-decode gate, so it costs no latency, and the count
   is settled before the first draw — the scroll-to-frame mapping never shifts
   under the viewer. A missing or malformed manifest falls back to
   `FALLBACK_FRAME_COUNT` in `ScrollHero.tsx`; keep that constant equal to what
-  is on the box. A bad count is refused rather than coerced: `"72"`, `0` and
+  is on the box. A bad count is refused rather than coerced: `"110"`, `0` and
   `1e9` all fall back, because guessing would scrub through frames that do not
   exist.
 
@@ -101,54 +97,77 @@ are cheap attribute writes and can go when the mechanic moves into the site.
 
 ## Results (2026-09-18, production build, preinstalled Chromium)
 
-**Playwright** — 10 of 10 passing. `shots/frame-000.png` … `frame-071.png` show
-frames 0001, 0019, 0037, 0054 and 0072 at the five scroll checkpoints;
+**Playwright** — 10 of 10 passing. `shots/frame-000.png` … `frame-109.png` show
+frames 0001, 0028, 0056, 0083 and 0110 at the five scroll checkpoints;
 `held-at-19.png` shows frame 0020 held with frames 21+ stalled at the
 network layer; `after-hero.png` is the test section filling the viewport;
-`mobile.png` and `reduced-motion.png` are poster-only.
+`mobile.png` and `reduced-motion.png` are poster-only; `outro-090.png` …
+`outro-100.png` walk the crossfade at the end.
+
+**A shot named after a frame lifts the outro overlay, and only that shot.**
+The overlay is fully opaque at 100% of the scrub, which is where the
+last-frame checkpoints sit — so `frame-109` and `held-at-19` came back as a
+flat fill the moment the crossfade landed. That is right on screen and
+useless as evidence: `held-at-19` exists to prove the canvas is never blank,
+and a flat fill is exactly what blank looks like. `shootFrame()` in the spec
+suppresses the overlay for those; the crossfade keeps its own three shots.
+
+The outro, measured rather than described:
+
+| through the scrub | overlay opacity |
+|---|---|
+| 0% | 0.00 |
+| 50% | 0.00 |
+| 90% | 0.00 |
+| 95% | 0.50 |
+| 100% | 1.00 |
+
+The test also asserts the overlay's computed `transform` is still `none`,
+so the effect cannot quietly grow a second mechanism, and that the section
+below resolves to the same colour.
 
 | Transfer (desktop, whole sequence) | |
 |---|---|
-| frames | 937 kB (72 requests) |
-| poster | 11 kB |
-| JS + CSS + HTML | 108 kB |
-| **total** | **1.03 MB** of the 3 MB budget |
+| frames | 1438 kB (110 requests) |
+| poster | 12 kB |
+| JS + CSS + HTML + webfont | 168 kB |
+| **total** | **1.58 MB** of the 3 MB budget |
 
 The frames above are synthetic gradients at ~13 kB each, which is why that
 total looks comfortable. **It is not what the real sequence costs.**
 
-### The real sequence is over the 3 MB budget (measured 2026-09-18)
+### The real sequence is well over the 3 MB budget (re-measured 2026-09-18)
 
-The 72 real frames went up on the box the evening of 2026-09-17, and every
-one of them was weighed over HTTP:
+The cut is 110 frames now, not 72, and it is already on the box. Every
+frame was weighed over HTTP:
 
 | | |
 |---|---|
-| frames on disk | 72, none missing |
-| smallest / mean / largest | 29.5 kB / 40.8 kB / 61.6 kB |
-| all 72 frames | **3,004,548 B — 2.87 MiB** |
+| frames on disk | 110, none missing, 111 absent |
+| smallest / mean / largest | 18.4 kB / 42.1 kB / 80.7 kB |
+| all 110 frames | **4,746,592 B — 4.53 MiB** |
 | poster | 41.8 kB |
-| JS + CSS + HTML + webfont | ~169 kB |
-| **hero total for a first visitor** | **~3.22 MB (3.07 MiB)** |
+| JS + CSS + HTML + webfont | ~168 kB |
+| **hero total for a first visitor** | **~4.96 MB (4.73 MiB)** |
 
-The budget is 3 MB, so this is over it — by about 7% against decimal MB,
-2% against MiB. The frames alone are 3.00 MB decimal, at the line without
-anything else counted. An earlier note here guessed 25–30 kB per frame and
-concluded 1.8–2.2 MB; the real mean is 40.8 kB, and the later frames are
-the heavy ones (61.6 kB at the end against 29.5 kB at the lightest).
+That is **65% over** the 3 MB budget, against 7% over when the cut was 72
+frames. Adding 38 frames added ~1.7 MB, and the new ones are heavier: the
+largest is 80.7 kB where the old sequence topped out at 61.6 kB.
 
-Three levers, cheapest first:
+Three levers, cheapest first, none of which need a code change:
 
-1. **Re-encode at a lower WebP quality.** The frames are visibly
-   high-quality; dropping to q≈70 typically takes 25–35% off with no
-   visible change at 1600×900 behind a scrim.
-2. **1280×720.** About 35% off, and the canvas scales it to fit anyway —
-   worth testing by eye, since the hero is full-bleed.
-3. **Fewer frames.** 60 would land near 2.45 MB. This one changes the
-   motion, so it is the last resort rather than the first.
+1. **Re-encode at a lower WebP quality.** q≈70 typically takes 25–35% off
+   with no visible change at 1600×900 behind a scrim. On its own that is
+   ~3.2–3.6 MB — closer, still over.
+2. **1280×720.** About 35% off, and the canvas scales it to fit anyway.
+   Combined with the re-encode this lands comfortably inside the budget.
+3. **Fewer frames.** The lever you just moved the other way, so probably
+   the last one to reach for.
 
-Nothing in the code needs to change for any of them: re-encode, upload, and
-update `manifest.json` if the count moves.
+A note on the shape of the problem: at 110 frames the budget is no longer
+something a single setting fixes. Either the frames get cheaper or the
+budget moves; it is worth deciding which, because the sequence will keep
+growing otherwise.
 
 **Not yet measured: LCP with the real poster.** The Lighthouse figures
 below were taken against the 11 kB placeholder poster; the real one is
@@ -156,48 +175,9 @@ below were taken against the 11 kB placeholder poster; the real one is
 2.3 s against the 2.5 s bar. Run `npm run lighthouse` with `URL` pointing
 at the live host to get the true number.
 
-### The doorway, measured off the real footage
-
-The final frame is a house at night with its front door open. The door
-rectangle and the colour of the light in it were not guessed: frame 72 was
-fetched from the box through n8n, downscaled, and the lit opening found by
-thresholding for bright warm pixels, then checked by drawing the rectangle
-back onto the frame and looking at it.
-
-| | |
-|---|---|
-| door rectangle (fractions of the frame) | `x 0.4625, y 0.3905, w 0.1099, h 0.3881` |
-| light | `#e4b068`, the mean of the bright warm pixels inside it |
-
-Both live in `manifest.json` under `door`, with the same measured values as
-the fallback in `ScrollHero.tsx`. **The box has no manifest yet**, so the
-fallback is what runs there — which is why it carries the real numbers
-rather than something neutral. A door that is malformed in the manifest is
-refused whole, never patched: three good numbers and one bad one would put
-the transition somewhere that is not the door, which reads as a bug in the
-film rather than in the file.
-
-The placeholder frames draw a doorway at the same rectangle, opening over
-the last third of the sequence, so the transition can be exercised locally
-against something that is actually there. Verified at 1280×800: the div
-lands at 586.7, 312.4 and 156×311 px, against a doorway drawn at 586, 311.
-
-`shots/door-025.png` … `door-100.png` walk the door track:
-
-| through the door track | area vs stage | door opacity | canvas opacity |
-|---|---|---|---|
-| 25% | 16% | 1.00 | 1.00 |
-| 50% | 53% | 1.00 | 1.00 |
-| 75% | 179% | 1.00 | 0.43 |
-| 100% | 371% | 1.00 | 0.00 |
-
-The test also asserts the door's centre does not move while it grows, that
-the area only ever increases, and that the section below resolves to the
-same colour as the div.
-
 ### Legibility, measured rather than eyeballed
 
-`shots/copy-000.png` … `copy-071.png` are the five frames at the scroll
+`shots/copy-000.png` … `copy-109.png` are the five frames at the scroll
 positions asked for. Each one is measured, not just looked at: the test
 screenshots the text region twice, with and without the words, and reads the
 backdrop's luminance from the second.
@@ -205,10 +185,10 @@ backdrop's luminance from the second.
 | frame | copy opacity | backdrop luminance | contrast vs white |
 |---|---|---|---|
 | 0 | 1.00 | 0.015 | 16.2:1 |
-| 20 | 0.53 | 0.036 | 12.2:1 |
-| 40 | 0.06 | 0.051 | 10.4:1 |
-| 60 | 0.00 | 0.065 | — faded out |
-| 71 | 0.00 | 0.065 | — faded out |
+| 20 | 0.69 | 0.027 | 13.6:1 |
+| 40 | 0.39 | 0.036 | 12.3:1 |
+| 60 | 0.08 | 0.050 | 10.5:1 |
+| 109 | 0.00 | 0.065 | — faded out |
 
 **Those numbers flatter the design, and one test says so.** This placeholder
 sequence is dark, so the scrim is barely being asked to work. Replace the

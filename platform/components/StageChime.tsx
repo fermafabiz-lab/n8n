@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { withScene } from "@/lib/deep-link";
+import styles from "./StageChime.module.css";
 
 /**
  * The ding, now with words.
@@ -20,8 +23,16 @@ import { useEffect, useRef, useState } from "react";
  * - the tab is visible  → an in-page toast (bottom-right, gone in ~8s);
  * - the tab is hidden   → a system notification, because that is precisely
  *   the situation where the ding reaches you from another tab or app with
- *   no way to tell what it was. Clicking it focuses the tab. Requires the
- *   one-time browser permission — see NotifyChip.
+ *   no way to tell what it was. Requires the one-time browser permission —
+ *   see NotifyChip.
+ *
+ * **Both of them GO somewhere**, which is the half that was missing: saying
+ * "S10 finished" and then leaving the producer to find S10 themselves is the
+ * same complaint the words were added to answer. Every item carries an
+ * `href` (`lib/deep-link.ts` owns how one is built and read), the toast is a
+ * button that routes to it, and the notification focuses the tab and then
+ * routes. Items with nowhere specific to go — a project on the library page
+ * that merely needs review — keep the flat, unclickable card.
  *
  * Both carry the same words, built from the diff itself: which scenes'
  * assets are new since the last look ("S7 finished") and which one the
@@ -145,13 +156,23 @@ export function markTitle() {
  *  a toast covers the visible case, and firing both would double every
  *  event. `tag` makes a newer message replace its predecessor in the OS
  *  tray instead of piling up. */
-function systemNotify(title: string, body: string, tag: string) {
+function systemNotify(
+  title: string,
+  body: string,
+  tag: string,
+  href: string | undefined,
+  open: (href: string) => void,
+) {
   try {
     if (document.visibilityState === "visible") return;
     if (!("Notification" in window) || Notification.permission !== "granted") return;
     const n = new Notification(title, { body, tag });
     n.onclick = () => {
+      // Focus FIRST: the tab is by definition hidden here, possibly in
+      // another window, and navigating a tab nobody then looks at is the bug
+      // this is fixing rather than a fix for it.
       window.focus();
+      if (href) open(href);
       n.close();
     };
   } catch {
@@ -207,9 +228,17 @@ export type ChimeItem = {
   next?: string | null;
   /** What landing means for this asset: finished / written / recorded. */
   verb?: string;
+  /**
+   * Where clicking this notification lands — built with `projectHref`. On a
+   * `have:` item it names the STEP, and the scene that just landed is
+   * appended here, because only the diff knows which scene that was.
+   * Omitted means the card stays flat and unclickable, which is the honest
+   * rendering for an item with no specific destination.
+   */
+  href?: string;
 };
 
-type Toast = { id: number; title: string; body: string };
+type Toast = { id: number; title: string; body: string; href?: string };
 
 let toastSeq = 0;
 
@@ -231,12 +260,22 @@ export default function StageChime({
   const signature = JSON.stringify(items);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const router = useRouter();
+  // `router` is stable across renders, so this closure is safe to hand to a
+  // notification that may be clicked minutes later.
+  const go = (href: string) => router.push(href);
+  const dismiss = (id: number) => setToasts((t) => t.filter((x) => x.id !== id));
 
   useEffect(() => {
     const store = readStore();
     let changed = false;
     let shouldDing = false;
-    const messages: Array<{ title: string; body: string; tag: string }> = [];
+    const messages: Array<{
+      title: string;
+      body: string;
+      tag: string;
+      href?: string;
+    }> = [];
 
     for (const it of items) {
       const prev = store[it.key];
@@ -261,14 +300,28 @@ export default function StageChime({
             it.total !== undefined ? `${it.label} · ${now.length}/${it.total}` : it.label;
           const parts = [`${nameNew(fresh)} ${it.verb ?? "finished"}`];
           if (it.next) parts.push(`${it.next} in work`);
-          messages.push({ title: head, body: parts.join(" · "), tag: it.key });
+          messages.push({
+            title: head,
+            body: parts.join(" · "),
+            tag: it.key,
+            // The FIRST of the new ones, which is also the one the body
+            // names first — several can land between two refreshes, and
+            // arriving at the earliest of them leaves the rest ahead in the
+            // filmstrip rather than behind.
+            href: it.href ? withScene(it.href, fresh[0]) : undefined,
+          });
         }
       } else if (ALERT_STAGES.has(it.stage)) {
         if (quietGates && GATE_STAGES.has(it.stage)) continue;
         shouldDing = true;
         const text = GATE_MESSAGES[it.stage];
         if (text) {
-          messages.push({ title: it.label ?? "House of Videos", body: text, tag: it.key });
+          messages.push({
+            title: it.label ?? "House of Videos",
+            body: text,
+            tag: it.key,
+            href: it.href,
+          });
         }
       } else if (it.stage.startsWith("count:") && prev.startsWith("count:")) {
         // The pre-`have:` form, still used by callers that only count.
@@ -282,9 +335,14 @@ export default function StageChime({
       markTitle();
     }
     if (messages.length > 0) {
-      for (const m of messages) systemNotify(m.title, m.body, m.tag);
+      for (const m of messages) systemNotify(m.title, m.body, m.tag, m.href, go);
       if (document.visibilityState === "visible") {
-        const fresh = messages.map((m) => ({ id: ++toastSeq, title: m.title, body: m.body }));
+        const fresh = messages.map((m) => ({
+          id: ++toastSeq,
+          title: m.title,
+          body: m.body,
+          href: m.href,
+        }));
         setToasts((t) => [...t, ...fresh]);
         for (const f of fresh) {
           timers.current.push(
@@ -305,11 +363,36 @@ export default function StageChime({
 
   if (toasts.length === 0) return null;
   return (
-    <div className="toaststack" aria-live="polite">
+    <div className={styles.stack} aria-live="polite">
       {toasts.map((t) => (
-        <div key={t.id} className="toast">
-          <b>{t.title}</b>
-          <span>{t.body}</span>
+        <div key={t.id} className={styles.toast}>
+          {t.href ? (
+            <button
+              type="button"
+              className={styles.go}
+              onClick={() => {
+                dismiss(t.id);
+                go(t.href!);
+              }}
+            >
+              <b className={styles.title}>{t.title}</b>
+              <span>{t.body}</span>
+              <span className={styles.cue}>Open →</span>
+            </button>
+          ) : (
+            <span className={styles.flat}>
+              <b className={styles.title}>{t.title}</b>
+              <span>{t.body}</span>
+            </span>
+          )}
+          <button
+            type="button"
+            className={styles.x}
+            aria-label="Dismiss"
+            onClick={() => dismiss(t.id)}
+          >
+            ×
+          </button>
         </div>
       ))}
     </div>

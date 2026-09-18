@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
   approveAllScenes,
   cancelSceneRewrite,
@@ -12,6 +12,7 @@ import {
 } from "@/app/actions";
 import type { Scene } from "@/lib/data";
 import RegenBadge from "@/components/RegenBadge";
+import { matchesScene, takeSceneParam } from "@/lib/deep-link";
 
 /**
  * Scene review stage — mirrors the script review: after the main script is
@@ -57,6 +58,31 @@ export default function SceneReview({
   };
   const [msg, setMsg] = useState<ActionResult | null>(null);
   const [pending, startTransition] = useTransition();
+  /** "S7 written" → scroll to S7 and ring it briefly. Same shape as
+   *  AudioReview's; both are lists, so arriving means putting the row on
+   *  screen rather than selecting it. */
+  const [landed, setLanded] = useState<string | null>(null);
+  useEffect(() => {
+    const want = takeSceneParam();
+    if (!want) return;
+    const hit = scenes.find((s) => matchesScene(s, want));
+    if (!hit) return;
+    setLanded(hit.id);
+    const t = setTimeout(() => {
+      document
+        .getElementById(`scene-${hit.id}`)
+        ?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, 0);
+    // Long enough to still be there once the smooth scroll lands —
+    // measured at ~1s on a 70-scene list — and short enough that
+    // nobody reads it as a state the row is in.
+    const clear = setTimeout(() => setLanded(null), 4500);
+    return () => {
+      clearTimeout(t);
+      clearTimeout(clear);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const draftFor = (s: Scene) =>
     drafts[s.id] ?? {
@@ -149,7 +175,15 @@ export default function SceneReview({
         {scenes.map((s, i) => {
           const d = draftFor(s);
           return (
-            <div className="card take" key={s.id}>
+            <div
+              className="card take"
+              key={s.id}
+              id={`scene-${s.id}`}
+              style={{
+                outline: landed === s.id ? "2px solid var(--accent)" : undefined,
+                scrollMarginTop: 90,
+              }}
+            >
               <div className="kv" style={{ borderBottom: "none", paddingBottom: 6 }}>
                 <h5 style={{ margin: 0 }}>
                   S{i + 1} · Scene

@@ -125,30 +125,35 @@ const isFrameRequest = (url: string) => /\/frames\/frame_\d+\.webp/.test(url);
 
 const hero = (page: Page) => page.locator("section.hero");
 
-// The hero's track has two parts, and the tests have to tell them apart:
-// the film scrubs over the first, the door opens over the last 60vh
-// (DOOR_TRACK_VH). Mapping a frame onto the WHOLE track would scroll past
-// the end of the film and into the transition.
-const DOOR_TRACK_VH = 60;
-
-async function trackParts(page: Page): Promise<{ scrub: number; door: number; full: number }> {
-  return page.evaluate((vh) => {
-    const s = document.querySelector("section.hero") as HTMLElement;
-    const full = s.offsetHeight - window.innerHeight;
-    const door = (window.innerHeight * vh) / 100;
-    return { scrub: full - door, door, full };
-  }, DOOR_TRACK_VH);
-}
-
-// Scroll distance across which the sequence plays.
+// Scroll distance across which the sequence plays: section height minus one
+// viewport (the sticky stage).
 async function scrubRange(page: Page): Promise<number> {
-  return (await trackParts(page)).scrub;
+  return page.evaluate(() => {
+    const s = document.querySelector("section.hero") as HTMLElement;
+    return s.offsetHeight - window.innerHeight;
+  });
 }
 
 async function scrollToFrame(page: Page, index: number, count: number) {
   const range = await scrubRange(page);
   const y = Math.round((index / (count - 1)) * range);
   await page.evaluate((y) => window.scrollTo(0, y), y);
+}
+
+/**
+ * A screenshot of the FILM, named after a frame.
+ *
+ * The outro covers the last tenth of the scrub, so a shot taken at the last
+ * frame is the handoff colour and nothing else — which is right on screen and
+ * useless as evidence: `held-at-19` exists to show the canvas is never blank,
+ * and a flat fill is exactly what blank looks like. So the overlay is lifted
+ * for these, and only these. What the outro does has its own three shots.
+ */
+async function shootFrame(page: Page, file: string) {
+  const lift = await page.addStyleTag({ content: ".hero__outro { opacity: 0 !important; }" });
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
+  await page.screenshot({ path: path.join(SHOTS, file) });
+  await lift.evaluate((el) => el.remove());
 }
 
 // Sums the bytes that actually crossed the wire for the hero's assets and
@@ -204,7 +209,7 @@ test.describe("desktop", () => {
       await expect(hero(page)).toHaveAttribute("data-frame", String(index));
       // one more frame so the compositor has shown the draw
       await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
-      await page.screenshot({ path: path.join(SHOTS, `frame-${String(index).padStart(3, "0")}.png`) });
+      await shootFrame(page, `frame-${String(index).padStart(3, "0")}.png`);
     }
 
     // Scrolling back up reverses.
@@ -216,8 +221,8 @@ test.describe("desktop", () => {
     await expect(hero(page)).toHaveAttribute("data-frame", String(lowUp));
 
     // Past the track the stage unpins and the test section takes the viewport.
-    const { full } = await trackParts(page);
-    await page.evaluate((y) => window.scrollTo(0, y + window.innerHeight), full);
+    const range = await scrubRange(page);
+    await page.evaluate((y) => window.scrollTo(0, y + window.innerHeight), range);
     await expect(page.getByTestId("after-hero")).toBeInViewport({ ratio: 0.95 });
     await page.screenshot({ path: path.join(SHOTS, "after-hero.png") });
 
@@ -248,7 +253,7 @@ test.describe("desktop", () => {
     // Never blank, never past what exists: index 19 is the 20th frame.
     await expect(hero(page)).toHaveAttribute("data-frame", "19");
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
-    await page.screenshot({ path: path.join(SHOTS, "held-at-19.png") });
+    await shootFrame(page, "held-at-19.png");
     const notBlank = await page.evaluate(() => {
       const c = document.querySelector("canvas.hero__canvas") as HTMLCanvasElement;
       const d = c.getContext("2d")!.getImageData(c.width >> 1, c.height >> 1, 1, 1).data;
@@ -280,7 +285,7 @@ test.describe("desktop", () => {
       await scrollToFrame(page, index, count);
       await expect(hero(page)).toHaveAttribute("data-frame", String(index));
       await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
-      await page.screenshot({ path: path.join(SHOTS, `copy-${String(index).padStart(3, "0")}.png`) });
+      await shootFrame(page, `copy-${String(index).padStart(3, "0")}.png`);
 
       const opacity = Number(await copy.evaluate((el) => getComputedStyle(el).opacity));
       const box = await words.boundingBox();
@@ -366,80 +371,50 @@ test.describe("desktop", () => {
     }
   });
 
-  test("the door grows from the doorway and hands off to the section below", async ({ page }) => {
+
+  test("crossfades into the next section's colour over the last 10%", async ({ page }) => {
     await page.goto("/");
     await expect(hero(page)).toHaveAttribute("data-state", "ready", { timeout: 15_000 });
     const count = await frameCount(page);
     await expect(hero(page)).toHaveAttribute("data-loaded", String(count), { timeout: 30_000 });
 
-    const doorEl = page.locator(".hero__door");
-    const canvas = page.locator("canvas.hero__canvas");
-
-    // Where the door sits before it opens: over the doorway in the last frame,
-    // not over the whole stage.
-    await scrollToFrame(page, count - 1, count);
-    const atRest = await doorEl.boundingBox();
-    const stageBox = await page.locator(".hero__stage").boundingBox();
-    expect(atRest).not.toBeNull();
-    expect(atRest!.width).toBeLessThan(stageBox!.width * 0.25);
-    expect(atRest!.height).toBeLessThan(stageBox!.height * 0.6);
-    // Its centre is the doorway's centre, which is what it grows from.
-    const originCx = atRest!.x + atRest!.width / 2;
-    const originCy = atRest!.y + atRest!.height / 2;
-    const origin = (await doorEl.evaluate((el) => getComputedStyle(el).transformOrigin))
-      .split(" ")
-      .map(parseFloat);
-    expect(Math.abs(origin[0] - atRest!.width / 2)).toBeLessThan(1);
-    expect(Math.abs(origin[1] - atRest!.height / 2)).toBeLessThan(1);
-    await expect(hero(page)).toHaveAttribute("data-door", "0.000");
-    expect(Number(await doorEl.evaluate((el) => getComputedStyle(el).opacity))).toBe(0);
-
-    // Walk the door track and watch it grow, stay centred, and take over.
-    const { scrub: scrubEnd, door: track } = await trackParts(page);
-    const seen: { at: number; area: number; doorOpacity: number; canvasOpacity: number }[] = [];
-
-    for (const step of [0.25, 0.5, 0.75, 1]) {
-      await page.evaluate((y) => window.scrollTo(0, y), Math.round(scrubEnd + track * step));
+    const outro = page.locator(".hero__outro");
+    const range = await scrubRange(page);
+    const opacityAt = async (p: number) => {
+      await page.evaluate((y) => window.scrollTo(0, y), Math.round(range * p));
       await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
-      const box = await doorEl.boundingBox();
-      seen.push({
-        at: step,
-        area: box ? box.width * box.height : 0,
-        doorOpacity: Number(await doorEl.evaluate((el) => getComputedStyle(el).opacity)),
-        canvasOpacity: Number(await canvas.evaluate((el) => getComputedStyle(el).opacity)),
-      });
-      // Growing about the doorway's centre keeps that centre put.
-      if (box) {
-        expect(Math.abs(box.x + box.width / 2 - originCx)).toBeLessThan(2);
-        expect(Math.abs(box.y + box.height / 2 - originCy)).toBeLessThan(2);
-      }
-      await page.screenshot({ path: path.join(SHOTS, `door-${String(Math.round(step * 100)).padStart(3, "0")}.png`) });
-    }
+      return Number(await outro.evaluate((el) => getComputedStyle(el).opacity));
+    };
 
-    console.table(
-      seen.map((s) => ({
-        "through the door track": `${s.at * 100}%`,
-        "area vs stage": `${((s.area / (stageBox!.width * stageBox!.height)) * 100).toFixed(0)}%`,
-        "door opacity": s.doorOpacity.toFixed(2),
-        "canvas opacity": s.canvasOpacity.toFixed(2),
-      })),
-    );
+    const seen: { at: number; opacity: number }[] = [];
+    for (const p of [0, 0.5, 0.9, 0.95, 1]) seen.push({ at: p, opacity: await opacityAt(p) });
+    console.table(seen.map((s) => ({ "through the scrub": `${s.at * 100}%`, "outro opacity": s.opacity.toFixed(2) })));
 
-    // It only ever grows, and by the end it covers the stage and the canvas
-    // has gone.
-    for (let i = 1; i < seen.length; i++) expect(seen[i].area).toBeGreaterThan(seen[i - 1].area);
-    const last = seen[seen.length - 1];
-    expect(last.area).toBeGreaterThanOrEqual(stageBox!.width * stageBox!.height);
-    expect(last.doorOpacity).toBe(1);
-    expect(last.canvasOpacity).toBe(0);
+    // Nothing until the last tenth, then it arrives and only ever increases.
+    expect(seen[0].opacity).toBe(0);
+    expect(seen[1].opacity).toBe(0);
+    expect(seen[2].opacity).toBe(0);
+    expect(seen[3].opacity).toBeGreaterThan(0.4);
+    expect(seen[3].opacity).toBeLessThan(0.6);
+    expect(seen[4].opacity).toBe(1);
 
-    // Past the hero the next section carries the same colour, so the handoff
-    // is a continuation rather than a cut.
-    const doorColour = await doorEl.evaluate((el) => getComputedStyle(el).backgroundColor);
+    // Opacity is the only thing that moved: no transform was introduced.
+    expect(await outro.evaluate((el) => getComputedStyle(el).transform)).toBe("none");
+
+    // And it is the colour the section below is painted in, so the join has
+    // nothing to show.
+    const outroColour = await outro.evaluate((el) => getComputedStyle(el).backgroundColor);
     const sectionColour = await page
       .getByTestId("after-hero")
       .evaluate((el) => getComputedStyle(el).backgroundColor);
-    expect(sectionColour).toBe(doorColour);
+    expect(sectionColour).toBe(outroColour);
+
+    // Screenshots at the positions they are named after: the loop above ends
+    // at 100%, so each one has to scroll back to its own mark first.
+    for (const p of [0.9, 0.95, 1]) {
+      await opacityAt(p);
+      await page.screenshot({ path: path.join(SHOTS, `outro-${String(Math.round(p * 100)).padStart(3, "0")}.png`) });
+    }
   });
 
   test("takes the frame count from the manifest, not from the build", async ({ page }) => {

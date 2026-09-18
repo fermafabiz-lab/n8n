@@ -28,6 +28,7 @@ import ProductionActivity from "@/components/ProductionActivity";
 import RoughCutButton from "@/components/RoughCutButton";
 import FilmCost from "@/components/FilmCost";
 import { StepCard, StageNavProvider } from "@/components/StageNav";
+import { GATE_STEP, projectHref, STAGE_KEYS, type StageKey } from "@/lib/deep-link";
 import {
   executionUrl,
   getAliveProduction,
@@ -152,23 +153,20 @@ function pipeline(
   ];
 }
 
-const STAGE_KEYS = [
-  "script",
-  "scenes",
-  "audio",
-  "images",
-  "video",
-  "final",
-  "assembly",
-] as const;
-type StageKey = (typeof STAGE_KEYS)[number];
+// STAGE_KEYS / StageKey now live in lib/deep-link.ts, next to the gate→step
+// map that has to name the same seven. They were declared here and the map
+// was written there, which is one vocabulary in two files — the shape that
+// drifts.
 
 export default async function ProductionRoom({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ stage?: string }>;
+  /** `scene` is read in the browser by whichever panel serves the step —
+   *  see `lib/deep-link.ts`. It is declared here so Next does not treat it
+   *  as an unexpected param. */
+  searchParams: Promise<{ stage?: string; scene?: string }>;
 }) {
   const { id } = await params;
   // Revisiting an earlier step. Without it the page shows only whatever the
@@ -417,15 +415,20 @@ export default async function ProductionRoom({
           ProductionActivity states out loud, because the batch reports no
           per-scene progress. Takes are watched too; they never dinged before,
           which was simply a gap. */}
+      {/* `href` is where the click lands. A gate goes to the step that is
+          waiting; a `have:` item goes to its step and StageChime appends the
+          scene that just landed, so "S10 finished" opens on S10 rather than
+          on whatever the batch happens to be working. */}
       <StageChime
         quietGates={project.editing.autoApprove}
         items={[
-          { key: id, stage, label: project.name },
+          { key: id, stage, label: project.name, href: projectHref(id, GATE_STEP[stage]) },
           {
             key: `${id}:scenes`,
             stage: `have:${scenes.map((s) => s.label).join("|")}`,
             label: "Scenes",
             verb: "written",
+            href: projectHref(id, "scenes"),
           },
           ...(silent
             ? []
@@ -437,6 +440,7 @@ export default async function ProductionRoom({
                   total: scenes.length,
                   next: scenes.find((s) => !s.voiceUrl)?.label ?? null,
                   verb: "recorded",
+                  href: projectHref(id, "audio"),
                 },
               ]),
           {
@@ -445,6 +449,7 @@ export default async function ProductionRoom({
             label: "Images",
             total: scenes.length,
             next: scenes.find((s) => !s.imageUrl)?.label ?? null,
+            href: projectHref(id, "images"),
           },
           {
             key: `${id}:clips`,
@@ -452,6 +457,7 @@ export default async function ProductionRoom({
             label: "Video",
             total: scenes.length,
             next: scenes.find((s) => !s.videoUrl)?.label ?? null,
+            href: projectHref(id, "video"),
           },
         ]}
       />

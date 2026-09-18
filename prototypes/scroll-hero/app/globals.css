@@ -1,5 +1,13 @@
 /* Mechanics only: no brand, no type scale. Just enough to see the hero work. */
 
+:root {
+  /* The first content section's ground, and the colour the film crossfades
+     into at the end of the scrub. ONE owner: the section is painted with it
+     and so is the hero's outro overlay, so the handoff cannot drift into a
+     visible seam. */
+  --content-bg: #0b0b0c;
+}
+
 html,
 body {
   margin: 0;
@@ -83,14 +91,12 @@ body {
   opacity: 1;
 }
 
-/* The section is the scroll track, and it has two parts after the pin:
-   260vh = 100vh of sticky stage + 100vh that scrubs the film + 60vh that
-   opens the door. The 60 is DOOR_TRACK_VH in ScrollHero.tsx; the split is
-   computed from these heights at runtime, so the two only need to agree on
-   that one number. */
+/* The section is the scroll track: 200vh tall, of which the sticky stage
+   pins 100vh, so the sequence scrubs across exactly one viewport of scroll.
+   After that the stage unpins and scroll is ordinary again. */
 .hero {
   position: relative;
-  height: 260vh;
+  height: 200vh;
 }
 
 .hero__stage {
@@ -129,24 +135,17 @@ body {
   visibility: hidden;
 }
 
-/* The doorway div. Everything that changes during scroll is transform and
-   opacity; left/top/width/height are written once per resize by the
-   component, from the door rectangle mapped through the canvas's own cover
-   transform. `transform-origin: center` is the door's centre, because the
-   element IS the door rectangle. */
-.hero__door {
+/* The outro. Sits over the film and under the copy, and crossfades the last
+   stretch of the sequence into the section below's colour. Opacity is the
+   only thing that changes — no transform, nothing to lay out. */
+.hero__outro {
   position: absolute;
-  left: 0;
-  top: 0;
-  width: 0;
-  height: 0;
+  inset: 0;
   z-index: 1;
+  background: var(--content-bg);
   opacity: 0;
-  transform: scale(1);
-  transform-origin: center;
-  will-change: transform, opacity;
-  backface-visibility: hidden;
   pointer-events: none;
+  will-change: opacity;
 }
 
 /* ── The copy over the film ──────────────────────────────────────────────
@@ -241,8 +240,8 @@ body {
     display: none;
   }
 
-  /* No long scroll, so there is nothing for the door to open across. */
-  .hero__door {
+  /* No long scroll, so there is no stretch to crossfade across. */
+  .hero__outro {
     display: none;
   }
 
@@ -251,16 +250,12 @@ body {
   }
 }
 
-/* The first content section. Its background is the doorway's light, so the
-   growing div does not hand over to a different colour — it simply stops
-   being the hero and starts being this. */
+/* The first content section. The film has already crossfaded to this colour
+   by the time the stage unpins, so the section arrives out of it rather than
+   after it — which is why there is no rule at the join. */
 .test-section {
   height: 100vh;
   display: grid;
   place-items: center;
-  /* The doorway's light. The component writes --door-light on :root from the
-     manifest, so this follows the film; the literal is only what answers
-     before the script has run. Same value, one owner. */
-  background: var(--door-light, #e4b068);
-  color: #2a1c0b;
+  background: var(--content-bg);
 }

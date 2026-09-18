@@ -263,11 +263,12 @@ the full entry in the file named:
 - **A numeric Airtable field left mapped with no value writes a literal `0`,
   not nothing.** Killed scene ordering and project length more than once.
   `docs/lessons-n8n.md`, "Airtable" section.
-- **A Claude Code web session has no outbound HTTP at all.** Anything that
-  needs to reach `wf7.house-of-videos.com` or run a real render must be done
-  through the n8n MCP connector, a throwaway workflow, or Railway's own
-  tools — never a direct `fetch()`/`curl` from this environment. See
-  `db/port/lib/README.md`.
+- **A Claude Code web session reaches GitHub and nothing else.** Anything
+  that needs `wf7.house-of-videos.com`, the site, an external API or a real
+  render must be done through the n8n MCP connector, a throwaway workflow, or
+  Railway's own tools — never a direct `fetch()`/`curl` from this
+  environment. `api.github.com` is the one exception and answers normally.
+  See `db/port/lib/README.md`.
 - **Any Code-node body or prompt edited through MCP must come from a real,
   committed file first** (`db/port/<feature>/paste/<Node Name>.js`), never
   composed inline in the tool call. `db/port/lib/README.md`.
@@ -694,10 +695,13 @@ expected and harmless for an app touching only its own Drive.
   (`voice_approved`, `production_status`); the NEW take was deliberately
   KEPT, so that scene is an A/B against its ai33 neighbours in the same
   film, same voice, same model.
-- **A Claude Code web session has NO outbound HTTP at all** — every host
-  answers `000`, not just the house-of-videos ones, so `curl` cannot reach
-  the site, wf7, or `api.elevenlabs.io`. The MCP connectors are the only way
-  out. To run a query or fire a webhook, create a throwaway workflow
+- **A Claude Code web session reaches GitHub and NOTHING else.** Measured
+  2026-09-18: `api.github.com` answers 200, while `example.com`,
+  `api.elevenlabs.io`, `house-of-videos.com` and `wf7.house-of-videos.com`
+  all answer `000`. So `curl` cannot reach the site, wf7 or any external API —
+  but the entry here used to say "every host answers 000", which is no longer
+  true and would send a session looking for a workaround it does not need for
+  GitHub. For everything else the MCP connectors are the only way out. To run a query or fire a webhook, create a throwaway workflow
   (manual trigger → Postgres, or → an HTTP node posting to
   `http://localhost:5678/webhook/<path>`), `execute_workflow` it, read the
   result, then `archive_workflow`. n8n can reach itself and the database

@@ -22,7 +22,7 @@ export default async function DeepSearchPage() {
   const films = await getDeepSearchHealth(20).catch(() => []);
   const rows = films.map((f) => ({
     ...f,
-    state: deepSearchState({ report: f.report, isDocumentary: true, scriptExists: true }),
+    state: deepSearchState({ report: f.report, isDocumentary: true, scriptExists: true, createdAt: f.createdAt }),
   }));
   const broken = rows.filter((r) => r.state.red);
 

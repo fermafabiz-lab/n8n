@@ -720,6 +720,7 @@ export default async function ProductionRoom({
               report={deepSearch}
               isDocumentary={project.category === "documentary"}
               scriptExists
+              createdAt={project.createdAt}
             />
             <ScriptReview
               projectId={id}

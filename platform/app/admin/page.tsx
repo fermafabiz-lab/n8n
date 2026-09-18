@@ -83,7 +83,10 @@ export default async function SettingsPage() {
   // dot would stop meaning anything.
   const broken = await getDeepSearchHealth(20)
     .then((films) =>
-      films.filter((f) => deepSearchState({ report: f.report, isDocumentary: true, scriptExists: true }).red).length,
+      films.filter(
+        (f) =>
+          deepSearchState({ report: f.report, isDocumentary: true, scriptExists: true, createdAt: f.createdAt }).red,
+      ).length,
     )
     .catch(() => 0);
 

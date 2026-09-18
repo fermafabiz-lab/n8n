@@ -42,6 +42,27 @@ export interface DeepSearchState {
 /** Skip codes that mean "it was asked for and did not happen". */
 const FAULTS = new Set(["no-mode", "not-researched", "no-pack", "no-chapters", "unknown"]);
 
+/**
+ * When Deep Search first ran in production — the publish of Claude Scripting
+ * `38d05de7`.
+ *
+ * A film whose script was written before this could not have a report, and
+ * calling that a fault would light the alarm on history. It is a hardcoded
+ * instant on purpose: the alternative is inferring the cutoff from the oldest
+ * row in the table, which quietly moves every time an old project is deleted
+ * and would eventually mark real faults as ancient history.
+ *
+ * The producer's own Google Maps film is exactly this case — a documentary
+ * whose script was written at 13:24, an hour before the chain existed.
+ */
+export const DEEP_SEARCH_LIVE_AT = Date.parse("2026-09-18T14:31:00Z");
+
+function predatesDeepSearch(createdAt?: string | null): boolean {
+  if (!createdAt) return false; // unknown age is not an excuse
+  const t = Date.parse(createdAt);
+  return Number.isFinite(t) && t < DEEP_SEARCH_LIVE_AT;
+}
+
 export interface DeepSearchInput {
   report: DeepSearchReport | null;
   /** The project's category is `documentary`. */
@@ -55,10 +76,26 @@ export interface DeepSearchInput {
    * report exists too — or something went wrong.
    */
   scriptExists: boolean;
+  /** The project's creation time, so films older than the feature are spared. */
+  createdAt?: string | null;
 }
 
-export function deepSearchState({ report, isDocumentary, scriptExists }: DeepSearchInput): DeepSearchState {
+export function deepSearchState({
+  report,
+  isDocumentary,
+  scriptExists,
+  createdAt,
+}: DeepSearchInput): DeepSearchState {
   if (!report) {
+    if (isDocumentary && predatesDeepSearch(createdAt)) {
+      return {
+        status: "off",
+        label: "Before Deep Search",
+        detail:
+          "This film was written before Deep Search existed, so it was never checked. Re-writing the script would check it.",
+        red: false,
+      };
+    }
     if (!isDocumentary) {
       return {
         status: "off",

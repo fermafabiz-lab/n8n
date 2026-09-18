@@ -444,7 +444,15 @@ export interface Project {
   progress: number; // 0..1
   finalVideoUrl: string | null;
   aspect: "16:9" | "9:16";
+  /**
+   * MISNAMED AND KEPT THAT WAY: this is the project's CREATION time, not its
+   * last write — `buildProject` has always set it from `createdAt`. Renaming it
+   * would touch every consumer for no behaviour change, so `createdAt` below
+   * is the honest one to read; this stays for the code that already uses it.
+   */
   updatedAt: string | null;
+  /** When the film was created. Deep Search uses it to spare older films. */
+  createdAt: string | null;
   /** First scene's generated image — the dashboard card cover. */
   coverUrl?: string | null;
   /** Overlay options, editable right up to final assembly. */
@@ -1111,6 +1119,7 @@ export function buildProject(r: RawProject): Project {
     finalVideoUrl: r.finalVideoUrl,
     aspect: r.aspectRaw === "9:16" ? "9:16" : "16:9",
     updatedAt: r.createdAt,
+    createdAt: r.createdAt,
     coverUrl: r.coverUrl ?? null,
     seriesId: r.seriesId ?? null,
     episodeNo: Number.isInteger(r.episodeNo) && (r.episodeNo as number) > 0 ? (r.episodeNo as number) : null,

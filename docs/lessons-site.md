@@ -2085,3 +2085,14 @@ card. Every film now gets a report row — a Story film's simply says
 "not-documentary" — so a card would put a grey Deep Search panel above the
 script of every film that was never going to be checked. The producer asked to
 see whether it is active; one line answers that, and a card would be in the way.
+
+**And the alarm must not fire on history.** Every documentary written before
+Deep Search existed has no report, which by the rule above is exactly the shape
+of a fault — so the very first thing the producer would have seen was a false
+one, on their own Google Maps film, whose script was written an hour before the
+chain went live. `DEEP_SEARCH_LIVE_AT` is a hardcoded instant for that reason.
+Inferring the cutoff from the oldest row in the table would have been tidier
+and wrong: it moves every time an old project is deleted, and would eventually
+start explaining real faults away as ancient history. An UNKNOWN creation date
+is not an excuse either — a backend that stopped returning the date would
+otherwise switch the alarm off everywhere at once.

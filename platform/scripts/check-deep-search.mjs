@@ -50,6 +50,36 @@ console.log("Nothing to report");
   ok("and says what to do about it", /should have one|did not run/i.test(s.detail));
 }
 
+console.log("Older than the feature");
+{
+  // The producer's Google Maps film: a documentary whose script was written an
+  // hour before the chain existed. Calling that a fault would light the alarm
+  // on history, and the very first thing they saw would be a false one.
+  const s = deepSearchState({
+    report: null,
+    isDocumentary: true,
+    scriptExists: true,
+    createdAt: "2026-09-18T13:22:50Z",
+  });
+  ok("a documentary written before Deep Search existed is not a fault", s.status === "off" && s.red === false);
+  ok("and says why rather than going quiet", /before Deep Search existed/i.test(s.detail));
+}
+{
+  const s = deepSearchState({
+    report: null,
+    isDocumentary: true,
+    scriptExists: true,
+    createdAt: "2026-09-18T16:00:00Z",
+  });
+  ok("a documentary written after it is still RED", s.status === "broken" && s.red === true);
+}
+{
+  // An unknown age must not become a free pass, or a backend that stops
+  // returning the date would switch the alarm off everywhere at once.
+  const s = deepSearchState({ report: null, isDocumentary: true, scriptExists: true, createdAt: null });
+  ok("an unknown creation date is not an excuse", s.red === true);
+}
+
 console.log("Skips");
 {
   const s = deepSearchState({

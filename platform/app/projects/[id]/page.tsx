@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getProject, getProjectScriptInfo, getScenes, type Scene } from "@/lib/data";
+import { getFactCheck, getProject, getProjectScriptInfo, getScenes, type Scene } from "@/lib/data";
 import { getCategory } from "@/lib/categories";
 import { toneType } from "@/lib/tone-type";
 import SceneBoard from "@/components/SceneBoard";
 import ScriptReview from "@/components/ScriptReview";
+import FactCheckPanel from "@/components/FactCheckPanel";
 import SceneReview from "@/components/SceneReview";
 import AudioReview from "@/components/AudioReview";
 import FinalSettings from "@/components/FinalSettings";
@@ -330,6 +331,12 @@ export default async function ProductionRoom({
     scriptInfo.content
       ? scriptInfo
       : null;
+
+  // What the fact-checker made of this narration. Fetched only when the panel
+  // it sits above will actually be drawn — it is one indexed read, but every
+  // avoidable query on this page is one the producer waits for on every click.
+  // A null answer (no row, older film, Airtable backend) draws nothing.
+  const factCheck = script ? await getFactCheck(id).catch(() => null) : null;
 
   // What production is doing right now — drives Pause/Resume and the
   // activity panel. null = the n8n API didn't answer (distinct from "nothing
@@ -675,13 +682,20 @@ export default async function ProductionRoom({
         )}
 
         {showing("script", !!script) && script && (
-          <ScriptReview
-            projectId={id}
-            scriptId={script.id}
-            content={script.content}
-            regenerating={scriptRewriting}
-            locked={scriptLocked}
-          />
+          <>
+            {/* Above the box, never inside it: the report is about the text,
+                and a warning under the Approve button is a warning nobody
+                read. It has no buttons — the producer's call was to warn
+                loudly and never block. */}
+            <FactCheckPanel report={factCheck} />
+            <ScriptReview
+              projectId={id}
+              scriptId={script.id}
+              content={script.content}
+              regenerating={scriptRewriting}
+              locked={scriptLocked}
+            />
+          </>
         )}
 
         {showing("final", project.awaitingFinalSettings) && (

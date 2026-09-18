@@ -58,6 +58,8 @@ export type {
   Scene,
   SceneVersion,
   ScriptInfo,
+  FactCheckReport,
+  FactCheckFinding,
   GenreProfile,
   LibraryScript,
   ScriptExample,
@@ -79,6 +81,7 @@ export {
 
 import type {
   Project, Scene, ScriptInfo, SceneVersion, StatusKind,
+  FactCheckReport,
   GenreProfile, LibraryScript, ScriptExample,
 } from "./data/derive";
 
@@ -886,6 +889,71 @@ export async function getProjectEvidence(
   if (USE_PG) return pgBackend.getProjectEvidence(projectId);
   return [];
 }
+
+/**
+ * What the fact-checker made of this film's narration, or null if it never
+ * ran — which is the normal answer for every film written before the check
+ * existed, and for a project on the frozen Airtable backend.
+ *
+ * Null and "it ran and found nothing" are deliberately different: the first
+ * draws no panel at all, the second draws a short green one. A film the check
+ * never saw must not be shown as a film that passed.
+ */
+export async function getFactCheck(projectId: string): Promise<FactCheckReport | null> {
+  if (USE_PG) return pgBackend.getFactCheck(projectId);
+  // Demo mode serves a report for the same reason it serves a script: so the
+  // panel is reviewable before anything is wired. A CONFIGURED Airtable
+  // backend still answers null — there is no fact_check table over there, and
+  // inventing one would show the producer a check that never ran.
+  if (!isConfigured) return DEMO_FACT_CHECK;
+  return null;
+}
+
+/**
+ * Both halves of the panel at once — a sentence the sources corrected and one
+ * they could not, plus a couple that held up — so a screenshot of demo mode
+ * exercises every branch except `skipped`.
+ */
+const DEMO_FACT_CHECK: FactCheckReport = {
+  checked: 12,
+  flagged: 3,
+  searched: 4,
+  rewritten: 2,
+  findings: [
+    {
+      quote: "The stadium roars, the cameras roll, and a nation rehearses the spectacle it will soon export as war.",
+      claim: "The 1936 Berlin Olympics were staged as a rehearsal for war.",
+      verdict: "unsupported",
+      reason: "No claim covers the intent behind the staging; the pack covers the games and the newsreels, not the motive.",
+      action: "flagged",
+    },
+    {
+      quote: "Berlin, 1936.",
+      claim: "The Summer Olympics were held in Berlin in 1936.",
+      verdict: "supported",
+      ref: "E2",
+      reason: "E2 gives the host city and the year.",
+      action: "kept",
+    },
+    {
+      quote: "Forty-nine nations marched past the box that morning.",
+      claim: "49 nations took part in the 1936 Berlin Olympics.",
+      verdict: "contradicted",
+      ref: "E4",
+      reason: "E4 puts the number at 49 competing nations but says they did not all march on the opening morning.",
+      source: "Olympic Studies Centre",
+      url: "https://example.org/olympics-1936",
+      action: "rewritten",
+    },
+    {
+      quote: "The films were shown in every cinema in the country.",
+      claim: "The Olympic films were shown in every cinema in Germany.",
+      verdict: "unsupported",
+      reason: "Nothing we can cite supports 'every cinema'. No source could be found for it.",
+      action: "rewritten",
+    },
+  ],
+};
 
 export async function writeSceneScript(
   sceneId: string,

@@ -544,6 +544,54 @@ export interface ScriptInfo {
   status: string;
 }
 
+/**
+ * One statement the fact-checker pulled out of the narration, and what
+ * became of it. Written by `FC Apply` in Claude Scripting; the full shape is
+ * documented in db/012_fact_check.sql.
+ */
+export interface FactCheckFinding {
+  /** The sentence as it stood in the draft, copied verbatim. */
+  quote: string;
+  /** The assertion inside it, isolated. */
+  claim?: string;
+  verdict: "supported" | "unsupported" | "contradicted";
+  /** The pack claim that settles it (E1, E12…), when one does. */
+  ref?: string;
+  reason?: string;
+  source?: string;
+  /** A primary source found for this statement specifically, if any. */
+  url?: string;
+  /** `kept` held up; `rewritten` was corrected; `flagged` still stands. */
+  action?: "kept" | "rewritten" | "flagged" | string;
+}
+
+/**
+ * EVERY FIELD IS OPTIONAL, on purpose. This row is written by a workflow that
+ * will keep changing, and a report saved by last month's version has to render
+ * in today's panel — a reader that insists on a shape is how an old row
+ * becomes a crash on a page the producer needs.
+ */
+export interface FactCheckReport {
+  /** Checkable statements the judge extracted. */
+  checked?: number;
+  /** How many of them the sources did not back. */
+  flagged?: number;
+  /** How many got a targeted primary-source lookup. */
+  searched?: number;
+  /** Sentences the rewrite actually changed. */
+  rewritten?: number;
+  /** Present only when the check did not run; says why, in prose. */
+  skipped?: string;
+  /** The narration is a story, so there was nothing to check it against. */
+  storyMode?: boolean;
+  /** Too much was unsupported to correct: reported, deliberately not rewritten. */
+  overwhelmed?: boolean;
+  /** The rewrite was produced and refused; this says what was wrong with it. */
+  refused?: string;
+  findings?: FactCheckFinding[];
+  checkedAt?: string | null;
+}
+
 // ---------------------------------------------------------------------------
 // The neutral shapes each adapter produces
 // ---------------------------------------------------------------------------

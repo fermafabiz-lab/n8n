@@ -1707,3 +1707,72 @@ holds its three until those scenes' text is regenerated (which goes through
 copies #2/#3, both fixed). And this is a fix with a mechanism and no outcome
 until a film written after 2026-09-15 is measured — re-run the query in that
 README and the post-fix bucket should read zero, not 3.2%.
+
+### The script is checked against its own research before it is cut up — 2026-09-18, LIVE
+
+The producer pasted a Google Maps script this pipeline had written, alongside
+ChatGPT's reading of it, which listed four things in it that were not true —
+a product described as still being a desktop one after it had shipped, a
+launch attributed to the wrong platform, a motive attributed to a named
+engineer, and two people credited with leading a team. The ask: *"a system to
+check whether the information from the scripting part is accurate and rewrite
+it if not."*
+
+**It is tractable only because the retrieval half already existed.** `Research
+Tema` → `Extract Claims` already produces a numbered pack of sourced claims
+(E1…E20), each with a real URL, and the narration is written FROM that pack.
+So the question the checker asks is not the open-ended, hallucination-prone
+*"is this true?"* but the closed-book *"does any claim in this numbered list
+say this?"* — answerable from the text in front of the model, with no
+knowledge of the world required. Design anything of this kind the same way:
+**find the closed-book version of the question before reaching for a model
+that knows things.**
+
+Full account, the chain, the version ids and every verification run:
+`db/port/fact-check/README.md`. Three lessons belong here.
+
+**A story is not a film with errors in it.** Run the judge on "The Roman slave
+who conquered Egypt" and it flags 55 of its 56 statements. Every verdict is
+correct — nothing in a pack about Ptolemaic Egypt backs what an invented
+Lazarus did on a Tuesday — and the result is worthless; the rewrite would have
+been handed the whole film. The gate that was supposed to prevent this,
+"researched, with a pack", does not, because that film IS researched: fiction
+here is researched for its background. **Nor does the project's category**:
+`story` is the site's default, so the Burj Al Arab, Peking to Paris and Tupac
+documentaries all carry it too — of eleven researched films in the database
+only three say `documentary`. The only signal that separates a documentary
+from a dramatisation is the narration itself, so the judge is asked FIRST what
+it is reading and returns nothing for a story. **When a gate has to tell two
+kinds of content apart, check whether the metadata you were about to trust
+actually varies — a field whose default is one of the two answers is not a
+signal.**
+
+**Never let a corrector rewrite most of its input.** Past some share, a
+rewrite stops correcting the producer's script and starts replacing it, and no
+per-sentence safety check notices, because each sentence individually looks
+like a fair fix. `FC Resolve` therefore stops offering to rewrite at all when
+more than 60% of at least 8 checkable statements fail, and reports instead.
+The findings still reach the producer in full — that is the producer's own
+"warn loudly, never block" — but the film is returned untouched.
+
+**A correction has to be visible or it is a silent edit.** The rewrite lands
+BEFORE segmentation, deliberately: at that moment no scene and no voice take
+exists, so a changed line costs nothing and desynchronises nothing (the whole
+of "A line and its recording drift apart silently" is about the other case).
+But it also means the producer opens the script gate looking at text a model
+changed without being asked. The panel above the box says so in bold and shows
+each sentence AS IT WAS, because the new wording is already in the box: the
+only way to see what changed is to be shown what it used to say.
+
+**Where the error rate actually lands.** On the Burj Al Arab film — a real
+documentary, 6 chapters, an 18-claim pack — the judge found 47 checkable
+statements, the pack backed 31, a targeted search sourced 16 more from
+Jumeirah's own pages, CTBUH and a Washington Post archive piece, and 8 were
+rewritten. Two of the eight are worth knowing by name, because they are the
+shape of the problem: *"including documented use of 24-carat gold leaf"* (the
+word "documented" was doing work no source supported — though the search then
+found Jumeirah's own page saying 1,790 m² of it, so the sentence survived with
+a citation), and *"9,000 tonnes of WHITE steel"*, where the pack gives the
+tonnage and nothing gives the colour. Neither is a hallucination in the usual
+sense. Both are a writer adding a true-sounding adjective to a sourced fact,
+which is what this check is really for.

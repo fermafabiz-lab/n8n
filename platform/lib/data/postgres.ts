@@ -23,6 +23,7 @@ import {
   type RawScene,
   type Scene,
   type ScriptInfo,
+  type FactCheckReport,
   type GenreProfile,
   type LibraryScript,
   type ScriptExample,
@@ -502,6 +503,30 @@ export async function getProjectEvidence(projectId: string): Promise<EvidenceRow
        from hov.evidence where project_id = $1 order by ref`,
     [projectId],
   );
+}
+
+/**
+ * The fact-check report Claude Scripting wrote for this film, or null.
+ *
+ * `report` is stored as jsonb and read straight through: its shape is
+ * documented in db/012_fact_check.sql and written by `FC Apply`, and the panel
+ * tolerates any subset of it. Deliberately NOT modelled field by field here —
+ * a report written by an older version of the workflow must still render, and
+ * a reader that insists on a shape is how an old row becomes a crash.
+ *
+ * Guarded by `tableReady`, like the stock tables: this reads on every project
+ * page, and before db/012 is applied an unguarded query would abort and take
+ * the page with it.
+ */
+export async function getFactCheck(projectId: string): Promise<FactCheckReport | null> {
+  if (!(await tableReady("hov.fact_check"))) return null;
+  const rows = await query<{ report: unknown; checked_at: string | null }>(
+    `select report, checked_at from hov.fact_check where project_id = $1`,
+    [projectId],
+  );
+  const r = rows[0];
+  if (!r || !r.report || typeof r.report !== "object") return null;
+  return { ...(r.report as FactCheckReport), checkedAt: r.checked_at ?? null };
 }
 
 export async function findRecentProjectByName(

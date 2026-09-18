@@ -183,6 +183,17 @@ export type WatermarkGeometry = {
 	label: {fontSize: number; padding: string};
 	source: {fontSize: number};
 	credit: {fontSize: number};
+	/**
+	 * The mark itself — the chip that opens into the pill.
+	 *
+	 * Sized here rather than derived in the component for the same reason
+	 * everything else on this object is: the site's `WatermarkPreview` draws
+	 * the badge from these numbers, and a preview whose geometry is read out
+	 * of JSX stops matching the film the first time someone nudges a padding.
+	 * `height` is the chip's side AND the pill's height, so the shape is
+	 * square when closed and a capsule when open.
+	 */
+	mark: {height: number; glyph: number; gap: number; padX: number};
 };
 
 export const WATERMARK_LAYOUT: {
@@ -198,6 +209,7 @@ export const WATERMARK_LAYOUT: {
 		label: {fontSize: 16, padding: '5px 12px'},
 		source: {fontSize: 13},
 		credit: {fontSize: 12},
+		mark: {height: 30, glyph: 15, gap: 8, padX: 10},
 	},
 	portrait: {
 		frame: {width: 720, height: 1280},
@@ -210,6 +222,7 @@ export const WATERMARK_LAYOUT: {
 		label: {fontSize: 17, padding: '5px 11px'},
 		source: {fontSize: 14},
 		credit: {fontSize: 13},
+		mark: {height: 32, glyph: 16, gap: 8, padX: 10},
 	},
 };
 
@@ -233,6 +246,18 @@ export const WATERMARK_STYLE = {
 	linePadding: '3px 9px',
 	lineLineHeight: 1.25,
 	textShadow: '0 2px 8px rgba(0,0,0,0.75)',
+	/** The chip's corner, as a fraction of its side. The pill's is always a
+	 *  half-height capsule, so only the closed end needs naming. */
+	chipRadiusRatio: 0.3,
+	/** Stroke width of the mark's border, and of the dashed variant. */
+	markBorderWidth: 1,
+	markBorderColor: 'rgba(255,255,255,0.55)',
+	/** How long the chip takes to open into the pill, in seconds, and how long
+	 *  it waits after the band's fade-in before starting. Short and
+	 *  un-bouncy on purpose: this is a label becoming legible, not an arrival
+	 *  — the same reasoning as the fade's `inOutCubic`. */
+	openDelaySeconds: 0.18,
+	openSeconds: 0.42,
 } as const;
 
 /**
@@ -247,16 +272,33 @@ export const WATERMARK_STYLE = {
 export type WatermarkBand = {
 	startSeconds: number;
 	endSeconds: number;
+	/** Which mark to draw. Carried on the band because two bands can share a
+	 *  label and differ in origin is impossible, but the reverse is not: a
+	 *  second archival band from another archive has the same origin and its
+	 *  own source line. The "open once" rule keys on THIS, not on the label. */
+	origin: VisualOrigin;
 	label: string;
 	source: string | null;
 	credit: string | null;
+	/**
+	 * Whether the badge opens into the full pill, or stays the small chip.
+	 *
+	 * Always true unless the producer asked for `openOncePerOrigin`, in which
+	 * case only the FIRST band of each origin opens and later ones are the
+	 * glyph alone — the film says "this is archival footage" once and then
+	 * just keeps a quiet mark in the corner.
+	 */
+	expand: boolean;
 };
 
 export const planWatermarkBands = (
 	scenes: {startSeconds: number; durationSeconds: number; provenance?: VisualProvenance}[],
-	opts: {showLabel: boolean},
+	opts: {showLabel: boolean; openOncePerOrigin?: boolean},
 ): WatermarkBand[] => {
 	const bands: WatermarkBand[] = [];
+	// Which origins have already had their say. Order of first appearance is
+	// what decides, so this is filled as the film runs, not precomputed.
+	const opened = new Set<VisualOrigin>();
 	for (const s of scenes) {
 		const p = s.provenance;
 		if (!p) continue;
@@ -265,17 +307,23 @@ export const planWatermarkBands = (
 		// With the label switched off only the licence obligation remains, so a
 		// scene that owes nothing draws nothing at all.
 		if (!opts.showLabel && !credit) continue;
+		const origin: VisualOrigin = p.visualOrigin ?? 'unknown';
 		const band: WatermarkBand = {
 			startSeconds: s.startSeconds,
 			endSeconds: s.startSeconds + s.durationSeconds,
+			origin,
 			label: opts.showLabel ? label : '',
 			source: opts.showLabel ? source : null,
 			credit,
+			// Decided AFTER the merge check below, so a band that merges into
+			// its predecessor cannot consume an origin's one opening.
+			expand: true,
 		};
 		const prev = bands[bands.length - 1];
 		if (
 			prev &&
 			Math.abs(prev.endSeconds - band.startSeconds) < 1e-6 &&
+			prev.origin === band.origin &&
 			prev.label === band.label &&
 			prev.source === band.source &&
 			prev.credit === band.credit
@@ -283,6 +331,10 @@ export const planWatermarkBands = (
 			prev.endSeconds = band.endSeconds;
 			continue;
 		}
+		if (opts.openOncePerOrigin) {
+			band.expand = !opened.has(origin);
+		}
+		opened.add(origin);
 		bands.push(band);
 	}
 	return bands;

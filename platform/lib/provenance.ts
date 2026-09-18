@@ -414,6 +414,12 @@ export interface WatermarkGeometry {
   label: { fontSize: number; padding: string };
   source: { fontSize: number };
   credit: { fontSize: number };
+  /**
+   * The mark itself — the chip that opens into the pill. `height` is the
+   * chip's side AND the pill's height, so the shape is square when closed and
+   * a capsule when open. Mirrored from remotion/src/provenance.ts.
+   */
+  mark: { height: number; glyph: number; gap: number; padX: number };
 }
 
 export const WATERMARK_LAYOUT: { landscape: WatermarkGeometry; portrait: WatermarkGeometry } = {
@@ -426,6 +432,7 @@ export const WATERMARK_LAYOUT: { landscape: WatermarkGeometry; portrait: Waterma
     label: { fontSize: 16, padding: "5px 12px" },
     source: { fontSize: 13 },
     credit: { fontSize: 12 },
+    mark: { height: 30, glyph: 15, gap: 8, padX: 10 },
   },
   portrait: {
     frame: { width: 720, height: 1280 },
@@ -436,6 +443,7 @@ export const WATERMARK_LAYOUT: { landscape: WatermarkGeometry; portrait: Waterma
     label: { fontSize: 17, padding: "5px 11px" },
     source: { fontSize: 14 },
     credit: { fontSize: 13 },
+    mark: { height: 32, glyph: 16, gap: 8, padX: 10 },
   },
 };
 
@@ -458,6 +466,14 @@ export const WATERMARK_STYLE = {
   linePadding: "3px 9px",
   lineLineHeight: 1.25,
   textShadow: "0 2px 8px rgba(0,0,0,0.75)",
+  /** The chip's corner as a fraction of its side; the pill's is a capsule. */
+  chipRadiusRatio: 0.3,
+  markBorderWidth: 1,
+  markBorderColor: "rgba(255,255,255,0.55)",
+  /** How the chip opens, in seconds. Mirrored — the preview animates the same
+   *  way the film does, or it is showing a different overlay. */
+  openDelaySeconds: 0.18,
+  openSeconds: 0.42,
 } as const;
 
 /**
@@ -502,16 +518,27 @@ export function attributionFor(p: VisualProvenance | null | undefined): string |
 export interface WatermarkBand {
   startSeconds: number;
   endSeconds: number;
+  /** Which mark to draw, and what the "open once" rule keys on. */
+  origin: VisualOrigin;
   label: string;
   source: string | null;
   credit: string | null;
+  /**
+   * Whether the badge opens into the full pill or stays the small chip.
+   * Always true unless `openOncePerOrigin` was asked for, in which case only
+   * the FIRST band of each origin opens.
+   */
+  expand: boolean;
 }
 
 export function planWatermarkBands(
   scenes: readonly { startSeconds: number; durationSeconds: number; provenance?: VisualProvenance | null }[],
-  opts: { showLabel: boolean },
+  opts: { showLabel: boolean; openOncePerOrigin?: boolean },
 ): WatermarkBand[] {
   const bands: WatermarkBand[] = [];
+  // Which origins have already had their say. Filled as the film runs, so
+  // order of first appearance is what decides.
+  const opened = new Set<VisualOrigin>();
   for (const s of scenes) {
     const p = s.provenance;
     if (!p) continue;
@@ -520,17 +547,23 @@ export function planWatermarkBands(
     // With the label switched off only the licence obligation remains, so a
     // scene that owes nothing draws nothing at all.
     if (!opts.showLabel && !credit) continue;
+    const origin: VisualOrigin = p.visualOrigin ?? "unknown";
     const band: WatermarkBand = {
       startSeconds: s.startSeconds,
       endSeconds: s.startSeconds + s.durationSeconds,
+      origin,
       label: opts.showLabel ? label : "",
       source: opts.showLabel ? source : null,
       credit,
+      // Decided AFTER the merge check below, so a band that merges into its
+      // predecessor cannot consume an origin's one opening.
+      expand: true,
     };
     const prev = bands[bands.length - 1];
     if (
       prev &&
       Math.abs(prev.endSeconds - band.startSeconds) < 1e-6 &&
+      prev.origin === band.origin &&
       prev.label === band.label &&
       prev.source === band.source &&
       prev.credit === band.credit
@@ -538,6 +571,10 @@ export function planWatermarkBands(
       prev.endSeconds = band.endSeconds;
       continue;
     }
+    if (opts.openOncePerOrigin) {
+      band.expand = !opened.has(origin);
+    }
+    opened.add(origin);
     bands.push(band);
   }
   return bands;

@@ -36,6 +36,12 @@
 
 import { useMemo, useState } from "react";
 import {
+  DASHED_ORIGINS,
+  GLYPH_STROKE,
+  GLYPH_VIEWBOX,
+  ORIGIN_GLYPHS,
+} from "@/lib/provenance-glyphs";
+import {
   planWatermarkBands,
   WATERMARK_LAYOUT,
   WATERMARK_STYLE,
@@ -86,26 +92,70 @@ function Badge({ band, g }: { band: WatermarkBand; g: WatermarkGeometry }) {
       }}
     >
       {band.label ? (
+        /* The mark as the film draws it: the glyph in a chip, opened into a
+           capsule — or left as a chip when the band does not expand, which is
+           what "announce each source once" looks like from the second band on.
+           Static here on purpose: the preview answers "what will be on
+           screen", and a looping animation in a settings panel competes with
+           the decision being made. */
         <span
           style={{
-            fontFamily: KICKER_STACK,
-            fontSize: g.label.fontSize,
-            fontWeight: WATERMARK_STYLE.labelWeight,
-            letterSpacing: WATERMARK_STYLE.labelLetterSpacing,
-            color: WATERMARK_STYLE.labelColor,
+            display: "inline-flex",
+            alignItems: "center",
+            boxSizing: "border-box",
+            height: g.mark.height,
+            paddingLeft: band.expand ? g.mark.padX : (g.mark.height - g.mark.glyph) / 2,
+            paddingRight: band.expand ? g.mark.padX * 1.15 : 0,
+            width: band.expand ? undefined : g.mark.height,
+            borderRadius: band.expand
+              ? g.mark.height / 2
+              : g.mark.height * WATERMARK_STYLE.chipRadiusRatio,
             background: WATERMARK_STYLE.labelBackground,
-            border: WATERMARK_STYLE.labelBorder,
-            borderRadius: WATERMARK_STYLE.labelRadius,
-            padding: g.label.padding,
-            textShadow: WATERMARK_STYLE.textShadow,
-            lineHeight: WATERMARK_STYLE.labelLineHeight,
+            border: `${WATERMARK_STYLE.markBorderWidth}px ${
+              DASHED_ORIGINS.has(band.origin) ? "dashed" : "solid"
+            } ${WATERMARK_STYLE.markBorderColor}`,
+            color: WATERMARK_STYLE.labelColor,
+            overflow: "hidden",
             whiteSpace: "nowrap",
           }}
         >
-          {band.label}
+          <svg
+            width={g.mark.glyph}
+            height={g.mark.glyph}
+            viewBox={`0 0 ${GLYPH_VIEWBOX} ${GLYPH_VIEWBOX}`}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={GLYPH_STROKE}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ flex: "none", display: "block" }}
+          >
+            {ORIGIN_GLYPHS[band.origin].map((d, i) =>
+              d.filled ? (
+                <path key={i} d={d.d} fill="currentColor" stroke="none" />
+              ) : (
+                <path key={i} d={d.d} />
+              ),
+            )}
+          </svg>
+          {band.expand ? (
+            <span
+              style={{
+                marginLeft: g.mark.gap,
+                fontFamily: KICKER_STACK,
+                fontSize: g.label.fontSize,
+                fontWeight: WATERMARK_STYLE.labelWeight,
+                letterSpacing: WATERMARK_STYLE.labelLetterSpacing,
+                lineHeight: WATERMARK_STYLE.labelLineHeight,
+                textShadow: WATERMARK_STYLE.textShadow,
+              }}
+            >
+              {band.label}
+            </span>
+          ) : null}
         </span>
       ) : null}
-      {band.source ? (
+      {band.source && band.expand ? (
         <span
           style={{
             fontFamily: KICKER_STACK,
@@ -147,12 +197,16 @@ export default function WatermarkPreview({
   scenes,
   aspectRatio,
   showLabel,
+  openOncePerOrigin = false,
 }: {
   scenes: readonly PreviewScene[];
   /** The project's Format. Anything but "9:16" is drawn landscape. */
   aspectRatio: string | null | undefined;
   /** The live state of the Source watermark toggle. */
   showLabel: boolean;
+  /** Mirror of the Editing Options switch, so the preview collapses the
+   *  repeats exactly as the film will. */
+  openOncePerOrigin?: boolean;
 }) {
   const [at, setAt] = useState(0);
   const portrait = String(aspectRatio ?? "").trim() === "9:16";
@@ -165,9 +219,9 @@ export default function WatermarkPreview({
     () =>
       planWatermarkBands(
         scenes.map((s, i) => ({ startSeconds: i, durationSeconds: 1, provenance: s.provenance })),
-        { showLabel },
+        { showLabel, openOncePerOrigin },
       ),
-    [scenes, showLabel],
+    [scenes, showLabel, openOncePerOrigin],
   );
 
   // The toggle changes how many bands there are, so a held index can point

@@ -88,6 +88,13 @@ const OPTIONS: Array<{
     icon: "🔎",
   },
   {
+    key: "watermarkOpenOnce",
+    label: "Announce each source once",
+    on: "The first archival shot says ARCHIVAL FOOTAGE in full; the rest keep just the small mark",
+    off: "Every run of shots announces its source in full",
+    icon: "1️⃣",
+  },
+  {
     key: "music",
     label: "Music",
     on: "A background track plus whoosh/boom accents at the cuts — composed here, unrelated to what the scenes show",
@@ -339,6 +346,11 @@ export default function FinalSettings({
                         scenes={watermarkScenes}
                         aspectRatio={aspectRatio}
                         showLabel={on}
+                        // Read from the live draft, not from `initial`: the
+                        // two switches sit in the same list and the preview
+                        // has to answer for the pair the producer is looking
+                        // at right now.
+                        openOncePerOrigin={opts.watermarkOpenOnce === true}
                       />
                     )}
                   </div>

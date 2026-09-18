@@ -24,6 +24,7 @@ const {
 	planWatermarkBands,
 	providerLabel,
 } = await import(join(root, 'src', 'provenance.ts'));
+const {ORIGIN_GLYPHS} = await import(join(root, 'src', 'provenanceGlyphs.ts'));
 
 const results = [];
 const check = (name, got, want) => {
@@ -156,6 +157,7 @@ check('the landscape geometry', WATERMARK_LAYOUT.landscape, {
 	label: {fontSize: 16, padding: '5px 12px'},
 	source: {fontSize: 13},
 	credit: {fontSize: 12},
+	mark: {height: 30, glyph: 15, gap: 8, padX: 10},
 });
 check('the portrait geometry, lifted clear of the platform chrome', WATERMARK_LAYOUT.portrait, {
 	frame: {width: 720, height: 1280},
@@ -166,6 +168,7 @@ check('the portrait geometry, lifted clear of the platform chrome', WATERMARK_LA
 	label: {fontSize: 17, padding: '5px 11px'},
 	source: {fontSize: 14},
 	credit: {fontSize: 13},
+	mark: {height: 32, glyph: 16, gap: 8, padX: 10},
 });
 // The frame is the render's real size and not 1080p (Root.tsx), which is the
 // one thing a preview cannot guess: at 1080p the badge would be drawn half
@@ -179,3 +182,48 @@ check('the badge never reaches full opacity', WATERMARK_STYLE.peakOpacity, 0.88)
 
 console.log(`\n${results.filter(Boolean).length}/${results.length} passed`);
 process.exit(results.every(Boolean) ? 0 : 1);
+
+// --- "announce each source once" -------------------------------------------
+// MIRRORED with platform/scripts/check-footage.mjs. The switch collapses
+// REPEATS of a kind, never a kind's first appearance and never a credit.
+const arch2 = {visualOrigin: 'archival_footage', provider: 'loc'};
+check(
+	'every band expands unless asked otherwise',
+	planWatermarkBands([scene(0, 8, arch), scene(8, 8, ai), scene(16, 8, arch2)], {showLabel: true}).map((b) => b.expand),
+	[true, true, true],
+);
+check(
+	'open once: the first band of each origin opens, later ones stay chips',
+	planWatermarkBands([scene(0, 8, arch), scene(8, 8, ai), scene(16, 8, arch2)], {
+		showLabel: true,
+		openOncePerOrigin: true,
+	}).map((b) => b.expand),
+	[true, true, false],
+);
+check(
+	'open once: a different ARCHIVE is still the same kind of source',
+	planWatermarkBands([scene(0, 8, arch), scene(8, 8, arch2)], {showLabel: true, openOncePerOrigin: true}).map(
+		(b) => [b.origin, b.expand],
+	),
+	[['archival_footage', true], ['archival_footage', false]],
+);
+check(
+	'open once: merged consecutive scenes are ONE band and consume one opening',
+	planWatermarkBands([scene(0, 8, arch), scene(8, 8, arch)], {showLabel: true, openOncePerOrigin: true}).map(
+		(b) => b.expand,
+	),
+	[true],
+);
+check(
+	'open once never reaches the licence credit',
+	planWatermarkBands([scene(0, 8, archCredited), scene(8, 8, arch2)], {
+		showLabel: true,
+		openOncePerOrigin: true,
+	}).map((b) => [b.expand, Boolean(b.credit)]),
+	[[true, true], [false, false]],
+);
+check(
+	'every origin has a glyph',
+	Object.keys(ORIGIN_LABELS).filter((o) => !(ORIGIN_GLYPHS[o] || []).length),
+	[],
+);

@@ -1,12 +1,21 @@
 import React from 'react';
-import {AbsoluteFill, useCurrentFrame, useVideoConfig} from 'remotion';
+import {
+	AbsoluteFill,
+	continueRender,
+	delayRender,
+	interpolate,
+	useCurrentFrame,
+	useVideoConfig,
+} from 'remotion';
 import {CURVES, eased} from '../easing';
 import {
 	planWatermarkBands,
 	WATERMARK_LAYOUT,
 	WATERMARK_STYLE,
+	type VisualOrigin,
 	type VisualProvenance,
 } from '../provenance';
+import {DASHED_ORIGINS, GLYPH_STROKE, GLYPH_VIEWBOX, ORIGIN_GLYPHS} from '../provenanceGlyphs';
 import type {StylePreset} from '../style';
 
 /**
@@ -40,23 +49,150 @@ import type {StylePreset} from '../style';
  *  on the scene's first frames — the spec's 150–250 ms window. */
 const FADE = 0.2;
 
+/**
+ * One provenance glyph, drawn at `size` in the current colour.
+ *
+ * `currentColor` rather than a literal white: the same mark has to work on a
+ * light scrim the day a blown-out shot needs one, and the pack ships a black
+ * copy precisely because a flattened PNG cannot do that.
+ */
+const Glyph: React.FC<{origin: VisualOrigin; size: number}> = ({origin, size}) => (
+	<svg
+		width={size}
+		height={size}
+		viewBox={`0 0 ${GLYPH_VIEWBOX} ${GLYPH_VIEWBOX}`}
+		fill="none"
+		stroke="currentColor"
+		strokeWidth={GLYPH_STROKE}
+		strokeLinecap="round"
+		strokeLinejoin="round"
+		style={{flex: 'none', display: 'block'}}
+	>
+		{ORIGIN_GLYPHS[origin].map((p, i) =>
+			p.filled ? (
+				<path key={i} d={p.d} fill="currentColor" stroke="none" />
+			) : (
+				<path key={i} d={p.d} />
+			),
+		)}
+	</svg>
+);
+
+/**
+ * The badge itself: a square chip holding the glyph, which opens sideways into
+ * a capsule carrying the label.
+ *
+ * The pill is BUILT rather than drawn from the pack's pill PNG, because a real
+ * opening needs the width and the corner radius to be live values — two
+ * flattened images can only be cross-faded, and a cross-fade reads as one mark
+ * replacing another rather than as the same mark opening.
+ *
+ * The label's width is MEASURED, not estimated from its character count: the
+ * eight labels differ by more than half a pill's width ("ARCHIVAL PHOTO"
+ * against "ILLUSTRATIVE FOOTAGE"), and a guess clips the long ones. Remotion's
+ * `delayRender` holds the first frame until the browser has laid the text out,
+ * so every frame of the render agrees on the same number.
+ */
+const Mark: React.FC<{
+	origin: VisualOrigin;
+	label: string;
+	geom: {height: number; glyph: number; gap: number; padX: number};
+	fontSize: number;
+	fontFamily: string;
+	/** 0 = chip, 1 = pill. */
+	open: number;
+}> = ({origin, label, geom, fontSize, fontFamily, open}) => {
+	const textRef = React.useRef<HTMLSpanElement>(null);
+	const [textWidth, setTextWidth] = React.useState(0);
+	const [handle] = React.useState(() => delayRender(`watermark label: ${label}`));
+	React.useLayoutEffect(() => {
+		setTextWidth(textRef.current?.getBoundingClientRect().width ?? 0);
+		continueRender(handle);
+	}, [handle]);
+
+	const {height, glyph, gap, padX} = geom;
+	const pillWidth = padX + glyph + gap + textWidth + padX * 1.15;
+	const width = interpolate(open, [0, 1], [height, pillWidth]);
+	const radius = interpolate(open, [0, 1], [height * WATERMARK_STYLE.chipRadiusRatio, height / 2]);
+	// The label uncovers from the glyph outward, clipped by the container, so
+	// it reads as the mark opening rather than as a second element arriving.
+	const reveal = interpolate(open, [0.25, 0.85], [0, 1], {
+		extrapolateLeft: 'clamp',
+		extrapolateRight: 'clamp',
+	});
+
+	return (
+		<div
+			style={{
+				position: 'relative',
+				boxSizing: 'border-box',
+				height,
+				width,
+				display: 'flex',
+				alignItems: 'center',
+				paddingLeft: interpolate(open, [0, 1], [(height - glyph) / 2, padX]),
+				borderRadius: radius,
+				background: WATERMARK_STYLE.labelBackground,
+				border: `${WATERMARK_STYLE.markBorderWidth}px ${
+					DASHED_ORIGINS.has(origin) ? 'dashed' : 'solid'
+				} ${WATERMARK_STYLE.markBorderColor}`,
+				color: WATERMARK_STYLE.labelColor,
+				overflow: 'hidden',
+				whiteSpace: 'nowrap',
+			}}
+		>
+			<Glyph origin={origin} size={glyph} />
+			<span
+				ref={textRef}
+				style={{
+					marginLeft: gap,
+					fontFamily,
+					fontSize,
+					fontWeight: WATERMARK_STYLE.labelWeight,
+					letterSpacing: WATERMARK_STYLE.labelLetterSpacing,
+					lineHeight: WATERMARK_STYLE.labelLineHeight,
+					color: WATERMARK_STYLE.labelColor,
+					textShadow: WATERMARK_STYLE.textShadow,
+					opacity: reveal,
+				}}
+			>
+				{label}
+			</span>
+		</div>
+	);
+};
+
 export const SourceWatermark: React.FC<{
 	scenes: {startSeconds: number; durationSeconds: number; provenance?: VisualProvenance}[];
 	preset: StylePreset;
 	/** False = the producer switched the label off. Credits still draw. */
 	showLabel: boolean;
+	/**
+	 * Open the pill only the FIRST time each kind of source appears; every
+	 * later band of that kind stays the small chip. The producer's switch —
+	 * a documentary that runs twenty archive shots says "ARCHIVAL FOOTAGE"
+	 * once and then keeps a quiet mark in the corner.
+	 */
+	openOncePerOrigin?: boolean;
 	/** Vertical (9:16): lift clear of the platform's own bottom chrome. */
 	portrait?: boolean;
 	/** Hide while the hook title owns the frame, exactly as captions do. */
 	suppressUntilSeconds?: number;
-}> = ({scenes, preset, showLabel, portrait = false, suppressUntilSeconds = 0}) => {
+}> = ({
+	scenes,
+	preset,
+	showLabel,
+	openOncePerOrigin = false,
+	portrait = false,
+	suppressUntilSeconds = 0,
+}) => {
 	const frame = useCurrentFrame();
 	const {fps} = useVideoConfig();
 	const seconds = frame / fps;
 
 	const bands = React.useMemo(
-		() => planWatermarkBands(scenes, {showLabel}),
-		[scenes, showLabel],
+		() => planWatermarkBands(scenes, {showLabel, openOncePerOrigin}),
+		[scenes, showLabel, openOncePerOrigin],
 	);
 
 	if (seconds < suppressUntilSeconds) return null;
@@ -75,6 +211,29 @@ export const SourceWatermark: React.FC<{
 	// Geometry lives in provenance.ts so the site's preview can mirror ONE
 	// named constant instead of numbers read out of this JSX.
 	const g = portrait ? WATERMARK_LAYOUT.portrait : WATERMARK_LAYOUT.landscape;
+
+	// Opens once, just after the fade has brought it up, and STAYS open for
+	// the rest of the band — it does not breathe shut and open again at every
+	// cut, which is the same reason consecutive scenes are merged into one
+	// band in the first place.
+	//
+	// A band shorter than the animation would otherwise be caught mid-open at
+	// its own fade-out, so the opening is compressed to fit rather than
+	// truncated: better a quick open than a pill frozen half-drawn.
+	const bandLength = band ? band.endSeconds - band.startSeconds : 0;
+	const openSpan = Math.min(
+		WATERMARK_STYLE.openSeconds,
+		Math.max(0.12, bandLength - WATERMARK_STYLE.openDelaySeconds - FADE),
+	);
+	const open =
+		band && band.expand
+			? eased(
+					seconds - band.startSeconds - WATERMARK_STYLE.openDelaySeconds,
+					[0, openSpan],
+					[0, 1],
+					CURVES.inOutCubic,
+				)
+			: 0;
 
 	// Bottom-LEFT, on the same left edge the captions keep, and below the band
 	// they occupy: captions are bottom-anchored at 84 (landscape) / 280
@@ -96,25 +255,20 @@ export const SourceWatermark: React.FC<{
 				}}
 			>
 				{band.label ? (
-					<span
-						style={{
-							fontFamily: preset.kickerFont,
-							fontSize: g.label.fontSize,
-							fontWeight: WATERMARK_STYLE.labelWeight,
-							letterSpacing: WATERMARK_STYLE.labelLetterSpacing,
-							color: WATERMARK_STYLE.labelColor,
-							background: WATERMARK_STYLE.labelBackground,
-							border: WATERMARK_STYLE.labelBorder,
-							borderRadius: WATERMARK_STYLE.labelRadius,
-							padding: g.label.padding,
-							textShadow: WATERMARK_STYLE.textShadow,
-							lineHeight: WATERMARK_STYLE.labelLineHeight,
-						}}
-					>
-						{band.label}
-					</span>
+					<Mark
+						origin={band.origin}
+						label={band.label}
+						geom={g.mark}
+						fontSize={g.label.fontSize}
+						fontFamily={preset.kickerFont}
+						open={open}
+					/>
 				) : null}
-				{band.source ? (
+				{/* The source line belongs to the label: a chip with a long
+				    "Source: …" line under it reads as a broken pill rather than
+				    a deliberate one. The CREDIT below is different — a licence
+				    obligation, drawn whatever the switches say. */}
+				{band.source && band.expand ? (
 					<span
 						style={{
 							fontFamily: preset.kickerFont,

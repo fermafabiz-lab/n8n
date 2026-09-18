@@ -232,3 +232,46 @@ body byte-identical to `paste/Assign Accounts.js`.
 **Still owed:** a pool run that reaches the end of a film. Nothing above shows
 the pool finishing; it shows it working for ten ticks and then hitting a bug in
 a node it does not own.
+
+## Second pool run: the film finishes (execution 14645, 2026-09-18 10:44)
+
+Same film, with the anchor fix live (`2d3f0f86`). This was exactly the case that
+broke run 14618 — a second pass over a partly-finished film, where
+`Sort & Cap Scenes` moves the finished scenes to the back and every block
+boundary shifts.
+
+**Result: 9 of 9 scenes have a clip, and `wrong_account` is 0.** Every clip is
+minted on the account that owns its own scene's image. No `Email mismatch`.
+
+The five clips this run produced, from a 10:44:55 start:
+
+| scene | account | landed |
+|---|---|---|
+| 101 | `houseofvideos01` | 10:47:02 |
+| 103 | `houseofvideos02` | 10:49:07 |
+| 3 | `fermafabiz` | 10:49:55 |
+| 104 | `houseofvideos02` | 10:50:46 |
+| 105 | `houseofvideos02` | 10:52:34 |
+
+**What this does and does not measure.** Five clips in 7m39, against a per-clip
+latency of roughly two minutes — so about 92 s per clip end to end. That is
+better than serial, but it is NOT the 3x the three accounts suggest, and the
+reason is visible in the table: the work left on this film was 1 clip on the
+primary, 1 on account 01 and **3 on account 02**. At one job per account, those
+three are strictly serial, and they are the critical path. The pool cannot beat
+an uneven remainder.
+
+**So the honest claim is correctness, not speed.** The pool runs a film to
+completion, writes every clip to the right scene on the right account, survives
+a second pass, and interleaves across accounts. A real speed measurement needs a
+film whose clip work is EVENLY divided — which means measuring on a first pass,
+where `Assign Accounts` splits the scenes into equal blocks, not on a remainder.
+
+**Still owed:**
+
+1. A first-pass film with `videoPool: true` and enough scenes for the blocks to be
+   even, timed against the same film with the flag off. That is the only number
+   that answers "does a film finish sooner".
+2. The probe for whether one account holds two generations at once, before
+   `videoPoolPerAccount` goes above 1. With an even split that is what turns 3
+   in flight into 6.

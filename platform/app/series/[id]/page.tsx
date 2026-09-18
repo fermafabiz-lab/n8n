@@ -4,6 +4,7 @@ import { getSeries, getSeriesEpisodes, getSeriesRefsUnion, getSheetMediaUrls } f
 import { getCategory } from "@/lib/categories";
 import SeriesCharacter from "@/components/SeriesCharacter";
 import SeriesNotes from "@/components/SeriesNotes";
+import SeriesFaces from "@/components/SeriesFaces";
 import { initials } from "@/lib/series";
 import s from "@/components/SeriesCast.module.css";
 
@@ -34,6 +35,24 @@ export default async function SeriesPage({ params }: { params: Promise<{ id: str
     ...Object.values(series.refs.objectRefs),
   ];
   const media = await getSheetMediaUrls(flowIds);
+  /*
+   * Two different absences, and only one of them is a fault.
+   *
+   * `missing` is a sheet that EXISTS on Flow and whose bytes we never kept —
+   * every one of those is one API call away (db/port/sheet-backfill), which
+   * is what the panel's button does. `undrawn` is a bible entry the pipeline
+   * never drew a sheet for at all, and for objects that is the rule rather
+   * than an oversight: `Cast Sheet Prep` draws one only for an object that
+   * appears in two or more scenes, at most three per film. A prop seen once
+   * shows its initials on purpose, and a button that claimed to fix that
+   * would be lying.
+   */
+  const uniqueIds = [...new Set(flowIds.filter(Boolean))];
+  const missingFaces = uniqueIds.filter((id) => !media[id]).length;
+  const undrawnFaces =
+    series.bible.characters.filter((c) => !series.refs.castSheets[c.name]).length +
+    series.bible.locations.filter((l) => !series.refs.locationPlates[l.name]).length +
+    series.bible.objects.filter((o) => !series.refs.objectRefs[o.name]).length;
   const cat = getCategory(series.category);
   const style = series.settings.categoryOptions.visual_style;
 
@@ -84,6 +103,10 @@ export default async function SeriesPage({ params }: { params: Promise<{ id: str
           </div>
         </div>
 
+        {/* Above the sections rather than inside "The cast", because one
+            press fetches the plates and the object sheets too. */}
+        <SeriesFaces seriesId={series.id} missing={missingFaces} undrawn={undrawnFaces} />
+
         <section className="fsec">
           <header>
             <h2>The cast</h2>
@@ -107,15 +130,10 @@ export default async function SeriesPage({ params }: { params: Promise<{ id: str
               })}
             </div>
           )}
-          {Object.keys(series.refs.castSheets).length > 0 &&
-            Object.values(series.refs.castSheets).every((c) => !media[c.id]) && (
-              <p className={s.hint} style={{ marginTop: 14 }}>
-                The sheets exist and the pipeline reuses them; their pictures were made before the site
-                started keeping a copy. They are not lost — Flow will hand each one back from its id
-                (see db/port/sheet-backfill), and a session with the n8n connector can fetch them in
-                about a minute. Sheets drawn from now on are kept as they are made.
-              </p>
-            )}
+          {/* The cast-only hint that used to sit here is gone: it explained
+              the same absence in words, for one of the three kinds, and told
+              the producer to fetch a session rather than press a button.
+              SeriesFaces above covers all three and does the fetching. */}
         </section>
 
         {series.bible.locations.length > 0 && (

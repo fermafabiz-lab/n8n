@@ -36,6 +36,7 @@ import {
   updateSeriesCharacter,
   updateSeriesBible,
   getSeriesRefsUnion,
+  getSheetMediaUrls,
 } from "@/lib/data";
 import {
   composeSeriesLore,
@@ -2919,6 +2920,107 @@ export async function createSeriesFromProject(formData: FormData): Promise<void>
   revalidatePath("/series");
   revalidatePath(`/projects/${src.id}`);
   redirect(`/series/${id}`);
+}
+
+/**
+ * Fire the standalone sheet-backfill webhook. One owner, same rule as every
+ * other: derived from `N8N_NEW_PROJECT_WEBHOOK_URL` by swapping the last path
+ * segment, so all seven live on one host and a copy that spells the segment
+ * differently fails against a 404.
+ *
+ * The timeout is minutes rather than the usual 15s because this one WAITS:
+ * n8n answers when the last node has run, which is one Flow call and one
+ * ingest per sheet. A show carries at most six cast sheets, ten plates and
+ * three objects, and ten of them measured 2.2s end to end.
+ */
+async function fireSheetBackfillWebhook(seriesId: string): Promise<"sent" | "off"> {
+  const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
+  const webhook =
+    process.env.N8N_SHEET_BACKFILL_WEBHOOK_URL ??
+    newProject?.replace(/new-project\/?$/, "sheet-backfill");
+  if (!webhook?.includes("sheet-backfill")) return "off";
+  const res = await fetch(webhook, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ series_id: seriesId }),
+    signal: AbortSignal.timeout(180_000),
+  });
+  if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
+  return "sent";
+}
+
+/** How many of this show's reference sheets we hold the bytes of. */
+async function countFaces(seriesId: string): Promise<{ referenced: number; kept: number }> {
+  const refs = await getSeriesRefsUnion(seriesId);
+  const ids = [
+    ...Object.values(refs.castSheets).map((c) => c.id),
+    ...Object.values(refs.locationPlates).map((p) => p.id),
+    ...Object.values(refs.objectRefs),
+  ].filter(Boolean);
+  const media = await getSheetMediaUrls(ids);
+  return { referenced: new Set(ids).size, kept: Object.keys(media).length };
+}
+
+/**
+ * Bring back the pictures of sheets whose bytes were never kept.
+ *
+ * The repo believed for two days that these were gone: Flow's signed URL dies
+ * within hours, so a sheet drawn before the ingest went live (2026-09-17
+ * 11:33 UTC) had no picture anyone could show. The URL dies; the ASSET does
+ * not — `GET api.useapi.net/v1/google-flow/assets/{mediaGenerationId}` mints a
+ * fresh one at any time. `db/port/sheet-backfill/README.md` has the account of
+ * how that was found, and the n8n workflow this fires is what uses it.
+ *
+ * The COUNT is taken here rather than read out of n8n's answer, and that is
+ * deliberate: the database is the thing the page renders from, so counting it
+ * before and after cannot disagree with what the producer then sees. n8n's
+ * body is advisory.
+ *
+ * Idempotent by construction — the worker's query only selects sheets with no
+ * `sheet_media` row — so pressing it twice is free, and pressing it on a show
+ * that has everything answers honestly instead of pretending to work.
+ */
+export async function bringBackFaces(seriesId: string): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was fetched." };
+  }
+  try {
+    const before = await countFaces(seriesId);
+    if (before.referenced === before.kept) {
+      return {
+        ok: true,
+        message: "Every sheet this show references already has its picture.",
+      };
+    }
+    const sent = await fireSheetBackfillWebhook(seriesId);
+    if (sent === "off") {
+      return {
+        ok: false,
+        message:
+          "No sheet-backfill webhook is configured here, so there is nothing to ask — check N8N_NEW_PROJECT_WEBHOOK_URL.",
+      };
+    }
+    const after = await countFaces(seriesId);
+    revalidatePath(`/series/${seriesId}`);
+    const brought = after.kept - before.kept;
+    const left = after.referenced - after.kept;
+    if (brought <= 0) {
+      return {
+        ok: false,
+        message:
+          "Flow did not hand those back. The sheets are still attached to every episode, so the films are unaffected — try again later, and see db/port/sheet-backfill if it keeps failing.",
+      };
+    }
+    return {
+      ok: true,
+      message:
+        left > 0
+          ? `${brought} picture${brought === 1 ? "" : "s"} came back. ${left} did not — Flow no longer answers for ${left === 1 ? "that one" : "those"}.`
+          : `${brought} picture${brought === 1 ? "" : "s"} came back.`,
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
 }
 
 export async function saveSeriesNotes(

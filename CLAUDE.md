@@ -120,7 +120,10 @@ Webhooks the site calls: `new-project`, `resume-project`, `restart-scripting`
 outlives the site's 15-second fetch), `assemble`, and the single-purpose ones — `expand-brief`, `yt-scene-titles`,
 `upscale-film`, `list-music`/`share-music`, `archive-suggest`, `hook-regen`,
 `series-recap` (its own workflow `4jVkQjpr7terqQhY`, fired by `approveScript`
-for an episode of a series — `db/port/series-recap/`). The site derives all of them from `N8N_NEW_PROJECT_WEBHOOK_URL`
+for an episode of a series — `db/port/series-recap/`), `sheet-backfill`
+(workflow `IGWjknKcffnGlOmV`, fired by the series page's "Bring the pictures
+back" — `db/port/sheet-backfill/`; it is the one webhook the site WAITS on,
+because the count it reports is taken from the database after n8n is done). The site derives all of them from `N8N_NEW_PROJECT_WEBHOOK_URL`
 by string-replacing the last path segment, so they must live on the same host
 — and each new one must be a plain `path` with no path parameters, or the
 derived URL will not resolve.

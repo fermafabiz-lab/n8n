@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
+import { useSearchParams } from "next/navigation";
 import { deleteProjects, type ActionResult } from "@/app/actions";
 import ExpandableTitle from "@/components/ExpandableTitle";
 import type { Project, StatusKind } from "@/lib/data";
+import { LIBRARY_FILTERS as FILTERS, isFilterKey, type FilterKey } from "@/lib/library-filters";
 import { CREATORS } from "@/lib/data/derive";
 import { mediaSrc } from "@/lib/media";
 
@@ -37,25 +39,15 @@ function badgeClass(p: Project): string {
   return p.statusKind;
 }
 
-type FilterKey = "all" | StatusKind | "topost";
-
-const FILTERS: Array<{ key: FilterKey; label: string }> = [
-  { key: "all", label: "All" },
-  { key: "wait", label: "Needs you" },
-  { key: "run", label: "Rendering" },
-  { key: "done", label: "Finished" },
-  // Finished films marked "Ready to post" in the Publishing panel — the tab
-  // that answers "what is left to upload". Appears only when non-empty, like
-  // every other tab.
-  { key: "topost", label: "To post" },
-  { key: "err", label: "Failed" },
-  // Anything whose status the map does not recognise. Without this tab those
-  // projects were counted in "All" and reachable from no tab at all, so the
-  // numbers across the top could not be made to add up — and a project you
-  // cannot open is a project you cannot delete either. The label stays vague
-  // because the bucket is: every card in it shows its own status text.
-  { key: "idle", label: "Other" },
-];
+/**
+ * Every status a card can wear must have a tab, or its projects are counted
+ * in "All" and reachable from nowhere — the fault the "Other" tab was added
+ * to cure. The list moved to lib/library-filters.ts so a link can be checked
+ * against it; this keeps the tie to StatusKind that the old local type had.
+ */
+type _EveryKindHasATab = Exclude<StatusKind, FilterKey> extends never ? true : never;
+const _everyKindHasATab: _EveryKindHasATab = true;
+void _everyKindHasATab;
 
 const isToPost = (p: Project) =>
   p.statusKind === "done" && p.publishing.state === "ready";
@@ -133,6 +125,26 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
   const [msg, setMsg] = useState<ActionResult | null>(null);
   const [pending, startTransition] = useTransition();
   const [filter, setFilter] = useState<FilterKey>("all");
+  /**
+   * The chosen tab lives in the URL, which is what makes it linkable.
+   *
+   * It did not, and that is why the hero's "Everything waiting on me" was a
+   * dead button: it pointed at `/projects?filter=wait` and NOTHING read that
+   * param — the tab was `useState("all")` and nothing else, so the link
+   * changed the address bar and not one pixel of the page. Reading it is the
+   * fix. Writing it back on every tab click is what keeps the two from
+   * drifting apart, and it also cures a smaller bug nobody had reported: the
+   * 15s refresh used to drop the chosen tab back to All.
+   *
+   * `useSearchParams` rather than a mount-time read of `location`, because
+   * the hero link goes from /projects to /projects — a soft navigation that
+   * leaves this component mounted, so an effect that only ran on mount would
+   * never fire and the button would still do nothing.
+   */
+  const searchParams = useSearchParams();
+  const urlFilter = searchParams.get("filter");
+  /** Set by our own tab clicks, so they do not count as "take me there". */
+  const selfSet = useRef(false);
   const [view, setView] = useState<"grid" | "list">("grid");
   /** Filters title and category live, exactly as the design's search does. */
   const [query, setQuery] = useState("");
@@ -239,6 +251,42 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
   const from = (current - 1) * PAGE_SIZE;
   const shown = matched.slice(from, from + PAGE_SIZE);
 
+  useEffect(() => {
+    if (!isFilterKey(urlFilter)) return;
+    setFilter(urlFilter);
+    setPage(1);
+    // Someone ASKED for this list, and it sits below the fold from the hero
+    // — which is the other half of why that button read as doing nothing.
+    // A tab clicked here writes the same param, so it is flagged first: the
+    // producer is already looking at the list and yanking the viewport for
+    // them would be its own bug.
+    if (selfSet.current) {
+      selfSet.current = false;
+      return;
+    }
+    headRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [urlFilter]);
+
+  /**
+   * Choose a tab, and say so in the URL — with `history.replaceState`, never
+   * a router navigation: this page is `force-dynamic`, so a real navigation
+   * would re-read every project from Postgres to change a filter that is
+   * applied entirely in the browser.
+   */
+  const chooseFilter = (key: FilterKey) => {
+    setFilter(key);
+    setPage(1);
+    selfSet.current = true;
+    try {
+      const url = new URL(window.location.href);
+      if (key === "all") url.searchParams.delete("filter");
+      else url.searchParams.set("filter", key);
+      window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    } catch {
+      selfSet.current = false;
+    }
+  };
+
   const toggle = (id: string) =>
     setSelected((prev) => {
       const next = new Set(prev);
@@ -291,10 +339,7 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
                 key={f.key}
                 type="button"
                 className={`ftab ${filter === f.key ? "on" : ""}`}
-                onClick={() => {
-                  setFilter(f.key);
-                  setPage(1);
-                }}
+                onClick={() => chooseFilter(f.key)}
               >
                 {f.label}
                 <span className="c">{counts.get(f.key) ?? 0}</span>

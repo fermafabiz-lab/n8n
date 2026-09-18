@@ -36,6 +36,29 @@ export default async function Dashboard() {
   const running = byKind.run;
   const finished = byKind.done;
 
+  /**
+   * The film the producer should open next — and it is the one that has been
+   * waiting LONGEST, not the newest.
+   *
+   * The list arrives newest-first, so `waiting[0]` is the film they made
+   * twenty minutes ago and are already thinking about. The one nobody is
+   * thinking about is the one at the other end, and it is also the one
+   * holding up the line. Taking it first is what turns this button into a
+   * queue: clear it, come back, and it names the next one by itself.
+   *
+   * An undated project sorts LAST rather than first — `updatedAt` is null on
+   * a row the cutover never dated, and treating that as "waiting since the
+   * epoch" would park the button on it forever.
+   */
+  const waitedSince = (p: (typeof projects)[number]) => {
+    const t = p.updatedAt ? new Date(p.updatedAt).getTime() : NaN;
+    return Number.isFinite(t) ? t : Infinity;
+  };
+  const nextUp =
+    waiting.length > 0
+      ? waiting.reduce((oldest, p) => (waitedSince(p) < waitedSince(oldest) ? p : oldest))
+      : null;
+
   // Titles come from a free-text field and people paste whole prompts into it
   // (a ~3000-char master prompt has been seen in production). The hero sets
   // this in display type, so it has to be cut before it becomes the page.
@@ -95,7 +118,7 @@ export default async function Dashboard() {
             <p className="lead">{heroLine}</p>
             <p className="sub">
               {waiting.length > 0
-                ? "Open a project below to review and approve. Everything else keeps moving without you."
+                ? "Review takes you straight into the one that has been waiting longest. Everything else keeps moving without you."
                 : "Start a new video or check on a finished one."}
             </p>
             <span className="pj-gap" />
@@ -103,11 +126,45 @@ export default async function Dashboard() {
               <Link href="/new" className="pj-cta">
                 Start a video
               </Link>
-              {/* Deep-links the library's own filter rather than being a
-                  second, separate view of the same thing. */}
-              <Link href="/projects?filter=wait" className="pj-ghost">
-                Everything waiting on me
-              </Link>
+              {/*
+                This used to read "Everything waiting on me" and go to
+                `/projects?filter=wait` — the page it was already on, with a
+                param nothing read. It now OPENS the work: the film that has
+                waited longest, at whatever step is waiting (the bare project
+                page lands on the live one, which is the only honest answer
+                from here — the library does not load scenes, so it cannot
+                know which gate it is).
+
+                Naming the film is the point. A button that says what it will
+                open is checkable before you press it, and once the film is
+                cleared the label moves to the next one on its own.
+              */}
+              {nextUp ? (
+                <>
+                  <Link
+                    href={projectHref(nextUp.id)}
+                    className="pj-ghost"
+                    title={`Waiting since ${nextUp.updatedAt ? new Date(nextUp.updatedAt).toLocaleString() : "an unknown date"}`}
+                  >
+                    {/* With one film waiting the lead line above has just
+                        named it, so naming it again is noise; with several,
+                        the lead line only counts them and WHICH one this
+                        opens is the thing worth saying. */}
+                    {waiting.length === 1 ? "Review it" : `Review “${short(nextUp.name, 22)}”`}
+                  </Link>
+                  {waiting.length > 1 && (
+                    <Link href="/projects?filter=wait" className="pj-ghost">
+                      See all {waiting.length}
+                    </Link>
+                  )}
+                </>
+              ) : finished > 0 ? (
+                // Nothing is waiting, so the second door is the one the line
+                // under it already offers — and it, too, now actually filters.
+                <Link href="/projects?filter=done" className="pj-ghost">
+                  Check a finished one
+                </Link>
+              ) : null}
             </div>
           </div>
 

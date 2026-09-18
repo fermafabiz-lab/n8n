@@ -230,13 +230,18 @@ the full entry in the file named:
   eight kids style prefixes (`KIDS_STYLES`) live in `Voice Mode` (Claude
   Scripting), `Cast Sheet Prep` and `Set Plate Prep` (Media Generation) —
   change one, change all three, and run `node db/port/sheet-style/check.mjs`.
-- **A notification has to GO somewhere.** The chime's toast and its system
-  notification both carry an `href` built by `platform/lib/deep-link.ts` —
-  one owner for the gate→step map, the `?scene=` param and the reading of
-  it, because the same vocabulary spelled two ways produces a link that
-  navigates and then selects nothing, which looks like success. Pinned by
-  `npm run check:deeplink`. Full account: `docs/lessons-site.md`, "A
-  notification that says what happened but does not GO there".
+- **A button has to GO somewhere, and nothing tells you when one stops.**
+  Two of them had: the chime's toast and system notification did nothing at
+  all on click, and the library hero's "Everything waiting on me" pointed at
+  `/projects?filter=wait` while the grid kept its tab in `useState("all")`
+  and read no param — a link to the page it was already on, with a query
+  string nobody consumed. Destinations now have one owner each
+  (`platform/lib/deep-link.ts` for the gate→step map and `?scene=`,
+  `platform/lib/library-filters.ts` for `?filter=`), and
+  `npm run check:deeplink` pins both halves: every link names a real key,
+  and the reader is still there. Full account: `docs/lessons-site.md`, "A
+  notification that says what happened but does not GO there" and "A link to
+  the page you are already on".
 - **Editing Options fields are refuse-then-clamp, never silently coerced** —
   the `normalize*` family in `platform/lib/data/derive.ts`, fixture-tested by
   `npm run check:normalize`. A value stored by the site, read by n8n and

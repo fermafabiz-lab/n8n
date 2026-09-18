@@ -943,6 +943,40 @@ Full account: `db/port/created-by/README.md`.
   state. Verified in a real browser (Playwright against the demo backend):
   the param is consumed, the toast navigates, the row is ringed, and × does
   NOT travel.
+- **A link to the page you are already on is the hardest dead button to
+  see** (2026-09-18, `lib/library-filters.ts`). The producer's read of the
+  library hero was "butonul ăsta mi se pare cam useless", and it was worse
+  than useless: `Everything waiting on me` pointed at
+  `/projects?filter=wait`, which is the page it sat on, and `ProjectsGrid`
+  held its tab in `useState("all")` and never read a search param. So the
+  click navigated, the address bar changed, the page re-rendered, and
+  nothing whatsoever happened. Nothing errors, nothing logs, and the diff
+  that would have caught it is the one that never wrote the reader.
+  - **The reader is now pinned, not just the link.** `check:deeplink`
+    asserts every `?filter=` in `app/` and `components/` names a key in
+    `LIBRARY_FILTERS` — and greps `ProjectsGrid` for the `searchParams.get`
+    that consumes it. A grep is blunt, but the fault WAS a missing line, and
+    deleting it should now have to delete an assertion too.
+  - **`useSearchParams`, not a mount-time read of `location`.** The hero
+    link goes from /projects to /projects: a soft navigation that leaves the
+    grid mounted, so an effect with `[]` deps would never fire and the
+    button would still do nothing. This is the trap that makes "same page,
+    different query" links special.
+  - **Arriving with a filter scrolls to the list; choosing a tab does not.**
+    The grid is below the fold from the hero, so a filter applied silently
+    900px down is the same nothing. A tab clicked in the toolbar writes the
+    same param, so it is flagged first (`selfSet`) — the producer is already
+    looking at the list and yanking the viewport would be its own bug.
+    Measured: no scroll movement across eight 15s auto-refreshes.
+  - **The button itself now opens work.** It names and opens the film that
+    has been WAITING LONGEST, not the newest — the list is newest-first, so
+    the newest waiting film is the one the producer just made and already
+    knows about. Taking the oldest makes the button a queue: clear it, come
+    back, and it names the next. With one film waiting the lead line above
+    has already named it, so the label shrinks to "Review it"; with several
+    it names the one it opens and a second ghost offers "See all N".
+  Free side-effect of reading the param: the chosen tab now survives the
+  15s refresh, which used to drop it back to All.
 - `ProductionActivity` (project page) mirrors the batch rule from `Sort & Cap
   Scenes`: a scene is done for the batch once its clip exists, pending scenes
   sort first, and `MEDIA_BATCH_CAP` in `platform/lib/n8n.ts` is a display

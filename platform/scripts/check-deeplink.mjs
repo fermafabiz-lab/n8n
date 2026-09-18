@@ -16,7 +16,7 @@
 //   node --experimental-strip-types --no-warnings scripts/check-deeplink.mjs
 import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {readFileSync} from 'node:fs';
+import {readFileSync, readdirSync} from 'node:fs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const D = await import(join(root, 'lib', 'deep-link.ts'));
@@ -106,6 +106,61 @@ check('a link built from the label matches', matchesScene(scene, 'S10'), true);
 check('case does not decide it', matchesScene(scene, 's10'), true);
 check('an id still matches, so older links keep working', matchesScene(scene, 'recABC'), true);
 check('S1 does not answer for S10', matchesScene({id: 'x', label: 'S1'}, 'S10'), false);
+
+// --- the library's own deep link -----------------------------------------
+//
+// The second half of the same fault, and the one that actually shipped: the
+// hero's "Everything waiting on me" pointed at `/projects?filter=wait` while
+// ProjectsGrid kept its tab in `useState("all")` and read no param, so the
+// link changed the address bar and nothing else. Two things can put it back:
+// a link naming a tab that does not exist, and the grid quietly ceasing to
+// read the param. Both are cheap to pin and neither is visible in a diff.
+
+const F = await import(join(root, 'lib', 'library-filters.ts'));
+const {LIBRARY_FILTERS, isFilterKey} = F;
+
+/** Every `?filter=x` written anywhere in the app — comments included, on
+ *  purpose: a comment naming a tab that no longer exists is a stale
+ *  instruction to the next person, which is the other way this rots. */
+function filterLinks() {
+	const out = [];
+	const walk = (dir) => {
+		for (const e of readdirSync(dir, {withFileTypes: true})) {
+			if (e.name === 'node_modules' || e.name === '.next') continue;
+			const full = join(dir, e.name);
+			if (e.isDirectory()) walk(full);
+			else if (/\.tsx?$/.test(e.name)) {
+				for (const m of readFileSync(full, 'utf8').matchAll(/[?&]filter=([a-z]+)/g)) {
+					out.push({file: full.slice(root.length + 1), key: m[1]});
+				}
+			}
+		}
+	};
+	walk(join(root, 'app'));
+	walk(join(root, 'components'));
+	return out;
+}
+
+const links = filterLinks();
+check('the app links the library filter at all', links.length > 0, true);
+check(
+	'every ?filter= link names a tab that exists',
+	links.filter((l) => !isFilterKey(l.key)),
+	[],
+);
+check('isFilterKey refuses a near-miss', isFilterKey('waiting'), false);
+check('isFilterKey refuses nothing at all', isFilterKey(null), false);
+check('…and accepts the one the hero uses', isFilterKey('wait'), true);
+check('all is a tab, so a link can clear the filter', isFilterKey('all'), true);
+check('the tabs are unique', new Set(LIBRARY_FILTERS.map((f) => f.key)).size, LIBRARY_FILTERS.length);
+
+// The link is only alive while something reads it. This is a grep, and a
+// grep is a blunt instrument — but the failure it guards is precisely that
+// nobody noticed the reader was missing, and a diff that deletes this line
+// should have to delete this assertion with it.
+const grid = readFileSync(join(root, 'components', 'ProjectsGrid.tsx'), 'utf8');
+check('the grid still reads the filter out of the URL', /searchParams\.get\(["']filter["']\)/.test(grid), true);
+check('…and still writes the chosen tab back into it', /history\.replaceState/.test(grid), true);
 
 console.log(`\n${results.filter(Boolean).length}/${results.length} passed`);
 process.exit(results.every(Boolean) ? 0 : 1);

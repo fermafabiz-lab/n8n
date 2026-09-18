@@ -47,7 +47,7 @@ its line (see CLAUDE.md, "A line and its recording drift apart silently").
 
 ```
 If Narration Retry[1] → FC Prep → FC Run?
-   ├─[false] ───────────────────────────────────────────→ Combine Chapters
+   ├─[false] ──────────────────────────────→ FC Apply   (writes WHY it skipped)
    └─[true]  → FC Judge → FC Gap?
                   ├─[true]  → FC Source ─┐
                   └─[false] ─────────────┴→ FC Resolve → FC Fix?
@@ -76,6 +76,57 @@ Models are REUSED, not duplicated — `Editor Model` feeds the judge and the
 rewrite, `Research Model` the search, the same way `Story Bible Model` was
 already shared. `FC Judge`, `FC Source`, `FC Rewrite` and `FC Save Report` all
 carry `onError: continueRegularOutput`: none of them may take a script down.
+
+## The two that got through, and cost the producer a film
+
+Both landed in the same publish at 15:18 and were found four hours later, by
+the producer, on their own documentary — which reached its script gate with a
+red light, no explanation, and a script whose hook said the acquisition was in
+April while its first chapter said October.
+
+### The category was read from a node that does not carry it
+
+`Receive Project Data` is the sub-workflow TRIGGER, and it declares typed
+inputs — `Project_ID`, `Tema`, `Tonalitate`, `Pace`, `Lenght`, `Language`,
+`Style`, `Lore`. n8n emits ONLY those eight. There is no `fields` on it and
+there never was, so `fields['Editing Options']` was `undefined` on every film,
+`modeRead` was false, and every documentary skipped as `no-mode`.
+
+`Fetch Project Record` is the node that carries the row, and `Voice Mode` has
+read the category off it since the kids styles landed. **When a workflow
+already answers a question somewhere, copy THAT node's reference.**
+
+Three things disguised it, and they are the transferable part:
+
+- **The execution data showed the object.** `get_execution` on the trigger
+  returns its stack entry, which is the INPUT the parent sent — not the output
+  the node emits.
+- **A sibling reference worked.** `FC Save Report` reads `Project_ID` off the
+  same node and always has, because that field IS declared. One field
+  resolving is not evidence the object is there.
+- **The failure was caught.** The read sat inside a `try` whose `catch`
+  recorded "mode could not be read" — honest, and completely invisible,
+  because of the second bug.
+
+### A skip wrote nothing, so silence meant two different things
+
+`FC Run?`[false] went straight to `Combine Chapters`, bypassing the report
+writer. So `skipCode` — the entire field the red light reads — never reached
+the database on the path that sets it, and an absent row meant both "this was
+a Story film" and "the chain is dead". Those are precisely the two states the
+producer asked to be able to tell apart.
+
+The false branch now goes through `FC Apply`, which finds its payload from
+`FC Resolve` or falls back to `FC Prep`. **Every film gets a row. From here
+on, no row means the chain genuinely did not run.**
+
+### And the reason neither was caught before shipping
+
+The only end-to-end run that ever verified Deep Search — execution 14771 at
+15:00 — ran on `ea076103`, the version BEFORE the Documentary gate was
+published at 15:18. The gate's first real film was the producer's. **A change
+published after the run that verified it is unverified**, and "I verified this
+feature" is not the same claim as "I verified this version of it".
 
 ## The three things that were wrong, and how each was found
 

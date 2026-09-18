@@ -237,6 +237,27 @@ the full entry in the file named:
   eight kids style prefixes (`KIDS_STYLES`) live in `Voice Mode` (Claude
   Scripting), `Cast Sheet Prep` and `Set Plate Prep` (Media Generation) —
   change one, change all three, and run `node db/port/sheet-style/check.mjs`.
+- **An `Execute Workflow Trigger` with typed inputs emits ONLY those fields,
+  and one of them resolving is not evidence the rest are there.** Claude
+  Scripting's `Receive Project Data` declares eight — `Project_ID`, `Tema`,
+  `Tonalitate`, `Pace`, `Lenght`, `Language`, `Style`, `Lore` — so the project
+  ROW is not on it, however plainly the parent's payload shows `fields` in the
+  execution's stack (that is the INPUT; the node filters it). Deep Search read
+  `$('Receive Project Data').first().json.fields['Editing Options']` for four
+  hours on 2026-09-18 and got undefined on every film, while
+  `FC Save Report`'s `$('Receive Project Data').first().json.Project_ID` kept
+  working — because that one IS declared. **The node that carries the project
+  row is `Fetch Project Record`**, which is what `Voice Mode` has always read.
+  The general rule: **when a workflow already answers a question somewhere,
+  copy THAT node's reference instead of inventing one**, and when a `$('…')`
+  read comes back empty, check what the node DECLARES before assuming the data
+  shape. Full account: `docs/lessons-n8n.md`, "A typed trigger is a filter".
+- **A branch that skips work must still write its record, or silence means two
+  things at once.** Deep Search's gate sent skipped films straight past the
+  report writer, so "no row" meant both "this was a Story film" and "the chain
+  is dead" — which are exactly the two the producer's red light exists to tell
+  apart. Every film gets a row now. **Any status a human is meant to act on
+  needs its negative case recorded, not merely not-recorded.**
 - **`category` is a REQUEST, not a description of the film.** `story` is the
   site's DEFAULT, so genuine documentaries carry it — of eleven researched
   films only three say `documentary`, and the Burj Al Arab, Peking to Paris and

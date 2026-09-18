@@ -1284,3 +1284,53 @@ CLAUDE.md's cross-cutting list:
   other parameters hold an unredacted API token can be edited by sending only
   the key that changed. `addNode`, by contrast, drops node-level settings like
   `alwaysOutputData` — set those with `setNodeSettings` and read them back.
+
+### A typed trigger is a filter — 2026-09-18
+
+`Receive Project Data`, the `executeWorkflowTrigger` at the top of Claude
+Scripting, declares eight workflow inputs:
+
+```
+Project_ID, Tema, Tonalitate, Pace, Lenght, Language, Style, Lore
+```
+
+**That declaration is a filter, not documentation.** The parent orchestrator
+sends the whole Airtable-shaped project record — `{id, createdTime, fields:{…,
+"Editing Options": "…"}, Project_ID, Tema, …}` — and you can SEE all of it in
+the execution's `nodeExecutionStack`, because that is what arrived. What the
+node emits is the eight declared keys and nothing else.
+
+Deep Search's Documentary gate read the category out of
+`$('Receive Project Data').first().json.fields['Editing Options']`. There is no
+`fields` on that node's output. Every documentary skipped as `no-mode` for four
+hours, including the producer's own film, which reached its script gate with a
+red light and a script that contradicted itself about the date it was built on.
+
+**Three things made the wrong node look right, and each is the transferable
+part:**
+
+1. **The execution data showed the object.** Reading `get_execution` for the
+   trigger returns the stack entry — the INPUT waiting to be processed. It is
+   not the output. `runData` is what would have proved it, and `runData` is
+   empty for a running execution and, as it turns out, for a cancelled one too.
+2. **A sibling reference worked.** `FC Save Report` reads
+   `$('Receive Project Data').first().json.Project_ID` and has always worked,
+   because `Project_ID` is one of the declared eight. **One field resolving is
+   not evidence that the object is there** — it is evidence that one field is.
+3. **Nothing complained.** The read was inside a `try` whose `catch` recorded
+   "mode could not be read", which was the honest outcome and also completely
+   invisible, because the skip branch bypassed the node that writes the report.
+
+**The node that actually carries the project row is `Fetch Project Record`**,
+and `Voice Mode` has read `(($('Fetch Project Record').first().json||{}).fields
+||{})['Editing Options']` since the kids styles landed. The rule that would
+have saved the day: **when a workflow already answers a question somewhere,
+copy that node's reference rather than inventing one.** A grep of
+`db/port/*/paste/` for `category` finds Voice Mode in one second.
+
+**And the reason it took a producer to notice**: the only end-to-end run that
+ever verified Deep Search (execution 14771, 15:00) ran on the version BEFORE
+the gate was published at 15:18. The gate's own first real film was the
+producer's. **A change published after the run that verified it is unverified**,
+however small it looks — and "I verified this feature" is not the same claim as
+"I verified this version of it".

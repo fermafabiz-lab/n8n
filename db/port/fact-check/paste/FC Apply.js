@@ -23,7 +23,18 @@
 // payload; `FC Rewrite` arrives carrying an agent's `{output: {chapters}}` and
 // nothing else. Only one of those has the narration on it, so the narration is
 // never read positionally — the rewrite's proposal is fetched by name below.
-const g = $('FC Resolve').first().json;
+// THREE directions now, not two. `FC Run?`[false] reaches here as well, so a
+// film Deep Search declined still gets a report row saying WHY — without that
+// the skip path wrote nothing at all, and "no row" meant both "it was a Story
+// film" and "the chain is dead". Those are the two things the producer's red
+// light exists to tell apart, and for a day it could not.
+let g;
+try {
+  g = $('FC Resolve').first().json;
+} catch (e) {
+  // The gate said no, so FC Resolve never ran. FC Prep is the payload then.
+  g = $('FC Prep').first().json;
+}
 const fc = (g && g.fc) || {};
 const original = Array.isArray(g.chapters) ? g.chapters : [];
 const findings = Array.isArray(fc.findings) ? fc.findings : [];

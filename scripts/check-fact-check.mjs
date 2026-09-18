@@ -125,20 +125,33 @@ const UNSUPPORTED = () => ({
 
 console.log('FC Prep');
 
-// The project record as `Receive Project Data` really carries it: Editing
-// Options is a JSON STRING inside `fields`, not an object. Copied from
-// execution 14771.
+// The project record as `Fetch Project Record` carries it: Editing Options is
+// a JSON STRING inside `fields`. This is the shape `Voice Mode` has read for
+// months, and copying it is the whole point — the first version of FC Prep
+// invented its own source (`Receive Project Data`, the typed sub-workflow
+// trigger) and got undefined on every film.
 const record = (category) => ({
   id: 'rec1',
   fields: { 'Editing Options': JSON.stringify({ sfx: true, speed: 1, category, chapterCards: true }) },
-  Project_ID: 'rec1',
 });
+// The trigger, for the regression test below: eight declared fields and no
+// project record anywhere on it.
+const TRIGGER_ONLY = {
+  Project_ID: 'rec1',
+  Tema: 'A film',
+  Tonalitate: 'Documentary',
+  Pace: 'Normal',
+  Lenght: '120',
+  Language: 'English',
+  Style: 'Documentary',
+  Lore: '',
+};
 const PACK = { researched: true, claims: [{ ref: 'E1', claim: 'c', source: 's', date: '2004', url: 'u' }] };
 
 {
   const out = runNode('FC Prep.js', {
     json: guard(),
-    nodes: { 'Receive Project Data': record('documentary'), 'Extract Claims': PACK },
+    nodes: { 'Fetch Project Record': record('documentary'), 'Extract Claims': PACK },
   });
   ok('runs on a researched DOCUMENTARY with a pack', out.fc.run === true);
   ok('keeps the guard payload intact', out.output === narration() && out.chapters.length === 2 && out.target === 30);
@@ -147,11 +160,22 @@ const PACK = { researched: true, claims: [{ ref: 'E1', claim: 'c', source: 's', 
   ok('records the mode it ran in', out.fc.category === 'documentary');
 }
 {
+  // THE REGRESSION. `Receive Project Data` is the typed trigger: eight declared
+  // fields, no project record. FC Prep read it for four hours on 2026-09-18 and
+  // skipped every documentary as `no-mode`. If this ever passes again, the
+  // category is being read from the wrong node.
+  const out = runNode('FC Prep.js', {
+    json: guard(),
+    nodes: { 'Receive Project Data': TRIGGER_ONLY, 'Extract Claims': PACK },
+  });
+  ok('the sub-workflow trigger alone is NOT a source for the mode', out.fc.run === false && out.fc.skipCode === 'no-mode');
+}
+{
   // THE PRODUCER'S RULE: Documentary mode only, whatever the narration is.
   for (const cat of ['story', 'cinematic', 'kids']) {
     const out = runNode('FC Prep.js', {
       json: guard(),
-      nodes: { 'Receive Project Data': record(cat), 'Extract Claims': PACK },
+      nodes: { 'Fetch Project Record': record(cat), 'Extract Claims': PACK },
     });
     ok(`does not run on a ${cat} film, even researched with a pack`, out.fc.run === false);
     ok(`and says so as "not-documentary" (${cat})`, out.fc.skipCode === 'not-documentary');
@@ -168,14 +192,14 @@ const PACK = { researched: true, claims: [{ ref: 'E1', claim: 'c', source: 's', 
 {
   const out = runNode('FC Prep.js', {
     json: guard(),
-    nodes: { 'Receive Project Data': { id: 'rec1', fields: {} }, 'Extract Claims': PACK },
+    nodes: { 'Fetch Project Record': { id: 'rec1', fields: {} }, 'Extract Claims': PACK },
   });
   ok('Editing Options with no category is also no-mode', out.fc.skipCode === 'no-mode');
 }
 {
   const out = runNode('FC Prep.js', {
     json: guard(),
-    nodes: { 'Receive Project Data': record('documentary'), 'Extract Claims': { researched: false, claims: [] } },
+    nodes: { 'Fetch Project Record': record('documentary'), 'Extract Claims': { researched: false, claims: [] } },
   });
   ok('a documentary with no research is not-researched', out.fc.run === false && out.fc.skipCode === 'not-researched');
   ok('a skipped film still carries its chapters on', out.chapters.length === 2);
@@ -183,14 +207,14 @@ const PACK = { researched: true, claims: [{ ref: 'E1', claim: 'c', source: 's', 
 {
   const out = runNode('FC Prep.js', {
     json: guard(),
-    nodes: { 'Receive Project Data': record('documentary'), 'Extract Claims': { researched: true, claims: [] } },
+    nodes: { 'Fetch Project Record': record('documentary'), 'Extract Claims': { researched: true, claims: [] } },
   });
   ok('a documentary with an empty pack is no-pack', out.fc.skipCode === 'no-pack');
 }
 {
   const out = runNode('FC Prep.js', {
     json: { ...guard(), chapters: [] },
-    nodes: { 'Receive Project Data': record('documentary'), 'Extract Claims': PACK },
+    nodes: { 'Fetch Project Record': record('documentary'), 'Extract Claims': PACK },
   });
   ok('no chapters is no-chapters', out.fc.skipCode === 'no-chapters');
 }
@@ -450,6 +474,20 @@ const FIXED_CH1 = 'Google acquired Where 2 Technologies in October 2004. Google 
   });
   ok('passes a clean script through unchanged', out.chapters[0].narrator_script === CH1 && out.output === narration());
   ok('reports it as checked and clean', out.fcReport.checked === 1 && out.fcReport.flagged === 0);
+}
+{
+  // REACHED STRAIGHT FROM THE GATE, with no FC Resolve in the run at all.
+  // This is the path a skipped film takes, and until 2026-09-18 evening it
+  // bypassed the report writer entirely — so `skipCode` never reached the
+  // database and "no row" meant both "a Story film" and "the chain is dead".
+  const skipped = {
+    ...guard(),
+    fc: { run: false, category: 'story', skipCode: 'not-documentary', skipped: 'Story mode', findings: [], needsRewrite: false },
+  };
+  const out = runNode('FC Apply.js', { json: {}, nodes: { 'FC Prep': skipped } });
+  ok('reaches the report writer straight from the gate', out.fcReport.skipCode === 'not-documentary');
+  ok('and hands the narration on untouched', out.chapters.length === 2 && out.output === narration());
+  ok('and still produces something for the writer to save', typeof out.fcReport64 === 'string' && out.fcReport64.length > 0);
 }
 {
   // The bypass: a film the chain never ran on still has to arrive intact.

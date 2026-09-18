@@ -25,22 +25,31 @@
 // it be done".
 const g = $json;
 
-// The category comes off the project record the orchestrator passed in, not
-// off the webhook payload, so it survives every entry path — the form, resume
-// and restart all populate `Receive Project Data` from the same row. This is
-// the same reference `FC Save Report` already depends on for the project id,
-// so it adds no new way for the chain to break.
+// `Fetch Project Record` IS THE NODE THAT CARRIES THE PROJECT ROW, and reading
+// the category from anywhere else does not work. This cost the producer a film:
+// the first version read `$('Receive Project Data')`, which is the sub-workflow
+// TRIGGER, and that node declares typed inputs — Project_ID, Tema, Tonalitate,
+// Pace, Lenght, Language, Style, Lore — so n8n emits ONLY those eight. There is
+// no `fields` on it and there never was. The read returned undefined, every
+// documentary skipped as `no-mode`, and because the skip path bypassed the
+// report writer there was no row to say so: the producer's Google Maps film
+// reached its script with a red light and no explanation.
+//
+// What made the wrong node look right is that `FC Save Report` reads
+// `$('Receive Project Data').first().json.Project_ID` and works — because
+// `Project_ID` is one of the declared eight. One field resolving is not
+// evidence that the object is there.
+//
+// `Voice Mode` has read the category exactly this way since the kids styles
+// landed. When a workflow already answers a question somewhere, copy THAT
+// node's reference rather than inventing one.
 let category = '';
 let modeRead = false;
 try {
-  const rec = $('Receive Project Data').first().json || {};
-  const raw = (rec.fields || {})['Editing Options'];
-  const eo = typeof raw === 'string' ? JSON.parse(raw || '{}') : raw || {};
-  if (eo && typeof eo === 'object' && 'category' in eo) {
-    category = String(eo.category || '').toLowerCase().trim();
-    modeRead = true;
-  } else if (rec.category) {
-    category = String(rec.category).toLowerCase().trim();
+  const pf = ($('Fetch Project Record').first().json || {}).fields || {};
+  const o = JSON.parse(pf['Editing Options'] || '{}') || {};
+  if (o && typeof o === 'object' && 'category' in o) {
+    category = String(o.category || '').toLowerCase().trim();
     modeRead = true;
   }
 } catch (e) {

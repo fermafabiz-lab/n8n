@@ -2,10 +2,24 @@ import { test, expect, type Page, type Route } from "@playwright/test";
 import path from "node:path";
 
 const SHOTS = path.resolve(__dirname, "..", "shots");
-const FRAME_COUNT = 100;
-const CHECKPOINTS = [0, 25, 50, 75, 99];
 const BUDGET_BYTES = 3 * 1024 * 1024;
 const POSTER_PATH = "/frames/poster.webp";
+
+// Nothing here hardcodes the sequence length. The page publishes what it
+// resolved from the manifest as `data-count`, and every test reads that — so
+// these checks follow a re-cut sequence instead of having to be edited with it.
+async function frameCount(page: Page): Promise<number> {
+  const attr = await hero(page).getAttribute("data-count");
+  const n = Number(attr);
+  expect(Number.isInteger(n) && n > 0, `data-count should be a positive integer, got ${attr}`).toBe(true);
+  return n;
+}
+
+// First, the three quarter marks, and last — whatever the length is.
+const checkpointsFor = (count: number): number[] => {
+  const last = count - 1;
+  return [...new Set([0, Math.round(last * 0.25), Math.round(last * 0.5), Math.round(last * 0.75), last])];
+};
 
 // Matches a numbered frame and NOT the poster beside it. The opt-out tests
 // assert that no frame is fetched, while the poster still must be.
@@ -22,9 +36,9 @@ async function scrubRange(page: Page): Promise<number> {
   });
 }
 
-async function scrollToFrame(page: Page, index: number) {
+async function scrollToFrame(page: Page, index: number, count: number) {
   const range = await scrubRange(page);
-  const y = Math.round((index / (FRAME_COUNT - 1)) * range);
+  const y = Math.round((index / (count - 1)) * range);
   await page.evaluate((y) => window.scrollTo(0, y), y);
 }
 
@@ -67,27 +81,30 @@ test.describe("desktop", () => {
     // Poster shows until the first batch is drawn.
     await expect(hero(page)).toHaveAttribute("data-state", /loading|ready/);
     await expect(hero(page)).toHaveAttribute("data-state", "ready", { timeout: 15_000 });
+    const count = await frameCount(page);
     const loadedAtReady = Number(await hero(page).getAttribute("data-loaded"));
-    expect(loadedAtReady).toBeGreaterThanOrEqual(20);
+    expect(loadedAtReady).toBeGreaterThanOrEqual(Math.min(20, count));
 
-    // Wait for the background loader to finish so frame 99 exists.
-    await expect(hero(page)).toHaveAttribute("data-loaded", String(FRAME_COUNT), {
+    // Wait for the background loader to finish so the last frame exists.
+    await expect(hero(page)).toHaveAttribute("data-loaded", String(count), {
       timeout: 30_000,
     });
 
-    for (const index of CHECKPOINTS) {
-      await scrollToFrame(page, index);
+    for (const index of checkpointsFor(count)) {
+      await scrollToFrame(page, index, count);
       await expect(hero(page)).toHaveAttribute("data-frame", String(index));
       // one more frame so the compositor has shown the draw
       await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
-      await page.screenshot({ path: path.join(SHOTS, `frame-${String(index).padStart(2, "0")}.png`) });
+      await page.screenshot({ path: path.join(SHOTS, `frame-${String(index).padStart(3, "0")}.png`) });
     }
 
     // Scrolling back up reverses.
-    await scrollToFrame(page, 40);
-    await expect(hero(page)).toHaveAttribute("data-frame", "40");
-    await scrollToFrame(page, 10);
-    await expect(hero(page)).toHaveAttribute("data-frame", "10");
+    const midUp = Math.round((count - 1) * 0.4);
+    const lowUp = Math.round((count - 1) * 0.1);
+    await scrollToFrame(page, midUp, count);
+    await expect(hero(page)).toHaveAttribute("data-frame", String(midUp));
+    await scrollToFrame(page, lowUp, count);
+    await expect(hero(page)).toHaveAttribute("data-frame", String(lowUp));
 
     // Past the track the stage unpins and the test section takes the viewport.
     const range = await scrubRange(page);
@@ -115,9 +132,10 @@ test.describe("desktop", () => {
 
     await page.goto("/");
     await expect(hero(page)).toHaveAttribute("data-state", "ready", { timeout: 15_000 });
+    const count = await frameCount(page);
     expect(await hero(page).getAttribute("data-loaded")).toBe("20");
 
-    await scrollToFrame(page, 99);
+    await scrollToFrame(page, count - 1, count);
     // Never blank, never past what exists: index 19 is the 20th frame.
     await expect(hero(page)).toHaveAttribute("data-frame", "19");
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
@@ -129,10 +147,49 @@ test.describe("desktop", () => {
     });
     expect(notBlank).toBe(true);
 
-    // Release the loader: the canvas catches up to 99 without a scroll event.
+    // Release the loader: the canvas catches up to the last frame with no
+    // scroll event of its own.
     for (const r of held.splice(0)) await r.continue();
     await page.unroute("**/frames/frame_*.webp");
-    await expect(hero(page)).toHaveAttribute("data-frame", "99", { timeout: 30_000 });
+    await expect(hero(page)).toHaveAttribute("data-frame", String(count - 1), { timeout: 30_000 });
+  });
+
+  test("takes the frame count from the manifest, not from the build", async ({ page }) => {
+    // A shorter sequence than the files on disk: if the count were compiled
+    // in, the page would ignore this and scrub to the end of the directory.
+    const SHORT = 30;
+    await page.route("**/frames/manifest.json", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ count: SHORT }) }),
+    );
+
+    await page.goto("/");
+    await expect(hero(page)).toHaveAttribute("data-state", "ready", { timeout: 15_000 });
+    await expect(hero(page)).toHaveAttribute("data-count", String(SHORT));
+    await expect(hero(page)).toHaveAttribute("data-loaded", String(SHORT), { timeout: 30_000 });
+
+    // The scroll track now maps onto 30 frames, and stops at the 30th.
+    await scrollToFrame(page, SHORT - 1, SHORT);
+    await expect(hero(page)).toHaveAttribute("data-frame", String(SHORT - 1));
+    await scrollToFrame(page, Math.round((SHORT - 1) / 2), SHORT);
+    await expect(hero(page)).toHaveAttribute("data-frame", String(Math.round((SHORT - 1) / 2)));
+  });
+
+  test("a missing or malformed manifest falls back instead of breaking", async ({ page }) => {
+    await page.goto("/");
+    await expect(hero(page)).toHaveAttribute("data-state", "ready", { timeout: 15_000 });
+    const normal = await frameCount(page);
+
+    for (const body of ["", "not json at all", '{"count":"30"}', '{"count":0}', '{"count":1e9}']) {
+      await page.route("**/frames/manifest.json", (route) =>
+        route.fulfill({ status: body === "" ? 404 : 200, contentType: "application/json", body }),
+      );
+      await page.goto("/");
+      await expect(hero(page)).toHaveAttribute("data-state", "ready", { timeout: 15_000 });
+      // Refused, not coerced: every one of these falls back to the constant,
+      // which is kept equal to the real sequence length.
+      expect(await frameCount(page), `manifest body ${JSON.stringify(body)}`).toBe(normal);
+      await page.unroute("**/frames/manifest.json");
+    }
   });
 
   test("nudges after 2s idle and stops for good after a real scroll", async ({ page }) => {

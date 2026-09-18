@@ -24,7 +24,14 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const outDir = path.join(root, "public", "frames");
 const posterPath = path.join(outDir, "poster.webp");
 
-const COUNT = 100;
+// `npm run frames -- 48` or FRAME_COUNT=48 to make a different length. The
+// count is written into manifest.json beside the frames, which is what the
+// hero reads — the constant in ScrollHero.tsx is only the fallback.
+const COUNT = Number(process.argv[2] ?? process.env.FRAME_COUNT ?? 72);
+if (!Number.isInteger(COUNT) || COUNT < 1 || COUNT > 2000) {
+  console.error(`frame count must be a whole number from 1 to 2000, got ${process.argv[2] ?? process.env.FRAME_COUNT}`);
+  process.exit(1);
+}
 const W = 1600;
 const H = 900;
 const BUDGET_BYTES = 3 * 1024 * 1024;
@@ -79,9 +86,15 @@ for (let i = 0; i < COUNT; i++) {
 // over from it is invisible.
 total += await render(svgFor(0), posterPath, 72);
 
+// What the hero reads to know how long the sequence is. It ships with the
+// frames; a real sequence uploaded by hand needs one of these too.
+const manifestPath = path.join(outDir, "manifest.json");
+await writeFile(manifestPath, `${JSON.stringify({ count: COUNT }, null, 2)}\n`);
+
 const posterSize = (await stat(posterPath)).size;
 console.log(`frames: ${COUNT} × ${W}×${H} in ${path.relative(root, outDir)}`);
 console.log(`poster: ${(posterSize / 1024).toFixed(1)} kB (same directory)`);
+console.log(`manifest: {"count": ${COUNT}}`);
 console.log(`total assets: ${(total / 1024 / 1024).toFixed(2)} MB (budget ${(BUDGET_BYTES / 1024 / 1024).toFixed(1)} MB)`);
 if (total > BUDGET_BYTES) {
   console.error("over budget");

@@ -275,3 +275,39 @@ where `Assign Accounts` splits the scenes into equal blocks, not on a remainder.
 2. The probe for whether one account holds two generations at once, before
    `videoPoolPerAccount` goes above 1. With an even split that is what turns 3
    in flight into 6.
+
+## The A/B, 2026-09-18 — the serial baseline is the easy half
+
+The film above (`rec1rkfxvBeMCFDRj`, nine scenes, three accounts, all nine
+images already on the right accounts) was cleared of its clips and run twice on
+the same scenes, changing exactly one thing: `videoPool`.
+
+### Arm A — `videoPool: false`, fired 12:26:24
+
+| scene | account | clip landed | gap |
+|---|---|---|---|
+| 1 | `fermafabiz` | 12:28:09 | 1m45 from the start |
+| 2 | `fermafabiz` | 12:29:34 | 1m25 |
+| 3 | `fermafabiz` | 12:30:59 | 1m25 |
+| 4 | `houseofvideos01` | 12:32:39 | 1m40 |
+
+**One clip every 85–100 seconds, dead steady.** The run was stopped at 12:35:06
+before it reached scene 101, so the nine-clip figure is an extrapolation rather
+than a stopwatch: 9 × ~88 s ≈ **13 minutes**. The cadence is regular enough over
+four consecutive clips that the extrapolation is worth more than the fifth
+data point would have added.
+
+Note what the account column already proves: `Assign Accounts` split nine scenes
+into three even blocks — 1/2/3 on the primary, 4/101/102 on account 01,
+103/104/105 on account 02 — which is the even split the previous run lacked.
+This is the first pass that entry 1 under "Still owed" asked for.
+
+**Arm A was killed by something outside this session**, 8m42 into the run, with
+a fresh webhook execution starting 46 seconds later. That is neither of the two
+signatures documented in `docs/lessons-site.md`: `restartProduction` leaves a
+1.7–5.3 s gap between the cancel and the resume, and `pauseProduction` stops
+every running execution inside 130 ms. A 46-second gap is a person reading the
+page between two clicks. **Nothing in an execution records who stopped it**, so
+this stays an inference — but it is the third time a timing run on this film has
+been cut short from outside, and that is the reason the serial arm is an
+extrapolation.

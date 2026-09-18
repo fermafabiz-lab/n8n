@@ -785,6 +785,27 @@ check('the landscape geometry', P.WATERMARK_LAYOUT.landscape, { frame: { width: 
 check('the portrait geometry, lifted clear of the platform chrome', P.WATERMARK_LAYOUT.portrait, { frame: { width: 720, height: 1280 }, left: 44, bottom: 232, maxWidth: 560, gap: 3, label: { fontSize: 17, padding: '5px 11px' }, source: { fontSize: 14 }, credit: { fontSize: 13 }, mark: { height: 32, glyph: 16, gap: 8, padX: 10 } });
 check('the badge never reaches full opacity', P.WATERMARK_STYLE.peakOpacity, 0.88);
 
+// --- the pill's own arithmetic, mirrored from remotion/scripts/check-watermark.mjs
+// Every number was MEASURED in a real Chromium against the real component
+// before it was pinned (db/port/watermark-open-once/README.md). All three were
+// wrong at once and each looks identical on screen: the label off-centre in
+// its capsule. The preview draws the same mark, so it has to agree.
+const wmLand = P.WATERMARK_LAYOUT.landscape;
+check('the trailing letter-space', P.labelTrailingSpace(wmLand.label.fontSize), 2.24);
+check('the capsule is padded equally on both sides', P.markPillWidth(wmLand.mark, 16, 142.11), 185);
+check('and grows with the label', P.markPillWidth(wmLand.mark, 16, 236.84), 280);
+check('an unmeasured label is just the two paddings', P.markPillWidth(wmLand.mark, 16, 0), 45);
+check('the chip centres its glyph inside the border', P.markChipPadX(wmLand.mark), 6.5);
+check('and in portrait too', P.markChipPadX(P.WATERMARK_LAYOUT.portrait.mark), 7);
+// DejaVu Sans Mono at 16px, as Chromium resolved `ui-monospace` on the render
+// box: ink from the baseline to the cap at 11 with nothing below it, against a
+// font box of 13 up and 5 down. The line box therefore centres 1.5px high.
+const wmMono16 = { width: 115.22, actualBoundingBoxAscent: 11, actualBoundingBoxDescent: 0, fontBoundingBoxAscent: 13, fontBoundingBoxDescent: 5 };
+check('all-caps ink rides high in its line box', P.labelInkDrop(wmMono16, 'AI GENERATED', 16, 142.11), 1.5);
+check('a canvas measuring another face is not believed', P.labelInkDrop(wmMono16, 'AI GENERATED', 16, 210), 0);
+check('nor is a TextMetrics without an ink box', P.labelInkDrop({ ...wmMono16, actualBoundingBoxAscent: undefined }, 'AI GENERATED', 16, 142.11), 0);
+check('nor a label with no width at all', P.labelInkDrop(wmMono16, 'AI GENERATED', 16, 0), 0);
+
 const wmScene = (start, dur, provenance) => ({ startSeconds: start, durationSeconds: dur, provenance });
 const wmAi = { visualOrigin: 'ai_generated' };
 const wmArch = { visualOrigin: 'archival_footage', provider: 'wikimedia', sourceCreator: 'NASA' };

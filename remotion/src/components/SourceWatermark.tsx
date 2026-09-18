@@ -9,11 +9,16 @@ import {
 } from 'remotion';
 import {CURVES, eased} from '../easing';
 import {
+	labelInkDrop,
+	labelTrailingSpace,
+	markChipPadX,
+	markPillWidth,
 	planWatermarkBands,
 	WATERMARK_LAYOUT,
 	WATERMARK_STYLE,
 	type VisualOrigin,
 	type VisualProvenance,
+	type WatermarkMark,
 } from '../provenance';
 import {DASHED_ORIGINS, GLYPH_STROKE, GLYPH_VIEWBOX, ORIGIN_GLYPHS} from '../provenanceGlyphs';
 import type {StylePreset} from '../style';
@@ -79,6 +84,29 @@ const Glyph: React.FC<{origin: VisualOrigin; size: number}> = ({origin, size}) =
 );
 
 /**
+ * Ask the browser where this label's ink actually sits — see `labelInkDrop`,
+ * which owns the arithmetic and the refusals. Only the canvas plumbing is
+ * here, because only the drawing knows which font it resolved.
+ */
+const measureInkDrop = (
+	label: string,
+	fontSize: number,
+	fontFamily: string,
+	/** The span's own laid-out width, letter-spacing and all. */
+	advance: number,
+): number => {
+	try {
+		if (typeof document === 'undefined') return 0;
+		const ctx = document.createElement('canvas').getContext('2d');
+		if (!ctx) return 0;
+		ctx.font = `${WATERMARK_STYLE.labelWeight} ${fontSize}px ${fontFamily}`;
+		return labelInkDrop(ctx.measureText(label), label, fontSize, advance);
+	} catch {
+		return 0;
+	}
+};
+
+/**
  * The badge itself: a square chip holding the glyph, which opens sideways into
  * a capsule carrying the label.
  *
@@ -90,36 +118,89 @@ const Glyph: React.FC<{origin: VisualOrigin; size: number}> = ({origin, size}) =
  * The label's width is MEASURED, not estimated from its character count: the
  * eight labels differ by more than half a pill's width ("ARCHIVAL PHOTO"
  * against "ILLUSTRATIVE FOOTAGE"), and a guess clips the long ones. Remotion's
- * `delayRender` holds the first frame until the browser has laid the text out,
- * so every frame of the render agrees on the same number.
+ * `delayRender` holds the frame until the browser has laid the text out, so
+ * every frame of the render agrees on the same number.
+ *
+ * Measured PER LABEL, and again once the web fonts have settled — both of
+ * which this got wrong, in ways that look identical on screen and are the
+ * whole of "the text does not fit in the pill":
+ *
+ * - `SourceWatermark` keeps ONE `Mark` in the tree and hands it a new label at
+ *   every band change, so a width taken on mount is the first band's width for
+ *   the rest of the film. `renderStill` hides it (a fresh page per still, one
+ *   band each) and `renderMedia` does not: a tab that seeks across a band
+ *   boundary draws "ILLUSTRATIVE FOOTAGE" in a capsule cut for "REAL FOOTAGE".
+ * - a web font that has not arrived yet lays the label out in the fallback
+ *   face, which is a different width. Remotion holds the frame for OUR handle,
+ *   not for the font's, so measuring on mount can measure the wrong typeface
+ *   and then draw the right one.
+ *
+ * Both are answered the same way: a fresh `delayRender` per measurement round,
+ * and the answer tagged with the label it belongs to so a stale one is simply
+ * not believed.
  */
 const Mark: React.FC<{
 	origin: VisualOrigin;
 	label: string;
-	geom: {height: number; glyph: number; gap: number; padX: number};
+	geom: WatermarkMark;
 	fontSize: number;
 	fontFamily: string;
 	/** 0 = chip, 1 = pill. */
 	open: number;
 }> = ({origin, label, geom, fontSize, fontFamily, open}) => {
 	const textRef = React.useRef<HTMLSpanElement>(null);
-	const [textWidth, setTextWidth] = React.useState(0);
-	const [handle] = React.useState(() => delayRender(`watermark label: ${label}`));
-	React.useLayoutEffect(() => {
-		// `offsetWidth`, NOT `getBoundingClientRect().width`: the rect is the
-		// VISUAL box, so any CSS transform on an ancestor multiplies it. Put
-		// this badge inside a scaled container — a magnified preview, a
-		// picture-in-picture — and the measured label comes back k times too
-		// wide, the pill is computed k times too wide in layout pixels, and it
-		// is then scaled AGAIN. Found exactly that way on a 2.8× review reel:
-		// the capsule ran off the frame. `offsetWidth` is layout-based and
-		// ignores transforms, at the cost of rounding to whole pixels.
-		setTextWidth(textRef.current?.offsetWidth ?? 0);
-		continueRender(handle);
-	}, [handle]);
+	const [measured, setMeasured] = React.useState<{
+		label: string;
+		advance: number;
+		drop: number;
+	} | null>(null);
 
-	const {height, glyph, gap, padX} = geom;
-	const pillWidth = padX + glyph + gap + textWidth + padX * 1.15;
+	React.useLayoutEffect(() => {
+		const handle = delayRender(`watermark label: ${label}`);
+		let live = true;
+		const release = () => {
+			if (!live) return;
+			live = false;
+			continueRender(handle);
+		};
+		const read = () => {
+			const el = textRef.current;
+			if (!live || !el) return;
+			// `offsetWidth`, NOT `getBoundingClientRect().width`: the rect is
+			// the VISUAL box, so any CSS transform on an ancestor multiplies
+			// it. Put this badge inside a scaled container — a magnified
+			// preview, a picture-in-picture — and the measured label comes
+			// back k times too wide, the pill is computed k times too wide in
+			// layout pixels, and it is then scaled AGAIN. Found exactly that
+			// way on a 2.8× review reel: the capsule ran off the frame.
+			// `offsetWidth` is layout-based and ignores transforms, at the
+			// cost of rounding to whole pixels.
+			const advance = el.offsetWidth;
+			setMeasured({label, advance, drop: measureInkDrop(label, fontSize, fontFamily, advance)});
+		};
+		read();
+		const ready = typeof document === 'undefined' ? null : document.fonts?.ready;
+		if (ready && typeof ready.then === 'function') {
+			ready.then(
+				() => {
+					read();
+					release();
+				},
+				() => release(),
+			);
+		} else {
+			release();
+		}
+		return release;
+	}, [label, fontSize, fontFamily]);
+
+	// Nothing is believed until it is measured for THIS label. Before that the
+	// capsule is its own empty width, which no frame is ever captured at — the
+	// handle above holds the render until the number exists.
+	const fresh = measured && measured.label === label ? measured : null;
+
+	const {height, glyph, gap} = geom;
+	const pillWidth = markPillWidth(geom, fontSize, fresh?.advance ?? 0);
 	const width = interpolate(open, [0, 1], [height, pillWidth]);
 	const radius = interpolate(open, [0, 1], [height * WATERMARK_STYLE.chipRadiusRatio, height / 2]);
 	// The label uncovers from the glyph outward, clipped by the container, so
@@ -138,7 +219,7 @@ const Mark: React.FC<{
 				width,
 				display: 'flex',
 				alignItems: 'center',
-				paddingLeft: interpolate(open, [0, 1], [(height - glyph) / 2, padX]),
+				paddingLeft: interpolate(open, [0, 1], [markChipPadX(geom), geom.padX]),
 				borderRadius: radius,
 				background: WATERMARK_STYLE.labelBackground,
 				border: `${WATERMARK_STYLE.markBorderWidth}px ${
@@ -154,6 +235,15 @@ const Mark: React.FC<{
 				ref={textRef}
 				style={{
 					marginLeft: gap,
+					// Pull the trailing letter-space back out of the layout, so
+					// the content really does end at the last letter and the
+					// capsule's own `padX` is the only thing after it.
+					marginRight: -labelTrailingSpace(fontSize),
+					// Measured, not guessed — see `labelInkDrop`. Relative
+					// rather than a transform: it must not touch the width the
+					// round above just measured.
+					position: 'relative',
+					top: fresh?.drop ?? 0,
 					fontFamily,
 					fontSize,
 					fontWeight: WATERMARK_STYLE.labelWeight,

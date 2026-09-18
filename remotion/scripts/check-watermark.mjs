@@ -21,6 +21,10 @@ const {
 	attributionFor,
 	formatSourceWatermark,
 	getSourceLabel,
+	labelInkDrop,
+	labelTrailingSpace,
+	markChipPadX,
+	markPillWidth,
 	planWatermarkBands,
 	providerLabel,
 } = await import(join(root, 'src', 'provenance.ts'));
@@ -180,8 +184,50 @@ check(
 );
 check('the badge never reaches full opacity', WATERMARK_STYLE.peakOpacity, 0.88);
 
-console.log(`\n${results.filter(Boolean).length}/${results.length} passed`);
-process.exit(results.every(Boolean) ? 0 : 1);
+// --- the pill's own arithmetic ---------------------------------------------
+// Every number below was MEASURED in a real Chromium, from the real component,
+// before it was pinned — see db/port/watermark-open-once/README.md. They are here
+// because all three were wrong at once and each failure looks identical on
+// screen: the label sitting off-centre inside its capsule.
+const LAND = WATERMARK_LAYOUT.landscape;
+// CSS letter-spacing is added after the LAST character too. 16 × 0.14em.
+check('the trailing letter-space', labelTrailingSpace(LAND.label.fontSize), 2.24);
+// "AI GENERATED" laid out at 16px in the render's mono kicker measured 142.11
+// wide; 2 borders + 10 + 15 glyph + 8 gap + ceil(142.11 - 2.24) + 10.
+check('the capsule is padded equally on both sides', markPillWidth(LAND.mark, 16, 142.11), 185);
+check('and grows with the label', markPillWidth(LAND.mark, 16, 236.84), 280);
+// A label that has not been measured yet must not leave a pill wider than the
+// chip it opens from — the render holds the frame until it has, but the width
+// still has to be sane in between.
+check('an unmeasured label is just the two paddings', markPillWidth(LAND.mark, 16, 0), 45);
+// The border is INSIDE the box: (30 - 2 - 15) / 2, not (30 - 15) / 2.
+check('the chip centres its glyph inside the border', markChipPadX(LAND.mark), 6.5);
+check('and in portrait too', markChipPadX(WATERMARK_LAYOUT.portrait.mark), 7);
+// DejaVu Sans Mono at 16px, as Chromium resolved `ui-monospace` on the render
+// box: ink from the baseline to the cap at 11, nothing below it, against a
+// font box of 13 up and 5 down. The line box therefore centres 1.5px high.
+const MONO16 = {
+	width: 115.22,
+	actualBoundingBoxAscent: 11,
+	actualBoundingBoxDescent: 0,
+	fontBoundingBoxAscent: 13,
+	fontBoundingBoxDescent: 5,
+};
+check('all-caps ink rides high in its line box', labelInkDrop(MONO16, 'AI GENERATED', 16, 142.11), 1.5);
+// The refusals. A canvas draws no letter-spacing, so its width must come out
+// exactly one space per character under the span's; anything else is a
+// different typeface and its ink box would push the text the wrong way.
+check(
+	'a canvas measuring another face is not believed',
+	labelInkDrop(MONO16, 'AI GENERATED', 16, 210),
+	0,
+);
+check(
+	'nor is a TextMetrics without an ink box',
+	labelInkDrop({...MONO16, actualBoundingBoxAscent: undefined}, 'AI GENERATED', 16, 142.11),
+	0,
+);
+check('nor a label with no width at all', labelInkDrop(MONO16, 'AI GENERATED', 16, 0), 0);
 
 // --- "announce each source once" -------------------------------------------
 // MIRRORED with platform/scripts/check-footage.mjs. The switch collapses
@@ -227,3 +273,10 @@ check(
 	Object.keys(ORIGIN_LABELS).filter((o) => !(ORIGIN_GLYPHS[o] || []).length),
 	[],
 );
+
+// Last line of the file on purpose. The summary used to sit halfway up, which
+// left the six checks below it unreachable and still reporting a cheerful
+// "24/24 passed" — a pass over the checks that ran, which is not the same
+// thing as a pass. Add new cases ABOVE this.
+console.log(`\n${results.filter(Boolean).length}/${results.length} passed`);
+process.exit(results.every(Boolean) ? 0 : 1);

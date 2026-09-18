@@ -196,6 +196,9 @@ export type WatermarkGeometry = {
 	mark: {height: number; glyph: number; gap: number; padX: number};
 };
 
+/** Just the mark's own numbers, so the arithmetic below can be handed them. */
+export type WatermarkMark = WatermarkGeometry['mark'];
+
 export const WATERMARK_LAYOUT: {
 	landscape: WatermarkGeometry;
 	portrait: WatermarkGeometry;
@@ -232,6 +235,15 @@ export const WATERMARK_STYLE = {
 	peakOpacity: 0.88,
 	labelWeight: 600,
 	labelLetterSpacing: '0.14em',
+	/**
+	 * The same value as a NUMBER, because the pill has to do arithmetic with it.
+	 *
+	 * CSS letter-spacing is added after EVERY character including the last, so
+	 * a measured label carries one trailing space of dead air that is not ink.
+	 * Sizing the capsule to the measured width therefore leaves the right side
+	 * wider than the left — which is what "the text is not centred" looks like.
+	 */
+	labelLetterSpacingEm: 0.14,
 	labelColor: '#FFFFFF',
 	labelBackground: 'rgba(0,0,0,0.42)',
 	labelBorder: '1px solid rgba(255,255,255,0.16)',
@@ -259,6 +271,122 @@ export const WATERMARK_STYLE = {
 	openDelaySeconds: 0.18,
 	openSeconds: 0.42,
 } as const;
+
+/**
+ * The dead air CSS letter-spacing leaves AFTER the last character.
+ *
+ * Spacing is added following every character, the final one included, so a
+ * laid-out label is one whole letter-space wider than its own ink. Size a
+ * capsule to that width with equal padding on both sides and the right side
+ * comes out a letter-space wider than the left — measured at 1.6px on a 30px
+ * pill, which is the 5% that reads as "the text is not centred".
+ *
+ * Both drawings of this badge take it off: the render subtracts it from the
+ * measured advance, the site's preview cancels it with a negative right
+ * margin. One function so they cannot disagree about how much it is.
+ */
+export const labelTrailingSpace = (fontSize: number): number =>
+	fontSize * WATERMARK_STYLE.labelLetterSpacingEm;
+
+/**
+ * The open capsule's width, in border-box pixels, from a MEASURED label.
+ *
+ * Two things here are easy to get wrong and were both wrong at once:
+ *
+ * - `box-sizing: border-box` means the border is INSIDE this number, so the
+ *   two 1px edges have to be added or the padding silently loses them.
+ * - the padding is `padX` on both sides. It used to be `padX * 1.15` on the
+ *   right, a fudge that was compensating for the trailing letter-space above
+ *   — two wrongs that did not quite make a right.
+ *
+ * The caller passes the label span's own laid-out width, letter-spacing and
+ * all; measuring is the component's job, because only it knows which font
+ * actually resolved. Rounded UP so a fractional advance can never clip the
+ * last letter against `overflow: hidden`.
+ */
+export const markPillWidth = (mark: WatermarkMark, fontSize: number, labelAdvance: number): number =>
+	2 * WATERMARK_STYLE.markBorderWidth +
+	mark.padX +
+	mark.glyph +
+	mark.gap +
+	Math.max(0, Math.ceil(labelAdvance - labelTrailingSpace(fontSize))) +
+	mark.padX;
+
+/**
+ * The closed chip's left padding — what centres the glyph in the square.
+ *
+ * The borders are inside the box, so they come off the space the glyph has to
+ * sit in. Forgetting them is how the chip ended up half a pixel left of
+ * centre: visible on nothing, wrong on everything.
+ */
+export const markChipPadX = (mark: WatermarkMark): number =>
+	(mark.height - 2 * WATERMARK_STYLE.markBorderWidth - mark.glyph) / 2;
+
+/** The fields of a canvas `TextMetrics` this needs, and nothing else. */
+export type LabelMetrics = {
+	width: number;
+	actualBoundingBoxAscent: number;
+	actualBoundingBoxDescent: number;
+	fontBoundingBoxAscent: number;
+	fontBoundingBoxDescent: number;
+};
+
+/**
+ * How far an all-caps label has to be nudged DOWN to sit on the pill's
+ * midline. Positive means the ink is riding high, which it always is.
+ *
+ * `align-items: center` centres the LINE BOX, and a line box is built around
+ * the font's own ascent and descent — room for accents above and descenders
+ * below that an all-caps label never uses. "ARCHIVAL FOOTAGE" runs from the
+ * baseline up to the cap height with nothing hanging beneath it, so a box
+ * centred on the font leaves the letters high: measured at 1.5px in a 30px
+ * pill, a twentieth of its height, and obvious once seen.
+ *
+ * How high depends entirely on the typeface — the render's kicker font is a
+ * Google font chosen per preset, the site's preview falls back to whatever
+ * monospace the producer has — so this is computed from the REAL ink box
+ * rather than from a cap-height ratio. Canvas is the only API that reports
+ * it; getting the metrics is each drawing's own job, because only it knows
+ * which face actually resolved.
+ *
+ * Note what does NOT appear here: `labelLineHeight`. The line box's own
+ * half-leading is distributed evenly above and below, so it falls out of the
+ * subtraction — which is also why changing the line height moves nothing.
+ *
+ * Returns 0 — the behaviour this badge had before the correction existed —
+ * whenever the answer cannot be trusted:
+ *
+ * - a `TextMetrics` without the actual-bounding-box fields (they are optional
+ *   in the spec and were missing from Firefox for years);
+ * - a canvas that resolved a DIFFERENT face than the DOM laid the label out
+ *   in. A canvas draws no letter-spacing, so its width must come out exactly
+ *   one space per character narrower than the span's; anything else means the
+ *   two are not measuring the same typeface, and an ink box from the wrong
+ *   font would push the text the wrong way by a font's worth of error.
+ */
+export const labelInkDrop = (
+	m: LabelMetrics,
+	label: string,
+	fontSize: number,
+	/** The label span's own laid-out width, letter-spacing and all. */
+	advance: number,
+): number => {
+	const all = [
+		m.width,
+		m.actualBoundingBoxAscent,
+		m.actualBoundingBoxDescent,
+		m.fontBoundingBoxAscent,
+		m.fontBoundingBoxDescent,
+	];
+	if (!all.every((n) => typeof n === 'number' && Number.isFinite(n))) return 0;
+	const bare = advance - label.length * labelTrailingSpace(fontSize);
+	if (bare <= 0 || Math.abs(m.width - bare) > Math.max(2, bare * 0.08)) return 0;
+	// Both centres measured from the baseline, downward positive.
+	return (
+		(m.fontBoundingBoxDescent - m.fontBoundingBoxAscent) / 2 -
+		(m.actualBoundingBoxDescent - m.actualBoundingBoxAscent) / 2
+	);
+};
 
 /**
  * The scene bands the watermark is drawn over.

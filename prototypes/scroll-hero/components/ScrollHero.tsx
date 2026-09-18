@@ -50,6 +50,9 @@ const MAX_DPR = 2;
 // a new sequence is an upload rather than a rebuild.
 const POSTER_SRC = "/frames/poster.webp";
 
+// The copy is gone by this far through the scrub, and the scrim with it.
+const COPY_FADE_END = 0.6;
+
 const HINT_IDLE_MS = 2000;
 const HINT_FRAMES = 4;
 const HINT_OUT_MS = 450;
@@ -133,6 +136,7 @@ export default function ScrollHero() {
 
     let rafId = 0;
     let lastDrawn = -1;
+    let lastFade = -1;
     let sizeDirty = true;
     let cssWidth = 0;
     let cssHeight = 0;
@@ -151,12 +155,14 @@ export default function ScrollHero() {
 
     // ---- geometry -------------------------------------------------------
 
-    const targetIndex = (): number => {
+    // How far through the scrub we are, 0..1, unrounded.
+    const progress = (): number => {
       const range = section.offsetHeight - window.innerHeight;
       if (range <= 0) return 0;
-      const top = section.getBoundingClientRect().top;
-      return Math.round(clamp01(-top / range) * (frameCount - 1));
+      return clamp01(-section.getBoundingClientRect().top / range);
     };
+
+    const targetIndex = (): number => Math.round(progress() * (frameCount - 1));
 
     const resizeCanvas = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
@@ -194,7 +200,21 @@ export default function ScrollHero() {
 
     const tick = () => {
       rafId = 0;
-      if (disposed || !firstBatchDone || !eligible()) return;
+      if (disposed) return;
+
+      // The copy fades on RAW progress, not on the rounded frame index, so it
+      // eases continuously instead of stepping once per frame. It runs before
+      // everything below: it does not depend on a single frame having loaded,
+      // so scrolling during the initial load still fades the words.
+      if (eligible()) {
+        const fade = 1 - clamp01(progress() / COPY_FADE_END);
+        if (fade !== lastFade) {
+          section.style.setProperty("--hero-fade", String(Number(fade.toFixed(3))));
+          lastFade = fade;
+        }
+      }
+
+      if (!firstBatchDone || !eligible()) return;
 
       let index = targetIndex();
 
@@ -403,6 +423,20 @@ export default function ScrollHero() {
           decoding="async"
         />
         <canvas ref={canvasRef} className="hero__canvas" aria-hidden="true" />
+        {/* Scrim and copy fade together: the scrim exists to hold this text
+            up, so it has no reason to outlive it. `pointer-events: none` in
+            the CSS keeps the whole layer out of the way of scrolling. */}
+        <div className="hero__copy">
+          <div className="hero__scrim" aria-hidden="true" />
+          <div className="hero__words">
+            <h1 className="hero__title">
+              Orice temă,
+              <br />
+              orice format.
+            </h1>
+            <p className="hero__subtitle">Long form, short form, orice platformă.</p>
+          </div>
+        </div>
       </div>
     </section>
   );

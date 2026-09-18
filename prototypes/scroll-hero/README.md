@@ -63,7 +63,17 @@ npm run build && npm run start
   (1100 ms), then re-arms for the next idle window. The first scroll event
   that moves `scrollY` cancels it for the life of the page.
 - **Vanilla** — no GSAP, Lenis, or scroll library. Dependencies: Next, React.
-
+- **The copy over the film** — fixed nav, and a title block at 10% in from
+  the bottom-left corner. Scrim and words live in one layer and fade as one
+  thing on raw scroll progress, gone by 60% of the scrub; a dark corner with
+  no text in it would be worse than no scrim. The nav does not fade: a hero
+  that scrubs away should still leave a way out. The fade is written in the
+  same rAF tick that draws, before the frame-index dedupe, so it eases
+  continuously instead of stepping once per frame.
+- **Typeface** — Bricolage Grotesque, variable, one family for everything,
+  self-hosted by `next/font` at build time into `.next/static`. No runtime
+  request to Google and no layout shift. The `latin-ext` subset is not
+  optional: without it "temă" and "platformă" break mid-word to a fallback.
 - **The length is not compiled in** — `/frames/manifest.json` (`{"count": 72}`)
   is uploaded with the frames and read at startup, so re-cutting the sequence
   needs no rebuild. The request starts in parallel with the poster and is
@@ -79,9 +89,9 @@ npm run build && npm run start
 `data-loaded` and `data-count` on the `<section>` exist for the tests; they
 are cheap attribute writes and can go when the mechanic moves into the site.
 
-## Results (2026-09-17, production build, preinstalled Chromium)
+## Results (2026-09-18, production build, preinstalled Chromium)
 
-**Playwright** — 7 of 7 passing. `shots/frame-000.png` … `frame-071.png` show
+**Playwright** — 9 of 9 passing. `shots/frame-000.png` … `frame-071.png` show
 frames 0001, 0019, 0037, 0054 and 0072 at the five scroll checkpoints;
 `held-at-19.png` shows frame 0020 held with frames 21+ stalled at the
 network layer; `after-hero.png` is the test section filling the viewport;
@@ -99,15 +109,58 @@ footage at 1600×900 lands nearer 25–30 kB per frame, so 72 frames is about
 1.8–2.2 MB — inside the budget, where 100 would have been at its edge.
 If a longer cut ever goes over, 1280×720 is the lever.
 
+### Legibility, measured rather than eyeballed
+
+`shots/copy-000.png` … `copy-071.png` are the five frames at the scroll
+positions asked for. Each one is measured, not just looked at: the test
+screenshots the text region twice, with and without the words, and reads the
+backdrop's luminance from the second.
+
+| frame | copy opacity | backdrop luminance | contrast vs white |
+|---|---|---|---|
+| 0 | 1.00 | 0.015 | 16.2:1 |
+| 20 | 0.53 | 0.036 | 12.2:1 |
+| 40 | 0.06 | 0.051 | 10.4:1 |
+| 60 | 0.00 | 0.065 | — faded out |
+| 71 | 0.00 | 0.065 | — faded out |
+
+**Those numbers flatter the design, and one test says so.** This placeholder
+sequence is dark, so the scrim is barely being asked to work. Replace the
+film with pure white — brighter than any real frame — and the 60% scrim on
+its own leaves the title at **1.8:1**, unreadable. Deepening the scrim
+enough to fix that would take 82% black, which is a box, not a gradient.
+
+What carries it instead is a tight dark ring at the glyph edge, the same
+thing subtitles have always used: invisible on dark footage, decisive on
+bright. `shots/copy-on-white.png` is that case, and the test measures each
+element against its own WCAG bar — 3:1 for the title, which is large text,
+4.5:1 for everything at body size:
+
+| on a pure white frame | scrim alone | glyphs vs their halo | bar |
+|---|---|---|---|
+| title | 1.8:1 | 6.6:1 | 3:1 |
+| subtitle | 2.2:1 | 5.8:1 | 4.5:1 |
+| nav brand | 9.2:1 | 8.0:1 | 4.5:1 |
+| nav links | 9.1:1 | 6.7:1 | 4.5:1 |
+
+The nav was the weakest of the four and is the reason its wash is taller
+than the bar itself: at the nav's own height the gradient had thinned to
+~0.27 alpha exactly where the words sit, and the links were the first thing
+a bright frame swallowed.
+
 **Lighthouse** (`lighthouse/summary.json`, `lighthouse/*.html`):
 
 | run | perf | a11y | best practices | SEO | FCP | LCP | TBT | CLS |
 |---|---|---|---|---|---|---|---|---|
-| mobile (Lighthouse default: slow 4G, 4× CPU, 412px → poster-only path) | 100 | 100 | 96 | 100 | 0.76 s | 1.77 s | 56 ms | 0 |
-| desktop screen + same slow-4G simulation (canvas path, whole sequence) | 87 | 100 | 100 | 100 | 0.75 s | 2.29 s | 64 ms | 0 |
+| mobile (Lighthouse default: slow 4G, 4× CPU, 412px → poster-only path) | 98 | 100 | 96 | 100 | 0.77 s | 2.13 s | 70 ms | 0 |
+| desktop screen + same slow-4G simulation (canvas path, whole sequence) | 89 | 100 | 100 | 100 | 0.75 s | 2.11 s | 70 ms | 0 |
 
 Measured with Caddy in front, the shape the box runs: frames and poster off
-disk, everything else proxied to Next. **Expect noise on the desktop run.**
+disk, everything else proxied to Next. **The webfont is what the headroom
+went on**: mobile LCP was 1.77 s before the copy layer and is 2.13 s with
+it, for ~60 kB of latin + latin-ext subsets competing with the poster on a
+narrow pipe. Still inside the 2.5 s budget, and latin-ext is not droppable
+— the copy is Romanian. **Expect noise on the desktop run.**
 Of two consecutive runs one came back 87 with 64 ms of blocking time and the
 other 76 with 285 ms, on identical code — Lighthouse, the server and Caddy
 share one small box here. LCP and CLS were stable across both (2.29 s /

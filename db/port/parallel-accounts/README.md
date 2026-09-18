@@ -786,3 +786,36 @@ clip. The speedup is Etapa 3 — the pool that keeps several Veo jobs in flight 
 and it remains unbuilt and unmeasured. What is now true is that the ground it
 needs is correct: every scene's start frame lives on the account its clip will be
 submitted to.
+
+## The regression Etapa 2 shipped, and what it cost (2026-09-18, `98e7b4b0`)
+
+**`Load Sheet Media` returning zero rows stopped the entire batch.** A node that
+emits nothing stops everything downstream of it — the trap this README already
+names, and the reason `Replicate Prep` and `Build Flow Refs` were written to
+always emit one item. The Postgres node in FRONT of them was left unguarded, so a
+project with no rows in `hov.sheet_media` never reached `Replicate Prep` at all.
+
+The batch did not fail. It ended, `status: success`, in 160 milliseconds, with
+`lastNodeExecuted: Load Sheet Media` and no audio, no images and no clips
+generated. From the site it looks like production simply refusing to start.
+
+**Ten of twelve active projects were in that state**, including a real film —
+"How ww2 started", 16 scenes, 0 clips. It shipped with Etapa 2 on 2026-09-17
+around 17:05 and was live for roughly seventeen hours.
+
+The fix is `alwaysOutputData: true` on `Load Sheet Media`. `Replicate Prep` then
+runs, finds no sources, and returns its `{skip: true}` item, which
+`Replicate Any?` already routes past the loop to `Find Audio Folder`. This is the
+one case the n8n guidance allows it: the empty result has a dedicated branch, and
+the node downstream reads no fields off the synthetic item.
+
+Diff before publishing: 234 → 234 nodes, added 0, removed 0, changed 1, and that
+one change is the setting — parameters byte-identical, connections identical.
+
+**How it was found matters more than the fix.** It was not found by a check; it
+surfaced because an unrelated execution of ANOTHER project appeared in the list
+while a pool test was being watched, and it had finished suspiciously fast. The
+lesson: **a node added in front of an existing chain inherits responsibility for
+that chain's liveness**, and the zero-item rule has to be applied to the node that
+FEEDS the guarded one, not only to the guard. Nothing in the Etapa 2 verification
+covered a project with no sheets, because the test film always had six.

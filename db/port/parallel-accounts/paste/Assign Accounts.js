@@ -92,10 +92,44 @@ const items = $input.all();
 const total = items.length;
 const per = Math.max(1, Math.ceil(total / n));
 
+// THE IMAGE IS THE ANCHOR, not the position.
+//
+// A clip is generated FROM the scene's start frame, and useapi refuses the pair
+// when the body's email and the reference's owner disagree:
+//   400 Email mismatch: body has 'X', references have 'Y'
+// Position alone cannot decide that, because the list this node receives is not
+// the same list between passes — `Sort & Cap Scenes` puts scenes that already
+// have a clip at the BACK, so on a second pass over a partly-finished film every
+// block boundary moves and scenes keep their old image while being handed a new
+// account. That is not hypothetical: it killed execution 14618 after two good
+// clips, with the image on account 02 and the body addressed to 01.
+//
+// So a scene that ALREADY has an image stays on whatever account minted it, and
+// position decides only for scenes that have none yet. This costs nothing in
+// balance — a scene with an image no longer needs image generation, which is the
+// only phase the block split exists to spread — and it makes the assignment
+// stable across passes instead of drifting with the sort.
+const ownerOf = function (id) {
+  let owner = '';
+  const hx = String(id || '').match(/-email:([0-9a-f]+)-/i);
+  if (hx) { for (let i = 0; i < hx[1].length; i += 2) owner += String.fromCharCode(parseInt(hx[1].substr(i, 2), 16)); }
+  return owner.indexOf('@') < 0 ? '' : owner;
+};
+
+let anchored = 0;
 const out = items.map((it, i) => {
   const block = n > 1 ? Math.min(n - 1, Math.floor(i / per)) : 0;
-  return { json: Object.assign({}, it.json, { flowEmail: ACCOUNTS[block], flowBlock: block }) };
+  let email = ACCOUNTS[block];
+  const imgOwner = ownerOf(((it.json.fields || {})['Image Media ID']) || '');
+  if (imgOwner && imgOwner !== email) {
+    anchored++;
+    email = imgOwner;
+  }
+  return { json: Object.assign({}, it.json, { flowEmail: email, flowBlock: block }) };
 });
+if (anchored) {
+  console.log('FLOW ACCOUNTS: ' + anchored + ' scene(s) kept on the account that minted their image rather than on their block');
+}
 
 const counts = {};
 out.forEach((o) => { counts[o.json.flowEmail] = (counts[o.json.flowEmail] || 0) + 1; });

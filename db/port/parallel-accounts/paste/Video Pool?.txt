@@ -1,0 +1,1 @@
+={{ (() => { try { return JSON.parse(($('IMG Load Project').first().json.fields || {})['Editing Options'] || '{}').videoPool === true; } catch (e) { return false; } })() }}

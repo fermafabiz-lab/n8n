@@ -125,3 +125,153 @@ be checked against that by walking the graph, not by eye.
 3. Every clip lands on the scene it belongs to — the failure mode of a broken tick
    is a clip written to the wrong scene, which no existing check would catch.
 4. Wall clock against the same film with the flag off.
+
+---
+
+## Applied 2026-09-18 (Media Generation `8ce5af14`, rollback `8c4ef1bf`)
+
+Nine nodes added, one changed, nothing removed.
+
+| node | kind | role |
+|---|---|---|
+| `Video Pool?` | if | reads `Editing Options.videoPool`; false → `Loop Scenes`, the serial path |
+| `Pool Tick` | code | the brain; one tick, one action, one scene |
+| `Pool Route` | switch | `wait` → `Pool Wait`, `done` → `Wait Video Approval`, fallback → `Current Scene` |
+| `Pool Wait` | wait, 20s | under the 65s suspension threshold |
+| `Pool Action?` | if | after `Current Scene`: poll tick → `Poll Video Job`, otherwise → `Needs Clip?` |
+| `Pool Submitted?` | if | after `Submit Video`: pool on → `Pool Record`, off → `Wait Video` |
+| `Pool Retry?` | if | job not finished: pool on → `Pool Record`, off → `Wait Retry` |
+| `Pool Record` | code | folds the tick's result in; edges told apart by `$prevNode.name` |
+| `Pool Return?` | if | pool on → `Pool Tick`, off → `Loop Scenes` |
+
+`Poll Video Job` is the only existing node changed: its url read
+`$('Submit Video').first().json.jobid`, whose latest run belongs to a different
+scene once more than one clip is in flight. It now prefers `$json.poolJobid`,
+which `Current Scene` carries through because it returns
+`Object.assign({}, $json, …)`, and falls back to the old lookup on the serial path.
+
+**Verified before publishing.** Diff against `8c4ef1bf`: 225 → 234 nodes,
+`added 9, removed 0, changed 1`, and the one change is the url above. No dangling
+`$('…')` references anywhere in 234 nodes, all 12 Google Drive nodes intact. Every
+Code body and every routing expression byte-identical to its file in `paste/`.
+
+**The OFF path was walked edge by edge**, because "it only runs when the flag is
+on" is exactly the kind of claim that is wrong in one branch:
+
+```
+Sort Scenes For Video → Video Pool?(1) → Loop Scenes → … → Current Scene
+  → Pool Action?(1) → Needs Clip? → … → Submit Video
+  → Pool Submitted?(1) → Wait Video → … → If Job Failed(1)
+  → Pool Retry?(1) → Wait Retry
+returns: Update Scene Record / Mark Video Prompt Rejected / Needs Clip?(1)
+  → Pool Record (no state → passes through) → Pool Return?(1) → Loop Scenes
+```
+
+Same order, same nodes, same data — six extra gates that only forward.
+
+**Still owed, and it is the whole point:** a run with `videoPool: true`. Nothing
+below has been exercised even once.
+
+1. Three clips in flight at the same time — `POOL submit … (3 in flight)` in the log.
+2. **Every clip written to the scene it belongs to.** This is the failure mode
+   that matters: a tick that reads another tick's `Current Scene` would write a
+   clip to the wrong scene, and no existing check would catch it. Audit by
+   decoding each scene's `video_media_id` and comparing with its block account.
+3. Wall clock against the same film with the flag off.
+4. Only then the probe for whether one account holds two generations at once,
+   before `videoPoolPerAccount` goes above 1.
+
+## First pool run: execution 14618 (2026-09-18 09:54 → 10:20)
+
+`rec1rkfxvBeMCFDRj`, `videoPool: true`, `flowAccounts: 3`, one job per account.
+
+**What the pool got right.**
+
+- Ten ticks, two clips written, and **every clip minted on the account that owns
+  its own scene's image** — 4 of 4 across the film, counting the two from the
+  earlier serial run. The failure this design was most exposed to, a tick reading
+  another tick's `Current Scene` and writing a clip to the wrong scene, did not
+  happen.
+- Three submits went out before the first clip came back, on three different
+  accounts. That is the concurrency, and it is impossible in the serial loop.
+- Two clips landed 26 seconds apart on different accounts.
+
+**What killed it, and it was not the pool.** The run ended `error` at tick 10:
+
+```
+400 Email mismatch: body has 'houseofvideos01@gmail.com',
+                    references have 'houseofvideos02@gmail.com'
+```
+
+`Submit Video` turns out to be written carefully — every one of its stale-run
+lookups (`Attach End Frame`, `Submit Cooldown Guard`, `Motion Resubmit`) is
+already guarded by `sceneId === cs.id`, so no cross-tick contamination was
+possible there. The disagreement came from `Assign Accounts`.
+
+**The latent Etapa 1 defect the pool exposed.** `Assign Accounts` assigned the
+account purely by POSITION in the list it receives. That list is not the same
+between passes: `Sort & Cap Scenes` puts scenes that already have a clip at the
+BACK. So on a second pass over a partly-finished film — this film had two clips
+from the earlier run — every block boundary moves, and a scene whose image was
+minted on account 02 is handed account 01. Every such scene then dies on
+`Email mismatch`.
+
+**This was never about the pool.** The serial loop would fail identically on any
+second pass of a multi-account film; it had simply never had one. `flowAccounts`
+defaults to 1, so no production film was exposed.
+
+**The fix (Media Generation `2d3f0f86`, rollback `98e7b4b0`).** The IMAGE is the
+anchor, not the position: a scene that already has an `Image Media ID` stays on
+whatever account minted it, and position decides only for scenes with no image
+yet. It costs nothing in balance — a scene with an image no longer needs image
+generation, which is the only phase the block split exists to spread — and it
+makes the assignment stable across passes instead of drifting with the sort.
+Diff: 234 → 234 nodes, added 0, removed 0, changed 1, connections identical,
+body byte-identical to `paste/Assign Accounts.js`.
+
+**Still owed:** a pool run that reaches the end of a film. Nothing above shows
+the pool finishing; it shows it working for ten ticks and then hitting a bug in
+a node it does not own.
+
+## Second pool run: the film finishes (execution 14645, 2026-09-18 10:44)
+
+Same film, with the anchor fix live (`2d3f0f86`). This was exactly the case that
+broke run 14618 — a second pass over a partly-finished film, where
+`Sort & Cap Scenes` moves the finished scenes to the back and every block
+boundary shifts.
+
+**Result: 9 of 9 scenes have a clip, and `wrong_account` is 0.** Every clip is
+minted on the account that owns its own scene's image. No `Email mismatch`.
+
+The five clips this run produced, from a 10:44:55 start:
+
+| scene | account | landed |
+|---|---|---|
+| 101 | `houseofvideos01` | 10:47:02 |
+| 103 | `houseofvideos02` | 10:49:07 |
+| 3 | `fermafabiz` | 10:49:55 |
+| 104 | `houseofvideos02` | 10:50:46 |
+| 105 | `houseofvideos02` | 10:52:34 |
+
+**What this does and does not measure.** Five clips in 7m39, against a per-clip
+latency of roughly two minutes — so about 92 s per clip end to end. That is
+better than serial, but it is NOT the 3x the three accounts suggest, and the
+reason is visible in the table: the work left on this film was 1 clip on the
+primary, 1 on account 01 and **3 on account 02**. At one job per account, those
+three are strictly serial, and they are the critical path. The pool cannot beat
+an uneven remainder.
+
+**So the honest claim is correctness, not speed.** The pool runs a film to
+completion, writes every clip to the right scene on the right account, survives
+a second pass, and interleaves across accounts. A real speed measurement needs a
+film whose clip work is EVENLY divided — which means measuring on a first pass,
+where `Assign Accounts` splits the scenes into equal blocks, not on a remainder.
+
+**Still owed:**
+
+1. A first-pass film with `videoPool: true` and enough scenes for the blocks to be
+   even, timed against the same film with the flag off. That is the only number
+   that answers "does a film finish sooner".
+2. The probe for whether one account holds two generations at once, before
+   `videoPoolPerAccount` goes above 1. With an even split that is what turns 3
+   in flight into 6.

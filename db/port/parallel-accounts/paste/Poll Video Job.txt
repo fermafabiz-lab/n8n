@@ -1,0 +1,1 @@
+=https://api.useapi.net/v1/google-flow/jobs/{{ $json.poolJobid || $('Submit Video').first().json.jobid }}

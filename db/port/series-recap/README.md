@@ -53,6 +53,49 @@ clay-builders test film `rec78haMNefc8xaWs`, seeded with two lines:
 Both throwaway rows were deleted afterwards (cleanup workflow), so
 `hov.series` is back to whatever real shows exist.
 
+## The button (2026-09-18)
+
+The chain only ever ran FORWARD — `approveScript` fires it when an episode's
+script is approved. **Episode 1 of every show is the film the show was
+started from, and its script was approved before the show existed**, so every
+show opens with an empty recap and no way to fill it but typing. That is not
+an edge case; it is the first line of every series.
+
+`writeRecapFromEpisodes` (`platform/app/actions.ts`) and the "✎ Write it from
+the episodes" button under the field in `SeriesNotes` fix that: it fires this
+webhook for every episode of the show, waits, and puts the text back in the
+field.
+
+Three things it has to do because of how this chain behaves:
+
+- **It watches the row; it does not trust the answer.** `Recap Webhook` is
+  `responseMode: onReceived`, so HTTP 200 means "n8n started", not "a line
+  was written". The action polls `hov.series.previously` every 2s for up to
+  30s and reports what it actually finds.
+- **It stops on a clock, not on a count.** An episode whose script was never
+  approved produces NO line — `Build Recap Prompt` returns `[]` — so waiting
+  for one line per episode would hang on exactly the shows this exists for.
+- **It writes the text back into the field.** Revalidating the page does not
+  reach `SeriesNotes`'s own state, so the producer would press the button and
+  watch nothing happen. The action returns the new `previously` and the
+  component sets it.
+
+Pressing it twice is safe for the same reason approving twice is: `Append
+Recap` replaces the line for an episode NUMBER. A note the producer typed
+that is not in `Episode N — …` shape is left alone. The button is disabled
+while the field has unsaved edits, since it would overwrite them.
+
+Verified on the real show `recQ9U0eHndN8HIXf` ("Pip and the Blue Scarf",
+`previously` 0 characters): the webhook fired for its one episode
+`reciXLwufF2IrLyhZ` and 25 s later the row read 591 characters, one
+`Episode 1 — …` line naming Pip, Momo and Tilly as the narration spells them.
+
+**One thing measured and NOT fixed**: the prompt asks for "two sentences, at
+most 60 words" and the model returned two sentences of about 100. Harmless
+at one episode — the Lore cap is 8,000 characters — but a show with fifteen
+episodes would spend 9,000 on the recap alone and start losing its oldest
+lines to `composeSeriesLore`'s trim. Tighten the prompt before that, not now.
+
 ## Where the recap goes
 
 `composeSeriesLore` (`platform/lib/series.ts`) puts the recap LAST in the

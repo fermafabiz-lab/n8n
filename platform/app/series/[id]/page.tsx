@@ -233,6 +233,7 @@ export default async function SeriesPage({ params }: { params: Promise<{ id: str
             premise={series.premise}
             previously={series.previously}
             channelName={series.channelName}
+            episodes={episodes.length}
           />
         </section>
 

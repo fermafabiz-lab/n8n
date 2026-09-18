@@ -1,5 +1,13 @@
 /* Mechanics only: no brand, no type scale. Just enough to see the hero work. */
 
+:root {
+  /* The first content section's ground, and the colour the film crossfades
+     into at the end of the scrub. ONE owner: the section is painted with it
+     and so is the hero's outro overlay, so the handoff cannot drift into a
+     visible seam. */
+  --content-bg: #0b0b0c;
+}
+
 html,
 body {
   margin: 0;
@@ -127,6 +135,19 @@ body {
   visibility: hidden;
 }
 
+/* The outro. Sits over the film and under the copy, and crossfades the last
+   stretch of the sequence into the section below's colour. Opacity is the
+   only thing that changes — no transform, nothing to lay out. */
+.hero__outro {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: var(--content-bg);
+  opacity: 0;
+  pointer-events: none;
+  will-change: opacity;
+}
+
 /* ── The copy over the film ──────────────────────────────────────────────
    One layer holding the scrim and the words, so they fade as one thing:
    a dark corner with nothing in it would be worse than no scrim at all.
@@ -219,18 +240,22 @@ body {
     display: none;
   }
 
+  /* No long scroll, so there is no stretch to crossfade across. */
+  .hero__outro {
+    display: none;
+  }
+
   .hero[data-state="ready"] .hero__poster {
     visibility: visible;
   }
 }
 
-/* The first content section. It follows the last frame directly — the
-   sequence now ends inside the hallway, so there is no transition between
-   the two. Neutral on purpose: this is a test section, and picking a colour
-   to match the film is a design decision, not a mechanic. */
+/* The first content section. The film has already crossfaded to this colour
+   by the time the stage unpins, so the section arrives out of it rather than
+   after it — which is why there is no rule at the join. */
 .test-section {
   height: 100vh;
   display: grid;
   place-items: center;
-  border-top: 1px dashed #444;
+  background: var(--content-bg);
 }

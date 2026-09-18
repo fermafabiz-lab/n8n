@@ -140,6 +140,22 @@ async function scrollToFrame(page: Page, index: number, count: number) {
   await page.evaluate((y) => window.scrollTo(0, y), y);
 }
 
+/**
+ * A screenshot of the FILM, named after a frame.
+ *
+ * The outro covers the last tenth of the scrub, so a shot taken at the last
+ * frame is the handoff colour and nothing else — which is right on screen and
+ * useless as evidence: `held-at-19` exists to show the canvas is never blank,
+ * and a flat fill is exactly what blank looks like. So the overlay is lifted
+ * for these, and only these. What the outro does has its own three shots.
+ */
+async function shootFrame(page: Page, file: string) {
+  const lift = await page.addStyleTag({ content: ".hero__outro { opacity: 0 !important; }" });
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
+  await page.screenshot({ path: path.join(SHOTS, file) });
+  await lift.evaluate((el) => el.remove());
+}
+
 // Sums the bytes that actually crossed the wire for the hero's assets and
 // the page's own JS/CSS/HTML: everything the hero costs a first visitor.
 function trackBytes(page: Page) {
@@ -193,7 +209,7 @@ test.describe("desktop", () => {
       await expect(hero(page)).toHaveAttribute("data-frame", String(index));
       // one more frame so the compositor has shown the draw
       await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
-      await page.screenshot({ path: path.join(SHOTS, `frame-${String(index).padStart(3, "0")}.png`) });
+      await shootFrame(page, `frame-${String(index).padStart(3, "0")}.png`);
     }
 
     // Scrolling back up reverses.
@@ -237,7 +253,7 @@ test.describe("desktop", () => {
     // Never blank, never past what exists: index 19 is the 20th frame.
     await expect(hero(page)).toHaveAttribute("data-frame", "19");
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
-    await page.screenshot({ path: path.join(SHOTS, "held-at-19.png") });
+    await shootFrame(page, "held-at-19.png");
     const notBlank = await page.evaluate(() => {
       const c = document.querySelector("canvas.hero__canvas") as HTMLCanvasElement;
       const d = c.getContext("2d")!.getImageData(c.width >> 1, c.height >> 1, 1, 1).data;
@@ -269,7 +285,7 @@ test.describe("desktop", () => {
       await scrollToFrame(page, index, count);
       await expect(hero(page)).toHaveAttribute("data-frame", String(index));
       await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
-      await page.screenshot({ path: path.join(SHOTS, `copy-${String(index).padStart(3, "0")}.png`) });
+      await shootFrame(page, `copy-${String(index).padStart(3, "0")}.png`);
 
       const opacity = Number(await copy.evaluate((el) => getComputedStyle(el).opacity));
       const box = await words.boundingBox();
@@ -355,6 +371,51 @@ test.describe("desktop", () => {
     }
   });
 
+
+  test("crossfades into the next section's colour over the last 10%", async ({ page }) => {
+    await page.goto("/");
+    await expect(hero(page)).toHaveAttribute("data-state", "ready", { timeout: 15_000 });
+    const count = await frameCount(page);
+    await expect(hero(page)).toHaveAttribute("data-loaded", String(count), { timeout: 30_000 });
+
+    const outro = page.locator(".hero__outro");
+    const range = await scrubRange(page);
+    const opacityAt = async (p: number) => {
+      await page.evaluate((y) => window.scrollTo(0, y), Math.round(range * p));
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
+      return Number(await outro.evaluate((el) => getComputedStyle(el).opacity));
+    };
+
+    const seen: { at: number; opacity: number }[] = [];
+    for (const p of [0, 0.5, 0.9, 0.95, 1]) seen.push({ at: p, opacity: await opacityAt(p) });
+    console.table(seen.map((s) => ({ "through the scrub": `${s.at * 100}%`, "outro opacity": s.opacity.toFixed(2) })));
+
+    // Nothing until the last tenth, then it arrives and only ever increases.
+    expect(seen[0].opacity).toBe(0);
+    expect(seen[1].opacity).toBe(0);
+    expect(seen[2].opacity).toBe(0);
+    expect(seen[3].opacity).toBeGreaterThan(0.4);
+    expect(seen[3].opacity).toBeLessThan(0.6);
+    expect(seen[4].opacity).toBe(1);
+
+    // Opacity is the only thing that moved: no transform was introduced.
+    expect(await outro.evaluate((el) => getComputedStyle(el).transform)).toBe("none");
+
+    // And it is the colour the section below is painted in, so the join has
+    // nothing to show.
+    const outroColour = await outro.evaluate((el) => getComputedStyle(el).backgroundColor);
+    const sectionColour = await page
+      .getByTestId("after-hero")
+      .evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(sectionColour).toBe(outroColour);
+
+    // Screenshots at the positions they are named after: the loop above ends
+    // at 100%, so each one has to scroll back to its own mark first.
+    for (const p of [0.9, 0.95, 1]) {
+      await opacityAt(p);
+      await page.screenshot({ path: path.join(SHOTS, `outro-${String(Math.round(p * 100)).padStart(3, "0")}.png`) });
+    }
+  });
 
   test("takes the frame count from the manifest, not from the build", async ({ page }) => {
     // A shorter sequence than the files on disk: if the count were compiled

@@ -70,6 +70,12 @@ npm run build && npm run start
   that scrubs away should still leave a way out. The fade is written in the
   same rAF tick that draws, before the frame-index dedupe, so it eases
   continuously instead of stepping once per frame.
+- **The outro** — over the last 10% of the scrub the film crossfades into
+  the colour the first content section is painted in, so that section arrives
+  out of the film rather than after it. One opacity on one full-stage
+  overlay: no transform, nothing to lay out, nothing to scale. The colour has
+  a single owner, `--content-bg` on `:root`, read by both the overlay and the
+  section, so the join cannot drift into a visible seam.
 - **Typeface** — Bricolage Grotesque, variable, one family for everything,
   self-hosted by `next/font` at build time into `.next/static`. No runtime
   request to Google and no layout shift. The `latin-ext` subset is not
@@ -91,11 +97,34 @@ are cheap attribute writes and can go when the mechanic moves into the site.
 
 ## Results (2026-09-18, production build, preinstalled Chromium)
 
-**Playwright** — 9 of 9 passing. `shots/frame-000.png` … `frame-109.png` show
+**Playwright** — 10 of 10 passing. `shots/frame-000.png` … `frame-109.png` show
 frames 0001, 0028, 0056, 0083 and 0110 at the five scroll checkpoints;
 `held-at-19.png` shows frame 0020 held with frames 21+ stalled at the
 network layer; `after-hero.png` is the test section filling the viewport;
-`mobile.png` and `reduced-motion.png` are poster-only.
+`mobile.png` and `reduced-motion.png` are poster-only; `outro-090.png` …
+`outro-100.png` walk the crossfade at the end.
+
+**A shot named after a frame lifts the outro overlay, and only that shot.**
+The overlay is fully opaque at 100% of the scrub, which is where the
+last-frame checkpoints sit — so `frame-109` and `held-at-19` came back as a
+flat fill the moment the crossfade landed. That is right on screen and
+useless as evidence: `held-at-19` exists to prove the canvas is never blank,
+and a flat fill is exactly what blank looks like. `shootFrame()` in the spec
+suppresses the overlay for those; the crossfade keeps its own three shots.
+
+The outro, measured rather than described:
+
+| through the scrub | overlay opacity |
+|---|---|
+| 0% | 0.00 |
+| 50% | 0.00 |
+| 90% | 0.00 |
+| 95% | 0.50 |
+| 100% | 1.00 |
+
+The test also asserts the overlay's computed `transform` is still `none`,
+so the effect cannot quietly grow a second mechanism, and that the section
+below resolves to the same colour.
 
 | Transfer (desktop, whole sequence) | |
 |---|---|

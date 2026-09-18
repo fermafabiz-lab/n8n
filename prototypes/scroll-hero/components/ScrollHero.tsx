@@ -54,6 +54,11 @@ const POSTER_SRC = "/frames/poster.webp";
 // The copy is gone by this far through the scrub, and the scrim with it.
 const COPY_FADE_END = 0.6;
 
+// The last stretch of scroll, over which the film crossfades to the colour
+// the first content section is painted in. Opacity only: no transform, no
+// second element moving — the film simply gives way to the page's ground.
+const OUTRO_FADE = 0.1;
+
 const HINT_IDLE_MS = 2000;
 const HINT_FRAMES = 4;
 const HINT_OUT_MS = 450;
@@ -113,6 +118,7 @@ export default function ScrollHero() {
   const sectionRef = useRef<HTMLElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const outroRef = useRef<HTMLDivElement>(null);
 
   // Emits <link rel="preload"> for the poster during SSR so it is the first
   // request after the document, which is what keeps LCP short.
@@ -122,7 +128,8 @@ export default function ScrollHero() {
     const section = sectionRef.current;
     const stage = stageRef.current;
     const canvas = canvasRef.current;
-    if (!section || !stage || !canvas) return;
+    const outroEl = outroRef.current;
+    if (!section || !stage || !canvas || !outroEl) return;
     const ctx = canvas.getContext("2d", { alpha: false });
     if (!ctx) return;
 
@@ -142,6 +149,7 @@ export default function ScrollHero() {
     let rafId = 0;
     let lastDrawn = -1;
     let lastFade = -1;
+    let lastOutro = -1;
     let sizeDirty = true;
     let cssWidth = 0;
     let cssHeight = 0;
@@ -223,10 +231,21 @@ export default function ScrollHero() {
       // One read, then writes only.
       const y = scrolled();
 
-      const fade = 1 - clamp01(progressFrom(y) / COPY_FADE_END);
+      const p = progressFrom(y);
+
+      const fade = 1 - clamp01(p / COPY_FADE_END);
       if (fade !== lastFade) {
         section.style.setProperty("--hero-fade", String(Number(fade.toFixed(3))));
         lastFade = fade;
+      }
+
+      // The outro: over the last OUTRO_FADE of the scrub the film gives way
+      // to the section below's colour, so that section arrives out of it
+      // rather than after it. Nothing moves — this is one opacity.
+      const outro = clamp01((p - (1 - OUTRO_FADE)) / OUTRO_FADE);
+      if (outro !== lastOutro) {
+        outroEl.style.opacity = String(Number(outro.toFixed(3)));
+        lastOutro = outro;
       }
 
 
@@ -444,6 +463,9 @@ export default function ScrollHero() {
           decoding="async"
         />
         <canvas ref={canvasRef} className="hero__canvas" aria-hidden="true" />
+        {/* Crossfades the film into the next section's colour. Opacity is the
+            only thing scroll writes on it. */}
+        <div ref={outroRef} className="hero__outro" aria-hidden="true" />
         {/* Scrim and copy fade together: the scrim exists to hold this text
             up, so it has no reason to outlive it. `pointer-events: none` in
             the CSS keeps the whole layer out of the way of scrolling. */}

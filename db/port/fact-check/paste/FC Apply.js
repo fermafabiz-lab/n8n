@@ -90,7 +90,7 @@ if (!fc.needsRewrite) {
 }
 
 if (refusal) {
-  console.log('FACT CHECK rewrite REFUSED — keeping the original narration: ' + refusal);
+  console.log('DEEP SEARCH rewrite REFUSED — keeping the original narration: ' + refusal);
 }
 
 const chapters = next || original;
@@ -123,6 +123,9 @@ const words = chapters.reduce((n, c) => n + wc(c.narrator_script), 0);
 
 const report = fc.run
   ? {
+      // The mode the film was made in, carried so the panel can say it back
+      // without a second query. Deep Search only runs on `documentary`.
+      category: fc.category || '',
       checked: findings.length,
       flagged: findings.filter((f) => f.verdict !== 'supported').length,
       searched: fc.searched || 0,
@@ -145,18 +148,24 @@ const report = fc.run
       })),
     }
   : {
+      category: fc.category || '',
       checked: 0,
       flagged: 0,
       searched: 0,
       rewritten: 0,
       skipped: fc.skipped || 'not checked',
+      // THE FIELD THE RED LIGHT IS WIRED TO. The prose above will be reworded
+      // one day; this will not. `not-documentary` is the one skip that is
+      // normal — every other value means a film that should have been checked
+      // was not, which is what the producer asked to be able to see.
+      skipCode: fc.skipCode || 'unknown',
       // Distinguishes "we read it and it is a story" from "there was no pack
       // to read it against", which are the same outcome and different news.
       storyMode: fc.storyMode ? true : undefined,
       findings: [],
     };
 
-console.log('FACT CHECK done: ' + report.checked + ' checked, ' + report.flagged + ' flagged, ' + report.rewritten + ' rewritten');
+console.log('DEEP SEARCH done: ' + report.checked + ' checked, ' + report.flagged + ' flagged, ' + report.rewritten + ' rewritten');
 
 // Base64 for the writer downstream. The report quotes the narration verbatim,
 // so it is arbitrary producer text going into a SQL literal: dollar-quoting

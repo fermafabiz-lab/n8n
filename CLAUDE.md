@@ -237,12 +237,15 @@ the full entry in the file named:
   eight kids style prefixes (`KIDS_STYLES`) live in `Voice Mode` (Claude
   Scripting), `Cast Sheet Prep` and `Set Plate Prep` (Media Generation) —
   change one, change all three, and run `node db/port/sheet-style/check.mjs`.
-- **A gate that tells two kinds of film apart must not trust `category`.**
-  `story` is the site's DEFAULT, so genuine documentaries carry it — of eleven
-  researched films in the database only three say `documentary`, and the Burj
-  Al Arab, Peking to Paris and Tupac films are all filed as `story`. The
-  fact-check chain asks the narration itself instead. Full account:
-  `docs/lessons-pipeline.md`, "The script is checked against its own research".
+- **`category` is a REQUEST, not a description of the film.** `story` is the
+  site's DEFAULT, so genuine documentaries carry it — of eleven researched
+  films only three say `documentary`, and the Burj Al Arab, Peking to Paris and
+  Tupac films are all filed as `story`. So never use it to infer what a film
+  IS. Deep Search nevertheless gates on it, because the producer's instruction
+  was that it is a feature OF Documentary mode: reading it as "this producer
+  asked for the documentary treatment" is sound, reading it as "this film is
+  factual" is not. Full account: `docs/lessons-pipeline.md`, "The script is
+  checked against its own research".
 - **A button has to GO somewhere, and nothing tells you when one stops.**
   Two of them had: the chime's toast and system notification did nothing at
   all on click, and the library hero's "Everything waiting on me" pointed at
@@ -363,14 +366,19 @@ expected and harmless for an app touching only its own Drive.
 
 ## Open work
 
-- **The fact check is live; what is owed is a film somebody keeps**
-  (2026-09-18, Claude Scripting `ea076103`; full account
+- **Deep Search is live; what is owed is a film somebody keeps**
+  (2026-09-18, Claude Scripting `99ad980b`; full account
   `db/port/fact-check/README.md`, lessons in `docs/lessons-pipeline.md` under
   "The script is checked against its own research" and `docs/lessons-site.md`
-  under "The fact-check panel"). Thirteen nodes between `If Narration Retry`[1]
+  under "Deep Search — a warning with no button"). **Documentary mode only**,
+  by the producer's instruction. Thirteen nodes between `If Narration Retry`[1]
   and `Combine Chapters` read the narration against the film's own research
   pack, look up what the pack does not cover, rewrite what nothing can back,
-  and write `hov.fact_check` for the panel above the script gate. It was
+  and write `hov.fact_check` for the panel above the script gate and the
+  Settings card. **The feature is called Deep Search; the nodes are `FC *` and
+  the table is `hov.fact_check`** — the mapping is FC = Deep Search, and it
+  stays that way because renaming thirteen live nodes means rewriting every
+  `$('FC …')` reference between them. It was
   exercised end to end on the Burj Al Arab film's real narration and pack
   through a throwaway (execution 14764: 47 statements, 16 looked up, 8
   corrected, 0 left flagged, rewrite accepted, every chapter within a few words

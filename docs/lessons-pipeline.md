@@ -2057,3 +2057,37 @@ a citation), and *"9,000 tonnes of WHITE steel"*, where the pack gives the
 tonnage and nothing gives the colour. Neither is a hallucination in the usual
 sense. Both are a writer adding a true-sounding adjective to a sourced fact,
 which is what this check is really for.
+
+### Deep Search is Documentary mode's feature, not the narration's — 2026-09-18
+
+The entry above says the project's `category` cannot tell a documentary from a
+dramatisation, and gives the evidence: `story` is the site's default, and of
+eleven researched films only three say `documentary` while the Burj Al Arab,
+Peking to Paris and Tupac films — all documentaries — say `story`.
+
+All of that is still true, and the producer gated on `category` anyway, the
+same afternoon: **"The new fact checking system has to be active only in
+documentary mode."** That is not a contradiction, it is a different question.
+The category is a REQUEST, not a description. Reading it as *"this film is
+factual"* is unsound. Reading it as *"this producer asked for the documentary
+treatment"* is exactly what it is for — it is the field that already decides
+archive footage, the source watermark and the end-screen credits, and Deep
+Search now joins that list.
+
+**What it costs, stated plainly because it is invisible from the screen**: a
+factual film created in Story mode gets nothing. Asking for Deep Search means
+choosing Documentary when the film is created.
+
+**The judge's own factual/story verdict is KEPT as an inner gate.** Two gates,
+one per failure mode: the category answers *was it asked for*, the judge
+answers *can it be done*. A documentary whose narration turns out to be a
+dramatisation is a real case and no category can catch it.
+
+**Every skip now carries a CODE as well as a sentence**, and that split is the
+point. `not-documentary` and `story` are normal; `no-mode`, `not-researched`,
+`no-pack`, `no-chapters` and anything unrecognised mean a film that asked for
+Deep Search and did not get it. The prose beside each one will be reworded; the
+code is what the site's red light is wired to, and `lib/deep-search.ts` is the
+only thing allowed to interpret it. **A code the site has never heard of fails
+CLOSED — red, not green** — because the alternative is a future workflow
+turning the alarm off by inventing a reason.

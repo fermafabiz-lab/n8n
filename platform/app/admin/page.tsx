@@ -1,4 +1,8 @@
 import Link from "next/link";
+import { getDeepSearchHealth } from "@/lib/data";
+import { deepSearchState } from "@/lib/deep-search";
+
+export const dynamic = "force-dynamic";
 
 /**
  * Settings is a hub of sections, not a form. Three of the four are reserved
@@ -47,6 +51,18 @@ const SECTIONS = [
     ),
   },
   {
+    href: "/admin/deep-search",
+    label: "Deep Search",
+    note: "Fact-checking on documentaries — and whether it is working.",
+    icon: (
+      <>
+        <circle cx="9" cy="9" r="5.5" />
+        <path d="M13 13l4 4" />
+        <path d="M6.7 9h4.6M9 6.7v4.6" />
+      </>
+    ),
+  },
+  {
     href: "/admin/customize",
     label: "Customize",
     note: "Appearance — light, dark, or follow the device.",
@@ -59,7 +75,18 @@ const SECTIONS = [
   },
 ] as const;
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  // The one number the hub carries. The producer asked for a red thing they
+  // could see without hunting for it, and a card you have to open to learn it
+  // is broken is not that. Failing the query is NOT treated as a fault: an
+  // unreachable database would paint the hub red on every page load and the
+  // dot would stop meaning anything.
+  const broken = await getDeepSearchHealth(20)
+    .then((films) =>
+      films.filter((f) => deepSearchState({ report: f.report, isDocumentary: true, scriptExists: true }).red).length,
+    )
+    .catch(() => 0);
+
   return (
     <main className="page admin settings">
       <div className="sechead">
@@ -75,8 +102,17 @@ export default function SettingsPage() {
               </svg>
             </span>
             <span className="stext">
-              <span className="slabel">{s.label}</span>
-              <span className="snote">{s.note}</span>
+              <span className="slabel">
+                {s.label}
+                {s.href === "/admin/deep-search" && broken > 0 && (
+                  <span className="sdot" aria-label={`${broken} films need attention`} />
+                )}
+              </span>
+              <span className="snote">
+                {s.href === "/admin/deep-search" && broken > 0
+                  ? `${broken} film${broken === 1 ? "" : "s"} did not get checked.`
+                  : s.note}
+              </span>
             </span>
             <svg className="schev" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M8 4l6 6-6 6" />

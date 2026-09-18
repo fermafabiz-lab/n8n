@@ -3128,6 +3128,34 @@ body:has(.nb) .nav {
   letter-spacing: -0.02em;
   line-height: 1.15;
 }
+/* The one alarm on the Settings hub: Deep Search did not run on a film that
+   asked for it. `--red` is already a token and carries both themes, so this
+   needs no literal. It pulses so it reads as a live state rather than
+   decoration — and the pulse is dropped for anyone who asked for less motion. */
+.sdot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 9px;
+  vertical-align: 0.14em;
+  border-radius: 999px;
+  background: var(--red);
+  animation: sdot-pulse 2s ease-in-out infinite;
+}
+@keyframes sdot-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sdot {
+    animation: none;
+  }
+}
 /* --soft, not --dim: the note sits on the cushioned gradient, which ends
    darker than --card2, the only ground --faint is guaranteed on. */
 .snote {

@@ -35,12 +35,9 @@ try {
 // Lazarus did on a Tuesday. Left alone, the rewrite would have been handed
 // every sentence of the film.
 //
-// `FC Prep` cannot catch this. Its gate is "researched, with a pack", and this
-// film was both. Neither can the project's category: `story` is the DEFAULT on
-// the site, so genuine documentaries (Burj Al Arab, Peking to Paris, the Tupac
-// film) carry it too. The only signal that separates them is the narration
-// itself, so the judge is asked first what it is reading, and answers in
-// `mode`.
+// This is the INNER gate. `FC Prep` already refused every film not made in
+// Documentary mode; this one catches the documentary whose narration turns out
+// to be a dramatisation, which no category can tell you.
 if (mode === 'story') {
   return [
     {
@@ -50,6 +47,7 @@ if (mode === 'story') {
           ...fc,
           run: false,
           storyMode: true,
+          skipCode: 'story',
           skipped:
             'This film tells a story rather than recounting real events, so there is nothing to check it against. Its research was used as background, not as claims.',
           findings: [],
@@ -69,7 +67,7 @@ const narration = String(fc.narration || '');
 const before = findings.length;
 findings = findings.filter((f) => f && typeof f.quote === 'string' && f.quote.trim() && narration.includes(f.quote.trim()));
 if (findings.length !== before) {
-  console.log('FACT CHECK dropped ' + (before - findings.length) + ' finding(s) whose quote did not match the narration verbatim');
+  console.log('DEEP SEARCH dropped ' + (before - findings.length) + ' finding(s) whose quote did not match the narration verbatim');
 }
 
 // The unsupported ones, in the SAME order the search prompt numbered them.
@@ -151,7 +149,7 @@ const OVERWHELMED_FLOOR = 8; // below this a high share is just a short script
 const overwhelmed = findings.length >= OVERWHELMED_FLOOR && toFix.length / findings.length > OVERWHELMED_SHARE;
 if (overwhelmed) {
   console.log(
-    'FACT CHECK not rewriting: ' +
+    'DEEP SEARCH not rewriting: ' +
       toFix.length + ' of ' + findings.length +
       ' statements are unsupported, which reads as a script this pack was never meant to back. Reporting only.',
   );
@@ -159,7 +157,7 @@ if (overwhelmed) {
 }
 
 console.log(
-  'FACT CHECK ' +
+  'DEEP SEARCH ' +
     findings.length + ' checkable statements, ' +
     findings.filter((f) => f.verdict === 'supported').length + ' supported, ' +
     findings.filter((f) => f.verdict === 'unsupported').length + ' unsupported, ' +

@@ -1,6 +1,10 @@
-# Fact check — does the script say anything our sources do not?
+# Deep Search — does the script say anything our sources do not?
 
-Built 2026-09-18, live the same day. The producer's ask: *"a system to check
+Built 2026-09-18, live the same day. **Named "Deep Search" by the producer**
+that afternoon; the n8n nodes keep their `FC *` prefix and the table is still
+`hov.fact_check`, because renaming thirteen live nodes would mean rewriting
+every `$('FC …')` reference between them and renaming a live table buys
+nothing. Read `FC` as Deep Search everywhere below. The producer's ask: *"a system to check
 whether the information from the scripting part is accurate and rewrite it if
 not, so it has no factual errors"* — after ChatGPT read a Google Maps script
 this pipeline had written and listed four things in it that were not true.
@@ -12,6 +16,7 @@ Three decisions were theirs, taken before any of this was written:
 | Report first, or fix straight away? | **Flag and rewrite immediately** |
 | Look things up for claims the pack does not cover? | **Yes — one targeted search, then decide** |
 | May it hold up the script approval? | **Warn loudly, never block** |
+| Which films get it? | **Documentary mode only** (added the same day) |
 
 The third is the load-bearing one. Nothing in this chain has a button, a gate
 or a veto. It corrects what it can, says what it could not, and the producer
@@ -55,8 +60,8 @@ If Narration Retry[1] → FC Prep → FC Run?
 
 | Node | What it does |
 |---|---|
-| `FC Prep` | Decides whether this script is checkable at all, and renders the pack and the narration for the judge. Emits `Narration Guard`'s exact shape plus `fc`. |
-| `FC Run?` | Researched, with a pack, with chapters. Otherwise straight to `Combine Chapters`. |
+| `FC Prep` | **Documentary mode only**, then researched, with a pack, with chapters. Renders the pack and the narration for the judge; emits `Narration Guard`'s exact shape plus `fc`. |
+| `FC Run?` | What `FC Prep` decided. Otherwise straight to `Combine Chapters`. |
 | `FC Judge` | `mode` (factual or story) first; then every checkable statement with a verdict against the numbered claims ONLY. `Editor Model`, gpt-5.4. |
 | `FC Gap?` | Any `unsupported` findings? |
 | `FC Source` | One targeted primary-source lookup per gap, one `RESULT:` line each. `Research Model`, gpt-5.4 with web search. |
@@ -94,7 +99,25 @@ Found by `scripts/check-fact-check.mjs`, before the node had ever run. The
 fixture in that file is now the REAL response out of execution 14761, curly
 quotes and all.
 
-### 2. A story is not a film with errors in it
+### 2. The outer gate is the producer's, not the model's
+
+The first cut deliberately did NOT gate on the project's category, on the
+evidence that `story` is the site's default and of eleven researched films only
+three said `documentary`. The producer overruled it the same afternoon —
+**Deep Search is a feature of Documentary mode** — and that settles it: a film
+made in any other mode does not get checked, whatever its narration says.
+
+The consequence is worth writing down because it is not obvious from the
+screen: the Burj Al Arab, Peking to Paris and Tupac films are documentaries in
+substance and `story` in the database, so they would get nothing. Asking for
+Deep Search now means **choosing Documentary when the film is created**.
+
+`FC Prep` reads the category off `Receive Project Data`'s `Editing Options` —
+the project record, not the webhook payload, so it survives the form, resume
+and restart alike, and it is the same reference `FC Save Report` already
+depends on for the project id, so it adds no new way for the chain to break.
+
+### 3. A story is not a film with errors in it
 
 Run the judge on `recqbPJ7aZu0a21mt`, "The Roman slave who conquered Egypt",
 and it flags **55 of its 56 statements**. Every verdict is correct — nothing in
@@ -114,7 +137,7 @@ empty list and the chain becomes a pass-through. The same film now answers
 `{"mode":"story","findings":[]}` in 2.2 s, where it spent 46 s producing 56
 useless findings.
 
-### 3. …and a backstop, for when it gets that wrong
+### 4. …and a backstop, for when it gets that wrong
 
 `FC Resolve` also refuses to rewrite when more than 60% of at least 8 checkable
 statements are unsupported. A documentary written from its own pack holds up in
@@ -150,11 +173,12 @@ The verification workflows were throwaways and are archived:
 
 | Version | What |
 |---|---|
+| `99ad980b` | Documentary-mode gate, skip codes, the Deep Search rename — **published 15:18, and what is live** |
 | `b9f95221` | the active version this was built on |
 | `e3091e15` / `600ce4a5` / `60efa205` | the three edits that added the 13 nodes |
 | `38d05de7` | read the narration by node name, not `$json` (an agent replaces the payload) — **published 14:31** |
 | `20fb4e8c` | the `RESULT:` parser fix and the overwhelmed backstop |
-| `ea076103` | `storyMode` / `overwhelmed` in the report — **published 14:47, and what is live** |
+| `ea076103` | `storyMode` / `overwhelmed` in the report — published 14:47 |
 
 Rolling back means publishing `b9f95221`: the chain is additive, and `FC Prep`
 is the only node on the old happy path's edge.

@@ -58,8 +58,8 @@ export type {
   Scene,
   SceneVersion,
   ScriptInfo,
-  FactCheckReport,
-  FactCheckFinding,
+  DeepSearchReport,
+  DeepSearchFinding,
   GenreProfile,
   LibraryScript,
   ScriptExample,
@@ -81,7 +81,7 @@ export {
 
 import type {
   Project, Scene, ScriptInfo, SceneVersion, StatusKind,
-  FactCheckReport,
+  DeepSearchReport,
   GenreProfile, LibraryScript, ScriptExample,
 } from "./data/derive";
 
@@ -904,7 +904,7 @@ export async function getProjectEvidence(
 }
 
 /**
- * What the fact-checker made of this film's narration, or null if it never
+ * What Deep Search made of this film's narration, or null if it never
  * ran — which is the normal answer for every film written before the check
  * existed, and for a project on the frozen Airtable backend.
  *
@@ -912,13 +912,50 @@ export async function getProjectEvidence(
  * draws no panel at all, the second draws a short green one. A film the check
  * never saw must not be shown as a film that passed.
  */
-export async function getFactCheck(projectId: string): Promise<FactCheckReport | null> {
-  if (USE_PG) return pgBackend.getFactCheck(projectId);
+export type { DeepSearchFilm } from "./data/postgres";
+
+/**
+ * Every recent documentary that reached a script, with its report or without
+ * one. The Settings card turns red on the second kind. Postgres only — the
+ * frozen Airtable backend has no such table and answers empty, which draws a
+ * card saying Deep Search is not wired up rather than one claiming health.
+ */
+export async function getDeepSearchHealth(
+  limit?: number,
+): Promise<import("./data/postgres").DeepSearchFilm[]> {
+  if (USE_PG) return pgBackend.getDeepSearchHealth(limit);
+  // Demo mode shows one of each, for the same reason it serves a script: so
+  // the alarm can be looked at before it has ever had to fire. A CONFIGURED
+  // Airtable backend still answers empty — there is no such table over there,
+  // and a fabricated green light is the one thing this panel must never show.
+  if (!isConfigured) return DEMO_DEEP_SEARCH_HEALTH;
+  return [];
+}
+
+const DEMO_DEEP_SEARCH_HEALTH: import("./data/postgres").DeepSearchFilm[] = [
+  {
+    id: "demo-1",
+    name: "How the first cash machine was installed in Enfield",
+    createdAt: "2026-09-18T15:00:00.000Z",
+    checkedAt: "2026-09-18T15:03:01.000Z",
+    report: { category: "documentary", checked: 18, flagged: 1, searched: 5, rewritten: 1, findings: [] },
+  },
+  {
+    id: "demo-broken",
+    name: "How the Channel Tunnel was dug from both ends",
+    createdAt: "2026-09-17T09:00:00.000Z",
+    checkedAt: null,
+    report: null,
+  },
+];
+
+export async function getDeepSearch(projectId: string): Promise<DeepSearchReport | null> {
+  if (USE_PG) return pgBackend.getDeepSearch(projectId);
   // Demo mode serves a report for the same reason it serves a script: so the
   // panel is reviewable before anything is wired. A CONFIGURED Airtable
   // backend still answers null — there is no fact_check table over there, and
   // inventing one would show the producer a check that never ran.
-  if (!isConfigured) return DEMO_FACT_CHECK;
+  if (!isConfigured) return DEMO_DEEP_SEARCH;
   return null;
 }
 
@@ -927,7 +964,7 @@ export async function getFactCheck(projectId: string): Promise<FactCheckReport |
  * they could not, plus a couple that held up — so a screenshot of demo mode
  * exercises every branch except `skipped`.
  */
-const DEMO_FACT_CHECK: FactCheckReport = {
+const DEMO_DEEP_SEARCH: DeepSearchReport = {
   checked: 12,
   flagged: 3,
   searched: 4,

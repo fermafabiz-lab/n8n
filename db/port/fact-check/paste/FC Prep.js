@@ -1,4 +1,4 @@
-// Decide whether this script can be fact-checked at all, and lay out what the
+// Decide whether this script gets Deep Search at all, and lay out what the
 // judge needs. Sits between `If Narration Retry`[1] and `Combine Chapters`.
 //
 // THE SHAPE IT EMITS IS `Narration Guard`'S SHAPE, and that is load-bearing:
@@ -9,11 +9,46 @@
 // Bible` there was safe; this edge is the other kind.) Everything the chain
 // adds rides in `fc`, which nothing downstream reads.
 //
-// IT RUNS ONLY ON A RESEARCHED SCRIPT WITH A PACK. Fiction has no claims to
-// check against — `Extract Claims` yields zero on the No Research branch — and
-// checking invention against an empty list would flag every sentence of every
-// story film. A pack of zero is not a strict checker, it is a broken one.
+// DOCUMENTARY MODE ONLY — the producer's instruction, 2026-09-18. This is the
+// outer gate and it is deliberately the project's declared category rather
+// than anything inferred from the text: Deep Search is a feature of
+// Documentary mode, and a film made in any other mode does not get it even if
+// its narration is entirely factual. The consequence is worth stating because
+// it is not obvious: `story` is the site's DEFAULT, so films that read as
+// documentaries (Burj Al Arab, Peking to Paris, the Tupac film) are filed as
+// `story` and are NOT checked. Asking for Deep Search means choosing
+// Documentary when the film is created.
+//
+// The judge's own factual/story verdict is KEPT as an inner gate, for the
+// documentary whose narration turns out to be a dramatisation. Two gates, one
+// per failure mode: this one answers "was it asked for", that one answers "can
+// it be done".
 const g = $json;
+
+// The category comes off the project record the orchestrator passed in, not
+// off the webhook payload, so it survives every entry path — the form, resume
+// and restart all populate `Receive Project Data` from the same row. This is
+// the same reference `FC Save Report` already depends on for the project id,
+// so it adds no new way for the chain to break.
+let category = '';
+let modeRead = false;
+try {
+  const rec = $('Receive Project Data').first().json || {};
+  const raw = (rec.fields || {})['Editing Options'];
+  const eo = typeof raw === 'string' ? JSON.parse(raw || '{}') : raw || {};
+  if (eo && typeof eo === 'object' && 'category' in eo) {
+    category = String(eo.category || '').toLowerCase().trim();
+    modeRead = true;
+  } else if (rec.category) {
+    category = String(rec.category).toLowerCase().trim();
+    modeRead = true;
+  }
+} catch (e) {
+  // Left as not read — which is a RED state downstream, not a quiet skip.
+  // A documentary whose mode could not be read is the one case where doing
+  // nothing looks exactly like working, so it is reported as a fault.
+}
+const isDocumentary = category === 'documentary';
 
 let pack = [];
 let researched = false;
@@ -28,7 +63,42 @@ try {
 }
 
 const chapters = Array.isArray(g.chapters) ? g.chapters : [];
-const run = researched && pack.length > 0 && chapters.length > 0;
+const run = isDocumentary && researched && pack.length > 0 && chapters.length > 0;
+
+// Why it did not run, as a CODE the site can colour by and a sentence the
+// producer can read. The two are deliberately separate: the prose will be
+// reworded, the code is what the red light is wired to.
+//
+// `not-documentary` is the only skip that is NORMAL. Every other one happens
+// on a film that asked for Deep Search and did not get it, which is exactly
+// what the producer wants to see turn red.
+let skipCode = null;
+let skipped = null;
+if (!run) {
+  if (!modeRead) {
+    skipCode = 'no-mode';
+    skipped =
+      'Deep Search could not tell which mode this film was made in, so it did not run. This is a fault, not a setting.';
+  } else if (!isDocumentary) {
+    skipCode = 'not-documentary';
+    skipped =
+      'Deep Search runs on Documentary films only, and this film was made in ' +
+      (category ? category.charAt(0).toUpperCase() + category.slice(1) : 'another') +
+      ' mode.';
+  } else if (!researched) {
+    skipCode = 'not-researched';
+    skipped =
+      'This documentary reached the script with no research behind it, so there was nothing to check it against.';
+  } else if (pack.length === 0) {
+    skipCode = 'no-pack';
+    skipped =
+      'The research step found no sourced claims for this documentary, so there was nothing to check the script against.';
+  } else {
+    skipCode = 'no-chapters';
+    skipped = 'The narration arrived with no chapters.';
+  }
+  console.log('DEEP SEARCH skipped (' + skipCode + '): ' + skipped);
+}
 
 // The narration as the judge will see it, with the chapter markers kept so it
 // can tell where a sentence lives, and so a quote it returns can be found
@@ -45,26 +115,15 @@ const packList = pack
 
 const words = (s) => String(s || '').split(/\s+/).filter(Boolean).length;
 
-if (!run) {
-  console.log(
-    'FACT CHECK skipped: ' +
-      (!researched ? 'not a researched topic' : pack.length === 0 ? 'no sourced claims' : 'no chapters'),
-  );
-}
-
 return [
   {
     json: {
       ...g,
       fc: {
         run,
-        skipped: run
-          ? null
-          : !researched
-            ? 'This film is not a researched topic, so there is nothing to check it against.'
-            : pack.length === 0
-              ? 'The research step found no sourced claims, so there was nothing to check the script against.'
-              : 'The narration arrived with no chapters.',
+        category,
+        skipCode,
+        skipped,
         pack,
         packList,
         narration,

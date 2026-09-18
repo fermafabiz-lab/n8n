@@ -88,6 +88,8 @@ const prepped = (extra = {}) => ({
   ...guard(),
   fc: {
     run: true,
+    category: 'documentary',
+    skipCode: null,
     skipped: null,
     pack: [],
     packList: 'E1. Google acquired Where 2 Technologies in October 2004. [News from Google, 2004 — https://example.org/a]',
@@ -122,23 +124,75 @@ const UNSUPPORTED = () => ({
 // ---------------------------------------------------------------------------
 
 console.log('FC Prep');
+
+// The project record as `Receive Project Data` really carries it: Editing
+// Options is a JSON STRING inside `fields`, not an object. Copied from
+// execution 14771.
+const record = (category) => ({
+  id: 'rec1',
+  fields: { 'Editing Options': JSON.stringify({ sfx: true, speed: 1, category, chapterCards: true }) },
+  Project_ID: 'rec1',
+});
+const PACK = { researched: true, claims: [{ ref: 'E1', claim: 'c', source: 's', date: '2004', url: 'u' }] };
+
 {
   const out = runNode('FC Prep.js', {
     json: guard(),
-    nodes: { 'Extract Claims': { researched: true, claims: [{ ref: 'E1', claim: 'c', source: 's', date: '2004', url: 'u' }] } },
+    nodes: { 'Receive Project Data': record('documentary'), 'Extract Claims': PACK },
   });
-  ok('runs on a researched film with a pack', out.fc.run === true);
+  ok('runs on a researched DOCUMENTARY with a pack', out.fc.run === true);
   ok('keeps the guard payload intact', out.output === narration() && out.chapters.length === 2 && out.target === 30);
   ok('numbers the pack for the judge', out.fc.packList.startsWith('E1. c ['));
   ok('the narration it hands the judge keeps the chapter markers', out.fc.narration.includes('[CHAPTER 2: Launch]'));
+  ok('records the mode it ran in', out.fc.category === 'documentary');
+}
+{
+  // THE PRODUCER'S RULE: Documentary mode only, whatever the narration is.
+  for (const cat of ['story', 'cinematic', 'kids']) {
+    const out = runNode('FC Prep.js', {
+      json: guard(),
+      nodes: { 'Receive Project Data': record(cat), 'Extract Claims': PACK },
+    });
+    ok(`does not run on a ${cat} film, even researched with a pack`, out.fc.run === false);
+    ok(`and says so as "not-documentary" (${cat})`, out.fc.skipCode === 'not-documentary');
+    ok(`and still carries the script on (${cat})`, out.chapters.length === 2 && out.output === narration());
+  }
+}
+{
+  // A mode that cannot be read is a FAULT, not a setting — it is the one case
+  // where doing nothing looks exactly like working.
+  const out = runNode('FC Prep.js', { json: guard(), nodes: { 'Extract Claims': PACK } });
+  ok('an unreadable mode is reported as no-mode, not as a quiet skip', out.fc.skipCode === 'no-mode');
+  ok('and the script survives it', out.chapters.length === 2);
 }
 {
   const out = runNode('FC Prep.js', {
     json: guard(),
-    nodes: { 'Extract Claims': { researched: false, claims: [] } },
+    nodes: { 'Receive Project Data': { id: 'rec1', fields: {} }, 'Extract Claims': PACK },
   });
-  ok('skips a film that was never researched', out.fc.run === false && /not a researched topic/i.test(out.fc.skipped));
+  ok('Editing Options with no category is also no-mode', out.fc.skipCode === 'no-mode');
+}
+{
+  const out = runNode('FC Prep.js', {
+    json: guard(),
+    nodes: { 'Receive Project Data': record('documentary'), 'Extract Claims': { researched: false, claims: [] } },
+  });
+  ok('a documentary with no research is not-researched', out.fc.run === false && out.fc.skipCode === 'not-researched');
   ok('a skipped film still carries its chapters on', out.chapters.length === 2);
+}
+{
+  const out = runNode('FC Prep.js', {
+    json: guard(),
+    nodes: { 'Receive Project Data': record('documentary'), 'Extract Claims': { researched: true, claims: [] } },
+  });
+  ok('a documentary with an empty pack is no-pack', out.fc.skipCode === 'no-pack');
+}
+{
+  const out = runNode('FC Prep.js', {
+    json: { ...guard(), chapters: [] },
+    nodes: { 'Receive Project Data': record('documentary'), 'Extract Claims': PACK },
+  });
+  ok('no chapters is no-chapters', out.fc.skipCode === 'no-chapters');
 }
 {
   // The reference itself dangling must not lose the script.
@@ -406,10 +460,29 @@ const FIXED_CH1 = 'Google acquired Where 2 Technologies in October 2004. Google 
   ok('a film with no pack is not labelled a story', out.fcReport.storyMode === undefined);
 }
 {
-  const story = { ...guard(), fc: { run: false, storyMode: true, skipped: 'it is a story', findings: [], needsRewrite: false } };
+  const story = { ...guard(), fc: { run: false, storyMode: true, skipCode: 'story', skipped: 'it is a story', findings: [], needsRewrite: false } };
   const out = runNode('FC Apply.js', { json: {}, nodes: { 'FC Resolve': story } });
-  ok('a story reaches the report as a story', out.fcReport.storyMode === true);
+  ok('a story reaches the report as a story', out.fcReport.storyMode === true && out.fcReport.skipCode === 'story');
   ok('and its narration is untouched', out.output === narration());
+}
+{
+  // Every skip carries its code to the report, because that is what the red
+  // light reads — the prose beside it will be reworded, the code will not.
+  for (const code of ['not-documentary', 'no-mode', 'not-researched', 'no-pack', 'no-chapters']) {
+    const skipped = { ...guard(), fc: { run: false, category: 'story', skipCode: code, skipped: 'x', findings: [], needsRewrite: false } };
+    const out = runNode('FC Apply.js', { json: {}, nodes: { 'FC Resolve': skipped } });
+    ok(`the report carries skipCode ${code}`, out.fcReport.skipCode === code);
+  }
+  const noCode = { ...guard(), fc: { run: false, skipped: 'x', findings: [], needsRewrite: false } };
+  const out = runNode('FC Apply.js', { json: {}, nodes: { 'FC Resolve': noCode } });
+  ok('a skip with no code reads as "unknown", never as normal', out.fcReport.skipCode === 'unknown');
+}
+{
+  const ran = runNode('FC Apply.js', {
+    json: {},
+    nodes: { 'FC Resolve': resolved([{ ...SUPPORTED(), action: 'keep' }], false) },
+  });
+  ok('a report that ran carries the mode and no skipCode', ran.fcReport.category === 'documentary' && ran.fcReport.skipCode === undefined);
 }
 {
   // Overwhelmed: findings still say `rewrite`, but nothing may be applied.

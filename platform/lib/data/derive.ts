@@ -594,11 +594,17 @@ export interface ScriptInfo {
 }
 
 /**
- * One statement the fact-checker pulled out of the narration, and what
- * became of it. Written by `FC Apply` in Claude Scripting; the full shape is
- * documented in db/012_fact_check.sql.
+ * One statement Deep Search pulled out of the narration, and what became of
+ * it. Written by `FC Apply` in Claude Scripting; the full shape is documented
+ * in db/012_fact_check.sql.
+ *
+ * NAMING: the feature is called **Deep Search** (the producer named it on
+ * 2026-09-18). The n8n nodes are still prefixed `FC *` and the table is still
+ * `hov.fact_check` — renaming thirteen live nodes would mean rewriting every
+ * `$('FC …')` reference between them, and renaming a live table buys nothing.
+ * The mapping is: FC = Deep Search.
  */
-export interface FactCheckFinding {
+export interface DeepSearchFinding {
   /** The sentence as it stood in the draft, copied verbatim. */
   quote: string;
   /** The assertion inside it, isolated. */
@@ -620,7 +626,7 @@ export interface FactCheckFinding {
  * in today's panel — a reader that insists on a shape is how an old row
  * becomes a crash on a page the producer needs.
  */
-export interface FactCheckReport {
+export interface DeepSearchReport {
   /** Checkable statements the judge extracted. */
   checked?: number;
   /** How many of them the sources did not back. */
@@ -631,13 +637,30 @@ export interface FactCheckReport {
   rewritten?: number;
   /** Present only when the check did not run; says why, in prose. */
   skipped?: string;
+  /**
+   * WHY it did not run, as a stable code rather than a sentence — this is what
+   * the status light reads. `not-documentary` and `story` are normal; every
+   * other value means a film that asked for Deep Search did not get it. See
+   * `lib/deep-search.ts`, which is the only thing allowed to interpret it.
+   */
+  skipCode?:
+    | "not-documentary"
+    | "story"
+    | "no-mode"
+    | "not-researched"
+    | "no-pack"
+    | "no-chapters"
+    | "unknown"
+    | string;
+  /** The mode the film was made in. Deep Search only runs on `documentary`. */
+  category?: string;
   /** The narration is a story, so there was nothing to check it against. */
   storyMode?: boolean;
   /** Too much was unsupported to correct: reported, deliberately not rewritten. */
   overwhelmed?: boolean;
   /** The rewrite was produced and refused; this says what was wrong with it. */
   refused?: string;
-  findings?: FactCheckFinding[];
+  findings?: DeepSearchFinding[];
   checkedAt?: string | null;
 }
 

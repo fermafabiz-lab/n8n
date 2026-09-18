@@ -2016,10 +2016,10 @@ stop what it returns. That loop can never run: all three return early when
 reads as a live safety net and is unreachable code. That is the safe direction
 to fail — but do not count it as protection that exists.
 
-### The fact-check panel — a warning with no button
+### Deep Search — a warning with no button
 
-`FactCheckPanel` sits above `ScriptReview`, reads `hov.fact_check` through
-`getFactCheck`, and has no controls at all. That is deliberate and it was the
+`DeepSearchPanel` sits above `ScriptReview`, reads `hov.fact_check` through
+`getDeepSearch`, and has no controls at all. That is deliberate and it was the
 producer's call: *warn loudly, never block*. The script gate works exactly as
 it did; this panel only tells the producer what the checker made of the text
 they are about to approve. Full account of the n8n side:
@@ -2042,10 +2042,46 @@ ever tell them. The panel says it in bold, and each finding shows the sentence
 **as it stood**, since the new wording is already in the textarea below — the
 old one is the only way to see what moved.
 
-**The reader is deliberately permissive.** `FactCheckReport` has no required
-fields and `getFactCheck` passes the stored jsonb through without validating
+**The reader is deliberately permissive.** `DeepSearchReport` has no required
+fields and `getDeepSearch` passes the stored jsonb through without validating
 it. A report written by last month's version of the workflow has to render in
 today's panel: a reader that insists on a shape is how an old row becomes a
 crash on the page the producer needs. The query is also guarded by
 `tableReady`, like the stock tables — before `db/012` is applied an unguarded
 read would abort the transaction and take the whole project page with it.
+
+### A red light is only worth having if it is right in both directions
+
+The producer's whole brief for it was one sentence: *"In the case anything
+stops working I want the thing to become Red so I can tell you to solve it."*
+Three things fell out of taking that literally.
+
+**One owner, because the same verdict is drawn in three places** — the panel
+above the script gate, the Settings card, and the dot on the Settings hub.
+`lib/deep-search.ts` computes it and nothing else is allowed to; a light that
+is green on the hub and red on the film teaches the producer to ignore all
+three. `npm run check:deepsearch` pins every branch.
+
+**`red` means exactly one thing: this film asked for Deep Search and did not
+get it.** It is NOT set for a film that was never a candidate, and — the one
+that takes discipline — it is NOT set for a film that was checked and came back
+with problems. Unsupported statements are the feature working. A refused
+rewrite is the safety valve working. Colouring those red would make the alarm
+meaningless inside a week, and then the real one lands on a page nobody reads.
+
+**The detector is sound because of an ordering, not a guess.** `FC Save Report`
+runs before `Combine Chapters`, which runs before the script row is written.
+So by the time a script exists, a documentary's report exists too — and "a
+documentary with a script and no report" is a fault rather than a race. That is
+the whole of the red state, and it is why the panel takes `scriptExists`
+instead of trying to infer it.
+
+**A skip code the site has never heard of fails CLOSED.** An unknown reason is
+red, not green — otherwise a future version of the workflow could switch the
+alarm off by inventing a reason nobody taught the site about.
+
+One deliberate piece of restraint: the `off` state is a one-line note, never a
+card. Every film now gets a report row — a Story film's simply says
+"not-documentary" — so a card would put a grey Deep Search panel above the
+script of every film that was never going to be checked. The producer asked to
+see whether it is active; one line answers that, and a card would be in the way.

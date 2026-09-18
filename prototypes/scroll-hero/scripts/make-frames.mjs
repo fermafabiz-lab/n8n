@@ -40,6 +40,26 @@ function pad(n) {
   return String(n).padStart(4, "0");
 }
 
+// Where the doorway sits in the real footage, measured off frame 72 on
+// 2026-09-18 and written into the manifest below. The placeholders draw a
+// doorway at the SAME rectangle, so the transition can be exercised locally
+// against something that is actually there.
+const DOOR = { x: 0.4625, y: 0.3905, w: 0.1099, h: 0.3881, light: "#e4b068" };
+
+// The doorway opens over the last third of the sequence: shut and dark at
+// first, then a widening slot of warm light.
+function doorSvg(t) {
+  const open = Math.max(0, (t - 0.66) / 0.34);
+  const x = DOOR.x * W;
+  const y = DOOR.y * H;
+  const w = DOOR.w * W;
+  const h = DOOR.h * H;
+  const lit = w * open;
+  return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="#120d08"/>
+  <rect x="${(x + (w - lit) / 2).toFixed(1)}" y="${y.toFixed(1)}" width="${lit.toFixed(1)}" height="${h.toFixed(1)}" fill="${DOOR.light}"/>
+  <rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="2"/>`;
+}
+
 function svgFor(index) {
   const t = index / (COUNT - 1);
   const hueA = Math.round(215 + 70 * t);
@@ -62,6 +82,7 @@ function svgFor(index) {
   <circle cx="${cx}" cy="${cy}" r="34" fill="#f5f2e8"/>
   <rect x="100" y="${H - 120}" width="${W - 200}" height="10" rx="5" fill="rgba(255,255,255,0.15)"/>
   <rect x="100" y="${H - 120}" width="${barW}" height="10" rx="5" fill="#f5f2e8"/>
+  ${doorSvg(t)}
   <text x="100" y="230" font-family="Helvetica, Arial, sans-serif" font-size="180" font-weight="700" fill="#f5f2e8">${pad(index + 1)}</text>
   <text x="100" y="290" font-family="Helvetica, Arial, sans-serif" font-size="40" fill="rgba(255,255,255,0.7)">frame ${index + 1} of ${COUNT} · ${tick}%</text>
 </svg>`;
@@ -89,12 +110,12 @@ total += await render(svgFor(0), posterPath, 72);
 // What the hero reads to know how long the sequence is. It ships with the
 // frames; a real sequence uploaded by hand needs one of these too.
 const manifestPath = path.join(outDir, "manifest.json");
-await writeFile(manifestPath, `${JSON.stringify({ count: COUNT }, null, 2)}\n`);
+await writeFile(manifestPath, `${JSON.stringify({ count: COUNT, door: DOOR }, null, 2)}\n`);
 
 const posterSize = (await stat(posterPath)).size;
 console.log(`frames: ${COUNT} × ${W}×${H} in ${path.relative(root, outDir)}`);
 console.log(`poster: ${(posterSize / 1024).toFixed(1)} kB (same directory)`);
-console.log(`manifest: {"count": ${COUNT}}`);
+console.log(`manifest: count ${COUNT}, door ${JSON.stringify(DOOR)}`);
 console.log(`total assets: ${(total / 1024 / 1024).toFixed(2)} MB (budget ${(BUDGET_BYTES / 1024 / 1024).toFixed(1)} MB)`);
 if (total > BUDGET_BYTES) {
   console.error("over budget");

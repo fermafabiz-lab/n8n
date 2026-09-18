@@ -6,8 +6,13 @@ import { preload } from "react-dom";
 /**
  * Scroll-scrubbed frame sequence on a <canvas>.
  *
- * Layout (see globals.css): a 200vh section with a sticky 100vh stage. The
- * frame index is the section's scroll progress mapped onto 0..FRAME_COUNT-1.
+ * Layout (see globals.css): a 260vh section with a sticky 100vh stage. The
+ * first 100vh of track scrubs the film; the last 60vh opens the door.
+ *
+ * The door: a div sized and placed over the lit doorway of the final frame,
+ * in its colour, which grows from that rectangle until it fills the stage and
+ * hands off to the section below in the same colour. Scroll writes nothing
+ * but transform and opacity — the div's box is set on resize only.
  *
  * Loading: the poster is one more file in the frame directory. Frames
  * 1..PRELOAD_COUNT are fetched in parallel; the canvas takes
@@ -53,6 +58,29 @@ const POSTER_SRC = "/frames/poster.webp";
 // The copy is gone by this far through the scrub, and the scrim with it.
 const COPY_FADE_END = 0.6;
 
+/**
+ * The doorway in the final frame, as fractions of the FRAME (not the
+ * viewport) — the canvas draws cover-cropped, so these are mapped through the
+ * same cover transform before they mean anything in pixels.
+ *
+ * Measured off the real frame 72 on 2026-09-18: the lit opening of the front
+ * door, and the mean colour of its bright warm pixels. Like the frame count,
+ * the manifest wins over this constant, so re-cutting the film is an upload;
+ * this is what answers when the manifest has no door.
+ */
+const FALLBACK_DOOR: Door = { x: 0.4625, y: 0.3905, w: 0.1099, h: 0.3881, light: "#e4b068" };
+
+// How much scroll the door gets after the sequence ends, as a share of the
+// viewport height. Kept in step with the hero's height in globals.css.
+const DOOR_TRACK_VH = 60;
+// The door finishes covering slightly before the track does, so the colour
+// holds for a beat before the stage unpins into the section below.
+const DOOR_COVER_AT = 0.9;
+// A margin on the final scale so no edge of the div can show at the corners.
+const DOOR_OVERSHOOT = 1.04;
+
+type Door = { x: number; y: number; w: number; h: number; light: string };
+
 const HINT_IDLE_MS = 2000;
 const HINT_FRAMES = 4;
 const HINT_OUT_MS = 450;
@@ -90,24 +118,46 @@ function easeInOutSine(t: number): number {
  * mistakes, and guessing what one meant would scrub through a film that is
  * not there.
  */
-async function readFrameCount(signal: AbortSignal): Promise<number> {
+async function readManifest(signal: AbortSignal): Promise<{ count: number; door: Door }> {
+  const fallback = { count: FALLBACK_FRAME_COUNT, door: FALLBACK_DOOR };
   try {
     const res = await fetch(MANIFEST_SRC, { signal, cache: "no-store" });
-    if (!res.ok) return FALLBACK_FRAME_COUNT;
-    const data: unknown = await res.json();
-    const raw = (data as { count?: unknown } | null)?.count;
-    if (typeof raw !== "number" || !Number.isInteger(raw)) return FALLBACK_FRAME_COUNT;
-    if (raw < 1 || raw > MAX_FRAME_COUNT) return FALLBACK_FRAME_COUNT;
-    return raw;
+    if (!res.ok) return fallback;
+    const data = (await res.json()) as { count?: unknown; door?: unknown } | null;
+    return { count: readCount(data?.count), door: readDoor(data?.door) };
   } catch {
-    return FALLBACK_FRAME_COUNT;
+    return fallback;
   }
+}
+
+function readCount(raw: unknown): number {
+  if (typeof raw !== "number" || !Number.isInteger(raw)) return FALLBACK_FRAME_COUNT;
+  if (raw < 1 || raw > MAX_FRAME_COUNT) return FALLBACK_FRAME_COUNT;
+  return raw;
+}
+
+/**
+ * A door is refused whole, never patched. A rectangle with three good numbers
+ * and one bad one would put the transition somewhere that is not the door,
+ * which looks like a bug in the film rather than in the manifest.
+ */
+function readDoor(raw: unknown): Door {
+  if (!raw || typeof raw !== "object") return FALLBACK_DOOR;
+  const d = raw as Record<string, unknown>;
+  const nums = ["x", "y", "w", "h"].map((k) => d[k]);
+  if (!nums.every((v) => typeof v === "number" && Number.isFinite(v))) return FALLBACK_DOOR;
+  const [x, y, w, h] = nums as number[];
+  if (w <= 0 || h <= 0) return FALLBACK_DOOR;
+  if (x < 0 || y < 0 || x + w > 1 || y + h > 1) return FALLBACK_DOOR;
+  const light = typeof d.light === "string" && /^#[0-9a-f]{6}$/i.test(d.light) ? d.light : FALLBACK_DOOR.light;
+  return { x, y, w, h, light };
 }
 
 export default function ScrollHero() {
   const sectionRef = useRef<HTMLElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const doorRef = useRef<HTMLDivElement>(null);
 
   // Emits <link rel="preload"> for the poster during SSR so it is the first
   // request after the document, which is what keeps LCP short.
@@ -117,7 +167,8 @@ export default function ScrollHero() {
     const section = sectionRef.current;
     const stage = stageRef.current;
     const canvas = canvasRef.current;
-    if (!section || !stage || !canvas) return;
+    const doorEl = doorRef.current;
+    if (!section || !stage || !canvas || !doorEl) return;
     const ctx = canvas.getContext("2d", { alpha: false });
     if (!ctx) return;
 
@@ -127,6 +178,7 @@ export default function ScrollHero() {
     // Both are empty until the manifest has answered; nothing draws before
     // then, because `tick` returns while `firstBatchDone` is false.
     let frameCount = FALLBACK_FRAME_COUNT;
+    let door = FALLBACK_DOOR;
     let frames: (HTMLImageElement | null)[] = [];
     const controller = new AbortController();
     let loadedUpTo = -1; // every index 0..loadedUpTo is decoded and drawable
@@ -140,6 +192,13 @@ export default function ScrollHero() {
     let sizeDirty = true;
     let cssWidth = 0;
     let cssHeight = 0;
+    // Cached so the tick never reads layout for them.
+    let sectionH = 0;
+    let viewportH = 0;
+    let lastDoorScale = -1;
+    let lastDoorOpacity = -1;
+    let lastCanvasOpacity = -1;
+    let doorTargetScale = 1;
 
     let lastScrollY = window.scrollY;
     let userScrolled = false;
@@ -155,14 +214,23 @@ export default function ScrollHero() {
 
     // ---- geometry -------------------------------------------------------
 
-    // How far through the scrub we are, 0..1, unrounded.
-    const progress = (): number => {
-      const range = section.offsetHeight - window.innerHeight;
-      if (range <= 0) return 0;
-      return clamp01(-section.getBoundingClientRect().top / range);
-    };
+    // The hero's track is two stretches: the film scrubs over the first, the
+    // door opens over the last DOOR_TRACK_VH of viewport height.
+    //
+    // ONE layout read per tick, and it is this one. Section and viewport
+    // heights are cached by the ResizeObserver instead of being read here,
+    // so the tick reads a rect and then only writes.
+    const scrolled = (): number => -section.getBoundingClientRect().top;
 
-    const targetIndex = (): number => Math.round(progress() * (frameCount - 1));
+    const doorTrackPx = () => (viewportH * DOOR_TRACK_VH) / 100;
+    const scrubRangePx = () => Math.max(1, sectionH - viewportH - doorTrackPx());
+
+    // 0..1 across the film only.
+    const progressFrom = (y: number): number => clamp01(y / scrubRangePx());
+    // 0..1 across the door stretch that follows it.
+    const doorFrom = (y: number): number => clamp01((y - scrubRangePx()) / doorTrackPx());
+
+    const targetIndexFrom = (y: number): number => Math.round(progressFrom(y) * (frameCount - 1));
 
     const resizeCanvas = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
@@ -171,6 +239,52 @@ export default function ScrollHero() {
       if (canvas.width !== w) canvas.width = w;
       if (canvas.height !== h) canvas.height = h;
       // Either assignment above clears the bitmap, so the caller must redraw.
+    };
+
+    /**
+     * Places the door div over the doorway and works out how far it has to
+     * grow to fill the stage.
+     *
+     * Runs on RESIZE ONLY, never on scroll: this is the one place that writes
+     * layout properties, so the scroll path is left with nothing but transform
+     * and opacity. The rect is mapped through the same cover transform the
+     * canvas draws with, otherwise the div would drift off the doorway on any
+     * viewport that is not the frame's aspect.
+     */
+    const placeDoor = () => {
+      const sample = frames.find((f) => f) ?? null;
+      const iw = sample?.naturalWidth || 1600;
+      const ih = sample?.naturalHeight || 900;
+      if (cssWidth <= 0 || cssHeight <= 0) return;
+
+      const cover = Math.max(cssWidth / iw, cssHeight / ih);
+      const dw = iw * cover;
+      const dh = ih * cover;
+      const ox = (cssWidth - dw) / 2;
+      const oy = (cssHeight - dh) / 2;
+
+      const left = ox + door.x * dw;
+      const top = oy + door.y * dh;
+      const w = Math.max(1, door.w * dw);
+      const h = Math.max(1, door.h * dh);
+
+      doorEl.style.left = `${left}px`;
+      doorEl.style.top = `${top}px`;
+      doorEl.style.width = `${w}px`;
+      doorEl.style.height = `${h}px`;
+      doorEl.style.background = door.light;
+      // One owner for the colour. The section below reads this variable, so a
+      // manifest that changes the light changes the handoff too, instead of
+      // leaving a hardcoded background behind to drift out of step.
+      document.documentElement.style.setProperty("--door-light", door.light);
+
+      // Grown about its own centre, so the reach is to the furthest edge.
+      const cx = left + w / 2;
+      const cy = top + h / 2;
+      const sx = (2 * Math.max(cx, cssWidth - cx)) / w;
+      const sy = (2 * Math.max(cy, cssHeight - cy)) / h;
+      doorTargetScale = Math.max(sx, sy) * DOOR_OVERSHOOT;
+      lastDoorScale = -1; // force the next tick to write the transform
     };
 
     const draw = (index: number) => {
@@ -206,17 +320,50 @@ export default function ScrollHero() {
       // eases continuously instead of stepping once per frame. It runs before
       // everything below: it does not depend on a single frame having loaded,
       // so scrolling during the initial load still fades the words.
-      if (eligible()) {
-        const fade = 1 - clamp01(progress() / COPY_FADE_END);
-        if (fade !== lastFade) {
-          section.style.setProperty("--hero-fade", String(Number(fade.toFixed(3))));
-          lastFade = fade;
-        }
+      if (!eligible()) return;
+
+      // One read, then writes only.
+      const y = scrolled();
+
+      const fade = 1 - clamp01(progressFrom(y) / COPY_FADE_END);
+      if (fade !== lastFade) {
+        section.style.setProperty("--hero-fade", String(Number(fade.toFixed(3))));
+        lastFade = fade;
       }
 
-      if (!firstBatchDone || !eligible()) return;
+      // ---- the door ------------------------------------------------------
+      // Scale is exponential rather than linear: apparent size grows by a
+      // constant ratio per unit of scroll, which is what reads as moving
+      // through the doorway at an even pace. A linear ramp crawls at the
+      // start and lurches at the end.
+      const d = doorFrom(y);
+      const cover = clamp01(d / DOOR_COVER_AT);
+      const scale = cover <= 0 ? 1 : Math.pow(doorTargetScale, cover);
+      // Fading in over the first stretch hides any mismatch between the div's
+      // rectangle and the doorway's real edges — it arrives as light, not as
+      // a block dropped on the frame.
+      const doorOpacity = clamp01(d / 0.22);
+      // The canvas goes once the door is nearly covering, so the browser
+      // stops compositing a full-screen bitmap nobody can see.
+      const canvasOpacity = 1 - clamp01((d - 0.55) / 0.35);
 
-      let index = targetIndex();
+      if (scale !== lastDoorScale) {
+        doorEl.style.transform = `scale(${scale.toFixed(4)})`;
+        lastDoorScale = scale;
+      }
+      if (doorOpacity !== lastDoorOpacity) {
+        doorEl.style.opacity = String(Number(doorOpacity.toFixed(3)));
+        lastDoorOpacity = doorOpacity;
+      }
+      if (canvasOpacity !== lastCanvasOpacity) {
+        canvas.style.opacity = String(Number(canvasOpacity.toFixed(3)));
+        lastCanvasOpacity = canvasOpacity;
+      }
+      section.dataset.door = d.toFixed(3);
+
+      if (!firstBatchDone) return;
+
+      let index = targetIndexFrom(y);
 
       if (hintStartedAt) {
         const elapsed = performance.now() - hintStartedAt;
@@ -314,7 +461,7 @@ export default function ScrollHero() {
           armHint(); // try again once the tab is back
           return;
         }
-        if (targetIndex() !== 0) return; // not resting on the first frame
+        if (targetIndexFrom(scrolled()) !== 0) return; // not resting on the first frame
         hintStartedAt = performance.now();
         schedule();
       }, HINT_IDLE_MS);
@@ -334,7 +481,7 @@ export default function ScrollHero() {
         // The manifest request starts NOW, in parallel with the poster, so
         // asking for the count costs no latency — by the time the gate below
         // opens, a 30-byte file on a warm connection is long back.
-        const countReady = readFrameCount(controller.signal);
+        const manifestReady = readManifest(controller.signal);
 
         // Let the poster (the LCP element) decode and paint before the first
         // batch of frame fetches and decodes competes with it for the main
@@ -343,14 +490,16 @@ export default function ScrollHero() {
         const posterReady = poster ? poster.decode().catch(() => undefined) : Promise.resolve();
         void posterReady
           .then(() => new Promise<void>((r) => requestAnimationFrame(() => setTimeout(r, 0))))
-          .then(() => countReady)
-          .then((count) => {
+          .then(() => manifestReady)
+          .then((m) => {
             if (disposed) return;
             // Settled before the first draw, so the scroll-to-frame mapping
             // never changes under the viewer's finger.
-            frameCount = count;
+            frameCount = m.count;
+            door = m.door;
             frames = new Array(frameCount).fill(null);
             section.dataset.count = String(frameCount);
+            placeDoor();
             void loadAll();
           });
         return;
@@ -387,7 +536,13 @@ export default function ScrollHero() {
       if (!rect) return;
       cssWidth = rect.width;
       cssHeight = rect.height;
+      // Cached here so the tick does not have to read them. This callback is
+      // the only place layout is read and written in the same breath, and it
+      // runs on resize, not on scroll.
+      sectionH = section.offsetHeight;
+      viewportH = window.innerHeight;
       sizeDirty = true;
+      placeDoor();
       schedule();
     });
 
@@ -423,6 +578,9 @@ export default function ScrollHero() {
           decoding="async"
         />
         <canvas ref={canvasRef} className="hero__canvas" aria-hidden="true" />
+        {/* The doorway. Its box is written on resize; scroll only ever sets
+            transform and opacity on it. */}
+        <div ref={doorRef} className="hero__door" aria-hidden="true" />
         {/* Scrim and copy fade together: the scrim exists to hold this text
             up, so it has no reason to outlive it. `pointer-events: none` in
             the CSS keeps the whole layer out of the way of scrolling. */}

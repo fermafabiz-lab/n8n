@@ -125,13 +125,24 @@ const isFrameRequest = (url: string) => /\/frames\/frame_\d+\.webp/.test(url);
 
 const hero = (page: Page) => page.locator("section.hero");
 
-// Scroll distance across which the sequence plays: section height minus one
-// viewport (the sticky stage).
-async function scrubRange(page: Page): Promise<number> {
-  return page.evaluate(() => {
+// The hero's track has two parts, and the tests have to tell them apart:
+// the film scrubs over the first, the door opens over the last 60vh
+// (DOOR_TRACK_VH). Mapping a frame onto the WHOLE track would scroll past
+// the end of the film and into the transition.
+const DOOR_TRACK_VH = 60;
+
+async function trackParts(page: Page): Promise<{ scrub: number; door: number; full: number }> {
+  return page.evaluate((vh) => {
     const s = document.querySelector("section.hero") as HTMLElement;
-    return s.offsetHeight - window.innerHeight;
-  });
+    const full = s.offsetHeight - window.innerHeight;
+    const door = (window.innerHeight * vh) / 100;
+    return { scrub: full - door, door, full };
+  }, DOOR_TRACK_VH);
+}
+
+// Scroll distance across which the sequence plays.
+async function scrubRange(page: Page): Promise<number> {
+  return (await trackParts(page)).scrub;
 }
 
 async function scrollToFrame(page: Page, index: number, count: number) {
@@ -205,8 +216,8 @@ test.describe("desktop", () => {
     await expect(hero(page)).toHaveAttribute("data-frame", String(lowUp));
 
     // Past the track the stage unpins and the test section takes the viewport.
-    const range = await scrubRange(page);
-    await page.evaluate((y) => window.scrollTo(0, y + window.innerHeight), range);
+    const { full } = await trackParts(page);
+    await page.evaluate((y) => window.scrollTo(0, y + window.innerHeight), full);
     await expect(page.getByTestId("after-hero")).toBeInViewport({ ratio: 0.95 });
     await page.screenshot({ path: path.join(SHOTS, "after-hero.png") });
 
@@ -353,6 +364,82 @@ test.describe("desktop", () => {
         part.bar,
       );
     }
+  });
+
+  test("the door grows from the doorway and hands off to the section below", async ({ page }) => {
+    await page.goto("/");
+    await expect(hero(page)).toHaveAttribute("data-state", "ready", { timeout: 15_000 });
+    const count = await frameCount(page);
+    await expect(hero(page)).toHaveAttribute("data-loaded", String(count), { timeout: 30_000 });
+
+    const doorEl = page.locator(".hero__door");
+    const canvas = page.locator("canvas.hero__canvas");
+
+    // Where the door sits before it opens: over the doorway in the last frame,
+    // not over the whole stage.
+    await scrollToFrame(page, count - 1, count);
+    const atRest = await doorEl.boundingBox();
+    const stageBox = await page.locator(".hero__stage").boundingBox();
+    expect(atRest).not.toBeNull();
+    expect(atRest!.width).toBeLessThan(stageBox!.width * 0.25);
+    expect(atRest!.height).toBeLessThan(stageBox!.height * 0.6);
+    // Its centre is the doorway's centre, which is what it grows from.
+    const originCx = atRest!.x + atRest!.width / 2;
+    const originCy = atRest!.y + atRest!.height / 2;
+    const origin = (await doorEl.evaluate((el) => getComputedStyle(el).transformOrigin))
+      .split(" ")
+      .map(parseFloat);
+    expect(Math.abs(origin[0] - atRest!.width / 2)).toBeLessThan(1);
+    expect(Math.abs(origin[1] - atRest!.height / 2)).toBeLessThan(1);
+    await expect(hero(page)).toHaveAttribute("data-door", "0.000");
+    expect(Number(await doorEl.evaluate((el) => getComputedStyle(el).opacity))).toBe(0);
+
+    // Walk the door track and watch it grow, stay centred, and take over.
+    const { scrub: scrubEnd, door: track } = await trackParts(page);
+    const seen: { at: number; area: number; doorOpacity: number; canvasOpacity: number }[] = [];
+
+    for (const step of [0.25, 0.5, 0.75, 1]) {
+      await page.evaluate((y) => window.scrollTo(0, y), Math.round(scrubEnd + track * step));
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
+      const box = await doorEl.boundingBox();
+      seen.push({
+        at: step,
+        area: box ? box.width * box.height : 0,
+        doorOpacity: Number(await doorEl.evaluate((el) => getComputedStyle(el).opacity)),
+        canvasOpacity: Number(await canvas.evaluate((el) => getComputedStyle(el).opacity)),
+      });
+      // Growing about the doorway's centre keeps that centre put.
+      if (box) {
+        expect(Math.abs(box.x + box.width / 2 - originCx)).toBeLessThan(2);
+        expect(Math.abs(box.y + box.height / 2 - originCy)).toBeLessThan(2);
+      }
+      await page.screenshot({ path: path.join(SHOTS, `door-${String(Math.round(step * 100)).padStart(3, "0")}.png`) });
+    }
+
+    console.table(
+      seen.map((s) => ({
+        "through the door track": `${s.at * 100}%`,
+        "area vs stage": `${((s.area / (stageBox!.width * stageBox!.height)) * 100).toFixed(0)}%`,
+        "door opacity": s.doorOpacity.toFixed(2),
+        "canvas opacity": s.canvasOpacity.toFixed(2),
+      })),
+    );
+
+    // It only ever grows, and by the end it covers the stage and the canvas
+    // has gone.
+    for (let i = 1; i < seen.length; i++) expect(seen[i].area).toBeGreaterThan(seen[i - 1].area);
+    const last = seen[seen.length - 1];
+    expect(last.area).toBeGreaterThanOrEqual(stageBox!.width * stageBox!.height);
+    expect(last.doorOpacity).toBe(1);
+    expect(last.canvasOpacity).toBe(0);
+
+    // Past the hero the next section carries the same colour, so the handoff
+    // is a continuation rather than a cut.
+    const doorColour = await doorEl.evaluate((el) => getComputedStyle(el).backgroundColor);
+    const sectionColour = await page
+      .getByTestId("after-hero")
+      .evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(sectionColour).toBe(doorColour);
   });
 
   test("takes the frame count from the manifest, not from the build", async ({ page }) => {

@@ -135,6 +135,7 @@ producer's script, it is replacing it.
 | …without flagging what the pack does back | same run: 321 m, 280 m offshore, 230 piles, 9,000 t of steel, 70,000 m³ of concrete, the 180 m atrium, 1 December 1999, and both suite counts (202 per Khaleej Times, 198 per Jumeirah) all read `supported` with a ref |
 | `FC Source` returns parseable lines with real URLs | execution **14761**: 12 statements, 12 `RESULT:` lines, 8 with a resolvable primary source (Jumeirah's own page for the gold leaf and the causeway, Designing Buildings for Al Muntaha and the fabric façade) |
 | The whole chain runs end to end and the rewrite is ACCEPTED | execution **14764**, the same film, 1m46s: 47 statements checked, 16 looked up, **8 corrected, 0 still flagged**, `refused: null`, 6 chapters in and 6 out, per-chapter words `31,385,412,348,339,357` → `33,371,414,343,340,356` |
+| **The LIVE nodes run inside a real scripting execution** | execution **14771**, a real pipeline fired at the `new-project` webhook for the disposable film `rec4ZIQVVxXZcS5no` ("How the first cash machine was installed in Enfield in 1967"): `hov.fact_check` written at 15:03:01 with `{checked: 18, flagged: 1, searched: 5, rewritten: 1}` and 18 stored findings, and the run went on to write its script and park at the approval gate — so `FC Done` handed the narration back intact |
 | `FC Resolve`, `FC Apply`, `FC Done` behave | `node scripts/check-fact-check.mjs` — 60 assertions over the committed bodies, including every refusal branch |
 
 `scripts/check-fact-check.mjs` runs the real `db/port/fact-check/paste/*.js`
@@ -160,12 +161,15 @@ is the only node on the old happy path's edge.
 
 ## What is owed
 
-- **One real film.** Everything above is the chain exercised on real data
-  through a twin — the real narration, the real pack, the real prompts and the
-  real bodies, but driven by a throwaway rather than by a scripting run that
-  wrote a film. The first researched documentary written after 2026-09-18 is
-  the measurement: read its `hov.fact_check` row, and check that what it
-  corrected reads as well as what it replaced.
+- **A film the producer keeps.** The live chain has now run inside a real
+  scripting execution (14771, above) and the row it wrote is good: 17 of 18
+  statements held up, ten against the pack by ref and the rest against sources
+  a targeted search found — Historic England's listing notice for the Enfield
+  branch among them, with a URL — and the one that did not (*"The problem was
+  not simply to copy a teller by machine"*, an interpretation no claim covers)
+  was rewritten away. What is still owed is the same run on a film somebody
+  intends to keep, where the corrected sentences are READ as prose rather than
+  counted.
 - **Watch what the rewrite does to the prose.** Execution 14764 changed eight
   sentences and every length check passed, but nobody has read the result as
   prose. "9,000 tonnes of white steel climb skyward" losing its *white* is

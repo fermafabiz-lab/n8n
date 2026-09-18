@@ -362,7 +362,7 @@ expected and harmless for an app touching only its own Drive.
 
 ## Open work
 
-- **The fact check is live and has never run inside a real scripting run**
+- **The fact check is live; what is owed is a film somebody keeps**
   (2026-09-18, Claude Scripting `ea076103`; full account
   `db/port/fact-check/README.md`, lessons in `docs/lessons-pipeline.md` under
   "The script is checked against its own research" and `docs/lessons-site.md`
@@ -374,12 +374,19 @@ expected and harmless for an app touching only its own Drive.
   through a throwaway (execution 14764: 47 statements, 16 looked up, 8
   corrected, 0 left flagged, rewrite accepted, every chapter within a few words
   of its length), and `node scripts/check-fact-check.mjs` holds 60 assertions
-  over the committed node bodies including every refusal branch. **What is
-  owed is one real researched documentary**: read its `hov.fact_check` row and
-  READ THE PROSE — the length checks all pass by construction, and nobody has
-  yet judged whether a corrected sentence reads as well as the one it replaced.
-  The escape hatch if a film goes wrong: publish `b9f95221`, the version this
-  was built on; the chain is purely additive.
+  over the committed node bodies including every refusal branch. It has also
+  run for real: execution 14771, a whole pipeline fired at `new-project` for
+  the disposable film `rec4ZIQVVxXZcS5no`, wrote `{checked: 18, flagged: 1,
+  searched: 5, rewritten: 1}` into `hov.fact_check` and then went on to write
+  its script and park at the gate — which is the only proof available from a
+  web session that the LIVE node bodies match the repo, since n8n's own tables
+  are in a different database from `hov` and a session here has no API key, so
+  `diff-workflow.mjs` cannot be run on a 123-node workflow. **What is owed is
+  the same on a film somebody intends to keep, with the corrected sentences
+  READ as prose rather than counted** — the length checks pass by
+  construction, and nobody has yet judged whether a correction reads as well
+  as the sentence it replaced. The escape hatch if a film goes wrong: publish
+  `b9f95221`, the version this was built on; the chain is purely additive.
 - **A Flow refusal that arrives as HTTP 200 no longer kills the film**
   (2026-09-17, Media Generation `6735a96a`, `db/port/regen-unstick/README.md`,
   lesson in `docs/lessons-pipeline.md` under "Flow refuses twice"). **What is

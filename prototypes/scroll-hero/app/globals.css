@@ -83,14 +83,12 @@ body {
   opacity: 1;
 }
 
-/* The section is the scroll track, and it has two parts after the pin:
-   260vh = 100vh of sticky stage + 100vh that scrubs the film + 60vh that
-   opens the door. The 60 is DOOR_TRACK_VH in ScrollHero.tsx; the split is
-   computed from these heights at runtime, so the two only need to agree on
-   that one number. */
+/* The section is the scroll track: 200vh tall, of which the sticky stage
+   pins 100vh, so the sequence scrubs across exactly one viewport of scroll.
+   After that the stage unpins and scroll is ordinary again. */
 .hero {
   position: relative;
-  height: 260vh;
+  height: 200vh;
 }
 
 .hero__stage {
@@ -127,26 +125,6 @@ body {
 
 .hero[data-state="ready"] .hero__poster {
   visibility: hidden;
-}
-
-/* The doorway div. Everything that changes during scroll is transform and
-   opacity; left/top/width/height are written once per resize by the
-   component, from the door rectangle mapped through the canvas's own cover
-   transform. `transform-origin: center` is the door's centre, because the
-   element IS the door rectangle. */
-.hero__door {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 0;
-  height: 0;
-  z-index: 1;
-  opacity: 0;
-  transform: scale(1);
-  transform-origin: center;
-  will-change: transform, opacity;
-  backface-visibility: hidden;
-  pointer-events: none;
 }
 
 /* ── The copy over the film ──────────────────────────────────────────────
@@ -241,26 +219,18 @@ body {
     display: none;
   }
 
-  /* No long scroll, so there is nothing for the door to open across. */
-  .hero__door {
-    display: none;
-  }
-
   .hero[data-state="ready"] .hero__poster {
     visibility: visible;
   }
 }
 
-/* The first content section. Its background is the doorway's light, so the
-   growing div does not hand over to a different colour — it simply stops
-   being the hero and starts being this. */
+/* The first content section. It follows the last frame directly — the
+   sequence now ends inside the hallway, so there is no transition between
+   the two. Neutral on purpose: this is a test section, and picking a colour
+   to match the film is a design decision, not a mechanic. */
 .test-section {
   height: 100vh;
   display: grid;
   place-items: center;
-  /* The doorway's light. The component writes --door-light on :root from the
-     manifest, so this follows the film; the literal is only what answers
-     before the script has run. Same value, one owner. */
-  background: var(--door-light, #e4b068);
-  color: #2a1c0b;
+  border-top: 1px dashed #444;
 }

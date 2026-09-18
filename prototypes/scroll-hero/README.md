@@ -104,10 +104,47 @@ network layer; `after-hero.png` is the test section filling the viewport;
 | JS + CSS + HTML | 108 kB |
 | **total** | **1.03 MB** of the 3 MB budget |
 
-The frames are synthetic gradients and compress to ~13 kB each. Real
-footage at 1600×900 lands nearer 25–30 kB per frame, so 72 frames is about
-1.8–2.2 MB — inside the budget, where 100 would have been at its edge.
-If a longer cut ever goes over, 1280×720 is the lever.
+The frames above are synthetic gradients at ~13 kB each, which is why that
+total looks comfortable. **It is not what the real sequence costs.**
+
+### The real sequence is over the 3 MB budget (measured 2026-09-18)
+
+The 72 real frames went up on the box the evening of 2026-09-17, and every
+one of them was weighed over HTTP:
+
+| | |
+|---|---|
+| frames on disk | 72, none missing |
+| smallest / mean / largest | 29.5 kB / 40.8 kB / 61.6 kB |
+| all 72 frames | **3,004,548 B — 2.87 MiB** |
+| poster | 41.8 kB |
+| JS + CSS + HTML + webfont | ~169 kB |
+| **hero total for a first visitor** | **~3.22 MB (3.07 MiB)** |
+
+The budget is 3 MB, so this is over it — by about 7% against decimal MB,
+2% against MiB. The frames alone are 3.00 MB decimal, at the line without
+anything else counted. An earlier note here guessed 25–30 kB per frame and
+concluded 1.8–2.2 MB; the real mean is 40.8 kB, and the later frames are
+the heavy ones (61.6 kB at the end against 29.5 kB at the lightest).
+
+Three levers, cheapest first:
+
+1. **Re-encode at a lower WebP quality.** The frames are visibly
+   high-quality; dropping to q≈70 typically takes 25–35% off with no
+   visible change at 1600×900 behind a scrim.
+2. **1280×720.** About 35% off, and the canvas scales it to fit anyway —
+   worth testing by eye, since the hero is full-bleed.
+3. **Fewer frames.** 60 would land near 2.45 MB. This one changes the
+   motion, so it is the last resort rather than the first.
+
+Nothing in the code needs to change for any of them: re-encode, upload, and
+update `manifest.json` if the count moves.
+
+**Not yet measured: LCP with the real poster.** The Lighthouse figures
+below were taken against the 11 kB placeholder poster; the real one is
+41.8 kB, roughly 200 ms more on simulated 4G, which would put LCP near
+2.3 s against the 2.5 s bar. Run `npm run lighthouse` with `URL` pointing
+at the live host to get the true number.
 
 ### Legibility, measured rather than eyeballed
 

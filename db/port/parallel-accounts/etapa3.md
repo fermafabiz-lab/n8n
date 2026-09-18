@@ -275,3 +275,110 @@ where `Assign Accounts` splits the scenes into equal blocks, not on a remainder.
 2. The probe for whether one account holds two generations at once, before
    `videoPoolPerAccount` goes above 1. With an even split that is what turns 3
    in flight into 6.
+
+## The A/B, 2026-09-18 — the serial baseline is the easy half
+
+The film above (`rec1rkfxvBeMCFDRj`, nine scenes, three accounts, all nine
+images already on the right accounts) was cleared of its clips and run twice on
+the same scenes, changing exactly one thing: `videoPool`.
+
+### Arm A — `videoPool: false`, fired 12:26:24
+
+| scene | account | clip landed | gap |
+|---|---|---|---|
+| 1 | `fermafabiz` | 12:28:09 | 1m45 from the start |
+| 2 | `fermafabiz` | 12:29:34 | 1m25 |
+| 3 | `fermafabiz` | 12:30:59 | 1m25 |
+| 4 | `houseofvideos01` | 12:32:39 | 1m40 |
+
+**One clip every 85–100 seconds, dead steady.** The run was stopped at 12:35:06
+before it reached scene 101, so the nine-clip figure is an extrapolation rather
+than a stopwatch: 9 × ~88 s ≈ **13 minutes**. The cadence is regular enough over
+four consecutive clips that the extrapolation is worth more than the fifth
+data point would have added.
+
+Note what the account column already proves: `Assign Accounts` split nine scenes
+into three even blocks — 1/2/3 on the primary, 4/101/102 on account 01,
+103/104/105 on account 02 — which is the even split the previous run lacked.
+This is the first pass that entry 1 under "Still owed" asked for.
+
+**Arm A was killed by something outside this session**, 8m42 into the run, with
+a fresh webhook execution starting 46 seconds later. That is neither of the two
+signatures documented in `docs/lessons-site.md`: `restartProduction` leaves a
+1.7–5.3 s gap between the cancel and the resume, and `pauseProduction` stops
+every running execution inside 130 ms. A 46-second gap is a person reading the
+page between two clicks. **Nothing in an execution records who stopped it**, so
+this stays an inference — but it is the third time a timing run on this film has
+been cut short from outside, and that is the reason the serial arm is an
+extrapolation.
+
+### Arm B — `videoPool: true`, fired 12:47:10
+
+Same nine scenes, cleared again, nothing else changed.
+
+| account | clips | landed | gap |
+|---|---|---|---|
+| `fermafabiz` | 1, 2, 3 | 12:49:30, 12:51:38, 12:53:46 | 2m08, 2m08 |
+| `houseofvideos01` | 4, 101, 102 | 12:49:07, 12:51:28, 12:53:58 | 2m21, 2m30 |
+| `houseofvideos02` | 103, 104, 105 | 12:49:18, 12:55:49, 12:57:15 | **6m31**, 1m26 |
+
+**9 of 9 clips, every one on the account that owns its scene's image, zero
+`Email mismatch`.** The three accounts submitted 14 seconds apart (12:47:31,
+12:47:45, 12:47:59) and the first three clips landed within 23 seconds of each
+other — the pool holds exactly three in flight, one per account, as designed.
+
+### The number
+
+| | clips | wall clock |
+|---|---|---|
+| Arm A, serial | 9 (extrapolated from 4) | **~13m12** |
+| Arm B, pool | 9 (measured) | **10m05** |
+
+**1.31x. Not 3x.** Two things eat the difference, and they are different in kind.
+
+**The one that is an accident:** scene 104 took 6m31 against a 2m10 norm — almost
+certainly a motion re-roll, which resubmits the job from inside a poll tick.
+Without it account 02 would have finished around 12:54 with the other two, for a
+total near 7 minutes. **With three accounts the slowest account IS the film**, so
+a single re-roll costs the whole run its margin. The serial arm has the same
+exposure but spreads it: one re-roll there adds its own length and nothing more.
+
+**The one that is structural, and was not predicted:** the pool's per-clip time
+is **2m10 per account**, against the serial arm's **1m28**. Three accounts do not
+buy 3x because each account's own clips got ~48% slower. Part of that is
+`POLL_EVERY_MS = 20000` — a finished job is noticed only on its next poll turn,
+and with three jobs in flight the pool spends ticks on polls it did not need.
+That accounts for maybe 10–20 s of the 42. **The rest is unexplained**, and the
+honest possibilities are that three concurrent generations are genuinely slower
+at Google, or that the per-tick cost of re-running `Current Scene` and its chain
+is higher than assumed. Nothing measured here separates the two.
+
+So the ceiling with three accounts at one job each is not 3x; on these numbers it
+is closer to **1.5x**, and the measured figure is 1.31x because of the re-roll.
+
+### What this means for a real film
+
+At the measured rates, a film whose clip work is evenly split three ways:
+
+| scenes | serial | pool |
+|---|---|---|
+| 9 | 13m | 10m |
+| 80 | ~2h | ~1h |
+
+**Do not carry the "80 scenes = 6.7 h" figure from the Etapa 2 plan forward** —
+that implies about 5 minutes per clip, and this film measured 88 seconds serial.
+Either the older number covered more than clip generation, or these clips are
+cheaper than a real film's. It is not reconciled, and the honest reading is that
+the RATIO above is the transferable part, not the absolute minutes.
+
+### Next, in order of what it buys
+
+1. **Find out why a pooled clip takes 2m10 where a serial one takes 1m28.** This
+   is worth more than any other change here: closing that gap alone would take
+   the same three accounts from 1.5x to nearly 2.5x. Dropping `POLL_EVERY_MS` to
+   10 s is the cheap half of the experiment; timing a single pooled clip against
+   a single serial one, with nothing else in flight, is the half that answers it.
+2. The probe for whether one account holds two generations at once. With an even
+   split that turns 3 in flight into 6 — but only after (1), or it compounds the
+   per-clip penalty instead of the gain.
+3. Nothing here justifies raising `videoPoolPerAccount` yet.

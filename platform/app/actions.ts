@@ -35,6 +35,7 @@ import {
   updateSeriesNotes,
   updateSeriesCharacter,
   updateSeriesBible,
+  getSeriesEpisodes,
   getSeriesRefsUnion,
   getSheetMediaUrls,
 } from "@/lib/data";
@@ -3101,17 +3102,126 @@ async function onEpisodeScriptApproved(projectId: string): Promise<void> {
     revalidatePath(`/series/${series.id}`);
   }
 
+  await fireSeriesRecapWebhook(projectId);
+}
+
+/**
+ * Ask the pipeline to write one episode's recap line.
+ *
+ * `false` means no webhook is configured — which the caller must be able to
+ * tell apart from "asked and it failed", because one is a misconfiguration
+ * and the other is a bad afternoon at OpenAI.
+ *
+ * The webhook answers `onReceived`, the moment n8n starts the run. So a
+ * `true` here means the request was ACCEPTED, never that a line was written;
+ * anything that needs the line has to watch the row.
+ */
+async function fireSeriesRecapWebhook(projectId: string): Promise<boolean> {
   try {
     const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
-    const webhook = newProject?.replace(/new-project\/?$/, "series-recap");
-    if (!webhook?.includes("series-recap")) return;
+    const webhook =
+      process.env.N8N_SERIES_RECAP_WEBHOOK_URL ??
+      newProject?.replace(/new-project\/?$/, "series-recap");
+    if (!webhook?.includes("series-recap")) return false;
     await fetch(webhook, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ project_id: projectId }),
       signal: AbortSignal.timeout(8000),
     });
+    return true;
   } catch (e) {
     console.warn(`series-recap webhook: ${(e as Error).message}`);
+    return false;
+  }
+}
+
+/** A line the pipeline wrote, as opposed to a note the producer typed. */
+const RECAP_LINE = /^Episode\s+\d+\s+—/;
+const countRecapLines = (text: string): number =>
+  text.split("\n").filter((l) => RECAP_LINE.test(l.trim())).length;
+
+/**
+ * Write "what has happened so far" from the episodes, instead of by hand.
+ *
+ * The pipeline has written this line itself since 2026-09-16 — but only
+ * forward, at the moment an episode's script is approved. A show started
+ * from a film whose script was approved BEFORE the show existed therefore
+ * has an empty recap and no way to fill it except typing, which is exactly
+ * what the producer asked not to do. Episode 1 is that film in every show,
+ * so this is not an edge case; it is every show's first line.
+ *
+ * Safe to press repeatedly. `Append Recap` in the n8n chain replaces the
+ * line for an episode NUMBER rather than appending a second one, so a
+ * re-run rewrites in place — and a note the producer typed that is not in
+ * `Episode N — …` shape is left alone, because the replace is keyed on
+ * that shape.
+ *
+ * It WATCHES the row rather than trusting the answer: the webhook responds
+ * `onReceived`, so "ok" arrives long before the model has written anything.
+ */
+export async function writeRecapFromEpisodes(
+  seriesId: string,
+): Promise<ActionResult & { previously?: string }> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    const episodes = await getSeriesEpisodes(seriesId);
+    if (episodes.length === 0) {
+      return { ok: false, message: "This show has no episodes yet, so there is nothing to recap." };
+    }
+    const before = (await getSeries(seriesId))?.previously ?? "";
+
+    let fired = 0;
+    for (const ep of episodes) {
+      if (await fireSeriesRecapWebhook(ep.id)) fired += 1;
+    }
+    if (fired === 0) {
+      return {
+        ok: false,
+        message:
+          "No series-recap webhook is configured here, so there is nothing to ask — check N8N_NEW_PROJECT_WEBHOOK_URL.",
+      };
+    }
+
+    /*
+     * One model call measured 2.4s on a throwaway, so a show of two or three
+     * episodes is done inside two polls. The clock, not a count, decides when
+     * to stop: an episode whose script was never approved produces NO line at
+     * all (the chain's own prompt node returns nothing), so waiting for one
+     * line per episode would hang on exactly the shows this is for.
+     */
+    let text = before;
+    for (let i = 0; i < 15; i++) {
+      await new Promise((r) => setTimeout(r, 2000));
+      text = (await getSeries(seriesId))?.previously ?? text;
+      if (countRecapLines(text) >= episodes.length) break;
+    }
+    revalidatePath(`/series/${seriesId}`);
+
+    if (text === before) {
+      return {
+        ok: false,
+        message:
+          "Nothing has come back yet. The writing runs in n8n and can outlast this wait — give it a minute and reload. If it stays empty, the episode probably has no approved script.",
+        previously: text,
+      };
+    }
+    const lines = countRecapLines(text);
+    const silent = episodes.length - lines;
+    const head = before.trim()
+      ? `Rewritten from ${episodes.length} episode${episodes.length === 1 ? "" : "s"}.`
+      : `Written from ${episodes.length} episode${episodes.length === 1 ? "" : "s"}.`;
+    return {
+      ok: true,
+      message:
+        silent > 0
+          ? `${head} ${silent} ${silent === 1 ? "has" : "have"} no approved script yet, so ${silent === 1 ? "it has" : "they have"} no line.`
+          : head,
+      previously: text,
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
   }
 }

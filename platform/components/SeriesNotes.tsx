@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { saveSeriesNotes, type ActionResult } from "@/app/actions";
+import { saveSeriesNotes, writeRecapFromEpisodes, type ActionResult } from "@/app/actions";
 import s from "./SeriesCast.module.css";
 
 /**
@@ -18,12 +18,15 @@ export default function SeriesNotes({
   premise,
   previously,
   channelName,
+  episodes = 0,
 }: {
   seriesId: string;
   name: string;
   premise: string;
   previously: string;
   channelName: string;
+  /** How many episodes the show has — the recap is written from them. */
+  episodes?: number;
 }) {
   const [v, setV] = useState({ name, premise, previously, channelName });
   const [msg, setMsg] = useState<ActionResult | null>(null);
@@ -33,6 +36,29 @@ export default function SeriesNotes({
     start(async () => {
       setMsg(await saveSeriesNotes(seriesId, v));
     });
+  /*
+   * The recap is written from the episodes rather than typed. The pipeline
+   * has done this on its own since 2026-09-16, but only FORWARD — at the
+   * moment a script is approved. Episode 1 of every show is the film the
+   * show was started from, and its script was approved before the show
+   * existed, so every show's first line is missing and this is the only way
+   * to get it without typing.
+   *
+   * It writes straight into the field because the action returns the new
+   * text: revalidating the page alone would not reach this component's
+   * state, and the producer would press a button and watch nothing change.
+   */
+  const [writing, setWriting] = useState(false);
+  const recapDirty = v.previously !== previously;
+  const write = () => {
+    setWriting(true);
+    start(async () => {
+      const r = await writeRecapFromEpisodes(seriesId);
+      setMsg(r);
+      if (r.previously !== undefined) setV((x) => ({ ...x, previously: r.previously ?? x.previously }));
+      setWriting(false);
+    });
+  };
   return (
     <div>
       <div className={s.notes}>
@@ -51,6 +77,27 @@ export default function SeriesNotes({
         <div style={{ gridColumn: "1 / -1" }}>
           <label>What has happened so far</label>
           <textarea rows={5} value={v.previously} onChange={(e) => setV({ ...v, previously: e.target.value })} maxLength={8000} placeholder="A running recap, one line per episode. The pipeline adds the line itself when an episode's script is approved; edit or trim it here whenever you like. The next episode is told not to contradict it and not to retell it." />
+          {episodes > 0 && (
+            <div className={s.row} style={{ marginTop: 8 }}>
+              <button
+                type="button"
+                className="abtn"
+                onClick={write}
+                disabled={pending || recapDirty}
+                title={
+                  recapDirty
+                    ? "Save or undo your edit first — this rewrites the recap from the episodes"
+                    : "Summarise every episode's approved script into one line each. A line you typed yourself that is not in “Episode N — …” shape is left alone."
+                }
+              >
+                {writing
+                  ? "Reading the episodes…"
+                  : v.previously.trim()
+                    ? "✎ Write it again from the episodes"
+                    : `✎ Write it from the ${episodes === 1 ? "episode" : `${episodes} episodes`}`}
+              </button>
+            </div>
+          )}
         </div>
       </div>
       <div className={s.row} style={{ marginTop: 12 }}>

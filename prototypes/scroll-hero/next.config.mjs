@@ -14,7 +14,9 @@ const nextConfig = {
         // any CDN keep them for a year. Only affects `next start` — on the box
         // these paths never reach Next, Caddy answers them — but that is what
         // the Playwright and Lighthouse runs use.
-        source: "/frames/:path*",
+        // Frames and poster only. manifest.json is deliberately NOT here: its
+        // contents change under the same name, so it must stay revalidated.
+        source: "/frames/:file(frame_\\d+\\.webp|poster\\.webp)",
         headers: [
           { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
         ],

@@ -90,8 +90,18 @@
 		# Only a frame that exists is immutable. A 404 with this header would
 		# be cached by the browser for a year, so a visit before the frames
 		# landed on disk would keep failing after they did.
-		@exists file
-		header @exists Cache-Control "public, max-age=31536000, immutable"
+		#
+		# manifest.json is the exception and must never be immutable: it is the
+		# one file here whose CONTENTS change under the same name (it carries
+		# the frame count), so a year-long cache would describe a sequence that
+		# is gone. The hero also asks for it with no-store, so this is the
+		# second lock on the same door.
+		@immutable {
+			file
+			not path /manifest.json
+		}
+		header @immutable Cache-Control "public, max-age=31536000, immutable"
+		header /manifest.json Cache-Control "no-cache"
 		file_server
 	}
 

@@ -29,13 +29,29 @@ import { preload } from "react-dom";
  * after which it never runs again.
  */
 
-const FRAME_COUNT = 100;
+// How long the sequence is. Two ways to change it, in this order:
+//
+//   1. `manifest.json` beside the frames — `{"count": 72}`. It is uploaded
+//      with them, so a new sequence needs no rebuild. This is the one to use.
+//   2. this constant, which answers when there is no manifest.
+//
+// Keep the constant matching whatever is on the box, so the fallback is right
+// rather than merely present.
+const FALLBACK_FRAME_COUNT = 72;
+const MANIFEST_SRC = "/frames/manifest.json";
+// A sanity bound, not a design limit: past this, a manifest is a typo rather
+// than a sequence, and 20,000 image loads would take the tab down with it.
+const MAX_FRAME_COUNT = 2000;
+
 const PRELOAD_COUNT = 20;
 const MAX_DPR = 2;
 // Lives beside the frames, and is served the same way: from Caddy's disk on
 // the box, from public/ locally. Nothing about the poster is in the image, so
 // a new sequence is an upload rather than a rebuild.
 const POSTER_SRC = "/frames/poster.webp";
+
+// The copy is gone by this far through the scrub, and the scrim with it.
+const COPY_FADE_END = 0.6;
 
 const HINT_IDLE_MS = 2000;
 const HINT_FRAMES = 4;
@@ -63,6 +79,31 @@ function easeInOutSine(t: number): number {
   return -(Math.cos(Math.PI * t) - 1) / 2;
 }
 
+/**
+ * The frame count, from the manifest if there is a usable one.
+ *
+ * `no-store` on purpose: everything under /frames/ is served `immutable`, and
+ * a manifest cached for a year would outlive the sequence it describes — the
+ * one file in that directory whose contents change under the same name.
+ *
+ * A malformed count is REFUSED, never coerced. "72", 0 and 1e9 are all
+ * mistakes, and guessing what one meant would scrub through a film that is
+ * not there.
+ */
+async function readFrameCount(signal: AbortSignal): Promise<number> {
+  try {
+    const res = await fetch(MANIFEST_SRC, { signal, cache: "no-store" });
+    if (!res.ok) return FALLBACK_FRAME_COUNT;
+    const data: unknown = await res.json();
+    const raw = (data as { count?: unknown } | null)?.count;
+    if (typeof raw !== "number" || !Number.isInteger(raw)) return FALLBACK_FRAME_COUNT;
+    if (raw < 1 || raw > MAX_FRAME_COUNT) return FALLBACK_FRAME_COUNT;
+    return raw;
+  } catch {
+    return FALLBACK_FRAME_COUNT;
+  }
+}
+
 export default function ScrollHero() {
   const sectionRef = useRef<HTMLElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -83,7 +124,11 @@ export default function ScrollHero() {
     const narrow = window.matchMedia(NARROW_QUERY);
     const reduced = window.matchMedia(REDUCED_MOTION_QUERY);
 
-    const frames: (HTMLImageElement | null)[] = new Array(FRAME_COUNT).fill(null);
+    // Both are empty until the manifest has answered; nothing draws before
+    // then, because `tick` returns while `firstBatchDone` is false.
+    let frameCount = FALLBACK_FRAME_COUNT;
+    let frames: (HTMLImageElement | null)[] = [];
+    const controller = new AbortController();
     let loadedUpTo = -1; // every index 0..loadedUpTo is decoded and drawable
     let started = false; // loading has begun (never restarts)
     let firstBatchDone = false;
@@ -91,6 +136,7 @@ export default function ScrollHero() {
 
     let rafId = 0;
     let lastDrawn = -1;
+    let lastFade = -1;
     let sizeDirty = true;
     let cssWidth = 0;
     let cssHeight = 0;
@@ -109,12 +155,14 @@ export default function ScrollHero() {
 
     // ---- geometry -------------------------------------------------------
 
-    const targetIndex = (): number => {
+    // How far through the scrub we are, 0..1, unrounded.
+    const progress = (): number => {
       const range = section.offsetHeight - window.innerHeight;
       if (range <= 0) return 0;
-      const top = section.getBoundingClientRect().top;
-      return Math.round(clamp01(-top / range) * (FRAME_COUNT - 1));
+      return clamp01(-section.getBoundingClientRect().top / range);
     };
+
+    const targetIndex = (): number => Math.round(progress() * (frameCount - 1));
 
     const resizeCanvas = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
@@ -152,7 +200,21 @@ export default function ScrollHero() {
 
     const tick = () => {
       rafId = 0;
-      if (disposed || !firstBatchDone || !eligible()) return;
+      if (disposed) return;
+
+      // The copy fades on RAW progress, not on the rounded frame index, so it
+      // eases continuously instead of stepping once per frame. It runs before
+      // everything below: it does not depend on a single frame having loaded,
+      // so scrolling during the initial load still fades the words.
+      if (eligible()) {
+        const fade = 1 - clamp01(progress() / COPY_FADE_END);
+        if (fade !== lastFade) {
+          section.style.setProperty("--hero-fade", String(Number(fade.toFixed(3))));
+          lastFade = fade;
+        }
+      }
+
+      if (!firstBatchDone || !eligible()) return;
 
       let index = targetIndex();
 
@@ -166,7 +228,7 @@ export default function ScrollHero() {
             elapsed < HINT_OUT_MS
               ? easeOutCubic(elapsed / HINT_OUT_MS)
               : 1 - easeInOutSine((elapsed - HINT_OUT_MS) / HINT_BACK_MS);
-          index = Math.min(index + Math.round(offset * HINT_FRAMES), FRAME_COUNT - 1);
+          index = Math.min(index + Math.round(offset * HINT_FRAMES), frameCount - 1);
           schedule();
         }
       }
@@ -212,20 +274,21 @@ export default function ScrollHero() {
       });
 
     const advance = () => {
-      while (loadedUpTo + 1 < FRAME_COUNT && frames[loadedUpTo + 1]) loadedUpTo++;
+      while (loadedUpTo + 1 < frameCount && frames[loadedUpTo + 1]) loadedUpTo++;
       section.dataset.loaded = String(loadedUpTo + 1);
       schedule();
     };
 
     const loadAll = async () => {
       const first: Promise<void>[] = [];
-      for (let i = 0; i < PRELOAD_COUNT; i++) first.push(loadFrame(i));
+      // A sequence shorter than the preload batch is loaded whole, in one go.
+      for (let i = 0; i < Math.min(PRELOAD_COUNT, frameCount); i++) first.push(loadFrame(i));
       await Promise.all(first);
       if (disposed) return;
       firstBatchDone = true;
       advance();
       armHint();
-      for (let i = PRELOAD_COUNT; i < FRAME_COUNT; i++) {
+      for (let i = PRELOAD_COUNT; i < frameCount; i++) {
         if (disposed) return;
         await loadFrame(i);
         advance();
@@ -268,6 +331,11 @@ export default function ScrollHero() {
       if (!started) {
         started = true;
         setState("loading");
+        // The manifest request starts NOW, in parallel with the poster, so
+        // asking for the count costs no latency — by the time the gate below
+        // opens, a 30-byte file on a warm connection is long back.
+        const countReady = readFrameCount(controller.signal);
+
         // Let the poster (the LCP element) decode and paint before the first
         // batch of frame fetches and decodes competes with it for the main
         // thread. decode() resolves at once if the poster is already there.
@@ -275,8 +343,15 @@ export default function ScrollHero() {
         const posterReady = poster ? poster.decode().catch(() => undefined) : Promise.resolve();
         void posterReady
           .then(() => new Promise<void>((r) => requestAnimationFrame(() => setTimeout(r, 0))))
-          .then(() => {
-            if (!disposed) void loadAll();
+          .then(() => countReady)
+          .then((count) => {
+            if (disposed) return;
+            // Settled before the first draw, so the scroll-to-frame mapping
+            // never changes under the viewer's finger.
+            frameCount = count;
+            frames = new Array(frameCount).fill(null);
+            section.dataset.count = String(frameCount);
+            void loadAll();
           });
         return;
       }
@@ -324,6 +399,7 @@ export default function ScrollHero() {
 
     return () => {
       disposed = true;
+      controller.abort();
       stopHint();
       if (rafId) window.cancelAnimationFrame(rafId);
       observer.disconnect();
@@ -347,6 +423,20 @@ export default function ScrollHero() {
           decoding="async"
         />
         <canvas ref={canvasRef} className="hero__canvas" aria-hidden="true" />
+        {/* Scrim and copy fade together: the scrim exists to hold this text
+            up, so it has no reason to outlive it. `pointer-events: none` in
+            the CSS keeps the whole layer out of the way of scrolling. */}
+        <div className="hero__copy">
+          <div className="hero__scrim" aria-hidden="true" />
+          <div className="hero__words">
+            <h1 className="hero__title">
+              Orice temă,
+              <br />
+              orice format.
+            </h1>
+            <p className="hero__subtitle">Long form, short form, orice platformă.</p>
+          </div>
+        </div>
       </div>
     </section>
   );

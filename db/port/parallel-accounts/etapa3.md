@@ -125,3 +125,58 @@ be checked against that by walking the graph, not by eye.
 3. Every clip lands on the scene it belongs to — the failure mode of a broken tick
    is a clip written to the wrong scene, which no existing check would catch.
 4. Wall clock against the same film with the flag off.
+
+---
+
+## Applied 2026-09-18 (Media Generation `8ce5af14`, rollback `8c4ef1bf`)
+
+Nine nodes added, one changed, nothing removed.
+
+| node | kind | role |
+|---|---|---|
+| `Video Pool?` | if | reads `Editing Options.videoPool`; false → `Loop Scenes`, the serial path |
+| `Pool Tick` | code | the brain; one tick, one action, one scene |
+| `Pool Route` | switch | `wait` → `Pool Wait`, `done` → `Wait Video Approval`, fallback → `Current Scene` |
+| `Pool Wait` | wait, 20s | under the 65s suspension threshold |
+| `Pool Action?` | if | after `Current Scene`: poll tick → `Poll Video Job`, otherwise → `Needs Clip?` |
+| `Pool Submitted?` | if | after `Submit Video`: pool on → `Pool Record`, off → `Wait Video` |
+| `Pool Retry?` | if | job not finished: pool on → `Pool Record`, off → `Wait Retry` |
+| `Pool Record` | code | folds the tick's result in; edges told apart by `$prevNode.name` |
+| `Pool Return?` | if | pool on → `Pool Tick`, off → `Loop Scenes` |
+
+`Poll Video Job` is the only existing node changed: its url read
+`$('Submit Video').first().json.jobid`, whose latest run belongs to a different
+scene once more than one clip is in flight. It now prefers `$json.poolJobid`,
+which `Current Scene` carries through because it returns
+`Object.assign({}, $json, …)`, and falls back to the old lookup on the serial path.
+
+**Verified before publishing.** Diff against `8c4ef1bf`: 225 → 234 nodes,
+`added 9, removed 0, changed 1`, and the one change is the url above. No dangling
+`$('…')` references anywhere in 234 nodes, all 12 Google Drive nodes intact. Every
+Code body and every routing expression byte-identical to its file in `paste/`.
+
+**The OFF path was walked edge by edge**, because "it only runs when the flag is
+on" is exactly the kind of claim that is wrong in one branch:
+
+```
+Sort Scenes For Video → Video Pool?(1) → Loop Scenes → … → Current Scene
+  → Pool Action?(1) → Needs Clip? → … → Submit Video
+  → Pool Submitted?(1) → Wait Video → … → If Job Failed(1)
+  → Pool Retry?(1) → Wait Retry
+returns: Update Scene Record / Mark Video Prompt Rejected / Needs Clip?(1)
+  → Pool Record (no state → passes through) → Pool Return?(1) → Loop Scenes
+```
+
+Same order, same nodes, same data — six extra gates that only forward.
+
+**Still owed, and it is the whole point:** a run with `videoPool: true`. Nothing
+below has been exercised even once.
+
+1. Three clips in flight at the same time — `POOL submit … (3 in flight)` in the log.
+2. **Every clip written to the scene it belongs to.** This is the failure mode
+   that matters: a tick that reads another tick's `Current Scene` would write a
+   clip to the wrong scene, and no existing check would catch it. Audit by
+   decoding each scene's `video_media_id` and comparing with its block account.
+3. Wall clock against the same film with the flag off.
+4. Only then the probe for whether one account holds two generations at once,
+   before `videoPoolPerAccount` goes above 1.

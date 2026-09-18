@@ -108,7 +108,54 @@ so re-run it whenever a show's faces are initials. That happens when a series
 is started from a film made before 2026-09-17 11:33 UTC; new films keep their
 own sheets as they draw them (24 rows and counting since it went live).
 
-**What is owed**: a producer-facing door. Today this needs a session with the
-n8n connector. The shape is a `sheet-backfill` webhook on its own workflow and
-a button on the series page, which would make "the faces are missing" a thing
-the producer fixes themselves. Nothing else is blocked on it.
+## The button (same day)
+
+The one-off above needed a session with the n8n connector, so it became a
+door the producer owns: **workflow `IGWjknKcffnGlOmV` "Sheet Backfill"**,
+webhook `sheet-backfill`, and "⤓ Bring the pictures back" on the series page
+(`SeriesFaces`, `bringBackFaces`).
+
+```
+Backfill Webhook (POST sheet-backfill, responseMode lastNode)
+  → Find Stranded      the query above, scoped by $1 = series_id
+  → Anything Stranded? IF flow_id notEmpty
+      ├ true  → Ask Flow For A Fresh Link → Keep The Bytes
+      └ false → Nothing Owed  (a Set: ok, brought: 0, note)
+```
+
+Four things are load-bearing, and three of them cost a round trip to find:
+
+- **The empty case needs its own branch.** With `responseMode: lastNode` and
+  zero rows, n8n answers **HTTP 500 `{"code":0,"message":"No item to return
+  was found"}`** — measured, not guessed. A show with nothing owed is the
+  common case for this button, so answering 500 to it would make the site
+  report a failure for the healthiest possible state. `Find Stranded` carries
+  `alwaysOutputData`, the IF splits, and the false arm returns a real body.
+  (This is the footgun the SDK reference warns about, used the one way it
+  says is correct: the empty case has a branch of its own.)
+- **The branch indices were read back before publishing**, per the rule in
+  `CLAUDE.md`: `addConnection` takes `sourceIndex`, and an edge that silently
+  lands on output 0 makes an If fire both arms with nothing complaining.
+- **Publishing is a second step.** After `update_workflow` added the IF, the
+  ACTIVE version was still the four-node one — `activeVersionId` said so while
+  `get_workflow_details` showed the draft. The webhook served the old graph
+  until `publish_workflow` ran again.
+- **The count is taken by the SITE, from the database**, before and after,
+  rather than read out of n8n's answer. The page renders from those rows, so
+  a count taken there cannot disagree with what the producer then sees; n8n's
+  body is advisory.
+
+Verified end to end on the real show: one `sheet_media` row deleted by hand,
+the webhook fired, HTTP 200 with the sheet ingested, and the row back at
+14:20:20 at the same content-addressed path — same bytes, so the delete and
+the refetch are provably the same picture. The empty case answers
+`{"ok":true,"brought":0,…}` with HTTP 200.
+
+**What is still owed**: nothing for this to work. The two things it
+deliberately does NOT do are worth knowing — it will not draw a sheet that
+was never drawn (an object gets one only when it appears in two or more
+scenes, at most three per film, `Cast Sheet Prep`), and the panel says so
+instead of offering a button that could not help; and the useapi token is a
+hardcoded header on `Ask Flow For A Fresh Link`, matching the existing
+pipeline nodes rather than improving on them — it moves when they all do
+(CLAUDE.md, "Rotate the ai33 / Railway / useapi keys").

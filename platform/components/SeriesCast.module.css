@@ -251,5 +251,12 @@
   background: var(--card2);
   margin-bottom: 22px;
 }
+/* The words take the room that is left and the button sits beside them.
+   Without this the text block consumes the whole row and `space-between` has
+   nothing to space, so the button wraps under it even on a wide screen —
+   which reads as a stray control rather than this panel's answer. Under
+   720px it wraps on purpose, which is what the flex-wrap above already
+   wanted. */
+.bannertext { flex: 1 1 420px; min-width: 0; }
 .banner b { font-family: var(--f-display), Georgia, serif; font-weight: 500; font-size: 17px; }
 .banner p { margin: 2px 0 0; font-size: 12.5px; color: var(--dim); }

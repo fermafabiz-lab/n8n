@@ -2,8 +2,18 @@
 
 `castSheets[name].url` and `locationPlates[name].url` are Flow's signed
 links, dead within hours. The pipeline never needed the picture again — it
-attaches sheets by Flow id — but a series page does (`db/port/series/`), and
-a face nobody kept is a face nobody can show. This port keeps them: right
+attaches sheets by Flow id — but a series page does (`db/port/series/`), so
+this port keeps a copy of each one as it is made:
+
+> **Correction, 2026-09-18.** This file used to say "a face nobody kept is a
+> face nobody can show", and that is false: `GET
+> api.useapi.net/v1/google-flow/assets/{mediaGenerationId}` hands back a
+> fresh signed URL for any asset, at any time. Sheets drawn before this port
+> went live were recovered from it — `db/port/sheet-backfill/README.md`. What
+> this port buys is that the fetch happens once, automatically, instead of
+> being owed forever; it is not the difference between having the picture and
+> not having it.
+ right
 after each pass makes its sheets and plates, Media Generation posts them to
 the site's `/api/media/ingest` with `field: "sheets"`, which downloads each
 one into `/opt/n8n/media/<project>/sheet/<hash>.<ext>` and files a

@@ -110,8 +110,10 @@ export default async function SeriesPage({ params }: { params: Promise<{ id: str
           {Object.keys(series.refs.castSheets).length > 0 &&
             Object.values(series.refs.castSheets).every((c) => !media[c.id]) && (
               <p className={s.hint} style={{ marginTop: 14 }}>
-                The sheets exist and the pipeline reuses them, but their pictures were made before the
-                site started keeping a copy — faces will appear for sheets drawn from now on.
+                The sheets exist and the pipeline reuses them; their pictures were made before the site
+                started keeping a copy. They are not lost — Flow will hand each one back from its id
+                (see db/port/sheet-backfill), and a session with the n8n connector can fetch them in
+                about a minute. Sheets drawn from now on are kept as they are made.
               </p>
             )}
         </section>

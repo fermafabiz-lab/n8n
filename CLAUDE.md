@@ -395,7 +395,17 @@ expected and harmless for an app touching only its own Drive.
   `71b42624`, `db/port/sheet-ingest/`): every new cast sheet and set plate
   is posted to `/api/media/ingest` (`field: "sheets"`) while Flow's signed
   URL is alive, so the series page shows faces for anything drawn from
-  then on; sheets drawn before that stay initials. **What is owed**: one
+  then on. **Sheets drawn BEFORE that are recoverable, and ten of them were
+  recovered on 2026-09-18** — `GET
+  api.useapi.net/v1/google-flow/assets/{mediaGenerationId}` mints a fresh
+  signed URL for any asset at any time, which nothing in the repo knew and
+  three files claimed was impossible (`db/port/sheet-backfill/README.md`
+  has the query, the four nodes and how the endpoint was found). The general
+  lesson: **a 4xx that rejects a value for its FORMAT is an endpoint that
+  wants a different value in that position, not an endpoint that does not
+  exist.** Re-run the backfill whenever a show's faces are initials — it is
+  idempotent, and it needs a session with the n8n connector until the
+  producer-facing button in that README exists. **What is owed**: one
   real episode — read its Story Bible against the series page (same
   names, same descriptions), check `SHEET PLAN` says the cast was skipped,
   not drawn again, and `SHEET KEEP` in the log of the first film that

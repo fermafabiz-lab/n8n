@@ -17,10 +17,16 @@
 -- producer writes it in.
 --
 -- sheet_media keeps the BYTES of a reference sheet. Flow hands back a signed
--- URL that dies within hours (consistency README), so the only durable copy
--- is one taken while it is alive: Media Generation posts each new sheet to
--- /api/media/ingest right after making it. Keyed by the Flow id, because a
--- sheet reused across episodes is the same picture.
+-- URL that dies within hours (consistency README), so the copy is taken while
+-- it is alive: Media Generation posts each new sheet to /api/media/ingest
+-- right after making it. Keyed by the Flow id, because a sheet reused across
+-- episodes is the same picture.
+--
+-- The URL dying does NOT mean the picture is gone, which this comment used to
+-- imply and 2026-09-18 disproved: GET api.useapi.net/v1/google-flow/assets/
+-- {mediaGenerationId} mints a fresh signed URL for an asset at any time. So a
+-- sheet whose bytes were never kept can still be fetched back — see
+-- db/port/sheet-backfill/README.md, which did exactly that for ten of them.
 --
 -- Idempotent; safe to re-run.
 

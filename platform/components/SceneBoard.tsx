@@ -29,6 +29,7 @@ import {
   groupsByChapter,
 } from "@/lib/chapters";
 import { explainRefusal } from "@/lib/refusals";
+import { matchesScene, takeSceneParam } from "@/lib/deep-link";
 import MediaPlayer from "@/components/MediaPlayer";
 import RegenBadge from "@/components/RegenBadge";
 import { usePendingStage } from "@/components/StageNav";
@@ -212,6 +213,52 @@ export default function SceneBoard({
 
   const running = scenes.find((s) => s.statusKind === "run");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  /**
+   * Which scene is under review — and why it is written down.
+   *
+   * The page refreshes itself every 10s and that can remount this board, the
+   * same thing the prompt drafts below are stored against. A selection that
+   * resets puts the producer back on whatever scene the batch is working,
+   * which is precisely the scene they navigated away from — and it would
+   * quietly undo a notification's deep link ten seconds after the click
+   * worked, which reads as the click not having worked at all.
+   */
+  const selKey = `vf-scene-sel:${projectId}`;
+  const selectScene = useCallback(
+    (id: string) => {
+      setSelectedId(id);
+      try {
+        sessionStorage.setItem(selKey, id);
+      } catch {}
+    },
+    [selKey],
+  );
+  /**
+   * Where the board opens: the scene a notification named, else the one the
+   * producer was last looking at, else the board's own answer (the running
+   * scene, then the first).
+   *
+   * In an effect rather than a lazy initializer because neither the URL nor
+   * `sessionStorage` exists during the server pass, and a first client render
+   * that disagreed with the server's would be a hydration mismatch. The scene
+   * param is consumed here and removed from the URL — see `lib/deep-link.ts`
+   * for why it must not survive the next refresh.
+   */
+  useEffect(() => {
+    const want = takeSceneParam();
+    if (want) {
+      const hit = scenes.find((s) => matchesScene(s, want));
+      if (hit) {
+        selectScene(hit.id);
+        return;
+      }
+    }
+    try {
+      const stored = sessionStorage.getItem(selKey);
+      if (stored && scenes.some((s) => s.id === stored)) setSelectedId(stored);
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [msg, setMsg] = useState<ActionResult | null>(null);
   /**
    * What the last approval signed off, so it can be taken back.
@@ -389,7 +436,7 @@ export default function SceneBoard({
   const pool = byChapter
     ? frames.filter(({ s }) => chapterKeyOf(s.order) === chapter)
     : frames;
-  const select = (id: string) => setSelectedId(id);
+  const select = (id: string) => selectScene(id);
   /** Approved / total for one chapter, for the step being reviewed. */
   const chapterStat = (key: string) => {
     const inCh = scenes.filter((s) => chapterKeyOf(s.order) === key);
@@ -479,10 +526,10 @@ export default function SceneBoard({
     (delta: number) => {
       if (idx === -1 || !ordered.length) return;
       const at = Math.min(ordered.length - 1, Math.max(0, idx + delta));
-      setSelectedId(ordered[at].id);
+      selectScene(ordered[at].id);
       setPreviewId(null);
     },
-    [idx, ordered],
+    [idx, ordered, selectScene],
   );
 
   /**
@@ -507,10 +554,10 @@ export default function SceneBoard({
 
     const nextScene = pickNextOwing(ordered, idx, owes);
     if (nextScene) {
-      setSelectedId(nextScene.id);
+      selectScene(nextScene.id);
       setPreviewId(null);
     }
-  }, [active, idx, step, owes, ordered, projectId, guess]);
+  }, [active, idx, step, owes, ordered, projectId, guess, selectScene]);
 
   /** Take back the last approval — the key and the link call this same one. */
   const undoLast = useCallback(() => {
@@ -637,10 +684,10 @@ export default function SceneBoard({
                 className={`fr ${frClass(s, step)} ${s.id === active?.id ? "sel" : ""}`}
                 key={s.id}
                 ref={s.id === active?.id ? selRef : undefined}
-                onClick={() => setSelectedId(s.id)}
+                onClick={() => selectScene(s.id)}
                 role="button"
                 tabIndex={0}
-                onKeyDown={(e) => e.key === "Enter" && setSelectedId(s.id)}
+                onKeyDown={(e) => e.key === "Enter" && selectScene(s.id)}
               >
                 <div
                   className={`art ${s.imageUrl ? "" : `fallback${(i % 4) + 1}`}`}

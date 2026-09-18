@@ -899,6 +899,50 @@ Full account: `db/port/created-by/README.md`.
   from `N8N_NEW_PROJECT_WEBHOOK_URL` by swapping the last path segment, and a
   copy that spells that segment differently fails silently against a host
   that answers 404.
+- **A notification that says what happened but does not GO there is the same
+  complaint one step further along** (2026-09-18, `lib/deep-link.ts`,
+  `npm run check:deeplink`). The chime was given words precisely because the
+  sound alone made the producer hunt the page; then the words said
+  "S10 finished" and clicking them did nothing — the toast was a plain `div`
+  with no handler, and the system notification's `onclick` called
+  `window.focus()` and stopped, landing the producer wherever they already
+  were. Every item now carries an `href` and both surfaces travel: the toast
+  is a button that routes, the notification focuses the tab and then routes.
+  What the fix turned on:
+  - **The step and the scene are two different vocabularies.** The page
+    derives a GATE name for the chime (`image-review`) and the stepper
+    navigates by STEP key (`images`). `GATE_STEP` maps one to the other, and
+    `STAGE_KEYS` moved beside it so the map cannot name a step the page does
+    not serve. A gate with no entry still produces a link, still navigates,
+    and still selects nothing — a failure that looks like success, which is
+    why the check reads both vocabularies out of the real sources instead of
+    restating them.
+  - **`?scene=` is an INSTRUCTION, not state, so reading it removes it.** The
+    project page re-renders itself every 10s; a param that stayed would drag
+    the producer back to scene 10 every time that fired, however many other
+    scenes they had clicked. `takeSceneParam` strips it with
+    `history.replaceState` — not `router.replace`, which on a `force-dynamic`
+    page is a full server round-trip to change nothing on screen.
+  - **…which is exactly why the board's selection had to be written down.**
+    Consuming the param and then losing the selection to the next remount
+    undoes the click ten seconds after it worked, which reads as the click
+    never having worked. `vf-scene-sel:<projectId>` in `sessionStorage`, the
+    same remedy the prompt drafts carry, restored in an effect rather than a
+    lazy initializer so the first client render cannot disagree with the
+    server's.
+  - **An empty destination must stay empty.** `withScene("", "S10")` returned
+    `"?scene=S10"` — truthy, so a caller's `|| undefined` never fired, and it
+    navigated to the CURRENT path. Found by writing the check, not by
+    clicking: it is invisible until an item without an `href` exists, and
+    then it looks like the page reloading itself for no reason.
+  The three review panels consume the param differently because they are
+  different shapes: `SceneBoard` selects the scene in its filmstrip;
+  `AudioReview` and `SceneReview` are lists, so they scroll the row into view
+  and ring it for 4.5s with the same accent outline a playing take wears —
+  long enough to survive the smooth scroll, short enough not to read as a
+  state. Verified in a real browser (Playwright against the demo backend):
+  the param is consumed, the toast navigates, the row is ringed, and × does
+  NOT travel.
 - `ProductionActivity` (project page) mirrors the batch rule from `Sort & Cap
   Scenes`: a scene is done for the batch once its clip exists, pending scenes
   sort first, and `MEDIA_BATCH_CAP` in `platform/lib/n8n.ts` is a display

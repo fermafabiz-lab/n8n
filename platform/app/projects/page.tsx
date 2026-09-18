@@ -2,6 +2,7 @@ import { getProjects, isConfigured, type StatusKind } from "@/lib/data";
 import AutoRefresh from "@/components/AutoRefresh";
 import OpsPanel from "@/components/OpsPanel";
 import StageChime from "@/components/StageChime";
+import { GATE_STEP, projectHref } from "@/lib/deep-link";
 import ProjectsGrid from "@/components/ProjectsGrid";
 import Link from "next/link";
 
@@ -61,19 +62,29 @@ export default async function Dashboard() {
   return (
     <main className="page pj">
       <AutoRefresh seconds={15} />
+      {/* From the library a notification can only mean "this project" — the
+          bucket is all this page knows. `finished` still earns a step, since
+          the one thing to do with a finished film is watch it; `error` and
+          `needs-review` deliberately do not, because the bare page lands on
+          whatever is actually live and guessing a step here would send the
+          producer to the wrong one with confidence. */}
       <StageChime
-        items={projects.map((p) => ({
-          key: p.id,
-          label: p.name,
-          stage:
+        items={projects.map((p) => {
+          const stage =
             p.statusKind === "done"
               ? "finished"
               : p.statusKind === "err"
                 ? "error"
                 : p.statusKind === "wait"
                   ? "needs-review"
-                  : "working",
-        }))}
+                  : "working";
+          return {
+            key: p.id,
+            label: p.name,
+            stage,
+            href: projectHref(p.id, GATE_STEP[stage]),
+          };
+        })}
       />
       <div className="pj-shell">
         <div className="arc" aria-hidden="true" />

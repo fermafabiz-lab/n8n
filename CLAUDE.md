@@ -481,6 +481,24 @@ expected and harmless for an app touching only its own Drive.
   cannot see this; only the returned `mediaGenerationId`'s hex-encoded owner can,
   which is why `Collect Replicated` files every copy by it.
 
+- **Three Google Flow accounts buy 1.3x, not 3x, and the reason is worth more
+  than the number** (2026-09-18, measured A/B on `rec1rkfxvBeMCFDRj`, nine scenes
+  split evenly three ways; full account `db/port/parallel-accounts/etapa3.md`,
+  "The A/B"). Serial (`videoPool: false`) delivered a clip every **88 seconds**,
+  dead steady. The pool (`videoPool: true`) delivered 9 of 9 on the right
+  accounts in **10m05** against a serial extrapolation of **13m12**. The gap
+  between that and the 3x the three accounts suggest has two causes. One is bad
+  luck: a single motion re-roll on one clip cost 6m31 against a 2m10 norm, and
+  **with a pool the slowest account IS the film** — the serial loop spreads that
+  exposure, the pool concentrates it. The other is structural and was NOT
+  predicted: a pooled clip takes **2m10 per account where a serial one takes
+  1m28**, so each account's own work got ~48% slower and three of them cannot
+  give back 3x. `POLL_EVERY_MS = 20000` explains part of it (a finished job is
+  seen only on its next poll turn) and the rest is unmeasured. **Fix the per-clip
+  penalty before raising `videoPoolPerAccount`** — more jobs in flight multiplies
+  whatever that penalty is. Note also that the old planning figure "80 scenes =
+  6.7 h serial" implies ~5 min per clip and does not reconcile with the 88 s
+  measured here; treat the RATIO as transferable, not the absolute minutes.
 
 - ~~**`houseofvideos01@gmail.com` is signed out at Google and must be reconnected**~~
   **Reconnected 2026-09-17 21:59** and all three accounts read `health: OK`. The

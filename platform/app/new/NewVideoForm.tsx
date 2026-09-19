@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState } from "react";
 import { createProject, type ActionResult } from "@/app/actions";
 import CategoryPicker, { type CategoryMeta } from "@/components/CategoryPicker";
 import { DEFAULT_CATEGORY, getCategory } from "@/lib/categories";
+import { TONES } from "@/lib/tones";
 import Toggle from "@/components/Toggle";
 import CaptionColorPicker from "@/components/CaptionColorPicker";
 import WatermarkOpenPicker from "@/components/WatermarkOpenPicker";
@@ -25,26 +26,10 @@ async function submit(_prev: ActionResult | null, formData: FormData) {
   return createProject(formData);
 }
 
-// Same option set as the n8n form — the site fully replaces it. Every name
-// here has a row in hov.genre_profile (matched case-insensitively) — a tone
-// without one is written with Scripting's built-in DOCUMENTARY fallback.
-const TONES = [
-  "Epic",
-  "Educativ",
-  "Cinematic",
-  "Corporate",
-  "Emotional",
-  "Dark",
-  "Conspiracy",
-  "Horror",
-  "Dramatic",
-  "Documentary",
-  "Motivational",
-  "Childish",
-];
-/** The tone a producer lands on before touching the row. */
-const DEFAULT_TONE = "Dark";
-
+// The tone chips are `TONES` from lib/tones.ts — same option set as the n8n
+// form, which the site fully replaces. There is no DEFAULT_TONE any more:
+// the tone a producer lands on is the CATEGORY's (`defaultTone`), so "what
+// kind of film" and "how it should feel" stop being two unrelated questions.
 
 /** Dashed suggestion chips under the subject — one click fills the field. */
 const SUGGESTIONS = [
@@ -289,7 +274,25 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
   // them can see who made what.
   const [createdBy, setCreatedBy] = useState("");
   const [name, setName] = useState("");
-  const [tone, setTone] = useState(series?.tone || DEFAULT_TONE);
+  // The category is chosen before the tone is (section 01 is above section
+  // 02), and it decides the tone — so the initial value has to be read from
+  // the SAME category the picker starts on, not from a constant. Computed
+  // once here because `category`'s own state is declared further down, and
+  // two `?? DEFAULT_CATEGORY` that could drift apart is how a form ends up
+  // starting on a tone no category asked for.
+  const initialCategory = series?.category ?? DEFAULT_CATEGORY;
+  const [tone, setTone] = useState(series?.tone || getCategory(initialCategory).defaultTone);
+  // Has the producer clicked a tone chip themselves? The effect below moves
+  // the tone with the category only while this is false.
+  //
+  // It has to be a flag rather than "is the tone still the default?", which
+  // is what the kids-only version of this used to test: now that every
+  // category has a default, that test cannot tell a producer who deliberately
+  // clicked "Epic" on a Story film from one who never touched the row — and
+  // would overwrite the first one's choice the moment they changed category.
+  // A series episode starts TOUCHED: the show's tone is a decision already
+  // made, recorded on the show, and nothing here may stomp it.
+  const [toneTouched, setToneTouched] = useState(Boolean(series?.tone));
   const [length, setLength] = useState(60);
   const [aspect, setAspect] = useState<"16:9" | "9:16">(series?.aspect ?? "16:9");
   // The rate is the state; the WORD the webhook wants is derived from it.
@@ -377,7 +380,7 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
   const [videoModel, setVideoModel] = useState(series?.videoModel || "veo-3.1-lite-low-priority");
   // The category selection lives here because BOTH halves of CategoryPicker
   // read it and they are rendered in different cards.
-  const [category, setCategory] = useState(series?.category ?? DEFAULT_CATEGORY);
+  const [category, setCategory] = useState(initialCategory);
   const [catValues, setCatValues] = useState<Record<string, string | boolean>>(
     series
       ? Object.fromEntries(
@@ -401,11 +404,13 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
       t.style === STORYTELLER_TONE.style && t.speakerBoost === STORYTELLER_TONE.speakerBoost;
     if (category === "kids" && voiceTone === null) setVoiceTone(STORYTELLER_TONE);
     else if (category !== "kids" && isStoryteller(voiceTone)) setVoiceTone(null);
-    // The tone moves with the category the same way: Kids story writes as a
-    // children's story (the Childish genre profile), and leaving it returns
-    // the default — unless the producer clicked a tone themselves.
-    if (category === "kids" && tone === DEFAULT_TONE) setTone("Childish");
-    else if (category !== "kids" && tone === "Childish") setTone(DEFAULT_TONE);
+    // The WRITING tone moves with the category the same way, and for every
+    // category rather than only Kids story: a Story film is Epic, a
+    // Documentary is Documentary, a Cinematic one is Cinematic, a Kids story
+    // is Childish. The chip lights up so the producer sees which profile will
+    // write the script, and one click overrides it for good — `toneTouched`
+    // is never cleared, so the category can no longer take the row back.
+    if (!toneTouched) setTone(getCategory(category).defaultTone);
     // Runs on the category, not on the tone: a producer switching the tone
     // away and back must not be fought by this effect.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -675,7 +680,19 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
                   <span className="no">02</span>
                 </header>
                 <div className="field">
-                  <label>Tone</label>
+                  <label>
+                    Tone{" "}
+                    {/* Which of the two states the row is in, said out loud.
+                        Without this the producer cannot tell a tone the
+                        category chose from one they chose — and so cannot
+                        tell that changing the category will, or will not,
+                        move it. The way back is the chips themselves. */}
+                    <span className="fhint">
+                      {toneTouched
+                        ? "your pick — it stays put if you change what kind of film this is"
+                        : `following ${getCategory(category).label} — change it and it stays where you put it`}
+                    </span>
+                  </label>
                   <input type="hidden" name="tone" value={tone} />
                   <div className="chiprow" role="group" aria-label="Tone">
                     {TONES.map((t) => (
@@ -683,7 +700,10 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
                         type="button"
                         key={t}
                         className={`pchip ${tone === t ? "on" : ""}`}
-                        onClick={() => setTone(t)}
+                        onClick={() => {
+                          setTone(t);
+                          setToneTouched(true);
+                        }}
                       >
                         {t}
                       </button>

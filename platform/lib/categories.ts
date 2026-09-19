@@ -6,6 +6,8 @@
 // stay that way — everything else is introduced around it, never by
 // changing it.
 
+import type { Tone } from "./tones";
+
 export interface CategoryOption {
   /** Form field name — travels to n8n inside the category_options JSON. */
   name: string;
@@ -41,6 +43,23 @@ export interface Category {
    * does, exactly as the picker already does for a typed choice.
    */
   narratorVoice?: string;
+  /**
+   * The tone this kind of film is written in before the producer touches the
+   * row — the `hov.genre_profile` Claude Scripting loads, which decides the
+   * structure, the voice and the words per minute.
+   *
+   * Not a suggestion and not a hidden default: the brief lights the chip the
+   * moment the category is chosen, so the producer SEES it and is one click
+   * from changing it — the same contract `narratorVoice` has. Only an
+   * untouched row follows the category; a tone the producer picked is theirs
+   * from then on, whatever the category does afterwards.
+   *
+   * REQUIRED on purpose, so a category added here cannot forget it and
+   * quietly inherit somebody else's mood — and typed as `Tone`, so a
+   * misspelling is a build error rather than a film written with Scripting's
+   * DOCUMENTARY fallback. See `lib/tones.ts` for why that failure is silent.
+   */
+  defaultTone: Tone;
   options: CategoryOption[];
 }
 
@@ -52,6 +71,7 @@ export const CATEGORIES: Category[] = [
     description:
       "A narrated fictional story — hook, chapters, cinematic scenes. This is the classic House of Videos pipeline.",
     ready: true,
+    defaultTone: "Epic",
     options: [
       {
         name: "multi_voice",
@@ -76,6 +96,7 @@ export const CATEGORIES: Category[] = [
     description:
       "Fact-driven storytelling: researched narration built like a real documentary. Any scene can use real footage or photos — from the EU Audiovisual Service, DVIDS, NASA, Wikimedia Commons, a pasted URL or your own upload — instead of a generated picture, chosen scene by scene on the Images step. Every scene says on screen what it is.",
     ready: true,
+    defaultTone: "Documentary",
     options: [
       {
         name: "multi_voice",
@@ -115,6 +136,7 @@ export const CATEGORIES: Category[] = [
       "No narration at all — a pure visual film carried by its own sound: engines, tires, rain, impacts. For car scenes, action sequences, atmosphere pieces.",
     ready: true,
     noNarration: true,
+    defaultTone: "Cinematic",
     options: [],
   },
   {
@@ -129,6 +151,10 @@ export const CATEGORIES: Category[] = [
     // Storyteller tone (STORYTELLER_TONE in derive.ts), which the brief
     // selects alongside it.
     narratorVoice: "elevenlabs_JBFqnCBsd6RMkjVDRZzb",
+    // The bedtime-story writing profile — db/port/childish-tone/, row
+    // recpa1ZmZmXFnGjDi, 110 wpm. This is where Kids story's tone default
+    // was born; the other three categories got theirs on 2026-09-19.
+    defaultTone: "Childish",
     options: [
       {
         name: "narration_pace",

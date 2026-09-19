@@ -2129,3 +2129,63 @@ the second one only when it differs. `report.sentences` carries it, and the
 panel counts distinct quotes itself when the field is missing, because every
 report written before that day has no such field and an old film's panel still
 has to add up.
+
+### The tone is part of what kind of film it is (2026-09-19)
+
+The brief asked two questions that were really one. Section 01 asks **what kind
+of film** — Story, Documentary, Cinematic, Kids story — and section 02 asks
+**how it should feel**, a row of twelve tone chips that every film landed on
+`Dark` with, whatever had just been chosen above it. A documentary written in
+the Dark profile is not a small mismatch: the tone names a row in
+`hov.genre_profile`, and that row is the structure, the voice and the words per
+minute Claude Scripting writes the entire script with. So the default was
+quietly making a Documentary sound like a thriller unless the producer noticed
+the second row and corrected it.
+
+Each category now owns its tone — `defaultTone` on the entry in
+`lib/categories.ts`: Story is **Epic**, Documentary is **Documentary**,
+Cinematic is **Cinematic**, Kids story is **Childish**. It is the same contract
+`narratorVoice` already had: the chip lights up the moment the category is
+chosen, so it is a visible selection the producer can disagree with, never a
+hidden default applied at submit.
+
+Three things are worth carrying past this feature.
+
+**A required field is how a map stays total.** `defaultTone` is not optional
+and it is typed as `Tone` (from the new `lib/tones.ts`, which is now the one
+owner of the twelve names). A category added without one does not compile, and
+a misspelled tone does not compile either — which matters more than it sounds,
+because the failure it prevents is silent: Scripting matches the profile on
+`lower(tone)` and falls back to its built-in DOCUMENTARY profile when nothing
+matches, with no error, no log line and nothing on screen. The same reason
+`lib/tones.ts` carries the date its twelve rows were last measured against the
+database, and `check:tones` pins the list against that measurement.
+
+**"Is it still the default?" is not a test for "did anybody touch this".** The
+kids-only version of this effect asked exactly that — `tone === DEFAULT_TONE`
+— and it worked only because one category had a default and it differed from
+everyone else's. The moment all four have one, that test cannot tell a producer
+who deliberately clicked *Epic* on a Story film from one who never looked at
+the row, and would overwrite the first one's choice on the next category click.
+It takes an explicit `toneTouched` flag, set by the chips and never cleared.
+The general form: **a proxy for "untouched" that reads the value works only
+while the value is unique to being untouched** — the day a real choice can
+equal the default, the proxy starts lying, and it lies by throwing away
+somebody's work.
+
+**Two states need saying which one you are in.** The row now carries a hint
+that reads either *"following Story — change it and it stays where you put
+it"* or *"your pick — it stays put if you change what kind of film this is"*.
+Without it the two states are pixel-identical, and a producer cannot tell
+whether changing the category is about to move their tone. That is the same
+rule as the in-flight flags in `CLAUDE.md`, one step earlier: a state with no
+exit is a dead end, and a state you cannot see you are in is a surprise.
+
+Verified in real Chromium against `next dev`, not by reading the code: all four
+categories move the row, a hand-picked `Horror` survives three category
+changes, a reload starts following the category again, and Kids story still
+selects George and the Storyteller read beside its Childish tone (19/19). The
+server keeps the same backstop for a form that never rendered the row —
+`createProject` resolves an empty `tone` through `getCategory(...).defaultTone`
+rather than the old literal `"Dark"`, with `||` and not `??`, because `""`
+matches no profile either.

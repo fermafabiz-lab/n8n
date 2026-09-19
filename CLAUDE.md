@@ -467,6 +467,26 @@ expected and harmless for an app touching only its own Drive.
   `rewritten`, all three of which now count distinct sentences.
   **What is owed**: `Extract Claims` still writes relative order ("after") as
   if it were sourced — claims should carry dates.
+
+  **Two more holes are found, written and NOT PUBLISHED** (2026-09-19,
+  `db/port/fact-check/README.md` §6; blocked on the OpenAI credits entry
+  below). The producer's next Google Maps documentary came back cleaner but
+  with ZipDash still wrong, and the reason is new: the writer had ATTRIBUTED
+  the ordering ("according to the same report"), so the assertion the judge
+  extracted was a claim about what a report SAYS — which is true — and "dates
+  settle order" never fired. **Attribution laundered the chronology**, and the
+  source it launders through is a real one: the 2020 U.S. House Judiciary
+  report itself carries the wrong order. The repo now has the judge ruling on
+  both the attribution AND the underlying fact whenever that fact is one
+  another source could check (narrowly: a party's claim about ITSELF stays one
+  claim), and the rewrite forbidden from repairing an ordering by attributing
+  it. The same film also said "early 2003" and "In 2004" for one founding,
+  three sentences apart, and the second sentence produced no finding at all —
+  so the judge is now asked to check **the narration against itself**, which
+  nothing in the chain could do before and which is the same fault as the very
+  first red-light film (hook said April, chapter one said October).
+  **Do not publish any of it without a verification run** — that is the
+  09-18 lesson, and the credits outage is why it is still parked.
 - **A Flow refusal that arrives as HTTP 200 no longer kills the film**
   (2026-09-17, Media Generation `6735a96a`, `db/port/regen-unstick/README.md`,
   lesson in `docs/lessons-pipeline.md` under "Flow refuses twice"). **What is
@@ -811,14 +831,36 @@ expected and harmless for an app touching only its own Drive.
   rejected `Ordine: 0` on 2026-08-16 (execution 4225 → 4226). Later runs
   succeeded, but whether the constraint, the payload or the absence of a hook is
   what changed is unknown.
-- ~~The OpenAI account is out of credits~~ — **resolved.** Full pipelines ran to
-  a finished film on 08-13, 08-14 and 08-16, and both `recCoZWsZBOrIU69L` and
-  `rec1GITgUCq4mEsUd` read `Finalizat` with a final video. The entry is kept for
-  its map of which nodes share that account — still the fastest way to see the
-  blast radius of a billing failure. **Check the DATE on a note like this
-  before repeating it**: this one had been resolved for a fortnight and was
-  still told to the producer as a live blocker on 08-27, which cost a round
-  trip and some of their patience. Original note: execution 1783 (2026-08-08,
+- **THE OPENAI ACCOUNT IS OUT OF CREDITS AGAIN — 2026-09-19, ~10:00 UTC.**
+  Measured, not inferred: a probe at 10:57 came back
+  *"You have no credits remaining. Add credits to continue using the API at
+  https://platform.openai.com/settings/organization/billing/"*, and the film
+  `reczMt4d9zqrYcceL` had written its whole script an hour earlier at 09:47.
+  So it ran dry inside that hour. **Only the producer can fix it**, by topping
+  up at that URL.
+
+  **What is dead while it is empty**, per the node map below: every writing
+  path. Story Bible, Outline, Narration, Segment, Hook and Research Model; the
+  three raw HTTP rewrites; and — new since 09-18 — all of Deep Search, whose
+  `FC Judge`, `FC Source` and `FC Rewrite` are agents on the same account. A
+  new film dies partway through scripting; per-scene regeneration fails
+  honestly (`Mark Scene Regen Failed` writes the reason and releases the flag);
+  Media Generation and Final Assembly are UNAFFECTED, so a film that already
+  has its scenes still renders.
+
+  **n8n reports it as "OpenAI: Rate limit reached"**, which is not what it is.
+  The credits sentence is in the error's `description`, not its `message`, so
+  the surface reading sends you looking for throttling that is not there.
+  Read the description before believing the message.
+
+  ~~Resolved as of 08-16~~ — it was, for a month, and the entry below is that
+  history. Full pipelines ran to a finished film on 08-13, 08-14 and 08-16, and
+  both `recCoZWsZBOrIU69L` and `rec1GITgUCq4mEsUd` read `Finalizat` with a
+  final video. **Check the DATE on a note like this before repeating it**: that
+  resolution had been true for a fortnight and was still told to the producer as
+  a live blocker on 08-27, which cost a round trip and some of their patience.
+  The same caution now runs the other way — do not read the strike-through above
+  and conclude this is history, because it recurred. Original note: execution 1783 (2026-08-08,
   project "Death cominig up to take someone into the underworld",
   `recCoZWsZBOrIU69L`) died at `Rebuild Story Bible` with *"You have no
   credits remaining"*, after the script had been written, edited and

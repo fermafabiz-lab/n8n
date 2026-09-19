@@ -259,6 +259,84 @@ lookup instead of being inherited. **The general rule for any closed-book
 check: a claim's PROSE is not evidence, only its facts are.** Dates settle
 order.
 
+### 6. …and then attribution walked straight around the order rule
+
+**WRITTEN AND COMMITTED, NOT PUBLISHED.** The live judge is still `63d21d49`;
+this section describes `FC Judge.txt` and `FC Rewrite.txt` as they now stand in
+the repo. They could not be verified because the OpenAI account ran out of
+credits at ~10:00 on 2026-09-19 (see CLAUDE.md), and **a prompt change nobody
+has run is not a prompt change you publish** — that is the lesson from 09-18,
+eighteen minutes and one whole feature wide.
+
+The producer made a fresh Google Maps documentary at 09:47, on the published
+one-assertion judge, and read it against ChatGPT again. It came back much
+cleaner — no major false claim — but with the ZipDash chronology still wrong.
+Here is why, and it is a genuinely new hole rather than the old one recurring.
+
+The narration said:
+
+> "Google acquired Where 2 in October 2004 and, **according to the same
+> report**, added Keyhole and ZipDash."
+
+The judge returned two findings, and both are correct:
+
+| claim | verdict | ref |
+|---|---|---|
+| Google acquired Where 2 in October 2004 | `supported` | E4 |
+| The same U.S. congressional report **says** Google added Keyhole and ZipDash | `supported` | E16 |
+
+E16 really does say that. **The ordering was never ruled on as an ordering** —
+once the writer attributed it, the assertion the judge extracted was a claim
+about what a report SAYS, which is true, so "dates settle order" never fired.
+Attribution laundered the chronology.
+
+And the source it launders through is a real one. ChatGPT traced the bad order
+to the **2020 U.S. House Judiciary report**, which states the Where 2
+acquisition and says Google "soon followed" with Keyhole and ZipDash — while
+other chronologies put ZipDash in **September 2004**, before both. So the
+strongest form of the lesson from §5 is now demonstrated rather than asserted:
+**a reputable primary source can carry an imprecise chronology, and citing it
+does not make the chronology right.**
+
+Two changes, neither published:
+
+- `FC Judge` — an attributed statement about a fact that exists independently
+  of who reports it (a date, an order, a count, a measurement) is TWO
+  assertions: the attribution, and the fact. Rule on both. The limit is
+  deliberate and stated in the prompt: a party's claim about ITSELF ("Google
+  said Maps had a billion users") stays ONE claim, because what Google said is
+  the fact and no one else can settle its internal number.
+- `FC Rewrite` — **an ordering is never repaired by attribution.** The ladder's
+  first rung is "attribute it", which is right for most things and wrong for
+  this one: it leaves the same chronology in the viewer's ears with a citation
+  in front of it. For an ordering the fix is rung 2, soften: name the period
+  everything is agreed to have happened in and drop the sequence.
+
+### A second, separate miss on the same film: the script disagreeing with itself
+
+Not something ChatGPT flagged as a fact problem — it noticed only that the
+prose reads repetitively — but the same two sentences carry two different
+years for one event:
+
+> "In **early 2003**, Lars Eilstrup Rasmussen and Jens Eilstrup Rasmussen
+> started Where 2 Technologies in Sydney and built Expedition."
+> …
+> "In **2004**, two Australians and two Danes came together in Sydney to
+> develop a new kind of mapping technology for the internet."
+
+Same founding, same city, two years, two counts. The second sentence produced
+**no finding at all** — it was not extracted, because "came together to
+develop" reads like scene-setting. It is not: it carries a date and a count.
+
+`FC Judge` now says so, and adds the capability that was missing rather than
+merely the instruction: **the narration must agree with ITSELF.** The judge
+holds the whole script and is the only step that ever reads it as a whole, so
+a restatement with a changed number is its job. This is the same failure that
+opened the whole Deep Search story — the producer's first red-light film had a
+hook saying April and a first chapter saying October — and until now nothing
+in the chain could see it, because every check ran against the pack and never
+across the script.
+
 ### What that change moved underneath everything else
 
 The judge now returns roughly twice as many findings for the same script, all
@@ -320,6 +398,7 @@ to read.
 
 | Version | What |
 |---|---|
+| (unpublished) | §6 — attribution does not settle an order, and the narration must agree with itself. **In the repo only**; blocked on OpenAI credits, needs one verification run against a real narration and pack before it goes live |
 | `63d21d49` | one assertion at a time, dates settle order, the counts move to sentences — **published 2026-09-19 09:37, and what is live** |
 | `b927a298` | the skip path writes its report too — published 2026-09-18 19:32 |
 | (same publish) | the category read moved to `Fetch Project Record` |

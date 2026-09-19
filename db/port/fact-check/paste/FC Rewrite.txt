@@ -9,9 +9,11 @@ SENTENCES TO FIX:
 WHAT OUR SOURCES ACTUALLY SAY — you may use these and nothing else as fact:
 {{ $json.fc.packList }}
 
+BEFORE THE LADDER, ONE REFUSAL: AN ORDER OF EVENTS IS NEVER FIXED BY ATTRIBUTING IT. If the PROBLEM line says the ordering is unsupported, you may not repair it by writing "according to the report…" or "one account says…". That leaves the same chronology in the viewer's ears with a citation in front of it, and a wrong order is wrong whoever is quoted. Go straight to 2 and SOFTEN: give the period everything is agreed to have happened in and drop the sequence. "Google acquired Where 2 in October 2004 and, according to the same report, added Keyhole and ZipDash" becomes "In 2004, Google acquired ZipDash, Where 2 Technologies and Keyhole as it assembled its mapping technology" — every event kept, no order claimed. Only attribute when the SOURCE ITSELF is the point ("the congressional report described the acquisitions as a single push"), never to smuggle a date past the check.
+
 HOW TO FIX ONE SENTENCE, in this order of preference:
 
-1. ATTRIBUTE IT. If the statement is something a named party said or claimed rather than an established fact, say so: "Google said…", "according to Lars Rasmussen…". This keeps the sentence and makes it true, because the claim about what someone said is checkable even when the thing said is not.
+1. ATTRIBUTE IT. If the statement is something a named party said or claimed rather than an established fact, say so: "Google said…", "according to Lars Rasmussen…". This keeps the sentence and makes it true, because the claim about what someone said is checkable even when the thing said is not. See the refusal above for the one case where this is forbidden.
 2. SOFTEN IT TO WHAT IS SUPPORTED. Keep the part the sources cover and drop the part they do not. "Lars wanted the map to move directly on the web" becomes "The team wanted the map to move directly on the web" only if a source covers the team; if nothing covers the motive at all, describe what was BUILT instead of why.
 3. CORRECT IT. When a source contradicts the sentence, rewrite it to what the source says. The DETAIL line tells you what that is.
 4. CUT IT. If none of the above can save it, remove the sentence and let the ones around it carry the paragraph. Repair the join so it still reads as prose.

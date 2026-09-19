@@ -86,6 +86,224 @@ Publishing the n8n half before the render half is deployed is safe: the
 composition has no zod schema, so Remotion merges `inputProps` over
 `defaultProps` and an unknown key is ignored.
 
+## The choice moved onto the brief, and became two named options
+
+2026-09-19. It was a switch at Final touches only, which meant it could not be
+decided when the film was specified — and as a second numbered row directly
+under "Source watermark" it read as an equal decision rather than as a detail
+of that one, offered at the top level of the list even on a film whose badge
+is switched off.
+
+It is now **one control in two places**: `WatermarkOpenPicker`, nested under
+the Source watermark row on the brief (`/new`) and at Final touches, shown only
+while the badge is on — the same rule the effects volume follows, because a
+control for something that is switched off is a decision with no subject.
+
+**Two named choices, not an on/off switch.** Neither side is an absence: "off"
+would have to mean "announce every time", which is a positive behaviour and the
+busier of the two. A switch leaves the producer working out which way round it
+goes every time they meet it.
+
+| | |
+|---|---|
+| **Every time** (default) | Every run of shots opens the full label |
+| **Once per source** | The first archival shot says ARCHIVAL FOOTAGE in full; after that the same kind keeps just its mark |
+
+The stored key is still `watermarkOpenOnce` and the ONCE side is still `true`.
+Renaming it would have meant an n8n edit, a render change and a migration for
+every film that carries it, to change a word the producer never sees.
+
+### It rides the webhook, and `sourceWatermark` beside it does not
+
+This is the one decision here worth reading twice, because the two keys sit in
+the same row and travel differently.
+
+`Merge Ref Into Options` rebuilds the WHOLE Editing Options blob from
+`Normalize Webhook Input`'s value and PATCHes it back seconds after the webhook
+answers. So anything the site merges in between is **overwritten on any film
+carrying a reference photo** — which is why `createdBy` rides the webhook body,
+and why `sourceWatermark`, which does not, silently loses a refused watermark
+on exactly those films (`docs/lessons-site.md`, and the note in
+`createProject`). That file's own warning is explicit: *any new key the site
+merges right after creation has the same hole.*
+
+A key added today has no history to protect, so it does not inherit the defect:
+the brief posts `watermark_open_once`, `createProject` forwards it in the
+webhook payload, and the orchestrator's `Normalize Webhook Input` stores it.
+Applied to `8CienBFfG6SgbB1A` on 2026-09-19, active version `0759685a`, from
+`paste/orch-Normalize_Webhook_Input.js`, diffed with
+`db/port/lib/diff-workflow.mjs` against `1bde883f`: 32 nodes both sides, one
+node changed, connections identical.
+
+**Publish the n8n half BEFORE the site deploys.** The other order leaves a
+window where the brief posts the choice and nothing reads it — the producer
+picks "Once per source", the film announces every source, and there is no
+error anywhere to say why.
+
+### What makes the drift loud
+
+`node db/port/watermark-open-once/check.mjs` — 11 assertions. It runs the
+orchestrator's REAL node body (the file that was pasted into n8n, through
+`new Function`, not a paraphrase) against fixtures with no n8n and no network,
+and then checks the site's two spellings against it.
+
+That exists because this key crosses a webhook body, a Code node and a jsonb
+column with **no loud failure anywhere on that path**. A drift between the
+posted name and the read name would look exactly like "the feature does not
+work": the brief would post the choice, n8n would drop it, and the film would
+come back announcing every source in full. Same reasoning as
+`npm run check:created-by` next door.
+
+The refusals are pinned too — `'true'`, `1` and a missing key all resolve to
+**every time**. Absence must never quieten a film's provenance labels by
+itself, and that rule is stated in three places (`Normalize Webhook Input`,
+`derive.ts`, the picker's own doc comment) precisely so it cannot be softened
+in one of them by accident.
+
+### One trap it walked into on the way
+
+Moving the switch out of `OPTIONS` took it out of `changedKeys`, which is what
+Final touches uses to decide whether the button reads "Keep initial settings"
+or "Apply N changes". Picking "Once per source" and nothing else would have
+left the panel believing nothing had changed and **thrown the choice away** —
+the identical failure the effects volume and the caption colour each carry a
+hand-written `…Moved` flag to prevent. `watermarkOpenMoved` is the third.
+
+Verified in a real Chromium on both screens rather than by reading: on the
+brief the hidden field posts `no` → `yes` → `no` as the two buttons are
+clicked, the control disappears with its parent switch while still posting what
+was chosen, and comes back holding it; at Final touches the old row is gone,
+the button flips to "Apply 1 change & render", and the `changed` chip appears
+on the Source watermark row.
+
+## It is a Documentary feature now — a decision taken against the rule
+
+2026-09-19, Final Assembly `309157bd`. The producer asked why the badge shows
+on films that are not documentaries and said it should be documentary-only.
+
+**Why it showed everywhere**: every scene gets a provenance, and a scene with
+no stored classification reads `ai_generated` (`buildProvenance` in
+`derive.ts` — "Every film this pipeline made before Documentary mode is AI").
+Consecutive same-origin scenes merge into one band, so a Story film — all Veo
+— drew ONE continuous `✦ AI GENERATED` pill for its entire length. The
+original reasoning was that a film saying nothing about where its pictures
+came from reads as a claim that they are real. The producer's counter is
+better: a label that never changes distinguishes nothing, which is the
+opposite of what this overlay is for.
+
+**The gate they chose is one CLAUDE.md explicitly warns against.** "A gate
+that tells two kinds of film apart must not trust `category`" — `story` is the
+site's default, so genuine documentaries carry it, and of eleven researched
+films in the database only three say `documentary`; Burj Al Arab, Peking to
+Paris and Tupac are all filed as Story. That was put to them with the count,
+alongside a category-free alternative (draw it only when the film MIXES kinds
+of source), and `category === 'documentary'` was chosen anyway. It is a
+decision, not an oversight, and this section exists so the next session does
+not "fix" it back.
+
+**What makes it survivable is that it is not silent.** The known failure —
+a documentary filed as Story shipping unlabelled — is now visible before the
+render instead of after it:
+
+| Where | What happens |
+|---|---|
+| The brief | the Source watermark row is dropped; no note, because the category control is a few rows up on the same screen and picking Documentary brings it straight back |
+| Final touches | the row is dropped AND a line says "No source labels on this film", naming the category it was filed as |
+| The run log | `watermark off (not a documentary: category=story)` — greppable afterwards |
+
+Dropped rather than disabled, the same call Captions makes on a silent film:
+a control you can reach and find inert is worse than one that is not there.
+
+**The licence credit is untouched.** `showSourceWatermark` owns the LABEL;
+a credit is decided from the provenance itself, and no category reaches it.
+Pinned.
+
+**If a documentary ever does ship unlabelled because of this**, the fix is not
+to widen the category list. It is the alternative that was on the table:
+draw the badge when the film contains more than one kind of visual origin,
+which needs no category at all and cannot be filed wrongly.
+
+## And how big it is drawn — a slider, not three named sizes
+
+2026-09-19. The badge is deliberately the least decorative element in the
+render: a claim about truthfulness that draws attention to itself stops being
+read as one. But "quiet" is a judgement about a particular film, on particular
+footage, watched on a particular screen — not a constant — and the producer is
+the one looking at it.
+
+**A slider rather than Small / Normal / Large**, because there is no natural
+set of steps here: three names would be three numbers somebody picked. What IS
+real is the two ends, and both are the artwork's rather than arbitrary:
+
+| | |
+|---|---|
+| **0.7×** | below this the 15px glyph falls under 11px and the pack's thin strokes start dropping out at 1080p |
+| **1.6×** | above this the capsule for the longest label ("ILLUSTRATIVE FOOTAGE", 280px at 1×) passes 448px and reads as a banner rather than a mark |
+
+`step` is 0.05 and is the SLIDER'S grid only — nothing downstream enforces it,
+because refusing an off-grid value would be refusing a film that was rendered
+before the grid existed.
+
+**Shown with a live sample at the render's real pixel size**, on both screens,
+for the same reason `WatermarkPreview` draws the badge at 1:1 under its frame:
+a percentage is not a size. "110%" means nothing until you can see that it is
+the difference between a mark you notice and one you do not, and the second
+thing is what is being chosen.
+
+### One function scales it, not a multiplication at each reader
+
+`scaleWatermark(geometry, scale)` in `provenance.ts` (both copies). Everything
+that is part of the MARK scales — height, glyph, both paddings, the three font
+sizes, the gap between the stacked lines. What does NOT:
+
+- **`left`, `bottom`, `frame`** — where the badge sits is about the
+  composition, not the mark. A badge that walked towards the corner as it grew
+  would be two decisions wearing one control.
+- **`maxWidth`** — a budget measured against the frame, and the widest capsule
+  at the largest size is still well inside it. `check:watermark` asserts that
+  rather than assuming it.
+- **the 1px border** — a hairline is a hairline. Scaling it would make the
+  largest badge look heavy-handed, which is the opposite of the point.
+
+`1×` returns the base object itself, not a rebuilt copy: every film rendered
+before this existed goes through here, and a rounding that moved one pixel
+would change all of them. Pinned.
+
+### Refused, not clamped — in four languages
+
+`normalizeWatermarkScale` follows `normalizeSpeed`: out of range falls back to
+**1**, it does not pull to the nearest end. A stored 4 is a mistake, not "as
+big as possible", and a badge silently drawn at the maximum would be a worse
+answer than the standard one.
+
+The rule exists four times — `platform/lib/provenance.ts`,
+`remotion/src/provenance.ts`, the orchestrator's `Normalize Webhook Input`,
+Final Assembly's `Source Watermark` — and `check.mjs` parses the bounds back
+out of each shipped text and asserts all four agree. **That parser caught a bug
+in itself first**: an unanchored `n >= … && n <= …` matched `normalizeSpeed`'s
+`0.5 … 2` six lines above, and reported the copies as disagreeing. A regex over
+a whole file finds the first thing shaped like the answer, which is not the
+same as the answer. It is anchored to the key's own clause now, and the pin was
+proved by deliberately drifting one copy and watching it fail.
+
+### Applied
+
+| Workflow | active version | node |
+|---|---|---|
+| Master Orchestrator `8CienBFfG6SgbB1A` | `fec6369c` | `Normalize Webhook Input` — stores `watermarkScale` from the brief |
+| Final Assembly `BY22Vlhh20Xdkr5Z` | `0ed5da71` | `Source Watermark` — passes it to the render props |
+
+Both from `paste/`, both diffed with `db/port/lib/diff-workflow.mjs` against
+the version they were built on: 32 and 40 nodes either side, one node changed
+each, connections identical, no Drive node losing `resource`/`operation`.
+
+**What is owed**: the slider has been seen on a locally rendered reel at all
+five stops and in the browser on both screens, but no real film has been
+rendered at anything other than 1×. The thing to look for is the largest sizes
+over BUSY footage — the scrim is tuned for a 30px pill, and at 48px it covers
+enough of the frame that a shot with detail in the bottom-left may need the
+badge smaller rather than larger.
+
 ## The label was not centred in the pill, three separate ways
 
 Found by the producer on the review reel — "scrisul si logoul sa fie centrate

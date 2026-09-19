@@ -6,6 +6,8 @@ import CategoryPicker, { type CategoryMeta } from "@/components/CategoryPicker";
 import { DEFAULT_CATEGORY, getCategory } from "@/lib/categories";
 import Toggle from "@/components/Toggle";
 import CaptionColorPicker from "@/components/CaptionColorPicker";
+import WatermarkOpenPicker from "@/components/WatermarkOpenPicker";
+import WatermarkSizePicker from "@/components/WatermarkSizePicker";
 import LanguagePicker from "@/components/LanguagePicker";
 import Link from "next/link";
 import { languageByCode, resolveLanguage } from "@/lib/languages";
@@ -350,6 +352,14 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
   // Hex, or "" for the white default. Empty is not "unset" — it is the
   // choice most films should keep, so it is what the control starts on.
   const [captionColor, setCaptionColor] = useState("");
+  // How often the source badge opens into its full label. FALSE — every run
+  // of shots announces itself — is the default and has to stay so: a film
+  // that quietly stops naming its sources is the failure the whole overlay
+  // exists to prevent, so absence resolves to the louder choice everywhere.
+  const [watermarkOpenOnce, setWatermarkOpenOnce] = useState(false);
+  // How big the badge is drawn. 1 is the size every film before this was
+  // rendered at, and the slider's own default — see WATERMARK_SCALE.
+  const [watermarkScale, setWatermarkScale] = useState(1);
   const [style, setStyle] = useState("");
   // Hands-off mode: every gate signs itself off. Off by default — approving
   // unseen is a real trade, and it must never be the accident.
@@ -442,7 +452,12 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
   const silent = catMeta.voiceMode === "silent";
   const gates = silent ? 3 : 4;
   const finishList = FINISHES.filter(
-    (f) => finishes[f.name] && !(silent && f.name === "captions"),
+    (f) =>
+      finishes[f.name] &&
+      !(silent && f.name === "captions") &&
+      // Same gate as the row itself: the estimate must not promise "Source"
+      // on a film that will not draw it.
+      !(f.name === "source_watermark" && category !== "documentary"),
   )
     .map((f) => f.sheet)
     .join(" · ");
@@ -928,7 +943,18 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
                   <span className="no">06</span>
                 </header>
                 <div className="swlist">
-                  {FINISHES.map((f, i) => {
+                  {/* Source labels are a Documentary feature (2026-09-19, the
+                      producer's call): every other category is wall-to-wall AI,
+                      so the badge drew one continuous AI GENERATED pill for the
+                      whole film and distinguished nothing. Dropped rather than
+                      disabled — and here, unlike at Final touches, no note is
+                      needed: the category control is a few rows up on this same
+                      screen, so picking Documentary brings the row straight
+                      back. The value is still POSTED, so switching category
+                      back and forth keeps what was chosen. */}
+                  {FINISHES.filter(
+                    (f) => !(f.name === "source_watermark" && category !== "documentary"),
+                  ).map((f, i) => {
                     const disabled = silent && f.name === "captions";
                     const on = !disabled && finishes[f.name];
                     return (
@@ -953,6 +979,27 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
                               value={captionColor}
                               onChange={setCaptionColor}
                             />
+                          )}
+                          {/* Same rule as the volumes below: the choice is
+                              only shown while the badge is on, because how
+                              often a label opens when there is no label is a
+                              decision with no subject. The value is posted
+                              either way, so switching the watermark off and
+                              back on keeps what the producer picked. */}
+                          {f.name === "source_watermark" && on && (
+                            <div style={{ marginTop: 10 }}>
+                              <WatermarkOpenPicker
+                                value={watermarkOpenOnce}
+                                onChange={setWatermarkOpenOnce}
+                              />
+                              <div style={{ marginTop: 14 }}>
+                                <WatermarkSizePicker
+                                  value={watermarkScale}
+                                  onChange={setWatermarkScale}
+                                  portrait={aspect === "9:16"}
+                                />
+                              </div>
+                            </div>
                           )}
                           {f.name === "sfx" && on && (
                             <div style={{ marginTop: 10 }}>
@@ -1059,6 +1106,22 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
                     value={(musicLevel / 100).toFixed(2)}
                   />
                   <input type="hidden" name="caption_color" value={captionColor} />
+                  {/* The node reads `yes`, and STRICTLY that — see the
+                      orchestrator's Normalize Webhook Input. Posted whatever
+                      the watermark switch says, like the two levels above. */}
+                  <input
+                    type="hidden"
+                    name="watermark_open_once"
+                    value={watermarkOpenOnce ? "yes" : "no"}
+                  />
+                  {/* The multiplier itself, not a percentage: the same unit
+                      `Normalize Webhook Input`, derive.ts and the render all
+                      refuse out of range. */}
+                  <input
+                    type="hidden"
+                    name="watermark_scale"
+                    value={watermarkScale}
+                  />
                 </div>
                 <div className="frow" style={{ marginTop: 18 }}>
                   <label>Cold open</label>

@@ -76,6 +76,7 @@ import {
 } from "@/lib/n8n";
 import { getCategory } from "@/lib/categories";
 import { normalizeStyleRefs } from "@/lib/style-refs";
+import { normalizeWatermarkScale } from "@/lib/provenance";
 import { attachArchiveAsset, DEFAULT_SECONDS } from "@/lib/archive/attach";
 import { detachStockFromScene, resetArchiveSuggestions } from "@/lib/data/stock";
 
@@ -1504,6 +1505,10 @@ export async function confirmFinalSettings(
     sourceWatermark: boolean;
     /* Same reason again — the panel shows the switch, so it writes it back. */
     watermarkOpenOnce: boolean;
+    /* And the size, which is a setting of that same row. Refused rather than
+       clamped on the way in, so a value the slider could not have produced
+       resolves to the standard size instead of the nearest end. */
+    watermarkScale: number;
     /* NO `speed` here, on purpose. The pace is decided and signed off at the
        audio step, which is the only moment it is free to change, and this
        panel must not be able to move it — nor to reset it. Because
@@ -1551,6 +1556,7 @@ export async function confirmFinalSettings(
         // Strictly `=== true`, matching normalizeEditing: a missing key must
         // never quieten a film's provenance labels by itself.
         watermarkOpenOnce: settings.watermarkOpenOnce === true,
+        watermarkScale: normalizeWatermarkScale(settings.watermarkScale),
       });
     }
     // Same merge, separate condition: the cards change even when no toggle
@@ -2411,6 +2417,22 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     // NOTE: `source_watermark` is deliberately NOT in this payload. It is the
     // one finish the site stores itself — see the write after the record is
     // confirmed, below, and the note there for why.
+    //
+    // Its COMPANION does ride the webhook, and the difference is deliberate
+    // rather than an inconsistency. `Merge Ref Into Options` rebuilds the
+    // whole Editing Options blob from `Normalize Webhook Input`'s value
+    // seconds after this call answers, so anything the site merges in between
+    // is wiped on a film carrying a reference photo — which is exactly the
+    // hole `sourceWatermark` still has (docs/lessons-site.md, and the note
+    // below says as much). A key added today has no history to protect, so it
+    // travels the way `created_by` does instead of inheriting the defect.
+    // `Normalize Webhook Input` reads it strictly: only this exact 'yes'.
+    watermark_open_once: String(formData.get("watermark_open_once") ?? "no") === "yes" ? "yes" : "no",
+    // And how big it is drawn. Sent as the raw multiplier, refused rather
+    // than clamped at every stop on the way — an out-of-range number is a
+    // mistake, and a badge silently drawn at the maximum would be a worse
+    // answer than the standard one.
+    watermark_scale: normalizeWatermarkScale(formData.get("watermark_scale")),
     // How the narrator reads. OMITTED when the producer left it on "Voice
     // default", and that absence is the feature: every ElevenLabs voice has
     // its own stored settings, so sending an object we made up would override

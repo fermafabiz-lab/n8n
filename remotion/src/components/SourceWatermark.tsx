@@ -12,6 +12,7 @@ import {
 	labelInkDrop,
 	labelTrailingSpace,
 	markChipPadX,
+	scaleWatermark,
 	markPillWidth,
 	planWatermarkBands,
 	WATERMARK_LAYOUT,
@@ -272,6 +273,12 @@ export const SourceWatermark: React.FC<{
 	 * once and then keeps a quiet mark in the corner.
 	 */
 	openOncePerOrigin?: boolean;
+	/**
+	 * How big the badge is drawn, as a multiplier — see `WATERMARK_SCALE`.
+	 * Anything outside the range, or absent, is the 1× every film rendered
+	 * before this existed was drawn at.
+	 */
+	scale?: number;
 	/** Vertical (9:16): lift clear of the platform's own bottom chrome. */
 	portrait?: boolean;
 	/** Hide while the hook title owns the frame, exactly as captions do. */
@@ -281,6 +288,7 @@ export const SourceWatermark: React.FC<{
 	preset,
 	showLabel,
 	openOncePerOrigin = false,
+	scale,
 	portrait = false,
 	suppressUntilSeconds = 0,
 }) => {
@@ -307,8 +315,13 @@ export const SourceWatermark: React.FC<{
 		) * WATERMARK_STYLE.peakOpacity;
 
 	// Geometry lives in provenance.ts so the site's preview can mirror ONE
-	// named constant instead of numbers read out of this JSX.
-	const g = portrait ? WATERMARK_LAYOUT.portrait : WATERMARK_LAYOUT.landscape;
+	// named constant instead of numbers read out of this JSX — and the size
+	// the producer chose is applied there too, by one function, rather than
+	// by multiplying numbers at each of the places that read them.
+	const g = scaleWatermark(
+		portrait ? WATERMARK_LAYOUT.portrait : WATERMARK_LAYOUT.landscape,
+		scale,
+	);
 
 	// Opens once, just after the fade has brought it up, and STAYS open for
 	// the rest of the band — it does not breathe shut and open again at every

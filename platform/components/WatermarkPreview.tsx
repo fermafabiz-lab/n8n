@@ -46,6 +46,7 @@ import {
   labelTrailingSpace,
   markChipPadX,
   planWatermarkBands,
+  scaleWatermark,
   WATERMARK_LAYOUT,
   WATERMARK_STYLE,
   type WatermarkBand,
@@ -123,7 +124,7 @@ function useInkDrop(
   return drop;
 }
 
-function Badge({ band, g }: { band: WatermarkBand; g: WatermarkGeometry }) {
+export function Badge({ band, g }: { band: WatermarkBand; g: WatermarkGeometry }) {
   const labelRef = useRef<HTMLSpanElement>(null);
   const drop = useInkDrop(band.label ?? "", g.label.fontSize, labelRef);
 
@@ -256,6 +257,7 @@ export default function WatermarkPreview({
   aspectRatio,
   showLabel,
   openOncePerOrigin = false,
+  scale,
 }: {
   scenes: readonly PreviewScene[];
   /** The project's Format. Anything but "9:16" is drawn landscape. */
@@ -265,10 +267,18 @@ export default function WatermarkPreview({
   /** Mirror of the Editing Options switch, so the preview collapses the
    *  repeats exactly as the film will. */
   openOncePerOrigin?: boolean;
+  /** And of the size slider. A preview at a size the film will not use is
+   *  worse than no preview: the whole claim of this panel is that the frame
+   *  is true, and how much of it the badge takes is the first thing anyone
+   *  looks at. */
+  scale?: number;
 }) {
   const [at, setAt] = useState(0);
   const portrait = String(aspectRatio ?? "").trim() === "9:16";
-  const g = portrait ? WATERMARK_LAYOUT.portrait : WATERMARK_LAYOUT.landscape;
+  const g = scaleWatermark(
+    portrait ? WATERMARK_LAYOUT.portrait : WATERMARK_LAYOUT.landscape,
+    scale,
+  );
 
   // Unit durations: a preview cares about the ORDER of the bands and which
   // scenes merged, never about seconds. Band boundaries then read directly as
@@ -307,9 +317,9 @@ export default function WatermarkPreview({
   const to = Math.round(band.endSeconds) - 1;
   const covered = scenes.slice(from, to + 1);
   const still = covered.find((s) => s.imageUrl)?.imageUrl ?? null;
-  const scale = Math.min(MAX_W / g.frame.width, MAX_H / g.frame.height);
-  const boxW = Math.round(g.frame.width * scale);
-  const boxH = Math.round(g.frame.height * scale);
+  const fit = Math.min(MAX_W / g.frame.width, MAX_H / g.frame.height);
+  const boxW = Math.round(g.frame.width * fit);
+  const boxH = Math.round(g.frame.height * fit);
 
   return (
     <div className={styles.wrap}>
@@ -318,7 +328,7 @@ export default function WatermarkPreview({
             the top of this file on why nothing here is multiplied by hand. */}
         <div
           className={styles.frame}
-          style={{ width: g.frame.width, height: g.frame.height, transform: `scale(${scale})` }}
+          style={{ width: g.frame.width, height: g.frame.height, transform: `scale(${fit})` }}
         >
           {still ? (
             // eslint-disable-next-line @next/next/no-img-element

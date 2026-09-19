@@ -468,9 +468,9 @@ expected and harmless for an app touching only its own Drive.
   **What is owed**: `Extract Claims` still writes relative order ("after") as
   if it were sourced — claims should carry dates.
 
-  **Two more holes are found, written and NOT PUBLISHED** (2026-09-19,
-  `db/port/fact-check/README.md` §6; blocked on the OpenAI credits entry
-  below). The producer's next Google Maps documentary came back cleaner but
+  **Two more holes are closed, LIVE as `3d1834f1` since 2026-09-19 11:14**
+  (`db/port/fact-check/README.md` §6, verified in execution 15071 BEFORE the
+  publish and on a real film after). The producer's next Google Maps documentary came back cleaner but
   with ZipDash still wrong, and the reason is new: the writer had ATTRIBUTED
   the ordering ("according to the same report"), so the assertion the judge
   extracted was a claim about what a report SAYS — which is true — and "dates
@@ -485,8 +485,12 @@ expected and harmless for an app touching only its own Drive.
   so the judge is now asked to check **the narration against itself**, which
   nothing in the chain could do before and which is the same fault as the very
   first red-light film (hook said April, chapter one said October).
-  **Do not publish any of it without a verification run** — that is the
-  09-18 lesson, and the credits outage is why it is still parked.
+  **The 09-18 lesson was applied rather than described**: this sat committed
+  and unpublished for an hour while the OpenAI account was empty, because a
+  prompt change nobody has run is not one to publish; execution 15071 then ran
+  it against the real narration, both rules fired, and it went live after
+  that. The ZipDash sentence now returns three findings — the attribution
+  still `supported` on E16, and the chronology as its own `unsupported` one.
 - **A Flow refusal that arrives as HTTP 200 no longer kills the film**
   (2026-09-17, Media Generation `6735a96a`, `db/port/regen-unstick/README.md`,
   lesson in `docs/lessons-pipeline.md` under "Flow refuses twice"). **What is
@@ -831,7 +835,10 @@ expected and harmless for an app touching only its own Drive.
   rejected `Ordine: 0` on 2026-08-16 (execution 4225 → 4226). Later runs
   succeeded, but whether the constraint, the payload or the absence of a hook is
   what changed is unknown.
-- **THE OPENAI ACCOUNT IS OUT OF CREDITS AGAIN — 2026-09-19, ~10:00 UTC.**
+- ~~**THE OPENAI ACCOUNT IS OUT OF CREDITS AGAIN — 2026-09-19, ~10:00 UTC**~~
+  — **topped up by the producer the same hour**, confirmed by execution 15071
+  running an agent normally at 11:12. The entry stays for the blast radius and
+  for the error-shape trap, both of which will be wanted the next time.
   Measured, not inferred: a probe at 10:57 came back
   *"You have no credits remaining. Add credits to continue using the API at
   https://platform.openai.com/settings/organization/billing/"*, and the film

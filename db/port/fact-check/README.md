@@ -261,12 +261,13 @@ order.
 
 ### 6. …and then attribution walked straight around the order rule
 
-**WRITTEN AND COMMITTED, NOT PUBLISHED.** The live judge is still `63d21d49`;
-this section describes `FC Judge.txt` and `FC Rewrite.txt` as they now stand in
-the repo. They could not be verified because the OpenAI account ran out of
-credits at ~10:00 on 2026-09-19 (see CLAUDE.md), and **a prompt change nobody
-has run is not a prompt change you publish** — that is the lesson from 09-18,
-eighteen minutes and one whole feature wide.
+**LIVE as `3d1834f1`, published 2026-09-19 11:14 — and in that order.** It sat
+committed-but-unpublished for an hour first, because the OpenAI account ran
+out of credits at ~10:00 and **a prompt change nobody has run is not a prompt
+change you publish**; the producer topped it up, execution 15071 ran the new
+judge against this film's real narration and a pack rebuilt from its own
+findings' citations, both new rules fired, and only then did it go live. That
+is the 09-18 lesson applied rather than described.
 
 The producer made a fresh Google Maps documentary at 09:47, on the published
 one-assertion judge, and read it against ChatGPT again. It came back much
@@ -371,6 +372,7 @@ it, silently and in the direction that looks like nothing happened.
 | **A skipped film writes its row** | a disposable Story film, 2026-09-19: `{skipCode: "not-documentary", category: "story", checked: 0, skipped: "Deep Search runs on Documentary films only, and this film was made in Story mode."}`. This is the branch that wrote nothing at all for four hours |
 | **The fixed gate runs on a real film** | execution at 19:32 for `recAVSS5qpc9V5DjV` ("How the Rosetta Stone was deciphered"): `{category: "documentary", checked: 15, searched: 9, flagged: 1, rewritten: 1}`. The `category` in the row is the proof — it is the field that was `undefined` all afternoon |
 | **The LIVE nodes run inside a real scripting execution** | execution **14771**, a real pipeline fired at the `new-project` webhook for the disposable film `rec4ZIQVVxXZcS5no` ("How the first cash machine was installed in Enfield in 1967"): `hov.fact_check` written at 15:03:01 with `{checked: 18, flagged: 1, searched: 5, rewritten: 1}` and 18 stored findings, and the run went on to write its script and park at the approval gate — so `FC Done` handed the narration back intact |
+| **Attribution stops laundering an order, and the script is read against itself** | execution **15071**, the new judge prompt against `reczMt4d9zqrYcceL`'s real narration: the ZipDash sentence now returns THREE findings where the previous version returned two — the attribution still `supported` on E16 (it really does say that), plus *"Google added Keyhole and ZipDash after acquiring Where 2"* as its own finding, `unsupported`, reason *"no date is given here for ZipDash, so the chronology cannot be backed from the claims alone"*. And *"In 2004, two Australians and two Danes came together in Sydney"* — which produced **no finding at all** on the live version — comes back `unsupported`. 17 findings over 10 sentences against 17 over 9, so the two new rules added what was missing without inflating the rest |
 | **One assertion at a time, on the producer's own film** | execution **15034**, the new `FC Judge` prompt run against `recJiAdwRqaeg8DnR`'s real narration and real pack: 26 findings across **13 distinct sentences** (was 15 findings, one per sentence), and all four of ChatGPT's reported misses come back `unsupported` — the ZipDash ordering (*"the claims date Where 2 and Keyhole to October 2004, but ZipDash is only dated to 2004"*), the browser clause, *"reached … 200 million places"*, and the spare-room narrowing |
 | **The PUBLISHED chain runs one-assertion-at-a-time on a real film** | execution **15039**, a whole pipeline fired at `new-project` at 09:38:19 — **after** `63d21d49` went live at 09:37, which is the point — for the disposable documentary `recF5TgqBT8nBwea5` (YouTube, February 2005 to November 2006). Row written 09:40:08: `{category: "documentary", checked: 21, sentences: 10, flagged: 2, searched: 8, rewritten: 2}`, and `count(distinct quote) = 10` against 21 findings, so eleven of them share a sentence with another. The two unsupported ones are the exact shape the producer reported: *"On February 14, 2005, youtube.com was registered, **giving Chad Hurley a real address for an unproven company**"* (E1 backs the date, nothing backs the rest) and *"YouTube said it was founded that month by PayPal veterans, **with Hurley alongside Steve Chen and Jawed Karim**"* (E2 backs "PayPal veterans", nothing names the three). **Under the old prompt both sentences would have come back `supported`.** The row right below it is the producer's own 09:18 film on the previous version: `checked: 15`, `sentences: null`, 15 findings over 15 distinct quotes — one per sentence |
 | `FC Resolve`, `FC Apply`, `FC Done` behave | `node scripts/check-fact-check.mjs` — 71 assertions over the committed bodies, including every refusal branch, the multi-finding sentence, the grouped fix list, and that a finely sliced sentence does not trip the overwhelmed backstop |
@@ -398,8 +400,8 @@ to read.
 
 | Version | What |
 |---|---|
-| (unpublished) | §6 — attribution does not settle an order, and the narration must agree with itself. **In the repo only**; blocked on OpenAI credits, needs one verification run against a real narration and pack before it goes live |
-| `63d21d49` | one assertion at a time, dates settle order, the counts move to sentences — **published 2026-09-19 09:37, and what is live** |
+| `3d1834f1` | §6 — attribution does not settle an order, and the narration must agree with itself — **published 2026-09-19 11:14, and what is live** |
+| `63d21d49` | one assertion at a time, dates settle order, the counts move to sentences — published 2026-09-19 09:37 |
 | `b927a298` | the skip path writes its report too — published 2026-09-18 19:32 |
 | (same publish) | the category read moved to `Fetch Project Record` |
 | `99ad980b` | Documentary-mode gate, skip codes, the Deep Search rename — published 15:18, **broken for four hours** |

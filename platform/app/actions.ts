@@ -1502,6 +1502,8 @@ export async function confirmFinalSettings(
     /* Sent for the same reason as sfxLevel: this panel SHOWS the switch, so
        writing it back is a no-op unless the producer moved it. */
     sourceWatermark: boolean;
+    /* Same reason again — the panel shows the switch, so it writes it back. */
+    watermarkOpenOnce: boolean;
     /* NO `speed` here, on purpose. The pace is decided and signed off at the
        audio step, which is the only moment it is free to change, and this
        panel must not be able to move it — nor to reset it. Because
@@ -1546,6 +1548,9 @@ export async function confirmFinalSettings(
         // The LABEL only. Provenance stays stored and a licence credit still
         // prints — see docs/source-watermark-license-separation.md.
         sourceWatermark: settings.sourceWatermark !== false,
+        // Strictly `=== true`, matching normalizeEditing: a missing key must
+        // never quieten a film's provenance labels by itself.
+        watermarkOpenOnce: settings.watermarkOpenOnce === true,
       });
     }
     // Same merge, separate condition: the cards change even when no toggle

@@ -183,7 +183,21 @@ export type WatermarkGeometry = {
 	label: {fontSize: number; padding: string};
 	source: {fontSize: number};
 	credit: {fontSize: number};
+	/**
+	 * The mark itself — the chip that opens into the pill.
+	 *
+	 * Sized here rather than derived in the component for the same reason
+	 * everything else on this object is: the site's `WatermarkPreview` draws
+	 * the badge from these numbers, and a preview whose geometry is read out
+	 * of JSX stops matching the film the first time someone nudges a padding.
+	 * `height` is the chip's side AND the pill's height, so the shape is
+	 * square when closed and a capsule when open.
+	 */
+	mark: {height: number; glyph: number; gap: number; padX: number};
 };
+
+/** Just the mark's own numbers, so the arithmetic below can be handed them. */
+export type WatermarkMark = WatermarkGeometry['mark'];
 
 export const WATERMARK_LAYOUT: {
 	landscape: WatermarkGeometry;
@@ -198,6 +212,7 @@ export const WATERMARK_LAYOUT: {
 		label: {fontSize: 16, padding: '5px 12px'},
 		source: {fontSize: 13},
 		credit: {fontSize: 12},
+		mark: {height: 30, glyph: 15, gap: 8, padX: 10},
 	},
 	portrait: {
 		frame: {width: 720, height: 1280},
@@ -210,6 +225,7 @@ export const WATERMARK_LAYOUT: {
 		label: {fontSize: 17, padding: '5px 11px'},
 		source: {fontSize: 14},
 		credit: {fontSize: 13},
+		mark: {height: 32, glyph: 16, gap: 8, padX: 10},
 	},
 };
 
@@ -219,6 +235,15 @@ export const WATERMARK_STYLE = {
 	peakOpacity: 0.88,
 	labelWeight: 600,
 	labelLetterSpacing: '0.14em',
+	/**
+	 * The same value as a NUMBER, because the pill has to do arithmetic with it.
+	 *
+	 * CSS letter-spacing is added after EVERY character including the last, so
+	 * a measured label carries one trailing space of dead air that is not ink.
+	 * Sizing the capsule to the measured width therefore leaves the right side
+	 * wider than the left — which is what "the text is not centred" looks like.
+	 */
+	labelLetterSpacingEm: 0.14,
 	labelColor: '#FFFFFF',
 	labelBackground: 'rgba(0,0,0,0.42)',
 	labelBorder: '1px solid rgba(255,255,255,0.16)',
@@ -233,7 +258,135 @@ export const WATERMARK_STYLE = {
 	linePadding: '3px 9px',
 	lineLineHeight: 1.25,
 	textShadow: '0 2px 8px rgba(0,0,0,0.75)',
+	/** The chip's corner, as a fraction of its side. The pill's is always a
+	 *  half-height capsule, so only the closed end needs naming. */
+	chipRadiusRatio: 0.3,
+	/** Stroke width of the mark's border, and of the dashed variant. */
+	markBorderWidth: 1,
+	markBorderColor: 'rgba(255,255,255,0.55)',
+	/** How long the chip takes to open into the pill, in seconds, and how long
+	 *  it waits after the band's fade-in before starting. Short and
+	 *  un-bouncy on purpose: this is a label becoming legible, not an arrival
+	 *  — the same reasoning as the fade's `inOutCubic`. */
+	openDelaySeconds: 0.18,
+	openSeconds: 0.42,
 } as const;
+
+/**
+ * The dead air CSS letter-spacing leaves AFTER the last character.
+ *
+ * Spacing is added following every character, the final one included, so a
+ * laid-out label is one whole letter-space wider than its own ink. Size a
+ * capsule to that width with equal padding on both sides and the right side
+ * comes out a letter-space wider than the left — measured at 1.6px on a 30px
+ * pill, which is the 5% that reads as "the text is not centred".
+ *
+ * Both drawings of this badge take it off: the render subtracts it from the
+ * measured advance, the site's preview cancels it with a negative right
+ * margin. One function so they cannot disagree about how much it is.
+ */
+export const labelTrailingSpace = (fontSize: number): number =>
+	fontSize * WATERMARK_STYLE.labelLetterSpacingEm;
+
+/**
+ * The open capsule's width, in border-box pixels, from a MEASURED label.
+ *
+ * Two things here are easy to get wrong and were both wrong at once:
+ *
+ * - `box-sizing: border-box` means the border is INSIDE this number, so the
+ *   two 1px edges have to be added or the padding silently loses them.
+ * - the padding is `padX` on both sides. It used to be `padX * 1.15` on the
+ *   right, a fudge that was compensating for the trailing letter-space above
+ *   — two wrongs that did not quite make a right.
+ *
+ * The caller passes the label span's own laid-out width, letter-spacing and
+ * all; measuring is the component's job, because only it knows which font
+ * actually resolved. Rounded UP so a fractional advance can never clip the
+ * last letter against `overflow: hidden`.
+ */
+export const markPillWidth = (mark: WatermarkMark, fontSize: number, labelAdvance: number): number =>
+	2 * WATERMARK_STYLE.markBorderWidth +
+	mark.padX +
+	mark.glyph +
+	mark.gap +
+	Math.max(0, Math.ceil(labelAdvance - labelTrailingSpace(fontSize))) +
+	mark.padX;
+
+/**
+ * The closed chip's left padding — what centres the glyph in the square.
+ *
+ * The borders are inside the box, so they come off the space the glyph has to
+ * sit in. Forgetting them is how the chip ended up half a pixel left of
+ * centre: visible on nothing, wrong on everything.
+ */
+export const markChipPadX = (mark: WatermarkMark): number =>
+	(mark.height - 2 * WATERMARK_STYLE.markBorderWidth - mark.glyph) / 2;
+
+/** The fields of a canvas `TextMetrics` this needs, and nothing else. */
+export type LabelMetrics = {
+	width: number;
+	actualBoundingBoxAscent: number;
+	actualBoundingBoxDescent: number;
+	fontBoundingBoxAscent: number;
+	fontBoundingBoxDescent: number;
+};
+
+/**
+ * How far an all-caps label has to be nudged DOWN to sit on the pill's
+ * midline. Positive means the ink is riding high, which it always is.
+ *
+ * `align-items: center` centres the LINE BOX, and a line box is built around
+ * the font's own ascent and descent — room for accents above and descenders
+ * below that an all-caps label never uses. "ARCHIVAL FOOTAGE" runs from the
+ * baseline up to the cap height with nothing hanging beneath it, so a box
+ * centred on the font leaves the letters high: measured at 1.5px in a 30px
+ * pill, a twentieth of its height, and obvious once seen.
+ *
+ * How high depends entirely on the typeface — the render's kicker font is a
+ * Google font chosen per preset, the site's preview falls back to whatever
+ * monospace the producer has — so this is computed from the REAL ink box
+ * rather than from a cap-height ratio. Canvas is the only API that reports
+ * it; getting the metrics is each drawing's own job, because only it knows
+ * which face actually resolved.
+ *
+ * Note what does NOT appear here: `labelLineHeight`. The line box's own
+ * half-leading is distributed evenly above and below, so it falls out of the
+ * subtraction — which is also why changing the line height moves nothing.
+ *
+ * Returns 0 — the behaviour this badge had before the correction existed —
+ * whenever the answer cannot be trusted:
+ *
+ * - a `TextMetrics` without the actual-bounding-box fields (they are optional
+ *   in the spec and were missing from Firefox for years);
+ * - a canvas that resolved a DIFFERENT face than the DOM laid the label out
+ *   in. A canvas draws no letter-spacing, so its width must come out exactly
+ *   one space per character narrower than the span's; anything else means the
+ *   two are not measuring the same typeface, and an ink box from the wrong
+ *   font would push the text the wrong way by a font's worth of error.
+ */
+export const labelInkDrop = (
+	m: LabelMetrics,
+	label: string,
+	fontSize: number,
+	/** The label span's own laid-out width, letter-spacing and all. */
+	advance: number,
+): number => {
+	const all = [
+		m.width,
+		m.actualBoundingBoxAscent,
+		m.actualBoundingBoxDescent,
+		m.fontBoundingBoxAscent,
+		m.fontBoundingBoxDescent,
+	];
+	if (!all.every((n) => typeof n === 'number' && Number.isFinite(n))) return 0;
+	const bare = advance - label.length * labelTrailingSpace(fontSize);
+	if (bare <= 0 || Math.abs(m.width - bare) > Math.max(2, bare * 0.08)) return 0;
+	// Both centres measured from the baseline, downward positive.
+	return (
+		(m.fontBoundingBoxDescent - m.fontBoundingBoxAscent) / 2 -
+		(m.actualBoundingBoxDescent - m.actualBoundingBoxAscent) / 2
+	);
+};
 
 /**
  * The scene bands the watermark is drawn over.
@@ -247,16 +400,33 @@ export const WATERMARK_STYLE = {
 export type WatermarkBand = {
 	startSeconds: number;
 	endSeconds: number;
+	/** Which mark to draw. Carried on the band because two bands can share a
+	 *  label and differ in origin is impossible, but the reverse is not: a
+	 *  second archival band from another archive has the same origin and its
+	 *  own source line. The "open once" rule keys on THIS, not on the label. */
+	origin: VisualOrigin;
 	label: string;
 	source: string | null;
 	credit: string | null;
+	/**
+	 * Whether the badge opens into the full pill, or stays the small chip.
+	 *
+	 * Always true unless the producer asked for `openOncePerOrigin`, in which
+	 * case only the FIRST band of each origin opens and later ones are the
+	 * glyph alone — the film says "this is archival footage" once and then
+	 * just keeps a quiet mark in the corner.
+	 */
+	expand: boolean;
 };
 
 export const planWatermarkBands = (
 	scenes: {startSeconds: number; durationSeconds: number; provenance?: VisualProvenance}[],
-	opts: {showLabel: boolean},
+	opts: {showLabel: boolean; openOncePerOrigin?: boolean},
 ): WatermarkBand[] => {
 	const bands: WatermarkBand[] = [];
+	// Which origins have already had their say. Order of first appearance is
+	// what decides, so this is filled as the film runs, not precomputed.
+	const opened = new Set<VisualOrigin>();
 	for (const s of scenes) {
 		const p = s.provenance;
 		if (!p) continue;
@@ -265,17 +435,23 @@ export const planWatermarkBands = (
 		// With the label switched off only the licence obligation remains, so a
 		// scene that owes nothing draws nothing at all.
 		if (!opts.showLabel && !credit) continue;
+		const origin: VisualOrigin = p.visualOrigin ?? 'unknown';
 		const band: WatermarkBand = {
 			startSeconds: s.startSeconds,
 			endSeconds: s.startSeconds + s.durationSeconds,
+			origin,
 			label: opts.showLabel ? label : '',
 			source: opts.showLabel ? source : null,
 			credit,
+			// Decided AFTER the merge check below, so a band that merges into
+			// its predecessor cannot consume an origin's one opening.
+			expand: true,
 		};
 		const prev = bands[bands.length - 1];
 		if (
 			prev &&
 			Math.abs(prev.endSeconds - band.startSeconds) < 1e-6 &&
+			prev.origin === band.origin &&
 			prev.label === band.label &&
 			prev.source === band.source &&
 			prev.credit === band.credit
@@ -283,6 +459,10 @@ export const planWatermarkBands = (
 			prev.endSeconds = band.endSeconds;
 			continue;
 		}
+		if (opts.openOncePerOrigin) {
+			band.expand = !opened.has(origin);
+		}
+		opened.add(origin);
 		bands.push(band);
 	}
 	return bands;

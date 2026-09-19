@@ -34,8 +34,17 @@
  * screen and the label goes while the credit stays.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  DASHED_ORIGINS,
+  GLYPH_STROKE,
+  GLYPH_VIEWBOX,
+  ORIGIN_GLYPHS,
+} from "@/lib/provenance-glyphs";
+import {
+  labelInkDrop,
+  labelTrailingSpace,
+  markChipPadX,
   planWatermarkBands,
   WATERMARK_LAYOUT,
   WATERMARK_STYLE,
@@ -73,7 +82,51 @@ const KICKER_STACK = '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Cons
  * actual-size strip cannot drift from each other — which would defeat the
  * point of showing both.
  */
+/**
+ * Where to nudge this label so its INK sits on the pill's midline, rather than
+ * the line box that holds it — the same correction the film makes, run
+ * against the font this browser actually resolved. `labelInkDrop` owns the
+ * arithmetic and every reason to refuse; this is the canvas plumbing and the
+ * span's laid-out width, which only the drawing can supply.
+ *
+ * 0 until measured, which is one paint, and 0 again if anything is off — the
+ * badge simply centres the old way, a pixel and a half high.
+ */
+function useInkDrop(
+  label: string,
+  fontSize: number,
+  ref: React.RefObject<HTMLSpanElement | null>,
+) {
+  const [drop, setDrop] = useState(0);
+  useEffect(() => {
+    let live = true;
+    const read = () => {
+      const el = ref.current;
+      if (!live || !el) return;
+      try {
+        const ctx = document.createElement("canvas").getContext("2d");
+        if (!ctx) return;
+        ctx.font = `${WATERMARK_STYLE.labelWeight} ${fontSize}px ${KICKER_STACK}`;
+        setDrop(labelInkDrop(ctx.measureText(label), label, fontSize, el.offsetWidth));
+      } catch {
+        /* leave it centred the old way */
+      }
+    };
+    read();
+    // A web font still loading lays the label out in the fallback face, which
+    // is a different width and a different ink box.
+    document.fonts?.ready?.then(read).catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [label, fontSize, ref]);
+  return drop;
+}
+
 function Badge({ band, g }: { band: WatermarkBand; g: WatermarkGeometry }) {
+  const labelRef = useRef<HTMLSpanElement>(null);
+  const drop = useInkDrop(band.label ?? "", g.label.fontSize, labelRef);
+
   return (
     <div
       style={{
@@ -86,26 +139,81 @@ function Badge({ band, g }: { band: WatermarkBand; g: WatermarkGeometry }) {
       }}
     >
       {band.label ? (
+        /* The mark as the film draws it: the glyph in a chip, opened into a
+           capsule — or left as a chip when the band does not expand, which is
+           what "announce each source once" looks like from the second band on.
+           Static here on purpose: the preview answers "what will be on
+           screen", and a looping animation in a settings panel competes with
+           the decision being made. */
         <span
           style={{
-            fontFamily: KICKER_STACK,
-            fontSize: g.label.fontSize,
-            fontWeight: WATERMARK_STYLE.labelWeight,
-            letterSpacing: WATERMARK_STYLE.labelLetterSpacing,
-            color: WATERMARK_STYLE.labelColor,
+            display: "inline-flex",
+            alignItems: "center",
+            boxSizing: "border-box",
+            height: g.mark.height,
+            // Equal on both sides — the right used to carry a 1.15 fudge that
+            // was really compensating for the trailing letter-space cancelled
+            // on the label below. See `markPillWidth`.
+            paddingLeft: band.expand ? g.mark.padX : markChipPadX(g.mark),
+            paddingRight: band.expand ? g.mark.padX : 0,
+            width: band.expand ? undefined : g.mark.height,
+            borderRadius: band.expand
+              ? g.mark.height / 2
+              : g.mark.height * WATERMARK_STYLE.chipRadiusRatio,
             background: WATERMARK_STYLE.labelBackground,
-            border: WATERMARK_STYLE.labelBorder,
-            borderRadius: WATERMARK_STYLE.labelRadius,
-            padding: g.label.padding,
-            textShadow: WATERMARK_STYLE.textShadow,
-            lineHeight: WATERMARK_STYLE.labelLineHeight,
+            border: `${WATERMARK_STYLE.markBorderWidth}px ${
+              DASHED_ORIGINS.has(band.origin) ? "dashed" : "solid"
+            } ${WATERMARK_STYLE.markBorderColor}`,
+            color: WATERMARK_STYLE.labelColor,
+            overflow: "hidden",
             whiteSpace: "nowrap",
           }}
         >
-          {band.label}
+          <svg
+            width={g.mark.glyph}
+            height={g.mark.glyph}
+            viewBox={`0 0 ${GLYPH_VIEWBOX} ${GLYPH_VIEWBOX}`}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={GLYPH_STROKE}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ flex: "none", display: "block" }}
+          >
+            {ORIGIN_GLYPHS[band.origin].map((d, i) =>
+              d.filled ? (
+                <path key={i} d={d.d} fill="currentColor" stroke="none" />
+              ) : (
+                <path key={i} d={d.d} />
+              ),
+            )}
+          </svg>
+          {band.expand ? (
+            <span
+              ref={labelRef}
+              style={{
+                marginLeft: g.mark.gap,
+                // Pull the trailing letter-space back out of the layout, so
+                // the content really does end at the last letter and the
+                // capsule's own padding is the only thing after it.
+                marginRight: -labelTrailingSpace(g.label.fontSize),
+                // Measured, not guessed — see `useInkDrop`.
+                position: "relative",
+                top: drop,
+                fontFamily: KICKER_STACK,
+                fontSize: g.label.fontSize,
+                fontWeight: WATERMARK_STYLE.labelWeight,
+                letterSpacing: WATERMARK_STYLE.labelLetterSpacing,
+                lineHeight: WATERMARK_STYLE.labelLineHeight,
+                textShadow: WATERMARK_STYLE.textShadow,
+              }}
+            >
+              {band.label}
+            </span>
+          ) : null}
         </span>
       ) : null}
-      {band.source ? (
+      {band.source && band.expand ? (
         <span
           style={{
             fontFamily: KICKER_STACK,
@@ -147,12 +255,16 @@ export default function WatermarkPreview({
   scenes,
   aspectRatio,
   showLabel,
+  openOncePerOrigin = false,
 }: {
   scenes: readonly PreviewScene[];
   /** The project's Format. Anything but "9:16" is drawn landscape. */
   aspectRatio: string | null | undefined;
   /** The live state of the Source watermark toggle. */
   showLabel: boolean;
+  /** Mirror of the Editing Options switch, so the preview collapses the
+   *  repeats exactly as the film will. */
+  openOncePerOrigin?: boolean;
 }) {
   const [at, setAt] = useState(0);
   const portrait = String(aspectRatio ?? "").trim() === "9:16";
@@ -165,9 +277,9 @@ export default function WatermarkPreview({
     () =>
       planWatermarkBands(
         scenes.map((s, i) => ({ startSeconds: i, durationSeconds: 1, provenance: s.provenance })),
-        { showLabel },
+        { showLabel, openOncePerOrigin },
       ),
-    [scenes, showLabel],
+    [scenes, showLabel, openOncePerOrigin],
   );
 
   // The toggle changes how many bands there are, so a held index can point

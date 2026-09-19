@@ -15,10 +15,16 @@ if (!raw || raw.length < 20) {
 }
 // This has to clear the word cap in Build Recap Prompt or it silently cuts a
 // sentence in half, which is the worse failure: a truncated recap still reads
-// as a recap. At 100 words a real line measured ~523 characters of summary, so
-// 600 was about to start chopping; 800 leaves room for a long one and still
-// stops a runaway. Move the two together.
-const summary = raw.slice(0, 800);
+// like a recap.
+//
+// And it has to clear it by a MARGIN, because the model treats the word cap as
+// a suggestion and overshoots it by about a third — measured twice on the same
+// episode: asked for 60 it wrote ~100 words / 591 characters, asked for 100 it
+// wrote 128 words / 717. So the cap does not hold the length still, it moves
+// it. 1000 keeps the next drift off the knife; it is a runaway guard, not the
+// budget (composeSeriesLore's 8,000-character trim is the budget, and it drops
+// the OLDEST lines first).
+const summary = raw.slice(0, 1000);
 const line = 'Episode ' + asked.episode_no + ' — ' + asked.title.replace(/[\r\n]+/g, ' ') + ': ' + summary;
 console.log('RECAP ' + asked.project_id + ': ' + line);
 return [{ json: {

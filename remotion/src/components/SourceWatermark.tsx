@@ -7,14 +7,16 @@ import {
 	useCurrentFrame,
 	useVideoConfig,
 } from 'remotion';
-import {CURVES, eased} from '../easing';
 import {
+	bandOpacityAt,
 	labelInkDrop,
 	labelTrailingSpace,
 	markChipPadX,
-	scaleWatermark,
+	markOpenAt,
 	markPillWidth,
+	markRevealAt,
 	planWatermarkBands,
+	scaleWatermark,
 	WATERMARK_LAYOUT,
 	WATERMARK_STYLE,
 	type VisualOrigin,
@@ -50,10 +52,6 @@ import type {StylePreset} from '../style';
  *   frame, and the same "one text element at a time" rule the captions follow
  *   applies. The caller owns both decisions — see FinalVideo.
  */
-
-/** Fade at each end of a band. Long enough to be soft, short enough to be up
- *  on the scene's first frames — the spec's 150–250 ms window. */
-const FADE = 0.2;
 
 /**
  * One provenance glyph, drawn at `size` in the current colour.
@@ -206,10 +204,7 @@ const Mark: React.FC<{
 	const radius = interpolate(open, [0, 1], [height * WATERMARK_STYLE.chipRadiusRatio, height / 2]);
 	// The label uncovers from the glyph outward, clipped by the container, so
 	// it reads as the mark opening rather than as a second element arriving.
-	const reveal = interpolate(open, [0.25, 0.85], [0, 1], {
-		extrapolateLeft: 'clamp',
-		extrapolateRight: 'clamp',
-	});
+	const reveal = markRevealAt(open);
 
 	return (
 		<div
@@ -308,11 +303,15 @@ export const SourceWatermark: React.FC<{
 
 	// Symmetric in and out. `inOutCubic` rather than an entrance curve: this is
 	// not an arrival, it is a label becoming legible and then stopping.
-	const opacity =
-		Math.min(
-			eased(seconds - band.startSeconds, [0, FADE], [0, 1], CURVES.inOutCubic),
-			eased(band.endSeconds - seconds, [0, FADE], [0, 1], CURVES.inOutCubic),
-		) * WATERMARK_STYLE.peakOpacity;
+	//
+	// The TIMING moved to provenance.ts on 2026-09-19, when the site's preview
+	// learned to animate: the preview has to play the same curve on the same
+	// clock or it is showing a different overlay, and two implementations of
+	// an easing cannot be kept in agreement by reading them. Same reason the
+	// geometry moved there when the preview was first built.
+	const bandLength = band.endSeconds - band.startSeconds;
+	const into = seconds - band.startSeconds;
+	const opacity = bandOpacityAt(into, bandLength);
 
 	// Geometry lives in provenance.ts so the site's preview can mirror ONE
 	// named constant instead of numbers read out of this JSX — and the size
@@ -324,27 +323,9 @@ export const SourceWatermark: React.FC<{
 	);
 
 	// Opens once, just after the fade has brought it up, and STAYS open for
-	// the rest of the band — it does not breathe shut and open again at every
-	// cut, which is the same reason consecutive scenes are merged into one
-	// band in the first place.
-	//
-	// A band shorter than the animation would otherwise be caught mid-open at
-	// its own fade-out, so the opening is compressed to fit rather than
-	// truncated: better a quick open than a pill frozen half-drawn.
-	const bandLength = band ? band.endSeconds - band.startSeconds : 0;
-	const openSpan = Math.min(
-		WATERMARK_STYLE.openSeconds,
-		Math.max(0.12, bandLength - WATERMARK_STYLE.openDelaySeconds - FADE),
-	);
-	const open =
-		band && band.expand
-			? eased(
-					seconds - band.startSeconds - WATERMARK_STYLE.openDelaySeconds,
-					[0, openSpan],
-					[0, 1],
-					CURVES.inOutCubic,
-				)
-			: 0;
+	// the rest of the band. `markOpenAt` owns why, and owns the compression a
+	// band shorter than the animation needs.
+	const open = markOpenAt(into, bandLength, band.expand);
 
 	// Bottom-LEFT, on the same left edge the captions keep, and below the band
 	// they occupy: captions are bottom-anchored at 84 (landscape) / 280

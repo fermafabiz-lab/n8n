@@ -270,7 +270,109 @@ export const WATERMARK_STYLE = {
 	 *  — the same reasoning as the fade's `inOutCubic`. */
 	openDelaySeconds: 0.18,
 	openSeconds: 0.42,
+	/** The fade at each END of a band. Long enough to be soft, short enough to
+	 *  be up on the scene's first frames — the spec's 150-250ms window. It
+	 *  lived in SourceWatermark.tsx until the site grew an ANIMATED preview and
+	 *  needed the same number. */
+	fadeSeconds: 0.2,
 } as const;
+
+/**
+ * The badge's easing, as a function of 0..1.
+ *
+ * `CURVES.inOutCubic` is `Easing.bezier(0.65, 0, 0.35, 1)`, and this is the
+ * same curve solved by hand rather than through Remotion — because the site's
+ * preview has to animate on the identical curve and cannot import Remotion.
+ * Verified against `Easing.bezier(0.65, 0, 0.35, 1)` over 101 samples: the
+ * largest disagreement is 3.9e-16, which is float noise. `check:watermark`
+ * pins four points of it so a rewrite here cannot quietly change the feel.
+ *
+ * Newton-Raphson first because it converges in a few steps on a well-behaved
+ * curve, then bisection to finish — the fallback matters at the flat ends,
+ * where the derivative approaches zero and Newton stops making progress.
+ */
+const solveBezier = (x1: number, y1: number, x2: number, y2: number) => {
+	const A = (a: number, b: number) => 1 - 3 * b + 3 * a;
+	const B = (a: number, b: number) => 3 * b - 6 * a;
+	const C = (a: number) => 3 * a;
+	const calc = (t: number, a: number, b: number) => ((A(a, b) * t + B(a, b)) * t + C(a)) * t;
+	const slope = (t: number, a: number, b: number) => 3 * A(a, b) * t * t + 2 * B(a, b) * t + C(a);
+	return (x: number): number => {
+		if (x <= 0) return 0;
+		if (x >= 1) return 1;
+		let t = x;
+		for (let i = 0; i < 8; i++) {
+			const s = slope(t, x1, x2);
+			if (s === 0) break;
+			t -= (calc(t, x1, x2) - x) / s;
+		}
+		let lo = 0;
+		let hi = 1;
+		for (let i = 0; i < 24 && (t < 0 || t > 1); i++) t = (lo + hi) / 2;
+		for (let i = 0; i < 24; i++) {
+			const cx = calc(t, x1, x2);
+			if (Math.abs(cx - x) < 1e-7) break;
+			if (cx < x) lo = t;
+			else hi = t;
+			t = (lo + hi) / 2;
+		}
+		return calc(t, y1, y2);
+	};
+};
+
+export const WATERMARK_EASE = solveBezier(0.65, 0, 0.35, 1);
+
+/** A clamped, eased 0..1 ramp — the shape `eased()` produces in the render. */
+const ramp = (input: number, span: number): number =>
+	span <= 0 ? (input >= 0 ? 1 : 0) : WATERMARK_EASE(Math.min(1, Math.max(0, input / span)));
+
+/**
+ * How long the opening takes on a band of `bandLength` seconds.
+ *
+ * A band shorter than the animation would otherwise be caught mid-open at its
+ * own fade-out, so the opening is COMPRESSED to fit rather than truncated:
+ * better a quick open than a pill frozen half-drawn. On any real film this is
+ * simply `openSeconds` — the shortest band is one scene, and a scene is
+ * eight seconds.
+ */
+export const markOpenSpan = (bandLength: number): number =>
+	Math.min(
+		WATERMARK_STYLE.openSeconds,
+		Math.max(0.12, bandLength - WATERMARK_STYLE.openDelaySeconds - WATERMARK_STYLE.fadeSeconds),
+	);
+
+/**
+ * How open the mark is, 0 (chip) to 1 (pill), `t` seconds into its band.
+ *
+ * It opens once, just after the fade has brought it up, and STAYS open for the
+ * rest of the band — it does not breathe shut and open again at every cut,
+ * which is the same reason consecutive scenes are merged into one band in the
+ * first place. A band that does not `expand` never opens at all: that is what
+ * "announce each source once" looks like from the second band on.
+ */
+export const markOpenAt = (t: number, bandLength: number, expand: boolean): number =>
+	expand ? ramp(t - WATERMARK_STYLE.openDelaySeconds, markOpenSpan(bandLength)) : 0;
+
+/**
+ * How far the label has uncovered, 0..1, from how open the mark is.
+ *
+ * A sub-range of the opening rather than its own clock: the text appears while
+ * the capsule is still widening, clipped by it, so it reads as the mark
+ * OPENING rather than as a second element arriving on top.
+ */
+export const markRevealAt = (open: number): number =>
+	Math.min(1, Math.max(0, (open - 0.25) / (0.85 - 0.25)));
+
+/** The whole badge's opacity `t` seconds into a band. Symmetric in and out —
+ *  not an arrival, a label becoming legible and then stopping. */
+export const bandOpacityAt = (t: number, bandLength: number): number =>
+	Math.min(ramp(t, WATERMARK_STYLE.fadeSeconds), ramp(bandLength - t, WATERMARK_STYLE.fadeSeconds)) *
+	WATERMARK_STYLE.peakOpacity;
+
+/** How long one band's animation takes to settle — what a preview that plays
+ *  it ONCE has to wait before it can stop the clock. */
+export const markSettleSeconds = (bandLength: number): number =>
+	WATERMARK_STYLE.openDelaySeconds + markOpenSpan(bandLength) + 0.05;
 
 /**
  * The dead air CSS letter-spacing leaves AFTER the last character.

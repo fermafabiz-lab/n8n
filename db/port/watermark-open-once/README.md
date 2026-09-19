@@ -176,6 +176,56 @@ was chosen, and comes back holding it; at Final touches the old row is gone,
 the button flips to "Apply 1 change & render", and the `changed` chip appears
 on the Source watermark row.
 
+## The preview moves now, and the clock moved with it
+
+2026-09-19. The producer asked for a preview that shows the badge **with its
+animation**. The preview was static on purpose — "a looping animation in a
+settings panel competes with the decision being made" — and that reasoning is
+still right, so the conclusion changed rather than the reasoning: it plays
+**once**, on demand, and then rests. No loop.
+
+**The expensive part was not the animation, it was making it honest.** A
+preview animating on its own curve, on its own clock, would be showing a
+different overlay — which is the one thing this whole preview exists not to
+do. So the timing left `SourceWatermark.tsx` and became shared, mirrored code:
+`markOpenSpan`, `markOpenAt`, `markRevealAt`, `bandOpacityAt`,
+`markSettleSeconds` and `WATERMARK_EASE`, in `provenance.ts` on both sides
+beside the geometry that moved there for exactly the same reason.
+
+`WATERMARK_EASE` is `Easing.bezier(0.65, 0, 0.35, 1)` — Remotion's
+`CURVES.inOutCubic` — solved by hand, because the site cannot import Remotion.
+**Verified rather than assumed**: against Remotion's own over 101 samples, the
+largest disagreement is **3.9e-16**.
+
+**The refactor was proved to change no frame before it was kept.** The old
+inline formulas were recomputed with Remotion's `Easing` and `interpolate` and
+compared to the new shared functions over 4846 samples — band lengths 0.3s to
+48s, every frame at 24fps, both `expand` states:
+
+| | max &#124;old − new&#124; |
+|---|---|
+| `open` | 1.1e-16 |
+| `reveal` | 2.2e-16 |
+| `opacity` | 2.8e-16 |
+
+Eight points of that clock are now pinned on both sides, so a rewrite of the
+solver cannot quietly change the feel.
+
+### Two previews, because they answer different questions
+
+| | |
+|---|---|
+| **Final touches** — `WatermarkPreview` | this film's OWN bands. Auto-plays when the preview opens and on every band change, with a `↻` to replay. Both badges — the framed one and the actual-size strip — run off ONE clock, so they cannot drift from each other |
+| **The brief** — `WatermarkMotionPreview` | there are no scenes yet, so a three-band synthetic sequence: archive, AI, archive again. **The repeat is the point** — one band cannot show what "once per source" does, because the difference only exists on a kind's SECOND appearance, and the AI band in the middle is there because `planWatermarkBands` would otherwise merge the two archive bands into one |
+
+Driven in a real Chromium rather than read: on the brief the mark grows
+**30px → 239px** (chip to pill) while the size picker's sample beside it stays
+at 239 throughout — which is the check that the animated one is animating and
+the static one is still static. The first four samples sit at 30: that is the
+0.18s the badge waits for its fade before it opens. At Final touches the
+preview auto-played on open and replayed on the button, both badges together,
+no page errors.
+
 ## It is a Documentary feature now — a decision taken against the rule
 
 2026-09-19, Final Assembly `309157bd`. The producer asked why the badge shows

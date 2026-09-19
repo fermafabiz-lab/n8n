@@ -388,7 +388,7 @@ expected and harmless for an app touching only its own Drive.
 ## Open work
 
 - **Deep Search is live; what is owed is a film somebody keeps**
-  (2026-09-18, Claude Scripting `99ad980b`; full account
+  (2026-09-18, Claude Scripting `b927a298`; full account
   `db/port/fact-check/README.md`, lessons in `docs/lessons-pipeline.md` under
   "The script is checked against its own research" and `docs/lessons-site.md`
   under "Deep Search — a warning with no button"). **Documentary mode only**,
@@ -417,6 +417,28 @@ expected and harmless for an app touching only its own Drive.
   construction, and nobody has yet judged whether a correction reads as well
   as the sentence it replaced. The escape hatch if a film goes wrong: publish
   `b9f95221`, the version this was built on; the chain is purely additive.
+
+  **It shipped broken for four hours on its first evening and the producer
+  found it, not a check.** The Documentary gate published at 15:18 read the
+  category from `$('Receive Project Data')` — the typed sub-workflow trigger,
+  which emits only its eight declared fields — so it was `undefined` on every
+  film and every documentary skipped as `no-mode`. And the skip branch went
+  straight past `FC Save Report`, so there was no row to say so: the
+  producer's own Google Maps film reached its script gate showing red with no
+  explanation, on a script whose hook said April and whose first chapter said
+  October. Both are fixed in `b927a298` — the category comes off
+  `Fetch Project Record` (what `Voice Mode` has always read), and
+  `FC Run?`[false] now runs through `FC Apply`, so **every film writes a row
+  and an absent row now means the chain genuinely did not run**. Verified on a
+  real documentary: `{category: "documentary", checked: 15, searched: 9,
+  flagged: 1, rewritten: 1}`.
+
+  **The process lesson is the expensive one**: the only end-to-end run that
+  ever verified Deep Search finished at 15:00, eighteen minutes BEFORE the gate
+  was published. It was reported verified when what had been verified was the
+  version before it. **A change published after the run that verified it is
+  unverified**, and it is worth re-reading that sentence before writing "live
+  and verified" about anything here.
 - **A Flow refusal that arrives as HTTP 200 no longer kills the film**
   (2026-09-17, Media Generation `6735a96a`, `db/port/regen-unstick/README.md`,
   lesson in `docs/lessons-pipeline.md` under "Flow refuses twice"). **What is

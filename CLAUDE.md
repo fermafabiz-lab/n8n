@@ -243,6 +243,14 @@ the full entry in the file named:
   Same for props: "the swinging door" is an instruction to animate the door.
   Full account: `docs/lessons-pipeline.md`, "A prompt that names a failure
   summons it".
+- **A number in a prompt is a dial, not a fence.** The series recap asked for
+  "at most 60 words" and got ~100; asked for 100 it wrote 128 — about a third
+  over, whichever number it is told. So a stated cap MOVES the length and
+  never lands on it: anything downstream that depends on the size needs its own
+  hard cut in code, with a margin. `Parse Recap`'s cut went 600 → 1,000 the day
+  the word cap moved, or the longer line would have been chopped mid-sentence —
+  and a truncated recap still reads like a recap. Full account:
+  `docs/lessons-pipeline.md`, "A word cap in a prompt MOVES the length".
 - **A prompt fragment always lives in more copies than the one you found.** The
   motion-prompt tail lived in seven places across three workflows; a fix that
   touched two was reported as done and shipped half-broken. Before calling a

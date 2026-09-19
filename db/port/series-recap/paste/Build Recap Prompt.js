@@ -25,11 +25,16 @@ const payload = {
         // describing something that was not happening — and the longer line is
         // the better one for the job: the next episode's writer reads this to
         // avoid contradicting and avoid retelling, and neither is possible if
-        // the events are not named. The cost is measured, not guessed: a line
-        // runs ~590 characters against ~400 at 60 words, so composeSeriesLore's
-        // 8,000-character Lore cap starts trimming the OLDEST lines at about
-        // episode 13 instead of about 20. Trimming is oldest-first and keeps
-        // the newest, so it degrades gently; revisit before a show gets there.
+        // the events are not named. The cost is measured on the same episode
+        // both ways, not guessed: a line runs 717 characters against the 591
+        // it ran at 60 words, so composeSeriesLore's 8,000-character Lore cap
+        // starts trimming the OLDEST lines at about episode 11 instead of
+        // about 13. Trimming is oldest-first and keeps the newest, so it
+        // degrades gently; revisit before a show gets there. Note what the two
+        // measurements say about the cap itself: 60 asked produced ~100 words,
+        // 100 asked produced 128 — the model overshoots by about a third
+        // whatever it is told, so this number MOVES the length, it does not
+        // hold it.
         'Two sentences, at most 100 words, in ' + language + ', in the past tense. ' +
         'Use the characters\' names exactly as the narration spells them. State only what the narration says: no interpretation, no moral, no praise, no preamble, no quotes, no headings, no line breaks.'
     },

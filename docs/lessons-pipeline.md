@@ -2186,3 +2186,38 @@ code is what the site's red light is wired to, and `lib/deep-search.ts` is the
 only thing allowed to interpret it. **A code the site has never heard of fails
 CLOSED — red, not green** — because the alternative is a future workflow
 turning the alarm off by inventing a reason.
+
+### A word cap in a prompt MOVES the length, it does not hold it — 2026-09-19
+
+The series recap (`db/port/series-recap/`) asked gpt-5.4 for *"two sentences, at
+most 60 words"* and got two sentences of about a hundred, every time. The
+producer's call was to raise the cap to 100 — the instruction was describing
+something that was not happening, and the longer line is the better one for the
+job. It was then measured both ways on the same real episode, with nothing else
+changed:
+
+| asked | written | the line on the row |
+|---|---|---|
+| 60 words | ~100 words | 591 characters |
+| 100 words | 128 words | 717 characters |
+
+**The overshoot is about a third in both directions.** So a number in a prompt
+is a dial, not a fence: raising it lengthens the output, but the output never
+lands on it, and the cap cannot be used to guarantee anything downstream. The
+100-word line is visibly the better recap — it names the Golden Acorn Toolbox
+and the Little Red Builder Wagon, which the 60-word one did not — so this is
+not an argument against raising it. It is an argument against *trusting* it.
+
+**What that means for anything reading the output**: a cap in the prompt needs
+a hard cut in code, and the cut needs a MARGIN over the cap, because the next
+model or the next wording will overshoot by a different amount.
+`Parse Recap`'s cut went 600 → 1,000 in the same commit; had it stayed, the
+717-character line would have been chopped mid-sentence, and a truncated recap
+still reads like a recap — a silent failure, which is the worse kind. The same
+shape applies to any cap this pipeline states in words: scene length, chapter
+length, the hook's beats. **State it, but never budget on it.**
+
+And budgets downstream move with the length. At 717 characters a line,
+`composeSeriesLore`'s 8,000-character Lore cap starts dropping the OLDEST recap
+lines at about episode 11 rather than about 13 — oldest-first, so it degrades
+gently, but a show heading past ten episodes is when to look again.

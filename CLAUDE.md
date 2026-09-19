@@ -518,6 +518,27 @@ expected and harmless for an app touching only its own Drive.
   it against the real narration, both rules fired, and it went live after
   that. The ZipDash sentence now returns three findings — the attribution
   still `supported` on E16, and the chronology as its own `unsupported` one.
+
+  **THE HOOK HAS NEVER BEEN FACT-CHECKED, ON ANY FILM** (found 2026-09-19,
+  `db/port/fact-check/README.md` §7 — read it before touching this chain).
+  `Generate Hook` runs AFTER the whole Deep Search chain
+  (`FC Done → Combine Chapters → Generate Hook`), so the hook does not exist
+  when the judge reads the narration and `FC Prep` cannot include it. The
+  producer's third Google Maps film opened on *"Lars Rasmussen faced a
+  deadline in 2003"* — an invention with no support anywhere in the script or
+  its pack — while all 9 checked sentences came from chapter 1. **This also
+  re-explains the first red-lit film's "hook said April, chapter one said
+  October"**, which was filed under the gate bug and was actually this.
+  The judge is fine: fed the hook, it catches the line instantly (15089).
+  What shipped is a CONSTRAINT, not a check — `Generate Hook` rule 3b forbids
+  stating any date, number, name or event the narration does not — and a
+  constraint is not a check. **§8 is the same shape**: nothing re-reads what
+  the REWRITE produced, so it can introduce an unsourced claim, half-fix a
+  contradiction, or create a new internal one, all of which happened on that
+  film. **One re-run of `FC Judge` over the FINISHED narration, after the
+  rewrite and after the hook, closes both** — that is the next piece of work
+  here, and it was deliberately not rushed in as the fourth publish of a day
+  the producer was making films through.
 - **A Flow refusal that arrives as HTTP 200 no longer kills the film**
   (2026-09-17, Media Generation `6735a96a`, `db/port/regen-unstick/README.md`,
   lesson in `docs/lessons-pipeline.md` under "Flow refuses twice"). **What is

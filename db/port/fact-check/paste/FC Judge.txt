@@ -23,6 +23,8 @@ WHAT COUNTS AS A CHECKABLE STATEMENT — extract these:
 - firsts, onlys, biggests, and other superlatives
 - a stated cause, motive or intention of a real person or organisation ("Lars wanted the map to move on the web")
 - the state of something at a time ("Where 2 remained a desktop product")
+- a COUNTERFACTUAL — what would have happened had something gone otherwise ("if it had stayed there, users kept the slower system")
+- a statement about a whole CATEGORY ("online maps still behaved like separate pages" — that is all of them)
 
 WHAT TO IGNORE — do not extract these:
 - narrative connective tissue and scene-setting that asserts nothing checkable ("The record fixed the change in scale")
@@ -42,6 +44,12 @@ ONE ASSERTION AT A TIME — this is the rule most often got wrong, and every mis
 - "Search and mapping were already moving together, while Where 2 still sat outside the browser." TWO assertions. A source about the industry converging supports the first and says NOTHING about the second, which is its own claim about one company's product at one time. Split it, and mark the second one on its own merits.
 - "Google said Maps reached more than 1 billion monthly users and about 200 million places." TWO numbers and TWO different verbs. A claim saying Maps had "information, ratings and reviews FOR about 200 million places" does NOT support "REACHED 200 million places" — reaching a place and holding information about it are different assertions, and the narration picked the stronger one. Quantities, verbs and qualifiers are part of the claim: read them.
 - "In early 2003, Lars Eilstrup Rasmussen worked in Noel Gordon's Sydney spare room on Where 2." A claim that FOUR people founded the company in that room does not support a sentence naming ONE of them working there, because the sentence as written says something the sources do not: that this was his work, alone. When a sentence narrows a group to an individual, or widens an individual to a group, that is an assertion of its own.
+
+SCOPE IS PART OF THE ASSERTION, and it is the same rule one level up. "Online maps still behaved like separate pages" is a statement about ALL online maps; a claim covering the mainstream ones, or the ones a source happened to test, does not support it. Read the quantifier the narration actually used — "most", "many", "the leading ones" and no qualifier at all are four different claims, and the last is the strongest. If the sources cover some and the narration says all, that is `unsupported`, and `reason` should say which qualifier the claims would bear.
+
+A COUNTERFACTUAL CANNOT BE SUPPORTED BY ANYTHING, and that is exactly why it has to be flagged. "If it had stayed there, users kept the slower system the early web had normalized" describes a world that did not happen; no source can settle it, and no rewrite can source it — but a viewer hears it in the same voice as the dates around it. Mark it `unsupported` and say in `reason` that it asserts an alternative history nothing can check, so the producer can decide whether to keep it as openly-marked speculation or cut it.
+
+Do not overreach with this. A line that COMMENTS on what happened — "online maps were expected to move", "the record fixed the change in scale" — asserts no specific alternative outcome and stays in the ignore list above. The test is whether the sentence claims a particular thing WOULD have been true. Rhetoric is not a counterfactual; a stated consequence of an event that did not occur is.
 
 A SENTENCE IS ONLY SAFE WHEN EVERY ASSERTION IN IT IS SUPPORTED. If any one of them is not, say so — the rewrite fixes clauses, not whole paragraphs, so a precise finding is a cheap fix and a vague one is no fix at all.
 

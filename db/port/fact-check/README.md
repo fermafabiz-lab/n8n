@@ -338,6 +338,90 @@ hook saying April and a first chapter saying October — and until now nothing
 in the chain could see it, because every check ran against the pack and never
 across the script.
 
+### 7. THE HOOK IS NEVER CHECKED, and it never has been
+
+**This is the largest hole in the feature and it is architectural, not a
+prompt.** Read the canvas order:
+
+```
+If Narration Retry[1] → FC Prep → FC Run? → … → FC Apply → FC Save Report
+  → FC Done → Combine Chapters → Generate Hook
+```
+
+**`Generate Hook` runs AFTER the entire Deep Search chain.** The hook does not
+exist when the judge reads the narration, so `FC Prep` cannot put it in
+`fc.narration`, so it has never been checked on any film since the feature
+shipped. The first two sentences of every documentary — the ones a viewer is
+most likely to watch — are the only ones nothing reads.
+
+Found on 2026-09-19 on the producer's third Google Maps film
+(`recxsFvSEv3g6blYn`, 21 findings over 9 sentences), where every one of the 9
+checked sentences came from chapter 1 and the hook said:
+
+> Lars Rasmussen faced a deadline in 2003.
+> The Sydney team held just four members.
+
+No deadline appears in that script, in its research pack, or anywhere in the
+sources. It is an invention, and it opens the film.
+
+**The judge is not the problem.** Fed the same hook inside the narration, it
+catches it immediately — execution 15089: *"Lars Rasmussen faced a deadline in
+2003"* → `unsupported`, *"No sourced claim mentions any deadline involving Lars
+Rasmussen in 2003"*, while *"The Sydney team held just four members"* comes
+back `supported` on the four-person claim. The chain would work if it ran.
+
+**This also re-explains the very first incident.** CLAUDE.md records the
+producer's first red-lit film as having "a hook that said April and a first
+chapter that said October", filed under the gate bug. The gate bug was real
+and separate; the hook/chapter mismatch was THIS, and it was never fixed
+because nobody noticed the hook was outside the checked text.
+
+**What is live now is a constraint, not a check.** `Generate Hook` gained
+rule 3b: every date, number, name and specific event in the hook must already
+appear in the narration, with the deadline line quoted as the failure to learn
+from. That attacks the cause — the hook is a teaser for a script that has just
+been fact-checked, so it should never assert something the script does not —
+and it costs nothing. But **a constraint is not a check**: if the model
+disobeys, nothing catches it.
+
+**The real fix, still owed**, is one of:
+
+1. a small `HK *` check after `Hook Guard` that judges the hook's beats
+   against the same pack (new nodes, new wiring, must not break the hook
+   retry loop); or
+2. moving the whole FC chain after the hook exists (bigger rewire, and the
+   hook is written FROM the narration, so the ordering is not accidental).
+
+(1) is the cheaper and safer of the two. Neither was attempted on 09-19 —
+it was the fourth publish of the day on a workflow the producer was actively
+making films through, and new nodes in a live chain deserve their own sitting.
+
+### 8. Nothing checks what the REWRITE produced
+
+The second half of the same shape: **what the producer reads is not what was
+checked.** `FC Apply` validates the rewrite's STRUCTURE — chapter count, no
+empty chapter, length within a fifth, untouched chapters really untouched —
+and never re-reads its prose. So the rewrite can:
+
+- **introduce a new unsourced claim.** Its own prompt forbids this ("NEVER
+  introduce a fact that is not in the sources above… a replacement sentence
+  with a new date, a new number or a new name in it is worse than the sentence
+  it replaced") and nothing enforces it.
+- **half-fix a contradiction.** On `recxsFvSEv3g6blYn` the judge ruled
+  *"Between 2002 and 2003, Lars Rasmussen worked with…"* `contradicted`
+  because the sources put the layoffs in 2002 and the Sydney team after. The
+  rewrite corrected the WHO and kept "Between 2002 and 2003".
+- **create a new internal inconsistency.** That same film now says "In 2002 …
+  teamed up in Sydney" and "Between 2002 and 2003 … teamed up in Sydney" —
+  one event, two dates. The self-consistency rule from §6 would catch it, but
+  it ran before the rewrite.
+
+The fix is the same shape as the hook's: the judge is cheap and already
+correct, it just needs to see the final text. **A single re-run of `FC Judge`
+over the FINISHED narration, after both the rewrite and the hook, would close
+§7 and §8 together** — and would have caught every one of the four things
+ChatGPT flagged on this film. That is the next piece of work on this feature.
+
 ### What that change moved underneath everything else
 
 The judge now returns roughly twice as many findings for the same script, all
@@ -402,7 +486,8 @@ arrive at the gate covered in red.
 
 | Version | What |
 |---|---|
-| `3d1834f1` | §6 — attribution does not settle an order, and the narration must agree with itself — **published 2026-09-19 11:14, and what is live** |
+| `a9ecfbb4` | §7 hook constraint + counterfactuals and whole-category scope are checkable — **published 2026-09-19 11:30, and what is live** |
+| `3d1834f1` | §6 — attribution does not settle an order, and the narration must agree with itself — published 2026-09-19 11:14 |
 | `63d21d49` | one assertion at a time, dates settle order, the counts move to sentences — published 2026-09-19 09:37 |
 | `b927a298` | the skip path writes its report too — published 2026-09-18 19:32 |
 | (same publish) | the category read moved to `Fetch Project Record` |

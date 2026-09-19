@@ -36,6 +36,23 @@ body.showSourceWatermark = opts.sourceWatermark !== false;
 // drawn under a collapsed chip exactly as under an open pill.
 body.watermarkOpenOnce = opts.watermarkOpenOnce === true;
 
+// How big the badge is drawn, as a multiplier of its base size (2026-09-19).
+// REFUSES rather than clamps, exactly like `normalizeWatermarkScale` in
+// platform/lib/provenance.ts and remotion/src/provenance.ts — three copies in
+// three languages, and they move together or a film is drawn at a size the
+// slider never offered. A stored 4 is a mistake, not "as big as possible", so
+// it resolves to the standard size rather than to the maximum; absent is 1,
+// which is what every film rendered before this existed was drawn at.
+//
+// The bounds are the artwork's, not arbitrary: under 0.7 the glyph's thin
+// strokes start dropping out at 1080p, over 1.6 the longest capsule reads as
+// a banner. `db/port/watermark-open-once/check.mjs` parses them back out of
+// this file and asserts they still equal WATERMARK_SCALE on the site.
+body.watermarkScale = (() => {
+  const n = Number(opts.watermarkScale);
+  return (Number.isFinite(n) && n >= 0.7 && n <= 1.6) ? n : 1;
+})();
+
 // Provenance per scene, matched on the scene ID rather than on position:
 // Prepare Clips DROPS every scene with no final clip, so the index the
 // database row sits at and the index the render draws part company the moment

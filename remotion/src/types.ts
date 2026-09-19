@@ -267,6 +267,15 @@ export type FinalVideoProps = {
 	 * obligation and no switch here reaches it.
 	 */
 	watermarkOpenOnce?: boolean;
+
+	/**
+	 * How big the provenance badge is drawn, as a multiplier of its base size.
+	 *
+	 * 1 is what every film rendered before this existed was drawn at, and what
+	 * an absent or out-of-range value resolves to — `normalizeWatermarkScale`
+	 * refuses rather than clamps, so a stored 4 is the default, not the maximum.
+	 */
+	watermarkScale?: number;
 };
 
 export const defaultFinalVideoProps: FinalVideoProps = {
@@ -290,6 +299,7 @@ export const defaultFinalVideoProps: FinalVideoProps = {
 	narrationIsSpoken: true,
 	showSourceWatermark: true,
 	watermarkOpenOnce: false,
+	watermarkScale: 1,
 };
 
 /** Tone → visual language. Lowercased, diacritics-insensitive lookup. */

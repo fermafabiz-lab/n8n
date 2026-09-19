@@ -806,6 +806,26 @@ check('a canvas measuring another face is not believed', P.labelInkDrop(wmMono16
 check('nor is a TextMetrics without an ink box', P.labelInkDrop({ ...wmMono16, actualBoundingBoxAscent: undefined }, 'AI GENERATED', 16, 142.11), 0);
 check('nor a label with no width at all', P.labelInkDrop(wmMono16, 'AI GENERATED', 16, 0), 0);
 
+// --- the badge's SIZE, mirrored from remotion/scripts/check-watermark.mjs ---
+// Four copies of the range exist (lib/provenance.ts, remotion's, the
+// orchestrator's Normalize node, Final Assembly's Source Watermark node) and
+// `node db/port/watermark-open-once/check.mjs` asserts all four agree.
+check('the size range and its default', P.WATERMARK_SCALE, { min: 0.7, max: 1.6, step: 0.05, default: 1 });
+check('an oversized value is refused, not clamped', P.normalizeWatermarkScale(4), 1);
+check('and an undersized one too', P.normalizeWatermarkScale(0.2), 1);
+check('a word is not a size', P.normalizeWatermarkScale('big'), 1);
+check('nor is nothing at all', P.normalizeWatermarkScale(undefined), 1);
+check('the ends themselves are allowed', [P.normalizeWatermarkScale(0.7), P.normalizeWatermarkScale(1.6)], [0.7, 1.6]);
+check('and anything between them', P.normalizeWatermarkScale(1.35), 1.35);
+check('1x is the base geometry untouched', P.scaleWatermark(wmLand, 1), wmLand);
+check('and so is a refused value', P.scaleWatermark(wmLand, 99), wmLand);
+check('the mark at the smallest size', P.scaleWatermark(wmLand, 0.7).mark, { height: 21, glyph: 11, gap: 6, padX: 7 });
+check('and at the largest', P.scaleWatermark(wmLand, 1.6).mark, { height: 48, glyph: 24, gap: 13, padX: 16 });
+check('the three font sizes scale with it', [P.scaleWatermark(wmLand, 1.6).label.fontSize, P.scaleWatermark(wmLand, 1.6).source.fontSize, P.scaleWatermark(wmLand, 1.6).credit.fontSize], [26, 21, 19]);
+check('but its place on the frame does not', [P.scaleWatermark(wmLand, 1.6).left, P.scaleWatermark(wmLand, 1.6).bottom, P.scaleWatermark(wmLand, 1.6).maxWidth], [wmLand.left, wmLand.bottom, wmLand.maxWidth]);
+check('portrait scales from its own base', P.scaleWatermark(P.WATERMARK_LAYOUT.portrait, 1.6).mark, { height: 51, glyph: 26, gap: 13, padX: 16 });
+check('the widest capsule still fits the budget', P.markPillWidth(P.scaleWatermark(wmLand, 1.6).mark, 26, 236.84 * 1.6) <= wmLand.maxWidth, true);
+
 const wmScene = (start, dur, provenance) => ({ startSeconds: start, durationSeconds: dur, provenance });
 const wmAi = { visualOrigin: 'ai_generated' };
 const wmArch = { visualOrigin: 'archival_footage', provider: 'wikimedia', sourceCreator: 'NASA' };

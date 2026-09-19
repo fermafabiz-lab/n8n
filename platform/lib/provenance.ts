@@ -533,6 +533,89 @@ export const markPillWidth = (
 export const markChipPadX = (mark: WatermarkMark): number =>
   (mark.height - 2 * WATERMARK_STYLE.markBorderWidth - mark.glyph) / 2;
 
+/**
+ * How much bigger or smaller the whole badge is drawn.
+ *
+ * The badge is deliberately the least decorative element in the render — a
+ * claim about truthfulness that draws attention to itself stops being read as
+ * one — but "quiet" is a judgement about a particular film on a particular
+ * screen, not a constant. A documentary watched on a phone needs it larger
+ * than a 16:9 essay does, and the producer is the one looking at it.
+ *
+ * The ends are chosen rather than arbitrary. Below 0.7 the 15px glyph falls
+ * under 11px and the artwork's thin strokes start dropping out at 1080p;
+ * above 1.6 the capsule for the longest label ("ILLUSTRATIVE FOOTAGE", 280px
+ * at 1x) passes 448px and begins to read as a banner rather than a mark.
+ * `step` is the slider's grid and nothing else enforces it — an arbitrary
+ * value inside the range is honoured, because refusing one would be refusing
+ * a film that was rendered before the grid existed.
+ *
+ * Mirrored from remotion/src/provenance.ts.
+ */
+export const WATERMARK_SCALE = {
+  min: 0.7,
+  max: 1.6,
+  step: 0.05,
+  default: 1,
+} as const;
+
+/**
+ * The stored size, or the default — refuse-then-clamp, like every other
+ * Editing Options number (`normalize*` in lib/data/derive.ts).
+ *
+ * REFUSES rather than clamps, exactly as `normalizeSpeed` does: a value
+ * outside the range falls back to 1 instead of being pulled to the nearest
+ * end. A stored 4 is not "as big as possible", it is a mistake, and a badge
+ * silently drawn at the maximum would be a worse answer than the default one.
+ *
+ * Three copies in three languages — here, remotion/src/provenance.ts and
+ * Final Assembly's `Source Watermark` node. They move together or a film is
+ * drawn at a size the control never offered.
+ */
+export const normalizeWatermarkScale = (value: unknown): number => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return WATERMARK_SCALE.default;
+  if (n < WATERMARK_SCALE.min || n > WATERMARK_SCALE.max) return WATERMARK_SCALE.default;
+  return n;
+};
+
+/**
+ * The badge's geometry at a given size.
+ *
+ * Everything that is part of the MARK scales — its height, its glyph, the two
+ * paddings, the three font sizes and the gap between the stacked lines. What
+ * does NOT scale is where the badge sits: `left`, `bottom` and `frame` are
+ * about the composition, not about the mark, and a badge that walked towards
+ * the corner as it grew would be two decisions wearing one control.
+ * `maxWidth` is left alone for the same reason.
+ *
+ * Rounded to whole pixels because half a pixel of border is a grey smear
+ * rather than a hairline, and because `markChipPadX` centres the glyph inside
+ * the border by halving what is left. The border itself stays 1px at every
+ * size, deliberately: a hairline is a hairline, and scaling it would make the
+ * largest badge look heavy-handed.
+ *
+ * Mirrored from remotion/src/provenance.ts.
+ */
+export const scaleWatermark = (g: WatermarkGeometry, scale: unknown): WatermarkGeometry => {
+  const k = normalizeWatermarkScale(scale);
+  if (k === WATERMARK_SCALE.default) return g;
+  const px = (n: number) => Math.max(1, Math.round(n * k));
+  return {
+    ...g,
+    gap: px(g.gap),
+    label: { ...g.label, fontSize: px(g.label.fontSize) },
+    source: { fontSize: px(g.source.fontSize) },
+    credit: { fontSize: px(g.credit.fontSize) },
+    mark: {
+      height: px(g.mark.height),
+      glyph: px(g.mark.glyph),
+      gap: px(g.mark.gap),
+      padX: px(g.mark.padX),
+    },
+  };
+};
+
 /** The fields of a canvas `TextMetrics` this needs, and nothing else. */
 export type LabelMetrics = {
   width: number;

@@ -6,6 +6,7 @@ import { confirmFinalSettings, type ActionResult } from "@/app/actions";
 import Toggle from "@/components/Toggle";
 import CaptionColorPicker from "@/components/CaptionColorPicker";
 import WatermarkOpenPicker from "@/components/WatermarkOpenPicker";
+import WatermarkSizePicker from "@/components/WatermarkSizePicker";
 import WatermarkPreview, { type PreviewScene } from "@/components/WatermarkPreview";
 import { useSetPendingStage } from "@/components/StageNav";
 import type { EditingOptions, MotifCard } from "@/lib/data";
@@ -232,6 +233,9 @@ export default function FinalSettings({
   const watermarkOpenMoved =
     rows.some((o) => o.key === "sourceWatermark") &&
     (opts.watermarkOpenOnce === true) !== (initial.watermarkOpenOnce === true);
+  const watermarkScaleMoved =
+    rows.some((o) => o.key === "sourceWatermark") &&
+    opts.watermarkScale !== initial.watermarkScale;
   // The pace is NOT here any more — it is decided and signed off at the audio
   // step, the one moment it costs nothing, and this panel neither shows it nor
   // writes it. (confirmFinalSettings therefore omits `speed` entirely rather
@@ -247,14 +251,16 @@ export default function FinalSettings({
     sfxLevelMoved ||
     musicLevelMoved ||
     captionColorMoved ||
-    watermarkOpenMoved;
+    watermarkOpenMoved ||
+    watermarkScaleMoved;
   const changeCount =
     changedKeys.length +
     dropped.length +
     (sfxLevelMoved ? 1 : 0) +
     (musicLevelMoved ? 1 : 0) +
     (captionColorMoved ? 1 : 0) +
-    (watermarkOpenMoved ? 1 : 0);
+    (watermarkOpenMoved ? 1 : 0) +
+    (watermarkScaleMoved ? 1 : 0);
   const done = msg?.ok === true;
   const router = useRouter();
   const setPendingStage = useSetPendingStage();
@@ -328,7 +334,8 @@ export default function FinalSettings({
                     (o.key === "sfx" && sfxLevelMoved) ||
                     (o.key === "music" && musicLevelMoved) ||
                     (o.key === "captions" && captionColorMoved) ||
-                    (o.key === "sourceWatermark" && watermarkOpenMoved)) && (
+                    (o.key === "sourceWatermark" &&
+                      (watermarkOpenMoved || watermarkScaleMoved))) && (
                     <span className="chg">changed</span>
                   )}
                 </h4>
@@ -357,6 +364,15 @@ export default function FinalSettings({
                         setOpts((p) => ({ ...p, watermarkOpenOnce: v }))
                       }
                     />
+                    <div style={{ marginTop: 14 }}>
+                      <WatermarkSizePicker
+                        value={opts.watermarkScale}
+                        onChange={(v) =>
+                          setOpts((p) => ({ ...p, watermarkScale: v }))
+                        }
+                        portrait={String(aspectRatio ?? "").trim() === "9:16"}
+                      />
+                    </div>
                   </div>
                 )}
                 {o.key === "sourceWatermark" && watermarkScenes.length > 0 && (
@@ -379,6 +395,7 @@ export default function FinalSettings({
                         // has to answer for the pair the producer is looking
                         // at right now.
                         openOncePerOrigin={opts.watermarkOpenOnce === true}
+                        scale={opts.watermarkScale}
                       />
                     )}
                   </div>

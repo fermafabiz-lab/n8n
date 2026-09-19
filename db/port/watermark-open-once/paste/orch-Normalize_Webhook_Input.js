@@ -155,6 +155,13 @@ return [{ json: {
     // is the hole `sourceWatermark` still has (docs/lessons-site.md) and the
     // one this key deliberately does not walk into.
     watermarkOpenOnce: b.watermark_open_once === 'yes' || b.watermark_open_once === true,
+    // And how big it is drawn (2026-09-19), as a multiplier of the base size.
+    // Refused rather than clamped, the same rule in all three languages that
+    // touch this number — platform/lib/provenance.ts, remotion's copy, and
+    // Final Assembly's `Source Watermark` node. An out-of-range value is a
+    // mistake, so it resolves to the standard size rather than to the nearest
+    // end; absent stores 1, which every film before this was drawn at.
+    watermarkScale: (() => { const n = Number(b.watermark_scale); return (Number.isFinite(n) && n >= 0.7 && n <= 1.6) ? n : 1; })(),
     ...(captionColor ? { captionColor } : {}),
     // Which Veo tier generates the clips. Whitelisted here AND on the
     // site (VIDEO_MODELS in derive.ts): the string reaches the Flow API

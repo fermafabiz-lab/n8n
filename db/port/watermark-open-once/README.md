@@ -176,6 +176,87 @@ was chosen, and comes back holding it; at Final touches the old row is gone,
 the button flips to "Apply 1 change & render", and the `changed` chip appears
 on the Source watermark row.
 
+## And how big it is drawn — a slider, not three named sizes
+
+2026-09-19. The badge is deliberately the least decorative element in the
+render: a claim about truthfulness that draws attention to itself stops being
+read as one. But "quiet" is a judgement about a particular film, on particular
+footage, watched on a particular screen — not a constant — and the producer is
+the one looking at it.
+
+**A slider rather than Small / Normal / Large**, because there is no natural
+set of steps here: three names would be three numbers somebody picked. What IS
+real is the two ends, and both are the artwork's rather than arbitrary:
+
+| | |
+|---|---|
+| **0.7×** | below this the 15px glyph falls under 11px and the pack's thin strokes start dropping out at 1080p |
+| **1.6×** | above this the capsule for the longest label ("ILLUSTRATIVE FOOTAGE", 280px at 1×) passes 448px and reads as a banner rather than a mark |
+
+`step` is 0.05 and is the SLIDER'S grid only — nothing downstream enforces it,
+because refusing an off-grid value would be refusing a film that was rendered
+before the grid existed.
+
+**Shown with a live sample at the render's real pixel size**, on both screens,
+for the same reason `WatermarkPreview` draws the badge at 1:1 under its frame:
+a percentage is not a size. "110%" means nothing until you can see that it is
+the difference between a mark you notice and one you do not, and the second
+thing is what is being chosen.
+
+### One function scales it, not a multiplication at each reader
+
+`scaleWatermark(geometry, scale)` in `provenance.ts` (both copies). Everything
+that is part of the MARK scales — height, glyph, both paddings, the three font
+sizes, the gap between the stacked lines. What does NOT:
+
+- **`left`, `bottom`, `frame`** — where the badge sits is about the
+  composition, not the mark. A badge that walked towards the corner as it grew
+  would be two decisions wearing one control.
+- **`maxWidth`** — a budget measured against the frame, and the widest capsule
+  at the largest size is still well inside it. `check:watermark` asserts that
+  rather than assuming it.
+- **the 1px border** — a hairline is a hairline. Scaling it would make the
+  largest badge look heavy-handed, which is the opposite of the point.
+
+`1×` returns the base object itself, not a rebuilt copy: every film rendered
+before this existed goes through here, and a rounding that moved one pixel
+would change all of them. Pinned.
+
+### Refused, not clamped — in four languages
+
+`normalizeWatermarkScale` follows `normalizeSpeed`: out of range falls back to
+**1**, it does not pull to the nearest end. A stored 4 is a mistake, not "as
+big as possible", and a badge silently drawn at the maximum would be a worse
+answer than the standard one.
+
+The rule exists four times — `platform/lib/provenance.ts`,
+`remotion/src/provenance.ts`, the orchestrator's `Normalize Webhook Input`,
+Final Assembly's `Source Watermark` — and `check.mjs` parses the bounds back
+out of each shipped text and asserts all four agree. **That parser caught a bug
+in itself first**: an unanchored `n >= … && n <= …` matched `normalizeSpeed`'s
+`0.5 … 2` six lines above, and reported the copies as disagreeing. A regex over
+a whole file finds the first thing shaped like the answer, which is not the
+same as the answer. It is anchored to the key's own clause now, and the pin was
+proved by deliberately drifting one copy and watching it fail.
+
+### Applied
+
+| Workflow | active version | node |
+|---|---|---|
+| Master Orchestrator `8CienBFfG6SgbB1A` | `fec6369c` | `Normalize Webhook Input` — stores `watermarkScale` from the brief |
+| Final Assembly `BY22Vlhh20Xdkr5Z` | `0ed5da71` | `Source Watermark` — passes it to the render props |
+
+Both from `paste/`, both diffed with `db/port/lib/diff-workflow.mjs` against
+the version they were built on: 32 and 40 nodes either side, one node changed
+each, connections identical, no Drive node losing `resource`/`operation`.
+
+**What is owed**: the slider has been seen on a locally rendered reel at all
+five stops and in the browser on both screens, but no real film has been
+rendered at anything other than 1×. The thing to look for is the largest sizes
+over BUSY footage — the scrim is tuned for a 30px pill, and at 48px it covers
+enough of the frame that a shot with detail in the bottom-left may need the
+badge smaller rather than larger.
+
 ## The label was not centred in the pill, three separate ways
 
 Found by the producer on the review reel — "scrisul si logoul sa fie centrate

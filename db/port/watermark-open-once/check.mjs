@@ -77,6 +77,65 @@ is(
   true,
 );
 
+// ---- the badge SIZE, which lives in four languages ------------------------
+// The multiplier is refused-not-clamped in platform/lib/provenance.ts,
+// remotion/src/provenance.ts, the orchestrator's Normalize node and Final
+// Assembly's `Source Watermark` node. Nothing makes a drift loud on its own:
+// a film would simply be drawn at a size the slider cannot produce, or the
+// slider would offer one the render refuses and silently reset to 1 — which
+// reads as "the slider does nothing".
+is('the node stores the size', opts({ watermark_scale: 1.35 }).watermarkScale, 1.35);
+is('an absent size is the standard one', opts({}).watermarkScale, 1);
+is('over the top end is refused, NOT clamped', opts({ watermark_scale: 4 }).watermarkScale, 1);
+is('and so is under the bottom', opts({ watermark_scale: 0.2 }).watermarkScale, 1);
+is('as is a word', opts({ watermark_scale: 'big' }).watermarkScale, 1);
+is('the ends themselves are allowed', [opts({ watermark_scale: 0.7 }).watermarkScale, opts({ watermark_scale: 1.6 }).watermarkScale], [0.7, 1.6]);
+
+// The four copies of the range, parsed back out of the text that ships.
+//
+// Anchored to the line that mentions the size, NOT to the first `n >= … &&
+// n <= …` in the file: the orchestrator's `normalizeSpeed` is such a clause
+// too, six lines up, and an unanchored pattern read ITS bounds (0.5, 2) and
+// reported the copies as disagreeing. A regex over a whole file finds the
+// first thing shaped like the answer, which is not the same as the answer.
+// A WINDOW from that anchor rather than the anchor line itself, because the
+// two copies are written differently: the orchestrator's is a one-liner and
+// Final Assembly's spans three lines, so the bounds are not on the line that
+// names the key. Four lines is enough for both and still nowhere near the
+// next unrelated clause.
+const boundsOf = (text) => {
+  const lines = text.split('\n');
+  const at = lines.findIndex((l) => /body\.watermarkScale|watermarkScale: \(\(\)/.test(l));
+  if (at < 0) return null;
+  const m = /n >= (\d(?:\.\d+)?) && n <= (\d(?:\.\d+)?)/.exec(lines.slice(at, at + 4).join('\n'));
+  return m ? [Number(m[1]), Number(m[2])] : null;
+};
+const prov = readFileSync(join(root, 'platform/lib/provenance.ts'), 'utf8');
+const site = /min:\s*(\d(?:\.\d+)?),\s*\n\s*max:\s*(\d(?:\.\d+)?)/.exec(prov);
+is('the site declares a range', !!site, true);
+const want = site ? [Number(site[1]), Number(site[2])] : null;
+
+const faB = boundsOf(readFileSync(join(here, 'paste', 'Source Watermark.js'), 'utf8'));
+is('Final Assembly still bounds the size', !!faB, true);
+is('and agrees with the site', faB, want);
+
+const orchB = boundsOf(body);
+is('the orchestrator still bounds it', !!orchB, true);
+is('and agrees too', orchB, want);
+
+const remotion = readFileSync(join(root, 'remotion/src/provenance.ts'), 'utf8');
+const rem = /min:\s*(\d(?:\.\d+)?),\s*\n\s*max:\s*(\d(?:\.\d+)?)/.exec(remotion);
+is('the render declares the same range', rem && [Number(rem[1]), Number(rem[2])], want);
+
+// The site half of the control, as with the switch above.
+is('the brief posts the size', /name="watermark_scale"/.test(form), true);
+is('and createProject forwards it', /watermark_scale:/.test(actions), true);
+is(
+  'derive.ts runs it through the shared refusal',
+  /watermarkScale:\s*normalizeWatermarkScale\(opts\.watermarkScale\)/.test(derive),
+  true,
+);
+
 console.log(`\n${pass}/${pass + fails.length} passed`);
 if (fails.length) {
   for (const f of fails) console.log(`  ${f}`);

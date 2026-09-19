@@ -7,6 +7,7 @@ import { DEFAULT_CATEGORY, getCategory } from "@/lib/categories";
 import Toggle from "@/components/Toggle";
 import CaptionColorPicker from "@/components/CaptionColorPicker";
 import WatermarkOpenPicker from "@/components/WatermarkOpenPicker";
+import WatermarkSizePicker from "@/components/WatermarkSizePicker";
 import LanguagePicker from "@/components/LanguagePicker";
 import Link from "next/link";
 import { languageByCode, resolveLanguage } from "@/lib/languages";
@@ -356,6 +357,9 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
   // that quietly stops naming its sources is the failure the whole overlay
   // exists to prevent, so absence resolves to the louder choice everywhere.
   const [watermarkOpenOnce, setWatermarkOpenOnce] = useState(false);
+  // How big the badge is drawn. 1 is the size every film before this was
+  // rendered at, and the slider's own default — see WATERMARK_SCALE.
+  const [watermarkScale, setWatermarkScale] = useState(1);
   const [style, setStyle] = useState("");
   // Hands-off mode: every gate signs itself off. Off by default — approving
   // unseen is a real trade, and it must never be the accident.
@@ -972,6 +976,13 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
                                 value={watermarkOpenOnce}
                                 onChange={setWatermarkOpenOnce}
                               />
+                              <div style={{ marginTop: 14 }}>
+                                <WatermarkSizePicker
+                                  value={watermarkScale}
+                                  onChange={setWatermarkScale}
+                                  portrait={aspect === "9:16"}
+                                />
+                              </div>
                             </div>
                           )}
                           {f.name === "sfx" && on && (
@@ -1086,6 +1097,14 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
                     type="hidden"
                     name="watermark_open_once"
                     value={watermarkOpenOnce ? "yes" : "no"}
+                  />
+                  {/* The multiplier itself, not a percentage: the same unit
+                      `Normalize Webhook Input`, derive.ts and the render all
+                      refuse out of range. */}
+                  <input
+                    type="hidden"
+                    name="watermark_scale"
+                    value={watermarkScale}
                   />
                 </div>
                 <div className="frow" style={{ marginTop: 18 }}>

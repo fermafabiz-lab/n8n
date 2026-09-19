@@ -24,6 +24,9 @@ const {
 	labelInkDrop,
 	labelTrailingSpace,
 	markChipPadX,
+	normalizeWatermarkScale,
+	scaleWatermark,
+	WATERMARK_SCALE,
 	markPillWidth,
 	planWatermarkBands,
 	providerLabel,
@@ -228,6 +231,57 @@ check(
 	0,
 );
 check('nor a label with no width at all', labelInkDrop(MONO16, 'AI GENERATED', 16, 0), 0);
+
+// --- the badge's SIZE --------------------------------------------------------
+// The multiplier the producer sets, and what it does to the geometry. Four
+// copies of the range exist (here, platform/lib/provenance.ts, the
+// orchestrator's Normalize node, Final Assembly's Source Watermark node) and
+// `node db/port/watermark-open-once/check.mjs` asserts all four agree.
+check('the size range and its default', WATERMARK_SCALE, {min: 0.7, max: 1.6, step: 0.05, default: 1});
+// REFUSES rather than clamps, exactly as normalizeSpeed does: a stored 4 is a
+// mistake, not "as big as possible", and a badge silently drawn at the maximum
+// would be a worse answer than the standard one.
+check('an oversized value is refused, not clamped', normalizeWatermarkScale(4), 1);
+check('and an undersized one too', normalizeWatermarkScale(0.2), 1);
+check('a word is not a size', normalizeWatermarkScale('big'), 1);
+check('nor is nothing at all', normalizeWatermarkScale(undefined), 1);
+check('the ends themselves are allowed', [normalizeWatermarkScale(0.7), normalizeWatermarkScale(1.6)], [0.7, 1.6]);
+check('and anything between them', normalizeWatermarkScale(1.35), 1.35);
+// 1x must be the object itself, not a rebuilt copy: every film rendered before
+// this existed goes through here, and a rounding that moved one pixel would
+// change all of them.
+check('1x is the base geometry untouched', scaleWatermark(LAND, 1), LAND);
+check('and so is a refused value', scaleWatermark(LAND, 99), LAND);
+check(
+	'the mark at the smallest size',
+	scaleWatermark(LAND, 0.7).mark,
+	{height: 21, glyph: 11, gap: 6, padX: 7},
+);
+check(
+	'and at the largest',
+	scaleWatermark(LAND, 1.6).mark,
+	{height: 48, glyph: 24, gap: 13, padX: 16},
+);
+check(
+	'the three font sizes scale with it',
+	[scaleWatermark(LAND, 1.6).label.fontSize, scaleWatermark(LAND, 1.6).source.fontSize, scaleWatermark(LAND, 1.6).credit.fontSize],
+	[26, 21, 19],
+);
+// Where the badge SITS is not part of the mark. A badge that walked towards
+// the corner as it grew would be two decisions wearing one control.
+check(
+	'but its place on the frame does not',
+	[scaleWatermark(LAND, 1.6).left, scaleWatermark(LAND, 1.6).bottom, scaleWatermark(LAND, 1.6).maxWidth],
+	[LAND.left, LAND.bottom, LAND.maxWidth],
+);
+check('portrait scales from its own base', scaleWatermark(WATERMARK_LAYOUT.portrait, 1.6).mark, {height: 51, glyph: 26, gap: 13, padX: 16});
+// The capsule the widest label needs at the largest size, which is what the
+// top of the range was chosen against: it has to stay inside maxWidth.
+check(
+	'the widest capsule still fits the budget',
+	markPillWidth(scaleWatermark(LAND, 1.6).mark, 26, 236.84 * 1.6) <= LAND.maxWidth,
+	true,
+);
 
 // --- "announce each source once" -------------------------------------------
 // MIRRORED with platform/scripts/check-footage.mjs. The switch collapses

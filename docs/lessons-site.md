@@ -2096,3 +2096,25 @@ and wrong: it moves every time an old project is deleted, and would eventually
 start explaining real faults away as ancient history. An UNKNOWN creation date
 is not an excuse either — a backend that stopped returning the date would
 otherwise switch the alarm off everywhere at once.
+
+**The same sentence, three times over, reads as a bug** (2026-09-19). Since
+the judge started ruling on one ASSERTION at a time rather than one sentence —
+see `docs/lessons-pipeline.md`, "A sentence is only as sound as its weakest
+clause" — several findings arrive carrying the SAME `quote`, because that is
+what a compound sentence with three separate problems in it honestly looks
+like. Listed flat, the panel printed the identical line three times and a
+producer would reasonably conclude it was repeating itself. `groupBySentence`
+renders one entry per sentence with its assertions nested under it, each with
+its own chip and its own reason, and `claim` — which had been in the type and
+never on screen — is what distinguishes them.
+
+The header had to change with it, for a reason that is the same class of
+mistake as the link to the page you are already on: **`checked` counts
+statements and the script has sentences, and after the prompt change those are
+no longer the same number.** "26 statements were checked" above a script with
+thirteen flagged sentences in it is arithmetic the producer cannot make add
+up, so the panel says both — "26 statements across 13 sentences" — and says
+the second one only when it differs. `report.sentences` carries it, and the
+panel counts distinct quotes itself when the field is missing, because every
+report written before that day has no such field and an old film's panel still
+has to add up.

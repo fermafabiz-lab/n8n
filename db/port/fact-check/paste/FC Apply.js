@@ -18,16 +18,16 @@
 //  - untouched chapters really are untouched: the rewrite is told to change
 //    only the flagged sentences; if it tidied elsewhere we cannot tell what
 //    else it changed, so the whole rewrite is refused.
-// BY NAME, NOT `$json`, and for a sharper reason than usual: this node is
-// reached from TWO directions. `FC Fix?`[1] arrives carrying FC Resolve's
-// payload; `FC Rewrite` arrives carrying an agent's `{output: {chapters}}` and
-// nothing else. Only one of those has the narration on it, so the narration is
-// never read positionally — the rewrite's proposal is fetched by name below.
+//
 // THREE directions now, not two. `FC Run?`[false] reaches here as well, so a
 // film Deep Search declined still gets a report row saying WHY — without that
 // the skip path wrote nothing at all, and "no row" meant both "it was a Story
 // film" and "the chain is dead". Those are the two things the producer's red
 // light exists to tell apart, and for a day it could not.
+//
+// BY NAME, NOT `$json`: `FC Fix?`[1] arrives carrying FC Resolve's payload and
+// `FC Rewrite` arrives carrying an agent's `{output: {chapters}}` and nothing
+// else, so the narration is never read positionally.
 let g;
 try {
   g = $('FC Resolve').first().json;
@@ -107,7 +107,13 @@ if (refusal) {
 const chapters = next || original;
 
 // What actually changed, per finding, for the report the producer reads.
-let rewritten = 0;
+//
+// COUNTED IN SENTENCES. Since the judge rules on one assertion at a time, a
+// compound sentence arrives here as several findings that all carry the SAME
+// quote, and all of them stop matching the moment that one sentence is
+// rewritten. Counting findings would report "3 corrected" for one corrected
+// sentence — a number the producer reads as three edits to go and reread.
+const fixedSentences = new Set();
 for (const f of findings) {
   if (f.action !== 'rewrite') {
     f.action = 'kept';
@@ -122,8 +128,9 @@ for (const f of findings) {
   }
   const still = chapters.some((c) => String(c.narrator_script || '').includes(f.quote));
   f.action = still ? 'flagged' : 'rewritten';
-  if (!still) rewritten += 1;
+  if (!still) fixedSentences.add(String(f.quote || '').trim());
 }
+const rewritten = fixedSentences.size;
 
 // Rebuild the two derived fields the guard emitted, so anything downstream
 // reading them sees the script that now exists rather than the draft.
@@ -139,13 +146,17 @@ const report = fc.run
       category: fc.category || '',
       checked: findings.length,
       flagged: findings.filter((f) => f.verdict !== 'supported').length,
+      // How many SENTENCES those statements came from. `checked` counts
+      // assertions and one sentence often carries several, so the two numbers
+      // diverge on purpose — the panel says both, because "26 statements" and
+      // "13 sentences" answer different questions and either alone misleads.
+      sentences: fc.sentences || new Set(findings.map((f) => String(f.quote || '').trim())).size,
       searched: fc.searched || 0,
       rewritten,
       refused: refusal || undefined,
       // Nothing was rewritten and that was a decision, not a failure — the
       // share of unsupported statements was high enough that this pack was
-      // plainly never meant to back this script. The site says so in its own
-      // words rather than printing a wall of red. See `FC Resolve`.
+      // plainly never meant to back this script. See `FC Resolve`.
       overwhelmed: fc.overwhelmed ? true : undefined,
       findings: findings.map((f) => ({
         quote: f.quote,
@@ -166,9 +177,8 @@ const report = fc.run
       rewritten: 0,
       skipped: fc.skipped || 'not checked',
       // THE FIELD THE RED LIGHT IS WIRED TO. The prose above will be reworded
-      // one day; this will not. `not-documentary` is the one skip that is
-      // normal — every other value means a film that should have been checked
-      // was not, which is what the producer asked to be able to see.
+      // one day; this will not. `not-documentary` and `story` are normal —
+      // every other value means a film that should have been checked was not.
       skipCode: fc.skipCode || 'unknown',
       // Distinguishes "we read it and it is a story" from "there was no pack
       // to read it against", which are the same outcome and different news.
@@ -176,7 +186,7 @@ const report = fc.run
       findings: [],
     };
 
-console.log('DEEP SEARCH done: ' + report.checked + ' checked, ' + report.flagged + ' flagged, ' + report.rewritten + ' rewritten');
+console.log('DEEP SEARCH done: ' + report.checked + ' checked, ' + report.flagged + ' flagged, ' + report.rewritten + ' rewritten' + (report.skipCode ? ' (skipped: ' + report.skipCode + ')' : ''));
 
 // Base64 for the writer downstream. The report quotes the narration verbatim,
 // so it is arbitrary producer text going into a SQL literal: dollar-quoting

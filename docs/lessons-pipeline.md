@@ -2058,6 +2058,58 @@ tonnage and nothing gives the colour. Neither is a hallucination in the usual
 sense. Both are a writer adding a true-sounding adjective to a sourced fact,
 which is what this check is really for.
 
+### A sentence is only as sound as its weakest clause — 2026-09-19, LIVE
+
+The producer ran the first post-Deep-Search Google Maps script past ChatGPT
+and brought back four things it had let through, with the verdict that *"the
+chronology-checking component needs improvement — especially when several
+acquisitions/events happen close together."* All four were one fault, and
+it is worth stating precisely because **the check was doing exactly what it
+was told and what it was told was wrong.**
+
+The judge returned **one finding per sentence**, and a documentary sentence is
+almost never one assertion. *"Search and mapping were already moving together,
+while Where 2 still sat outside the browser"* has two: the pack backed the
+first and was silent on the second, and the sentence as a whole came back
+`supported`. The same shape produced the other three — *"reached … about 200
+million places"* ruled against a claim that Maps held "information, ratings
+and reviews FOR about 200 million places" (a quieter verb), and *"Lars
+Eilstrup Rasmussen worked in Noel Gordon's Sydney spare room"* against a claim
+that FOUR people founded the company there.
+
+**Ask a judge for a verdict on a unit bigger than the claim and it will rule
+on what the unit is mostly about.** The prompt now asks for one finding per
+ASSERTION, the same `quote` repeated as often as the sentence needs, with
+`claim` as what tells them apart. On the producer's own narration that went
+from 15 findings to 26 across 13 sentences, and all four misses came back
+`unsupported`.
+
+**A closed-book checker inherits its pack's errors, and that is not a bug it
+can be prompted out of.** The ZipDash one — *"Google acquired Where 2 and
+Keyhole that month, then bought ZipDash"*, when ZipDash came first, in
+September — was not missed. It was checked, against claim E5: *"Google
+acquired ZipDash in 2004 AFTER buying Where 2 Technologies and Keyhole."* The
+research asserted the order, the judge cited it, and both were wrong. Nothing
+about reading the narration more carefully finds that.
+
+What CAN be fixed is the judge treating an ordering as sourced because a claim
+phrased it confidently. **A claim's PROSE is not evidence; only its facts
+are.** E3 and E4 are dated October 2004, E5 says only "2004" — so the ORDER is
+unsupported however the claim words it, and an unsupported ordering goes to
+the live source lookup instead of being inherited. *Dates settle order.
+Sequence words do not.* The other half of the repair belongs upstream and is
+still owed: `Extract Claims` should be writing dates rather than "after".
+
+**And the arithmetic underneath moved with the prompt.** Twice as many
+findings for the same script meant `FC Resolve`'s "don't rewrite more than 60%
+of it" backstop was suddenly measuring a different thing, its fix list was
+asking for one sentence to be rewritten three times, and `FC Apply` would have
+reported one corrected sentence as three corrections. All three now count
+DISTINCT SENTENCES. The general form is worth carrying: **a ratio measured
+over units that a prompt defines is not a threshold, it is a coincidence** —
+change how finely the model is asked to slice and every number underneath
+moves with it, silently, in the direction that looks like nothing happened.
+
 ### Deep Search is Documentary mode's feature, not the narration's — 2026-09-18
 
 The entry above says the project's `category` cannot tell a documentary from a

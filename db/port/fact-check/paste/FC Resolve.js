@@ -133,6 +133,16 @@ for (const f of findings) {
 }
 let toFix = findings.filter((f) => f.action === 'rewrite');
 
+// A SENTENCE IS THE UNIT OF THE SCRIPT; AN ASSERTION IS THE UNIT OF THE CHECK.
+// Since the judge was taught to rule on one assertion at a time (2026-09-19),
+// several findings routinely share one `quote` — that is the fix for the
+// compound sentence whose good half hid its bad half. Everything that measures
+// the SCRIPT therefore has to count sentences, not findings, or the same change
+// of prompt quietly moves every threshold underneath it.
+const sentences = (list) => new Set(list.map((f) => String(f.quote || '').trim()));
+const allSentences = sentences(findings);
+const badSentences = sentences(toFix);
+
 // THE BACKSTOP, for when the judge answers `factual` about something that is
 // not. A documentary written from its own pack holds up in most of its
 // sentences; four bad ones in twenty is the shape of a real problem. Most of
@@ -144,21 +154,27 @@ let toFix = findings.filter((f) => f.action === 'rewrite');
 // So past this line we stop offering to fix and start only reporting. The
 // producer still sees every finding, which is the whole of "warn loudly, never
 // block"; nothing is hidden and nothing is rewritten.
+//
+// MEASURED IN SENTENCES, deliberately. "Most of the film is wrong" is a
+// statement about the film's prose, and a sentence with three bad clauses in it
+// is still one sentence the producer has to reread. Counting findings instead
+// would make this threshold depend on how finely the judge happens to slice a
+// sentence that day — which is a prompt, not a fact about the script.
 const OVERWHELMED_SHARE = 0.6;
 const OVERWHELMED_FLOOR = 8; // below this a high share is just a short script
-const overwhelmed = findings.length >= OVERWHELMED_FLOOR && toFix.length / findings.length > OVERWHELMED_SHARE;
+const overwhelmed = allSentences.size >= OVERWHELMED_FLOOR && badSentences.size / allSentences.size > OVERWHELMED_SHARE;
 if (overwhelmed) {
   console.log(
     'DEEP SEARCH not rewriting: ' +
-      toFix.length + ' of ' + findings.length +
-      ' statements are unsupported, which reads as a script this pack was never meant to back. Reporting only.',
+      badSentences.size + ' of ' + allSentences.size +
+      ' sentences are unsupported, which reads as a script this pack was never meant to back. Reporting only.',
   );
   toFix = [];
 }
 
 console.log(
   'DEEP SEARCH ' +
-    findings.length + ' checkable statements, ' +
+    findings.length + ' checkable statements across ' + allSentences.size + ' sentences, ' +
     findings.filter((f) => f.verdict === 'supported').length + ' supported, ' +
     findings.filter((f) => f.verdict === 'unsupported').length + ' unsupported, ' +
     findings.filter((f) => f.verdict === 'contradicted').length + ' contradicted' +
@@ -167,11 +183,35 @@ console.log(
 
 // The brief the rewrite works from: only the sentences that need changing,
 // each with what is wrong and what the source actually says.
-const fixList = toFix
-  .map(
-    (f, i) =>
-      `${i + 1}. SENTENCE: ${f.quote}\n   PROBLEM: ${f.verdict === 'contradicted' ? 'a source contradicts this' : 'nothing we can cite supports this'}\n   DETAIL: ${f.reason || '(none)'}${f.url ? '\n   SOURCE: ' + f.url : ''}`,
-  )
+//
+// GROUPED BY SENTENCE, because the rewrite's unit is the sentence. A compound
+// sentence now arrives here as several findings, and listing it several times
+// would ask for it to be rewritten several times — two independent rewrites of
+// one sentence, the second overwriting the first, each blind to the other's
+// problem. One entry, every problem under it, is the same information and one
+// instruction.
+const grouped = [];
+const byQuote = new Map();
+for (const f of toFix) {
+  const q = String(f.quote || '').trim();
+  let e = byQuote.get(q);
+  if (!e) {
+    e = { quote: q, problems: [] };
+    byQuote.set(q, e);
+    grouped.push(e);
+  }
+  e.problems.push(f);
+}
+const fixList = grouped
+  .map((e, i) => {
+    const problems = e.problems
+      .map(
+        (f) =>
+          `   - ${f.claim || 'this statement'}: ${f.verdict === 'contradicted' ? 'a source contradicts this' : 'nothing we can cite supports this'}. ${(f.reason || '').trim()}${f.url ? ' [' + f.url + ']' : ''}`,
+      )
+      .join('\n');
+    return `${i + 1}. SENTENCE: ${e.quote}\n   WHAT IS WRONG WITH IT${e.problems.length > 1 ? ' (' + e.problems.length + ' separate problems — fix all of them in the one rewrite)' : ''}:\n${problems}`;
+  })
   .join('\n\n');
 
 return [
@@ -183,6 +223,8 @@ return [
         findings,
         searched,
         overwhelmed,
+        sentences: allSentences.size,
+        badSentences: badSentences.size,
         needsRewrite: toFix.length > 0,
         fixList,
       },

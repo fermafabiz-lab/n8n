@@ -652,6 +652,15 @@ export interface DeepSearchFinding {
 export interface DeepSearchReport {
   /** Checkable statements the judge extracted. */
   checked?: number;
+  /**
+   * How many SENTENCES those statements came from. Since 2026-09-19 the judge
+   * rules on one assertion at a time, so a compound sentence yields several
+   * findings that all carry the same `quote` — `checked` counts assertions and
+   * this counts sentences, and the gap between them is the point. Absent on
+   * every report written before that day, which is why the panel falls back to
+   * counting distinct quotes itself.
+   */
+  sentences?: number;
   /** How many of them the sources did not back. */
   flagged?: number;
   /** How many got a targeted primary-source lookup. */

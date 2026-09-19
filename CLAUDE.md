@@ -243,14 +243,18 @@ the full entry in the file named:
   Same for props: "the swinging door" is an instruction to animate the door.
   Full account: `docs/lessons-pipeline.md`, "A prompt that names a failure
   summons it".
-- **A number in a prompt is a dial, not a fence.** The series recap asked for
-  "at most 60 words" and got ~100; asked for 100 it wrote 128 — about a third
-  over, whichever number it is told. So a stated cap MOVES the length and
-  never lands on it: anything downstream that depends on the size needs its own
-  hard cut in code, with a margin. `Parse Recap`'s cut went 600 → 1,000 the day
-  the word cap moved, or the longer line would have been chopped mid-sentence —
-  and a truncated recap still reads like a recap. Full account:
-  `docs/lessons-pipeline.md`, "A word cap in a prompt MOVES the length".
+- **A length in a prompt is obeyed or ignored according to how it is PHRASED,
+  not according to the number.** "At most 80 words" produced 92 and 97; the same
+  budget written as a rule — length named as a rule, the model asked to count
+  its draft before answering, and the consequence stated — produced 73, 75, 80,
+  71, 76, 72 across a 1.4 KB kids episode and the 11.4 KB Burj Al Arab
+  documentary. All three parts are load-bearing; the version missing one went
+  over. So when a length matters, measure the wording rather than lowering the
+  number, and keep a net under it that cuts at a SENTENCE boundary (a half
+  sentence still reads like a recap — the silent failure). `node
+  db/port/series-recap/check.mjs`, in `npm run check`. Full account:
+  `docs/lessons-pipeline.md`, "A word cap is obeyed or ignored according to how
+  it is PHRASED".
 - **A prompt fragment always lives in more copies than the one you found.** The
   motion-prompt tail lived in seven places across three workflows; a fix that
   touched two was reported as done and shipped half-broken. Before calling a

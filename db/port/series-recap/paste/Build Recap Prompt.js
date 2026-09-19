@@ -13,6 +13,8 @@ if (!script || script.length < 80 || !episodeNo || !r.series_id) {
 }
 const language = String(r.language || 'English').trim().slice(0, 40) || 'English';
 const title = String(r.name || '').trim().slice(0, 160);
+// The budget. `Parse Recap` holds a ceiling 25% above it and must move with it.
+const RECAP_WORDS = 80;
 const payload = {
   model: 'gpt-5.4',
   messages: [
@@ -20,22 +22,32 @@ const payload = {
       role: 'system',
       content:
         'You keep the running recap of an episodic series of short films. From the narration of ONE episode, write what happened in it: the events, who did what, and how it ended. ' +
-        // 100, not the 60 this asked for until 2026-09-19. The model had been
-        // ignoring 60 and writing about 100 anyway, so the instruction was
-        // describing something that was not happening — and the longer line is
-        // the better one for the job: the next episode's writer reads this to
-        // avoid contradicting and avoid retelling, and neither is possible if
-        // the events are not named. The cost is measured on the same episode
-        // both ways, not guessed: a line runs 717 characters against the 591
-        // it ran at 60 words, so composeSeriesLore's 8,000-character Lore cap
-        // starts trimming the OLDEST lines at about episode 11 instead of
-        // about 13. Trimming is oldest-first and keeps the newest, so it
-        // degrades gently; revisit before a show gets there. Note what the two
-        // measurements say about the cap itself: 60 asked produced ~100 words,
-        // 100 asked produced 128 — the model overshoots by about a third
-        // whatever it is told, so this number MOVES the length, it does not
-        // hold it.
-        'Two sentences, at most 100 words, in ' + language + ', in the past tense. ' +
+        // THE WORDING BELOW IS MEASURED. Do not soften it.
+        //
+        // This asked for "two sentences, at most 60 words" until 2026-09-19 and
+        // got about a hundred, every time; raised to 100 it wrote 128. The
+        // obvious reading — a model overshoots any cap by a third — was wrong.
+        // Four phrasings were run against the same two narrations, a 1.4 KB kids
+        // episode and the 11.4 KB Burj Al Arab documentary, three runs each at a
+        // budget of 80 words (probe execution 15110/15111):
+        //
+        //   "at most 80 words"                        92, 97
+        //   "budget of 80 words you cannot spend"     78, 77, 73, 81, 77, 77
+        //   THIS ONE (hard rule + count your draft)   73, 75, 80, 71, 76, 72
+        //
+        // Eight of eight inside the budget, on both a short film and the longest
+        // script in the database — where the soft wording was 15-21% over and
+        // the budget wording went over once. So a cap is obeyed or ignored
+        // according to how it is PHRASED, not according to the number. What does
+        // the work here is naming length as a rule, asking for the count before
+        // the answer, and saying what happens to an answer that is too long.
+        //
+        // Changing RECAP_WORDS is free. Changing these sentences means running
+        // the probe again — and moving `Parse Recap`'s ceiling with it.
+        'LENGTH IS A HARD RULE: your whole answer must be ' + RECAP_WORDS + ' words or fewer. ' +
+        'One or two sentences, in ' + language + ', in the past tense. ' +
+        'Count the words of your draft before you answer; if it is over ' + RECAP_WORDS + ', cut the least important detail and rewrite until it fits. ' +
+        'An answer longer than ' + RECAP_WORDS + ' words is rejected and useless. ' +
         'Use the characters\' names exactly as the narration spells them. State only what the narration says: no interpretation, no moral, no praise, no preamble, no quotes, no headings, no line breaks.'
     },
     {
@@ -48,4 +60,4 @@ const payload = {
     }
   ]
 };
-return [{ json: { project_id: String(r.id), series_id: String(r.series_id), episode_no: episodeNo, title: title || 'Untitled', payload } }];
+return [{ json: { project_id: String(r.id), series_id: String(r.series_id), episode_no: episodeNo, title: title || 'Untitled', words_asked: RECAP_WORDS, payload } }];

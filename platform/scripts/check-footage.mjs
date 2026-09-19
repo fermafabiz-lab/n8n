@@ -826,6 +826,34 @@ check('but its place on the frame does not', [P.scaleWatermark(wmLand, 1.6).left
 check('portrait scales from its own base', P.scaleWatermark(P.WATERMARK_LAYOUT.portrait, 1.6).mark, { height: 51, glyph: 26, gap: 13, padX: 16 });
 check('the widest capsule still fits the budget', P.markPillWidth(P.scaleWatermark(wmLand, 1.6).mark, 26, 236.84 * 1.6) <= wmLand.maxWidth, true);
 
+const round = (n) => Math.round(n * 1e6) / 1e6;
+// --- the ANIMATION's clock, mirrored from remotion/scripts/check-watermark.mjs ---------------------------------------------------
+// Moved out of SourceWatermark.tsx on 2026-09-19 so the site's preview could
+// play the same curve on the same clock. The refactor was proved to change no
+// frame: 4846 samples across band lengths 0.3s-48s, old inline formulas
+// against these, max disagreement 2.8e-16.
+//
+// `WATERMARK_EASE` is `Easing.bezier(0.65, 0, 0.35, 1)` solved by hand, because
+// the site cannot import Remotion. Verified against Remotion's own over 101
+// samples: largest disagreement 3.9e-16. These four points are what stops a
+// rewrite of the solver quietly changing the feel.
+check('the easing curve', [0, 0.25, 0.5, 0.75, 1].map((x) => round(P.WATERMARK_EASE(x))), [0, 0.070797, 0.5, 0.929203, 1]);
+// On any real film the opening runs its full length — the shortest band is one
+// scene and a scene is eight seconds. The compression only exists so a
+// pathologically short band is not frozen half-drawn.
+check('a real band opens at full length', P.markOpenSpan(8), 0.42);
+check('and a very short one compresses to the floor', [round(P.markOpenSpan(0.5)), round(P.markOpenSpan(0.3))], [0.12, 0.12]);
+// Nothing happens for the first 0.18s: the fade brings the chip up before it
+// opens, so the two are read as one movement rather than as two.
+check('the mark waits, opens, and stays open', [0, 0.18, 0.28, 0.39, 0.6, 1].map((t) => round(P.markOpenAt(t, 8, true))), [0, 0, 0.062843, 0.5, 1, 1]);
+check('a collapsed band never opens at all', P.markOpenAt(0.6, 8, false), 0);
+check('the label uncovers over the middle of the opening', [0, 0.25, 0.55, 0.85, 1].map((o) => round(P.markRevealAt(o))), [0, 0, 0.5, 1, 1]);
+// Symmetric in and out, and never past the peak: this is a claim, not a
+// headline.
+check('the band fades in and out, to 0.88 at most', [0, 0.1, 0.2, 4, 7.9, 8].map((t) => round(P.bandOpacityAt(t, 8))), [0, 0.44, 0.88, 0.88, 0.44, 0]);
+// What a preview that plays the animation ONCE waits before it stops its clock.
+check('the animation settles', [round(P.markSettleSeconds(8)), round(P.markSettleSeconds(0.5))], [0.65, 0.35]);
+
 const wmScene = (start, dur, provenance) => ({ startSeconds: start, durationSeconds: dur, provenance });
 const wmAi = { visualOrigin: 'ai_generated' };
 const wmArch = { visualOrigin: 'archival_footage', provider: 'wikimedia', sourceCreator: 'NASA' };

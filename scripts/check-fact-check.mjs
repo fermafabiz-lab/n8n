@@ -27,9 +27,9 @@ import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const PASTE = join(here, '..', 'db', 'port', 'fact-check', 'paste');
-// The re-run chain's own bodies. Its two AGENTS take the FC prompts byte for
-// byte — that is the point of `DS Prep` emitting under `fc` — so only its two
-// Code nodes have logic of their own to check.
+// The re-run chain's own bodies. `DS Judge` and `DS Source` take the FC prompts
+// byte for byte — that is the point of `DS Prep` emitting under `fc` — so only
+// its Code nodes and its one extra prompt rule have logic of their own here.
 const DS = join(here, '..', 'db', 'port', 'deep-search-rerun', 'paste');
 
 let failures = 0;
@@ -644,11 +644,21 @@ console.log('FC Save Report');
 console.log('DS Prep');
 
 // The row `DS Load` hands over: one project, one script, the pack as JSON.
+const DS_HOOK = 'Lars faced a deadline in 2003.\nThe Sydney team held just four members.';
+const DS_CH1 = 'The map went live in February 2005.';
+const DS_SCRIPT = `[CHAPTER 0: HOOK]\n${DS_HOOK}\n\n[CHAPTER 1: Launch]\n${DS_CH1}`;
+
 const dsRow = (over = {}) => ({
   project_id: 'rec1',
   project_name: 'A film',
-  editing_options: JSON.stringify({ category: 'documentary', sfx: true }),
-  script: '[CHAPTER 0: HOOK]\nLars faced a deadline in 2003.\n\n[CHAPTER 1: Launch]\nThe map went live in February 2005.',
+  editing_options: JSON.stringify({
+    category: 'documentary',
+    sfx: true,
+    // The hook's SPOKEN copy. One line per shot, and the copy the render reads.
+    hookPlan: { style: 'question', beats: DS_HOOK.split('\n') },
+  }),
+  script: DS_SCRIPT,
+  scene_count: 0,
   claims: [{ ref: 'E1', claim: 'c', source: 's', date: '2004', url: 'u' }],
   ...over,
 });
@@ -664,6 +674,23 @@ const dsRow = (over = {}) => ({
   ok('and is the script verbatim, not a rebuild', out.fc.narration === dsRow().script);
   ok('emits under `fc`, so the FC prompts work unchanged', typeof out.fc.packList === 'string' && out.fc.packList.startsWith('E1. c ['));
   ok('carries the project id for the writer', out.projectId === 'rec1');
+  // The rewrite works on chapters, and the re-run only has the assembled text.
+  ok('parses the script back into chapters, hook first', out.chapters.length === 2 && out.chapters[0].chapter_number === 0 && out.chapters[0].chapter_title === 'HOOK');
+  ok('and keeps each chapter body verbatim', out.chapters[1].narrator_script === DS_CH1);
+  // The whole Editing Options object rides along, because the hook's SPOKEN
+  // copy lives in it and `DS Apply` has to hand it back with the beats moved.
+  ok('carries Editing Options through for the hook beats', out.editing.category === 'documentary' && out.editing.sfx === true);
+}
+{
+  // PAST THE SCRIPT GATE THE RE-RUN REPORTS AND DOES NOT EDIT. At the gate the
+  // film has no scenes, so the script text is the only thing derived from the
+  // narration; once scenes exist they carry their own copy of every line and
+  // their own recordings, and editing under them is the drift fault.
+  const gate = runNode('DS Prep.js', { json: dsRow(), dir: DS });
+  ok('may rewrite at the script gate, where there are no scenes', gate.fc.mayRewrite === true && gate.fc.sceneCount === 0);
+  const later = runNode('DS Prep.js', { json: dsRow({ scene_count: 42 }), dir: DS });
+  ok('and refuses to once the scenes exist', later.fc.mayRewrite === false && later.fc.sceneCount === 42);
+  ok('while still running the check itself', later.fc.run === true);
 }
 {
   for (const [over, code] of [
@@ -679,78 +706,253 @@ const dsRow = (over = {}) => ({
 
 console.log('DS Resolve');
 
+const dsChapters = () => [
+  { chapter_number: 0, chapter_title: 'HOOK', narrator_script: DS_HOOK },
+  { chapter_number: 1, chapter_title: 'Launch', narrator_script: DS_CH1 },
+];
+
 const dsPrepped = (over = {}) => ({
+  chapters: dsChapters(),
   fc: {
     run: true,
     category: 'documentary',
     skipCode: null,
     packList: 'E1. c [s, 2004 — u]',
-    narration: dsRow().script,
+    narration: DS_SCRIPT,
+    originalWords: DS_SCRIPT.split(/\s+/).filter(Boolean).length,
+    mayRewrite: true,
+    sceneCount: 0,
     ...over,
   },
+  editing: JSON.parse(dsRow().editing_options),
   projectId: 'rec1',
   projectName: 'A film',
 });
 
-{
-  const findings = [
-    { quote: 'Lars faced a deadline in 2003.', claim: 'Lars faced a deadline in 2003.', verdict: 'unsupported', ref: '', reason: 'No claim mentions a deadline.' },
-    { quote: 'The map went live in February 2005.', claim: 'The map went live in February 2005.', verdict: 'supported', ref: 'E1', reason: 'E1 states it.' },
-  ];
-  const judged = { output: { mode: 'factual', findings } };
-  const out = runNode('DS Resolve.js', {
+const DS_BAD = 'Lars faced a deadline in 2003.';
+const DS_GOOD = DS_CH1;
+
+const dsFindings = () => [
+  { quote: DS_BAD, claim: 'Lars faced a deadline in 2003.', verdict: 'unsupported', ref: '', reason: 'No claim mentions a deadline.' },
+  { quote: DS_GOOD, claim: 'The map went live in February 2005.', verdict: 'supported', ref: 'E1', reason: 'E1 states it.' },
+];
+
+const dsResolve = (findings, prepOver = {}, mode = 'factual') => {
+  const judged = { output: { mode, findings } };
+  return runNode('DS Resolve.js', {
     json: judged,
-    nodes: { 'DS Prep': dsPrepped(), 'DS Judge': judged },
+    nodes: { 'DS Prep': dsPrepped(prepOver), 'DS Judge': judged },
     dir: DS,
   });
-  ok('reports both statements', out.fcReport.checked === 2 && out.fcReport.flagged === 1);
-  ok('marks itself a re-run of the finished script', out.fcReport.rerun === true && out.fcReport.scope === 'final');
-  // A re-run must never let the panel print "the script below already contains
-  // the corrections" — that line is drawn off `rewritten`, and nothing was
-  // corrected, because this chain has no rewrite in it at all.
-  ok('never claims a correction it did not make', out.fcReport.rewritten === 0);
-  ok('and no finding can read as rewritten', out.fcReport.findings.every((f) => f.action === 'kept' || f.action === 'flagged'));
-  ok('counts the sentences as well as the statements', out.fcReport.sentences === 2);
-  ok('base64 round-trips', JSON.parse(Buffer.from(out.fcReport64, 'base64').toString('utf8')).rerun === true);
+};
+
+{
+  const out = dsResolve(dsFindings());
+  ok('keeps both statements and settles their verdicts', out.fc.findings.length === 2 && out.fc.sentences === 2);
+  // THE PRODUCER ASKED FOR THE BUTTON TO FIX WHAT IT FINDS, not only to report
+  // it, so unlike the first design of this chain a flagged sentence must reach
+  // the rewrite. `needsRewrite` is what `DS Fix?` branches on.
+  ok('sends the unsupported sentence to the rewrite', out.fc.needsRewrite === true && out.fc.badSentences === 1);
+  ok('and never sends the supported one', out.fc.findings.find((f) => f.quote === DS_GOOD).action === 'keep');
+  ok('names the sentence and the problem in the fix list', out.fc.fixList.includes(DS_BAD) && out.fc.fixList.includes('nothing we can cite supports this'));
+  ok('carries the chapters through for the rewrite to work on', out.chapters.length === 2);
+  ok('and the Editing Options, for the hook beats', out.editing.hookPlan.beats.length === 2);
 }
 {
   // A quote the judge did not copy verbatim is dropped, same as the first pass.
-  const findings = [{ quote: 'A sentence that is not in the script.', claim: 'x', verdict: 'unsupported', ref: '', reason: 'r' }];
-  const judged = { output: { mode: 'factual', findings } };
-  const out = runNode('DS Resolve.js', {
-    json: judged,
-    nodes: { 'DS Prep': dsPrepped(), 'DS Judge': judged },
-    dir: DS,
-  });
-  ok('drops a finding whose quote is not in the script', out.fcReport.checked === 0);
+  const out = dsResolve([{ quote: 'A sentence that is not in the script.', claim: 'x', verdict: 'unsupported', ref: '', reason: 'r' }]);
+  ok('drops a finding whose quote is not in the script', out.fc.findings.length === 0 && out.fc.needsRewrite === false);
 }
 {
   // The inner gate still applies: a documentary whose narration is a
   // dramatisation is reported as a story, not as a film full of errors.
-  const judged = { output: { mode: 'story', findings: [] } };
+  const out = dsResolve(dsFindings(), {}, 'story');
+  ok('a story is flagged as a story and rewrites nothing', out.fc.storyMode === true && out.fc.needsRewrite === false);
+}
+{
+  // PAST APPROVAL: checked in full, reported in full, and not edited — because
+  // the scenes carry their own copy of every line and their own recordings.
+  const out = dsResolve(dsFindings(), { mayRewrite: false, sceneCount: 42 });
+  ok('a film with scenes is reported, not rewritten', out.fc.frozen === true && out.fc.needsRewrite === false);
+  ok('and the finding still reaches the producer', out.fc.findings.length === 2);
+}
+{
+  // THE BACKSTOP. Most of the film failing is a check aimed at the wrong thing,
+  // not a film that is mostly wrong — and rewriting at that volume replaces the
+  // producer's script rather than correcting it. Counted in SENTENCES.
+  const many = [];
+  for (let i = 1; i <= 10; i += 1) many.push({ quote: DS_BAD, claim: 'claim ' + i, verdict: 'unsupported', ref: '', reason: 'r' });
+  const out = dsResolve(many);
+  ok('ten findings on one sentence are one sentence, not a flood', out.fc.sentences === 1 && out.fc.overwhelmed === false);
+  ok('and are listed once, as several problems in one rewrite', (out.fc.fixList.match(/SENTENCE:/g) || []).length === 1 && out.fc.fixList.includes('10 separate problems'));
+}
+{
+  const narr = Array.from({ length: 10 }, (_, i) => `Sentence number ${i + 1} here.`).join(' ');
+  const findings = Array.from({ length: 10 }, (_, i) => ({
+    quote: `Sentence number ${i + 1} here.`,
+    claim: 'c',
+    verdict: i < 7 ? 'unsupported' : 'supported',
+    ref: '',
+    reason: 'r',
+  }));
+  const judged = { output: { mode: 'factual', findings } };
   const out = runNode('DS Resolve.js', {
     json: judged,
-    nodes: { 'DS Prep': dsPrepped(), 'DS Judge': judged },
+    nodes: { 'DS Prep': dsPrepped({ narration: narr }), 'DS Judge': judged },
     dir: DS,
   });
-  ok('a story is reported as a story', out.fcReport.skipCode === 'story' && out.fcReport.storyMode === true);
-  ok('and still says it was a re-run', out.fcReport.rerun === true);
+  ok('seven of ten sentences unsupported stops the rewrite', out.fc.overwhelmed === true && out.fc.needsRewrite === false);
 }
 {
   // The gate said no upstream, so `DS Judge` never ran and its reference
-  // throws — the report must still be written, with the reason.
+  // throws — the payload must still come through, with the reason.
   const out = runNode('DS Resolve.js', {
     json: {},
     nodes: { 'DS Prep': dsPrepped({ run: false, skipCode: 'not-documentary', skipped: 'Story mode.' }) },
     dir: DS,
   });
-  ok('a skipped re-run still writes its row', out.fcReport.skipCode === 'not-documentary' && out.fcReport.checked === 0);
+  ok('a skipped re-run still carries its reason forward', out.fc.skipCode === 'not-documentary' && out.fc.needsRewrite === false);
 }
 
-console.log('DS Save');
+console.log('DS Apply');
+
+const dsApply = (resolved, rewrite) =>
+  runNode('DS Apply.js', {
+    json: {},
+    nodes: rewrite ? { 'DS Resolve': resolved, 'DS Rewrite': rewrite } : { 'DS Resolve': resolved },
+    dir: DS,
+  });
+
+const DS_FIXED_HOOK = 'Lars faced a hard problem in 2003.\nThe Sydney team held just four members.';
+
+{
+  // THE ROUND TRIP, and the most load-bearing assertion in this section. The
+  // re-run reassembles the script from chapters it parsed out of the script,
+  // so a reassembly that drifted by one newline would rewrite EVERY film it
+  // touched — including the clean ones, where `DS Write` must do nothing.
+  const clean = dsResolve([dsFindings()[1]]);
+  const out = dsApply(clean);
+  ok('a clean re-run reassembles the script byte for byte', out.script === DS_SCRIPT);
+  ok('and says so, so `DS Write` touches no row', out.scriptChanged === false && out.hookChanged === false);
+  ok('claims no correction it did not make', out.fcReport.rewritten === 0 && out.fcReport.findings.every((f) => f.action === 'kept'));
+  ok('marks itself a re-run of the FINISHED script', out.fcReport.rerun === true && out.fcReport.scope === 'final');
+  ok('base64 round-trips for all three writers', Buffer.from(out.script64, 'base64').toString('utf8') === DS_SCRIPT && JSON.parse(Buffer.from(out.fcReport64, 'base64').toString('utf8')).rerun === true && JSON.parse(Buffer.from(out.editing64, 'base64').toString('utf8')).category === 'documentary');
+}
+{
+  const resolved = dsResolve(dsFindings());
+  const out = dsApply(resolved, {
+    output: {
+      chapters: [
+        { chapter_number: 0, narrator_script: DS_FIXED_HOOK },
+        { chapter_number: 1, narrator_script: DS_CH1 },
+      ],
+    },
+  });
+  ok('accepts a correction of the flagged sentence', out.fcReport.refused === undefined && out.script.includes('a hard problem in 2003'));
+  ok('and the old sentence is gone', !out.script.includes(DS_BAD));
+  ok('counts it as one corrected sentence', out.fcReport.rewritten === 1 && out.fcReport.findings.find((f) => f.quote === DS_BAD).action === 'rewritten');
+  ok('leaves the supported sentence alone', out.script.includes(DS_CH1));
+  ok('says the script changed, so the row is written', out.scriptChanged === true);
+  // THE HOOK LIVES TWICE. `hov.script.content` carries it as text and
+  // `Editing Options.hookPlan.beats` carries the same lines again — and THAT is
+  // the copy the render speaks. Fixing one and not the other shows a corrected
+  // hook on the panel while the film still says the old one.
+  ok('moves the hook\'s spoken copy with it', out.hookChanged === true && out.fcReport.hookFixed === true);
+  const beats = JSON.parse(Buffer.from(out.editing64, 'base64').toString('utf8')).hookPlan.beats;
+  ok('one beat per line, in order, corrected', beats.length === 2 && beats[0] === 'Lars faced a hard problem in 2003.' && beats[1] === 'The Sydney team held just four members.');
+  ok('and nothing else in Editing Options moved', JSON.parse(Buffer.from(out.editing64, 'base64').toString('utf8')).sfx === true);
+}
+{
+  // THE HOOK IS CUT ONE SHOT PER LINE. A correction that merges two of its
+  // lines silently drops a shot from the film, so the whole rewrite is refused
+  // rather than half-applied.
+  const resolved = dsResolve(dsFindings());
+  const out = dsApply(resolved, {
+    output: {
+      chapters: [
+        { chapter_number: 0, narrator_script: 'Lars faced a hard problem and the Sydney team held four members.' },
+        { chapter_number: 1, narrator_script: DS_CH1 },
+      ],
+    },
+  });
+  ok('refuses a rewrite that merges two hook lines', /hook went from 2 lines to 1/.test(out.fcReport.refused || ''));
+  ok('and keeps the script exactly as it was', out.script === DS_SCRIPT && out.scriptChanged === false);
+  ok('the finding then reads as flagged, not corrected', out.fcReport.rewritten === 0 && out.fcReport.findings.find((f) => f.quote === DS_BAD).action === 'flagged');
+}
+{
+  for (const [label, chapters, pattern] of [
+    ['no chapters at all', [], /returned no chapters/],
+    ['a chapter short', [{ chapter_number: 0, narrator_script: DS_HOOK }], /returned 1 chapters for 2/],
+    ['a chapter renumbered', [{ chapter_number: 0, narrator_script: DS_HOOK }, { chapter_number: 9, narrator_script: DS_CH1 }], /chapter 1 is missing/],
+    ['a chapter emptied', [{ chapter_number: 0, narrator_script: DS_HOOK }, { chapter_number: 1, narrator_script: '' }], /chapter 1 came back empty/],
+    ['a chapter re-told', [{ chapter_number: 0, narrator_script: 'Lars.' }, { chapter_number: 1, narrator_script: DS_CH1 }], /chapter 0 went from 13 to 1 words/],
+    ['a clean chapter edited', [{ chapter_number: 0, narrator_script: DS_FIXED_HOOK }, { chapter_number: 1, narrator_script: 'The map went live in February 2006.' }], /chapter 1 was changed but had nothing flagged/],
+  ]) {
+    // A FRESH `resolved` EACH TIME. `DS Apply` settles each finding's `action`
+    // in place on the item it read, so a reused fixture would arrive with
+    // nothing left marked `rewrite` and refuse for the wrong reason. In a real
+    // run the node executes once, which is why this is a harness concern only.
+    const out = dsApply(dsResolve(dsFindings()), { output: { chapters } });
+    ok(`refuses ${label}`, pattern.test(out.fcReport.refused || ''), out.fcReport.refused);
+    ok(`  and keeps the script that exists`, out.script === DS_SCRIPT && out.scriptChanged === false);
+  }
+}
+{
+  // The rewrite node never ran at all — `DS Fix?`[1] went straight here.
+  const resolved = dsResolve(dsFindings(), { mayRewrite: false, sceneCount: 42 });
+  const out = dsApply(resolved);
+  ok('a frozen film keeps its script and says why', out.script === DS_SCRIPT && out.fcReport.frozen === true);
+  ok('and its findings read as flagged', out.fcReport.findings.find((f) => f.quote === DS_BAD).action === 'flagged');
+  ok('with nothing claimed as corrected', out.fcReport.rewritten === 0);
+}
+{
+  const resolved = runNode('DS Resolve.js', {
+    json: {},
+    nodes: { 'DS Prep': dsPrepped({ run: false, skipCode: 'not-documentary', skipped: 'Story mode.' }) },
+    dir: DS,
+  });
+  const out = dsApply(resolved);
+  ok('a skipped re-run still writes its row', out.fcReport.skipCode === 'not-documentary' && out.fcReport.checked === 0);
+  ok('and is still marked a re-run', out.fcReport.rerun === true && out.fcReport.scope === 'final');
+  ok('and writes no script', out.scriptChanged === false && out.hookChanged === false);
+}
+
+console.log('DS Rewrite, DS Write, DS Save, DS Load');
+{
+  // ONE PROMPT, TWO LIVE NODES is already the rule for the judge; the rewrite
+  // is the one place the re-run needs a rule of its own, and it must be ONE
+  // rule — anything more and the two prompts have started drifting apart.
+  const fcRw = readFileSync(join(PASTE, 'FC Rewrite.txt'), 'utf8');
+  const dsRw = readFileSync(join(DS, 'DS Rewrite.txt'), 'utf8');
+  const lines = dsRw.split('\n');
+  const at = lines.findIndex((l) => l.includes('CHAPTER 0 IS THE OPENING HOOK'));
+  ok('DS Rewrite carries the hook rule', at >= 0);
+  ok('and is otherwise FC Rewrite byte for byte', lines.slice(0, at).concat(lines.slice(at + 1)).join('\n') === fcRw);
+}
+{
+  const sql = readFileSync(join(DS, 'DS Write.sql'), 'utf8');
+  ok('DS Write decodes the script in Postgres rather than inlining prose', /decode\('\{\{ \$json\.script64 \}\}',\s*'base64'\)/.test(sql) && /decode\('\{\{ \$json\.editing64 \}\}',\s*'base64'\)/.test(sql));
+  ok('and writes the NEWEST script row only', /order by s2\.created_at desc limit 1/.test(sql));
+  // Guarded both ways: a clean re-run must not bump `updated_at` or leave a
+  // phantom edit in the history.
+  ok('touches no script row when nothing changed', /s\.content is distinct from d\.new_script/.test(sql));
+  // `new_editing` is the whole object re-serialised, so key order alone would
+  // make it "distinct" on every single run — the flag is what gates it.
+  ok('touches the hook only when the beats actually moved', /'\{\{ \$json\.hookChanged \}\}' = 'true'/.test(sql));
+  // `editing_options` is jsonb and the decode yields text. The refusal takes
+  // the whole statement with it, script included — execution 15199.
+  ok('casts the rebuilt Editing Options back to jsonb', /set editing_options = d\.new_editing::jsonb/.test(sql));
+  ok('and reports what it wrote', /script_rows/.test(sql) && /hook_rows/.test(sql));
+  ok('whitelists the project id rather than quoting around it', sql.includes('replace(/[^A-Za-z0-9_-]/g'));
+}
 {
   const sql = readFileSync(join(DS, 'DS Save.sql'), 'utf8');
-  ok('decodes the report in Postgres rather than inlining prose', sql.includes("decode('{{ $json.fcReport64 }}', 'base64')"));
+  ok('decodes the report in Postgres rather than inlining prose', /decode\('\{\{ \$\("DS Apply"\)\.first\(\)\.json\.fcReport64 \}\}',\s*'base64'\)/.test(sql));
+  // BY NAME, NOT `$json`. `DS Write` runs between `DS Apply` and this node and
+  // emits `{script_rows, hook_rows}`, so `$json.fcReport64` is undefined and
+  // the node dies with "invalid base64 end sequence" — execution 15202, where
+  // the correction was written and the report describing it was not.
+  ok('reads the report off `DS Apply`, which `DS Write` does not pass through', !/\$json\.fcReport64/.test(sql) && !/\$json\.projectId/.test(sql));
   ok('whitelists the project id rather than quoting around it', sql.includes('replace(/[^A-Za-z0-9_-]/g'));
   ok('upserts on the project', /on conflict \(project_id\) do update/.test(sql));
 }
@@ -758,6 +960,8 @@ console.log('DS Save');
   const sql = readFileSync(join(DS, 'DS Load.sql'), 'utf8');
   ok('DS Load whitelists the id from the webhook body', sql.includes('replace(/[^A-Za-z0-9_-]/g'));
   ok('and reads the NEWEST script row', /order by s\.created_at desc\s*\n\s*limit 1/.test(sql));
+  // What decides whether a correction may be written at all.
+  ok('and counts the scenes, which is what freezes the rewrite', /count\(\*\) from hov\.scene/.test(sql) && sql.includes('as scene_count'));
 }
 
 console.log('');

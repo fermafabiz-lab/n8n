@@ -579,24 +579,48 @@ expected and harmless for an app touching only its own Drive.
   the producer was making films through.
 
   **That next piece exists now: "⟳ Re-check this script"**, Claude Scripting
-  `2497c18b`, webhook `deep-search-rerun`, full account
-  `db/port/deep-search-rerun/README.md`. Nine `DS *` nodes on their own canvas
-  row read `hov.script.content` — the finished text, hook included, corrections
-  applied — rebuild the pack from `hov.evidence`, and re-run the judge and the
-  live lookup over it. **It never rewrites**: the producer is reading the
-  script when they press it, so `rewritten` is always 0 and no finding can read
-  as `rewritten`. The report replaces the row and carries `rerun: true` /
-  `scope: "final"`, which is what makes the panel say "Re-checked at HH:MM" and
-  name the hook. Verified on the film that started this (execution 15097, 34 s):
-  it read `[CHAPTER 0: HOOK] Lars Rasmussen faced a deadline in 2003`, searched
-  for it, and stored `unsupported` — *"no adequate source specifically stating
-  that Lars Rasmussen faced a deadline in 2003"* — while passing the hook's
-  other line. **Two design notes that will bite**: `DS Prep` emits under `fc`
+  `6d7e0079`, webhook `deep-search-rerun`, full account
+  `db/port/deep-search-rerun/README.md`. Thirteen `DS *` nodes on their own
+  canvas row read `hov.script.content` — the finished text, hook included,
+  corrections applied — rebuild the pack from `hov.evidence`, re-run the judge
+  and the live lookup over it, **and correct what nothing can back**. The
+  report replaces the row and carries `rerun: true` / `scope: "final"`, which
+  is what makes the panel say "Re-checked at HH:MM" and name the hook.
+  **Two design notes that will bite**: `DS Prep` emits under `fc`
   so `DS Judge` / `DS Source` take the FC prompts BYTE FOR BYTE, which means
   **the judge prompt now lives in two live nodes and both must be re-pasted
   together**; and the webhook answers `onReceived`, so the button does not
   change the numbers on screen — the timestamp is how the producer tells the
-  new report from the old one.
+  new report from the old one, and the site polls for it.
+
+  **It shipped report-only and the producer overruled that the same evening**
+  (*"cand da recheck ar trebui sa si schimbe ce e gresit/unsupported"*). The
+  reasoning for abstaining was not wrong about the hazard — editing text under
+  someone who is reading it — only about who prices it; what it identified is
+  now enforced mechanically instead: `supported` is never touched, the
+  overwhelmed backstop stands, `DS Apply` refuses six shapes of bad rewrite,
+  and **past the script gate it reports and refuses to edit** (`DS Load` counts
+  the scenes; a non-zero count sets `frozen`, because by then the scenes carry
+  their own copy of every line and their own recordings).
+  **The hook is written in BOTH places or neither** — `hov.script.content` and
+  `editing_options.hookPlan.beats`, one statement, since the beats are what the
+  render speaks.
+  **Verified on the producer's own Google Maps film**, four presses in a row,
+  each reading what the last one wrote: flagged **3 → 2 → 1 → 0**, and the
+  fourth pass wrote `script_rows 0, hook_rows 0` — the reassembly round-trips
+  to identical bytes, so a clean re-check costs one judge call and no writes.
+  The first press corrected exactly the three things the producer's reader had
+  rejected: the invented hook line (now *"In 2003, Google Labs launched 'Search
+  by Location.'"*, in both copies), the over-universal scope claim and the
+  counterfactual.
+  **Two failures worth carrying**, both invisible in the diff and caught only
+  by running it: `editing_options` is `jsonb` so the decode needs `::jsonb`,
+  and the refusal took the corrected script down with it because they share one
+  statement; and **inserting `DS Write` between `DS Apply` and `DS Save`
+  replaced the payload** — a Postgres node mid-chain replaces `$json` exactly
+  as an agent does, which this repo knew about agents and had not generalised.
+  It died as *"invalid base64 end sequence"*, having written the correction and
+  not the report that described it.
 - **A Flow refusal that arrives as HTTP 200 no longer kills the film**
   (2026-09-17, Media Generation `6735a96a`, `db/port/regen-unstick/README.md`,
   lesson in `docs/lessons-pipeline.md` under "Flow refuses twice"). **What is

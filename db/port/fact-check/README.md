@@ -340,6 +340,12 @@ across the script.
 
 ### 7. THE HOOK IS NEVER CHECKED, and it never has been
 
+> **Closed 2026-09-19 by the re-check button** — see the box at the end of §8.
+> The hole below is still exactly right about the FIRST pass, which is why it
+> stays written out: `Generate Hook` still runs after this chain, and rule 3b
+> is still a constraint rather than a check. What changed is that something
+> now reads the hook afterwards.
+
 **This is the largest hole in the feature and it is architectural, not a
 prompt.** Read the canvas order:
 
@@ -421,6 +427,24 @@ correct, it just needs to see the final text. **A single re-run of `FC Judge`
 over the FINISHED narration, after both the rewrite and the hook, would close
 §7 and §8 together** — and would have caught every one of the four things
 ChatGPT flagged on this film. That is the next piece of work on this feature.
+
+> **BOTH ARE CLOSED, the same evening** — `db/port/deep-search-rerun/`, the
+> "⟳ Re-check this script" button, Claude Scripting `6d7e0079`. Thirteen
+> `DS *` nodes re-read `hov.script.content` (the finished text, hook included,
+> corrections applied), re-run the judge and the live lookup over it, and
+> correct what nothing can back — in the script AND in
+> `editing_options.hookPlan.beats`, which is the copy the render speaks.
+> Measured on this exact film, four presses: flagged **3 → 2 → 1 → 0**, with
+> the three corrections on the first press being precisely the invented hook
+> line, the over-universal scope claim and the counterfactual. The fourth
+> press wrote nothing at all.
+>
+> **It is a separate button, not a fifth node in this chain, and that is the
+> design.** A re-check that ran automatically at the end of scripting would
+> face the same problem one level up — something would then have to check what
+> IT rewrote — so the recursion has to stop at a human. The producer presses
+> it while reading, which is the only moment anyone can say "that reads worse
+> than what it replaced".
 
 ### What that change moved underneath everything else
 

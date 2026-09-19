@@ -722,6 +722,7 @@ export default async function ProductionRoom({
               scriptExists
               createdAt={project.createdAt}
               projectId={id}
+              scriptId={script.id}
             />
             <ScriptReview
               projectId={id}

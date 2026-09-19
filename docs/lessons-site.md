@@ -2061,6 +2061,59 @@ crash on the page the producer needs. The query is also guarded by
 `tableReady`, like the stock tables — before `db/012` is applied an unguarded
 read would abort the transaction and take the whole project page with it.
 
+### A button that changes the page under you has to reload it — 2026-09-19
+
+The one control that panel now has is "⟳ Re-check this script", and the day it
+learned to CORRECT what it finds it acquired a failure mode the report-only
+version could not have. Three separate mechanisms conspire:
+
+1. The webhook answers `onReceived`, so the click returns in milliseconds and
+   the answer lands about a minute later. Nothing changes on screen.
+2. `AutoRefresh` does a `router.refresh()` every 10 s, so the REPORT updates by
+   itself — including the line *"the script below already contains the
+   corrections"*.
+3. `ScriptReview` seeds its textarea from `content` **once, on mount**, and
+   restores any `sessionStorage` draft over it on every remount.
+
+Put together: the panel announces a correction the box does not contain, and
+keeps announcing it for as long as the producer stays on the page. That is this
+project's oldest fault — *the artifact on screen outliving the fix* — in the one
+place where the artifact is the thing being judged.
+
+So `DeepSearchRerun` does not fire and forget. It captures the report's
+`checkedAt`, polls `router.refresh()` every 4 s, and when the stamp moves it
+either says *"nothing needed changing"* or, if `rewritten > 0`, **drops the
+stale draft key and does a full `window.location.reload()`**. A soft refresh
+cannot fix this, because React will not reset an uncontrolled textarea and the
+draft would be restored on top anyway. It gives up after three minutes with a
+message that says where to look, because a spinner that spins forever is a
+worse lie than an error.
+
+Two smaller pieces of the same thought. **The button arms when there is
+something to lose** — an unsaved draft means the re-check is about to read
+text the producer is not looking at and then reload over their typing, so it
+asks first, the same shape as Pause's *"sure?"*. And **the poll does NOT pause
+on a hidden tab**, unlike `AutoRefresh`: pressing this and switching away is
+the normal case, and the whole point is that the answer is there on return.
+
+### The all-clear is a sentence, not an absence
+
+The producer's words were *"daca dupa check nu apare nimic flagged atunci ar
+trebui sa apara un mesaj cu 'Everything seems fine and checked'"*, and the
+reason they had to ask is instructive: the panel already SAID so, in a chip
+reading "All checked" and a count of statements. A count is not a verdict. A
+producer who presses a button to find out whether anything is wrong should not
+have to infer "nothing is wrong" from the absence of red — they should read it.
+So `clean` and `corrected` now print one green line above the findings, and it
+names the hook when the report's `scope` is `final`, because "including the
+hook" is the specific reassurance this button exists to give.
+
+The same applies to the state that says nothing was fixed. A re-run on a film
+past its script gate checks in full and refuses to edit — `frozen` — and
+without a sentence explaining that, "3 unsupported" on an approved film reads
+as a correction that is still coming. It is not; the scenes hold the text by
+then. The detail line says so and points at the scenes.
+
 ### A red light is only worth having if it is right in both directions
 
 The producer's whole brief for it was one sentence: *"In the case anything

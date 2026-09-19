@@ -172,6 +172,20 @@ console.log("Ran");
   ok("a refused rewrite is the safety valve working, not a fault", s.status === "flagged" && s.red === false);
   ok("and names the refusal so it is not mysterious", s.detail.includes("300 to 180"));
 }
+{
+  // A RE-RUN ON A FILM PAST ITS SCRIPT GATE checks in full and refuses to edit,
+  // because the scenes carry their own copy of every line and their own
+  // recordings by then. Unsaid, "3 unsupported" on an approved film reads as a
+  // correction that is still coming, and none is.
+  const s = deepSearchState({
+    report: { checked: 14, rewritten: 0, frozen: true, rerun: true, scope: "final", findings: [finding("flagged")] },
+    isDocumentary: true,
+    scriptExists: true,
+  });
+  ok("a frozen re-run is flagged, not red", s.status === "flagged" && s.red === false);
+  ok("and says why nothing was corrected", /past its script gate/i.test(s.detail));
+  ok("and points at the scenes, which is where the text now lives", /scenes/i.test(s.detail));
+}
 
 console.log("Tone");
 {

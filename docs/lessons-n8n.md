@@ -1285,6 +1285,44 @@ CLAUDE.md's cross-cutting list:
   the key that changed. `addNode`, by contrast, drops node-level settings like
   `alwaysOutputData` — set those with `setNodeSettings` and read them back.
 
+### A Postgres node in the middle of a chain replaces `$json` too — 2026-09-19
+
+This repo has known for a long time that **an agent REPLACES the payload** with
+`{output: …}`, which is why every node downstream of `FC Judge` or `DS Judge`
+reads `$('FC Prep')` by name rather than `$json`. What it had not generalised
+is that this is not a fact about agents. It is a fact about every node that
+returns its own rows.
+
+Adding `DS Write` between `DS Apply` and `DS Save` — a Postgres `UPDATE`
+returning `{script_rows, hook_rows}` — silently emptied `DS Save`'s two reads,
+which were `$json.fcReport64` and `$json.projectId`. The failure was:
+
+```
+invalid base64 end sequence
+```
+
+`decode(undefined, 'base64')`. **Nothing in that sentence names the cause**, and
+the node it names is not the node that changed. Worse, by the time it fired the
+run had already done the irreversible half: the corrected script and the
+corrected hook were both written, and the only thing lost was the report
+describing them — so the producer would have seen a red panel above a script
+that was already fixed.
+
+The rule, stated in the general form: **a node's output is whatever THAT node
+returns, and inserting any node into a chain re-points every `$json` downstream
+of it.** Before wiring a node into the middle of an existing chain, read what
+the node BELOW it reads. If it reads `$json`, it is now reading your new node.
+Reference by name, and prefer a name that will still be upstream if someone
+inserts another node tomorrow.
+
+(The same commit carried a second one-liner of the same family: `DS Write`
+assigns to `editing_options`, which is `jsonb`, from a `convert_from(decode(…))`
+that yields `text`. Postgres refuses the whole STATEMENT — and because the
+script update was a CTE in that statement, the cast error took the corrected
+script down with it. That is the cost side of "both or neither in one
+statement", and it is the right trade; it just means a type error anywhere in
+such a statement is a total failure, not a partial one.)
+
 ### A typed trigger is a filter — 2026-09-18
 
 `Receive Project Data`, the `executeWorkflowTrigger` at the top of Claude

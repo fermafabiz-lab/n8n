@@ -7,22 +7,19 @@
 // text, two live nodes. The cost is that the two nodes must be re-pasted
 // TOGETHER whenever the judge prompt changes — that is the `KIDS_STYLES` rule
 // again, and it is written down in this folder's README and in CLAUDE.md.
-//
-// What this does NOT do is decide anything about a rewrite. A re-run reports;
-// it never edits. The producer is looking at the script when they press the
-// button, and may well have hand-edited it — changing text under someone who
-// is reading it is the "silent edit" failure the panel exists to prevent.
 const row = $json || {};
 
 let category = '';
 let modeRead = false;
+let editing = {};
 try {
-  const o = JSON.parse(row.editing_options || '{}') || {};
-  if (o && typeof o === 'object' && 'category' in o) {
-    category = String(o.category || '').toLowerCase().trim();
+  editing = JSON.parse(row.editing_options || '{}') || {};
+  if (editing && typeof editing === 'object' && 'category' in editing) {
+    category = String(editing.category || '').toLowerCase().trim();
     modeRead = true;
   }
 } catch (e) {
+  editing = {};
   // Left unread, which is a RED state downstream — same rule as `FC Prep`.
 }
 const isDocumentary = category === 'documentary';
@@ -30,6 +27,32 @@ const isDocumentary = category === 'documentary';
 // The script as it now stands. `hov.script.content` is already in the judge's
 // expected shape, hook included, so there is nothing to rebuild.
 const narration = String(row.script || '').trim();
+
+// PARSED BACK INTO CHAPTERS, because the rewrite works on chapters and the
+// re-run only has the assembled text. The markers `Combine Chapters` writes
+// are `[CHAPTER n: title]`, so the parse is exact and the reassembly in
+// `DS Apply` round-trips to the same bytes when nothing changes — which the
+// check harness asserts, because a reassembly that drifted would rewrite every
+// script it touched even when the judge found nothing.
+function parseChapters(text) {
+  const out = [];
+  const re = /^\[CHAPTER\s+(\d+):\s*([^\]]*)\]\s*$/gm;
+  const marks = [];
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    marks.push({ number: Number(m[1]), title: m[2].trim(), from: m.index, bodyFrom: m.index + m[0].length });
+  }
+  marks.forEach((mk, i) => {
+    const end = i + 1 < marks.length ? marks[i + 1].from : text.length;
+    out.push({
+      chapter_number: mk.number,
+      chapter_title: mk.title,
+      narrator_script: text.slice(mk.bodyFrom, end).trim(),
+    });
+  });
+  return out;
+}
+const chapters = parseChapters(narration);
 
 let pack = [];
 try {
@@ -40,7 +63,18 @@ try {
   pack = [];
 }
 
-const run = isDocumentary && pack.length > 0 && narration.length > 0;
+// WHETHER A CORRECTION MAY BE WRITTEN AT ALL. At the script gate a film has no
+// chapters and no scenes — measured on 2026-09-19, `recxsFvSEv3g6blYn` read
+// `scenes: 0, chapters: 0` while parked there — so the script text is the only
+// thing derived from the narration and rewriting it is safe. Past approval the
+// scenes carry their own copy of every line and their own recordings, and
+// changing the script under them is precisely the "a line and its recording
+// drift apart silently" fault in a new costume. So: past that point the re-run
+// still CHECKS and still reports, and refuses to edit.
+const sceneCount = Number(row.scene_count || 0);
+const mayRewrite = sceneCount === 0;
+
+const run = isDocumentary && pack.length > 0 && narration.length > 0 && chapters.length > 0;
 
 // Why it did not run, in the SAME vocabulary the first pass uses, so the site's
 // one owner of the verdict (`platform/lib/deep-search.ts`) needs no new codes.
@@ -59,7 +93,7 @@ if (!run) {
       'Deep Search runs on Documentary films only, and this film was made in ' +
       (category ? category.charAt(0).toUpperCase() + category.slice(1) : 'another') +
       ' mode.';
-  } else if (!narration) {
+  } else if (!narration || chapters.length === 0) {
     skipCode = 'no-script';
     skipped = 'This film has no script saved yet, so there was nothing to re-check.';
   } else {
@@ -81,6 +115,7 @@ const words = (s) => String(s || '').split(/\s+/).filter(Boolean).length;
 return [
   {
     json: {
+      chapters,
       fc: {
         run,
         category,
@@ -90,7 +125,10 @@ return [
         packList,
         narration,
         originalWords: words(narration),
+        mayRewrite,
+        sceneCount,
       },
+      editing,
       projectId: String(row.project_id || ''),
       projectName: String(row.project_name || ''),
     },

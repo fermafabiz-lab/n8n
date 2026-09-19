@@ -179,7 +179,7 @@ export async function rerunDeepSearch(projectId: string): Promise<ActionResult> 
     return {
       ok: true,
       message:
-        "Re-checking the script as it now stands, hook included — about a minute. The report below updates when it lands; reload to see it.",
+        "Re-checking the script as it now stands, hook included — about a minute. Anything the sources cannot back is corrected, and this page reloads onto the corrected script when it lands.",
     };
   } catch (e) {
     return { ok: false, message: friendlyError(e) };

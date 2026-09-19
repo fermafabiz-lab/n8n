@@ -713,6 +713,21 @@ export interface DeepSearchReport {
   storyMode?: boolean;
   /** Too much was unsupported to correct: reported, deliberately not rewritten. */
   overwhelmed?: boolean;
+  /**
+   * The re-run CHECKED and refused to edit, because the film is past its
+   * script gate: the scenes carry their own copy of every line and their own
+   * recordings, so changing the script under them is the "a line and its
+   * recording drift apart silently" fault. Only a re-run can set this — the
+   * first pass runs before any scene exists.
+   */
+  frozen?: boolean;
+  /**
+   * The corrected hook was written to `Editing Options.hookPlan.beats` as well
+   * as to the script text. The hook lives twice and the beats are the copy the
+   * RENDER speaks, so a report that corrected the hook without this would mean
+   * the film still says the old line.
+   */
+  hookFixed?: boolean;
   /** The rewrite was produced and refused; this says what was wrong with it. */
   refused?: string;
   findings?: DeepSearchFinding[];

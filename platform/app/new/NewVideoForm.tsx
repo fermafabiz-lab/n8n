@@ -452,7 +452,12 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
   const silent = catMeta.voiceMode === "silent";
   const gates = silent ? 3 : 4;
   const finishList = FINISHES.filter(
-    (f) => finishes[f.name] && !(silent && f.name === "captions"),
+    (f) =>
+      finishes[f.name] &&
+      !(silent && f.name === "captions") &&
+      // Same gate as the row itself: the estimate must not promise "Source"
+      // on a film that will not draw it.
+      !(f.name === "source_watermark" && category !== "documentary"),
   )
     .map((f) => f.sheet)
     .join(" · ");
@@ -938,7 +943,18 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
                   <span className="no">06</span>
                 </header>
                 <div className="swlist">
-                  {FINISHES.map((f, i) => {
+                  {/* Source labels are a Documentary feature (2026-09-19, the
+                      producer's call): every other category is wall-to-wall AI,
+                      so the badge drew one continuous AI GENERATED pill for the
+                      whole film and distinguished nothing. Dropped rather than
+                      disabled — and here, unlike at Final touches, no note is
+                      needed: the category control is a few rows up on this same
+                      screen, so picking Documentary brings the row straight
+                      back. The value is still POSTED, so switching category
+                      back and forth keeps what was chosen. */}
+                  {FINISHES.filter(
+                    (f) => !(f.name === "source_watermark" && category !== "documentary"),
+                  ).map((f, i) => {
                     const disabled = silent && f.name === "captions";
                     const on = !disabled && finishes[f.name];
                     return (

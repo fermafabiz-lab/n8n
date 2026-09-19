@@ -179,6 +179,7 @@ export default function FinalSettings({
   initial,
   motifCards = [],
   silent = false,
+  category = null,
   watermarkScenes = [],
   aspectRatio = null,
 }: {
@@ -188,6 +189,9 @@ export default function FinalSettings({
   motifCards?: MotifCard[];
   /** Cinematic: no narration is ever spoken, so some rows have no meaning. */
   silent?: boolean;
+  /** The project's category. Source labels are a Documentary feature since
+   *  2026-09-19 — see the note this renders when it is anything else. */
+  category?: string | null;
   /**
    * The film's scenes, for the source-watermark preview. Empty on a film with
    * no archive step, which is exactly when the preview has nothing to show and
@@ -209,7 +213,19 @@ export default function FinalSettings({
   // Dropped rather than disabled, the same call the stepper makes about the
   // Audio step: a control you can reach and find inert is worse than one that
   // is simply not there.
-  const rows = OPTIONS.filter((o) => !(silent && o.spokenOnly));
+  // Source labels are a Documentary feature (2026-09-19, the producer's call):
+  // every other category is wall-to-wall AI, so the badge drew one continuous
+  // AI GENERATED pill for the whole film and distinguished nothing.
+  //
+  // DROPPED rather than disabled, the same call as Captions on a silent film —
+  // a control you can reach and find inert is worse than one that is not there.
+  // But NOT silent: the note under the list says the labels are off and why,
+  // because this gate is known to catch a documentary filed as Story and the
+  // producer must be able to see that before the render rather than after it.
+  const isDocumentary = String(category ?? "").trim() === "documentary";
+  const rows = OPTIONS.filter(
+    (o) => !(silent && o.spokenOnly) && !(!isDocumentary && o.key === "sourceWatermark"),
+  );
   const changedKeys = rows.filter((o) => opts[o.key] !== initial[o.key]);
   // The effects volume is a row's SETTING, not a row of its own, so it has to
   // be counted by hand — otherwise moving only the slider left `changed`
@@ -310,6 +326,30 @@ export default function FinalSettings({
       </p>
 
       {msg && <p className={`formmsg ${msg.ok ? "ok" : "err"}`}>{msg.message}</p>}
+
+      {/* Said out loud rather than left to be discovered in the finished film.
+          The Source watermark row is dropped on anything but a Documentary
+          (2026-09-19), and the gate is KNOWN to catch a documentary that was
+          filed as Story — which is most of them, because Story is the default
+          category. A producer who meant to label this film can only find that
+          out here, and only if somebody says it. */}
+      {!isDocumentary && (
+        <p
+          style={{
+            margin: "0 0 16px",
+            fontSize: 12.5,
+            color: "var(--soft)",
+            borderLeft: "2px solid var(--line)",
+            paddingLeft: 10,
+          }}
+        >
+          <b>No source labels on this film.</b> Saying on screen whether a shot is
+          AI-generated, archival or real is a Documentary feature — this project is
+          filed as{" "}
+          <b>{String(category ?? "story").replace(/_/g, " ")}</b>. A licence credit,
+          where one is owed, is still drawn.
+        </p>
+      )}
 
       {/* The last five decisions as a numbered index — hairlines and a drawn
           switch, not a grid of boxed checkboxes. A changed row says so in

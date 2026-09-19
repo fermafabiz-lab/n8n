@@ -260,6 +260,22 @@ the full entry in the file named:
   Al Arab, Peking to Paris and Tupac films are all filed as `story`. The
   fact-check chain asks the narration itself instead. Full account:
   `docs/lessons-pipeline.md`, "The script is checked against its own research".
+  **ONE gate now trusts `category` anyway, on purpose**: the source watermark
+  is a Documentary feature since 2026-09-19 (Final Assembly `309157bd`). The
+  producer was shown this rule and the 3-of-11 count and chose it regardless,
+  because the alternative was every Story and Kids film wearing one continuous
+  `AI GENERATED` pill that distinguishes nothing. So it is a decision, not an
+  oversight — and the thing that makes it survivable is that it is NOT silent:
+  the row is dropped on the brief (where the category is two rows up) and
+  Final touches prints "No source labels on this film" with the category it
+  was filed as, so a documentary filed as Story is caught before the render
+  rather than after it. The licence credit is untouched — that is an
+  obligation and no category reaches it. Full account
+  `db/port/watermark-open-once/README.md`, pinned by
+  `node db/port/watermark-open-once/check.mjs`. **If you are here because a
+  documentary shipped unlabelled, the fix is not to widen the category list —
+  it is to gate on whether the film MIXES kinds of source, which needs no
+  category at all.**
 - **A button has to GO somewhere, and nothing tells you when one stops.**
   Two of them had: the chime's toast and system notification did nothing at
   all on click, and the library hero's "Everything waiting on me" pointed at

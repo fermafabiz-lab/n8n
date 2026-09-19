@@ -176,6 +176,53 @@ was chosen, and comes back holding it; at Final touches the old row is gone,
 the button flips to "Apply 1 change & render", and the `changed` chip appears
 on the Source watermark row.
 
+## It is a Documentary feature now — a decision taken against the rule
+
+2026-09-19, Final Assembly `309157bd`. The producer asked why the badge shows
+on films that are not documentaries and said it should be documentary-only.
+
+**Why it showed everywhere**: every scene gets a provenance, and a scene with
+no stored classification reads `ai_generated` (`buildProvenance` in
+`derive.ts` — "Every film this pipeline made before Documentary mode is AI").
+Consecutive same-origin scenes merge into one band, so a Story film — all Veo
+— drew ONE continuous `✦ AI GENERATED` pill for its entire length. The
+original reasoning was that a film saying nothing about where its pictures
+came from reads as a claim that they are real. The producer's counter is
+better: a label that never changes distinguishes nothing, which is the
+opposite of what this overlay is for.
+
+**The gate they chose is one CLAUDE.md explicitly warns against.** "A gate
+that tells two kinds of film apart must not trust `category`" — `story` is the
+site's default, so genuine documentaries carry it, and of eleven researched
+films in the database only three say `documentary`; Burj Al Arab, Peking to
+Paris and Tupac are all filed as Story. That was put to them with the count,
+alongside a category-free alternative (draw it only when the film MIXES kinds
+of source), and `category === 'documentary'` was chosen anyway. It is a
+decision, not an oversight, and this section exists so the next session does
+not "fix" it back.
+
+**What makes it survivable is that it is not silent.** The known failure —
+a documentary filed as Story shipping unlabelled — is now visible before the
+render instead of after it:
+
+| Where | What happens |
+|---|---|
+| The brief | the Source watermark row is dropped; no note, because the category control is a few rows up on the same screen and picking Documentary brings it straight back |
+| Final touches | the row is dropped AND a line says "No source labels on this film", naming the category it was filed as |
+| The run log | `watermark off (not a documentary: category=story)` — greppable afterwards |
+
+Dropped rather than disabled, the same call Captions makes on a silent film:
+a control you can reach and find inert is worse than one that is not there.
+
+**The licence credit is untouched.** `showSourceWatermark` owns the LABEL;
+a credit is decided from the provenance itself, and no category reaches it.
+Pinned.
+
+**If a documentary ever does ship unlabelled because of this**, the fix is not
+to widen the category list. It is the alternative that was on the table:
+draw the badge when the film contains more than one kind of visual origin,
+which needs no category at all and cannot be filed wrongly.
+
 ## And how big it is drawn — a slider, not three named sizes
 
 2026-09-19. The badge is deliberately the least decorative element in the

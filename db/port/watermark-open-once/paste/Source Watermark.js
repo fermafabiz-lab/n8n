@@ -24,7 +24,25 @@ try {
 //
 // The switch owns the LABEL only. A credit a licence REQUIRES is drawn
 // whatever it says, and the render decides that from the provenance itself.
-body.showSourceWatermark = opts.sourceWatermark !== false;
+//
+// AND the film has to be a DOCUMENTARY (2026-09-19, the producer's call).
+// Every other category is wall-to-wall AI, so the badge drew one continuous
+// `AI GENERATED` pill for the whole film — a label that distinguishes nothing,
+// which is the opposite of what this overlay is for.
+//
+// Read this before changing it back: CLAUDE.md says a gate that tells two
+// kinds of film apart must NOT trust `category`, because `story` is the site's
+// default and genuine documentaries carry it — of eleven researched films in
+// the database only three say `documentary`. This gate is therefore KNOWN to
+// switch the label off on a documentary filed as Story. That was put to the
+// producer with the count and chosen anyway, so it is a decision and not an
+// oversight; the mitigation is that the site now SAYS the labels are off on
+// such a film instead of dropping the row silently.
+//
+// The credit is untouched either way — `showSourceWatermark` owns the label,
+// and a licence obligation is not a style choice.
+const isDocumentary = String(opts.category || 'story') === 'documentary';
+body.showSourceWatermark = opts.sourceWatermark !== false && isDocumentary;
 
 // Announce each kind of source ONCE: the first archival band opens into the
 // full pill, every later one stays the small glyph. Strictly `=== true`,
@@ -75,6 +93,6 @@ let labelled = 0;
   // direction for a label about truthfulness: silence rather than a guess.
   if (p) { s.provenance = p; labelled++; }
 });
-console.log('provenance on ' + labelled + '/' + (body.scenes || []).length + ' scenes, watermark ' + (body.showSourceWatermark ? 'on' : 'off') + (body.watermarkOpenOnce ? ', announced once per source' : ''));
+console.log('provenance on ' + labelled + '/' + (body.scenes || []).length + ' scenes, watermark ' + (body.showSourceWatermark ? 'on' : 'off') + (isDocumentary ? '' : ' (not a documentary: category=' + String(opts.category || 'story') + ')') + (body.watermarkOpenOnce ? ', announced once per source' : '') + (body.watermarkScale !== 1 ? ', size ' + Math.round(body.watermarkScale * 100) + '%' : ''));
 
 return [{ json: { body } }];

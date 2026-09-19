@@ -115,7 +115,7 @@ const site = /min:\s*(\d(?:\.\d+)?),\s*\n\s*max:\s*(\d(?:\.\d+)?)/.exec(prov);
 is('the site declares a range', !!site, true);
 const want = site ? [Number(site[1]), Number(site[2])] : null;
 
-const faB = boundsOf(readFileSync(join(here, 'paste', 'Source Watermark.js'), 'utf8'));
+const faB = boundsOf(readFileSync(join(here, 'paste', 'Source Watermark.js'), 'utf8')); // eslint-disable-line
 is('Final Assembly still bounds the size', !!faB, true);
 is('and agrees with the site', faB, want);
 
@@ -126,6 +126,51 @@ is('and agrees too', orchB, want);
 const remotion = readFileSync(join(root, 'remotion/src/provenance.ts'), 'utf8');
 const rem = /min:\s*(\d(?:\.\d+)?),\s*\n\s*max:\s*(\d(?:\.\d+)?)/.exec(remotion);
 is('the render declares the same range', rem && [Number(rem[1]), Number(rem[2])], want);
+
+// ---- and the label is a DOCUMENTARY feature ------------------------------
+// 2026-09-19, the producer's call, made against the warning in CLAUDE.md that
+// a gate telling two kinds of film apart must not trust `category` — `story`
+// is the site's default and 8 of 11 researched films in the database carry it.
+// The decision stands; what must NOT happen is it becoming silent, so the
+// three places that implement it are pinned here together.
+const fa = readFileSync(join(here, 'paste', 'Source Watermark.js'), 'utf8');
+is(
+  'Final Assembly gates the label on the category',
+  /showSourceWatermark = opts\.sourceWatermark !== false && isDocumentary/.test(fa),
+  true,
+);
+is(
+  "and 'documentary' is the only value that passes",
+  /isDocumentary = String\(opts\.category \|\| 'story'\) === 'documentary'/.test(fa),
+  true,
+);
+// The credit is NOT gated. It is a licence obligation, it is decided from the
+// provenance rather than from this flag, and no category may reach it.
+is(
+  'the credit is not gated with it',
+  /attributionRequired|credit/.test(fa) === false || !/credit[^\n]*isDocumentary/.test(fa),
+  true,
+);
+// A film that ships unlabelled has to be greppable in the run log afterwards.
+is('the log says when a film was skipped for its category', /not a documentary: category=/.test(fa), true);
+// And the producer has to be able to see it BEFORE the render, not after —
+// the row is dropped on both screens, and Final touches says why.
+const finalSettings = readFileSync(join(root, 'platform/components/FinalSettings.tsx'), 'utf8');
+is(
+  'Final touches drops the row off a documentary',
+  /!\(!isDocumentary && o\.key === "sourceWatermark"\)/.test(finalSettings),
+  true,
+);
+is(
+  'and says so rather than dropping it silently',
+  /No source labels on this film/.test(finalSettings),
+  true,
+);
+is(
+  'the brief drops it too',
+  /f\.name === "source_watermark" && category !== "documentary"/.test(form),
+  true,
+);
 
 // The site half of the control, as with the switch above.
 is('the brief posts the size', /name="watermark_scale"/.test(form), true);

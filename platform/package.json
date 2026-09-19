@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "check": "npm run check:review && npm run check:cost && npm run check:provenance && npm run check:normalize && npm run check:validation && npm run check:routes && npm run check:footage && npm run check:kenburns && npm run check:series && npm run check:regen-wait && npm run check:deeplink && npm run check:deepsearch",
+    "check": "npm run check:review && npm run check:cost && npm run check:provenance && npm run check:normalize && npm run check:validation && npm run check:routes && npm run check:footage && npm run check:kenburns && npm run check:series && npm run check:regen-wait && npm run check:deeplink && npm run check:deepsearch && npm run check:tones",
     "check:review": "node --experimental-strip-types scripts/check-review.mjs",
     "check:cost": "node --experimental-strip-types scripts/check-cost.mjs",
     "check:provenance": "node --experimental-strip-types scripts/check-provenance.mjs",
@@ -20,7 +20,8 @@
     "check:created-by": "node --experimental-strip-types --no-warnings --import ./scripts/footage-loader.mjs scripts/check-created-by.mjs",
     "check:series": "node --experimental-strip-types --no-warnings --import ./scripts/alias-loader.mjs scripts/check-series.mjs",
     "check:regen-wait": "node --experimental-strip-types --no-warnings --import ./scripts/alias-loader.mjs scripts/check-regen-wait.mjs",
-    "check:deepsearch": "node --experimental-strip-types --no-warnings --import ./scripts/alias-loader.mjs scripts/check-deep-search.mjs"
+    "check:deepsearch": "node --experimental-strip-types --no-warnings --import ./scripts/alias-loader.mjs scripts/check-deep-search.mjs",
+    "check:tones": "node --experimental-strip-types --no-warnings scripts/check-tones.mjs"
   },
   "dependencies": {
     "next": "^15.3.0",

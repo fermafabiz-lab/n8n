@@ -356,6 +356,22 @@ the full entry in the file named:
   exactly today's working pipeline. Everything else is built *around* it,
   never by changing it. Categories marked `ready: false` are selectable, saved,
   and inert on purpose — so colleagues can work while the rest is wired up.
+- **Each category owns the tone its films are written in** (2026-09-19):
+  `defaultTone` on every entry in `platform/lib/categories.ts` — Story →
+  **Epic**, Documentary → **Documentary**, Cinematic → **Cinematic**, Kids
+  story → **Childish**. The brief lights that chip the moment the category is
+  chosen (the same contract `narratorVoice` has: a visible selection, never a
+  hidden default), and one click on any chip makes the row the producer's for
+  good — an explicit `toneTouched` flag, because "is it still the default?"
+  cannot tell a deliberate *Epic* on a Story film from an untouched one. The
+  field is REQUIRED and typed against `lib/tones.ts`, the one owner of the
+  twelve names, so a new category cannot forget it and a misspelling is a
+  build error. **That matters because a tone with no `hov.genre_profile` row
+  is written with Scripting's DOCUMENTARY fallback silently** — no error, no
+  log line — so adding a tone means inserting its profile first
+  (`db/port/childish-tone/` is the worked example) and re-measuring the date
+  recorded in `lib/tones.ts`. `npm run check:tones`; full account
+  `docs/lessons-site.md`, "The tone is part of what kind of film it is".
 
 ## Environment
 

@@ -2351,7 +2351,16 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     cast_voices: cast,
     Language: String(formData.get("language") ?? "English"),
     Lenght: Number(formData.get("length") ?? 64),
-    Tonalitate: String(formData.get("tone") ?? "Dark"),
+    // The writing profile Claude Scripting loads (hov.genre_profile, matched
+    // case-insensitively). The brief lights the category's own tone the
+    // moment the category is chosen, so this is the backstop for a form that
+    // never rendered the chip row — from the same owner, so the two can't
+    // disagree. `||` and not `??`: an EMPTY tone field must fall back too,
+    // because "" matches no profile and is written with Scripting's silent
+    // DOCUMENTARY fallback. `getCategory` resolves an unknown id to Story.
+    Tonalitate: String(
+      formData.get("tone") || getCategory(String(formData.get("category") ?? "")).defaultTone,
+    ),
     Pace: String(formData.get("pace") ?? "Normal"),
     // The exact playback rate the brief's PACE control chose. `Pace` above is
     // still the word, because Claude Scripting interpolates it into two

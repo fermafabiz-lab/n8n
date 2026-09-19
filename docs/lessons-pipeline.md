@@ -2187,37 +2187,54 @@ only thing allowed to interpret it. **A code the site has never heard of fails
 CLOSED — red, not green** — because the alternative is a future workflow
 turning the alarm off by inventing a reason.
 
-### A word cap in a prompt MOVES the length, it does not hold it — 2026-09-19
+### A word cap is obeyed or ignored according to how it is PHRASED — 2026-09-19
 
 The series recap (`db/port/series-recap/`) asked gpt-5.4 for *"two sentences, at
-most 60 words"* and got two sentences of about a hundred, every time. The
-producer's call was to raise the cap to 100 — the instruction was describing
-something that was not happening, and the longer line is the better one for the
-job. It was then measured both ways on the same real episode, with nothing else
-changed:
+most 60 words"* and got about a hundred, every time. Raised to 100 on the
+producer's call, it wrote 128. Two points, a clean third over on both, and the
+conclusion looked obvious: **a model overshoots any cap by about a third, so a
+number in a prompt is a dial, not a fence.** That is what this section said for
+an hour, and it was wrong — or rather, it was a law derived from one phrasing.
 
-| asked | written | the line on the row |
-|---|---|---|
-| 60 words | ~100 words | 591 characters |
-| 100 words | 128 words | 717 characters |
+The producer's answer to it is what found the fault: *"I don't want this limit
+to affect future episodes — leave it at 60-80 if you like, but make the workflow
+actually generate that much, because I'm not going to rephrase it by hand."*
+Which turns the question from *how much does it overshoot* into *what makes it
+not overshoot*. Four phrasings, same budget of 80 words, same two narrations —
+a 1.4 KB kids episode and the 11.4 KB Burj Al Arab documentary, the longest
+script in the database — three runs each (probe executions 15110, 15111):
 
-**The overshoot is about a third in both directions.** So a number in a prompt
-is a dial, not a fence: raising it lengthens the output, but the output never
-lands on it, and the cap cannot be used to guarantee anything downstream. The
-100-word line is visibly the better recap — it names the Golden Acorn Toolbox
-and the Little Red Builder Wagon, which the 60-word one did not — so this is
-not an argument against raising it. It is an argument against *trusting* it.
+| phrasing | words written |
+|---|---|
+| `at most 80 words` (what it had) | 92, 97 |
+| `write between 55 and 80 words` | 79, 86 |
+| `a budget of 80 words you cannot spend` | 78, 77, 73, 81, 77, 77 |
+| **hard rule + count your draft + what happens if it is over** | **73, 75, 80, 71, 76, 72** |
 
-**What that means for anything reading the output**: a cap in the prompt needs
-a hard cut in code, and the cut needs a MARGIN over the cap, because the next
-model or the next wording will overshoot by a different amount.
-`Parse Recap`'s cut went 600 → 1,000 in the same commit; had it stayed, the
-717-character line would have been chopped mid-sentence, and a truncated recap
-still reads like a recap — a silent failure, which is the worse kind. The same
-shape applies to any cap this pipeline states in words: scene length, chapter
-length, the hook's beats. **State it, but never budget on it.**
+Eight of eight inside the budget, on the shortest and the longest material in
+the project. The number never mattered; the framing did. What does the work in
+the winning version is three things together: **length is named as a rule**
+rather than a preference, **the model is asked to count its draft before
+answering**, and **the consequence is stated** ("an answer longer than N words
+is rejected and useless"). Drop any one of them and it drifts — the range
+version has two of the three and went over once in two runs.
 
-And budgets downstream move with the length. At 717 characters a line,
-`composeSeriesLore`'s 8,000-character Lore cap starts dropping the OLDEST recap
-lines at about episode 11 rather than about 13 — oldest-first, so it degrades
-gently, but a show heading past ten episodes is when to look again.
+So the rule for this pipeline is: **when a length matters, do not merely state
+it — make it a rule, ask for the count, and say what happens if it is broken.**
+And measure the phrasing, because *"at most N"* reads to a human like a hard
+limit and reads to a model like an aspiration.
+
+**A net still belongs under it, and it belongs at a sentence boundary.**
+`Parse Recap` trims to 25% over the budget by dropping whole sentences, never
+cutting inside one — a half sentence still reads like a recap, which is the
+silent failure. It logs `RECAP LONG` when it fires, and with the measured
+wording it never has: it exists so that a future model, or a future rewording,
+shows up in a log instead of in the producer's field. `node
+db/port/series-recap/check.mjs` (in `npm run check`) pins both halves — that the
+prompt still states the rule, asks for the count and names the consequence, and
+that the net still trims where it should.
+
+Live on the producer's own show the same afternoon: 71 words, 405 characters,
+where the 100-word cap had produced 717. At ~450 characters a line,
+`composeSeriesLore`'s 8,000-character Lore cap now starts dropping the oldest
+recap lines at about episode 17 rather than about 11.

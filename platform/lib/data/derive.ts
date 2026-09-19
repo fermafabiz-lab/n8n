@@ -21,6 +21,7 @@ import { parseEditingOptionsShape } from "@/lib/editingOptionsShape";
 import {
   normalizeConfidence,
   normalizeVisualOrigin,
+  normalizeWatermarkScale,
   type VisualProvenance,
 } from "@/lib/provenance";
 
@@ -206,6 +207,19 @@ export interface EditingOptions {
    * with it — a long line under a small chip reads as a broken pill.
    */
   watermarkOpenOnce: boolean;
+  /**
+   * How big the badge is drawn, as a multiplier of its base size — the
+   * producer's answer to "quiet" being a judgement about a particular film on
+   * a particular screen rather than a constant.
+   *
+   * 1 is what every film rendered before this existed was drawn at, and what
+   * an absent or out-of-range value resolves to: `normalizeWatermarkScale`
+   * REFUSES rather than clamps, so a stored 4 is the default and not the
+   * maximum. The rule has three copies (lib/provenance.ts here,
+   * remotion/src/provenance.ts, Final Assembly's `Source Watermark` node) and
+   * they move together, or a film is drawn at a size the slider never offered.
+   */
+  watermarkScale: number;
   /**
    * Hands-off mode: the site signs off every gate by itself as the assets
    * land — script, scene texts, takes, images, clips — and presses the final
@@ -1194,6 +1208,7 @@ export function buildProject(r: RawProject): Project {
       // Strictly `=== true`: see the field's note. Absence must not quieten a
       // film's provenance labels by itself.
       watermarkOpenOnce: opts.watermarkOpenOnce === true,
+      watermarkScale: normalizeWatermarkScale(opts.watermarkScale),
       // Strictly opt-in, `=== true`: hands-off is a real trade (nothing gets
       // a human look) and must never switch itself on by absence.
       autoApprove: opts.autoApprove === true,

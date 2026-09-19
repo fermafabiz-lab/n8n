@@ -322,6 +322,92 @@ export const markPillWidth = (mark: WatermarkMark, fontSize: number, labelAdvanc
 export const markChipPadX = (mark: WatermarkMark): number =>
 	(mark.height - 2 * WATERMARK_STYLE.markBorderWidth - mark.glyph) / 2;
 
+/**
+ * How much bigger or smaller the whole badge is drawn.
+ *
+ * The badge is deliberately the least decorative element in the render — a
+ * claim about truthfulness that draws attention to itself stops being read as
+ * one — but "quiet" is a judgement about a particular film on a particular
+ * screen, not a constant. A documentary watched on a phone needs it larger
+ * than a 16:9 essay does, and the producer is the one looking at it.
+ *
+ * The ends are chosen rather than arbitrary. Below 0.7 the 15px glyph falls
+ * under 11px and the artwork's thin strokes start dropping out at 1080p;
+ * above 1.6 the capsule for the longest label ("ILLUSTRATIVE FOOTAGE", 280px
+ * at 1×) passes 448px and begins to read as a banner rather than a mark.
+ * `step` is the slider's grid and nothing else enforces it — an arbitrary
+ * value inside the range is honoured, because refusing one would be refusing
+ * a film that was rendered before the grid existed.
+ */
+export const WATERMARK_SCALE = {
+	min: 0.7,
+	max: 1.6,
+	step: 0.05,
+	default: 1,
+} as const;
+
+/**
+ * The stored size, or the default — refuse-then-clamp, like every other
+ * Editing Options number.
+ *
+ * REFUSES rather than clamps, exactly as `normalizeSpeed` does: a value
+ * outside the range falls back to 1 instead of being pulled to the nearest
+ * end. A stored 4 is not "as big as possible", it is a mistake, and a badge
+ * silently drawn at the maximum would be a worse answer than the default one.
+ *
+ * MIRRORED in `platform/lib/provenance.ts` and in Final Assembly's
+ * `Source Watermark` node — three copies in three languages, and the rule
+ * this project keeps for such a number is that they move together or a film
+ * is drawn at a size the control never offered. Pinned on both repo sides.
+ */
+export const normalizeWatermarkScale = (value: unknown): number => {
+	const n = Number(value);
+	if (!Number.isFinite(n)) return WATERMARK_SCALE.default;
+	if (n < WATERMARK_SCALE.min || n > WATERMARK_SCALE.max) return WATERMARK_SCALE.default;
+	return n;
+};
+
+/**
+ * The badge's geometry at a given size.
+ *
+ * Everything that is part of the MARK scales — its height, its glyph, the two
+ * paddings, the three font sizes and the gap between the stacked lines. What
+ * does NOT scale is where the badge sits: `left`, `bottom` and `frame` are
+ * about the composition, not about the mark, and a badge that walked towards
+ * the corner as it grew would be two decisions wearing one control.
+ *
+ * `maxWidth` is left alone for the same reason — it is a budget measured
+ * against the frame, and the widest capsule at the largest size is still well
+ * inside it.
+ *
+ * Rounded to whole pixels because half a pixel of border is a grey smear
+ * rather than a hairline, and because `markChipPadX` centres the glyph inside
+ * the border by halving what is left: on whole numbers that lands on a clean
+ * .0 or .5, which the browser draws the same way every frame.
+ *
+ * The border itself stays 1px at every size, deliberately. A hairline is a
+ * hairline — scaling it would make the largest badge look heavy-handed, which
+ * is the opposite of what this overlay is for.
+ */
+export const scaleWatermark = (g: WatermarkGeometry, scale: unknown): WatermarkGeometry => {
+	const k = normalizeWatermarkScale(scale);
+	if (k === WATERMARK_SCALE.default) return g;
+	const px = (n: number) => Math.max(1, Math.round(n * k));
+	return {
+		...g,
+		gap: px(g.gap),
+		label: {...g.label, fontSize: px(g.label.fontSize)},
+		source: {fontSize: px(g.source.fontSize)},
+		credit: {fontSize: px(g.credit.fontSize)},
+		mark: {
+			height: px(g.mark.height),
+			glyph: px(g.mark.glyph),
+			gap: px(g.mark.gap),
+			padX: px(g.mark.padX),
+		},
+	};
+};
+
 /** The fields of a canvas `TextMetrics` this needs, and nothing else. */
 export type LabelMetrics = {
 	width: number;

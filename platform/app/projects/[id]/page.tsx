@@ -739,6 +739,7 @@ export default async function ProductionRoom({
               initial={project.editing}
               motifCards={project.motifCards}
               silent={silent}
+              category={project.category}
               /* Documentary only: every other category is wall-to-wall AI, so
                  the preview would step through one band reading AI GENERATED
                  and teach the producer nothing they cannot read in the row. */

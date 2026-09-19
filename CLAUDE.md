@@ -176,6 +176,17 @@ the full entry in the file named:
   Media Generation) execution is running.** A deploy restarts the container
   mid-render. Check `search_executions` first. Full account:
   `docs/lessons-n8n.md` under "Never push while a final render is running".
+  **CLAUDE SCRIPTING BELONGS IN THAT LIST TOO** (measured 2026-09-19): it makes
+  **15 HTTP calls into the site container**, and five of them are on the main
+  writing path, not just the regen tails — `Fetch Genre Profile`, `Fetch
+  Project Record`, `Load Project Bible`, `Load Scene`, `Save Evidence` (the
+  other ten are the `IR *` / `VR *` / rewrite tails). A `platform/**` deploy
+  restarts `web` for about a minute, so a film that is mid-script can lose a
+  node to a connection refused and die with the script half written. The rule
+  as written names only the two render workflows, which reads as permission to
+  deploy over a scripting run. It is not. List them with:
+  `jq -r '.workflow.nodes[] | select((.parameters|tostring) | test("house-of-videos|/api/at")) | .name'`
+  over a saved `get_workflow_details` dump.
 - **A PUT to the n8n public REST API has no draft — it is live immediately.**
   The MCP connector's `update_workflow` DOES stage a real draft;
   `get_workflow_details` always returns the DRAFT, never the live version —
@@ -273,6 +284,22 @@ the full entry in the file named:
   asked for the documentary treatment" is sound, reading it as "this film is
   factual" is not. Full account: `docs/lessons-pipeline.md`, "The script is
   checked against its own research".
+  **The source watermark is the SECOND gate to do this** (2026-09-19,
+  Final Assembly `309157bd`): source labels are a Documentary feature now,
+  on the same reading — the producer asked for a label that distinguishes
+  sources, and every other category is wall-to-wall AI, so the badge drew
+  one continuous `AI GENERATED` pill that distinguished nothing. They were
+  shown this rule and the 3-of-11 count and chose it anyway, so it is a
+  decision. What makes it survivable is that it is NOT silent: the row is
+  dropped on the brief (where the category control is two rows up) and
+  Final touches prints "No source labels on this film" with the category it
+  was filed as, so a documentary filed as Story is caught before the render
+  rather than after it. The licence credit is untouched — an obligation, and
+  no category reaches it. Full account `db/port/watermark-open-once/README.md`,
+  pinned by `node db/port/watermark-open-once/check.mjs`. **If a documentary
+  ever does ship unlabelled because of this, the fix is not to widen the
+  category list — it is to gate on whether the film MIXES kinds of source,
+  which needs no category at all.**
 - **A button has to GO somewhere, and nothing tells you when one stops.**
   Two of them had: the chime's toast and system notification did nothing at
   all on click, and the library hero's "Everything waiting on me" pointed at

@@ -932,7 +932,12 @@ console.log('DS — a sentence the narration already made');
 // the end of this section.
 const DUP = 'The map went live in February 2005.';
 const DUP_KEEP = 'Google announced Google Local on March 17, 2004.';
-const DUP_CH1 = DUP_KEEP + ' ' + DUP;
+// A REAL CLOSING LINE, so the duplicate under test sits in the MIDDLE of the
+// chapter. Put the repeat last and it is spared as a bookend — which is the
+// rule below, and would quietly stop every other case here from testing what
+// it says it tests.
+const DUP_CLOSE = 'The whole web could be dragged at last.';
+const DUP_CH1 = DUP_KEEP + ' ' + DUP + ' ' + DUP_CLOSE;
 const DUP_SCRIPT = `[CHAPTER 0: HOOK]\n${DS_HOOK}\n\n[CHAPTER 1: Launch]\n${DUP_CH1}`;
 
 const dupPrepped = (over = {}) => ({
@@ -949,6 +954,13 @@ const dupPrepped = (over = {}) => ({
     originalWords: DUP_SCRIPT.split(/\s+/).filter(Boolean).length,
     mayRewrite: true,
     sceneCount: 0,
+    // Generous by default, so the budget is not what the other cases are
+    // measuring; the floor gets its own block below.
+    lengthSeconds: 64,
+    targetWords: 154,
+    minWords: 10,
+    bodyWords: DUP_CH1.split(/\s+/).filter(Boolean).length,
+    closingSentence: DUP_CLOSE,
     ...over,
   },
   editing: JSON.parse(dsRow().editing_options),
@@ -991,7 +1003,7 @@ const dupResolve = (findings) => {
     output: {
       chapters: [
         { chapter_number: 0, narrator_script: DS_FIXED_HOOK },
-        { chapter_number: 1, narrator_script: DUP_KEEP },
+        { chapter_number: 1, narrator_script: DUP_KEEP + ' ' + DUP_CLOSE },
       ],
     },
   });
@@ -1010,7 +1022,7 @@ const dupResolve = (findings) => {
     output: {
       chapters: [
         { chapter_number: 0, narrator_script: 'Lars.' },
-        { chapter_number: 1, narrator_script: DUP_KEEP },
+        { chapter_number: 1, narrator_script: DUP_KEEP + ' ' + DUP_CLOSE },
       ],
     },
   });
@@ -1030,7 +1042,7 @@ const dupResolve = (findings) => {
     output: {
       chapters: [
         { chapter_number: 0, narrator_script: DS_HOOK },
-        { chapter_number: 1, narrator_script: DUP_KEEP },
+        { chapter_number: 1, narrator_script: DUP_KEEP + ' ' + DUP_CLOSE },
       ],
     },
   });
@@ -1057,6 +1069,108 @@ const dupResolve = (findings) => {
   });
   ok('a chapter that is nothing BUT the repeat cannot be emptied', /chapter 1 came back empty/.test(out.fcReport.refused || ''));
   ok('and the script is kept whole', out.script === DS_SCRIPT && out.scriptChanged === false);
+}
+
+console.log('DS — the floor the cuts cannot go under');
+
+// EVERY OTHER GUARD IN THIS CHAIN IS PER PRESS. This one is not: it measures
+// what the script weighs NOW against the floor `Narration Guard` derives from
+// the length the producer ordered, so pressing the button ten times cannot
+// take the film below it. Two presses took one chapter from 185 words to 101
+// before this existed.
+{
+  // The film is ordered long enough that the repeat fits inside the budget.
+  const out = dupResolve(dupFindings());
+  ok('a repeat is cut when the film can spare the words', out.fc.needsRewrite === true && /CUT THIS SENTENCE/.test(out.fc.fixList));
+  ok('and nothing says the budget was hit', out.fc.cutBudgetHit === undefined);
+}
+{
+  // The same film, ordered so short that its narration is already at the
+  // floor. The repeat is still FOUND and still reported — only the deletion
+  // is withheld, because cutting it would make the film shorter than ordered.
+  const judged = { output: { mode: 'factual', findings: dupFindings() } };
+  const out = runNode('DS Resolve.js', {
+    json: judged,
+    nodes: { 'DS Prep': dupPrepped({ minWords: 200, bodyWords: 205 }), 'DS Judge': judged },
+    dir: DS,
+  });
+  ok('a repeat that would breach the floor is NOT cut', !/CUT THIS SENTENCE/.test(out.fc.fixList));
+  ok('and the run says so, rather than going quiet', out.fc.cutBudgetHit === true);
+  ok('while the finding still reaches the producer', out.fc.findings.some((f) => f.verdict === 'redundant'));
+  // The unsupported sentence is a correction, not a deletion: it does not
+  // shorten the film, so the floor has no business stopping it.
+  ok('and a genuine correction is unaffected by the floor', out.fc.needsRewrite === true && /nothing we can cite supports this/.test(out.fc.fixList));
+}
+{
+  // The budget is spent per SENTENCE, not per finding — a compound sentence
+  // arrives as several findings and must cost its words once.
+  const twice = [
+    { quote: DUP, claim: 'the date', verdict: 'redundant', ref: 'E1', reason: 'r' },
+    { quote: DUP, claim: 'the launch', verdict: 'redundant', ref: 'E1', reason: 'r' },
+  ];
+  const judged = { output: { mode: 'factual', findings: twice } };
+  const out = runNode('DS Resolve.js', {
+    json: judged,
+    nodes: { 'DS Prep': dupPrepped({ minWords: 10, bodyWords: 17 }), 'DS Judge': judged },
+    dir: DS,
+  });
+  ok('one sentence costs its words once, however many findings it carries', /CUT THIS SENTENCE/.test(out.fc.fixList) && out.fc.cutBudgetHit === undefined);
+}
+{
+  // A film with no stored length must still have its repeats cut. Failing
+  // closed here would switch the feature off and look like a clean check.
+  const judged = { output: { mode: 'factual', findings: dupFindings() } };
+  const out = runNode('DS Resolve.js', {
+    json: judged,
+    nodes: { 'DS Prep': dupPrepped({ minWords: 0, bodyWords: 0 }), 'DS Judge': judged },
+    dir: DS,
+  });
+  ok('no floor means no limit, not a limit of zero', /CUT THIS SENTENCE/.test(out.fc.fixList));
+}
+{
+  // THE CLOSING LINE IS A BOOKEND. The dedupe removed one on its first
+  // outing — "A four-person Sydney prototype had become a public product"
+  // repeats the hook's four-person team, and repeating it is the point.
+  const closing = [{ quote: DUP_CLOSE, claim: 'the web could be dragged', verdict: 'redundant', ref: 'E1', reason: 'the hook says this' }];
+  const judged = { output: { mode: 'factual', findings: closing } };
+  const out = runNode('DS Resolve.js', {
+    json: judged,
+    nodes: { 'DS Prep': dupPrepped(), 'DS Judge': judged },
+    dir: DS,
+  });
+  ok('the last sentence of the last chapter is never cut', out.fc.needsRewrite === false && out.fc.closingSpared === true);
+  ok('and it is still reported, so the producer can cut it by hand', out.fc.findings.length === 1);
+}
+{
+  // THE HOOK IS A TEASER, so a hook line whose fact reappears below is doing
+  // its job; the copy to cut is the one in the body. Cutting a hook line would
+  // also cost more than the line — `DS Apply` refuses any rewrite that changes
+  // the hook's line count, so it would throw away every other correction in
+  // the same press.
+  const inHook = [{ quote: 'Lars faced a deadline in 2003.', claim: 'the deadline', verdict: 'redundant', ref: 'E1', reason: 'said again below' }];
+  const judged = { output: { mode: 'factual', findings: inHook } };
+  const out = runNode('DS Resolve.js', {
+    json: judged,
+    nodes: { 'DS Prep': dupPrepped(), 'DS Judge': judged },
+    dir: DS,
+  });
+  ok('a hook line is never cut', out.fc.needsRewrite === false && out.fc.hookSpared === true);
+  ok('and is still reported', out.fc.findings.length === 1);
+}
+
+console.log('DS Prep — the floor it computes');
+{
+  const out = runNode('DS Prep.js', { json: dsRow({ length_seconds: 300 }), dir: DS });
+  // Narration Guard: scenes = ceil(300/8) - 1 = 37; target = 37*22 = 814;
+  // min = round(814*0.55) = 448. Copied arithmetic, asserted so the two
+  // cannot drift into disagreeing about the same film.
+  ok('it derives the length window exactly as Narration Guard does', out.fc.targetWords === 814 && out.fc.minWords === 448);
+  ok('and measures the body WITHOUT the hook', out.fc.bodyWords === DS_CH1.split(/\s+/).filter(Boolean).length);
+  ok('and names the closing line it will not cut', out.fc.closingSentence === DS_CH1);
+}
+{
+  const out = runNode('DS Prep.js', { json: dsRow(), dir: DS });
+  ok('a film with no stored length falls back to the guard default', out.fc.lengthSeconds === 64);
 }
 
 console.log('DS Rewrite, DS Write, DS Save, DS Load');
@@ -1104,6 +1218,9 @@ console.log('DS Rewrite, DS Write, DS Save, DS Load');
   ok('and reads the NEWEST script row', /order by s\.created_at desc\s*\n\s*limit 1/.test(sql));
   // What decides whether a correction may be written at all.
   ok('and counts the scenes, which is what freezes the rewrite', /count\(\*\) from hov\.scene/.test(sql) && sql.includes('as scene_count'));
+  // Without the ordered length there is no floor, and the cuts are bounded
+  // per press and unbounded across presses.
+  ok('and reads the ordered length, which is what floors the cuts', /coalesce\(p\.length_seconds, 64\) as length_seconds/.test(sql));
 }
 
 console.log('');

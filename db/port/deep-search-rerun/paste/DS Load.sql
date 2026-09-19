@@ -34,6 +34,13 @@ select
   -- the "a line and its recording drift apart silently" fault — so `DS Prep`
   -- turns a non-zero count into report-only.
   (select count(*) from hov.scene sc where sc.project_id = p.id) as scene_count,
+  -- THE FILM'S ORDERED LENGTH, which is what sets the floor the cuts may not
+  -- go under. `Narration Guard` derives its whole length window from this one
+  -- number, and `DS Prep` re-derives it with the SAME arithmetic so the re-run
+  -- and the first pass cannot disagree about how short is too short. Without
+  -- it the dedupe is bounded per press and unbounded across presses: two
+  -- presses took one chapter from 185 words to 101 on 2026-09-19.
+  coalesce(p.length_seconds, 64) as length_seconds,
   coalesce(
     (select json_agg(
        json_build_object(

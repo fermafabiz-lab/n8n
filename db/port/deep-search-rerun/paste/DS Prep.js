@@ -74,6 +74,51 @@ try {
 const sceneCount = Number(row.scene_count || 0);
 const mayRewrite = sceneCount === 0;
 
+// THE FLOOR THE CUTS MAY NOT GO UNDER.
+//
+// `FC Apply`'s length guard is per press and per chapter: it subtracts the
+// words a press was asked to cut, then allows a fifth either way around what
+// remains. That is right for one press and blind across several — two presses
+// at a quarter each pass individually and halve the chapter together, which is
+// exactly what happened on 2026-09-19 (185 words to 101, and the film lost its
+// closing line). The word count is what decides the film's runtime and how
+// many scenes it is cut into, so an unbounded shrink is a shorter film nobody
+// ordered.
+//
+// THE SAME ARITHMETIC AS `Narration Guard`, deliberately copied rather than
+// invented: it is the one owner of "how short is too short", and a second
+// opinion here would mean the first pass and the re-run disagreeing about the
+// same film. Keep these four lines in step with it.
+const lengthSeconds = Number(row.length_seconds || 64);
+const plannedScenes = Math.max(1, Math.ceil(lengthSeconds / 8) - 1);
+const targetWords = plannedScenes * 22;
+const minWords = Math.round(targetWords * 0.55);
+
+// MEASURED WITHOUT THE HOOK, because `Narration Guard` measured without it —
+// chapter 0 does not exist when the guard runs. Comparing a hook-inclusive
+// count against a hook-exclusive floor would quietly buy the cuts two spare
+// lines of budget.
+const words = (s) => String(s || '').split(/\s+/).filter(Boolean).length;
+const bodyWords = chapters
+  .filter((c) => Number(c.chapter_number) !== 0)
+  .reduce((n, c) => n + words(c.narrator_script), 0);
+
+// THE LAST SENTENCE OF THE LAST CHAPTER IS NEVER CUT. A closing line that
+// echoes the opening is a bookend, which is what a closing line IS — and the
+// dedupe removed one on its first outing ("A four-person Sydney prototype had
+// become a public product" repeats the hook's four-person team, and repeating
+// it is the point). `db/port/story-close/` exists because that resolution was
+// worth adding; this is what stops a fact-checker taking it away again.
+const lastBody = [...chapters].filter((c) => Number(c.chapter_number) !== 0).pop();
+const closingSentence = lastBody
+  ? (String(lastBody.narrator_script || '')
+      .replace(/\s+/g, ' ')
+      .split(/(?<=[.!?…])\s+/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .pop() || '')
+  : '';
+
 const run = isDocumentary && pack.length > 0 && narration.length > 0 && chapters.length > 0;
 
 // Why it did not run, in the SAME vocabulary the first pass uses, so the site's
@@ -110,8 +155,6 @@ const packList = pack
   .map((c) => `${c.ref}. ${c.claim} [${c.source}${c.date && c.date !== 'n/a' ? ', ' + c.date : ''} — ${c.url}]`)
   .join('\n');
 
-const words = (s) => String(s || '').split(/\s+/).filter(Boolean).length;
-
 return [
   {
     json: {
@@ -127,6 +170,12 @@ return [
         originalWords: words(narration),
         mayRewrite,
         sceneCount,
+        // The floor, and what the cuts are measured against.
+        lengthSeconds,
+        targetWords,
+        minWords,
+        bodyWords,
+        closingSentence,
       },
       editing,
       projectId: String(row.project_id || ''),

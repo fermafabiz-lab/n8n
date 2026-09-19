@@ -111,6 +111,83 @@ if (toFix.length && !fc.mayRewrite) {
   toFix = [];
 }
 
+// THE CUTS ARE BUDGETED, and the budget is the film's own ordered length.
+//
+// Every other guard in this chain is per press. This one is not: it compares
+// what the script WEIGHS NOW against the floor `Narration Guard` derived from
+// the length the producer ordered, so pressing the button ten times cannot take
+// the film below it. Without this the dedupe was bounded per press and
+// unbounded across presses — 185 words to 101 in two presses on 2026-09-19.
+//
+// GREEDY, IN SCRIPT ORDER. The judge already decides WHICH copy to keep (it
+// rules the later ones redundant), so the ones it marked are interchangeable
+// as far as this is concerned and taking them in the order they appear is the
+// most predictable thing to do. A repeat that does not fit stays in the report
+// as a finding the producer can act on by hand — it is never hidden.
+const wordsOf = (s) => String(s || '').split(/\s+/).filter(Boolean).length;
+const hookText = (g.chapters || [])
+  .filter((c) => Number(c.chapter_number) === 0)
+  .map((c) => String(c.narrator_script || ''))
+  .join('\n');
+
+// NO FLOOR MEANS NO LIMIT, not a limit of zero. A film with no stored length,
+// or a report from before `DS Prep` learned to compute this, must still have
+// its repeats cut — failing closed here would silently switch the whole
+// feature off and look exactly like a judge that found nothing.
+const haveFloor = Number(fc.minWords) > 0 && Number(fc.bodyWords) > 0;
+let cutBudget = haveFloor ? Math.max(0, Number(fc.bodyWords) - Number(fc.minWords)) : Infinity;
+let budgetHit = false;
+let closingSpared = false;
+let hookSpared = false;
+const spent = new Set();
+toFix = toFix.filter((f) => {
+  if (f.verdict !== 'redundant') return true;
+  const q = String(f.quote || '').trim();
+
+  // THE CLOSING LINE IS NEVER CUT. A last line that echoes the first is a
+  // bookend, not an accident, and the dedupe took one on its first outing.
+  if (q && fc.closingSentence && q === String(fc.closingSentence).trim()) {
+    closingSpared = true;
+    return false;
+  }
+
+  // THE HOOK IS SPARED TOO, and this one is belt and braces over the prompt.
+  // The hook is a teaser: its job is to state in two lines something the film
+  // then tells properly, so a hook line whose fact reappears below is working
+  // rather than repeating — the copy to cut is the one in the body. And
+  // cutting a hook line would cost more than the line: `DS Apply` refuses any
+  // rewrite that changes the hook's line count, because the film cuts a shot
+  // per line, so a hook cut would throw away every other correction in the
+  // same press.
+  if (q && hookText.includes(q)) {
+    hookSpared = true;
+    return false;
+  }
+
+  if (spent.has(q)) return true; // same sentence, already paid for
+  const cost = wordsOf(q);
+  if (cost > cutBudget) {
+    budgetHit = true;
+    return false;
+  }
+  cutBudget -= cost;
+  spent.add(q);
+  return true;
+});
+if (budgetHit) {
+  console.log(
+    'DEEP SEARCH re-run kept a repeat rather than cut it: the film is ordered at ' +
+      fc.lengthSeconds + 's, so its narration may not fall below ' + fc.minWords +
+      ' words and it is at ' + fc.bodyWords + '. Reported, not removed.',
+  );
+}
+if (closingSpared) {
+  console.log('DEEP SEARCH re-run spared the closing line: a last line that echoes the first is a bookend.');
+}
+if (hookSpared) {
+  console.log('DEEP SEARCH re-run spared a hook line: the hook is a teaser, so the copy to cut is the one in the body.');
+}
+
 // THE BACKSTOP, unchanged in intent from `FC Resolve`: most of the film failing
 // is not a film that is mostly wrong, it is a check aimed at the wrong thing,
 // and rewriting at that volume replaces the producer's script instead of
@@ -197,6 +274,12 @@ return [
         sentences: allSentences.size,
         badSentences: badSentences.size,
         needsRewrite: toFix.length > 0,
+        // A repeat was found and deliberately NOT cut, because cutting it
+        // would take the film under the length it was ordered at. The finding
+        // still reaches the producer; only the deletion is withheld.
+        cutBudgetHit: budgetHit || undefined,
+        closingSpared: closingSpared || undefined,
+        hookSpared: hookSpared || undefined,
         fixList,
       },
     },

@@ -445,6 +445,28 @@ expected and harmless for an app touching only its own Drive.
   version before it. **A change published after the run that verified it is
   unverified**, and it is worth re-reading that sentence before writing "live
   and verified" about anything here.
+
+  **The judge rules on one ASSERTION at a time since 2026-09-19 09:37**
+  (`63d21d49`, `db/port/fact-check/README.md` §5, lesson in
+  `docs/lessons-pipeline.md` under "A sentence is only as sound as its weakest
+  clause"). The producer read a post-Deep-Search script against ChatGPT and
+  found four things through it; all four were one fault — **the judge was
+  asked for a verdict per SENTENCE, and a documentary sentence is almost never
+  one assertion**, so a source for the half it was mostly about carried the
+  half nothing backed. It now returns one finding per assertion, repeating the
+  `quote`, with `claim` as what distinguishes them; on the producer's own
+  narration that is 26 findings across 13 sentences where it was 15, and all
+  four misses come back unsupported (execution 15034). Two consequences worth
+  carrying past this feature. **A closed-book checker inherits its pack's
+  errors**: the ZipDash chronology was not missed but checked, against a claim
+  that itself said "after buying Where 2 and Keyhole" — so the judge now
+  refuses to take ORDER from a claim's prose and takes it only from dates,
+  which routes it to a live lookup. And **a ratio measured over units a prompt
+  defines is not a threshold**: doubling the findings silently moved
+  `FC Resolve`'s overwhelmed backstop, its fix list and `FC Apply`'s
+  `rewritten`, all three of which now count distinct sentences.
+  **What is owed**: `Extract Claims` still writes relative order ("after") as
+  if it were sourced — claims should carry dates.
 - **A Flow refusal that arrives as HTTP 200 no longer kills the film**
   (2026-09-17, Media Generation `6735a96a`, `db/port/regen-unstick/README.md`,
   lesson in `docs/lessons-pipeline.md` under "Flow refuses twice"). **What is

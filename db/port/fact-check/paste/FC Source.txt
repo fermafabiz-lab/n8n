@@ -10,7 +10,7 @@ PREFER PRIMARY SOURCES, in this order:
 Never cite a Wikipedia MIRROR — a copy of Wikipedia served under somebody else's domain. They look like independent corroboration and are not. If the only thing you can find is an encyclopedia entry, say so in SOURCE rather than dressing it up.
 
 STATEMENTS TO CHECK:
-{{ ($json.output.findings || []).filter(f => f.verdict === 'unsupported').map((f, i) => (i + 1) + '. ' + f.claim).join('\n') }}
+{{ (($json.output || {}).findings || []).filter(f => f.verdict === 'unsupported').slice(0, 25).map((f, i) => (i + 1) + '. ' + f.claim).join('\n') }}
 
 FOR EACH numbered statement, output exactly one line, in this format, and nothing else:
 

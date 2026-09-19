@@ -354,6 +354,50 @@ console.log('FC Resolve');
   });
   ok('a documentary with a handful of errors is still rewritten', out.fc.overwhelmed === false && out.fc.needsRewrite === true);
 }
+{
+  // ONE SENTENCE, THREE PROBLEMS — the shape the judge started returning on
+  // 2026-09-19, after the producer found that "Google bought ZipDash after
+  // buying Where 2 and Keyhole" was marked supported because two of its three
+  // assertions were. Everything here that measures the SCRIPT must count the
+  // sentence once; everything that measures the CHECK counts three.
+  const q = 'Lars and Jens led the team into launch.';
+  const three = [
+    { ...UNSUPPORTED(), quote: q, claim: 'Lars led the team.', reason: 'No claim names a leader.' },
+    { ...UNSUPPORTED(), quote: q, claim: 'Jens led the team.', reason: 'No claim names a leader.' },
+    { ...UNSUPPORTED(), quote: q, claim: 'They led it through to launch.', reason: 'No claim covers the period.' },
+    SUPPORTED(),
+  ];
+  const j = judged(three);
+  const out = runNode('FC Resolve.js', { json: j, nodes: { 'FC Prep': prepped(), 'FC Judge': j } });
+
+  ok('every assertion of a compound sentence is reported', out.fc.findings.length === 4);
+  ok('but the sentence is counted once', out.fc.sentences === 2 && out.fc.badSentences === 1);
+
+  // The fix list is what the rewrite is instructed from. Two entries for one
+  // sentence would ask for it to be rewritten twice, the second rewrite blind
+  // to the first — so the three problems arrive under ONE numbered sentence.
+  const entries = out.fc.fixList.split('\n\n');
+  ok('the fix list names the sentence once', entries.length === 1 && entries[0].startsWith('1. SENTENCE: ' + q));
+  ok('and carries all three problems under it', ['Lars led the team.', 'Jens led the team.', 'They led it through to launch.'].every((c) => out.fc.fixList.includes(c)));
+  ok('and says there is more than one', out.fc.fixList.includes('3 separate problems'));
+}
+{
+  // The backstop must not trip on a script whose sentences are merely being
+  // sliced finely. Two bad sentences out of twelve is 17% however many
+  // assertions the judge draws out of them — counting findings, the same film
+  // would read as 6 of 16, which is close enough to the threshold that a
+  // slightly chattier judge would start silently refusing to correct films.
+  const dense = [];
+  for (let i = 0; i < 2; i += 1) {
+    for (let k = 0; k < 3; k += 1) dense.push({ ...UNSUPPORTED(), quote: `Bad ${i}.`, claim: `Bad ${i} part ${k}.` });
+  }
+  for (let i = 0; i < 10; i += 1) dense.push({ ...SUPPORTED(), quote: `Good ${i}.` });
+  const narr = narration() + '\n\n' + dense.map((f) => f.quote).join(' ');
+  const j = judged(dense);
+  const out = runNode('FC Resolve.js', { json: j, nodes: { 'FC Prep': prepped({ narration: narr }), 'FC Judge': j } });
+  ok('a finely sliced sentence does not overwhelm the check', out.fc.overwhelmed === false && out.fc.needsRewrite === true);
+  ok('and the sentence count is what was measured', out.fc.sentences === 12 && out.fc.badSentences === 2);
+}
 
 // ---------------------------------------------------------------------------
 // FC Apply — the safety valve
@@ -390,6 +434,38 @@ const FIXED_CH1 = 'Google acquired Where 2 Technologies in October 2004. Google 
   ok('reports the sentence as rewritten', out.fcReport.rewritten === 1 && out.fcReport.findings[1].action === 'rewritten');
   ok('reports the supported one as kept', out.fcReport.findings[0].action === 'kept');
   ok('base64 round-trips to the same report', JSON.parse(Buffer.from(out.fcReport64, 'base64').toString('utf8')).rewritten === 1);
+}
+{
+  // ONE SENTENCE FIXED IS ONE CORRECTION, however many assertions were wrong
+  // in it. All three findings stop matching the moment the sentence changes,
+  // so counting findings would tell the producer "3 corrected" about a single
+  // edit — three sentences to go and reread, two of which do not exist.
+  const q = 'Lars and Jens led the team into launch.';
+  const three = ['Lars led the team.', 'Jens led the team.', 'They led it through to launch.'].map((claim) => ({
+    ...UNSUPPORTED(),
+    quote: q,
+    claim,
+    action: 'rewrite',
+  }));
+  const out = runNode('FC Apply.js', {
+    json: {},
+    nodes: {
+      'FC Resolve': { ...resolved([...three, { ...SUPPORTED(), action: 'keep' }]), fc: { ...prepped().fc, findings: [...three, { ...SUPPORTED(), action: 'keep' }], needsRewrite: true, searched: 0, fixList: 'x', sentences: 2 } },
+      'FC Rewrite': {
+        output: {
+          chapters: [
+            { chapter_number: 1, chapter_title: 'The acquisition', narrator_script: FIXED_CH1 },
+            { chapter_number: 2, chapter_title: 'Launch', narrator_script: CH2 },
+          ],
+        },
+      },
+    },
+  });
+  ok('one corrected sentence is reported as one correction', out.fcReport.rewritten === 1);
+  ok('while every assertion is still listed', out.fcReport.checked === 4 && out.fcReport.flagged === 3);
+  ok('and the report says how many sentences those came from', out.fcReport.sentences === 2);
+  ok('each assertion of the fixed sentence reads as rewritten', out.fcReport.findings.slice(0, 3).every((f) => f.action === 'rewritten'));
+  ok('and carries the claim that distinguishes it', out.fcReport.findings[1].claim === 'Jens led the team.');
 }
 {
   // The rewrite tidied a chapter nobody asked it to touch.

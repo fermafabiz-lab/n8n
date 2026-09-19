@@ -373,6 +373,7 @@ it, silently and in the direction that looks like nothing happened.
 | **The fixed gate runs on a real film** | execution at 19:32 for `recAVSS5qpc9V5DjV` ("How the Rosetta Stone was deciphered"): `{category: "documentary", checked: 15, searched: 9, flagged: 1, rewritten: 1}`. The `category` in the row is the proof — it is the field that was `undefined` all afternoon |
 | **The LIVE nodes run inside a real scripting execution** | execution **14771**, a real pipeline fired at the `new-project` webhook for the disposable film `rec4ZIQVVxXZcS5no` ("How the first cash machine was installed in Enfield in 1967"): `hov.fact_check` written at 15:03:01 with `{checked: 18, flagged: 1, searched: 5, rewritten: 1}` and 18 stored findings, and the run went on to write its script and park at the approval gate — so `FC Done` handed the narration back intact |
 | **Attribution stops laundering an order, and the script is read against itself** | execution **15071**, the new judge prompt against `reczMt4d9zqrYcceL`'s real narration: the ZipDash sentence now returns THREE findings where the previous version returned two — the attribution still `supported` on E16 (it really does say that), plus *"Google added Keyhole and ZipDash after acquiring Where 2"* as its own finding, `unsupported`, reason *"no date is given here for ZipDash, so the chronology cannot be backed from the claims alone"*. And *"In 2004, two Australians and two Danes came together in Sydney"* — which produced **no finding at all** on the live version — comes back `unsupported`. 17 findings over 10 sentences against 17 over 9, so the two new rules added what was missing without inflating the rest |
+| **…and an ordering that IS dated still passes, which is the half that matters** | execution **15074**, a whole pipeline fired at `new-project` at 11:14:43 — after the 11:14 publish — for the disposable documentary `recKMOrar94pZqq6j` (Facebook/Instagram/WhatsApp/Oculus, chosen because its acquisitions cluster). Row at 11:16:05: `{checked: 15, sentences: 7, flagged: 0, searched: 5, rewritten: 0}`. The finding to read is *"Facebook completed the Instagram acquisition after the FTC closed its investigation"* → **`supported`, ref `E2, E5`**, reason *"E5 dates the FTC closure to August 22, 2012, and E2 says the acquisition was completed in August 2012, establishing that the closure came first"*. **The judge cited the two dates as its justification.** That is the rule behaving as designed rather than as a blunt instrument: an undated ordering (ZipDash) is refused, a dated one is accepted and says which dates settled it. The obvious failure mode — flagging every sentence containing "after" — did not happen, and five statements the pack did not cover were all sourced live from Facebook's own announcements and Meta's Form 10-K |
 | **One assertion at a time, on the producer's own film** | execution **15034**, the new `FC Judge` prompt run against `recJiAdwRqaeg8DnR`'s real narration and real pack: 26 findings across **13 distinct sentences** (was 15 findings, one per sentence), and all four of ChatGPT's reported misses come back `unsupported` — the ZipDash ordering (*"the claims date Where 2 and Keyhole to October 2004, but ZipDash is only dated to 2004"*), the browser clause, *"reached … 200 million places"*, and the spare-room narrowing |
 | **The PUBLISHED chain runs one-assertion-at-a-time on a real film** | execution **15039**, a whole pipeline fired at `new-project` at 09:38:19 — **after** `63d21d49` went live at 09:37, which is the point — for the disposable documentary `recF5TgqBT8nBwea5` (YouTube, February 2005 to November 2006). Row written 09:40:08: `{category: "documentary", checked: 21, sentences: 10, flagged: 2, searched: 8, rewritten: 2}`, and `count(distinct quote) = 10` against 21 findings, so eleven of them share a sentence with another. The two unsupported ones are the exact shape the producer reported: *"On February 14, 2005, youtube.com was registered, **giving Chad Hurley a real address for an unproven company**"* (E1 backs the date, nothing backs the rest) and *"YouTube said it was founded that month by PayPal veterans, **with Hurley alongside Steve Chen and Jawed Karim**"* (E2 backs "PayPal veterans", nothing names the three). **Under the old prompt both sentences would have come back `supported`.** The row right below it is the producer's own 09:18 film on the previous version: `checked: 15`, `sentences: null`, 15 findings over 15 distinct quotes — one per sentence |
 | `FC Resolve`, `FC Apply`, `FC Done` behave | `node scripts/check-fact-check.mjs` — 71 assertions over the committed bodies, including every refusal branch, the multi-finding sentence, the grouped fix list, and that a finely sliced sentence does not trip the overwhelmed backstop |
@@ -384,17 +385,18 @@ drift apart. It does NOT prove the live node matches the file — that is
 
 The verification workflows were throwaways and are archived:
 `PhZtGYUo5mLqd11E` (the data probes) and `eMjJ0X7RvH6PUbuT` (the chain); and
-from 2026-09-19, `q5gue5gQ4oJkRtmx` (the new judge prompt against the real
-narration and pack), `wyUS527vzBnGQaGo` (fires `new-project`) and
-`snKTsHwHQUfobBGE` (reads `hov.fact_check` back).
+from 2026-09-19, `q5gue5gQ4oJkRtmx` and `utlOHyZDN31Bbzr3` (the two judge
+prompts against real narration and pack), `wyUS527vzBnGQaGo` /
+`UL5DChAzyhiYWLzW` (fire `new-project`) and `snKTsHwHQUfobBGE` /
+`YhGEJUOMr5gNXgIf` / `2fX41mkMCBk4ON5G` (read `hov.fact_check` back).
 
-**The ordering rule is the one thing NOT exercised by the live run.** The
-YouTube film's narration happened to assert no relative order, so every
-finding in execution 15039 is a plain factual one. "Dates settle order" was
-verified in execution 15034, on the producer's real narration and real pack,
-against the judge prompt as published — but not inside a full pipeline. The
-next documentary whose research clusters several events in one year is the one
-to read.
+**The ordering rule is now exercised in both directions, and the positive one
+is the one that proves it.** The YouTube film (15039) asserted no relative
+order at all; the Facebook film (15074) asserted one and had it ACCEPTED,
+with the judge naming the two dates that settled it. A rule that refuses
+undated orderings is only useful if it still passes dated ones — otherwise it
+is a filter on the word "after", and every acquisition documentary would
+arrive at the gate covered in red.
 
 ## Version ids
 

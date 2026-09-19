@@ -2110,6 +2110,49 @@ over units that a prompt defines is not a threshold, it is a coincidence** —
 change how finely the model is asked to slice and every number underneath
 moves with it, silently, in the direction that looks like nothing happened.
 
+**Then attribution walked straight around the order rule, and that is the
+sharper lesson** (same day, `3d1834f1`). The next film's writer had
+*attributed* the chronology — "Google acquired Where 2 in October 2004 and,
+**according to the same report**, added Keyhole and ZipDash" — so the
+assertion the judge extracted was a claim about what a report SAYS. The pack's
+E16 really does say it, the finding was correctly `supported`, and "dates
+settle order" never fired because no ordering claim was ever extracted at all.
+**Naming a source does not make a date right, and a viewer does not hear
+"this ordering is contested" — they hear the ordering.**
+
+The judge now rules on an attributed statement TWICE when the underlying fact
+is one somebody else could check — a date, an order, a count, a measurement —
+once on the attribution and once on the fact. The limit is as important as the
+rule and is written into the prompt: a party's claim about ITSELF ("Google said
+Maps had a billion monthly users") stays ONE claim, because what they said IS
+the fact and no outside source can settle their internal number. And the
+rewrite may no longer repair an ordering by attributing it: that leaves the
+same chronology in the viewer's ears with a citation in front of it, so an
+ordering goes to the ladder's second rung instead — name the period everything
+is agreed to have happened in, drop the sequence.
+
+**A rule that refuses is only useful if it still accepts.** The obvious
+failure mode here was a filter on the word "after", which would paint every
+acquisition documentary red. It did not happen: on the film that verified this
+live, *"Facebook completed the Instagram acquisition after the FTC closed its
+investigation"* came back `supported`, citing E5's August 22 2012 closure and
+E2's August 2012 completion — **the judge named the two dates as its
+justification.** Undated order refused, dated order accepted with its working
+shown. When you add a rule that says no, find the case where it should say yes
+and check that it still does.
+
+**The narration is also now checked against ITSELF**, which nothing in the
+chain could do before. The same film said "In early 2003, Lars and Jens started
+Where 2 Technologies in Sydney" and, three sentences later, "In 2004, two
+Australians and two Danes came together in Sydney" — one founding, two years,
+two counts — and the second sentence produced no finding at all, because "came
+together to develop" reads like scene-setting. It is not: it carries a date and
+a count. **A sentence that re-tells an event already narrated is always
+checkable**, and the judge is the only step that ever holds the whole script,
+so it is the only place this can be caught. It is the same fault that opened
+this entire story, when the first red-lit film's hook said April and its first
+chapter said October.
+
 ### Deep Search is Documentary mode's feature, not the narration's — 2026-09-18
 
 The entry above says the project's `category` cannot tell a documentary from a

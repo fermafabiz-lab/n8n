@@ -154,15 +154,32 @@ for (const f of toFix) {
   }
   e.problems.push(f);
 }
+// A REDUNDANT SENTENCE IS CUT, NOT REWORDED, and the instruction has to say so
+// in the imperative — the ladder's first three rungs (attribute, soften,
+// correct) all keep the sentence, and every one of them leaves the viewer
+// hearing the same fact twice in a new costume.
+const problemOf = (f) => {
+  if (f.verdict === 'contradicted') return 'a source contradicts this';
+  if (f.verdict === 'redundant') return 'THE NARRATION ALREADY SAYS THIS — delete the sentence, do not reword it';
+  return 'nothing we can cite supports this';
+};
+
 const fixList = grouped
   .map((e, i) => {
     const problems = e.problems
       .map(
         (f) =>
-          `   - ${f.claim || 'this statement'}: ${f.verdict === 'contradicted' ? 'a source contradicts this' : 'nothing we can cite supports this'}. ${(f.reason || '').trim()}${f.url ? ' [' + f.url + ']' : ''}`,
+          `   - ${f.claim || 'this statement'}: ${problemOf(f)}. ${(f.reason || '').trim()}${f.url ? ' [' + f.url + ']' : ''}`,
       )
       .join('\n');
-    return `${i + 1}. SENTENCE: ${e.quote}\n   WHAT IS WRONG WITH IT${e.problems.length > 1 ? ' (' + e.problems.length + ' separate problems — fix all of them in the one rewrite)' : ''}:\n${problems}`;
+    // When every problem with a sentence is that it repeats another, the whole
+    // entry is a deletion and saying so once at the top beats hoping the model
+    // reads to the end of the bullets.
+    const allDup = e.problems.every((f) => f.verdict === 'redundant');
+    const head = allDup
+      ? '   CUT THIS SENTENCE — it repeats what the narration has already said:'
+      : `   WHAT IS WRONG WITH IT${e.problems.length > 1 ? ' (' + e.problems.length + ' separate problems — fix all of them in the one rewrite)' : ''}:`;
+    return `${i + 1}. SENTENCE: ${e.quote}\n${head}\n${problems}`;
   })
   .join('\n\n');
 

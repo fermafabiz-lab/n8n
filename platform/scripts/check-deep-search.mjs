@@ -173,6 +173,29 @@ console.log("Ran");
   ok("and names the refusal so it is not mysterious", s.detail.includes("300 to 180"));
 }
 {
+  // A SENTENCE THAT WAS CUT IS SETTLED, not standing. Left out of the settled
+  // set it would light the same warning as an unsourced statement, so a film
+  // that was tidied would read as a film with a problem.
+  const s = deepSearchState({
+    report: { checked: 12, flagged: 1, rewritten: 0, deduped: 1, findings: [finding("cut", "redundant"), finding("kept", "supported")] },
+    isDocumentary: true,
+    scriptExists: true,
+  });
+  ok("a cut repeat is not a problem still standing", s.status === "corrected" && s.red === false);
+  ok("and the deletion is said out loud", /repeated something said earlier/i.test(s.detail));
+  ok("without claiming a correction to reread", !/corrected 1 sentence/i.test(s.detail));
+}
+{
+  // A repeat the rewrite did NOT remove. The sources back it, so the wording
+  // must not call it unsupported — the fault is that the film says it twice.
+  const s = deepSearchState({
+    report: { checked: 12, flagged: 1, rewritten: 0, findings: [finding("flagged", "redundant")] },
+    isDocumentary: true,
+    scriptExists: true,
+  });
+  ok("an uncut repeat still counts as standing", s.status === "flagged" && s.red === false);
+}
+{
   // A RE-RUN ON A FILM PAST ITS SCRIPT GATE checks in full and refuses to edit,
   // because the scenes carry their own copy of every line and their own
   // recordings by then. Unsaid, "3 unsupported" on an approved film reads as a

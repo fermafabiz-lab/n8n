@@ -172,8 +172,14 @@ export function deepSearchState({
     };
   }
 
-  const standing = findings.filter((f) => f.action !== "kept" && f.action !== "rewritten").length;
+  // `cut` joins `kept` and `rewritten` as an action that RESOLVED a finding:
+  // the sentence was a repeat of one the film already had, and it is gone. Left
+  // out of this list it would read as a problem still standing, and a film that
+  // was tidied would light the same warning as one that was not.
+  const settled = new Set(["kept", "rewritten", "cut"]);
+  const standing = findings.filter((f) => !settled.has(String(f.action))).length;
   const rewritten = report.rewritten ?? 0;
+  const deduped = report.deduped ?? 0;
   const s = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
   if (standing > 0) {
@@ -195,11 +201,24 @@ export function deepSearchState({
       red: false,
     };
   }
+  // A DELETION IS NEWS TOO, and it is different news from a correction: the
+  // producer does not have to reread a sentence that is gone, but they should
+  // know the film got shorter and why.
+  const cutNote = deduped > 0 ? ` ${s(deduped, "sentence")} that repeated something said earlier ${deduped === 1 ? "was" : "were"} cut.` : "";
+
   if (rewritten > 0) {
     return {
       status: "corrected",
       label: `${s(rewritten, "fix")}`,
-      detail: `Deep Search corrected ${s(rewritten, "sentence")} before you saw this script, and everything else checked out.`,
+      detail: `Deep Search corrected ${s(rewritten, "sentence")} before you saw this script, and everything else checked out.${cutNote}`,
+      red: false,
+    };
+  }
+  if (deduped > 0) {
+    return {
+      status: "corrected",
+      label: deduped === 1 ? "1 cut" : `${deduped} cut`,
+      detail: `Every statement in this script is backed by the film's sources.${cutNote}`,
       red: false,
     };
   }

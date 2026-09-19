@@ -210,15 +210,21 @@ function groupBySentence(findings: DeepSearchFinding[]): DeepSearchFinding[][] {
 
 function rank(f: DeepSearchFinding): number {
   if (f.verdict === "contradicted" && f.action !== "rewritten") return 0;
-  if (f.action !== "kept" && f.action !== "rewritten") return 1;
+  if (f.action !== "kept" && f.action !== "rewritten" && f.action !== "cut") return 1;
   if (f.action === "rewritten") return 2;
-  return 3;
+  // A cut sentence sorts below a corrected one: there is nothing to reread.
+  if (f.action === "cut") return 3;
+  return 4;
 }
 
 function labelFor(f: DeepSearchFinding): { label: string; tone: string } {
   if (f.action === "rewritten") return { label: "CORRECTED", tone: "run" };
+  if (f.action === "cut") return { label: "CUT — ALREADY SAID", tone: "run" };
   if (f.action === "kept") return { label: "SOURCED", tone: "ok" };
   if (f.verdict === "contradicted") return { label: "CONTRADICTED", tone: "err" };
+  // A repeat the rewrite did NOT manage to remove. The sources back it, so
+  // "unsupported" would be a lie — the problem is that the film says it twice.
+  if (f.verdict === "redundant") return { label: "REPEATED", tone: "wait" };
   return { label: "UNSUPPORTED", tone: "wait" };
 }
 

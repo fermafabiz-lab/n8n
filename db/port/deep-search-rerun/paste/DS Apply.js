@@ -26,6 +26,32 @@ for (const f of toFix) {
   }
 }
 
+// HOW MANY WORDS EACH CHAPTER IS SUPPOSED TO LOSE. A `redundant` sentence is
+// told to leave, so the chapter it sits in is EXPECTED to come back shorter —
+// and the length guard below, which exists to catch a rewrite that re-tells a
+// chapter in miniature, would otherwise read a correct deletion as exactly that
+// and refuse the whole rewrite. Subtracting the cut first keeps the guard as
+// strict as it was about everything else.
+//
+// DEDUPED BY QUOTE, because the judge rules on one assertion at a time and a
+// sentence can arrive as several findings; counting its words once per finding
+// would let a chapter shrink by a multiple of what was actually removed.
+const cutWordsFor = new Map();
+const countedCuts = new Set();
+for (const f of toFix) {
+  if (f.verdict !== 'redundant') continue;
+  const q = String(f.quote || '').trim();
+  if (!q || countedCuts.has(q)) continue;
+  countedCuts.add(q);
+  for (const c of original) {
+    if (String(c.narrator_script || '').includes(q)) {
+      const n = Number(c.chapter_number);
+      cutWordsFor.set(n, (cutWordsFor.get(n) || 0) + wc(q));
+      break;
+    }
+  }
+}
+
 let next = null;
 let refusal = null;
 
@@ -60,11 +86,15 @@ if (!fc.needsRewrite) {
       }
       const wasWords = wc(c.narrator_script);
       const nowWords = wc(text);
-      // A fifth either way. Wide enough that attributing or cutting one
-      // sentence passes; narrow enough that a rewrite which re-tells the
-      // chapter does not.
-      if (wasWords && (nowWords < wasWords * 0.8 || nowWords > wasWords * 1.2)) {
-        refusal = 'chapter ' + c.chapter_number + ' went from ' + wasWords + ' to ' + nowWords + ' words';
+      // A fifth either way, measured against what the chapter SHOULD now weigh:
+      // what it arrived at, minus any sentence the judge asked to have cut.
+      // Wide enough that attributing or cutting one sentence passes; narrow
+      // enough that a rewrite which re-tells the chapter does not.
+      const expectWords = Math.max(1, wasWords - (cutWordsFor.get(Number(c.chapter_number)) || 0));
+      if (wasWords && (nowWords < expectWords * 0.8 || nowWords > expectWords * 1.2)) {
+        refusal =
+          'chapter ' + c.chapter_number + ' went from ' + wasWords + ' to ' + nowWords + ' words' +
+          (expectWords !== wasWords ? ' (about ' + expectWords + ' expected after the cut)' : '');
         break;
       }
       if (!touched.has(Number(c.chapter_number)) && text !== String(c.narrator_script || '').trim()) {
@@ -128,6 +158,12 @@ const nextEditing = hookChanged
 // that all stop matching the moment that one sentence is rewritten, and
 // counting findings would report "3 corrected" for one edit.
 const fixedSentences = new Set();
+// Counted apart from the corrections, because they are a different piece of
+// news: a correction changes what the film SAYS and the producer must reread
+// it, a deletion only removes a sentence they were about to hear for the
+// second time. Rolled together, "5 sentences corrected" would send them
+// hunting for five edits when there are three.
+const cutSentences = new Set();
 for (const f of findings) {
   if (f.action !== 'rewrite') {
     f.action = 'kept';
@@ -138,10 +174,17 @@ for (const f of findings) {
     continue;
   }
   const still = chapters.some((c) => String(c.narrator_script || '').includes(f.quote));
-  f.action = still ? 'flagged' : 'rewritten';
-  if (!still) fixedSentences.add(String(f.quote || '').trim());
+  const dup = f.verdict === 'redundant';
+  f.action = still ? 'flagged' : dup ? 'cut' : 'rewritten';
+  if (!still) (dup ? cutSentences : fixedSentences).add(String(f.quote || '').trim());
 }
+// A sentence with both problems — repeated AND unsourced — is a correction, not
+// a deletion, wherever it lands: `redundant` is only ever used for a statement
+// the sources DO back, so the two sets cannot legitimately overlap. Subtracting
+// is belt and braces against a judge that ignores that instruction.
+for (const q of fixedSentences) cutSentences.delete(q);
 const rewritten = fixedSentences.size;
+const deduped = cutSentences.size;
 
 const ran = fc.run && !fc.storyMode;
 
@@ -153,6 +196,10 @@ const report = ran
       sentences: fc.sentences || 0,
       searched: fc.searched || 0,
       rewritten,
+      // Sentences removed because the narration already carried the fact.
+      // Undefined rather than 0 when there were none, so an older report and a
+      // clean new one read the same on the panel.
+      deduped: deduped || undefined,
       refused: refusal || undefined,
       overwhelmed: fc.overwhelmed ? true : undefined,
       // The film is past its script gate, so the re-run checked and refused to
@@ -195,7 +242,7 @@ const report = ran
 
 console.log(
   'DEEP SEARCH re-run done: ' + report.checked + ' checked, ' + report.flagged + ' flagged, ' +
-    report.rewritten + ' rewritten' + (hookChanged ? ' (hook updated)' : '') +
+    report.rewritten + ' rewritten' + (deduped ? ', ' + deduped + ' repeated sentence(s) cut' : '') + (hookChanged ? ' (hook updated)' : '') +
     (report.skipCode ? ' (skipped: ' + report.skipCode + ')' : ''),
 );
 

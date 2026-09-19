@@ -646,7 +646,12 @@ export interface DeepSearchFinding {
   quote: string;
   /** The assertion inside it, isolated. */
   claim?: string;
-  verdict: "supported" | "unsupported" | "contradicted";
+  /**
+   * `redundant` (2026-09-19) means the sources DO back it — the fault is that
+   * the narration had already said it. It is deliberately not a sourcing
+   * verdict, so it must never be reported to the producer as "unsupported".
+   */
+  verdict: "supported" | "unsupported" | "contradicted" | "redundant";
   /** The pack claim that settles it (E1, E12…), when one does. */
   ref?: string;
   reason?: string;
@@ -654,7 +659,13 @@ export interface DeepSearchFinding {
   /** A primary source found for this statement specifically, if any. */
   url?: string;
   /** `kept` held up; `rewritten` was corrected; `flagged` still stands. */
-  action?: "kept" | "rewritten" | "flagged" | string;
+  /**
+   * What became of the sentence. `cut` was added 2026-09-19: the sources back
+   * the statement, but the narration had already made it, so the sentence was
+   * deleted rather than reworded. It is a RESOLVED action like `kept` and
+   * `rewritten`, not a problem still standing.
+   */
+  action?: "kept" | "rewritten" | "cut" | "flagged" | string;
 }
 
 /**
@@ -690,6 +701,12 @@ export interface DeepSearchReport {
   searched?: number;
   /** Sentences the rewrite actually changed. */
   rewritten?: number;
+  /**
+   * Sentences DELETED because the narration already carried the fact. Counted
+   * apart from `rewritten` because it is different news: a correction has to
+   * be reread, a deletion does not.
+   */
+  deduped?: number;
   /** Present only when the check did not run; says why, in prose. */
   skipped?: string;
   /**

@@ -917,6 +917,148 @@ const DS_FIXED_HOOK = 'Lars faced a hard problem in 2003.\nThe Sydney team held 
   ok('and writes no script', out.scriptChanged === false && out.hookChanged === false);
 }
 
+console.log('DS — a sentence the narration already made');
+
+// THE FAULT THIS CHAIN CAUSED. Four presses of the re-check turned one film
+// into a script that announced the same product launch four times: the rewrite
+// was told to keep each chapter's length and to use only the claims, so every
+// pass replaced an unsourced sentence with the best-sourced fact it had — the
+// one the previous sentence already carried. `redundant` is how the judge says
+// so, and `cut` is what becomes of the sentence.
+//
+// A LOCAL FIXTURE, because a duplicate has to sit ALONGSIDE other sentences to
+// be a realistic one. The shared fixture's chapter 1 is a single sentence, and
+// a chapter whose whole body is the repeat is a different case — covered at
+// the end of this section.
+const DUP = 'The map went live in February 2005.';
+const DUP_KEEP = 'Google announced Google Local on March 17, 2004.';
+const DUP_CH1 = DUP_KEEP + ' ' + DUP;
+const DUP_SCRIPT = `[CHAPTER 0: HOOK]\n${DS_HOOK}\n\n[CHAPTER 1: Launch]\n${DUP_CH1}`;
+
+const dupPrepped = (over = {}) => ({
+  chapters: [
+    { chapter_number: 0, chapter_title: 'HOOK', narrator_script: DS_HOOK },
+    { chapter_number: 1, chapter_title: 'Launch', narrator_script: DUP_CH1 },
+  ],
+  fc: {
+    run: true,
+    category: 'documentary',
+    skipCode: null,
+    packList: 'E1. c [s, 2004 — u]',
+    narration: DUP_SCRIPT,
+    originalWords: DUP_SCRIPT.split(/\s+/).filter(Boolean).length,
+    mayRewrite: true,
+    sceneCount: 0,
+    ...over,
+  },
+  editing: JSON.parse(dsRow().editing_options),
+  projectId: 'rec1',
+  projectName: 'A film',
+});
+
+const dupFindings = () => [
+  { quote: DS_BAD, claim: 'Lars faced a deadline in 2003.', verdict: 'unsupported', ref: '', reason: 'No claim mentions a deadline.' },
+  { quote: DUP, claim: 'The map went live in February 2005.', verdict: 'redundant', ref: 'E1', reason: 'The hook already says the map went live in February 2005.' },
+];
+
+const dupResolve = (findings) => {
+  const judged = { output: { mode: 'factual', findings } };
+  return runNode('DS Resolve.js', {
+    json: judged,
+    nodes: { 'DS Prep': dupPrepped(), 'DS Judge': judged },
+    dir: DS,
+  });
+};
+
+{
+  const out = dupResolve(dupFindings());
+  ok('a repeat reaches the rewrite like any other problem', out.fc.needsRewrite === true);
+  // The ladder's first three rungs all KEEP the sentence, which is exactly the
+  // wrong outcome here — the viewer hears the same fact in a new costume. The
+  // instruction has to be an imperative to delete, at the top of the entry.
+  ok('and is told to be CUT, not reworded', /CUT THIS SENTENCE/.test(out.fc.fixList) && /delete the sentence, do not reword it/.test(out.fc.fixList));
+  ok('while a genuine gap keeps its own wording', /nothing we can cite supports this/.test(out.fc.fixList));
+  // `unsupported` is what routes a finding to the live web lookup. A repeat is
+  // not a sourcing question — the sources back it — so a search would be a
+  // wasted call AND could flip it to `supported`, losing the cut.
+  ok('a repeat is never sent to the live source lookup', out.fc.findings.filter((f) => f.verdict === 'unsupported').length === 1);
+}
+{
+  // The rewrite deletes the repeat and corrects the hook. Chapter 1 loses the
+  // 7 words of the cut sentence — a third of it — which is outside the ±20%
+  // band, so without the subtraction the guard would refuse a correct cut.
+  const out = dsApply(dupResolve(dupFindings()), {
+    output: {
+      chapters: [
+        { chapter_number: 0, narrator_script: DS_FIXED_HOOK },
+        { chapter_number: 1, narrator_script: DUP_KEEP },
+      ],
+    },
+  });
+  ok('the cut is accepted rather than refused as a re-telling', out.fcReport.refused === undefined);
+  ok('and the repeated sentence is gone from the script', !out.script.includes(DUP));
+  ok('while the sentence it duplicated stays', out.script.includes(DUP_KEEP));
+  ok('the cut sentence reads as cut, not corrected', out.fcReport.findings.find((f) => f.quote === DUP).action === 'cut');
+  ok('and is counted apart from the corrections', out.fcReport.deduped === 1 && out.fcReport.rewritten === 1);
+  ok('the script is shorter, and says so', out.scriptChanged === true);
+}
+{
+  // The guard must still bite on a chapter that was re-told rather than cut —
+  // the subtraction is per chapter and per quote, so a chapter with nothing
+  // marked redundant keeps the old band exactly.
+  const out = dsApply(dupResolve(dupFindings()), {
+    output: {
+      chapters: [
+        { chapter_number: 0, narrator_script: 'Lars.' },
+        { chapter_number: 1, narrator_script: DUP_KEEP },
+      ],
+    },
+  });
+  ok('a chapter with no cut still refuses a re-telling', /chapter 0 went from 13 to 1 words/.test(out.fcReport.refused || ''));
+}
+{
+  // Several findings can share one quote. Counting its words once per finding
+  // would let the chapter shrink by a multiple of what was actually removed —
+  // the same bug as counting findings where sentences were meant.
+  const twice = [
+    { quote: DUP, claim: 'the launch date', verdict: 'redundant', ref: 'E1', reason: 'already said' },
+    { quote: DUP, claim: 'the launch itself', verdict: 'redundant', ref: 'E1', reason: 'already said' },
+  ];
+  const resolved = dupResolve(twice);
+  ok('two findings on one repeated sentence list it once', (resolved.fc.fixList.match(/SENTENCE:/g) || []).length === 1);
+  const out = dsApply(resolved, {
+    output: {
+      chapters: [
+        { chapter_number: 0, narrator_script: DS_HOOK },
+        { chapter_number: 1, narrator_script: DUP_KEEP },
+      ],
+    },
+  });
+  ok('and it counts as one deletion, not two', out.fcReport.deduped === 1);
+}
+{
+  // A chapter whose WHOLE body is the repeat cannot simply be emptied — a
+  // chapter with no narration has no scenes and breaks the film's structure.
+  // `FC Apply`'s empty-chapter refusal already covers it, and that is the
+  // better error than a length one, so this pins WHICH refusal fires.
+  const judged = { output: { mode: 'factual', findings: [{ quote: DS_CH1, claim: 'launch', verdict: 'redundant', ref: 'E1', reason: 'already said' }] } };
+  const resolved = runNode('DS Resolve.js', {
+    json: judged,
+    nodes: { 'DS Prep': dsPrepped(), 'DS Judge': judged },
+    dir: DS,
+  });
+  const out = dsApply(resolved, {
+    output: {
+      chapters: [
+        { chapter_number: 0, narrator_script: DS_HOOK },
+        { chapter_number: 1, narrator_script: '' },
+      ],
+    },
+  });
+  ok('a chapter that is nothing BUT the repeat cannot be emptied', /chapter 1 came back empty/.test(out.fcReport.refused || ''));
+  ok('and the script is kept whole', out.script === DS_SCRIPT && out.scriptChanged === false);
+}
+
 console.log('DS Rewrite, DS Write, DS Save, DS Load');
 {
   // ONE PROMPT, TWO LIVE NODES is already the rule for the judge; the rewrite

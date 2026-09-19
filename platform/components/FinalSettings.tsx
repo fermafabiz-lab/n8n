@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { confirmFinalSettings, type ActionResult } from "@/app/actions";
 import Toggle from "@/components/Toggle";
 import CaptionColorPicker from "@/components/CaptionColorPicker";
+import WatermarkOpenPicker from "@/components/WatermarkOpenPicker";
 import WatermarkPreview, { type PreviewScene } from "@/components/WatermarkPreview";
 import { useSetPendingStage } from "@/components/StageNav";
 import type { EditingOptions, MotifCard } from "@/lib/data";
@@ -87,13 +88,14 @@ const OPTIONS: Array<{
     off: "No origin label on screen — the provenance is still recorded, and a credit a licence requires is still shown",
     icon: "🔎",
   },
-  {
-    key: "watermarkOpenOnce",
-    label: "Announce each source once",
-    on: "The first archival shot says ARCHIVAL FOOTAGE in full; the rest keep just the small mark",
-    off: "Every run of shots announces its source in full",
-    icon: "1️⃣",
-  },
+  // `watermarkOpenOnce` is NOT a row of its own. It was one, and as a second
+  // numbered switch immediately under "Source watermark" it read as an equal
+  // decision rather than as a detail of that one — and it is offered, at the
+  // top level of the list, even on a film whose badge is switched off. It is
+  // now a WatermarkOpenPicker nested under the row below, on the same rule as
+  // the effects volume: a control for something that is off is a decision
+  // with no subject. It is still saved from `opts`, which OPTIONS only
+  // renders and never owns.
   {
     key: "music",
     label: "Music",
@@ -221,6 +223,15 @@ export default function FinalSettings({
     rows.some((o) => o.key === "sfx") && opts.sfxLevel !== initial.sfxLevel;
   const musicLevelMoved =
     rows.some((o) => o.key === "music") && opts.musicLevel !== initial.musicLevel;
+  // And the same again for how often the badge opens, which stopped being a
+  // row of its own on 2026-09-19 and became a setting of the watermark row.
+  // That move is exactly what puts it in this list: `changedKeys` only sees
+  // OPTIONS rows, so without this, picking "Once per source" and nothing else
+  // would leave the button reading "Keep initial settings" and throw the
+  // choice away — the failure the two above are here to prevent.
+  const watermarkOpenMoved =
+    rows.some((o) => o.key === "sourceWatermark") &&
+    (opts.watermarkOpenOnce === true) !== (initial.watermarkOpenOnce === true);
   // The pace is NOT here any more — it is decided and signed off at the audio
   // step, the one moment it costs nothing, and this panel neither shows it nor
   // writes it. (confirmFinalSettings therefore omits `speed` entirely rather
@@ -235,13 +246,15 @@ export default function FinalSettings({
     dropped.length > 0 ||
     sfxLevelMoved ||
     musicLevelMoved ||
-    captionColorMoved;
+    captionColorMoved ||
+    watermarkOpenMoved;
   const changeCount =
     changedKeys.length +
     dropped.length +
     (sfxLevelMoved ? 1 : 0) +
     (musicLevelMoved ? 1 : 0) +
-    (captionColorMoved ? 1 : 0);
+    (captionColorMoved ? 1 : 0) +
+    (watermarkOpenMoved ? 1 : 0);
   const done = msg?.ok === true;
   const router = useRouter();
   const setPendingStage = useSetPendingStage();
@@ -314,7 +327,8 @@ export default function FinalSettings({
                   {(moved ||
                     (o.key === "sfx" && sfxLevelMoved) ||
                     (o.key === "music" && musicLevelMoved) ||
-                    (o.key === "captions" && captionColorMoved)) && (
+                    (o.key === "captions" && captionColorMoved) ||
+                    (o.key === "sourceWatermark" && watermarkOpenMoved)) && (
                     <span className="chg">changed</span>
                   )}
                 </h4>
@@ -331,6 +345,20 @@ export default function FinalSettings({
                     to get across is that switching the label off leaves a
                     credit a licence demands standing, and the only way to make
                     that believable is to let the producer watch it happen. */}
+                {/* How often the badge opens — gated on `on`, unlike the
+                    preview below it, because there is nothing to open when
+                    the label is off. `changed` is reported by the row above,
+                    since the producer moved it inside that row. */}
+                {o.key === "sourceWatermark" && on && (
+                  <div style={{ marginTop: 10 }}>
+                    <WatermarkOpenPicker
+                      value={opts.watermarkOpenOnce === true}
+                      onChange={(v) =>
+                        setOpts((p) => ({ ...p, watermarkOpenOnce: v }))
+                      }
+                    />
+                  </div>
+                )}
                 {o.key === "sourceWatermark" && watermarkScenes.length > 0 && (
                   <div style={{ marginTop: 10 }}>
                     <button

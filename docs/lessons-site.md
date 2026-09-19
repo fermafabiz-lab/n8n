@@ -69,6 +69,17 @@ Full account: `db/port/created-by/README.md`.
   reference photo silently loses a refused watermark.** Not fixed: the cure is
   making that node re-read the record instead of rebuilding. Any new key the
   site merges right after creation has the same hole.
+  **`watermarkOpenOnce` is the worked example of taking the other road**
+  (2026-09-19, `db/port/watermark-open-once/README.md`): it sits in the SAME
+  row as `sourceWatermark` on both screens and rides the webhook body instead,
+  because a key added today has no history to protect and need not inherit the
+  defect. The two travelling differently is deliberate, and
+  `node db/port/watermark-open-once/check.mjs` pins the crossing — it runs the
+  orchestrator's real node body against fixtures and then checks the site's two
+  spellings against it, because a drift there has no loud failure anywhere and
+  looks exactly like "the feature does not work".
+  **Publish the n8n half before the site deploys**, or the brief posts a choice
+  nothing reads.
 - **The four names are whitelisted TWICE** — `CREATORS` in
   `platform/lib/data/derive.ts` and the same array in the orchestrator's
   Normalize node — because the value crosses a webhook body, a Code node and a

@@ -86,6 +86,96 @@ Publishing the n8n half before the render half is deployed is safe: the
 composition has no zod schema, so Remotion merges `inputProps` over
 `defaultProps` and an unknown key is ignored.
 
+## The choice moved onto the brief, and became two named options
+
+2026-09-19. It was a switch at Final touches only, which meant it could not be
+decided when the film was specified — and as a second numbered row directly
+under "Source watermark" it read as an equal decision rather than as a detail
+of that one, offered at the top level of the list even on a film whose badge
+is switched off.
+
+It is now **one control in two places**: `WatermarkOpenPicker`, nested under
+the Source watermark row on the brief (`/new`) and at Final touches, shown only
+while the badge is on — the same rule the effects volume follows, because a
+control for something that is switched off is a decision with no subject.
+
+**Two named choices, not an on/off switch.** Neither side is an absence: "off"
+would have to mean "announce every time", which is a positive behaviour and the
+busier of the two. A switch leaves the producer working out which way round it
+goes every time they meet it.
+
+| | |
+|---|---|
+| **Every time** (default) | Every run of shots opens the full label |
+| **Once per source** | The first archival shot says ARCHIVAL FOOTAGE in full; after that the same kind keeps just its mark |
+
+The stored key is still `watermarkOpenOnce` and the ONCE side is still `true`.
+Renaming it would have meant an n8n edit, a render change and a migration for
+every film that carries it, to change a word the producer never sees.
+
+### It rides the webhook, and `sourceWatermark` beside it does not
+
+This is the one decision here worth reading twice, because the two keys sit in
+the same row and travel differently.
+
+`Merge Ref Into Options` rebuilds the WHOLE Editing Options blob from
+`Normalize Webhook Input`'s value and PATCHes it back seconds after the webhook
+answers. So anything the site merges in between is **overwritten on any film
+carrying a reference photo** — which is why `createdBy` rides the webhook body,
+and why `sourceWatermark`, which does not, silently loses a refused watermark
+on exactly those films (`docs/lessons-site.md`, and the note in
+`createProject`). That file's own warning is explicit: *any new key the site
+merges right after creation has the same hole.*
+
+A key added today has no history to protect, so it does not inherit the defect:
+the brief posts `watermark_open_once`, `createProject` forwards it in the
+webhook payload, and the orchestrator's `Normalize Webhook Input` stores it.
+Applied to `8CienBFfG6SgbB1A` on 2026-09-19, active version `0759685a`, from
+`paste/orch-Normalize_Webhook_Input.js`, diffed with
+`db/port/lib/diff-workflow.mjs` against `1bde883f`: 32 nodes both sides, one
+node changed, connections identical.
+
+**Publish the n8n half BEFORE the site deploys.** The other order leaves a
+window where the brief posts the choice and nothing reads it — the producer
+picks "Once per source", the film announces every source, and there is no
+error anywhere to say why.
+
+### What makes the drift loud
+
+`node db/port/watermark-open-once/check.mjs` — 11 assertions. It runs the
+orchestrator's REAL node body (the file that was pasted into n8n, through
+`new Function`, not a paraphrase) against fixtures with no n8n and no network,
+and then checks the site's two spellings against it.
+
+That exists because this key crosses a webhook body, a Code node and a jsonb
+column with **no loud failure anywhere on that path**. A drift between the
+posted name and the read name would look exactly like "the feature does not
+work": the brief would post the choice, n8n would drop it, and the film would
+come back announcing every source in full. Same reasoning as
+`npm run check:created-by` next door.
+
+The refusals are pinned too — `'true'`, `1` and a missing key all resolve to
+**every time**. Absence must never quieten a film's provenance labels by
+itself, and that rule is stated in three places (`Normalize Webhook Input`,
+`derive.ts`, the picker's own doc comment) precisely so it cannot be softened
+in one of them by accident.
+
+### One trap it walked into on the way
+
+Moving the switch out of `OPTIONS` took it out of `changedKeys`, which is what
+Final touches uses to decide whether the button reads "Keep initial settings"
+or "Apply N changes". Picking "Once per source" and nothing else would have
+left the panel believing nothing had changed and **thrown the choice away** —
+the identical failure the effects volume and the caption colour each carry a
+hand-written `…Moved` flag to prevent. `watermarkOpenMoved` is the third.
+
+Verified in a real Chromium on both screens rather than by reading: on the
+brief the hidden field posts `no` → `yes` → `no` as the two buttons are
+clicked, the control disappears with its parent switch while still posting what
+was chosen, and comes back holding it; at Final touches the old row is gone,
+the button flips to "Apply 1 change & render", and the `changed` chip appears
+on the Source watermark row.
+
 ## The label was not centred in the pill, three separate ways
 
 Found by the producer on the review reel — "scrisul si logoul sa fie centrate

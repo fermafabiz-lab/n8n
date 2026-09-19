@@ -2410,6 +2410,17 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     // NOTE: `source_watermark` is deliberately NOT in this payload. It is the
     // one finish the site stores itself — see the write after the record is
     // confirmed, below, and the note there for why.
+    //
+    // Its COMPANION does ride the webhook, and the difference is deliberate
+    // rather than an inconsistency. `Merge Ref Into Options` rebuilds the
+    // whole Editing Options blob from `Normalize Webhook Input`'s value
+    // seconds after this call answers, so anything the site merges in between
+    // is wiped on a film carrying a reference photo — which is exactly the
+    // hole `sourceWatermark` still has (docs/lessons-site.md, and the note
+    // below says as much). A key added today has no history to protect, so it
+    // travels the way `created_by` does instead of inheriting the defect.
+    // `Normalize Webhook Input` reads it strictly: only this exact 'yes'.
+    watermark_open_once: String(formData.get("watermark_open_once") ?? "no") === "yes" ? "yes" : "no",
     // How the narrator reads. OMITTED when the producer left it on "Voice
     // default", and that absence is the feature: every ElevenLabs voice has
     // its own stored settings, so sending an object we made up would override

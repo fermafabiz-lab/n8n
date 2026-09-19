@@ -68,6 +68,36 @@ export interface PreviewScene {
   provenance: VisualProvenance;
 }
 
+/**
+ * Three shots to demonstrate the badge on, for a screen that has no film yet.
+ *
+ * The choice is the whole design: the first and third are the SAME kind of
+ * source, because one band cannot show what "announce each source once" does —
+ * the difference only exists on a kind's second appearance. The AI shot in
+ * between is not decoration either: `planWatermarkBands` merges consecutive
+ * scenes carrying the same badge, so without it the two archive shots would be
+ * one band and there would be no repeat left to collapse.
+ *
+ * No `imageUrl` on any of them, which is what makes the frame draw blank —
+ * the brief is specifying a film that does not exist, and inventing a picture
+ * for it would be the kind of small lie that makes the rest untrustworthy.
+ */
+export const SAMPLE_SCENES: PreviewScene[] = [
+  {
+    order: 1,
+    label: "1",
+    imageUrl: null,
+    provenance: { visualOrigin: "archival_footage", provider: "internet_archive" },
+  },
+  { order: 2, label: "2", imageUrl: null, provenance: { visualOrigin: "ai_generated" } },
+  {
+    order: 3,
+    label: "3",
+    imageUrl: null,
+    provenance: { visualOrigin: "archival_footage", provider: "loc" },
+  },
+];
+
 /** The box the scaled frame has to fit inside. Portrait is bound by height. */
 const MAX_W = 440;
 const MAX_H = 300;
@@ -337,6 +367,7 @@ export default function WatermarkPreview({
   showLabel,
   openOncePerOrigin = false,
   scale,
+  sample = false,
 }: {
   scenes: readonly PreviewScene[];
   /** The project's Format. Anything but "9:16" is drawn landscape. */
@@ -351,6 +382,13 @@ export default function WatermarkPreview({
    *  is true, and how much of it the badge takes is the first thing anyone
    *  looks at. */
   scale?: number;
+  /**
+   * These scenes are a DEMONSTRATION, not a film — the brief showing what the
+   * badge will do before anything has been written. Only the wording changes:
+   * "no picture generated yet" would be wrong on a project that does not
+   * exist, and counting scenes that were never made would be worse.
+   */
+  sample?: boolean;
 }) {
   const [at, setAt] = useState(0);
   const portrait = String(aspectRatio ?? "").trim() === "9:16";
@@ -426,7 +464,7 @@ export default function WatermarkPreview({
             <img src={still} alt="" className={styles.still} />
           ) : (
             <div className={styles.noStill}>
-              <span>no picture generated yet</span>
+              <span>{sample ? "your footage goes here" : "no picture generated yet"}</span>
             </div>
           )}
           <div style={{ position: "absolute", left: g.left, bottom: g.bottom }}>
@@ -457,9 +495,13 @@ export default function WatermarkPreview({
         <span className={styles.count}>
           {bands.length === 1 ? "One label" : `Label ${index + 1} of ${bands.length}`}
           {" · "}
-          {covered.length === 1
-            ? `scene ${covered[0]?.label ?? from + 1}`
-            : `scenes ${covered[0]?.label ?? from + 1}–${covered[covered.length - 1]?.label ?? to + 1}`}
+          {sample
+            ? covered.length === 1
+              ? `example shot ${covered[0]?.label ?? from + 1}`
+              : `example shots ${covered[0]?.label ?? from + 1}–${covered[covered.length - 1]?.label ?? to + 1}`
+            : covered.length === 1
+              ? `scene ${covered[0]?.label ?? from + 1}`
+              : `scenes ${covered[0]?.label ?? from + 1}–${covered[covered.length - 1]?.label ?? to + 1}`}
         </span>
         <button
           type="button"

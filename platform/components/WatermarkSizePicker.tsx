@@ -48,6 +48,7 @@ export default function WatermarkSizePicker({
   onChange,
   portrait = false,
   disabled,
+  sample = true,
 }: {
   /** The stored `watermarkScale`. */
   value: number;
@@ -55,6 +56,14 @@ export default function WatermarkSizePicker({
   /** 9:16 films have their own base geometry, so the sample follows it. */
   portrait?: boolean;
   disabled?: boolean;
+  /**
+   * Draw the badge under the slider. TRUE where this is the only place the
+   * size can be seen — Final touches, where the full preview is behind a
+   * button. FALSE on the brief, where `WatermarkPreview` is always on screen
+   * below and already ends in an actual-size strip: two identical badges a
+   * finger apart is not twice the information.
+   */
+  sample?: boolean;
 }) {
   const scale = normalizeWatermarkScale(value);
   const base = portrait ? WATERMARK_LAYOUT.portrait : WATERMARK_LAYOUT.landscape;
@@ -101,6 +110,7 @@ export default function WatermarkSizePicker({
           and its scrim is built for that — on the panel's own light ground a
           white label on a 42%-black pill would look like a bug rather than
           like what the film draws. */}
+      {sample ? (
       <div
         style={{
           marginTop: 8,
@@ -114,6 +124,7 @@ export default function WatermarkSizePicker({
       >
         <Badge band={SAMPLE} g={g} />
       </div>
+      ) : null}
       <p style={{ margin: "8px 0 0", fontSize: 11.5 }}>
         {g.mark.height}px tall on the {base.frame.width}×{base.frame.height} frame the film is
         rendered at

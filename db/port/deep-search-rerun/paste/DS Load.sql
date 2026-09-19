@@ -27,6 +27,13 @@ select
     where s.project_id = p.id
     order by s.created_at desc
     limit 1)                                       as script,
+  -- WHETHER A CORRECTION MAY BE WRITTEN. At the script gate a film has no
+  -- scenes, so the script text is the only thing derived from the narration
+  -- and rewriting it is safe. Past approval the scenes carry their own copy of
+  -- every line and their own recordings, and editing the script under them is
+  -- the "a line and its recording drift apart silently" fault — so `DS Prep`
+  -- turns a non-zero count into report-only.
+  (select count(*) from hov.scene sc where sc.project_id = p.id) as scene_count,
   coalesce(
     (select json_agg(
        json_build_object(

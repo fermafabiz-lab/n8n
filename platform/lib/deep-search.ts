@@ -182,9 +182,16 @@ export function deepSearchState({
       label: `${standing} unsupported`,
       detail: report.overwhelmed
         ? `Too much of this narration went unsupported for a correction to be safe, so nothing was changed. ${s(standing, "statement")} to judge by eye.`
-        : report.refused
-          ? `A correction was written and rejected (${report.refused}), so ${s(standing, "statement")} still stand as written.`
-          : `${s(standing, "statement")} in this script have nothing behind ${standing === 1 ? "it" : "them"}.`,
+        : // PAST THE SCRIPT GATE THE RE-RUN CHECKS AND REFUSES TO EDIT, because
+          // the scenes carry their own copy of every line and their own
+          // recordings by then. Said out loud, or a producer reading "3
+          // unsupported" on an approved film waits for a correction that is
+          // never coming.
+          report.frozen
+          ? `${s(standing, "statement")} have nothing behind ${standing === 1 ? "it" : "them"}. This film is past its script gate — the scenes already carry these lines — so nothing was changed for you; edit the scenes that say ${standing === 1 ? "it" : "them"}.`
+          : report.refused
+            ? `A correction was written and rejected (${report.refused}), so ${s(standing, "statement")} still stand as written.`
+            : `${s(standing, "statement")} in this script have nothing behind ${standing === 1 ? "it" : "them"}.`,
       red: false,
     };
   }

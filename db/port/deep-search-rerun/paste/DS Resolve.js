@@ -1,12 +1,15 @@
-// Fold any sources found back onto the judge's findings and build the report.
-// This is `FC Resolve` with the rewrite half removed: a re-run never edits the
-// script, so there is no fix list, no `needsRewrite`, and no overwhelmed
-// backstop — that backstop exists to stop a RUNAWAY REWRITE, and with nothing
-// to rewrite it would only suppress information the producer asked for.
+// Fold any sources found back onto the judge's findings, settle a verdict for
+// each, and decide what the rewrite is allowed to touch.
+//
+// This is `FC Resolve` adapted to the re-run's node names. It kept the rewrite
+// half — the producer asked on 2026-09-19 for the button to FIX what it finds,
+// not only report it — which means the overwhelmed backstop matters here for
+// exactly the reason it does in the first pass: rewriting most of a film stops
+// being a correction and becomes a replacement.
 //
 // BY NAME, NOT `$json`, for the reason that bites everywhere in this chain: an
 // agent's output REPLACES the payload with `{output: …}`, so neither `fc` nor
-// the project id survives `DS Judge`.
+// the chapters survive `DS Judge`.
 const g = $('DS Prep').first().json;
 const fc = (g && g.fc) || {};
 
@@ -82,85 +85,103 @@ gaps.forEach((f, i) => {
   }
 });
 
-// The panel reads `action` on every finding. A re-run changes nothing, so a
-// statement either held up (`kept`) or still stands unsupported (`flagged`) —
-// `rewritten` can never occur here and its absence is the honest signal that
-// nothing in the script moved.
+// What the rewrite may touch. `supported` is never touched — a sentence the
+// sources back is correct, and rewriting correct prose is how a fact-checker
+// starts damaging scripts.
 for (const f of findings) {
-  f.action = f.verdict === 'supported' ? 'kept' : 'flagged';
+  f.action = f.verdict === 'supported' ? 'keep' : 'rewrite';
+}
+let toFix = storyMode ? [] : findings.filter((f) => f.action === 'rewrite');
+
+const sentencesOf = (list) => new Set(list.map((f) => String(f.quote || '').trim()));
+const allSentences = sentencesOf(findings);
+const badSentences = sentencesOf(toFix);
+
+// PAST APPROVAL THE RE-RUN REPORTS AND DOES NOT EDIT. The scenes carry their
+// own copy of every line and their own recordings by then, so changing the
+// script under them is the "a line and its recording drift apart" fault. The
+// findings still reach the producer in full.
+let frozen = false;
+if (toFix.length && !fc.mayRewrite) {
+  frozen = true;
+  console.log(
+    'DEEP SEARCH re-run not rewriting: this film already has ' + fc.sceneCount +
+      ' scenes, which carry their own copy of the narration. Reporting only.',
+  );
+  toFix = [];
 }
 
-const sentences = new Set(findings.map((f) => String(f.quote || '').trim()));
-
-if (storyMode) {
-  console.log('DEEP SEARCH re-run: the judge read this narration as a story; nothing checked.');
+// THE BACKSTOP, unchanged in intent from `FC Resolve`: most of the film failing
+// is not a film that is mostly wrong, it is a check aimed at the wrong thing,
+// and rewriting at that volume replaces the producer's script instead of
+// correcting it. Measured in SENTENCES because the judge rules on one assertion
+// at a time — see `db/port/fact-check/README.md` §5.
+const OVERWHELMED_SHARE = 0.6;
+const OVERWHELMED_FLOOR = 8;
+const overwhelmed =
+  allSentences.size >= OVERWHELMED_FLOOR && badSentences.size / allSentences.size > OVERWHELMED_SHARE;
+if (overwhelmed) {
+  console.log(
+    'DEEP SEARCH re-run not rewriting: ' +
+      badSentences.size + ' of ' + allSentences.size +
+      ' sentences are unsupported, which reads as a script this pack was never meant to back. Reporting only.',
+  );
+  toFix = [];
 }
 
 console.log(
   'DEEP SEARCH re-run ' +
-    findings.length + ' checkable statements across ' + sentences.size + ' sentences, ' +
+    findings.length + ' checkable statements across ' + allSentences.size + ' sentences, ' +
     findings.filter((f) => f.verdict === 'supported').length + ' supported, ' +
     findings.filter((f) => f.verdict === 'unsupported').length + ' unsupported, ' +
     findings.filter((f) => f.verdict === 'contradicted').length + ' contradicted' +
     (searched ? ' (' + searched + ' looked up)' : ''),
 );
 
-const ran = fc.run && !storyMode;
+// GROUPED BY SENTENCE, because the rewrite's unit is the sentence. A compound
+// sentence arrives here as several findings, and listing it several times would
+// ask for it to be rewritten several times — two independent rewrites of one
+// sentence, the second overwriting the first, each blind to the other's problem.
+const grouped = [];
+const byQuote = new Map();
+for (const f of toFix) {
+  const q = String(f.quote || '').trim();
+  let e = byQuote.get(q);
+  if (!e) {
+    e = { quote: q, problems: [] };
+    byQuote.set(q, e);
+    grouped.push(e);
+  }
+  e.problems.push(f);
+}
+const fixList = grouped
+  .map((e, i) => {
+    const problems = e.problems
+      .map(
+        (f) =>
+          `   - ${f.claim || 'this statement'}: ${f.verdict === 'contradicted' ? 'a source contradicts this' : 'nothing we can cite supports this'}. ${(f.reason || '').trim()}${f.url ? ' [' + f.url + ']' : ''}`,
+      )
+      .join('\n');
+    return `${i + 1}. SENTENCE: ${e.quote}\n   WHAT IS WRONG WITH IT${e.problems.length > 1 ? ' (' + e.problems.length + ' separate problems — fix all of them in the one rewrite)' : ''}:\n${problems}`;
+  })
+  .join('\n\n');
 
-const report = ran
-  ? {
-      category: fc.category || '',
-      checked: findings.length,
-      flagged: findings.filter((f) => f.verdict !== 'supported').length,
-      sentences: sentences.size,
-      searched,
-      // Always zero, and deliberately present: the panel prints "the script
-      // below already contains the corrections" off this number, and a re-run
-      // must never make that claim.
-      rewritten: 0,
-      // WHAT MAKES THIS REPORT DIFFERENT FROM THE FIRST PASS, and the only two
-      // fields the site needs to say so. `scope: 'final'` means the text
-      // checked was the script as it stands — hook included, rewrite included
-      // — rather than the draft the first pass saw.
-      rerun: true,
-      scope: 'final',
-      findings: findings.map((f) => ({
-        quote: f.quote,
-        claim: f.claim || '',
-        verdict: f.verdict,
-        ref: f.ref || '',
-        reason: (f.reason || '').trim(),
-        source: f.source || '',
-        url: f.url || '',
-        action: f.action,
-      })),
-    }
-  : {
-      category: fc.category || '',
-      checked: 0,
-      flagged: 0,
-      searched: 0,
-      rewritten: 0,
-      rerun: true,
-      scope: 'final',
-      skipped: storyMode
-        ? 'This film tells a story rather than recounting real events, so there is nothing to check it against.'
-        : fc.skipped || 'not checked',
-      skipCode: storyMode ? 'story' : fc.skipCode || 'unknown',
-      storyMode: storyMode ? true : undefined,
-      findings: [],
-    };
-
-console.log(
-  'DEEP SEARCH re-run done: ' + report.checked + ' checked, ' + report.flagged + ' flagged' +
-    (report.skipCode ? ' (skipped: ' + report.skipCode + ')' : ''),
-);
-
-// Base64 for the writer, for the same reason `FC Apply` does it: the report
-// quotes the script verbatim, so it is arbitrary producer text heading into a
-// SQL literal, and any `$` followed by a digit ("$5 billion") becomes a
-// positional parameter the moment that node is switched to transaction
-// batching. Buffer exists here and does not in an n8n expression.
-const fcReport64 = Buffer.from(JSON.stringify(report), 'utf8').toString('base64');
-
-return [{ json: { projectId: g.projectId, projectName: g.projectName, fcReport: report, fcReport64 } }];
+return [
+  {
+    json: {
+      ...g,
+      fc: {
+        ...fc,
+        findings,
+        searched,
+        overwhelmed,
+        frozen,
+        storyMode,
+        sentences: allSentences.size,
+        badSentences: badSentences.size,
+        needsRewrite: toFix.length > 0,
+        fixList,
+      },
+    },
+  },
+];

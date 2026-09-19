@@ -23,8 +23,10 @@ import type { DeepSearchFinding } from "@/lib/data";
  * already in the textarea below, so the old one is the only way to see what
  * moved.
  */
-export default function DeepSearchPanel(props: DeepSearchInput & { projectId?: string }) {
-  const { report, projectId } = props;
+export default function DeepSearchPanel(
+  props: DeepSearchInput & { projectId?: string; scriptId?: string },
+) {
+  const { report, projectId, scriptId } = props;
   const state = deepSearchState(props);
 
   // A documentary still being written has no news yet.
@@ -113,6 +115,28 @@ export default function DeepSearchPanel(props: DeepSearchInput & { projectId?: s
         </p>
       )}
 
+      {/* THE ALL-CLEAR, said in as many words.
+          A producer who presses "re-check" and gets back a panel of green
+          chips has to read the chips to learn that nothing is wrong — and
+          "nothing is wrong" is the answer they pressed the button for. The
+          chip and `state.detail` above are a count; this is the verdict.
+          Shown whenever nothing is left standing, which is `clean` (nothing
+          was ever wrong) or `corrected` (what was wrong is now fixed). */}
+      {(state.status === "clean" || state.status === "corrected") && (
+        <p
+          style={{
+            margin: "10px 0 0",
+            fontSize: 13,
+            lineHeight: 1.55,
+            fontWeight: 600,
+            color: "var(--green)",
+          }}
+        >
+          ✓ Everything in this script is checked and holds up
+          {readTheFinalScript ? ", the opening hook included" : ""} — nothing is flagged.
+        </p>
+      )}
+
       {/* The one thing the first pass could not tell you. Said only on a
           report that DID read the finished text, so it is a statement of fact
           about this report rather than a promise about the feature. */}
@@ -143,7 +167,14 @@ export default function DeepSearchPanel(props: DeepSearchInput & { projectId?: s
         </div>
       )}
 
-      {projectId && <DeepSearchRerun projectId={projectId} />}
+      {projectId && (
+        <DeepSearchRerun
+          projectId={projectId}
+          scriptId={scriptId}
+          checkedAt={report?.checkedAt}
+          rewritten={report?.rewritten}
+        />
+      )}
     </div>
   );
 }

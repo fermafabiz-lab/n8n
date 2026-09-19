@@ -176,6 +176,17 @@ the full entry in the file named:
   Media Generation) execution is running.** A deploy restarts the container
   mid-render. Check `search_executions` first. Full account:
   `docs/lessons-n8n.md` under "Never push while a final render is running".
+  **CLAUDE SCRIPTING BELONGS IN THAT LIST TOO** (measured 2026-09-19): it makes
+  **15 HTTP calls into the site container**, and five of them are on the main
+  writing path, not just the regen tails — `Fetch Genre Profile`, `Fetch
+  Project Record`, `Load Project Bible`, `Load Scene`, `Save Evidence` (the
+  other ten are the `IR *` / `VR *` / rewrite tails). A `platform/**` deploy
+  restarts `web` for about a minute, so a film that is mid-script can lose a
+  node to a connection refused and die with the script half written. The rule
+  as written names only the two render workflows, which reads as permission to
+  deploy over a scripting run. It is not. List them with:
+  `jq -r '.workflow.nodes[] | select((.parameters|tostring) | test("house-of-videos|/api/at")) | .name'`
+  over a saved `get_workflow_details` dump.
 - **A PUT to the n8n public REST API has no draft — it is live immediately.**
   The MCP connector's `update_workflow` DOES stage a real draft;
   `get_workflow_details` always returns the DRAFT, never the live version —

@@ -120,7 +120,11 @@ Webhooks the site calls: `new-project`, `resume-project`, `restart-scripting`
 outlives the site's 15-second fetch), `assemble`, and the single-purpose ones — `expand-brief`, `yt-scene-titles`,
 `upscale-film`, `list-music`/`share-music`, `archive-suggest`, `hook-regen`,
 `series-recap` (its own workflow `4jVkQjpr7terqQhY`, fired by `approveScript`
-for an episode of a series — `db/port/series-recap/`), `sheet-backfill`
+for an episode of a series — `db/port/series-recap/`), `deep-search-rerun`
+(on **Claude Scripting**, the "⟳ Re-check this script" button above the script
+gate — nine `DS *` nodes that re-check the FINISHED script including the hook;
+answers `onReceived` because the run outlives the site's 15-second fetch —
+`db/port/deep-search-rerun/`), `sheet-backfill`
 (workflow `IGWjknKcffnGlOmV`, fired by the series page's "Bring the pictures
 back" — `db/port/sheet-backfill/`; it is the one webhook the site WAITS on,
 because the count it reports is taken from the database after n8n is done). The site derives all of them from `N8N_NEW_PROJECT_WEBHOOK_URL`
@@ -248,7 +252,13 @@ the full entry in the file named:
   found on 2026-09-15 after a grep of the two obvious workflows missed it. The
   rule lives in `Segment Chapter Into Scenes`, `Rewrite Scene Text`, `Rewrite
   Scene Standalone` (Claude Scripting), `HR Shots Prompt` (Hook Regen) and
-  `VP Rewrite AI` (Media Generation). Guardrails are cheapest composed at submit
+  `VP Rewrite AI` (Media Generation).
+  **Deep Search's judge is the newest member of this family, since
+  2026-09-19**: `FC Judge` and `DS Judge` carry the SAME 11 KB prompt, as do
+  `FC Source` and `DS Source`, because the re-run chain emits its payload under
+  `fc` precisely so the prompts can be shared byte for byte. One file,
+  `db/port/fact-check/paste/FC Judge.txt`, two live nodes — **re-paste both or
+  the button silently checks films by last week's rules.** Guardrails are cheapest composed at submit
   time, where one node owns them, rather than stored in the database where
   changing them means a backfill. The same rule now covers a TABLE: the
   eight kids style prefixes (`KIDS_STYLES`) live in `Voice Mode` (Claude
@@ -539,6 +549,26 @@ expected and harmless for an app touching only its own Drive.
   rewrite and after the hook, closes both** — that is the next piece of work
   here, and it was deliberately not rushed in as the fourth publish of a day
   the producer was making films through.
+
+  **That next piece exists now: "⟳ Re-check this script"**, Claude Scripting
+  `2497c18b`, webhook `deep-search-rerun`, full account
+  `db/port/deep-search-rerun/README.md`. Nine `DS *` nodes on their own canvas
+  row read `hov.script.content` — the finished text, hook included, corrections
+  applied — rebuild the pack from `hov.evidence`, and re-run the judge and the
+  live lookup over it. **It never rewrites**: the producer is reading the
+  script when they press it, so `rewritten` is always 0 and no finding can read
+  as `rewritten`. The report replaces the row and carries `rerun: true` /
+  `scope: "final"`, which is what makes the panel say "Re-checked at HH:MM" and
+  name the hook. Verified on the film that started this (execution 15097, 34 s):
+  it read `[CHAPTER 0: HOOK] Lars Rasmussen faced a deadline in 2003`, searched
+  for it, and stored `unsupported` — *"no adequate source specifically stating
+  that Lars Rasmussen faced a deadline in 2003"* — while passing the hook's
+  other line. **Two design notes that will bite**: `DS Prep` emits under `fc`
+  so `DS Judge` / `DS Source` take the FC prompts BYTE FOR BYTE, which means
+  **the judge prompt now lives in two live nodes and both must be re-pasted
+  together**; and the webhook answers `onReceived`, so the button does not
+  change the numbers on screen — the timestamp is how the producer tells the
+  new report from the old one.
 - **A Flow refusal that arrives as HTTP 200 no longer kills the film**
   (2026-09-17, Media Generation `6735a96a`, `db/port/regen-unstick/README.md`,
   lesson in `docs/lessons-pipeline.md` under "Flow refuses twice"). **What is

@@ -109,6 +109,84 @@ async function fireArchiveSuggest(projectId: string): Promise<void> {
 }
 
 /**
+ * Re-run Deep Search over the script AS IT NOW STANDS.
+ *
+ * WHY THIS BUTTON EXISTS, and it is not "because a re-check is nice": the
+ * first pass physically cannot see two things. `Generate Hook` runs AFTER the
+ * whole Deep Search chain, so the hook — the two sentences a viewer is most
+ * likely to watch — has never been fact-checked on any film; and nothing
+ * re-reads what the REWRITE produced, so a correction can introduce a new
+ * unsourced claim or half-fix a contradiction and no one finds out. Both are
+ * the same shape: what the producer reads is not what was checked. The re-run
+ * reads `hov.script.content`, which is the finished text with the hook in it,
+ * so one press closes both. Full account: `db/port/fact-check/README.md` §7-8.
+ *
+ * FIRE AND FORGET, by necessity. `deep-search-rerun` answers `onReceived`
+ * because the run takes about half a minute to two minutes — a judge pass plus
+ * a live source lookup — and every other webhook here has a 15s budget. So
+ * this returns as soon as n8n has the request, the panel keeps showing the
+ * PREVIOUS report with its timestamp, and the new one appears on the next
+ * load. That is why the panel prints "Checked at …": it is the only way to
+ * tell which report you are reading.
+ *
+ * It never rewrites. The producer is looking at the script when they press
+ * this, and may well have edited it in the box below — changing text under
+ * someone who is reading it is the silent edit this whole panel exists to
+ * prevent. The re-run reports; the producer decides.
+ */
+async function fireDeepSearchRerunWebhook(projectId: string): Promise<"sent" | "off"> {
+  const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
+  const webhook =
+    process.env.N8N_DEEP_SEARCH_RERUN_WEBHOOK_URL ??
+    newProject?.replace(/new-project\/?$/, "deep-search-rerun");
+  if (!webhook?.includes("deep-search-rerun")) return "off";
+  const res = await fetch(webhook, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ project_id: projectId }),
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
+  return "sent";
+}
+
+export async function rerunDeepSearch(projectId: string): Promise<ActionResult> {
+  if (!isConfigured) return { ok: true, message: "Demo mode — nothing was checked." };
+  if (process.env.DATA_BACKEND !== "postgres") {
+    return { ok: false, message: "Deep Search needs the Postgres backend." };
+  }
+  try {
+    // The mode gate is n8n's to enforce — `DS Prep` writes a `not-documentary`
+    // row exactly like the first pass does, so the panel stays consistent
+    // whichever door the report came through. Answering here as well is only
+    // so the producer is not made to wait a minute to be told no.
+    const project = await getProject(projectId);
+    if (project?.category !== "documentary") {
+      return {
+        ok: false,
+        message: "Deep Search runs on Documentary films only, so there is nothing to re-check here.",
+      };
+    }
+    const sent = await fireDeepSearchRerunWebhook(projectId);
+    if (sent === "off") {
+      return {
+        ok: false,
+        message:
+          "No deep-search-rerun webhook is configured here, so there is nothing to ask — check N8N_NEW_PROJECT_WEBHOOK_URL.",
+      };
+    }
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message:
+        "Re-checking the script as it now stands, hook included — about a minute. The report below updates when it lands; reload to see it.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/**
  * The manual door: look again, for every AI scene of the film that has no
  * clip yet. Existing picks stay until the run replaces them.
  */

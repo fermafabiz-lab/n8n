@@ -1,4 +1,5 @@
 import Disclosure from "@/components/Disclosure";
+import DeepSearchRerun from "@/components/DeepSearchRerun";
 import { deepSearchState, deepSearchTone, type DeepSearchInput } from "@/lib/deep-search";
 import type { DeepSearchFinding } from "@/lib/data";
 
@@ -22,8 +23,8 @@ import type { DeepSearchFinding } from "@/lib/data";
  * already in the textarea below, so the old one is the only way to see what
  * moved.
  */
-export default function DeepSearchPanel(props: DeepSearchInput) {
-  const { report } = props;
+export default function DeepSearchPanel(props: DeepSearchInput & { projectId?: string }) {
+  const { report, projectId } = props;
   const state = deepSearchState(props);
 
   // A documentary still being written has no news yet.
@@ -46,6 +47,18 @@ export default function DeepSearchPanel(props: DeepSearchInput) {
     );
   }
 
+  // WHEN the report was written, and whether it read the finished script.
+  // Both exist for one reason: the re-run answers `onReceived`, so pressing
+  // the button does not change these numbers — the new report lands a minute
+  // later. Without a timestamp the producer cannot tell the old report from
+  // the new one, and the button reads as broken.
+  const checkedAt = report?.checkedAt ? new Date(report.checkedAt) : null;
+  const when =
+    checkedAt && !Number.isNaN(checkedAt.getTime())
+      ? checkedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+      : null;
+  const readTheFinalScript = report?.scope === "final";
+
   const findings: DeepSearchFinding[] = Array.isArray(report?.findings) ? report!.findings! : [];
   const tone = deepSearchTone(state.status);
 
@@ -67,6 +80,11 @@ export default function DeepSearchPanel(props: DeepSearchInput) {
         {state.red && (
           <span style={{ fontSize: 12, color: "var(--red)", fontWeight: 650 }}>
             — this needs looking at
+          </span>
+        )}
+        {when && (
+          <span style={{ fontSize: 11, color: "var(--soft)", marginLeft: "auto" }}>
+            {readTheFinalScript ? "Re-checked" : "Checked"} at {when}
           </span>
         )}
       </div>
@@ -95,6 +113,16 @@ export default function DeepSearchPanel(props: DeepSearchInput) {
         </p>
       )}
 
+      {/* The one thing the first pass could not tell you. Said only on a
+          report that DID read the finished text, so it is a statement of fact
+          about this report rather than a promise about the feature. */}
+      {readTheFinalScript && (
+        <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--soft)", lineHeight: 1.55 }}>
+          This one read the script as it now stands — <b>the opening hook included</b>, and with
+          any corrections already in place. The first pass runs before either exists.
+        </p>
+      )}
+
       {findings.length > 0 && (
         <div style={{ marginTop: 14 }}>
           <Disclosure
@@ -114,6 +142,8 @@ export default function DeepSearchPanel(props: DeepSearchInput) {
           </Disclosure>
         </div>
       )}
+
+      {projectId && <DeepSearchRerun projectId={projectId} />}
     </div>
   );
 }

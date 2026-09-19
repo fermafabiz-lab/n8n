@@ -721,6 +721,7 @@ export default async function ProductionRoom({
               isDocumentary={project.category === "documentary"}
               scriptExists
               createdAt={project.createdAt}
+              projectId={id}
             />
             <ScriptReview
               projectId={id}

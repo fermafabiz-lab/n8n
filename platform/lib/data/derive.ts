@@ -675,6 +675,15 @@ export interface DeepSearchReport {
    * counting distinct quotes itself.
    */
   sentences?: number;
+  /**
+   * Written by the RE-RUN rather than by the scripting pass. The two differ in
+   * what they could see: the first pass reads the narration before
+   * `Generate Hook` exists and before the rewrite has run, the re-run reads
+   * `hov.script.content`, which is the finished text with both. `scope:
+   * "final"` says so; absent means the ordinary first pass.
+   */
+  rerun?: boolean;
+  scope?: "final" | string;
   /** How many of them the sources did not back. */
   flagged?: number;
   /** How many got a targeted primary-source lookup. */

@@ -27,6 +27,10 @@ import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const PASTE = join(here, '..', 'db', 'port', 'fact-check', 'paste');
+// The re-run chain's own bodies. Its two AGENTS take the FC prompts byte for
+// byte — that is the point of `DS Prep` emitting under `fc` — so only its two
+// Code nodes have logic of their own to check.
+const DS = join(here, '..', 'db', 'port', 'deep-search-rerun', 'paste');
 
 let failures = 0;
 const logs = [];
@@ -44,8 +48,8 @@ function ok(label, cond, detail) {
 // the item its `$('Name').first().json` should return; a name that is absent
 // throws, which is what n8n does for an unreachable node and what the bodies'
 // try/catch blocks are written against.
-function runNode(file, { json = {}, nodes = {} } = {}) {
-  const body = readFileSync(join(PASTE, file), 'utf8');
+function runNode(file, { json = {}, nodes = {}, dir = PASTE } = {}) {
+  const body = readFileSync(join(dir, file), 'utf8');
   const $ = (name) => {
     if (!(name in nodes)) throw new Error(`No node called "${name}" could be found`);
     return { first: () => ({ json: nodes[name] }) };
@@ -631,6 +635,129 @@ console.log('FC Save Report');
   ok('decodes the report in Postgres rather than inlining prose', sql.includes("decode('{{ $json.fcReport64 }}', 'base64')"));
   ok('never interpolates the report itself into the statement', !sql.includes('$json.fcReport }}'));
   ok('upserts on the project', /on conflict \(project_id\) do update/.test(sql));
+}
+
+// ---------------------------------------------------------------------------
+// The re-run chain — `deep-search-rerun`, the button on the script gate
+// ---------------------------------------------------------------------------
+
+console.log('DS Prep');
+
+// The row `DS Load` hands over: one project, one script, the pack as JSON.
+const dsRow = (over = {}) => ({
+  project_id: 'rec1',
+  project_name: 'A film',
+  editing_options: JSON.stringify({ category: 'documentary', sfx: true }),
+  script: '[CHAPTER 0: HOOK]\nLars faced a deadline in 2003.\n\n[CHAPTER 1: Launch]\nThe map went live in February 2005.',
+  claims: [{ ref: 'E1', claim: 'c', source: 's', date: '2004', url: 'u' }],
+  ...over,
+});
+
+{
+  const out = runNode('DS Prep.js', { json: dsRow(), dir: DS });
+  ok('runs on a documentary with a script and a pack', out.fc.run === true);
+  // THE WHOLE REASON THIS CHAIN EXISTS. `hov.script.content` carries the hook,
+  // which `Generate Hook` writes after the first pass has already finished, so
+  // the re-run is the only thing that ever reads it. If this ever stops being
+  // true the button is checking the same text twice.
+  ok('the narration it checks INCLUDES the hook', out.fc.narration.includes('[CHAPTER 0: HOOK]'));
+  ok('and is the script verbatim, not a rebuild', out.fc.narration === dsRow().script);
+  ok('emits under `fc`, so the FC prompts work unchanged', typeof out.fc.packList === 'string' && out.fc.packList.startsWith('E1. c ['));
+  ok('carries the project id for the writer', out.projectId === 'rec1');
+}
+{
+  for (const [over, code] of [
+    [{ editing_options: JSON.stringify({ category: 'story' }) }, 'not-documentary'],
+    [{ editing_options: '{}' }, 'no-mode'],
+    [{ script: '' }, 'no-script'],
+    [{ claims: [] }, 'no-pack'],
+  ]) {
+    const out = runNode('DS Prep.js', { json: dsRow(over), dir: DS });
+    ok(`skips as ${code}`, out.fc.run === false && out.fc.skipCode === code);
+  }
+}
+
+console.log('DS Resolve');
+
+const dsPrepped = (over = {}) => ({
+  fc: {
+    run: true,
+    category: 'documentary',
+    skipCode: null,
+    packList: 'E1. c [s, 2004 — u]',
+    narration: dsRow().script,
+    ...over,
+  },
+  projectId: 'rec1',
+  projectName: 'A film',
+});
+
+{
+  const findings = [
+    { quote: 'Lars faced a deadline in 2003.', claim: 'Lars faced a deadline in 2003.', verdict: 'unsupported', ref: '', reason: 'No claim mentions a deadline.' },
+    { quote: 'The map went live in February 2005.', claim: 'The map went live in February 2005.', verdict: 'supported', ref: 'E1', reason: 'E1 states it.' },
+  ];
+  const judged = { output: { mode: 'factual', findings } };
+  const out = runNode('DS Resolve.js', {
+    json: judged,
+    nodes: { 'DS Prep': dsPrepped(), 'DS Judge': judged },
+    dir: DS,
+  });
+  ok('reports both statements', out.fcReport.checked === 2 && out.fcReport.flagged === 1);
+  ok('marks itself a re-run of the finished script', out.fcReport.rerun === true && out.fcReport.scope === 'final');
+  // A re-run must never let the panel print "the script below already contains
+  // the corrections" — that line is drawn off `rewritten`, and nothing was
+  // corrected, because this chain has no rewrite in it at all.
+  ok('never claims a correction it did not make', out.fcReport.rewritten === 0);
+  ok('and no finding can read as rewritten', out.fcReport.findings.every((f) => f.action === 'kept' || f.action === 'flagged'));
+  ok('counts the sentences as well as the statements', out.fcReport.sentences === 2);
+  ok('base64 round-trips', JSON.parse(Buffer.from(out.fcReport64, 'base64').toString('utf8')).rerun === true);
+}
+{
+  // A quote the judge did not copy verbatim is dropped, same as the first pass.
+  const findings = [{ quote: 'A sentence that is not in the script.', claim: 'x', verdict: 'unsupported', ref: '', reason: 'r' }];
+  const judged = { output: { mode: 'factual', findings } };
+  const out = runNode('DS Resolve.js', {
+    json: judged,
+    nodes: { 'DS Prep': dsPrepped(), 'DS Judge': judged },
+    dir: DS,
+  });
+  ok('drops a finding whose quote is not in the script', out.fcReport.checked === 0);
+}
+{
+  // The inner gate still applies: a documentary whose narration is a
+  // dramatisation is reported as a story, not as a film full of errors.
+  const judged = { output: { mode: 'story', findings: [] } };
+  const out = runNode('DS Resolve.js', {
+    json: judged,
+    nodes: { 'DS Prep': dsPrepped(), 'DS Judge': judged },
+    dir: DS,
+  });
+  ok('a story is reported as a story', out.fcReport.skipCode === 'story' && out.fcReport.storyMode === true);
+  ok('and still says it was a re-run', out.fcReport.rerun === true);
+}
+{
+  // The gate said no upstream, so `DS Judge` never ran and its reference
+  // throws — the report must still be written, with the reason.
+  const out = runNode('DS Resolve.js', {
+    json: {},
+    nodes: { 'DS Prep': dsPrepped({ run: false, skipCode: 'not-documentary', skipped: 'Story mode.' }) },
+    dir: DS,
+  });
+  ok('a skipped re-run still writes its row', out.fcReport.skipCode === 'not-documentary' && out.fcReport.checked === 0);
+}
+
+console.log('DS Save');
+{
+  const sql = readFileSync(join(DS, 'DS Save.sql'), 'utf8');
+  ok('decodes the report in Postgres rather than inlining prose', sql.includes("decode('{{ $json.fcReport64 }}', 'base64')"));
+  ok('whitelists the project id rather than quoting around it', sql.includes('replace(/[^A-Za-z0-9_-]/g'));
+  ok('upserts on the project', /on conflict \(project_id\) do update/.test(sql));
+}
+{
+  const sql = readFileSync(join(DS, 'DS Load.sql'), 'utf8');
+  ok('DS Load whitelists the id from the webhook body', sql.includes('replace(/[^A-Za-z0-9_-]/g'));
+  ok('and reads the NEWEST script row', /order by s\.created_at desc\s*\n\s*limit 1/.test(sql));
 }
 
 console.log('');

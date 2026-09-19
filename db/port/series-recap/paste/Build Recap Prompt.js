@@ -20,7 +20,17 @@ const payload = {
       role: 'system',
       content:
         'You keep the running recap of an episodic series of short films. From the narration of ONE episode, write what happened in it: the events, who did what, and how it ended. ' +
-        'Two sentences, at most 60 words, in ' + language + ', in the past tense. ' +
+        // 100, not the 60 this asked for until 2026-09-19. The model had been
+        // ignoring 60 and writing about 100 anyway, so the instruction was
+        // describing something that was not happening — and the longer line is
+        // the better one for the job: the next episode's writer reads this to
+        // avoid contradicting and avoid retelling, and neither is possible if
+        // the events are not named. The cost is measured, not guessed: a line
+        // runs ~590 characters against ~400 at 60 words, so composeSeriesLore's
+        // 8,000-character Lore cap starts trimming the OLDEST lines at about
+        // episode 13 instead of about 20. Trimming is oldest-first and keeps
+        // the newest, so it degrades gently; revisit before a show gets there.
+        'Two sentences, at most 100 words, in ' + language + ', in the past tense. ' +
         'Use the characters\' names exactly as the narration spells them. State only what the narration says: no interpretation, no moral, no praise, no preamble, no quotes, no headings, no line breaks.'
     },
     {

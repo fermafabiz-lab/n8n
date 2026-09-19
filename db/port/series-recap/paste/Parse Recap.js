@@ -13,7 +13,12 @@ if (!raw || raw.length < 20) {
   console.log('RECAP EMPTY ' + asked.project_id + ': ' + JSON.stringify($json).slice(0, 300));
   return [];
 }
-const summary = raw.slice(0, 600);
+// This has to clear the word cap in Build Recap Prompt or it silently cuts a
+// sentence in half, which is the worse failure: a truncated recap still reads
+// as a recap. At 100 words a real line measured ~523 characters of summary, so
+// 600 was about to start chopping; 800 leaves room for a long one and still
+// stops a runaway. Move the two together.
+const summary = raw.slice(0, 800);
 const line = 'Episode ' + asked.episode_no + ' — ' + asked.title.replace(/[\r\n]+/g, ' ') + ': ' + summary;
 console.log('RECAP ' + asked.project_id + ': ' + line);
 return [{ json: {

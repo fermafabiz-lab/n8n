@@ -446,6 +446,76 @@ ChatGPT flagged on this film. That is the next piece of work on this feature.
 > it while reading, which is the only moment anyone can say "that reads worse
 > than what it replaced".
 
+### 9. The rewrite manufactured duplicates, and cutting them shortens the film
+
+Found 2026-09-19 by the producer's reader, on the script four presses of the
+re-check had produced. Every fact in it was sourced. It also said one of them
+four times:
+
+```
+[CHAPTER 0: HOOK]  In 2003, Google Labs launched "Search by Location."
+      chapter 1 ¶1  In September 2003, Google Labs launched "Search by
+                    Location" before Google had sufficient mapping data.
+      chapter 1 ¶2  In 2003, Google Labs launched "Search by Location"
+                    before Google had sufficient mapping data.
+      chapter 1 ¶3  A House report says Google Labs launched "Search by
+                    Location" in September 2003 before Google had
+                    sufficient mapping data.
+```
+
+**THIS CHAIN MADE THEM.** `FC Rewrite` is told "you may use these and nothing
+else as fact" and "if cutting a sentence leaves a chapter noticeably short,
+carry the same beat with the material the sources do support" — and is never
+shown what the narration already says. So each press replaced an unsourced
+sentence with the best-sourced fact available, which was the fact the sentence
+before it already carried. The convergence reported in
+`db/port/deep-search-rerun/README.md` as 3 → 2 → 1 → 0 flagged was measuring
+the factual axis while the editorial one got worse on every pass.
+
+The fix is in three places, both copies of each: the rewrite may not restate
+what the narration already says and the length rule no longer pushes toward
+filler; the judge has a fourth verdict, `redundant`; and `FC Resolve` tells the
+rewrite to CUT such a sentence in the imperative, while `FC Apply` subtracts
+the cut words before the length guard measures.
+
+**Verified on the film that caused it** (executions 15228 and 15231). Press one
+cut two — including one where the judge split the attributed sentence into its
+attribution (`supported`) and its underlying fact (`redundant`), which is the
+§6 rule and this one composing correctly. Press two cut the rest.
+
+#### THE BILL, and it is not small
+
+| | chapter 1 |
+|---|---|
+| before the two presses | **185 words, 11 sentences** |
+| after | **101 words, 6 sentences** |
+| lost | **84 words — 45%** |
+
+**Nothing measures that.** `FC Apply`'s guard is per press and per chapter: it
+subtracts the words a press was asked to cut and then allows ±20% around what
+remains, which is correct for one press and blind across several. Two presses
+at a quarter each is nearly half the chapter, and **the word count is what
+decides the film's runtime and how many scenes it is cut into.**
+
+**And the film lost its closing line.** *"A four-person Sydney prototype had
+become a public product, and online maps were expected to move"* was cut as a
+repeat of the hook's four-person team — which it is, and which is also what a
+closing bookend IS. The rule as written cannot tell a deliberate echo from an
+accidental one, and the last line of a film is the likeliest place to find one.
+
+**What is owed, in this order:**
+
+1. **A floor the cuts cannot go under.** The principled anchor already exists:
+   the narration guard computes `target` / `min` / `max` words from the film's
+   length, and `DS Load` does not read them. A re-run should refuse to cut
+   below `min`, and say so, instead of trusting a per-press percentage.
+2. **Exempt the last sentence of the last chapter**, or teach the judge that a
+   closing echo is structure rather than repetition. Until then a re-check can
+   quietly remove a film's resolution — and `db/port/story-close/` exists
+   precisely because that resolution was worth adding.
+3. Until 1 ships, **pressing the button repeatedly shortens the film.** It is
+   not idempotent in length even though it now converges in findings.
+
 ### What that change moved underneath everything else
 
 The judge now returns roughly twice as many findings for the same script, all

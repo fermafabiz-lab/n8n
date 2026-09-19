@@ -621,6 +621,30 @@ expected and harmless for an app touching only its own Drive.
   as an agent does, which this repo knew about agents and had not generalised.
   It died as *"invalid base64 end sequence"*, having written the correction and
   not the report that described it.
+
+  **AND THEN IT WROTE THE SAME SENTENCE FOUR TIMES.** The producer's reader
+  found it the same evening: every fact sourced, one of them stated four times
+  over. **This chain made them** — the rewrite is told to keep each chapter's
+  length and to use only the claims, and is never shown what the narration
+  already says, so each press replaced an unsourced sentence with the
+  best-sourced fact available, which was the one the sentence before it already
+  carried. The convergence reported above as 3 → 2 → 1 → 0 was measuring the
+  factual axis while the editorial one got worse every pass. Live as
+  `dfc81d23`: the rewrite may not restate what the narration says, the judge
+  has a fourth verdict `redundant`, `FC Resolve` orders such a sentence CUT,
+  and `FC Apply` subtracts the cut words before its length guard measures.
+  Verified on that film (15228, 15231) — two presses removed all four copies,
+  including one where the judge correctly split an attributed sentence into its
+  attribution (`supported`) and its underlying fact (`redundant`).
+  **THE BILL IS UNPAID: chapter 1 went from 185 words to 101, a 45% cut, and
+  nothing measures that.** The guard is per press and per chapter, so two
+  presses at a quarter each pass individually and halve the chapter together —
+  and the word count is what sets the film's runtime and scene count. The film
+  also lost its closing bookend, cut as a repeat of the hook, which is what a
+  bookend IS. **So the button is idempotent in findings and NOT in length; do
+  not press it repeatedly.** The fix is a floor read from the narration guard's
+  own `min` words, which `DS Load` does not yet fetch — full account and the
+  ordered owed list in `db/port/fact-check/README.md` §9.
 - **A Flow refusal that arrives as HTTP 200 no longer kills the film**
   (2026-09-17, Media Generation `6735a96a`, `db/port/regen-unstick/README.md`,
   lesson in `docs/lessons-pipeline.md` under "Flow refuses twice"). **What is

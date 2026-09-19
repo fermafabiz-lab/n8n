@@ -764,6 +764,7 @@ check('the router can never pick it', F.searchableProviders().map((p) => p.id).i
 // ---------------------------------------------------------------------------
 console.log('\n--- source watermark ---');
 const P = await import(join(root, 'lib', 'provenance.ts'));
+const G = await import(join(root, 'lib', 'provenance-glyphs.ts'));
 const chosen = F.judge(ceutaReq, { ...exact, id: 'rec1' }, false);
 check('an actual-footage match prints ACTUAL FOOTAGE with its source', P.formatSourceWatermark({ visualOrigin: chosen.provenance, provider: 'eu_av', originalLocation: exact.location, originalDate: exact.filmingDate }), { label: 'ACTUAL FOOTAGE', source: 'Source: EU Audiovisual Service · Ceuta, Spain · 2026-05-18' });
 const ill = F.judge(ceutaReq, { ...wrongPlace, id: 'rec2' }, false);
@@ -780,9 +781,30 @@ check('and a retired provider still prints something readable', P.providerLabel(
 // remotion/scripts/check-watermark.mjs pins the originals against. Change one,
 // change all four places: the two modules and the two checks.
 check('the frame is the render size, not 1080p', [P.WATERMARK_LAYOUT.landscape.frame, P.WATERMARK_LAYOUT.portrait.frame], [{ width: 1280, height: 720 }, { width: 720, height: 1280 }]);
-check('the landscape geometry', P.WATERMARK_LAYOUT.landscape, { frame: { width: 1280, height: 720 }, left: 90, bottom: 30, maxWidth: 700, gap: 3, label: { fontSize: 16, padding: '5px 12px' }, source: { fontSize: 13 }, credit: { fontSize: 12 } });
-check('the portrait geometry, lifted clear of the platform chrome', P.WATERMARK_LAYOUT.portrait, { frame: { width: 720, height: 1280 }, left: 44, bottom: 232, maxWidth: 560, gap: 3, label: { fontSize: 17, padding: '5px 11px' }, source: { fontSize: 14 }, credit: { fontSize: 13 } });
+check('the landscape geometry', P.WATERMARK_LAYOUT.landscape, { frame: { width: 1280, height: 720 }, left: 90, bottom: 30, maxWidth: 700, gap: 3, label: { fontSize: 16, padding: '5px 12px' }, source: { fontSize: 13 }, credit: { fontSize: 12 }, mark: { height: 30, glyph: 15, gap: 8, padX: 10 } });
+check('the portrait geometry, lifted clear of the platform chrome', P.WATERMARK_LAYOUT.portrait, { frame: { width: 720, height: 1280 }, left: 44, bottom: 232, maxWidth: 560, gap: 3, label: { fontSize: 17, padding: '5px 11px' }, source: { fontSize: 14 }, credit: { fontSize: 13 }, mark: { height: 32, glyph: 16, gap: 8, padX: 10 } });
 check('the badge never reaches full opacity', P.WATERMARK_STYLE.peakOpacity, 0.88);
+
+// --- the pill's own arithmetic, mirrored from remotion/scripts/check-watermark.mjs
+// Every number was MEASURED in a real Chromium against the real component
+// before it was pinned (db/port/watermark-open-once/README.md). All three were
+// wrong at once and each looks identical on screen: the label off-centre in
+// its capsule. The preview draws the same mark, so it has to agree.
+const wmLand = P.WATERMARK_LAYOUT.landscape;
+check('the trailing letter-space', P.labelTrailingSpace(wmLand.label.fontSize), 2.24);
+check('the capsule is padded equally on both sides', P.markPillWidth(wmLand.mark, 16, 142.11), 185);
+check('and grows with the label', P.markPillWidth(wmLand.mark, 16, 236.84), 280);
+check('an unmeasured label is just the two paddings', P.markPillWidth(wmLand.mark, 16, 0), 45);
+check('the chip centres its glyph inside the border', P.markChipPadX(wmLand.mark), 6.5);
+check('and in portrait too', P.markChipPadX(P.WATERMARK_LAYOUT.portrait.mark), 7);
+// DejaVu Sans Mono at 16px, as Chromium resolved `ui-monospace` on the render
+// box: ink from the baseline to the cap at 11 with nothing below it, against a
+// font box of 13 up and 5 down. The line box therefore centres 1.5px high.
+const wmMono16 = { width: 115.22, actualBoundingBoxAscent: 11, actualBoundingBoxDescent: 0, fontBoundingBoxAscent: 13, fontBoundingBoxDescent: 5 };
+check('all-caps ink rides high in its line box', P.labelInkDrop(wmMono16, 'AI GENERATED', 16, 142.11), 1.5);
+check('a canvas measuring another face is not believed', P.labelInkDrop(wmMono16, 'AI GENERATED', 16, 210), 0);
+check('nor is a TextMetrics without an ink box', P.labelInkDrop({ ...wmMono16, actualBoundingBoxAscent: undefined }, 'AI GENERATED', 16, 142.11), 0);
+check('nor a label with no width at all', P.labelInkDrop(wmMono16, 'AI GENERATED', 16, 0), 0);
 
 const wmScene = (start, dur, provenance) => ({ startSeconds: start, durationSeconds: dur, provenance });
 const wmAi = { visualOrigin: 'ai_generated' };
@@ -795,7 +817,43 @@ check('and it spans them all', P.planWatermarkBands([wmScene(0, 1, wmArch), wmSc
 check('a change of badge starts a new one', P.planWatermarkBands([wmScene(0, 1, wmArch), wmScene(1, 1, wmAi)], { showLabel: true }).map((b) => b.label), ['ARCHIVAL FOOTAGE', 'AI GENERATED']);
 // The sentence the row's prose has to work hardest to explain, and the reason
 // the preview is not gated on the toggle being ON.
-check('switching the label off leaves the licence credit standing', P.planWatermarkBands([wmScene(0, 1, wmCredited)], { showLabel: false }), [{ startSeconds: 0, endSeconds: 1, label: '', source: null, credit: 'NASA · Wikimedia Commons · CC BY-SA 3.0' }]);
+check('switching the label off leaves the licence credit standing', P.planWatermarkBands([wmScene(0, 1, wmCredited)], { showLabel: false }), [{ startSeconds: 0, endSeconds: 1, origin: 'archival_footage', label: '', source: null, credit: 'NASA · Wikimedia Commons · CC BY-SA 3.0', expand: true }]);
+
+// --- "announce each source once" -------------------------------------------
+// The switch collapses REPEATS of a kind, never its first appearance, and
+// never the licence credit. Keyed on the ORIGIN, so a second archival band
+// from a different archive is still a repeat.
+const wmArch2 = { visualOrigin: 'archival_footage', provider: 'loc' };
+check(
+  'every band expands unless asked otherwise',
+  P.planWatermarkBands([wmScene(0, 1, wmArch), wmScene(2, 1, wmAi), wmScene(4, 1, wmArch2)], { showLabel: true }).map((b) => b.expand),
+  [true, true, true],
+);
+check(
+  'open once: the first band of each origin opens, later ones stay chips',
+  P.planWatermarkBands([wmScene(0, 1, wmArch), wmScene(2, 1, wmAi), wmScene(4, 1, wmArch2)], { showLabel: true, openOncePerOrigin: true }).map((b) => b.expand),
+  [true, true, false],
+);
+check(
+  'open once: a different ARCHIVE is still the same kind of source',
+  P.planWatermarkBands([wmScene(0, 1, wmArch), wmScene(2, 1, wmArch2)], { showLabel: true, openOncePerOrigin: true }).map((b) => [b.origin, b.expand]),
+  [['archival_footage', true], ['archival_footage', false]],
+);
+check(
+  'open once: merged consecutive scenes are ONE band and consume one opening',
+  P.planWatermarkBands([wmScene(0, 1, wmArch), wmScene(1, 1, wmArch)], { showLabel: true, openOncePerOrigin: true }).map((b) => b.expand),
+  [true],
+);
+check(
+  'open once never reaches the licence credit',
+  P.planWatermarkBands([wmScene(0, 1, wmCredited), wmScene(2, 1, wmCredited)], { showLabel: true, openOncePerOrigin: true }).map((b) => [b.expand, b.credit]),
+  [[true, 'NASA · Wikimedia Commons · CC BY-SA 3.0'], [false, 'NASA · Wikimedia Commons · CC BY-SA 3.0']],
+);
+check(
+  'every origin has a glyph',
+  P.VISUAL_ORIGINS.filter((o) => !(G.ORIGIN_GLYPHS[o] || []).length),
+  [],
+);
 check('while a scene that owes nothing draws nothing at all', P.planWatermarkBands([wmScene(0, 1, wmAi)], { showLabel: false }), []);
 check('a scene with no provenance record is skipped, not labelled blank', P.planWatermarkBands([wmScene(0, 1, null)], { showLabel: true }), []);
 

@@ -192,6 +192,21 @@ export interface EditingOptions {
    */
   sourceWatermark: boolean;
   /**
+   * Open the provenance pill only the FIRST time each kind of source appears;
+   * every later band of that kind stays the small glyph.
+   *
+   * Strictly opt-in (`=== true`), so a film made before this existed, or one
+   * whose producer never touched the switch, keeps announcing each band in
+   * full. It is a quietening, and quietening a truthfulness overlay is a
+   * choice somebody has to make on purpose.
+   *
+   * It governs the LABEL only, like `sourceWatermark` above it: a credit a
+   * licence requires is drawn under a collapsed chip exactly as under an open
+   * pill. The "Source: …" courtesy line is part of the label and collapses
+   * with it — a long line under a small chip reads as a broken pill.
+   */
+  watermarkOpenOnce: boolean;
+  /**
    * Hands-off mode: the site signs off every gate by itself as the assets
    * land — script, scene texts, takes, images, clips — and presses the final
    * render with the stored settings. The film runs end to end with nobody
@@ -1167,6 +1182,9 @@ export function buildProject(r: RawProject): Project {
       // is what makes every existing film gain the label rather than quietly
       // shipping unlabelled. `sourceWatermark: false` is the only stored form.
       sourceWatermark: opts.sourceWatermark !== false,
+      // Strictly `=== true`: see the field's note. Absence must not quieten a
+      // film's provenance labels by itself.
+      watermarkOpenOnce: opts.watermarkOpenOnce === true,
       // Strictly opt-in, `=== true`: hands-off is a real trade (nothing gets
       // a human look) and must never switch itself on by absence.
       autoApprove: opts.autoApprove === true,

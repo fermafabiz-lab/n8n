@@ -213,7 +213,13 @@ the full entry in the file named:
 - **Any MCP edit to a live node must be diffed against the version you built
   on, node by node, confirming the ONLY entry that differs is yours** — use
   `db/port/lib/diff-workflow.mjs` rather than ad hoc python/jq. See
-  `db/port/lib/README.md`.
+  `db/port/lib/README.md`. **Feed it the workflow object, not the tool's
+  output**: `get_workflow_details` wraps it as `{workflow: …}`, and handed the
+  raw file the differ reads `before 0 nodes → after 0 nodes, changed 0` and
+  still prints `RESULT: OK`, plus a cheerful "only the expected nodes differ".
+  A pass over nothing looks exactly like a pass. Pipe both sides through
+  `jq '.workflow'` first and check the node count is not zero before believing
+  the verdict (2026-09-18, `db/port/watermark-open-once/`).
 - **Never write a prompt instruction as a negation.** Google's Veo guidance is
   explicit that "no walls" / "don't show walls" makes the model render walls;
   what is unwanted belongs in a bare comma-separated NOUN LIST. This pipeline

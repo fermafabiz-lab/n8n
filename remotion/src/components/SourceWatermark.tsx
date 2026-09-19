@@ -1,12 +1,26 @@
 import React from 'react';
-import {AbsoluteFill, useCurrentFrame, useVideoConfig} from 'remotion';
+import {
+	AbsoluteFill,
+	continueRender,
+	delayRender,
+	interpolate,
+	useCurrentFrame,
+	useVideoConfig,
+} from 'remotion';
 import {CURVES, eased} from '../easing';
 import {
+	labelInkDrop,
+	labelTrailingSpace,
+	markChipPadX,
+	markPillWidth,
 	planWatermarkBands,
 	WATERMARK_LAYOUT,
 	WATERMARK_STYLE,
+	type VisualOrigin,
 	type VisualProvenance,
+	type WatermarkMark,
 } from '../provenance';
+import {DASHED_ORIGINS, GLYPH_STROKE, GLYPH_VIEWBOX, ORIGIN_GLYPHS} from '../provenanceGlyphs';
 import type {StylePreset} from '../style';
 
 /**
@@ -40,23 +54,243 @@ import type {StylePreset} from '../style';
  *  on the scene's first frames — the spec's 150–250 ms window. */
 const FADE = 0.2;
 
+/**
+ * One provenance glyph, drawn at `size` in the current colour.
+ *
+ * `currentColor` rather than a literal white: the same mark has to work on a
+ * light scrim the day a blown-out shot needs one, and the pack ships a black
+ * copy precisely because a flattened PNG cannot do that.
+ */
+const Glyph: React.FC<{origin: VisualOrigin; size: number}> = ({origin, size}) => (
+	<svg
+		width={size}
+		height={size}
+		viewBox={`0 0 ${GLYPH_VIEWBOX} ${GLYPH_VIEWBOX}`}
+		fill="none"
+		stroke="currentColor"
+		strokeWidth={GLYPH_STROKE}
+		strokeLinecap="round"
+		strokeLinejoin="round"
+		style={{flex: 'none', display: 'block'}}
+	>
+		{ORIGIN_GLYPHS[origin].map((p, i) =>
+			p.filled ? (
+				<path key={i} d={p.d} fill="currentColor" stroke="none" />
+			) : (
+				<path key={i} d={p.d} />
+			),
+		)}
+	</svg>
+);
+
+/**
+ * Ask the browser where this label's ink actually sits — see `labelInkDrop`,
+ * which owns the arithmetic and the refusals. Only the canvas plumbing is
+ * here, because only the drawing knows which font it resolved.
+ */
+const measureInkDrop = (
+	label: string,
+	fontSize: number,
+	fontFamily: string,
+	/** The span's own laid-out width, letter-spacing and all. */
+	advance: number,
+): number => {
+	try {
+		if (typeof document === 'undefined') return 0;
+		const ctx = document.createElement('canvas').getContext('2d');
+		if (!ctx) return 0;
+		ctx.font = `${WATERMARK_STYLE.labelWeight} ${fontSize}px ${fontFamily}`;
+		return labelInkDrop(ctx.measureText(label), label, fontSize, advance);
+	} catch {
+		return 0;
+	}
+};
+
+/**
+ * The badge itself: a square chip holding the glyph, which opens sideways into
+ * a capsule carrying the label.
+ *
+ * The pill is BUILT rather than drawn from the pack's pill PNG, because a real
+ * opening needs the width and the corner radius to be live values — two
+ * flattened images can only be cross-faded, and a cross-fade reads as one mark
+ * replacing another rather than as the same mark opening.
+ *
+ * The label's width is MEASURED, not estimated from its character count: the
+ * eight labels differ by more than half a pill's width ("ARCHIVAL PHOTO"
+ * against "ILLUSTRATIVE FOOTAGE"), and a guess clips the long ones. Remotion's
+ * `delayRender` holds the frame until the browser has laid the text out, so
+ * every frame of the render agrees on the same number.
+ *
+ * Measured PER LABEL, and again once the web fonts have settled — both of
+ * which this got wrong, in ways that look identical on screen and are the
+ * whole of "the text does not fit in the pill":
+ *
+ * - `SourceWatermark` keeps ONE `Mark` in the tree and hands it a new label at
+ *   every band change, so a width taken on mount is the first band's width for
+ *   the rest of the film. `renderStill` hides it (a fresh page per still, one
+ *   band each) and `renderMedia` does not: a tab that seeks across a band
+ *   boundary draws "ILLUSTRATIVE FOOTAGE" in a capsule cut for "REAL FOOTAGE".
+ * - a web font that has not arrived yet lays the label out in the fallback
+ *   face, which is a different width. Remotion holds the frame for OUR handle,
+ *   not for the font's, so measuring on mount can measure the wrong typeface
+ *   and then draw the right one.
+ *
+ * Both are answered the same way: a fresh `delayRender` per measurement round,
+ * and the answer tagged with the label it belongs to so a stale one is simply
+ * not believed.
+ */
+const Mark: React.FC<{
+	origin: VisualOrigin;
+	label: string;
+	geom: WatermarkMark;
+	fontSize: number;
+	fontFamily: string;
+	/** 0 = chip, 1 = pill. */
+	open: number;
+}> = ({origin, label, geom, fontSize, fontFamily, open}) => {
+	const textRef = React.useRef<HTMLSpanElement>(null);
+	const [measured, setMeasured] = React.useState<{
+		label: string;
+		advance: number;
+		drop: number;
+	} | null>(null);
+
+	React.useLayoutEffect(() => {
+		const handle = delayRender(`watermark label: ${label}`);
+		let live = true;
+		const release = () => {
+			if (!live) return;
+			live = false;
+			continueRender(handle);
+		};
+		const read = () => {
+			const el = textRef.current;
+			if (!live || !el) return;
+			// `offsetWidth`, NOT `getBoundingClientRect().width`: the rect is
+			// the VISUAL box, so any CSS transform on an ancestor multiplies
+			// it. Put this badge inside a scaled container — a magnified
+			// preview, a picture-in-picture — and the measured label comes
+			// back k times too wide, the pill is computed k times too wide in
+			// layout pixels, and it is then scaled AGAIN. Found exactly that
+			// way on a 2.8× review reel: the capsule ran off the frame.
+			// `offsetWidth` is layout-based and ignores transforms, at the
+			// cost of rounding to whole pixels.
+			const advance = el.offsetWidth;
+			setMeasured({label, advance, drop: measureInkDrop(label, fontSize, fontFamily, advance)});
+		};
+		read();
+		const ready = typeof document === 'undefined' ? null : document.fonts?.ready;
+		if (ready && typeof ready.then === 'function') {
+			ready.then(
+				() => {
+					read();
+					release();
+				},
+				() => release(),
+			);
+		} else {
+			release();
+		}
+		return release;
+	}, [label, fontSize, fontFamily]);
+
+	// Nothing is believed until it is measured for THIS label. Before that the
+	// capsule is its own empty width, which no frame is ever captured at — the
+	// handle above holds the render until the number exists.
+	const fresh = measured && measured.label === label ? measured : null;
+
+	const {height, glyph, gap} = geom;
+	const pillWidth = markPillWidth(geom, fontSize, fresh?.advance ?? 0);
+	const width = interpolate(open, [0, 1], [height, pillWidth]);
+	const radius = interpolate(open, [0, 1], [height * WATERMARK_STYLE.chipRadiusRatio, height / 2]);
+	// The label uncovers from the glyph outward, clipped by the container, so
+	// it reads as the mark opening rather than as a second element arriving.
+	const reveal = interpolate(open, [0.25, 0.85], [0, 1], {
+		extrapolateLeft: 'clamp',
+		extrapolateRight: 'clamp',
+	});
+
+	return (
+		<div
+			style={{
+				position: 'relative',
+				boxSizing: 'border-box',
+				height,
+				width,
+				display: 'flex',
+				alignItems: 'center',
+				paddingLeft: interpolate(open, [0, 1], [markChipPadX(geom), geom.padX]),
+				borderRadius: radius,
+				background: WATERMARK_STYLE.labelBackground,
+				border: `${WATERMARK_STYLE.markBorderWidth}px ${
+					DASHED_ORIGINS.has(origin) ? 'dashed' : 'solid'
+				} ${WATERMARK_STYLE.markBorderColor}`,
+				color: WATERMARK_STYLE.labelColor,
+				overflow: 'hidden',
+				whiteSpace: 'nowrap',
+			}}
+		>
+			<Glyph origin={origin} size={glyph} />
+			<span
+				ref={textRef}
+				style={{
+					marginLeft: gap,
+					// Pull the trailing letter-space back out of the layout, so
+					// the content really does end at the last letter and the
+					// capsule's own `padX` is the only thing after it.
+					marginRight: -labelTrailingSpace(fontSize),
+					// Measured, not guessed — see `labelInkDrop`. Relative
+					// rather than a transform: it must not touch the width the
+					// round above just measured.
+					position: 'relative',
+					top: fresh?.drop ?? 0,
+					fontFamily,
+					fontSize,
+					fontWeight: WATERMARK_STYLE.labelWeight,
+					letterSpacing: WATERMARK_STYLE.labelLetterSpacing,
+					lineHeight: WATERMARK_STYLE.labelLineHeight,
+					color: WATERMARK_STYLE.labelColor,
+					textShadow: WATERMARK_STYLE.textShadow,
+					opacity: reveal,
+				}}
+			>
+				{label}
+			</span>
+		</div>
+	);
+};
+
 export const SourceWatermark: React.FC<{
 	scenes: {startSeconds: number; durationSeconds: number; provenance?: VisualProvenance}[];
 	preset: StylePreset;
 	/** False = the producer switched the label off. Credits still draw. */
 	showLabel: boolean;
+	/**
+	 * Open the pill only the FIRST time each kind of source appears; every
+	 * later band of that kind stays the small chip. The producer's switch —
+	 * a documentary that runs twenty archive shots says "ARCHIVAL FOOTAGE"
+	 * once and then keeps a quiet mark in the corner.
+	 */
+	openOncePerOrigin?: boolean;
 	/** Vertical (9:16): lift clear of the platform's own bottom chrome. */
 	portrait?: boolean;
 	/** Hide while the hook title owns the frame, exactly as captions do. */
 	suppressUntilSeconds?: number;
-}> = ({scenes, preset, showLabel, portrait = false, suppressUntilSeconds = 0}) => {
+}> = ({
+	scenes,
+	preset,
+	showLabel,
+	openOncePerOrigin = false,
+	portrait = false,
+	suppressUntilSeconds = 0,
+}) => {
 	const frame = useCurrentFrame();
 	const {fps} = useVideoConfig();
 	const seconds = frame / fps;
 
 	const bands = React.useMemo(
-		() => planWatermarkBands(scenes, {showLabel}),
-		[scenes, showLabel],
+		() => planWatermarkBands(scenes, {showLabel, openOncePerOrigin}),
+		[scenes, showLabel, openOncePerOrigin],
 	);
 
 	if (seconds < suppressUntilSeconds) return null;
@@ -75,6 +309,29 @@ export const SourceWatermark: React.FC<{
 	// Geometry lives in provenance.ts so the site's preview can mirror ONE
 	// named constant instead of numbers read out of this JSX.
 	const g = portrait ? WATERMARK_LAYOUT.portrait : WATERMARK_LAYOUT.landscape;
+
+	// Opens once, just after the fade has brought it up, and STAYS open for
+	// the rest of the band — it does not breathe shut and open again at every
+	// cut, which is the same reason consecutive scenes are merged into one
+	// band in the first place.
+	//
+	// A band shorter than the animation would otherwise be caught mid-open at
+	// its own fade-out, so the opening is compressed to fit rather than
+	// truncated: better a quick open than a pill frozen half-drawn.
+	const bandLength = band ? band.endSeconds - band.startSeconds : 0;
+	const openSpan = Math.min(
+		WATERMARK_STYLE.openSeconds,
+		Math.max(0.12, bandLength - WATERMARK_STYLE.openDelaySeconds - FADE),
+	);
+	const open =
+		band && band.expand
+			? eased(
+					seconds - band.startSeconds - WATERMARK_STYLE.openDelaySeconds,
+					[0, openSpan],
+					[0, 1],
+					CURVES.inOutCubic,
+				)
+			: 0;
 
 	// Bottom-LEFT, on the same left edge the captions keep, and below the band
 	// they occupy: captions are bottom-anchored at 84 (landscape) / 280
@@ -96,25 +353,20 @@ export const SourceWatermark: React.FC<{
 				}}
 			>
 				{band.label ? (
-					<span
-						style={{
-							fontFamily: preset.kickerFont,
-							fontSize: g.label.fontSize,
-							fontWeight: WATERMARK_STYLE.labelWeight,
-							letterSpacing: WATERMARK_STYLE.labelLetterSpacing,
-							color: WATERMARK_STYLE.labelColor,
-							background: WATERMARK_STYLE.labelBackground,
-							border: WATERMARK_STYLE.labelBorder,
-							borderRadius: WATERMARK_STYLE.labelRadius,
-							padding: g.label.padding,
-							textShadow: WATERMARK_STYLE.textShadow,
-							lineHeight: WATERMARK_STYLE.labelLineHeight,
-						}}
-					>
-						{band.label}
-					</span>
+					<Mark
+						origin={band.origin}
+						label={band.label}
+						geom={g.mark}
+						fontSize={g.label.fontSize}
+						fontFamily={preset.kickerFont}
+						open={open}
+					/>
 				) : null}
-				{band.source ? (
+				{/* The source line belongs to the label: a chip with a long
+				    "Source: …" line under it reads as a broken pill rather than
+				    a deliberate one. The CREDIT below is different — a licence
+				    obligation, drawn whatever the switches say. */}
+				{band.source && band.expand ? (
 					<span
 						style={{
 							fontFamily: preset.kickerFont,

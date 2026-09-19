@@ -8,6 +8,7 @@ import Toggle from "@/components/Toggle";
 import CaptionColorPicker from "@/components/CaptionColorPicker";
 import WatermarkOpenPicker from "@/components/WatermarkOpenPicker";
 import WatermarkSizePicker from "@/components/WatermarkSizePicker";
+import WatermarkMotionPreview from "@/components/WatermarkMotionPreview";
 import LanguagePicker from "@/components/LanguagePicker";
 import Link from "next/link";
 import { languageByCode, resolveLanguage } from "@/lib/languages";
@@ -996,6 +997,18 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
                                 <WatermarkSizePicker
                                   value={watermarkScale}
                                   onChange={setWatermarkScale}
+                                  portrait={aspect === "9:16"}
+                                />
+                              </div>
+                              {/* The one moving part of this overlay, on
+                                  demand. The size picker's sample answers "how
+                                  big"; this answers "what happens", which is
+                                  the question the two controls above it are
+                                  really about. */}
+                              <div style={{ marginTop: 14 }}>
+                                <WatermarkMotionPreview
+                                  scale={watermarkScale}
+                                  openOncePerOrigin={watermarkOpenOnce}
                                   portrait={aspect === "9:16"}
                                 />
                               </div>

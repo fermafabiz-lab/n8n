@@ -84,61 +84,69 @@ exactly what went wrong. The audio element is also `preload="auto"` now — a
 take is tens of kilobytes, so fetching it whole costs one request where
 `metadata` left the browser to range its way through it.
 
-**2. The proxy keeps what it fetches** (`app/api/media/route.ts`,
-`lib/media-cache.ts`). A hit is served off `/media/_drive/<id>.bin` with real
-byte ranges. A MISS is served exactly the way this route always served it —
-the caller's range forwarded, the body streamed — and the file is fetched
-again in the background so the NEXT request is local. Content-addressed by the
-Drive id, which is what makes `immutable` honest on a hit: a Drive file id
-names one fixed set of bytes.
+**2. ~~The proxy keeps what it fetches.~~ WITHDRAWN — see below.** The disk
+cache was reverted the same hour. `/api/media` is byte-for-byte the version it
+had before today.
 
-Files over `MAX_CACHE_BYTES` (32 MB) are never kept. That number is a memory
-ceiling as much as a disk one — a fill buffers the whole file before writing —
-and at two concurrent fills the worst case is 64 MB on a box that also
-renders.
+### The cache failed twice and never once worked
 
-### The first version of this was wrong, and shipped
+Kept in full, because the failure is more useful than the feature would have
+been.
 
-Worth keeping, because the mistake is a general one. The first attempt made
-the request that MISSED do the downloading: fetch the whole file, write it,
-then answer. On a 40 kB voiceover that is invisible, and every test passed.
-On a film it meant the browser was sent **nothing at all** until the server
-held the last byte — where before it had streamed from the first. A player
-that used to start immediately simply never started, which is what the
-producer reported as *"nu se mai incarca deloc videoul intreg"*.
+**Attempt one** made the request that MISSED do the downloading: fetch the
+whole file, write it, then answer. Invisible on a 40 kB voiceover — which is
+every case the tests covered — and fatal on a film: the browser was sent
+nothing at all until the server held the last byte, so a player that used to
+stream from the first byte never started. The producer reported it as *"nu se
+mai incarca deloc videoul intreg"*.
 
-**A cache is not allowed to be slower than no cache.** The fill has to be off
-the request path, always. The corrected version adds exactly one non-blocking
-line to a miss and is otherwise byte-for-byte the old handler.
+**Attempt two** moved the fill off the request path, which was the right
+shape. It did not help, because the cache had never written anything at all.
+Checked directly through Caddy, which serves the media volume:
+`/media/_drive/<id>.json` answered **404 for every id tried** — a final video,
+a voiceover, a second film. `writeCached` swallows its own failure by design
+(a full volume must not cost a play), so it had been failing silently from the
+first deploy, almost certainly on `mkdir` inside `/media`: the `web` container
+runs with `group_add: "2000"` for write access to what already exists, which
+is not the same as being able to create a new directory at the volume root.
 
-### And what was NOT caused by any of this
+So: two user-visible regressions, zero measured benefit, and a component that
+has never functioned. It was removed rather than repaired. **The measured win
+for scene review was the player fix alone** (no seek storm, `preload="auto"`),
+which is what the producer confirmed working.
 
-Drive answers a file too large to virus-scan with an HTML interstitial —
-*"Google Drive can't scan this file for viruses … (306M) is too large"* —
-**whatever range is asked for**. Verified both ways on the 306 MB final of
-`recqbPJ7aZu0a21mt`: a `HEAD` with no range and a `GET` with
-`Range: bytes=0-0` both came back `text/html`. This route has always answered
-502 for those and `MediaPlayer` has always fallen back to Drive's own embed
-player, which is what actually plays the big finals. That was true before this
-change and is true after it. If the large finals are ever to play through the
-site's own player, the fix is a different Drive endpoint
-(`drive.usercontent.google.com/download?...&confirm=t`), not anything here.
+### And the cache header poisoned browsers on the way out
 
-## Why not the tidier fix
+The withdrawn version answered `Cache-Control: private, max-age=31536000,
+immutable` for twelve minutes. `immutable` tells a browser not to revalidate
+*at all*, so any response a player received in that window — whole, truncated
+or aborted — is pinned for a year, and a normal reload is precisely what
+`immutable` says to skip. That is why the final video kept showing a spinner
+after the fix deployed.
+
+`mediaSrc` now appends `&v=2`. A different URL cannot match a poisoned entry,
+so every player starts clean without anyone having to know about hard reloads.
+Bump it again if this route ever ships a bad cache header again.
+
+## What to do instead, when someone comes back to this
 
 The structurally right answer is for a voiceover to be an attachment like its
 clip and its still — `field: 'voice'` through `/api/media/ingest`, a
-`storedVoiceUrl` beside `storedVideoUrl`. That is worth doing and is written
-down as owed below. It is NOT what was done today because it would have healed
-nothing that already exists: it needs three n8n write-back nodes changed and a
-backfill over every film ever made, and until that backfill ran the producer's
-current film would have lagged exactly as before. The disk cache fixes every
-film, old and new, from the moment it deploys.
+`storedVoiceUrl` beside `storedVideoUrl`. It writes through the path that has
+worked for 850 images and 775 clips, under a directory that already exists and
+is already writable, and it needs no new caching layer at all.
+
+The disk cache was chosen over it because it promised to heal films that
+already exist, where the attachment row needs three n8n write-back nodes
+changed and a backfill before it helps anything. That reasoning was sound and
+the execution was not: the thing that "heals everything immediately" healed
+nothing, twice, in production. **Prefer the path that already works, even when
+it is slower to arrive.**
 
 ## Verified
 
-`npm run check:media-range` — **49 checks** on the byte-range arithmetic and
-the fill decision,
+~~`npm run check:media-range`~~ — removed with the cache it covered. It was
+**49 checks** on the byte-range arithmetic and the fill decision,
 which is the part of this that fails invisibly. An off-by-one there does not
 look like an off-by-one; it looks like a clip that plays but will not seek, or
 a take that stops a fraction early, or a 416 the player reports as a broken
@@ -170,10 +178,12 @@ than eaten.
 
 ## What is owed
 
-- **Watch one scene AND one final video play on the deployed site.** The
-  scenes were confirmed working by the producer after the first deploy; the
-  final video is what the first version broke, and the corrected one has been
-  verified by build and by unit test but not yet by a play.
+- **Confirm the final video plays again.** The scenes were confirmed working
+  by the producer; the final video is what the cache broke, and the revert
+  plus the `v=2` bust have been verified by build but not yet by a play.
+- If a local copy of voiceovers is ever wanted, do it as an attachment row
+  (above), not as a proxy cache — and whatever the mechanism, **test it on a
+  file the size of a film**, which is the one thing neither attempt did.
 - **Give voiceovers a real attachment row** (`field: 'voice'`), so new films
   never touch Drive for playback at all, and backfill the existing ones. The
   cache makes this an optimisation rather than a fix, which is why it can wait

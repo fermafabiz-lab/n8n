@@ -1178,18 +1178,29 @@ picked the asset, not signed it off. Final Assembly receives an ordinary mp4.
   Byte-range arithmetic is pinned by `npm run check:media-range` (49 checks) —
   an off-by-one there looks like "plays but will not seek", never like an
   off-by-one.
-  **The first version of that cache shipped broken, and the mistake
-  generalises: A CACHE IS NOT ALLOWED TO BE SLOWER THAN NO CACHE.** It made
-  the request that missed do the downloading — fetch the whole file, write it,
-  then answer — which is invisible on a 40 kB take and fatal on a film, where
-  the browser got nothing until the server held the last byte and a player
-  that used to start immediately never started. Every test passed, because
-  every test used a small file. The fill belongs OFF the request path: a miss
-  now streams exactly as it always did and the bytes are fetched again in the
-  background for next time. Related, and not caused by any of it: Drive
-  answers a file too large to virus-scan (306 MB here) with an HTML
-  interstitial whatever range is asked for, so the big finals have always
-  played through `MediaPlayer`'s Drive-embed fallback rather than the proxy.
+  **The proxy cache that shipped alongside it was WITHDRAWN the same hour,
+  and the way it failed is the lesson.** Attempt one made the request that
+  missed do the downloading, which is invisible on a 40 kB take — every test
+  used one — and fatal on a film, where the browser got nothing until the
+  server held the last byte and a player that used to start immediately never
+  started. **A cache is not allowed to be slower than no cache.** Attempt two
+  moved the fill off the request path, correctly, and still did not help:
+  checked through Caddy, `/media/_drive/` answered 404 for every id, so the
+  cache had never written a byte — `writeCached` swallows its own failure by
+  design, and `mkdir` at the volume root is not something the `web`
+  container's `group_add: "2000"` actually permits. Two regressions, no
+  benefit, a component that never once worked; removed rather than repaired.
+  **The measured win for scene review was the player fix alone.**
+  It also left a trap on the way out: twelve minutes of `Cache-Control:
+  private, max-age=31536000, immutable`, which tells a browser not to
+  revalidate at all, so a truncated response was pinned for a year and a
+  normal reload was exactly what `immutable` says to skip. `mediaSrc` appends
+  `&v=2` now — a different URL cannot match a poisoned entry. **Never send
+  `immutable` from a route that can answer with a partial or an error.**
+  What to do instead, if a local copy of takes is ever wanted: an attachment
+  row through `/api/media/ingest`, the path that has worked for 850 images
+  and 775 clips. Prefer the path that already works, even when it is slower
+  to arrive.
   Full account and the numbers: `db/port/scene-lag/README.md`.
 - **The video-regen trap, and three guards for it.** A stock scene has no
   Flow asset to regenerate from, and `Prep Video Regen` THROWS without an

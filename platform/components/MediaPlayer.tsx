@@ -18,6 +18,32 @@ import { driveId, mediaSrc } from "@/lib/media";
  * proxy — with byte ranges intact, which is what makes the clip seekable. If
  * that fails, we fall back to Drive's own embed player (which can't carry the
  * overlay).
+ *
+ * WHY THE SYNC BELOW DOES NOT SEEK (2026-09-20). Reviewing scenes one by one
+ * had become unusable: press play, the clip loads, then either freezes or
+ * "loads slower than it plays" until the two collide and stop. The cause was
+ * measured, not guessed, and it was this effect.
+ *
+ * The picture is fast — every scene clip is stored on the box and Caddy
+ * answers a byte range in ~25 ms. The VOICEOVER is not: all 48 takes of the
+ * film under review live on Google Drive, none has a local copy, and a ranged
+ * GET to Drive measured 1383 ms cold and 593-730 ms warm — 20 to 50 times the
+ * local file. `/api/media` also marked every 206 `no-store`, so nothing was
+ * ever reused.
+ *
+ * On top of that this effect used to hard-seek the audio whenever it drifted
+ * more than 0.15 s, on `timeupdate` — which fires about four times a second.
+ * Every correction was a fresh Drive round trip; during that second the audio
+ * produced nothing, so the drift grew past 0.15 s again and the next
+ * `timeupdate` seeked again. The audio could never catch up and the seek
+ * storm dragged the picture down with it. A 0.15 s tolerance is tighter than
+ * the media clock's own resolution, so on a slow source it could not have
+ * settled even in principle.
+ *
+ * So: correct on the DELIBERATE moments only (play, and the user scrubbing),
+ * nudge `playbackRate` for ordinary drift, and keep one rate-limited hard
+ * seek for real desync. Nothing here fires on a timer faster than the drift
+ * it is correcting.
  */
 
 export default function MediaPlayer({
@@ -50,23 +76,76 @@ export default function MediaPlayer({
     const v = videoRef.current;
     const a = audioRef.current;
     if (!v || !a) return;
-    const sync = () => {
-      if (Math.abs(a.currentTime - v.currentTime) > 0.15) a.currentTime = v.currentTime;
+
+    // Drift big enough to hear as lip-sync error. Well above the media
+    // clock's resolution, so ordinary jitter never trips it.
+    const HARD = 1;
+    // Below this, do nothing at all — chasing it costs more than it buys.
+    const SOFT = 0.12;
+    // A seek on a slow source is expensive and self-defeating; never more
+    // than one every few seconds, whatever the drift says.
+    const RESEEK_MS = 3000;
+    let lastSeek = 0;
+
+    /** The deliberate moments: starting, and the producer scrubbing. */
+    const hardSync = () => {
+      lastSeek = Date.now();
+      try {
+        a.playbackRate = 1;
+        a.currentTime = v.currentTime;
+      } catch {
+        /* seeking before metadata is ignored; the next play() fixes it */
+      }
     };
+
+    // Ordinary drift is corrected by running the audio a little faster or
+    // slower, which costs nothing and is inaudible at these ratios. A seek is
+    // the last resort, not the first: it discards the audio's buffer, which
+    // on a slow source guarantees the next stall.
+    const drift = () => {
+      if (a.paused || v.paused || v.seeking) return;
+      const d = v.currentTime - a.currentTime;
+      const ad = Math.abs(d);
+      if (ad < SOFT) {
+        if (a.playbackRate !== 1) a.playbackRate = 1;
+        return;
+      }
+      if (ad > HARD && Date.now() - lastSeek > RESEEK_MS) {
+        hardSync();
+        return;
+      }
+      // ±6%: enough to close a 0.9 s gap inside fifteen seconds, far below
+      // the ~10% where a voice starts to sound wrong.
+      a.playbackRate = d > 0 ? 1.06 : 0.94;
+    };
+
     const onPlay = () => {
-      sync();
+      hardSync();
       void a.play().catch(() => {});
     };
-    const onPause = () => a.pause();
+    const onPause = () => {
+      a.pause();
+      a.playbackRate = 1;
+    };
+    // The audio ran out of buffer. Correcting now would seek a source that is
+    // already waiting for bytes, which is what made this loop pathological.
+    const onWaiting = () => {
+      a.playbackRate = 1;
+    };
+
     v.addEventListener("play", onPlay);
     v.addEventListener("pause", onPause);
-    v.addEventListener("seeked", sync);
-    v.addEventListener("timeupdate", sync);
+    v.addEventListener("seeked", hardSync);
+    v.addEventListener("timeupdate", drift);
+    a.addEventListener("waiting", onWaiting);
+    a.addEventListener("stalled", onWaiting);
     return () => {
       v.removeEventListener("play", onPlay);
       v.removeEventListener("pause", onPause);
-      v.removeEventListener("seeked", sync);
-      v.removeEventListener("timeupdate", sync);
+      v.removeEventListener("seeked", hardSync);
+      v.removeEventListener("timeupdate", drift);
+      a.removeEventListener("waiting", onWaiting);
+      a.removeEventListener("stalled", onWaiting);
       a.pause();
     };
   }, [url, audioUrl]);
@@ -123,7 +202,13 @@ export default function MediaPlayer({
         onError={() => setFailed(true)}
         style={frameStyle}
       />
-      {audioUrl && <audio ref={audioRef} src={mediaSrc(audioUrl)} preload="metadata" />}
+      {/*
+        `auto`, not `metadata`. A take is tens of kilobytes — the whole file
+        costs one request, where `metadata` leaves the browser to range its
+        way through a source that answers each range in about a second. There
+        is nothing to save by fetching it lazily and a stall to lose.
+      */}
+      {audioUrl && <audio ref={audioRef} src={mediaSrc(audioUrl)} preload="auto" />}
     </>
   );
 }

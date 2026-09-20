@@ -1031,6 +1031,34 @@ picked the asset, not signed it off. Final Assembly receives an ordinary mp4.
   true when written and was, for video, the sentence that sent them to the
   destructive button. Full account:
   `db/port/video-regen-webhook/README.md`.
+- **A player that "corrects" drift on a timer will destroy a slow source
+  (2026-09-20).** Scene review had become unusable — press play, the clip
+  loads, then either freezes or loads slower than it plays until the two
+  collide. It was not element count (one `MediaPlayer` mounts at a time) and
+  it was not the clip (48 of 48 are on the box; Caddy answered a byte range in
+  **25 ms**). It was the VOICEOVER, which no path has ever kept locally —
+  `hov.attachment` holds 850 `image` rows and 775 `video` rows and has no
+  audio field, so every take of every film is still fetched from Drive, where
+  the same range measured **593–1383 ms**. Twenty to fifty times slower, and
+  `/api/media` marked each 206 `no-store`, so a re-watch paid again.
+  **The amplifier is the lesson**: `MediaPlayer` hard-set `a.currentTime`
+  whenever the take drifted past 0.15 s, on `timeupdate`, which fires four
+  times a second. Setting `currentTime` is a SEEK; each seek threw away the
+  audio's buffer and cost a second of Drive; during that second the drift grew
+  past the threshold again. The loop could not converge — 0.15 s is tighter
+  than the media clock's own resolution — so the correction WAS the stall, and
+  the video was dragged along by it. **Correct on deliberate moments (play,
+  the user scrubbing); take ordinary drift out with `playbackRate`, which
+  discards nothing; keep one rate-limited hard seek for real desync; and never
+  correct while the element says `waiting` or `stalled`.** The other half of
+  the fix is that `/api/media` now keeps what it fetches — the whole file on a
+  miss, content-addressed by the Drive id under `/media/_drive/`, every later
+  request served off disk with real ranges. A take is also `preload="auto"`
+  now: tens of kilobytes is one request, where `metadata` left the browser
+  ranging its way through a source that answers each range in about a second.
+  Byte-range arithmetic is pinned by `npm run check:media-range` (33 checks) —
+  an off-by-one there looks like "plays but will not seek", never like an
+  off-by-one. Full account and the numbers: `db/port/scene-lag/README.md`.
 - **The video-regen trap, and three guards for it.** A stock scene has no
   Flow asset to regenerate from, and `Prep Video Regen` THROWS without an
   `Image Media ID` — a throw that kills the whole batch, not the scene. So

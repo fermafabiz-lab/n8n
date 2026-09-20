@@ -55,6 +55,15 @@ So the timeout is now explicit rather than inherited:
 `maxRetries: 2` is set explicitly on all eight, matching the declared default so
 it stops depending on one.
 
+**The ceiling is the timeout TIMES THREE, not the timeout.** `maxRetries: 2`
+means a call that times out is tried again twice, so a node that hangs every
+time fails only after 3 × 5 min = **15 minutes**, and one of the two web-search
+nodes after 3 × 10 = **30 minutes**. The table above reads as if 5 minutes were
+the ceiling; it is the ceiling per ATTEMPT. This was not stated when it shipped,
+and it matters for reading a stalled run: a scripting execution that has been
+silent for twelve minutes is not yet evidence the guard failed. (Found on
+2026-09-20 while watching exactly such a run.)
+
 **Per CALL, deliberately, not per run.** A workflow-level `executionTimeout` was
 the obvious alternative and is worse: a legitimately long run is many normal
 calls, so any ceiling that catches a hang also kills the 51- and 69-minute runs

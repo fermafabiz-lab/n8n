@@ -57,6 +57,7 @@ import {
 import {
   normalizeCaptionColor,
   normalizeCreatedBy,
+  normalizeFlowAccounts,
   normalizeHookStyle,
   normalizeMusicLevel,
   normalizeMusicTrack,
@@ -2453,6 +2454,17 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     // unknown id must never travel, because Current Scene sends the string
     // to the Flow API verbatim. Absent/free posts "" and stores nothing.
     video_model: normalizeVideoModel(formData.get("video_model")) ?? "",
+    // Parallel clip generation across the linked Google Flow accounts. One
+    // switch on the form writes both keys, because separately they do not do
+    // what the producer asked for: spreading the scenes across accounts
+    // (flow_accounts) only avoids useapi's per-account 429s, and the pool
+    // (video_pool) is what actually holds several Veo jobs in flight at once.
+    // Measured on the same nine scenes, 2026-09-18: 10m05 with both on
+    // against 13m12 one clip at a time — db/port/parallel-accounts/etapa3.md.
+    // Clamped here as well as chosen in the form, so a tampered or stale
+    // field cannot ask for accounts that are not linked.
+    flow_accounts: normalizeFlowAccounts(formData.get("flow_accounts")),
+    video_pool: String(formData.get("video_pool") ?? "no"),
     // The producer's direction: the film's angle in their own words, plus up
     // to three mandatory beats. Normalize stores both in Editing Options
     // (producerBrief / mustInclude) so a script restart keeps them — the gap

@@ -792,6 +792,24 @@ expected and harmless for an app touching only its own Drive.
   cannot see this; only the returned `mediaGenerationId`'s hex-encoded owner can,
   which is why `Collect Replicated` files every copy by it.
 
+- **The parallel-accounts work is reachable from the site since 2026-09-20**
+  (`db/port/flow-accounts-ui/README.md`; orchestrator `4f022248`, rollback
+  `fec6369c`). The brief has a **Clip generation** control next to Video
+  quality; one switch writes both `flowAccounts` and `videoPool`, because
+  apart neither does what was asked — the first only stops useapi's 429s, the
+  second is the half that makes a film finish sooner. **It defaults to OFF**:
+  the pool has been measured on one disposable film, not on a real one. Flip
+  the default after the first real film goes through it. `flowAccounts`
+  refuses out-of-range values DOWN to 1 rather than clamping up, and
+  `FLOW_ACCOUNTS_MAX` in `derive.ts` must agree with the `ACCOUNTS` list in
+  `Assign Accounts`, order included. **The trap this change nearly fell into
+  is worth more than the feature**: the committed copy of `Normalize Webhook
+  Input` under `db/port/series/` was four days stale — another session had
+  edited that node on 09-19 — so republishing it with one key appended would
+  have silently reverted `watermarkScale` and `watermarkOpenOnce`. Four people
+  work in this repo and n8n has no merge. **`get_workflow_history` before any
+  node edit**: it names the version, the date and the file each body came from.
+
 - **Three Google Flow accounts buy 1.3x, not 3x, and the reason is worth more
   than the number** (2026-09-18, measured A/B on `rec1rkfxvBeMCFDRj`, nine scenes
   split evenly three ways; full account `db/port/parallel-accounts/etapa3.md`,

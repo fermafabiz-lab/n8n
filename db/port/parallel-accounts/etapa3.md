@@ -415,3 +415,35 @@ the RATIO above is the transferable part, not the absolute minutes.
    split that turns 3 in flight into 6 — but only after (1), or it compounds the
    per-clip penalty instead of the gain.
 3. Nothing here justifies raising `videoPoolPerAccount` yet.
+
+### 2026-09-20 — the submit-to-land experiment, attempted and stopped
+
+The test film `rec1rkfxvBeMCFDRj` this whole file measures **no longer exists**:
+by 16:42 on 09-20 the project row and all nine scenes were gone, along with
+every other disposable film (`%test%`, `%disposable%`, `%probe%` all return
+nothing). Someone cleaned up. The `resume-project` fired at it ran 15 ms and
+did nothing — `Fetch Project For Resume` returned zero rows, and a node that
+returns zero rows stops everything after it, silently.
+
+A fresh film was created instead, through the LIVE brief path with the new
+control — `recGea91h5CGUvTeB`, "ZZ DELETE pool timing", `flowAccounts: 3`,
+`videoPool: true` confirmed in Editing Options — which would have been the
+first film to go through replication and the pool from creation. Its scripting
+(execution 15511) wrote the Story Bible and one script row at 16:45:30 and then
+**nothing for 24 minutes** — the same shape as `db/port/scripting-timeout/`,
+with the per-call timeout armed this time — and was **cancelled from outside at
+17:09:33**, before any ceiling could fire and name the node. No execution
+started after it, so it was a Pause or a manual stop, not a restart.
+
+So the experiment is still owed, and so is the stall's diagnosis, and both for
+the same reason: **four timing runs in three days were stopped by someone else
+on a shared instance, and a cancelled execution keeps no data.** Running it
+again unattended while others are working is throwing away runs. It needs a
+quiet window — or, better, one real film the producer makes with "All accounts
+at once" and leaves alone, whose Media Generation execution can then be READ
+after its video gate is approved.
+
+`recGea91h5CGUvTeB` is left in place on purpose: it is the one film that
+reproduces the scripting stall with the guard armed, so a "⟳ Restart writing"
+on it is the cheapest possible chance of the timeout finally naming the node.
+Delete it once that has been tried.

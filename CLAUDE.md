@@ -853,7 +853,16 @@ expected and harmless for an app touching only its own Drive.
   serial speed — so the leading suspect is now Google itself being slower when
   three of our accounts generate at once. **Measure that before raising
   `videoPoolPerAccount`**, submit-to-land rather than land-to-land, and do not
-  start by tuning `POLL_EVERY_MS`. Note also that the old planning figure "80 scenes =
+  start by tuning `POLL_EVERY_MS`. **That measurement was attempted on
+  2026-09-20 and stopped from outside** (`etapa3.md`, last section): the test
+  film had been deleted, a fresh one was created through the live brief, its
+  scripting stalled 24 minutes in the known shape, and it was cancelled at
+  17:09:33 by a Pause or a manual stop — the fourth timing run in three days
+  killed on the shared instance, and a cancelled execution keeps no data. Do
+  not run it again unattended while anyone else is working; it needs a quiet
+  window, or one real film left alone. `recGea91h5CGUvTeB` ("ZZ DELETE pool
+  timing") is kept as the stall reproduction — "⟳ Restart writing" on it is
+  the cheapest chance of the scripting timeout naming its node. Note also that the old planning figure "80 scenes =
   6.7 h serial" implies ~5 min per clip and does not reconcile with the 88 s
   measured here; treat the RATIO as transferable, not the absolute minutes.
 

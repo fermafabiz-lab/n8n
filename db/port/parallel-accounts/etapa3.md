@@ -351,13 +351,35 @@ exposure but spreads it: one re-roll there adds its own length and nothing more.
 
 **The one that is structural, and was not predicted:** the pool's per-clip time
 is **2m10 per account**, against the serial arm's **1m28**. Three accounts do not
-buy 3x because each account's own clips got ~48% slower. Part of that is
-`POLL_EVERY_MS = 20000` — a finished job is noticed only on its next poll turn,
-and with three jobs in flight the pool spends ticks on polls it did not need.
-That accounts for maybe 10–20 s of the 42. **The rest is unexplained**, and the
-honest possibilities are that three concurrent generations are genuinely slower
-at Google, or that the per-tick cost of re-running `Current Scene` and its chain
-is higher than assumed. Nothing measured here separates the two.
+buy 3x because each account's own clips got ~48% slower.
+
+**Correction, 2026-09-20.** This entry first blamed `POLL_EVERY_MS = 20000` for
+part of that gap — a finished job being noticed only on its next poll turn.
+**That is wrong, and it is wrong in the informative direction.** The serial
+path's own waits are COARSER than the pool's: `Wait Video` is **30 s** and each
+`Wait Retry` is **15 s**, against the pool's 20 s. If detection latency were the
+story the pool would come out AHEAD, not 42 s behind. Polling cannot be why.
+
+Tick contention does not cover it either. With three jobs in flight a job's
+effective poll interval is 20 s plus the couple of ticks spent on the other
+two — call it 8 s at a few seconds a tick. That is not 42 s.
+
+What the run does say, and it is the useful part:
+
+| jobs in flight | land-to-land on one account |
+|---|---|
+| 3 (waves 1–3) | 2m08 – 2m30 |
+| **1** (scene 105, after the other accounts had finished) | **1m26** |
+
+The pool's LAST clip, running alone, was indistinguishable from serial's 1m25.
+Same machinery, same film, same hour — only the concurrency differed. So the
+penalty **scales with the number of jobs in flight**, and with polling and tick
+cost both too small to carry it, the leading explanation is now that three
+concurrent generations really are slower at Google, on three separate accounts
+under one useapi tenant.
+
+That is still an inference from one run, not a measurement. But it points the
+next experiment somewhere different from where this entry first sent it.
 
 So the ceiling with three accounts at one job each is not 3x; on these numbers it
 is closer to **1.5x**, and the measured figure is 1.31x because of the re-roll.
@@ -379,11 +401,16 @@ the RATIO above is the transferable part, not the absolute minutes.
 
 ### Next, in order of what it buys
 
-1. **Find out why a pooled clip takes 2m10 where a serial one takes 1m28.** This
-   is worth more than any other change here: closing that gap alone would take
-   the same three accounts from 1.5x to nearly 2.5x. Dropping `POLL_EVERY_MS` to
-   10 s is the cheap half of the experiment; timing a single pooled clip against
-   a single serial one, with nothing else in flight, is the half that answers it.
+1. **Find out whether Google is slower when three of our accounts generate at
+   once.** This is worth more than any other change here: if the 42 s is ours,
+   closing it takes the same three accounts from 1.5x to nearly 2.5x; if it is
+   Google's, no amount of tuning helps and the honest ceiling is 1.5x.
+   **Do NOT start by lowering `POLL_EVERY_MS`** — that was this document's first
+   instinct and the correction above shows why it cannot be the cause.
+   The experiment is a submit-to-land stopwatch, not a land-to-land one: submit
+   ONE clip alone and time it, then submit three on three accounts within a few
+   seconds and time each. Same scenes, same model. If the three are each
+   markedly slower than the one, it is Google and this line of work is done.
 2. The probe for whether one account holds two generations at once. With an even
    split that turns 3 in flight into 6 — but only after (1), or it compounds the
    per-clip penalty instead of the gain.

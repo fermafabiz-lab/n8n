@@ -824,10 +824,16 @@ expected and harmless for an app touching only its own Drive.
   exposure, the pool concentrates it. The other is structural and was NOT
   predicted: a pooled clip takes **2m10 per account where a serial one takes
   1m28**, so each account's own work got ~48% slower and three of them cannot
-  give back 3x. `POLL_EVERY_MS = 20000` explains part of it (a finished job is
-  seen only on its next poll turn) and the rest is unmeasured. **Fix the per-clip
-  penalty before raising `videoPoolPerAccount`** — more jobs in flight multiplies
-  whatever that penalty is. Note also that the old planning figure "80 scenes =
+  give back 3x. **That penalty is NOT the pool's polling**, which this entry
+  first claimed: the serial path waits 30 s (`Wait Video`) then 15 s
+  (`Wait Retry`) between polls, COARSER than the pool's 20 s, so if detection
+  latency were the story the pool would be ahead rather than 42 s behind. What
+  the run does show is that the penalty scales with jobs in flight — the pool's
+  last clip, running alone after the other accounts finished, took 1m26, i.e.
+  serial speed — so the leading suspect is now Google itself being slower when
+  three of our accounts generate at once. **Measure that before raising
+  `videoPoolPerAccount`**, submit-to-land rather than land-to-land, and do not
+  start by tuning `POLL_EVERY_MS`. Note also that the old planning figure "80 scenes =
   6.7 h serial" implies ~5 min per clip and does not reconcile with the 88 s
   measured here; treat the RATIO as transferable, not the absolute minutes.
 

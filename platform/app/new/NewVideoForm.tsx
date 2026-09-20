@@ -20,7 +20,7 @@ import SpeedPicker from "@/components/SpeedPicker";
 import VoiceTonePicker from "@/components/VoiceTonePicker";
 import StyleRefPicker from "@/components/StyleRefPicker";
 import type { HookStyleChoice, VoiceTone } from "@/lib/data/derive";
-import { CREATORS, HOOK_STYLES, SPEED_BY_PACE, STORYTELLER_TONE } from "@/lib/data/derive";
+import { CREATORS, FLOW_ACCOUNTS_MAX, HOOK_STYLES, SPEED_BY_PACE, STORYTELLER_TONE } from "@/lib/data/derive";
 
 async function submit(_prev: ActionResult | null, formData: FormData) {
   return createProject(formData);
@@ -378,6 +378,12 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
   // Which Veo tier generates the clips. Free is the default and the business
   // model; a paid tier is a per-film decision, priced on the spot.
   const [videoModel, setVideoModel] = useState(series?.videoModel || "veo-3.1-lite-low-priority");
+  // Parallel clip generation. OFF by default on purpose: it has been measured
+  // on one disposable film, not on a real one, and it changes the failure
+  // shape as well as the speed — with three accounts running at once the
+  // SLOWEST account is the film, where the serial loop spreads a bad clip's
+  // cost out. Flip the default once a real film has gone through it.
+  const [parallelClips, setParallelClips] = useState(false);
   // The category selection lives here because BOTH halves of CategoryPicker
   // read it and they are rendered in different cards.
   const [category, setCategory] = useState(initialCategory);
@@ -795,6 +801,48 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
                         ? `Free tier — clips cost no credits (the opening teaser's few shots still render on Fast, ~40 credits). Fine for scenery and slow shots; complex motion (races, crowds, physical contact) is where it glitches.`
                         : `${t.note} ≈ ${total.toLocaleString("en-US")} credits for this film (${clips} clips × ${t.credits}), out of 25,050/month.`;
                     })()}
+                  </p>
+                </div>
+                <div className="frow">
+                  <label>Clip generation</label>
+                  {/* Three Google Flow accounts are linked, and until this
+                      control existed nothing on the site could reach them —
+                      the two keys had to be typed into Editing Options by
+                      hand. They move TOGETHER because apart neither does what
+                      the producer asked for: flow_accounts alone only spreads
+                      the scenes so useapi stops answering 429, and video_pool
+                      is the half that actually keeps several Veo jobs in
+                      flight. Clamped again in actions.ts. */}
+                  <input
+                    type="hidden"
+                    name="flow_accounts"
+                    value={parallelClips ? String(FLOW_ACCOUNTS_MAX) : "1"}
+                  />
+                  <input
+                    type="hidden"
+                    name="video_pool"
+                    value={parallelClips ? "yes" : "no"}
+                  />
+                  <div className="seg" role="group" aria-label="Clip generation">
+                    <button
+                      type="button"
+                      className={parallelClips ? "" : "on"}
+                      onClick={() => setParallelClips(false)}
+                    >
+                      One at a time
+                    </button>
+                    <button
+                      type="button"
+                      className={parallelClips ? "on" : ""}
+                      onClick={() => setParallelClips(true)}
+                    >
+                      All accounts at once
+                    </button>
+                  </div>
+                  <p className="fnote">
+                    {parallelClips
+                      ? `The scenes are cut into ${FLOW_ACCOUNTS_MAX} blocks, one per linked account, and a clip is kept generating on each at the same time. Measured on nine scenes: 10 minutes, against 13 one at a time. Two things worth knowing — a film whose character sheets and set plates come from an earlier pass drops back to one account by itself rather than risk mismatched references, and while the accounts run together the SLOWEST one decides when the film is done.`
+                      : `One clip is generated, then the next. Slower, and how every film has been made so far — pick this if anything looks wrong with the parallel runs.`}
                   </p>
                 </div>
               </section>

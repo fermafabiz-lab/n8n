@@ -421,6 +421,32 @@ export function normalizeMusicLevel(value: unknown): number {
 }
 
 /**
+ * How many Google Flow accounts one film may spread its work across.
+ *
+ * Three are linked. The same list lives in `Assign Accounts` (Media
+ * Generation) as `ACCOUNTS` — change one, change both, and the order matters
+ * because a film's scenes are cut into consecutive blocks in that order.
+ *
+ * The number is a CEILING, never a promise. `Assign Accounts` lowers it by
+ * itself when the film's reference sheets have not been replicated onto every
+ * account, because a clip built from a sheet its own account does not own
+ * comes back `Email mismatch` from useapi. So asking for 3 on a film whose
+ * sheets are from an older pass quietly produces 1, and says so in the log.
+ *
+ * Refuse-then-clamp like every other Editing Options field: anything that is
+ * not an integer in range means ONE account, which is exactly how every film
+ * behaved before the accounts existed.
+ */
+export const FLOW_ACCOUNTS_MAX = 3;
+
+export function normalizeFlowAccounts(value: unknown): number {
+  const n = Number(value);
+  if (!Number.isInteger(n)) return 1;
+  if (n < 1 || n > FLOW_ACCOUNTS_MAX) return 1;
+  return n;
+}
+
+/**
  * A drawn card the pipeline chose for this film — a route chart, a departure
  * board — as stored on the project by Claude Scripting.
  *

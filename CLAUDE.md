@@ -192,6 +192,16 @@ the full entry in the file named:
   `updateNodeParameters` MERGES rather than replaces, which is what lets one
   key be edited without re-sending a node's unredacted API tokens. Full
   account: `db/port/video-regen-webhook/README.md`.
+- **A scene preview is TWO media elements, and only one of them is local.**
+  Clips and stills are kept on the box by `/api/media/ingest`; VOICEOVERS
+  never were (`hov.attachment` has no audio field), so they come from Google
+  Drive at 593-1383 ms a range against 25 ms for a local file. Anything that
+  "corrects" audio/video drift on a timer will therefore seek a stalling
+  source four times a second and block playback outright — which is what made
+  scene review unusable on 2026-09-20. `/api/media` now caches to
+  `/media/_drive/` and `MediaPlayer` nudges `playbackRate` instead of seeking.
+  Full account: `db/port/scene-lag/README.md`; lesson in
+  `docs/lessons-site.md`.
 - **`runData` is EMPTY for the whole life of a healthy running execution.**
   You cannot watch progress through the API — wait for it to end.
   `docs/lessons-n8n.md`, "n8n" section.
@@ -724,6 +734,14 @@ expected and harmless for an app touching only its own Drive.
 - Optional: `channelName: 'Video Factory'` → `'House of Videos'` in
   `remotion/src/types.ts` and the n8n "Build Remotion Props" node (affects
   rendered end screens).
+- **Give voiceovers a real attachment row** (`field: 'voice'` through
+  `/api/media/ingest`, a `storedVoiceUrl` beside `storedVideoUrl`), so new
+  films never reach Drive for playback at all, and backfill the existing
+  ones. Since 2026-09-20 the proxy's disk cache makes this an optimisation
+  rather than a fix — `db/port/scene-lag/README.md` explains why the cache
+  was done first (it heals films that already exist; the attachment row
+  would need three n8n nodes changed and a backfill before it helped
+  anything). Also owed there: watch one scene play on the deployed site.
 - Rotate the ai33 / Railway / useapi keys. Discord webhook URLs are still empty.
 
 ## Working language

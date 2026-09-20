@@ -220,10 +220,14 @@ the full entry in the file named:
   Drive at 593-1383 ms a range against 25 ms for a local file. Anything that
   "corrects" audio/video drift on a timer will therefore seek a stalling
   source four times a second and block playback outright — which is what made
-  scene review unusable on 2026-09-20. `/api/media` now caches to
-  `/media/_drive/` and `MediaPlayer` nudges `playbackRate` instead of seeking.
-  Full account: `db/port/scene-lag/README.md`; lesson in
-  `docs/lessons-site.md`.
+  scene review unusable on 2026-09-20. `MediaPlayer` nudges `playbackRate`
+  instead of seeking, which is the whole of the fix that worked. A disk cache
+  in `/api/media` was tried the same day, broke the final video twice, turned
+  out never to have written a single byte, and was withdrawn — **and it left
+  browsers poisoned with a year-long `immutable` header, which is why
+  `mediaSrc` now carries `&v=2`. Never send `immutable` from a route that can
+  answer with a partial or an error.** Full account:
+  `db/port/scene-lag/README.md`; lesson in `docs/lessons-site.md`.
 - **A pipeline fix does not reach a batch that is already running, and the
   regenerate buttons hide that.** Executions are version-pinned, so a producer
   clicking "regenerate" during a 12-hour-old batch is served 12-hour-old code

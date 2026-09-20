@@ -19,10 +19,28 @@ export const driveId = (url: string): string | null => {
 	return m ? m[1] : null;
 };
 
+/**
+ * `v` BUSTS A POISONED BROWSER CACHE, and that is its only job (2026-09-20).
+ *
+ * For twelve minutes this proxy answered with `Cache-Control: private,
+ * max-age=31536000, immutable` — a year, and `immutable` means the browser
+ * will not even revalidate. Any response a player got in that window, whole or
+ * truncated, is pinned in that browser until the URL changes. The final video
+ * came back as a spinner that a normal reload could not clear, because a
+ * normal reload is exactly what `immutable` tells the browser to skip.
+ *
+ * Bumping the query changes the URL, so nothing cached under the old one can
+ * match and every player starts clean. Bump it again if this route ever ships
+ * a bad cache header again — and it should not: the route now answers
+ * `no-store` on a partial and an hour on a whole file, which is what it did
+ * for months before that mistake.
+ */
+const PROXY_VERSION = "2";
+
 export const mediaSrc = (url: string): string => {
 	if (!url) return url;
 	const id = url.includes("drive.google.com") ? driveId(url) : null;
-	return id ? `/api/media?id=${id}` : url;
+	return id ? `/api/media?id=${id}&v=${PROXY_VERSION}` : url;
 };
 
 /**

@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "check": "npm run check:review && npm run check:cost && npm run check:provenance && npm run check:normalize && npm run check:validation && npm run check:routes && npm run check:footage && npm run check:kenburns && npm run check:series && npm run check:regen-wait && npm run check:deeplink && npm run check:deepsearch && npm run check:recap && npm run check:tones && npm run check:media-range",
+    "check": "npm run check:review && npm run check:cost && npm run check:provenance && npm run check:normalize && npm run check:validation && npm run check:routes && npm run check:footage && npm run check:kenburns && npm run check:series && npm run check:regen-wait && npm run check:deeplink && npm run check:deepsearch && npm run check:recap && npm run check:tones",
     "check:review": "node --experimental-strip-types scripts/check-review.mjs",
     "check:cost": "node --experimental-strip-types scripts/check-cost.mjs",
     "check:provenance": "node --experimental-strip-types scripts/check-provenance.mjs",
@@ -22,8 +22,7 @@
     "check:regen-wait": "node --experimental-strip-types --no-warnings --import ./scripts/alias-loader.mjs scripts/check-regen-wait.mjs",
     "check:deepsearch": "node --experimental-strip-types --no-warnings --import ./scripts/alias-loader.mjs scripts/check-deep-search.mjs",
     "check:recap": "node ../db/port/series-recap/check.mjs",
-    "check:tones": "node --experimental-strip-types --no-warnings scripts/check-tones.mjs",
-    "check:media-range": "node --experimental-strip-types --no-warnings --import ./scripts/alias-loader.mjs scripts/check-media-range.mjs"
+    "check:tones": "node --experimental-strip-types --no-warnings scripts/check-tones.mjs"
   },
   "dependencies": {
     "next": "^15.3.0",

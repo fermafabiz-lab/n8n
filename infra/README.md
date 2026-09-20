@@ -49,6 +49,42 @@ workflows, archived), inside the network and over the public URL:
 header, which is the behaviour to preserve — a frame that is missing when
 someone visits must not be cached as missing for a year.
 
+## `/media/*` on the dev host — NOT applied yet
+
+The examples section under the hero plays three files that already exist on
+the box, in `/opt/n8n/media`:
+
+| file | size | duration |
+|---|---|---|
+| `kidsstory.mp4` | 56.4 MB | 1:39 |
+| `m8 .mp4` | 3.3 MB | 0:08 |
+| `roman empire.mp4` | 321.3 MB | 6:41 |
+
+Measured on 2026-09-20 by HTTP probes from n8n (throwaway workflows, since a
+Claude web session has no outbound HTTP of its own; all three archived).
+They answer 200 as `video/mp4` with `accept-ranges: bytes` on
+**`house-of-videos.com/media/...`**, and **404 on
+`dev.house-of-videos.com/media/...`** — that host's block routes `/frames/*`
+and nothing else, so `/media/...` falls through to Next, which has no such
+page.
+
+The `handle_path /media/*` block now in the `{$SITE_DEV_HOST}` block here is
+what fixes that. **It is written in this repo only — nobody has applied it to
+the box**, because that needs a key on the box. Until someone runs
+
+    docker compose up -d caddy
+
+in `/opt/n8n` (a reload is not enough — see `CLAUDE.md`), the examples
+section renders and stays black: three `<video>` elements pointing at three
+404s. Nothing else on the page is affected.
+
+Two things about that block, both deliberate: it needs **no new mount**
+(`./media:/srv/media:ro` is already on the caddy service, which is how the
+main host serves the same directory), and it is **not** `immutable` like the
+frames are. These files are hand-named rather than content-hashed, so a film
+replaced under the same name has to become visible again — an hour, not a
+year.
+
 **`/opt/n8n/frames` is hand-managed content, not deploy output.** The
 poster moved in beside the frames and left the container image, and the
 deploy workflow no longer copies anything there — it used to overwrite the

@@ -22,9 +22,15 @@ export default defineConfig({
     },
   },
   webServer: {
-    command: "npm run start",
+    // Builds, THEN starts. It used to be `npm run start` alone, under a
+    // comment claiming it built first — so a run would happily test whatever
+    // was last compiled into .next. A whole suite once passed against a build
+    // that predated the section it was meant to be checking.
+    command: "npm run build && npm run start",
     url: "http://localhost:3000",
-    reuseExistingServer: true,
-    timeout: 60_000,
+    // Not reused for the same reason: a server someone left running is a
+    // server from some other commit. Better to fail loudly on a busy port.
+    reuseExistingServer: false,
+    timeout: 180_000,
   },
 });

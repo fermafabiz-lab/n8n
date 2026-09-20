@@ -36,14 +36,27 @@ import { MEDIA_ROOT } from "@/lib/media-store";
 const CACHE_DIR = join(MEDIA_ROOT, "_drive");
 
 /**
- * Above this, stream through and cache nothing.
+ * Above this, cache nothing.
  *
  * A voiceover is tens of kilobytes and a scene clip a couple of megabytes —
  * the things reviewed over and over. A finished film is hundreds of megabytes
- * and watched once or twice, so buffering it to disk would spend the media
- * volume on the one case that does not benefit.
+ * (306 MB on the film this was measured against) and watched once or twice,
+ * so keeping one would spend the media volume on the case that benefits
+ * least.
+ *
+ * Lowered from 96 MB on 2026-09-20: a fill buffers the whole file in memory
+ * before writing it, so this number is also a memory ceiling, and 32 MB
+ * covers everything that is actually replayed with room to spare.
  */
-export const MAX_CACHE_BYTES = 96 * 1024 * 1024;
+export const MAX_CACHE_BYTES = 32 * 1024 * 1024;
+
+/**
+ * How many fills may run at once.
+ *
+ * Each holds up to MAX_CACHE_BYTES in memory, so this is the other half of
+ * the ceiling: two at a time is 64 MB worst case on a box that also renders.
+ */
+const MAX_CONCURRENT_FILLS = 2;
 
 export interface CachedMedia {
   abs: string;
@@ -153,4 +166,77 @@ export function parseRange(header: string | null, size: number): ParsedRange | n
   if (end >= size) end = size - 1;
   if (end < start) return null;
   return { start, end };
+}
+
+/**
+ * Fill the cache for `id`, in the background, without making anyone wait.
+ *
+ * THIS IS THE WHOLE SHAPE OF THE FIX, and it is the second attempt. The first
+ * one made the request that MISSED do the downloading: fetch the whole file,
+ * write it, then answer. For a voiceover that is invisible. For a 60 MB film
+ * it meant the browser was sent nothing at all until the server had the last
+ * byte — tens of seconds of a player that simply never starts, where before
+ * it had streamed from the first byte. That is a worse bug than the one being
+ * fixed, and it is the one the producer hit.
+ *
+ * So the caller never waits on this. The miss streams straight through, and
+ * the file lands here for NEXT time.
+ *
+ * Fire-and-forget on purpose, and safe to be: `writeCached` renames into
+ * place atomically, so an interrupted fill leaves nothing behind, and the
+ * `filling` set means a scene played twice in quick succession downloads
+ * once.
+ */
+const filling = new Set<string>();
+
+export function scheduleFill(id: string, url: string): void {
+  if (filling.has(id) || filling.size >= MAX_CONCURRENT_FILLS) return;
+  filling.add(id);
+  void (async () => {
+    try {
+      if (await readCached(id)) return;
+      const res = await fetch(url, {redirect: "follow", cache: "no-store"});
+      if (!res.ok) return;
+      const contentType = res.headers.get("content-type") ?? "";
+      // Drive answers a file too large to virus-scan with an HTML
+      // interstitial, whatever range is asked for. Never cache that.
+      if (contentType.includes("html")) {
+        await res.body?.cancel().catch(() => {});
+        return;
+      }
+      const declared = Number(res.headers.get("content-length") ?? "0");
+      if (declared > MAX_CACHE_BYTES) {
+        await res.body?.cancel().catch(() => {});
+        return;
+      }
+      const buf = Buffer.from(await res.arrayBuffer());
+      await writeCached(id, buf, contentType || "application/octet-stream");
+    } catch {
+      /* a fill that fails costs nothing: the next request streams as usual */
+    } finally {
+      filling.delete(id);
+    }
+  })();
+}
+
+/**
+ * The file's FULL size, read from the headers of a response that may be
+ * partial — `content-range: bytes a-b/N` on a 206, `content-length` on a 200.
+ * null when it cannot be known, which is the signal not to try caching.
+ */
+export function totalSizeOf(res: Response): number | null {
+  const cr = res.headers.get("content-range");
+  if (cr) {
+    const m = /\/(\d+)\s*$/.exec(cr);
+    if (m) {
+      const n = Number(m[1]);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    }
+    return null;
+  }
+  if (res.status === 200) {
+    const n = Number(res.headers.get("content-length") ?? "0");
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+  return null;
 }

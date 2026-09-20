@@ -85,18 +85,44 @@ take is tens of kilobytes, so fetching it whole costs one request where
 `metadata` left the browser to range its way through it.
 
 **2. The proxy keeps what it fetches** (`app/api/media/route.ts`,
-`lib/media-cache.ts`). A miss now asks Drive for the WHOLE file once — not the
-requested range, because a range request would leave the cache empty and the
-next seek would pay Drive again — writes it to `/media/_drive/<id>.bin`
-atomically, and serves every request after that off the disk with real byte
-ranges. Content-addressed by the Drive id, which is what makes `immutable`
-honest: a Drive file id names one fixed set of bytes.
+`lib/media-cache.ts`). A hit is served off `/media/_drive/<id>.bin` with real
+byte ranges. A MISS is served exactly the way this route always served it —
+the caller's range forwarded, the body streamed — and the file is fetched
+again in the background so the NEXT request is local. Content-addressed by the
+Drive id, which is what makes `immutable` honest on a hit: a Drive file id
+names one fixed set of bytes.
 
-Files over `MAX_CACHE_BYTES` (96 MB) are not kept — a finished film is watched
-once or twice and would spend the media volume on the one case that does not
-benefit — and fall back to the streaming behaviour this route always had. A
-cache write that fails (full volume, read-only mount) is not an error: the
-bytes are already in hand and get served from memory that once.
+Files over `MAX_CACHE_BYTES` (32 MB) are never kept. That number is a memory
+ceiling as much as a disk one — a fill buffers the whole file before writing —
+and at two concurrent fills the worst case is 64 MB on a box that also
+renders.
+
+### The first version of this was wrong, and shipped
+
+Worth keeping, because the mistake is a general one. The first attempt made
+the request that MISSED do the downloading: fetch the whole file, write it,
+then answer. On a 40 kB voiceover that is invisible, and every test passed.
+On a film it meant the browser was sent **nothing at all** until the server
+held the last byte — where before it had streamed from the first. A player
+that used to start immediately simply never started, which is what the
+producer reported as *"nu se mai incarca deloc videoul intreg"*.
+
+**A cache is not allowed to be slower than no cache.** The fill has to be off
+the request path, always. The corrected version adds exactly one non-blocking
+line to a miss and is otherwise byte-for-byte the old handler.
+
+### And what was NOT caused by any of this
+
+Drive answers a file too large to virus-scan with an HTML interstitial —
+*"Google Drive can't scan this file for viruses … (306M) is too large"* —
+**whatever range is asked for**. Verified both ways on the 306 MB final of
+`recqbPJ7aZu0a21mt`: a `HEAD` with no range and a `GET` with
+`Range: bytes=0-0` both came back `text/html`. This route has always answered
+502 for those and `MediaPlayer` has always fallen back to Drive's own embed
+player, which is what actually plays the big finals. That was true before this
+change and is true after it. If the large finals are ever to play through the
+site's own player, the fix is a different Drive endpoint
+(`drive.usercontent.google.com/download?...&confirm=t`), not anything here.
 
 ## Why not the tidier fix
 
@@ -111,7 +137,8 @@ film, old and new, from the moment it deploys.
 
 ## Verified
 
-`npm run check:media-range` — **33 checks** on the byte-range arithmetic,
+`npm run check:media-range` — **49 checks** on the byte-range arithmetic and
+the fill decision,
 which is the part of this that fails invisibly. An off-by-one there does not
 look like an off-by-one; it looks like a clip that plays but will not seek, or
 a take that stops a fraction early, or a 416 the player reports as a broken
@@ -121,12 +148,18 @@ classic cause of "plays but never seeks"), clamping past the end, the exact
 416 shape the probe hit, malformed input, one-byte files, and the
 `Content-Length = end - start + 1` derivation.
 
-Four deliberate mutations were injected to confirm the check is not vacuous:
-an off-by-one clamp, a negative start from an oversized suffix, and an
-accepted reversed range were all caught. The fourth — deleting the
-`start >= size` guard — was NOT caught, and that is correct: the reversed-range
-check already rejects those inputs, so the guard is redundant rather than the
-test weak. It is kept for intent.
+Seven deliberate mutations were injected to confirm the check is not vacuous.
+Five were caught: an off-by-one clamp, a negative start from an oversized
+suffix, an accepted reversed range, a `content-range` parsed as its slice
+start rather than its total, and the cache ceiling raised past what fits in
+memory. One — deleting the `start >= size` guard — was NOT caught, and that is
+correct: the reversed-range check already rejects those inputs, so the guard is
+redundant rather than the test weak, and it is kept for intent.
+
+The seventh exposed a real gap and was fixed rather than explained away: a
+`content-range` whose TOTAL is zero was treated as a size, and `0 <=
+MAX_CACHE_BYTES` would have scheduled a fill for an empty file. Three
+assertions now cover it, and the mutation is caught.
 
 The check also caught a real one on the way in: `header.trim()` silently
 accepted `bytes=0-10\n`. A CR or LF inside a header value is a smuggling
@@ -137,9 +170,10 @@ than eaten.
 
 ## What is owed
 
-- **Watch one scene play on the deployed site.** Everything above is measured
-  at the transport layer and unit-tested; nobody has yet pressed play in the
-  browser and seen the badge-free, stall-free version.
+- **Watch one scene AND one final video play on the deployed site.** The
+  scenes were confirmed working by the producer after the first deploy; the
+  final video is what the first version broke, and the corrected one has been
+  verified by build and by unit test but not yet by a play.
 - **Give voiceovers a real attachment row** (`field: 'voice'`), so new films
   never touch Drive for playback at all, and backfill the existing ones. The
   cache makes this an optimisation rather than a fix, which is why it can wait

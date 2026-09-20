@@ -1175,9 +1175,22 @@ picked the asset, not signed it off. Final Assembly receives an ordinary mp4.
   request served off disk with real ranges. A take is also `preload="auto"`
   now: tens of kilobytes is one request, where `metadata` left the browser
   ranging its way through a source that answers each range in about a second.
-  Byte-range arithmetic is pinned by `npm run check:media-range` (33 checks) —
+  Byte-range arithmetic is pinned by `npm run check:media-range` (49 checks) —
   an off-by-one there looks like "plays but will not seek", never like an
-  off-by-one. Full account and the numbers: `db/port/scene-lag/README.md`.
+  off-by-one.
+  **The first version of that cache shipped broken, and the mistake
+  generalises: A CACHE IS NOT ALLOWED TO BE SLOWER THAN NO CACHE.** It made
+  the request that missed do the downloading — fetch the whole file, write it,
+  then answer — which is invisible on a 40 kB take and fatal on a film, where
+  the browser got nothing until the server held the last byte and a player
+  that used to start immediately never started. Every test passed, because
+  every test used a small file. The fill belongs OFF the request path: a miss
+  now streams exactly as it always did and the bytes are fetched again in the
+  background for next time. Related, and not caused by any of it: Drive
+  answers a file too large to virus-scan (306 MB here) with an HTML
+  interstitial whatever range is asked for, so the big finals have always
+  played through `MediaPlayer`'s Drive-embed fallback rather than the proxy.
+  Full account and the numbers: `db/port/scene-lag/README.md`.
 - **The video-regen trap, and three guards for it.** A stock scene has no
   Flow asset to regenerate from, and `Prep Video Regen` THROWS without an
   `Image Media ID` — a throw that kills the whole batch, not the scene. So

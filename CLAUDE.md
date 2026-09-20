@@ -862,7 +862,23 @@ expected and harmless for an app touching only its own Drive.
   not run it again unattended while anyone else is working; it needs a quiet
   window, or one real film left alone. `recGea91h5CGUvTeB` ("ZZ DELETE pool
   timing") is kept as the stall reproduction — "⟳ Restart writing" on it is
-  the cheapest chance of the scripting timeout naming its node. Note also that the old planning figure "80 scenes =
+  the cheapest chance of the scripting timeout naming its node. **That restart
+  was pressed the same evening and reproduced the stall exactly** (new bible
+  at 20:05:01, then 45 minutes of nothing) — and was cancelled by hand at
+  20:50:46, the fifth such kill in three days, every one before the guard
+  could fire. The reason it never fires is arithmetic, not a missing
+  timeout: the model timeouts are confirmed present in the live version, but
+  four agents carried n8n's own `retryOnFail`/`maxTries: 3` on top, so a hang
+  cost 3 × 3 × 5 = **45 minutes** before failing — above anyone's patience.
+  **That retry is gone since 2026-09-20 ~20:55** (Claude Scripting
+  `f86e6cc1`, rollback `c0b8e3d8`, `db/port/scripting-timeout/README.md`);
+  the ceiling is 15 minutes per agent now. **Leave the next stalled run alone
+  for 15 minutes** and the error names the node. Two traps met on the way:
+  `diff-workflow.mjs` is blind to node SETTINGS (it reported `changed 0`
+  over a real four-node change — compare `retryOnFail` by hand), and a
+  `glob(...)[-1]` over the tool-results folder picks files lexically, not by
+  time, which produced a confident diff of two unrelated workflows before
+  the selection was redone by workflow id and mtime. Note also that the old planning figure "80 scenes =
   6.7 h serial" implies ~5 min per clip and does not reconcile with the 88 s
   measured here; treat the RATIO as transferable, not the absolute minutes.
 

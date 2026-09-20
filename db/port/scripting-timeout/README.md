@@ -82,9 +82,45 @@ bible written, then silence past the 15-minute mark, still `running`.)
 
 **Should the node-level retry be there at all?** Retrying a hung agent three
 times is what turns a 15-minute failure into a 45-minute one, and the retry
-was put on for transient API errors, not for hangs. Leave the question open
-until a run has actually been seen to fail on the ceiling; removing it blind
-would be the same mistake as adding the timeout blind.
+was put on for transient API errors, not for hangs. The question was left open
+for a few hours on 2026-09-20 and then answered by the evidence below.
+
+## Applied 2026-09-20 — the node-level retry is gone
+
+Claude Scripting **`f86e6cc1`**, rollback **`c0b8e3d8`**. Four operations, all
+`setNodeSettings { retryOnFail: false }`: `Generate Story Bible`,
+`Generate Outline`, `Segment Chapter Into Scenes`, `Generate Hook`. Nothing
+else — the draft was verified byte-identical to the active version before the
+edit (136 nodes, `diff-workflow.mjs` RESULT: OK), and after it a field-level
+comparison found exactly those four nodes changed, in exactly that one field.
+**`diff-workflow.mjs` is blind to node SETTINGS** — it compares parameters and
+connections, so it reported `changed 0` over a real four-node change. Compare
+`retryOnFail` / `maxTries` / `onError` by hand when a change touches them.
+
+The ceiling is now **15 minutes** for every agent in the writing path and 30
+for the Story Bible agent (its model keeps the 10-minute timeout).
+
+**Why this was no longer blind.** The stall was reproduced three times on one
+film in one day — `recGea91h5CGUvTeB`: 16:45:30, then a "⟳ Restart writing" at
+20:04:11 that wrote a new bible at 20:05:01 and then **nothing for 45 minutes**
+— and on every occasion, and on the two before it, the run was cancelled BY
+HAND before the guard could fire. The parent execution says so in as many
+words each time: *"The execution was cancelled manually"* (15573 at 20:50:46,
+15555 at 20:04:08, and the 17:09:33 one). Five kills in three days, the latest
+at 45m39 of silence. So the 45-minute ceiling sat above the patience of every
+person who has ever watched one of these runs, which means it would never fire
+in practice, which means it was not a guard. With the model's own
+`maxRetries: 2` still covering transient API errors, the node-level retry was
+buying nothing but that extra half hour.
+
+**What is still owed is unchanged, and now cheaper**: one stalled run left
+alone for 15 minutes. `recGea91h5CGUvTeB` reproduces the stall on demand from
+"⟳ Restart writing". The error will name the node.
+
+The model timeouts themselves were confirmed present in the live version on
+2026-09-20 (all eight nodes, 300 000 / 600 000 ms, `maxRetries: 2`) — the
+other explanation for a guard that never fired, a later publish having been
+built from an older draft, was checked and is not what happened.
 
 **Per CALL, deliberately, not per run.** A workflow-level `executionTimeout` was
 the obvious alternative and is worse: a legitimately long run is many normal

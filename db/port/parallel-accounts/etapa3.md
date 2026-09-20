@@ -447,3 +447,16 @@ after its video gate is approved.
 reproduces the scripting stall with the guard armed, so a "⟳ Restart writing"
 on it is the cheapest possible chance of the timeout finally naming the node.
 Delete it once that has been tried.
+
+**Later the same evening.** "⟳ Restart writing" WAS pressed on
+`recGea91h5CGUvTeB` at 20:04:11 (execution 15573/15574): a new Story Bible at
+20:05:01, then nothing for 45 minutes, then a manual cancel at 20:50:46 — the
+parent execution's own words. Fifth kill. What it bought is in
+`db/port/scripting-timeout/README.md`: the guard's ceiling turned out to be 45
+minutes because of node-level retry on four agents, which is why it never got
+to fire, and that retry is now removed (`f86e6cc1`). The concurrency
+measurement this section is about is unchanged: still owed, still needs a
+quiet instance or a real film left alone. The producer's own real film that
+evening (`rec0w52EKvBoBlBLF`, made through the new brief with
+`flow_accounts: 1, video_pool: "no"` in its payload — the first proof the
+control is live) ran serially by their choice.

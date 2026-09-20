@@ -251,6 +251,31 @@ export type FinalVideoProps = {
 	 * carries no provenance at all.
 	 */
 	showSourceWatermark?: boolean;
+
+	/**
+	 * Open the provenance pill only the FIRST time each kind of source appears.
+	 *
+	 * Off by default, so a film rendered before this existed, or by a producer
+	 * who never touched the switch, keeps every band's label open. On, a
+	 * documentary that runs twenty archive shots announces ARCHIVAL FOOTAGE
+	 * once and then leaves a small glyph in the corner for the rest — the
+	 * claim is made, and repeating it at every cut is noise.
+	 *
+	 * Keyed on the ORIGIN, not on the label: a second archival band from
+	 * another archive is the same kind of source, so it stays collapsed. Its
+	 * licence credit, if it owes one, is drawn regardless — that is an
+	 * obligation and no switch here reaches it.
+	 */
+	watermarkOpenOnce?: boolean;
+
+	/**
+	 * How big the provenance badge is drawn, as a multiplier of its base size.
+	 *
+	 * 1 is what every film rendered before this existed was drawn at, and what
+	 * an absent or out-of-range value resolves to — `normalizeWatermarkScale`
+	 * refuses rather than clamps, so a stored 4 is the default, not the maximum.
+	 */
+	watermarkScale?: number;
 };
 
 export const defaultFinalVideoProps: FinalVideoProps = {
@@ -273,6 +298,8 @@ export const defaultFinalVideoProps: FinalVideoProps = {
 	chapterTitles: {},
 	narrationIsSpoken: true,
 	showSourceWatermark: true,
+	watermarkOpenOnce: false,
+	watermarkScale: 1,
 };
 
 /** Tone → visual language. Lowercased, diacritics-insensitive lookup. */

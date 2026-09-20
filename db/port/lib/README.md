@@ -24,8 +24,9 @@ formalizes a convention the first pattern needs to stop being ad hoc.
 
 ## The constraint that shapes everything here
 
-**A Claude Code web session has no outbound HTTP at all.** Every host
-answers with no response — not just house-of-videos ones — which is exactly
+**A Claude Code web session reaches GitHub and nothing else.** Measured
+2026-09-18: `api.github.com` answers 200; every other host
+answers with no response, which is exactly
 why CLAUDE.md says `scripts/check-n8n.mjs` "has to be run from a machine
 that can reach `wf7.house-of-videos.com`". `motif-cards/apply.mjs`'s
 `fetch()` calls could never have run from inside a session like this one —

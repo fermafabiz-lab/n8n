@@ -120,7 +120,14 @@ Webhooks the site calls: `new-project`, `resume-project`, `restart-scripting`
 outlives the site's 15-second fetch), `assemble`, and the single-purpose ones — `expand-brief`, `yt-scene-titles`,
 `upscale-film`, `list-music`/`share-music`, `archive-suggest`, `hook-regen`,
 `series-recap` (its own workflow `4jVkQjpr7terqQhY`, fired by `approveScript`
-for an episode of a series — `db/port/series-recap/`). The site derives all of them from `N8N_NEW_PROJECT_WEBHOOK_URL`
+for an episode of a series — `db/port/series-recap/`), `deep-search-rerun`
+(on **Claude Scripting**, the "⟳ Re-check this script" button above the script
+gate — nine `DS *` nodes that re-check the FINISHED script including the hook;
+answers `onReceived` because the run outlives the site's 15-second fetch —
+`db/port/deep-search-rerun/`), `sheet-backfill`
+(workflow `IGWjknKcffnGlOmV`, fired by the series page's "Bring the pictures
+back" — `db/port/sheet-backfill/`; it is the one webhook the site WAITS on,
+because the count it reports is taken from the database after n8n is done). The site derives all of them from `N8N_NEW_PROJECT_WEBHOOK_URL`
 by string-replacing the last path segment, so they must live on the same host
 — and each new one must be a plain `path` with no path parameters, or the
 derived URL will not resolve.
@@ -131,7 +138,11 @@ verify all of the above in one shot — ids, active state, webhooks, every
 
 **It has to be run from a machine that can reach `wf7.house-of-videos.com`.**
 Claude Code web sessions egress through a proxy that answers 403 to that host,
-so the script cannot run there — the n8n MCP connector still works, and is the
+so the script cannot run there. `node scripts/check-fact-check.mjs` is the
+opposite kind of check and runs anywhere: it executes the fact-check chain's
+committed Code-node bodies against fixtures with no n8n and no network, which
+is how the `RESULT:` parser was caught matching nothing before it ever ran.
+The n8n MCP connector still works, and is the
 way to check things from inside such a session.
 
 ## Where the lessons live
@@ -145,7 +156,7 @@ pipeline is not forced to hold all of it in context:
 | `docs/lessons-n8n.md` | n8n as a platform — execution/draft/publish mechanics, Airtable field-writing traps, gate wiring, the whole Airtable → Postgres cutover |
 | `docs/lessons-render.md` | Everything downstream of "the clip exists" — TTS, breath trim, speed, the montage, text cards, captions, the sound mix, the Remotion render pipeline |
 | `docs/lessons-site.md` | `platform/` (Next.js) — review UI, pickers, hands-off mode, documentary mode, the footage engine, the source watermark |
-| `docs/lessons-pipeline.md` | What Claude Scripting and Media Generation WRITE and CHOOSE — story structure, evidence, consistency, the hook, genre rules, model choice, the batch cap |
+| `docs/lessons-pipeline.md` | What Claude Scripting and Media Generation WRITE and CHOOSE — story structure, evidence, consistency, the hook, genre rules, model choice, the batch cap, the fact check |
 
 **Read this file always.** Then read the file (or files) for the area the
 task actually touches. If a task crosses areas — and most non-trivial ones
@@ -169,6 +180,17 @@ the full entry in the file named:
   Media Generation) execution is running.** A deploy restarts the container
   mid-render. Check `search_executions` first. Full account:
   `docs/lessons-n8n.md` under "Never push while a final render is running".
+  **CLAUDE SCRIPTING BELONGS IN THAT LIST TOO** (measured 2026-09-19): it makes
+  **15 HTTP calls into the site container**, and five of them are on the main
+  writing path, not just the regen tails — `Fetch Genre Profile`, `Fetch
+  Project Record`, `Load Project Bible`, `Load Scene`, `Save Evidence` (the
+  other ten are the `IR *` / `VR *` / rewrite tails). A `platform/**` deploy
+  restarts `web` for about a minute, so a film that is mid-script can lose a
+  node to a connection refused and die with the script half written. The rule
+  as written names only the two render workflows, which reads as permission to
+  deploy over a scripting run. It is not. List them with:
+  `jq -r '.workflow.nodes[] | select((.parameters|tostring) | test("house-of-videos|/api/at")) | .name'`
+  over a saved `get_workflow_details` dump.
 - **A PUT to the n8n public REST API has no draft — it is live immediately.**
   The MCP connector's `update_workflow` DOES stage a real draft;
   `get_workflow_details` always returns the DRAFT, never the live version —
@@ -202,13 +224,33 @@ the full entry in the file named:
   `/media/_drive/` and `MediaPlayer` nudges `playbackRate` instead of seeking.
   Full account: `db/port/scene-lag/README.md`; lesson in
   `docs/lessons-site.md`.
+- **A pipeline fix does not reach a batch that is already running, and the
+  regenerate buttons hide that.** Executions are version-pinned, so a producer
+  clicking "regenerate" during a 12-hour-old batch is served 12-hour-old code
+  and is given no sign of it — which looks exactly like "your fix did not
+  work". Repaired STORED PROMPTS do reach it (read fresh per submit); node
+  bodies do not. Check `search_executions` before claiming a fix is live.
+  Full account: `db/port/motion-permanence/stale-execution/` and
+  `docs/lessons-n8n.md`.
+  **One clause of that entry has been out of date since 2026-09-17**: it said
+  video regen "is the batch's own job, not a webhook". It has `scene-video-regen`
+  now (`db/port/video-regen-webhook/`), so a video regeneration runs on its own
+  execution and therefore on the CURRENTLY PUBLISHED version — it is the one
+  regenerate button the stale-batch trap no longer applies to. The trap is
+  entirely real for everything still inside the batch.
 - **`runData` is EMPTY for the whole life of a healthy running execution.**
   You cannot watch progress through the API — wait for it to end.
   `docs/lessons-n8n.md`, "n8n" section.
 - **Any MCP edit to a live node must be diffed against the version you built
   on, node by node, confirming the ONLY entry that differs is yours** — use
   `db/port/lib/diff-workflow.mjs` rather than ad hoc python/jq. See
-  `db/port/lib/README.md`.
+  `db/port/lib/README.md`. **Feed it the workflow object, not the tool's
+  output**: `get_workflow_details` wraps it as `{workflow: …}`, and handed the
+  raw file the differ reads `before 0 nodes → after 0 nodes, changed 0` and
+  still prints `RESULT: OK`, plus a cheerful "only the expected nodes differ".
+  A pass over nothing looks exactly like a pass. Pipe both sides through
+  `jq '.workflow'` first and check the node count is not zero before believing
+  the verdict (2026-09-18, `db/port/watermark-open-once/`).
 - **Never write a prompt instruction as a negation.** Google's Veo guidance is
   explicit that "no walls" / "don't show walls" makes the model render walls;
   what is unwanted belongs in a bare comma-separated NOUN LIST. This pipeline
@@ -217,6 +259,18 @@ the full entry in the file named:
   Same for props: "the swinging door" is an instruction to animate the door.
   Full account: `docs/lessons-pipeline.md`, "A prompt that names a failure
   summons it".
+- **A length in a prompt is obeyed or ignored according to how it is PHRASED,
+  not according to the number.** "At most 80 words" produced 92 and 97; the same
+  budget written as a rule — length named as a rule, the model asked to count
+  its draft before answering, and the consequence stated — produced 73, 75, 80,
+  71, 76, 72 across a 1.4 KB kids episode and the 11.4 KB Burj Al Arab
+  documentary. All three parts are load-bearing; the version missing one went
+  over. So when a length matters, measure the wording rather than lowering the
+  number, and keep a net under it that cuts at a SENTENCE boundary (a half
+  sentence still reads like a recap — the silent failure). `node
+  db/port/series-recap/check.mjs`, in `npm run check`. Full account:
+  `docs/lessons-pipeline.md`, "A word cap is obeyed or ignored according to how
+  it is PHRASED".
 - **A prompt fragment always lives in more copies than the one you found.** The
   motion-prompt tail lived in seven places across three workflows; a fix that
   touched two was reported as done and shipped half-broken. Before calling a
@@ -226,12 +280,76 @@ the full entry in the file named:
   found on 2026-09-15 after a grep of the two obvious workflows missed it. The
   rule lives in `Segment Chapter Into Scenes`, `Rewrite Scene Text`, `Rewrite
   Scene Standalone` (Claude Scripting), `HR Shots Prompt` (Hook Regen) and
-  `VP Rewrite AI` (Media Generation). Guardrails are cheapest composed at submit
+  `VP Rewrite AI` (Media Generation).
+  **Deep Search's judge is the newest member of this family, since
+  2026-09-19**: `FC Judge` and `DS Judge` carry the SAME 11 KB prompt, as do
+  `FC Source` and `DS Source`, because the re-run chain emits its payload under
+  `fc` precisely so the prompts can be shared byte for byte. One file,
+  `db/port/fact-check/paste/FC Judge.txt`, two live nodes — **re-paste both or
+  the button silently checks films by last week's rules.** Guardrails are cheapest composed at submit
   time, where one node owns them, rather than stored in the database where
   changing them means a backfill. The same rule now covers a TABLE: the
   eight kids style prefixes (`KIDS_STYLES`) live in `Voice Mode` (Claude
   Scripting), `Cast Sheet Prep` and `Set Plate Prep` (Media Generation) —
   change one, change all three, and run `node db/port/sheet-style/check.mjs`.
+- **An `Execute Workflow Trigger` with typed inputs emits ONLY those fields,
+  and one of them resolving is not evidence the rest are there.** Claude
+  Scripting's `Receive Project Data` declares eight — `Project_ID`, `Tema`,
+  `Tonalitate`, `Pace`, `Lenght`, `Language`, `Style`, `Lore` — so the project
+  ROW is not on it, however plainly the parent's payload shows `fields` in the
+  execution's stack (that is the INPUT; the node filters it). Deep Search read
+  `$('Receive Project Data').first().json.fields['Editing Options']` for four
+  hours on 2026-09-18 and got undefined on every film, while
+  `FC Save Report`'s `$('Receive Project Data').first().json.Project_ID` kept
+  working — because that one IS declared. **The node that carries the project
+  row is `Fetch Project Record`**, which is what `Voice Mode` has always read.
+  The general rule: **when a workflow already answers a question somewhere,
+  copy THAT node's reference instead of inventing one**, and when a `$('…')`
+  read comes back empty, check what the node DECLARES before assuming the data
+  shape. Full account: `docs/lessons-n8n.md`, "A typed trigger is a filter".
+- **A branch that skips work must still write its record, or silence means two
+  things at once.** Deep Search's gate sent skipped films straight past the
+  report writer, so "no row" meant both "this was a Story film" and "the chain
+  is dead" — which are exactly the two the producer's red light exists to tell
+  apart. Every film gets a row now. **Any status a human is meant to act on
+  needs its negative case recorded, not merely not-recorded.**
+- **`category` is a REQUEST, not a description of the film.** `story` is the
+  site's DEFAULT, so genuine documentaries carry it — of eleven researched
+  films only three say `documentary`, and the Burj Al Arab, Peking to Paris and
+  Tupac films are all filed as `story`. So never use it to infer what a film
+  IS. Deep Search nevertheless gates on it, because the producer's instruction
+  was that it is a feature OF Documentary mode: reading it as "this producer
+  asked for the documentary treatment" is sound, reading it as "this film is
+  factual" is not. Full account: `docs/lessons-pipeline.md`, "The script is
+  checked against its own research".
+  **The source watermark is the SECOND gate to do this** (2026-09-19,
+  Final Assembly `309157bd`): source labels are a Documentary feature now,
+  on the same reading — the producer asked for a label that distinguishes
+  sources, and every other category is wall-to-wall AI, so the badge drew
+  one continuous `AI GENERATED` pill that distinguished nothing. They were
+  shown this rule and the 3-of-11 count and chose it anyway, so it is a
+  decision. What makes it survivable is that it is NOT silent: the row is
+  dropped on the brief (where the category control is two rows up) and
+  Final touches prints "No source labels on this film" with the category it
+  was filed as, so a documentary filed as Story is caught before the render
+  rather than after it. The licence credit is untouched — an obligation, and
+  no category reaches it. Full account `db/port/watermark-open-once/README.md`,
+  pinned by `node db/port/watermark-open-once/check.mjs`. **If a documentary
+  ever does ship unlabelled because of this, the fix is not to widen the
+  category list — it is to gate on whether the film MIXES kinds of source,
+  which needs no category at all.**
+- **A button has to GO somewhere, and nothing tells you when one stops.**
+  Two of them had: the chime's toast and system notification did nothing at
+  all on click, and the library hero's "Everything waiting on me" pointed at
+  `/projects?filter=wait` while the grid kept its tab in `useState("all")`
+  and read no param — a link to the page it was already on, with a query
+  string nobody consumed. Destinations now have one owner each
+  (`platform/lib/deep-link.ts` for the gate→step map and `?scene=`,
+  `platform/lib/library-filters.ts` for `?filter=`), and
+  `npm run check:deeplink` pins both halves: every link names a real key,
+  and the reader is still there. Full account: `docs/lessons-site.md`, "A
+  notification that says what happened but does not GO there" and "A link to
+  the page you are already on".
 - **Editing Options fields are refuse-then-clamp, never silently coerced** —
   the `normalize*` family in `platform/lib/data/derive.ts`, fixture-tested by
   `npm run check:normalize`. A value stored by the site, read by n8n and
@@ -240,11 +358,12 @@ the full entry in the file named:
 - **A numeric Airtable field left mapped with no value writes a literal `0`,
   not nothing.** Killed scene ordering and project length more than once.
   `docs/lessons-n8n.md`, "Airtable" section.
-- **A Claude Code web session has no outbound HTTP at all.** Anything that
-  needs to reach `wf7.house-of-videos.com` or run a real render must be done
-  through the n8n MCP connector, a throwaway workflow, or Railway's own
-  tools — never a direct `fetch()`/`curl` from this environment. See
-  `db/port/lib/README.md`.
+- **A Claude Code web session reaches GitHub and nothing else.** Anything
+  that needs `wf7.house-of-videos.com`, the site, an external API or a real
+  render must be done through the n8n MCP connector, a throwaway workflow, or
+  Railway's own tools — never a direct `fetch()`/`curl` from this
+  environment. `api.github.com` is the one exception and answers normally.
+  See `db/port/lib/README.md`.
 - **Any Code-node body or prompt edited through MCP must come from a real,
   committed file first** (`db/port/<feature>/paste/<Node Name>.js`), never
   composed inline in the tool call. `db/port/lib/README.md`.
@@ -275,6 +394,22 @@ the full entry in the file named:
   exactly today's working pipeline. Everything else is built *around* it,
   never by changing it. Categories marked `ready: false` are selectable, saved,
   and inert on purpose — so colleagues can work while the rest is wired up.
+- **Each category owns the tone its films are written in** (2026-09-19):
+  `defaultTone` on every entry in `platform/lib/categories.ts` — Story →
+  **Epic**, Documentary → **Documentary**, Cinematic → **Cinematic**, Kids
+  story → **Childish**. The brief lights that chip the moment the category is
+  chosen (the same contract `narratorVoice` has: a visible selection, never a
+  hidden default), and one click on any chip makes the row the producer's for
+  good — an explicit `toneTouched` flag, because "is it still the default?"
+  cannot tell a deliberate *Epic* on a Story film from an untouched one. The
+  field is REQUIRED and typed against `lib/tones.ts`, the one owner of the
+  twelve names, so a new category cannot forget it and a misspelling is a
+  build error. **That matters because a tone with no `hov.genre_profile` row
+  is written with Scripting's DOCUMENTARY fallback silently** — no error, no
+  log line — so adding a tone means inserting its profile first
+  (`db/port/childish-tone/` is the worked example) and re-measuring the date
+  recorded in `lib/tones.ts`. `npm run check:tones`; full account
+  `docs/lessons-site.md`, "The tone is part of what kind of film it is".
 
 ## Environment
 
@@ -339,6 +474,193 @@ expected and harmless for an app touching only its own Drive.
 
 ## Open work
 
+- **Deep Search is live; what is owed is a film somebody keeps**
+  (2026-09-18, Claude Scripting `b927a298`; full account
+  `db/port/fact-check/README.md`, lessons in `docs/lessons-pipeline.md` under
+  "The script is checked against its own research" and `docs/lessons-site.md`
+  under "Deep Search — a warning with no button"). **Documentary mode only**,
+  by the producer's instruction. Thirteen nodes between `If Narration Retry`[1]
+  and `Combine Chapters` read the narration against the film's own research
+  pack, look up what the pack does not cover, rewrite what nothing can back,
+  and write `hov.fact_check` for the panel above the script gate and the
+  Settings card. **The feature is called Deep Search; the nodes are `FC *` and
+  the table is `hov.fact_check`** — the mapping is FC = Deep Search, and it
+  stays that way because renaming thirteen live nodes means rewriting every
+  `$('FC …')` reference between them. It was
+  exercised end to end on the Burj Al Arab film's real narration and pack
+  through a throwaway (execution 14764: 47 statements, 16 looked up, 8
+  corrected, 0 left flagged, rewrite accepted, every chapter within a few words
+  of its length), and `node scripts/check-fact-check.mjs` holds 60 assertions
+  over the committed node bodies including every refusal branch. It has also
+  run for real: execution 14771, a whole pipeline fired at `new-project` for
+  the disposable film `rec4ZIQVVxXZcS5no`, wrote `{checked: 18, flagged: 1,
+  searched: 5, rewritten: 1}` into `hov.fact_check` and then went on to write
+  its script and park at the gate — which is the only proof available from a
+  web session that the LIVE node bodies match the repo, since n8n's own tables
+  are in a different database from `hov` and a session here has no API key, so
+  `diff-workflow.mjs` cannot be run on a 123-node workflow. **What is owed is
+  the same on a film somebody intends to keep, with the corrected sentences
+  READ as prose rather than counted** — the length checks pass by
+  construction, and nobody has yet judged whether a correction reads as well
+  as the sentence it replaced. The escape hatch if a film goes wrong: publish
+  `b9f95221`, the version this was built on; the chain is purely additive.
+
+  **It shipped broken for four hours on its first evening and the producer
+  found it, not a check.** The Documentary gate published at 15:18 read the
+  category from `$('Receive Project Data')` — the typed sub-workflow trigger,
+  which emits only its eight declared fields — so it was `undefined` on every
+  film and every documentary skipped as `no-mode`. And the skip branch went
+  straight past `FC Save Report`, so there was no row to say so: the
+  producer's own Google Maps film reached its script gate showing red with no
+  explanation, on a script whose hook said April and whose first chapter said
+  October. Both are fixed in `b927a298` — the category comes off
+  `Fetch Project Record` (what `Voice Mode` has always read), and
+  `FC Run?`[false] now runs through `FC Apply`, so **every film writes a row
+  and an absent row now means the chain genuinely did not run**. Verified on a
+  real documentary: `{category: "documentary", checked: 15, searched: 9,
+  flagged: 1, rewritten: 1}`.
+
+  **The process lesson is the expensive one**: the only end-to-end run that
+  ever verified Deep Search finished at 15:00, eighteen minutes BEFORE the gate
+  was published. It was reported verified when what had been verified was the
+  version before it. **A change published after the run that verified it is
+  unverified**, and it is worth re-reading that sentence before writing "live
+  and verified" about anything here.
+
+  **The judge rules on one ASSERTION at a time since 2026-09-19 09:37**
+  (`63d21d49`, `db/port/fact-check/README.md` §5, lesson in
+  `docs/lessons-pipeline.md` under "A sentence is only as sound as its weakest
+  clause"). The producer read a post-Deep-Search script against ChatGPT and
+  found four things through it; all four were one fault — **the judge was
+  asked for a verdict per SENTENCE, and a documentary sentence is almost never
+  one assertion**, so a source for the half it was mostly about carried the
+  half nothing backed. It now returns one finding per assertion, repeating the
+  `quote`, with `claim` as what distinguishes them; on the producer's own
+  narration that is 26 findings across 13 sentences where it was 15, and all
+  four misses come back unsupported (execution 15034). Two consequences worth
+  carrying past this feature. **A closed-book checker inherits its pack's
+  errors**: the ZipDash chronology was not missed but checked, against a claim
+  that itself said "after buying Where 2 and Keyhole" — so the judge now
+  refuses to take ORDER from a claim's prose and takes it only from dates,
+  which routes it to a live lookup. And **a ratio measured over units a prompt
+  defines is not a threshold**: doubling the findings silently moved
+  `FC Resolve`'s overwhelmed backstop, its fix list and `FC Apply`'s
+  `rewritten`, all three of which now count distinct sentences.
+  **What is owed**: `Extract Claims` still writes relative order ("after") as
+  if it were sourced — claims should carry dates.
+
+  **Two more holes are closed, LIVE as `3d1834f1` since 2026-09-19 11:14**
+  (`db/port/fact-check/README.md` §6, verified in execution 15071 BEFORE the
+  publish and on a real film after). The producer's next Google Maps documentary came back cleaner but
+  with ZipDash still wrong, and the reason is new: the writer had ATTRIBUTED
+  the ordering ("according to the same report"), so the assertion the judge
+  extracted was a claim about what a report SAYS — which is true — and "dates
+  settle order" never fired. **Attribution laundered the chronology**, and the
+  source it launders through is a real one: the 2020 U.S. House Judiciary
+  report itself carries the wrong order. The repo now has the judge ruling on
+  both the attribution AND the underlying fact whenever that fact is one
+  another source could check (narrowly: a party's claim about ITSELF stays one
+  claim), and the rewrite forbidden from repairing an ordering by attributing
+  it. The same film also said "early 2003" and "In 2004" for one founding,
+  three sentences apart, and the second sentence produced no finding at all —
+  so the judge is now asked to check **the narration against itself**, which
+  nothing in the chain could do before and which is the same fault as the very
+  first red-light film (hook said April, chapter one said October).
+  **The 09-18 lesson was applied rather than described**: this sat committed
+  and unpublished for an hour while the OpenAI account was empty, because a
+  prompt change nobody has run is not one to publish; execution 15071 then ran
+  it against the real narration, both rules fired, and it went live after
+  that. The ZipDash sentence now returns three findings — the attribution
+  still `supported` on E16, and the chronology as its own `unsupported` one.
+
+  **THE HOOK HAS NEVER BEEN FACT-CHECKED, ON ANY FILM** (found 2026-09-19,
+  `db/port/fact-check/README.md` §7 — read it before touching this chain).
+  `Generate Hook` runs AFTER the whole Deep Search chain
+  (`FC Done → Combine Chapters → Generate Hook`), so the hook does not exist
+  when the judge reads the narration and `FC Prep` cannot include it. The
+  producer's third Google Maps film opened on *"Lars Rasmussen faced a
+  deadline in 2003"* — an invention with no support anywhere in the script or
+  its pack — while all 9 checked sentences came from chapter 1. **This also
+  re-explains the first red-lit film's "hook said April, chapter one said
+  October"**, which was filed under the gate bug and was actually this.
+  The judge is fine: fed the hook, it catches the line instantly (15089).
+  What shipped is a CONSTRAINT, not a check — `Generate Hook` rule 3b forbids
+  stating any date, number, name or event the narration does not — and a
+  constraint is not a check. **§8 is the same shape**: nothing re-reads what
+  the REWRITE produced, so it can introduce an unsourced claim, half-fix a
+  contradiction, or create a new internal one, all of which happened on that
+  film. **One re-run of `FC Judge` over the FINISHED narration, after the
+  rewrite and after the hook, closes both** — that is the next piece of work
+  here, and it was deliberately not rushed in as the fourth publish of a day
+  the producer was making films through.
+
+  **That next piece exists now: "⟳ Re-check this script"**, Claude Scripting
+  `6d7e0079`, webhook `deep-search-rerun`, full account
+  `db/port/deep-search-rerun/README.md`. Thirteen `DS *` nodes on their own
+  canvas row read `hov.script.content` — the finished text, hook included,
+  corrections applied — rebuild the pack from `hov.evidence`, re-run the judge
+  and the live lookup over it, **and correct what nothing can back**. The
+  report replaces the row and carries `rerun: true` / `scope: "final"`, which
+  is what makes the panel say "Re-checked at HH:MM" and name the hook.
+  **Two design notes that will bite**: `DS Prep` emits under `fc`
+  so `DS Judge` / `DS Source` take the FC prompts BYTE FOR BYTE, which means
+  **the judge prompt now lives in two live nodes and both must be re-pasted
+  together**; and the webhook answers `onReceived`, so the button does not
+  change the numbers on screen — the timestamp is how the producer tells the
+  new report from the old one, and the site polls for it.
+
+  **It shipped report-only and the producer overruled that the same evening**
+  (*"cand da recheck ar trebui sa si schimbe ce e gresit/unsupported"*). The
+  reasoning for abstaining was not wrong about the hazard — editing text under
+  someone who is reading it — only about who prices it; what it identified is
+  now enforced mechanically instead: `supported` is never touched, the
+  overwhelmed backstop stands, `DS Apply` refuses six shapes of bad rewrite,
+  and **past the script gate it reports and refuses to edit** (`DS Load` counts
+  the scenes; a non-zero count sets `frozen`, because by then the scenes carry
+  their own copy of every line and their own recordings).
+  **The hook is written in BOTH places or neither** — `hov.script.content` and
+  `editing_options.hookPlan.beats`, one statement, since the beats are what the
+  render speaks.
+  **Verified on the producer's own Google Maps film**, four presses in a row,
+  each reading what the last one wrote: flagged **3 → 2 → 1 → 0**, and the
+  fourth pass wrote `script_rows 0, hook_rows 0` — the reassembly round-trips
+  to identical bytes, so a clean re-check costs one judge call and no writes.
+  The first press corrected exactly the three things the producer's reader had
+  rejected: the invented hook line (now *"In 2003, Google Labs launched 'Search
+  by Location.'"*, in both copies), the over-universal scope claim and the
+  counterfactual.
+  **Two failures worth carrying**, both invisible in the diff and caught only
+  by running it: `editing_options` is `jsonb` so the decode needs `::jsonb`,
+  and the refusal took the corrected script down with it because they share one
+  statement; and **inserting `DS Write` between `DS Apply` and `DS Save`
+  replaced the payload** — a Postgres node mid-chain replaces `$json` exactly
+  as an agent does, which this repo knew about agents and had not generalised.
+  It died as *"invalid base64 end sequence"*, having written the correction and
+  not the report that described it.
+
+  **AND THEN IT WROTE THE SAME SENTENCE FOUR TIMES.** The producer's reader
+  found it the same evening: every fact sourced, one of them stated four times
+  over. **This chain made them** — the rewrite is told to keep each chapter's
+  length and to use only the claims, and is never shown what the narration
+  already says, so each press replaced an unsourced sentence with the
+  best-sourced fact available, which was the one the sentence before it already
+  carried. The convergence reported above as 3 → 2 → 1 → 0 was measuring the
+  factual axis while the editorial one got worse every pass. Live as
+  `dfc81d23`: the rewrite may not restate what the narration says, the judge
+  has a fourth verdict `redundant`, `FC Resolve` orders such a sentence CUT,
+  and `FC Apply` subtracts the cut words before its length guard measures.
+  Verified on that film (15228, 15231) — two presses removed all four copies,
+  including one where the judge correctly split an attributed sentence into its
+  attribution (`supported`) and its underlying fact (`redundant`).
+  **THE BILL IS UNPAID: chapter 1 went from 185 words to 101, a 45% cut, and
+  nothing measures that.** The guard is per press and per chapter, so two
+  presses at a quarter each pass individually and halve the chapter together —
+  and the word count is what sets the film's runtime and scene count. The film
+  also lost its closing bookend, cut as a repeat of the hook, which is what a
+  bookend IS. **So the button is idempotent in findings and NOT in length; do
+  not press it repeatedly.** The fix is a floor read from the narration guard's
+  own `min` words, which `DS Load` does not yet fetch — full account and the
+  ordered owed list in `db/port/fact-check/README.md` §9.
 - **A Flow refusal that arrives as HTTP 200 no longer kills the film**
   (2026-09-17, Media Generation `6735a96a`, `db/port/regen-unstick/README.md`,
   lesson in `docs/lessons-pipeline.md` under "Flow refuses twice"). **What is
@@ -385,7 +707,17 @@ expected and harmless for an app touching only its own Drive.
   `71b42624`, `db/port/sheet-ingest/`): every new cast sheet and set plate
   is posted to `/api/media/ingest` (`field: "sheets"`) while Flow's signed
   URL is alive, so the series page shows faces for anything drawn from
-  then on; sheets drawn before that stay initials. **What is owed**: one
+  then on. **Sheets drawn BEFORE that are recoverable, and ten of them were
+  recovered on 2026-09-18** — `GET
+  api.useapi.net/v1/google-flow/assets/{mediaGenerationId}` mints a fresh
+  signed URL for any asset at any time, which nothing in the repo knew and
+  three files claimed was impossible (`db/port/sheet-backfill/README.md`
+  has the query, the four nodes and how the endpoint was found). The general
+  lesson: **a 4xx that rejects a value for its FORMAT is an endpoint that
+  wants a different value in that position, not an endpoint that does not
+  exist.** Re-run the backfill whenever a show's faces are initials — it is
+  idempotent, and it needs a session with the n8n connector until the
+  producer-facing button in that README exists. **What is owed**: one
   real episode — read its Story Bible against the series page (same
   names, same descriptions), check `SHEET PLAN` says the cast was skipped,
   not drawn again, and `SHEET KEEP` in the log of the first film that
@@ -440,15 +772,113 @@ expected and harmless for an app touching only its own Drive.
   post-fix bucket should read 0, where it read 3.2% before. It is a prompt
   change, so existing films keep their motes until those scenes' text is
   regenerated.
+- **A MERGE TO THE TRUNK IS A RAILWAY DEPLOY, and nothing in the repo says so.**
+  Railway's service config (project `ee89d76e`, service `651807a9`) watches
+  branch **`claude/hello-7o90qh` — the trunk** — with
+  `watchPatterns: ["/remotion/**"]` and `rootDirectory: /remotion`. So the rule
+  "never push to `remotion/**` while a render is running" is really "never MERGE
+  a branch touching `remotion/**` into the trunk while a render is running", and
+  the second form is the one that catches you, because merging feels like
+  bookkeeping. Check `search_executions` for running Media Generation / Final
+  Assembly work before merging such a branch, exactly as you would before a push.
+  (The site is the other half and behaves differently: `platform/**` deploys
+  through GitHub Actions, also off the trunk.)
+  **The hold this entry carried is released** (2026-09-17): the contact-sheet
+  sampling ceiling in `remotion/server/inspect.mjs` waited on Media Generation
+  `13033`, which ended on 09-14, and it merged with nothing running anywhere in
+  n8n. Keep the rule; the example is history.
+
+
+- **The upload address is a PATH segment, and sending it as a query parameter
+  silently load-balances across accounts** (2026-09-17, fixed in Media Generation
+  `8c4ef1bf`; full account `db/port/parallel-accounts/README.md`, "The real
+  blocker"). useapi's endpoint is **`POST /v1/google-flow/assets/{email}`**, and
+  its own spec says that OMITTING the email "triggers automatic load balancing
+  […] to select the healthiest account". Both our callers sent
+  `assets?email=…`, which that endpoint reads as no email at all. **With one
+  account linked this was invisible for months**, because the balancer had
+  nothing to choose from; the day a second and third account were linked, every
+  asset upload started going wherever it liked — including
+  `Upload Asset To Flow`, which carries the producer's own reference picture, so
+  it was never only a parallel-generation problem. Measured both ways on the same
+  file: query form 1 of 3 landed on the account asked for, path form 3 of 3.
+  **The general lesson: a REST parameter in the wrong position does not error, it
+  defaults** — and a default that is "pick something sensible" is the hardest
+  kind to notice. `scripts/check-n8n.mjs` block 7 checks account health but
+  cannot see this; only the returned `mediaGenerationId`'s hex-encoded owner can,
+  which is why `Collect Replicated` files every copy by it.
+
+- **The parallel-accounts work is reachable from the site since 2026-09-20**
+  (`db/port/flow-accounts-ui/README.md`; orchestrator `4f022248`, rollback
+  `fec6369c`). The brief has a **Clip generation** control next to Video
+  quality; one switch writes both `flowAccounts` and `videoPool`, because
+  apart neither does what was asked — the first only stops useapi's 429s, the
+  second is the half that makes a film finish sooner. **It defaults to OFF**:
+  the pool has been measured on one disposable film, not on a real one. Flip
+  the default after the first real film goes through it. `flowAccounts`
+  refuses out-of-range values DOWN to 1 rather than clamping up, and
+  `FLOW_ACCOUNTS_MAX` in `derive.ts` must agree with the `ACCOUNTS` list in
+  `Assign Accounts`, order included. **The trap this change nearly fell into
+  is worth more than the feature**: the committed copy of `Normalize Webhook
+  Input` under `db/port/series/` was four days stale — another session had
+  edited that node on 09-19 — so republishing it with one key appended would
+  have silently reverted `watermarkScale` and `watermarkOpenOnce`. Four people
+  work in this repo and n8n has no merge. **`get_workflow_history` before any
+  node edit**: it names the version, the date and the file each body came from.
+
+- **Three Google Flow accounts buy 1.3x, not 3x, and the reason is worth more
+  than the number** (2026-09-18, measured A/B on `rec1rkfxvBeMCFDRj`, nine scenes
+  split evenly three ways; full account `db/port/parallel-accounts/etapa3.md`,
+  "The A/B"). Serial (`videoPool: false`) delivered a clip every **88 seconds**,
+  dead steady. The pool (`videoPool: true`) delivered 9 of 9 on the right
+  accounts in **10m05** against a serial extrapolation of **13m12**. The gap
+  between that and the 3x the three accounts suggest has two causes. One is bad
+  luck: one clip took 6m31 against a 2m10 norm **for reasons that are not known**
+  (it was not a motion re-roll — no scene on the film has a second
+  `media_versions.video` entry), and
+  **with a pool the slowest account IS the film** — the serial loop spreads that
+  exposure, the pool concentrates it. The other is structural and was NOT
+  predicted: a pooled clip takes **2m10 per account where a serial one takes
+  1m28**, so each account's own work got ~48% slower and three of them cannot
+  give back 3x. **That penalty is NOT the pool's polling**, which this entry
+  first claimed: the serial path waits 30 s (`Wait Video`) then 15 s
+  (`Wait Retry`) between polls, COARSER than the pool's 20 s, so if detection
+  latency were the story the pool would be ahead rather than 42 s behind. What
+  the run does show is that the penalty scales with jobs in flight — the pool's
+  last clip, running alone after the other accounts finished, took 1m26, i.e.
+  serial speed — so the leading suspect is now Google itself being slower when
+  three of our accounts generate at once. **Measure that before raising
+  `videoPoolPerAccount`**, submit-to-land rather than land-to-land, and do not
+  start by tuning `POLL_EVERY_MS`. Note also that the old planning figure "80 scenes =
+  6.7 h serial" implies ~5 min per clip and does not reconcile with the 88 s
+  measured here; treat the RATIO as transferable, not the absolute minutes.
+
+- ~~**`houseofvideos01@gmail.com` is signed out at Google and must be reconnected**~~
+  **Reconnected 2026-09-17 21:59** and all three accounts read `health: OK`. The
+  lesson below is the durable part; the misrouting it was blamed for turned out to
+  be the separate, larger fault in the bullet above
+  (`db/port/parallel-accounts/README.md`, "The fixed chain, run on a film").
+  Reconnecting is something only the producer can do, at
+  `https://useapi.net/docs/start-here/setup-google-flow`.
+  **The lesson that outlives it is that a dead Flow account is SILENT**: tier, credits
+  and the model list all still read fine, useapi keeps answering 2xx, and an
+  upload addressed to the dead account comes back with an id minted on a
+  DIFFERENT account, which looks entirely ordinary. The only signal is `health`
+  in `GET /v1/google-flow/accounts`. `scripts/check-n8n.mjs` block 7 now fails
+  on it (needs `USEAPI_TOKEN`, and a machine that can reach useapi).
 
 - **The Veo direction work needs a real film to measure it** (2026-09-13,
   Media Generation `6a79f422`; full account `db/port/veo-direction/`, lessons
   in `docs/lessons-pipeline.md` under "Direction: why Veo played the shot
   backwards"). Three changes went live in one afternoon against the
   producer's report that clips contradict their own scene — the contradictory
-  continuity clause is gone, every clip is now made from a start frame AND an
+  continuity clause is gone, every clip was made from a start frame AND an
   end frame, and a gpt-4o judge scores each finished clip and re-rolls it
-  once when it clearly disagrees with its brief. Each was verified at the API
+  once when it clearly disagrees with its brief. **The end frame half was
+  REVERSED on 2026-09-14 and is now opt-in** (`endFrame: true`), because the
+  one real film that ever carried it came back with two of its signature
+  artefacts and a per-shot "draw it only when it helps" rule measured 0 of 16
+  — see the entry below and `db/port/motion-permanence/endframe/`. Each was verified at the API
   level on a throwaway (executions 12930, 12933, 12947) and the one clip that
   exists scored `direction: 1, coherent: 1, morph: false` on exactly the
   reported failure. **None of that is a measurement.** What is owed:
@@ -460,9 +890,13 @@ expected and harmless for an app touching only its own Drive.
   and click "regenerate" on one real clip — the gate's regeneration got the
   same two changes mirrored onto it (`69c992f9`, seven `RG *` nodes) but has
   only had its pieces exercised, never the whole chain; the log lines to look
-  for are `RG ENDFRAME <id>: got …` and `RG MOTION <id>: ok`. The two escape
-  hatches, if a film goes wrong at 2 a.m.: `endFrame: false` and
-  `motionJudge: false` in `Editing Options`.
+  for are `RG ENDFRAME <id>: got …` and `RG MOTION <id>: ok`. The escape
+  hatch, if a film goes wrong at 2 a.m., is `motionJudge: false` in
+  `Editing Options`. **`endFrame` reversed polarity on 2026-09-14**: it used
+  to be `endFrame: false` to switch OFF, it is now `endFrame: true` to switch
+  ON, and the strict boolean is deliberate — there is no UI for the key
+  (`grep -rn endFrame platform/` is empty), so a hand-typed `"true"` stays OFF
+  and the skip log echoes what it actually saw.
 
 - **Documentary mode, what is still owed** (see `docs/lessons-site.md`,
   "Documentary mode — archive footage" and "The Universal Footage Engine"):
@@ -558,10 +992,13 @@ expected and harmless for an app touching only its own Drive.
   (`voice_approved`, `production_status`); the NEW take was deliberately
   KEPT, so that scene is an A/B against its ai33 neighbours in the same
   film, same voice, same model.
-- **A Claude Code web session has NO outbound HTTP at all** — every host
-  answers `000`, not just the house-of-videos ones, so `curl` cannot reach
-  the site, wf7, or `api.elevenlabs.io`. The MCP connectors are the only way
-  out. To run a query or fire a webhook, create a throwaway workflow
+- **A Claude Code web session reaches GitHub and NOTHING else.** Measured
+  2026-09-18: `api.github.com` answers 200, while `example.com`,
+  `api.elevenlabs.io`, `house-of-videos.com` and `wf7.house-of-videos.com`
+  all answer `000`. So `curl` cannot reach the site, wf7 or any external API —
+  but the entry here used to say "every host answers 000", which is no longer
+  true and would send a session looking for a workaround it does not need for
+  GitHub. For everything else the MCP connectors are the only way out. To run a query or fire a webhook, create a throwaway workflow
   (manual trigger → Postgres, or → an HTTP node posting to
   `http://localhost:5678/webhook/<path>`), `execute_workflow` it, read the
   result, then `archive_workflow`. n8n can reach itself and the database
@@ -592,14 +1029,39 @@ expected and harmless for an app touching only its own Drive.
   rejected `Ordine: 0` on 2026-08-16 (execution 4225 → 4226). Later runs
   succeeded, but whether the constraint, the payload or the absence of a hook is
   what changed is unknown.
-- ~~The OpenAI account is out of credits~~ — **resolved.** Full pipelines ran to
-  a finished film on 08-13, 08-14 and 08-16, and both `recCoZWsZBOrIU69L` and
-  `rec1GITgUCq4mEsUd` read `Finalizat` with a final video. The entry is kept for
-  its map of which nodes share that account — still the fastest way to see the
-  blast radius of a billing failure. **Check the DATE on a note like this
-  before repeating it**: this one had been resolved for a fortnight and was
-  still told to the producer as a live blocker on 08-27, which cost a round
-  trip and some of their patience. Original note: execution 1783 (2026-08-08,
+- ~~**THE OPENAI ACCOUNT IS OUT OF CREDITS AGAIN — 2026-09-19, ~10:00 UTC**~~
+  — **topped up by the producer the same hour**, confirmed by execution 15071
+  running an agent normally at 11:12. The entry stays for the blast radius and
+  for the error-shape trap, both of which will be wanted the next time.
+  Measured, not inferred: a probe at 10:57 came back
+  *"You have no credits remaining. Add credits to continue using the API at
+  https://platform.openai.com/settings/organization/billing/"*, and the film
+  `reczMt4d9zqrYcceL` had written its whole script an hour earlier at 09:47.
+  So it ran dry inside that hour. **Only the producer can fix it**, by topping
+  up at that URL.
+
+  **What is dead while it is empty**, per the node map below: every writing
+  path. Story Bible, Outline, Narration, Segment, Hook and Research Model; the
+  three raw HTTP rewrites; and — new since 09-18 — all of Deep Search, whose
+  `FC Judge`, `FC Source` and `FC Rewrite` are agents on the same account. A
+  new film dies partway through scripting; per-scene regeneration fails
+  honestly (`Mark Scene Regen Failed` writes the reason and releases the flag);
+  Media Generation and Final Assembly are UNAFFECTED, so a film that already
+  has its scenes still renders.
+
+  **n8n reports it as "OpenAI: Rate limit reached"**, which is not what it is.
+  The credits sentence is in the error's `description`, not its `message`, so
+  the surface reading sends you looking for throttling that is not there.
+  Read the description before believing the message.
+
+  ~~Resolved as of 08-16~~ — it was, for a month, and the entry below is that
+  history. Full pipelines ran to a finished film on 08-13, 08-14 and 08-16, and
+  both `recCoZWsZBOrIU69L` and `rec1GITgUCq4mEsUd` read `Finalizat` with a
+  final video. **Check the DATE on a note like this before repeating it**: that
+  resolution had been true for a fortnight and was still told to the producer as
+  a live blocker on 08-27, which cost a round trip and some of their patience.
+  The same caution now runs the other way — do not read the strike-through above
+  and conclude this is history, because it recurred. Original note: execution 1783 (2026-08-08,
   project "Death cominig up to take someone into the underworld",
   `recCoZWsZBOrIU69L`) died at `Rebuild Story Bible` with *"You have no
   credits remaining"*, after the script had been written, edited and

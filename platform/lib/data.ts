@@ -58,6 +58,8 @@ export type {
   Scene,
   SceneVersion,
   ScriptInfo,
+  DeepSearchReport,
+  DeepSearchFinding,
   GenreProfile,
   LibraryScript,
   ScriptExample,
@@ -79,6 +81,7 @@ export {
 
 import type {
   Project, Scene, ScriptInfo, SceneVersion, StatusKind,
+  DeepSearchReport,
   GenreProfile, LibraryScript, ScriptExample,
 } from "./data/derive";
 
@@ -461,7 +464,8 @@ const DEMO_PROJECTS: Project[] = [
     finalVideoUrl: null,
     aspect: "16:9" as const,
     updatedAt: null,
-    editing: { captions: true, hookStyle: "auto", chapterCards: true, endScreen: true, sfx: true, sfxLevel: 0.35, music: false, musicTrack: null, musicLevel: 0.22, styleRefs: [], drawnCards: true, captionColor: null, videoModel: null, speed: 1, speedLocked: false, sourceWatermark: true, voice: null, autoApprove: false },
+    createdAt: null,
+    editing: { captions: true, hookStyle: "auto", chapterCards: true, endScreen: true, sfx: true, sfxLevel: 0.35, music: false, musicTrack: null, musicLevel: 0.22, styleRefs: [], drawnCards: true, captionColor: null, videoModel: null, speed: 1, speedLocked: false, sourceWatermark: true, watermarkOpenOnce: false, watermarkScale: 1, voice: null, autoApprove: false },
     awaitingFinalSettings: false,
     category: "story",
     createdBy: "Alex",
@@ -489,7 +493,8 @@ const DEMO_PROJECTS: Project[] = [
     finalVideoUrl: null,
     aspect: "16:9" as const,
     updatedAt: null,
-    editing: { captions: true, hookStyle: "auto", chapterCards: true, endScreen: true, sfx: true, sfxLevel: 0.35, music: false, musicTrack: null, musicLevel: 0.22, styleRefs: [], drawnCards: true, captionColor: null, videoModel: null, speed: 1, speedLocked: false, sourceWatermark: true, voice: null, autoApprove: false },
+    createdAt: null,
+    editing: { captions: true, hookStyle: "auto", chapterCards: true, endScreen: true, sfx: true, sfxLevel: 0.35, music: false, musicTrack: null, musicLevel: 0.22, styleRefs: [], drawnCards: true, captionColor: null, videoModel: null, speed: 1, speedLocked: false, sourceWatermark: true, watermarkOpenOnce: false, watermarkScale: 1, voice: null, autoApprove: false },
     awaitingFinalSettings: false,
     category: "story",
     createdBy: "Dan",
@@ -517,7 +522,8 @@ const DEMO_PROJECTS: Project[] = [
     finalVideoUrl: null,
     aspect: "16:9" as const,
     updatedAt: null,
-    editing: { captions: true, hookStyle: "auto", chapterCards: true, endScreen: true, sfx: true, sfxLevel: 0.35, music: false, musicTrack: null, musicLevel: 0.22, styleRefs: [], drawnCards: true, captionColor: null, videoModel: null, speed: 1, speedLocked: false, sourceWatermark: true, voice: null, autoApprove: false },
+    createdAt: null,
+    editing: { captions: true, hookStyle: "auto", chapterCards: true, endScreen: true, sfx: true, sfxLevel: 0.35, music: false, musicTrack: null, musicLevel: 0.22, styleRefs: [], drawnCards: true, captionColor: null, videoModel: null, speed: 1, speedLocked: false, sourceWatermark: true, watermarkOpenOnce: false, watermarkScale: 1, voice: null, autoApprove: false },
     awaitingFinalSettings: false,
     category: "story",
     createdBy: "David",
@@ -545,7 +551,8 @@ const DEMO_PROJECTS: Project[] = [
     finalVideoUrl: "#",
     aspect: "16:9" as const,
     updatedAt: null,
-    editing: { captions: true, hookStyle: "auto", chapterCards: true, endScreen: true, sfx: true, sfxLevel: 0.35, music: false, musicTrack: null, musicLevel: 0.22, styleRefs: [], drawnCards: true, captionColor: null, videoModel: null, speed: 1, speedLocked: false, sourceWatermark: true, voice: null, autoApprove: false },
+    createdAt: null,
+    editing: { captions: true, hookStyle: "auto", chapterCards: true, endScreen: true, sfx: true, sfxLevel: 0.35, music: false, musicTrack: null, musicLevel: 0.22, styleRefs: [], drawnCards: true, captionColor: null, videoModel: null, speed: 1, speedLocked: false, sourceWatermark: true, watermarkOpenOnce: false, watermarkScale: 1, voice: null, autoApprove: false },
     awaitingFinalSettings: false,
     category: "story",
     createdBy: "Iustin",
@@ -899,6 +906,108 @@ export async function getProjectEvidence(
   if (USE_PG) return pgBackend.getProjectEvidence(projectId);
   return [];
 }
+
+/**
+ * What Deep Search made of this film's narration, or null if it never
+ * ran — which is the normal answer for every film written before the check
+ * existed, and for a project on the frozen Airtable backend.
+ *
+ * Null and "it ran and found nothing" are deliberately different: the first
+ * draws no panel at all, the second draws a short green one. A film the check
+ * never saw must not be shown as a film that passed.
+ */
+export type { DeepSearchFilm } from "./data/postgres";
+
+/**
+ * Every recent documentary that reached a script, with its report or without
+ * one. The Settings card turns red on the second kind. Postgres only — the
+ * frozen Airtable backend has no such table and answers empty, which draws a
+ * card saying Deep Search is not wired up rather than one claiming health.
+ */
+export async function getDeepSearchHealth(
+  limit?: number,
+): Promise<import("./data/postgres").DeepSearchFilm[]> {
+  if (USE_PG) return pgBackend.getDeepSearchHealth(limit);
+  // Demo mode shows one of each, for the same reason it serves a script: so
+  // the alarm can be looked at before it has ever had to fire. A CONFIGURED
+  // Airtable backend still answers empty — there is no such table over there,
+  // and a fabricated green light is the one thing this panel must never show.
+  if (!isConfigured) return DEMO_DEEP_SEARCH_HEALTH;
+  return [];
+}
+
+const DEMO_DEEP_SEARCH_HEALTH: import("./data/postgres").DeepSearchFilm[] = [
+  {
+    id: "demo-1",
+    name: "How the first cash machine was installed in Enfield",
+    createdAt: "2026-09-18T15:00:00.000Z",
+    checkedAt: "2026-09-18T15:03:01.000Z",
+    report: { category: "documentary", checked: 18, flagged: 1, searched: 5, rewritten: 1, findings: [] },
+  },
+  {
+    id: "demo-broken",
+    name: "How the Channel Tunnel was dug from both ends",
+    createdAt: "2026-09-17T09:00:00.000Z",
+    checkedAt: null,
+    report: null,
+  },
+];
+
+export async function getDeepSearch(projectId: string): Promise<DeepSearchReport | null> {
+  if (USE_PG) return pgBackend.getDeepSearch(projectId);
+  // Demo mode serves a report for the same reason it serves a script: so the
+  // panel is reviewable before anything is wired. A CONFIGURED Airtable
+  // backend still answers null — there is no fact_check table over there, and
+  // inventing one would show the producer a check that never ran.
+  if (!isConfigured) return DEMO_DEEP_SEARCH;
+  return null;
+}
+
+/**
+ * Both halves of the panel at once — a sentence the sources corrected and one
+ * they could not, plus a couple that held up — so a screenshot of demo mode
+ * exercises every branch except `skipped`.
+ */
+const DEMO_DEEP_SEARCH: DeepSearchReport = {
+  checked: 12,
+  flagged: 3,
+  searched: 4,
+  rewritten: 2,
+  findings: [
+    {
+      quote: "The stadium roars, the cameras roll, and a nation rehearses the spectacle it will soon export as war.",
+      claim: "The 1936 Berlin Olympics were staged as a rehearsal for war.",
+      verdict: "unsupported",
+      reason: "No claim covers the intent behind the staging; the pack covers the games and the newsreels, not the motive.",
+      action: "flagged",
+    },
+    {
+      quote: "Berlin, 1936.",
+      claim: "The Summer Olympics were held in Berlin in 1936.",
+      verdict: "supported",
+      ref: "E2",
+      reason: "E2 gives the host city and the year.",
+      action: "kept",
+    },
+    {
+      quote: "Forty-nine nations marched past the box that morning.",
+      claim: "49 nations took part in the 1936 Berlin Olympics.",
+      verdict: "contradicted",
+      ref: "E4",
+      reason: "E4 puts the number at 49 competing nations but says they did not all march on the opening morning.",
+      source: "Olympic Studies Centre",
+      url: "https://example.org/olympics-1936",
+      action: "rewritten",
+    },
+    {
+      quote: "The films were shown in every cinema in the country.",
+      claim: "The Olympic films were shown in every cinema in Germany.",
+      verdict: "unsupported",
+      reason: "Nothing we can cite supports 'every cinema'. No source could be found for it.",
+      action: "rewritten",
+    },
+  ],
+};
 
 export async function writeSceneScript(
   sceneId: string,

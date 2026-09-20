@@ -37,6 +37,8 @@ const {
 	normalizeHookRegen,
 	normalizeMusicTrack,
 	normalizeVideoModel,
+	normalizeFlowAccounts,
+	FLOW_ACCOUNTS_MAX,
 	normalizePublishing,
 } = derive;
 
@@ -124,6 +126,24 @@ check('video model: absent -> null (free default)', normalizeVideoModel(undefine
 check('video model: unknown id -> null', normalizeVideoModel('veo-9-imaginary'), null);
 check('video model: the free id itself normalizes to null (one spelling of absent)', normalizeVideoModel('veo-3.1-lite-low-priority'), null);
 check('video model: a real paid id passes through', normalizeVideoModel('veo-3.1-fast'), 'veo-3.1-fast');
+
+// --- normalizeFlowAccounts -----------------------------------------------------
+// REFUSES rather than clamps, and refuses DOWN to 1: asking for more accounts
+// than are linked must not quietly become "use them all", because the number
+// decides how a film's scenes are cut into blocks and a block pointed at an
+// account that does not exist produces clips nobody can use. 1 is what every
+// film had before the accounts were added.
+check('flow accounts: absent -> 1', normalizeFlowAccounts(undefined), 1);
+check('flow accounts: empty string -> 1', normalizeFlowAccounts(''), 1);
+check('flow accounts: 0 -> 1', normalizeFlowAccounts(0), 1);
+check('flow accounts: negative -> 1', normalizeFlowAccounts(-2), 1);
+check('flow accounts: above the linked count -> 1, NOT clamped to the max', normalizeFlowAccounts(9), 1);
+check('flow accounts: a fraction is not a count -> 1', normalizeFlowAccounts(2.5), 1);
+check('flow accounts: nonsense -> 1', normalizeFlowAccounts('all of them'), 1);
+check('flow accounts: the numeric string the form posts', normalizeFlowAccounts('3'), 3);
+check('flow accounts: 1 stays 1', normalizeFlowAccounts(1), 1);
+check('flow accounts: 2 stays 2', normalizeFlowAccounts(2), 2);
+check('flow accounts: the max passes through', normalizeFlowAccounts(FLOW_ACCOUNTS_MAX), FLOW_ACCOUNTS_MAX);
 
 // --- normalizePublishing -------------------------------------------------------
 check('publishing: absent -> review state, empty fields', normalizePublishing(undefined), {

@@ -34,6 +34,7 @@ import SpeedPicker from "@/components/SpeedPicker";
 import VoiceTonePicker from "@/components/VoiceTonePicker";
 import { normalizeVoiceTone, type VoiceTone } from "@/lib/data/derive";
 import VoicePicker from "@/components/VoicePicker";
+import { matchesScene, takeSceneParam } from "@/lib/deep-link";
 
 /**
  * Play a take at the film's pace.
@@ -877,6 +878,38 @@ export default function AudioReview({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /**
+   * "S7 recorded" → scroll to S7 and ring it for a moment.
+   *
+   * This panel is a list, not a filmstrip, so arriving at the right take means
+   * putting it on screen rather than selecting it. The ring is the same accent
+   * outline a playing row wears, borrowed on purpose: the producer already
+   * reads it as "this row, here". It clears after three seconds so it cannot
+   * be mistaken for a state.
+   */
+  const [landed, setLanded] = useState<string | null>(null);
+  useEffect(() => {
+    const want = takeSceneParam();
+    if (!want) return;
+    const hit = scenes.find((s) => matchesScene(s, want));
+    if (!hit) return;
+    setLanded(hit.id);
+    const t = setTimeout(() => {
+      document
+        .getElementById(`scene-${hit.id}`)
+        ?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, 0);
+    // Long enough to still be there once the smooth scroll lands —
+    // measured at ~1s on a 70-scene list — and short enough that
+    // nobody reads it as a state the row is in.
+    const clear = setTimeout(() => setLanded(null), 4500);
+    return () => {
+      clearTimeout(t);
+      clearTimeout(clear);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const run = async (fn: () => Promise<ActionResult>) => {
     setPending(true);
     setMsg(await fn());
@@ -1604,9 +1637,14 @@ export default function AudioReview({
               )}
             <div
               className="card take"
+              id={`scene-${s.id}`}
               style={{
                 padding: "12px 14px",
-                outline: isPlaying ? "2px solid var(--accent)" : undefined,
+                outline:
+                  isPlaying || landed === s.id ? "2px solid var(--accent)" : undefined,
+                // The bar is sticky; without this the row a link jumps to
+                // lands underneath it.
+                scrollMarginTop: 90,
               }}
             >
               <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>

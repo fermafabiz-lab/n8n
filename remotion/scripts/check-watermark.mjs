@@ -21,10 +21,25 @@ const {
 	attributionFor,
 	formatSourceWatermark,
 	getSourceLabel,
+	labelInkDrop,
+	labelTrailingSpace,
+	markChipPadX,
+	markOpenAt,
+	markOpenSpan,
+	markRevealAt,
+	markSettleSeconds,
+	bandOpacityAt,
+	WATERMARK_EASE,
+	normalizeWatermarkScale,
+	scaleWatermark,
+	WATERMARK_SCALE,
+	markPillWidth,
 	planWatermarkBands,
 	providerLabel,
 } = await import(join(root, 'src', 'provenance.ts'));
+const {ORIGIN_GLYPHS} = await import(join(root, 'src', 'provenanceGlyphs.ts'));
 
+const round = (n) => Math.round(n * 1e6) / 1e6;
 const results = [];
 const check = (name, got, want) => {
 	const ok = JSON.stringify(got) === JSON.stringify(want);
@@ -156,6 +171,7 @@ check('the landscape geometry', WATERMARK_LAYOUT.landscape, {
 	label: {fontSize: 16, padding: '5px 12px'},
 	source: {fontSize: 13},
 	credit: {fontSize: 12},
+	mark: {height: 30, glyph: 15, gap: 8, padX: 10},
 });
 check('the portrait geometry, lifted clear of the platform chrome', WATERMARK_LAYOUT.portrait, {
 	frame: {width: 720, height: 1280},
@@ -166,6 +182,7 @@ check('the portrait geometry, lifted clear of the platform chrome', WATERMARK_LA
 	label: {fontSize: 17, padding: '5px 11px'},
 	source: {fontSize: 14},
 	credit: {fontSize: 13},
+	mark: {height: 32, glyph: 16, gap: 8, padX: 10},
 });
 // The frame is the render's real size and not 1080p (Root.tsx), which is the
 // one thing a preview cannot guess: at 1080p the badge would be drawn half
@@ -177,5 +194,177 @@ check(
 );
 check('the badge never reaches full opacity', WATERMARK_STYLE.peakOpacity, 0.88);
 
+// --- the pill's own arithmetic ---------------------------------------------
+// Every number below was MEASURED in a real Chromium, from the real component,
+// before it was pinned — see db/port/watermark-open-once/README.md. They are here
+// because all three were wrong at once and each failure looks identical on
+// screen: the label sitting off-centre inside its capsule.
+const LAND = WATERMARK_LAYOUT.landscape;
+// CSS letter-spacing is added after the LAST character too. 16 × 0.14em.
+check('the trailing letter-space', labelTrailingSpace(LAND.label.fontSize), 2.24);
+// "AI GENERATED" laid out at 16px in the render's mono kicker measured 142.11
+// wide; 2 borders + 10 + 15 glyph + 8 gap + ceil(142.11 - 2.24) + 10.
+check('the capsule is padded equally on both sides', markPillWidth(LAND.mark, 16, 142.11), 185);
+check('and grows with the label', markPillWidth(LAND.mark, 16, 236.84), 280);
+// A label that has not been measured yet must not leave a pill wider than the
+// chip it opens from — the render holds the frame until it has, but the width
+// still has to be sane in between.
+check('an unmeasured label is just the two paddings', markPillWidth(LAND.mark, 16, 0), 45);
+// The border is INSIDE the box: (30 - 2 - 15) / 2, not (30 - 15) / 2.
+check('the chip centres its glyph inside the border', markChipPadX(LAND.mark), 6.5);
+check('and in portrait too', markChipPadX(WATERMARK_LAYOUT.portrait.mark), 7);
+// DejaVu Sans Mono at 16px, as Chromium resolved `ui-monospace` on the render
+// box: ink from the baseline to the cap at 11, nothing below it, against a
+// font box of 13 up and 5 down. The line box therefore centres 1.5px high.
+const MONO16 = {
+	width: 115.22,
+	actualBoundingBoxAscent: 11,
+	actualBoundingBoxDescent: 0,
+	fontBoundingBoxAscent: 13,
+	fontBoundingBoxDescent: 5,
+};
+check('all-caps ink rides high in its line box', labelInkDrop(MONO16, 'AI GENERATED', 16, 142.11), 1.5);
+// The refusals. A canvas draws no letter-spacing, so its width must come out
+// exactly one space per character under the span's; anything else is a
+// different typeface and its ink box would push the text the wrong way.
+check(
+	'a canvas measuring another face is not believed',
+	labelInkDrop(MONO16, 'AI GENERATED', 16, 210),
+	0,
+);
+check(
+	'nor is a TextMetrics without an ink box',
+	labelInkDrop({...MONO16, actualBoundingBoxAscent: undefined}, 'AI GENERATED', 16, 142.11),
+	0,
+);
+check('nor a label with no width at all', labelInkDrop(MONO16, 'AI GENERATED', 16, 0), 0);
+
+// --- the badge's SIZE --------------------------------------------------------
+// The multiplier the producer sets, and what it does to the geometry. Four
+// copies of the range exist (here, platform/lib/provenance.ts, the
+// orchestrator's Normalize node, Final Assembly's Source Watermark node) and
+// `node db/port/watermark-open-once/check.mjs` asserts all four agree.
+check('the size range and its default', WATERMARK_SCALE, {min: 0.7, max: 1.6, step: 0.05, default: 1});
+// REFUSES rather than clamps, exactly as normalizeSpeed does: a stored 4 is a
+// mistake, not "as big as possible", and a badge silently drawn at the maximum
+// would be a worse answer than the standard one.
+check('an oversized value is refused, not clamped', normalizeWatermarkScale(4), 1);
+check('and an undersized one too', normalizeWatermarkScale(0.2), 1);
+check('a word is not a size', normalizeWatermarkScale('big'), 1);
+check('nor is nothing at all', normalizeWatermarkScale(undefined), 1);
+check('the ends themselves are allowed', [normalizeWatermarkScale(0.7), normalizeWatermarkScale(1.6)], [0.7, 1.6]);
+check('and anything between them', normalizeWatermarkScale(1.35), 1.35);
+// 1x must be the object itself, not a rebuilt copy: every film rendered before
+// this existed goes through here, and a rounding that moved one pixel would
+// change all of them.
+check('1x is the base geometry untouched', scaleWatermark(LAND, 1), LAND);
+check('and so is a refused value', scaleWatermark(LAND, 99), LAND);
+check(
+	'the mark at the smallest size',
+	scaleWatermark(LAND, 0.7).mark,
+	{height: 21, glyph: 11, gap: 6, padX: 7},
+);
+check(
+	'and at the largest',
+	scaleWatermark(LAND, 1.6).mark,
+	{height: 48, glyph: 24, gap: 13, padX: 16},
+);
+check(
+	'the three font sizes scale with it',
+	[scaleWatermark(LAND, 1.6).label.fontSize, scaleWatermark(LAND, 1.6).source.fontSize, scaleWatermark(LAND, 1.6).credit.fontSize],
+	[26, 21, 19],
+);
+// Where the badge SITS is not part of the mark. A badge that walked towards
+// the corner as it grew would be two decisions wearing one control.
+check(
+	'but its place on the frame does not',
+	[scaleWatermark(LAND, 1.6).left, scaleWatermark(LAND, 1.6).bottom, scaleWatermark(LAND, 1.6).maxWidth],
+	[LAND.left, LAND.bottom, LAND.maxWidth],
+);
+check('portrait scales from its own base', scaleWatermark(WATERMARK_LAYOUT.portrait, 1.6).mark, {height: 51, glyph: 26, gap: 13, padX: 16});
+// The capsule the widest label needs at the largest size, which is what the
+// top of the range was chosen against: it has to stay inside maxWidth.
+check(
+	'the widest capsule still fits the budget',
+	markPillWidth(scaleWatermark(LAND, 1.6).mark, 26, 236.84 * 1.6) <= LAND.maxWidth,
+	true,
+);
+
+// --- the ANIMATION's clock ---------------------------------------------------
+// Moved out of SourceWatermark.tsx on 2026-09-19 so the site's preview could
+// play the same curve on the same clock. The refactor was proved to change no
+// frame: 4846 samples across band lengths 0.3s-48s, old inline formulas
+// against these, max disagreement 2.8e-16.
+//
+// `WATERMARK_EASE` is `Easing.bezier(0.65, 0, 0.35, 1)` solved by hand, because
+// the site cannot import Remotion. Verified against Remotion's own over 101
+// samples: largest disagreement 3.9e-16. These four points are what stops a
+// rewrite of the solver quietly changing the feel.
+check('the easing curve', [0, 0.25, 0.5, 0.75, 1].map((x) => round(WATERMARK_EASE(x))), [0, 0.070797, 0.5, 0.929203, 1]);
+// On any real film the opening runs its full length — the shortest band is one
+// scene and a scene is eight seconds. The compression only exists so a
+// pathologically short band is not frozen half-drawn.
+check('a real band opens at full length', markOpenSpan(8), 0.42);
+check('and a very short one compresses to the floor', [round(markOpenSpan(0.5)), round(markOpenSpan(0.3))], [0.12, 0.12]);
+// Nothing happens for the first 0.18s: the fade brings the chip up before it
+// opens, so the two are read as one movement rather than as two.
+check('the mark waits, opens, and stays open', [0, 0.18, 0.28, 0.39, 0.6, 1].map((t) => round(markOpenAt(t, 8, true))), [0, 0, 0.062843, 0.5, 1, 1]);
+check('a collapsed band never opens at all', markOpenAt(0.6, 8, false), 0);
+check('the label uncovers over the middle of the opening', [0, 0.25, 0.55, 0.85, 1].map((o) => round(markRevealAt(o))), [0, 0, 0.5, 1, 1]);
+// Symmetric in and out, and never past the peak: this is a claim, not a
+// headline.
+check('the band fades in and out, to 0.88 at most', [0, 0.1, 0.2, 4, 7.9, 8].map((t) => round(bandOpacityAt(t, 8))), [0, 0.44, 0.88, 0.88, 0.44, 0]);
+// What a preview that plays the animation ONCE waits before it stops its clock.
+check('the animation settles', [round(markSettleSeconds(8)), round(markSettleSeconds(0.5))], [0.65, 0.35]);
+
+// --- "announce each source once" -------------------------------------------
+// MIRRORED with platform/scripts/check-footage.mjs. The switch collapses
+// REPEATS of a kind, never a kind's first appearance and never a credit.
+const arch2 = {visualOrigin: 'archival_footage', provider: 'loc'};
+check(
+	'every band expands unless asked otherwise',
+	planWatermarkBands([scene(0, 8, arch), scene(8, 8, ai), scene(16, 8, arch2)], {showLabel: true}).map((b) => b.expand),
+	[true, true, true],
+);
+check(
+	'open once: the first band of each origin opens, later ones stay chips',
+	planWatermarkBands([scene(0, 8, arch), scene(8, 8, ai), scene(16, 8, arch2)], {
+		showLabel: true,
+		openOncePerOrigin: true,
+	}).map((b) => b.expand),
+	[true, true, false],
+);
+check(
+	'open once: a different ARCHIVE is still the same kind of source',
+	planWatermarkBands([scene(0, 8, arch), scene(8, 8, arch2)], {showLabel: true, openOncePerOrigin: true}).map(
+		(b) => [b.origin, b.expand],
+	),
+	[['archival_footage', true], ['archival_footage', false]],
+);
+check(
+	'open once: merged consecutive scenes are ONE band and consume one opening',
+	planWatermarkBands([scene(0, 8, arch), scene(8, 8, arch)], {showLabel: true, openOncePerOrigin: true}).map(
+		(b) => b.expand,
+	),
+	[true],
+);
+check(
+	'open once never reaches the licence credit',
+	planWatermarkBands([scene(0, 8, archCredited), scene(8, 8, arch2)], {
+		showLabel: true,
+		openOncePerOrigin: true,
+	}).map((b) => [b.expand, Boolean(b.credit)]),
+	[[true, true], [false, false]],
+);
+check(
+	'every origin has a glyph',
+	Object.keys(ORIGIN_LABELS).filter((o) => !(ORIGIN_GLYPHS[o] || []).length),
+	[],
+);
+
+// Last line of the file on purpose. The summary used to sit halfway up, which
+// left the six checks below it unreachable and still reporting a cheerful
+// "24/24 passed" — a pass over the checks that ran, which is not the same
+// thing as a pass. Add new cases ABOVE this.
 console.log(`\n${results.filter(Boolean).length}/${results.length} passed`);
 process.exit(results.every(Boolean) ? 0 : 1);

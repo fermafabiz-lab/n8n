@@ -15,6 +15,20 @@ These each cost hours. Do not rediscover them.
   snapshot from when it started. Publishing a fix does *not* affect work
   already in flight — only new executions. When a fix "didn't work", check
   whether the execution predates it before assuming the fix is wrong.
+  **This collides with the regenerate buttons, and the collision is silent.**
+  Video regeneration has no webhook of its own: it is the batch's own job
+  (`If Video Regen Pending` → … → `Submit Video Regen`), so while a batch is
+  alive every regenerate click the producer makes is executed by whatever code
+  that batch loaded, however old. On 2026-09-14 a night of prompt fixes was
+  published against a batch that had started 57 minutes before the first of
+  them; the producer regenerated, got a clip with the very artefacts the fixes
+  removed, and reasonably reported that nothing had changed. Nothing in the
+  site or in n8n says which version answered. **Before telling anyone a
+  pipeline fix is live, check `search_executions` for a batch that predates it
+  — and say so in the same breath.** The database half of a fix (a repaired
+  stored prompt) DOES reach such a batch, because prompts are read fresh per
+  submit; only node bodies are frozen. Full account:
+  `db/port/motion-permanence/stale-execution/`.
 - **`waiting` means alive, not idle.** Work paused in a Wait node reports as
   `waiting`. Polling loops spend most of their life there. Treating it as
   "nothing is running" produces duplicate concurrent executions.
@@ -1270,3 +1284,91 @@ CLAUDE.md's cross-cutting list:
   other parameters hold an unredacted API token can be edited by sending only
   the key that changed. `addNode`, by contrast, drops node-level settings like
   `alwaysOutputData` — set those with `setNodeSettings` and read them back.
+
+### A Postgres node in the middle of a chain replaces `$json` too — 2026-09-19
+
+This repo has known for a long time that **an agent REPLACES the payload** with
+`{output: …}`, which is why every node downstream of `FC Judge` or `DS Judge`
+reads `$('FC Prep')` by name rather than `$json`. What it had not generalised
+is that this is not a fact about agents. It is a fact about every node that
+returns its own rows.
+
+Adding `DS Write` between `DS Apply` and `DS Save` — a Postgres `UPDATE`
+returning `{script_rows, hook_rows}` — silently emptied `DS Save`'s two reads,
+which were `$json.fcReport64` and `$json.projectId`. The failure was:
+
+```
+invalid base64 end sequence
+```
+
+`decode(undefined, 'base64')`. **Nothing in that sentence names the cause**, and
+the node it names is not the node that changed. Worse, by the time it fired the
+run had already done the irreversible half: the corrected script and the
+corrected hook were both written, and the only thing lost was the report
+describing them — so the producer would have seen a red panel above a script
+that was already fixed.
+
+The rule, stated in the general form: **a node's output is whatever THAT node
+returns, and inserting any node into a chain re-points every `$json` downstream
+of it.** Before wiring a node into the middle of an existing chain, read what
+the node BELOW it reads. If it reads `$json`, it is now reading your new node.
+Reference by name, and prefer a name that will still be upstream if someone
+inserts another node tomorrow.
+
+(The same commit carried a second one-liner of the same family: `DS Write`
+assigns to `editing_options`, which is `jsonb`, from a `convert_from(decode(…))`
+that yields `text`. Postgres refuses the whole STATEMENT — and because the
+script update was a CTE in that statement, the cast error took the corrected
+script down with it. That is the cost side of "both or neither in one
+statement", and it is the right trade; it just means a type error anywhere in
+such a statement is a total failure, not a partial one.)
+
+### A typed trigger is a filter — 2026-09-18
+
+`Receive Project Data`, the `executeWorkflowTrigger` at the top of Claude
+Scripting, declares eight workflow inputs:
+
+```
+Project_ID, Tema, Tonalitate, Pace, Lenght, Language, Style, Lore
+```
+
+**That declaration is a filter, not documentation.** The parent orchestrator
+sends the whole Airtable-shaped project record — `{id, createdTime, fields:{…,
+"Editing Options": "…"}, Project_ID, Tema, …}` — and you can SEE all of it in
+the execution's `nodeExecutionStack`, because that is what arrived. What the
+node emits is the eight declared keys and nothing else.
+
+Deep Search's Documentary gate read the category out of
+`$('Receive Project Data').first().json.fields['Editing Options']`. There is no
+`fields` on that node's output. Every documentary skipped as `no-mode` for four
+hours, including the producer's own film, which reached its script gate with a
+red light and a script that contradicted itself about the date it was built on.
+
+**Three things made the wrong node look right, and each is the transferable
+part:**
+
+1. **The execution data showed the object.** Reading `get_execution` for the
+   trigger returns the stack entry — the INPUT waiting to be processed. It is
+   not the output. `runData` is what would have proved it, and `runData` is
+   empty for a running execution and, as it turns out, for a cancelled one too.
+2. **A sibling reference worked.** `FC Save Report` reads
+   `$('Receive Project Data').first().json.Project_ID` and has always worked,
+   because `Project_ID` is one of the declared eight. **One field resolving is
+   not evidence that the object is there** — it is evidence that one field is.
+3. **Nothing complained.** The read was inside a `try` whose `catch` recorded
+   "mode could not be read", which was the honest outcome and also completely
+   invisible, because the skip branch bypassed the node that writes the report.
+
+**The node that actually carries the project row is `Fetch Project Record`**,
+and `Voice Mode` has read `(($('Fetch Project Record').first().json||{}).fields
+||{})['Editing Options']` since the kids styles landed. The rule that would
+have saved the day: **when a workflow already answers a question somewhere,
+copy that node's reference rather than inventing one.** A grep of
+`db/port/*/paste/` for `category` finds Voice Mode in one second.
+
+**And the reason it took a producer to notice**: the only end-to-end run that
+ever verified Deep Search (execution 14771, 15:00) ran on the version BEFORE
+the gate was published at 15:18. The gate's own first real film was the
+producer's. **A change published after the run that verified it is unverified**,
+however small it looks — and "I verified this feature" is not the same claim as
+"I verified this version of it".

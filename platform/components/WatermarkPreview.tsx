@@ -34,9 +34,24 @@
  * screen and the label goes while the credit stays.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  DASHED_ORIGINS,
+  GLYPH_STROKE,
+  GLYPH_VIEWBOX,
+  ORIGIN_GLYPHS,
+} from "@/lib/provenance-glyphs";
+import {
+  labelInkDrop,
+  labelTrailingSpace,
+  markChipPadX,
+  bandOpacityAt,
+  markOpenAt,
+  markPillWidth,
+  markRevealAt,
+  markSettleSeconds,
   planWatermarkBands,
+  scaleWatermark,
   WATERMARK_LAYOUT,
   WATERMARK_STYLE,
   type WatermarkBand,
@@ -52,6 +67,36 @@ export interface PreviewScene {
   imageUrl: string | null;
   provenance: VisualProvenance;
 }
+
+/**
+ * Three shots to demonstrate the badge on, for a screen that has no film yet.
+ *
+ * The choice is the whole design: the first and third are the SAME kind of
+ * source, because one band cannot show what "announce each source once" does —
+ * the difference only exists on a kind's second appearance. The AI shot in
+ * between is not decoration either: `planWatermarkBands` merges consecutive
+ * scenes carrying the same badge, so without it the two archive shots would be
+ * one band and there would be no repeat left to collapse.
+ *
+ * No `imageUrl` on any of them, which is what makes the frame draw blank —
+ * the brief is specifying a film that does not exist, and inventing a picture
+ * for it would be the kind of small lie that makes the rest untrustworthy.
+ */
+export const SAMPLE_SCENES: PreviewScene[] = [
+  {
+    order: 1,
+    label: "1",
+    imageUrl: null,
+    provenance: { visualOrigin: "archival_footage", provider: "internet_archive" },
+  },
+  { order: 2, label: "2", imageUrl: null, provenance: { visualOrigin: "ai_generated" } },
+  {
+    order: 3,
+    label: "3",
+    imageUrl: null,
+    provenance: { visualOrigin: "archival_footage", provider: "loc" },
+  },
+];
 
 /** The box the scaled frame has to fit inside. Portrait is bound by height. */
 const MAX_W = 440;
@@ -73,12 +118,82 @@ const KICKER_STACK = '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Cons
  * actual-size strip cannot drift from each other — which would defeat the
  * point of showing both.
  */
-function Badge({ band, g }: { band: WatermarkBand; g: WatermarkGeometry }) {
+/**
+ * Where to nudge this label so its INK sits on the pill's midline, rather than
+ * the line box that holds it — the same correction the film makes, run
+ * against the font this browser actually resolved. `labelInkDrop` owns the
+ * arithmetic and every reason to refuse; this is the canvas plumbing and the
+ * span's laid-out width, which only the drawing can supply.
+ *
+ * 0 until measured, which is one paint, and 0 again if anything is off — the
+ * badge simply centres the old way, a pixel and a half high.
+ */
+function useLabelMetrics(
+  label: string,
+  fontSize: number,
+  ref: React.RefObject<HTMLSpanElement | null>,
+) {
+  const [m, setM] = useState({ drop: 0, advance: 0 });
+  useEffect(() => {
+    let live = true;
+    const read = () => {
+      const el = ref.current;
+      if (!live || !el) return;
+      const advance = el.offsetWidth;
+      let drop = 0;
+      try {
+        const ctx = document.createElement("canvas").getContext("2d");
+        if (ctx) {
+          ctx.font = `${WATERMARK_STYLE.labelWeight} ${fontSize}px ${KICKER_STACK}`;
+          drop = labelInkDrop(ctx.measureText(label), label, fontSize, advance);
+        }
+      } catch {
+        /* leave it centred the old way */
+      }
+      setM({ drop, advance });
+    };
+    read();
+    // A web font still loading lays the label out in the fallback face, which
+    // is a different width and a different ink box.
+    document.fonts?.ready?.then(read).catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [label, fontSize, ref]);
+  return m;
+}
+
+export function Badge({
+  band,
+  g,
+  open,
+  opacity,
+}: {
+  band: WatermarkBand;
+  g: WatermarkGeometry;
+  /**
+   * How open the mark is, 0 (chip) to 1 (pill). Omitted means STILL — the
+   * band's resting state, which is what a preview that is not playing shows
+   * and what every caller wanted before this could animate.
+   */
+  open?: number;
+  /** The band's own fade. Omitted means fully up, at the badge's peak. */
+  opacity?: number;
+}) {
+  const labelRef = useRef<HTMLSpanElement>(null);
+  const { drop, advance } = useLabelMetrics(band.label ?? "", g.label.fontSize, labelRef);
+  // The resting state is the band's own: an expanding band sits open, a
+  // collapsed one sits as a chip. That is what "announce each source once"
+  // looks like from the second band on, animated or not.
+  const o = open ?? (band.expand ? 1 : 0);
+  const reveal = markRevealAt(o);
+  const lerp = (from: number, to: number) => from + (to - from) * o;
+
   return (
     <div
       style={{
         maxWidth: g.maxWidth,
-        opacity: WATERMARK_STYLE.peakOpacity,
+        opacity: opacity ?? WATERMARK_STYLE.peakOpacity,
         display: "flex",
         flexDirection: "column",
         gap: g.gap,
@@ -86,26 +201,92 @@ function Badge({ band, g }: { band: WatermarkBand; g: WatermarkGeometry }) {
       }}
     >
       {band.label ? (
+        /* The mark as the film draws it: the glyph in a chip, opened into a
+           capsule — or left as a chip when the band does not expand, which is
+           what "announce each source once" looks like from the second band on.
+
+           It used to be static on purpose, on the reasoning that a looping
+           animation in a settings panel competes with the decision being
+           made. That reasoning survives; the conclusion did not, because the
+           producer asked to SEE the animation and a preview that cannot show
+           the one moving part of the overlay is answering a smaller question
+           than it looks like it is. It therefore plays ONCE — on open, and on
+           each band change — and then rests. No loop. */
         <span
           style={{
-            fontFamily: KICKER_STACK,
-            fontSize: g.label.fontSize,
-            fontWeight: WATERMARK_STYLE.labelWeight,
-            letterSpacing: WATERMARK_STYLE.labelLetterSpacing,
-            color: WATERMARK_STYLE.labelColor,
+            display: "inline-flex",
+            alignItems: "center",
+            boxSizing: "border-box",
+            height: g.mark.height,
+            // Equal on both sides — the right used to carry a 1.15 fudge that
+            // was really compensating for the trailing letter-space cancelled
+            // on the label below. See `markPillWidth`.
+            paddingLeft: lerp(markChipPadX(g.mark), g.mark.padX),
+            // An explicit width at every moment, exactly as the render does
+            // it: the capsule GROWS from the chip and clips the label as it
+            // goes, which is what reads as one mark opening rather than as a
+            // second element arriving. Until the label has been measured the
+            // width is the chip's, and no frame is ever seen at that state.
+            width: lerp(g.mark.height, markPillWidth(g.mark, g.label.fontSize, advance)),
+            borderRadius: lerp(
+              g.mark.height * WATERMARK_STYLE.chipRadiusRatio,
+              g.mark.height / 2,
+            ),
             background: WATERMARK_STYLE.labelBackground,
-            border: WATERMARK_STYLE.labelBorder,
-            borderRadius: WATERMARK_STYLE.labelRadius,
-            padding: g.label.padding,
-            textShadow: WATERMARK_STYLE.textShadow,
-            lineHeight: WATERMARK_STYLE.labelLineHeight,
+            border: `${WATERMARK_STYLE.markBorderWidth}px ${
+              DASHED_ORIGINS.has(band.origin) ? "dashed" : "solid"
+            } ${WATERMARK_STYLE.markBorderColor}`,
+            color: WATERMARK_STYLE.labelColor,
+            overflow: "hidden",
             whiteSpace: "nowrap",
           }}
         >
-          {band.label}
+          <svg
+            width={g.mark.glyph}
+            height={g.mark.glyph}
+            viewBox={`0 0 ${GLYPH_VIEWBOX} ${GLYPH_VIEWBOX}`}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={GLYPH_STROKE}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ flex: "none", display: "block" }}
+          >
+            {ORIGIN_GLYPHS[band.origin].map((d, i) =>
+              d.filled ? (
+                <path key={i} d={d.d} fill="currentColor" stroke="none" />
+              ) : (
+                <path key={i} d={d.d} />
+              ),
+            )}
+          </svg>
+          {band.label ? (
+            <span
+              ref={labelRef}
+              style={{
+                marginLeft: g.mark.gap,
+                // Pull the trailing letter-space back out of the layout, so
+                // the content really does end at the last letter and the
+                // capsule's own padding is the only thing after it.
+                marginRight: -labelTrailingSpace(g.label.fontSize),
+                // Measured, not guessed — see `useInkDrop`.
+                position: "relative",
+                top: drop,
+                fontFamily: KICKER_STACK,
+                fontSize: g.label.fontSize,
+                fontWeight: WATERMARK_STYLE.labelWeight,
+                letterSpacing: WATERMARK_STYLE.labelLetterSpacing,
+                lineHeight: WATERMARK_STYLE.labelLineHeight,
+                textShadow: WATERMARK_STYLE.textShadow,
+                opacity: reveal,
+              }}
+            >
+              {band.label}
+            </span>
+          ) : null}
         </span>
       ) : null}
-      {band.source ? (
+      {band.source && o > 0.99 ? (
         <span
           style={{
             fontFamily: KICKER_STACK,
@@ -143,20 +324,78 @@ function Badge({ band, g }: { band: WatermarkBand; g: WatermarkGeometry }) {
   );
 }
 
+/**
+ * Plays the badge's opening ONCE and then stops, on the film's own clock.
+ *
+ * `null` means settled — the Badge then draws its resting state, which is
+ * exactly what it drew before this existed. Restarting is a nonce rather than
+ * a boolean so that pressing "play again" on an already-settled preview is
+ * still an event.
+ *
+ * requestAnimationFrame rather than a CSS transition, and the timing comes
+ * from `markOpenAt` / `bandOpacityAt` rather than from a duration written
+ * here, because those are the render's own functions: a preview animating on
+ * its own curve would be showing a different overlay, which is the one thing
+ * this whole file exists not to do.
+ */
+function usePlayOnce(key: string, bandLength: number) {
+  const [t, setT] = useState<number | null>(null);
+  const [nonce, setNonce] = useState(0);
+  useEffect(() => {
+    const settle = markSettleSeconds(bandLength);
+    const start = performance.now();
+    let raf = 0;
+    const tick = (now: number) => {
+      const s = (now - start) / 1000;
+      if (s >= settle) {
+        setT(null);
+        return;
+      }
+      setT(s);
+      raf = requestAnimationFrame(tick);
+    };
+    setT(0);
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [key, nonce, bandLength]);
+  return { t, replay: () => setNonce((n) => n + 1) };
+}
+
 export default function WatermarkPreview({
   scenes,
   aspectRatio,
   showLabel,
+  openOncePerOrigin = false,
+  scale,
+  sample = false,
 }: {
   scenes: readonly PreviewScene[];
   /** The project's Format. Anything but "9:16" is drawn landscape. */
   aspectRatio: string | null | undefined;
   /** The live state of the Source watermark toggle. */
   showLabel: boolean;
+  /** Mirror of the Editing Options switch, so the preview collapses the
+   *  repeats exactly as the film will. */
+  openOncePerOrigin?: boolean;
+  /** And of the size slider. A preview at a size the film will not use is
+   *  worse than no preview: the whole claim of this panel is that the frame
+   *  is true, and how much of it the badge takes is the first thing anyone
+   *  looks at. */
+  scale?: number;
+  /**
+   * These scenes are a DEMONSTRATION, not a film — the brief showing what the
+   * badge will do before anything has been written. Only the wording changes:
+   * "no picture generated yet" would be wrong on a project that does not
+   * exist, and counting scenes that were never made would be worse.
+   */
+  sample?: boolean;
 }) {
   const [at, setAt] = useState(0);
   const portrait = String(aspectRatio ?? "").trim() === "9:16";
-  const g = portrait ? WATERMARK_LAYOUT.portrait : WATERMARK_LAYOUT.landscape;
+  const g = scaleWatermark(
+    portrait ? WATERMARK_LAYOUT.portrait : WATERMARK_LAYOUT.landscape,
+    scale,
+  );
 
   // Unit durations: a preview cares about the ORDER of the bands and which
   // scenes merged, never about seconds. Band boundaries then read directly as
@@ -165,15 +404,27 @@ export default function WatermarkPreview({
     () =>
       planWatermarkBands(
         scenes.map((s, i) => ({ startSeconds: i, durationSeconds: 1, provenance: s.provenance })),
-        { showLabel },
+        { showLabel, openOncePerOrigin },
       ),
-    [scenes, showLabel],
+    [scenes, showLabel, openOncePerOrigin],
   );
 
   // The toggle changes how many bands there are, so a held index can point
   // past the end — clamp on read rather than reaching for an effect.
   const index = bands.length ? Math.min(at, bands.length - 1) : 0;
   const band = bands[index];
+
+  // BEFORE the guards below: a hook cannot sit after an early return, and both
+  // returns here are reachable (a film with no scenes, a film whose label is
+  // off and owes no credit). The band length is the count of scenes it covers,
+  // which is what `planWatermarkBands` produces on unit durations — and on any
+  // real band that is >= 1, so the opening runs at its full length exactly as
+  // it does in the film.
+  const bandLength = band ? band.endSeconds - band.startSeconds : 1;
+  const { t, replay } = usePlayOnce(`${index}:${showLabel}:${openOncePerOrigin}`, bandLength);
+  const playing = t !== null && band !== undefined;
+  const open = playing ? markOpenAt(t as number, bandLength, band.expand) : undefined;
+  const opacity = playing ? bandOpacityAt(t as number, bandLength) : undefined;
 
   if (!scenes.length) {
     return <p className={styles.quiet}>No scenes yet — there is nothing to label.</p>;
@@ -195,9 +446,9 @@ export default function WatermarkPreview({
   const to = Math.round(band.endSeconds) - 1;
   const covered = scenes.slice(from, to + 1);
   const still = covered.find((s) => s.imageUrl)?.imageUrl ?? null;
-  const scale = Math.min(MAX_W / g.frame.width, MAX_H / g.frame.height);
-  const boxW = Math.round(g.frame.width * scale);
-  const boxH = Math.round(g.frame.height * scale);
+  const fit = Math.min(MAX_W / g.frame.width, MAX_H / g.frame.height);
+  const boxW = Math.round(g.frame.width * fit);
+  const boxH = Math.round(g.frame.height * fit);
 
   return (
     <div className={styles.wrap}>
@@ -206,18 +457,18 @@ export default function WatermarkPreview({
             the top of this file on why nothing here is multiplied by hand. */}
         <div
           className={styles.frame}
-          style={{ width: g.frame.width, height: g.frame.height, transform: `scale(${scale})` }}
+          style={{ width: g.frame.width, height: g.frame.height, transform: `scale(${fit})` }}
         >
           {still ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={still} alt="" className={styles.still} />
           ) : (
             <div className={styles.noStill}>
-              <span>no picture generated yet</span>
+              <span>{sample ? "your footage goes here" : "no picture generated yet"}</span>
             </div>
           )}
           <div style={{ position: "absolute", left: g.left, bottom: g.bottom }}>
-            <Badge band={band} g={g} />
+            <Badge band={band} g={g} open={open} opacity={opacity} />
           </div>
         </div>
       </div>
@@ -232,12 +483,25 @@ export default function WatermarkPreview({
         >
           ‹
         </button>
+        <button
+          type="button"
+          className="abtn"
+          onClick={replay}
+          aria-label="Play the animation again"
+          title="Play the animation again"
+        >
+          ↻
+        </button>
         <span className={styles.count}>
           {bands.length === 1 ? "One label" : `Label ${index + 1} of ${bands.length}`}
           {" · "}
-          {covered.length === 1
-            ? `scene ${covered[0]?.label ?? from + 1}`
-            : `scenes ${covered[0]?.label ?? from + 1}–${covered[covered.length - 1]?.label ?? to + 1}`}
+          {sample
+            ? covered.length === 1
+              ? `example shot ${covered[0]?.label ?? from + 1}`
+              : `example shots ${covered[0]?.label ?? from + 1}–${covered[covered.length - 1]?.label ?? to + 1}`
+            : covered.length === 1
+              ? `scene ${covered[0]?.label ?? from + 1}`
+              : `scenes ${covered[0]?.label ?? from + 1}–${covered[covered.length - 1]?.label ?? to + 1}`}
         </span>
         <button
           type="button"
@@ -256,7 +520,7 @@ export default function WatermarkPreview({
       <div className={styles.actual}>
         <span className={styles.actualCap}>Actual size on a {g.frame.width}×{g.frame.height} frame</span>
         <div className={styles.actualBox}>
-          <Badge band={band} g={g} />
+          <Badge band={band} g={g} open={open} opacity={opacity} />
         </div>
       </div>
 

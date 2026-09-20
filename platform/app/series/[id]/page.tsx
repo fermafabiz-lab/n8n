@@ -4,6 +4,7 @@ import { getSeries, getSeriesEpisodes, getSeriesRefsUnion, getSheetMediaUrls } f
 import { getCategory } from "@/lib/categories";
 import SeriesCharacter from "@/components/SeriesCharacter";
 import SeriesNotes from "@/components/SeriesNotes";
+import SeriesFaces from "@/components/SeriesFaces";
 import { initials } from "@/lib/series";
 import s from "@/components/SeriesCast.module.css";
 
@@ -34,33 +35,77 @@ export default async function SeriesPage({ params }: { params: Promise<{ id: str
     ...Object.values(series.refs.objectRefs),
   ];
   const media = await getSheetMediaUrls(flowIds);
+  /*
+   * Two different absences, and only one of them is a fault.
+   *
+   * `missing` is a sheet that EXISTS on Flow and whose bytes we never kept —
+   * every one of those is one API call away (db/port/sheet-backfill), which
+   * is what the panel's button does. `undrawn` is a bible entry the pipeline
+   * never drew a sheet for at all, and for objects that is the rule rather
+   * than an oversight: `Cast Sheet Prep` draws one only for an object that
+   * appears in two or more scenes, at most three per film. A prop seen once
+   * shows its initials on purpose, and a button that claimed to fix that
+   * would be lying.
+   */
+  const uniqueIds = [...new Set(flowIds.filter(Boolean))];
+  const missingFaces = uniqueIds.filter((id) => !media[id]).length;
+  const undrawnFaces =
+    series.bible.characters.filter((c) => !series.refs.castSheets[c.name]).length +
+    series.bible.locations.filter((l) => !series.refs.locationPlates[l.name]).length +
+    series.bible.objects.filter((o) => !series.refs.objectRefs[o.name]).length;
   const cat = getCategory(series.category);
   const style = series.settings.categoryOptions.visual_style;
 
   return (
     <main className="page">
-      <div className="pj-shell">
-        <div className="eyebrow" style={{ marginBottom: 8 }}>
-          <Link href="/series">Series</Link>
-          <span style={{ color: "var(--dim)" }}>/</span>
-          <span>{series.name}</span>
-        </div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 20, flexWrap: "wrap" }}>
-          <div>
-            <h1 style={{ margin: 0 }}>{series.name}</h1>
-            <div className="specs" style={{ marginTop: 10 }}>
-              <span>{cat.label}</span>
-              {style && <span>{style}</span>}
-              {series.tone && <span>{series.tone}</span>}
-              <span>{series.language}</span>
-              <span>{series.aspect}</span>
-              <span>{episodes.length} episode{episodes.length === 1 ? "" : "s"}</span>
+      {/*
+        The same header card the workspace wears, and for the same reason the
+        workspace wears it: `.pj-shell` is a HERO CARD, not a page wrapper.
+        This page used to put its whole document inside one — every section,
+        every rule, right out to the shell's edges, because the shell carries
+        no padding of its own. Two faults came out of that single mistake and
+        the producer reported both: the title sat under the fixed 100px
+        `.navfade` blur (the shell began 82px down the page and the first line
+        of text with it), and every horizontal rule — `.specs` has one above
+        and below, `.fsec > header` one under it — ran flush into a 30px
+        rounded corner, which is what "marginile sunt conturate urât" is.
+
+        `.room` supplies the 44px that clears the blur, `.wk-head` the 34px
+        that keeps text off the edges, and the sections now sit OUTSIDE the
+        card on the page ground, exactly as they do on /projects and
+        /projects/[id]. Nothing about the content changed.
+      */}
+      <div className="room">
+        <div className="wk-shell">
+          <div className="arc wk-arc" aria-hidden />
+          <div className="wk-head">
+            <div className="wk-id">
+              <div className="eyebrow" style={{ marginBottom: 16 }}>
+                <Link href="/series">Series</Link>
+                <span style={{ color: "var(--dim)" }}>/</span>
+                <span>{series.name}</span>
+              </div>
+              <h1 style={{ margin: 0 }}>{series.name}</h1>
+              <div className="specs" style={{ marginTop: 10 }}>
+                <span>{cat.label}</span>
+                {style && <span>{style}</span>}
+                {series.tone && <span>{series.tone}</span>}
+                <span>{series.language}</span>
+                <span>{series.aspect}</span>
+                <span>{episodes.length} episode{episodes.length === 1 ? "" : "s"}</span>
+              </div>
+            </div>
+            <div className="wk-side">
+              <Link href={`/new?series=${series.id}`} className="pj-cta">
+                New episode →
+              </Link>
             </div>
           </div>
-          <Link href={`/new?series=${series.id}`} className="pj-cta">
-            New episode →
-          </Link>
         </div>
+
+        {/* Above the sections rather than inside "The cast", because one
+            press fetches the plates and the object sheets too. */}
+        <SeriesFaces seriesId={series.id} missing={missingFaces} undrawn={undrawnFaces} />
 
         <section className="fsec">
           <header>
@@ -85,13 +130,10 @@ export default async function SeriesPage({ params }: { params: Promise<{ id: str
               })}
             </div>
           )}
-          {Object.keys(series.refs.castSheets).length > 0 &&
-            Object.values(series.refs.castSheets).every((c) => !media[c.id]) && (
-              <p className={s.hint} style={{ marginTop: 14 }}>
-                The sheets exist and the pipeline reuses them, but their pictures were made before the
-                site started keeping a copy — faces will appear for sheets drawn from now on.
-              </p>
-            )}
+          {/* The cast-only hint that used to sit here is gone: it explained
+              the same absence in words, for one of the three kinds, and told
+              the producer to fetch a session rather than press a button.
+              SeriesFaces above covers all three and does the fetching. */}
         </section>
 
         {series.bible.locations.length > 0 && (
@@ -191,6 +233,7 @@ export default async function SeriesPage({ params }: { params: Promise<{ id: str
             premise={series.premise}
             previously={series.previously}
             channelName={series.channelName}
+            episodes={episodes.length}
           />
         </section>
 

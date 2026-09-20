@@ -155,7 +155,19 @@ export default function ProductionActivity({
         ),
       )
     : 0;
-  const FROZEN_MIN = 12;
+  /**
+   * MIRROR of STALL_AGE_MS in `lib/n8n.ts` — the two must move together.
+   *
+   * This used to be 12, and that number is what actually stopped production.
+   * n8n's own record shows the shape: a batch cancelled, then a new one
+   * starting 1.7-5.3s later (14215→14246, 13033→13215, 14371→14374) — the
+   * machine-tight gap of restartProduction's pause → poll → resume, pressed
+   * over and over. At 12 minutes the door opened on EVERY healthy pass, since
+   * a real one runs for the best part of an hour, and the panel then told the
+   * producer it was wedged. The site's own stall threshold had said 45 all
+   * along; this line disagreed with it by 4x.
+   */
+  const FROZEN_MIN = 45;
   const runsAfterThis = Math.max(0, Math.ceil(unfinished.length / cap) - 1);
   const showCapNote = scenes.length > cap && unfinished.length > 0;
   const showNextBatch = aliveKnown && !aliveAny && unfinished.length > 0;
@@ -299,13 +311,14 @@ export default function ProductionActivity({
           <p style={{ margin: "0 0 8px", fontSize: 13, color: "var(--soft)" }}>
             {aliveAny ? (
               <>
-                This pass has been running for {oldestAliveMin} minutes.{" "}
+                This pass has been running for {oldestAliveMin} minutes, which
+                is long even for a full one.{" "}
                 <b style={{ color: "var(--ink)" }}>
-                  If nothing new has appeared in that time, it is wedged
+                  Restart it only if NOTHING new has appeared in that whole time
                 </b>{" "}
                 — n8n does sometimes open an execution and never actually run
                 it, and from the outside that looks exactly like work in
-                progress.
+                progress. A pass that is merely slow still finishes on its own.
               </>
             ) : (
               <>
@@ -323,9 +336,10 @@ export default function ProductionActivity({
               {pending ? "Restarting…" : "⟳ Restart this pass"}
             </button>
             <span style={{ fontSize: 12, color: "var(--dim)" }}>
-              Stops what n8n thinks is running and starts the pass again.
-              Every image, take and clip already made is kept — only the
-              missing pieces are generated.
+              Stops EVERY execution n8n has running — including another
+              project&apos;s — and starts this pass again. Saved images, takes
+              and clips are kept; anything still being generated at Google
+              right now is abandoned and made again from scratch.
             </span>
           </div>
         </div>

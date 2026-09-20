@@ -1,0 +1,102 @@
+# The scroll-hero prototype as the `site-dev` container: same recipe as
+# deploy-platform.yml, smaller. Build the image here, tell the box to pull.
+#
+# Runs on trunk pushes that touch the prototype, or by hand from any branch
+# (Actions -> Deploy site-dev -> Run workflow, pick the branch). The manual
+# path is how a feature branch reaches site-dev without going through the
+# trunk first — that is what a dev site is for.
+#
+# It ships CODE ONLY. The WebP sequence and the poster live in
+# /opt/n8n/frames, are put there by hand, and are never touched by a deploy;
+# Caddy serves them as /frames/*. Neither is in the image, so replacing the
+# sequence needs no build and a build never replaces the sequence.
+
+name: Deploy site-dev
+
+on:
+  push:
+    branches: [claude/hello-7o90qh]
+    paths:
+      - "prototypes/scroll-hero/**"
+      - ".github/workflows/deploy-site-dev.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-site-dev
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}/site-dev
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check required secrets are set
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+        run: |
+          missing=""
+          for v in SSH_HOST SSH_USER SSH_KEY; do
+            [ -n "${!v}" ] || missing="$missing $v"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Secrete lipsa:$missing"
+            exit 1
+          fi
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./prototypes/scroll-hero
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
+          cache-from: type=gha,scope=site-dev
+          cache-to: type=gha,mode=max,scope=site-dev
+
+      # NOTHING here writes /opt/n8n/frames. The real WebP sequence and its
+      # poster are uploaded by hand and must survive every deploy:
+      #
+      #     scp prototypes/scroll-hero/public/frames/*.webp \
+      #         root@<box>:/opt/n8n/frames/
+      #
+      # This workflow used to scp the placeholder frames from the repo on each
+      # run, which overwrote the real ones. Do not put that step back — a
+      # deploy is a code deploy, and the sequence is content.
+
+      - name: Pull and restart on Hetzner
+        uses: appleboy/ssh-action@v1
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REGISTRY_USER: ${{ github.actor }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          envs: REGISTRY_TOKEN,REGISTRY_USER
+          script: |
+            set -euo pipefail
+            cd /opt/n8n
+            echo "${REGISTRY_TOKEN}" \
+              | docker login ghcr.io -u "${REGISTRY_USER}" --password-stdin
+            docker compose pull site-dev
+            docker compose up -d site-dev
+            docker image prune -f

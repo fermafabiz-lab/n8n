@@ -1,0 +1,261 @@
+/* Mechanics only: no brand, no type scale. Just enough to see the hero work. */
+
+:root {
+  /* The first content section's ground, and the colour the film crossfades
+     into at the end of the scrub. ONE owner: the section is painted with it
+     and so is the hero's outro overlay, so the handoff cannot drift into a
+     visible seam. */
+  --content-bg: #0b0b0c;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: #000;
+  color: #ddd;
+  font-family: var(--font-display), system-ui, sans-serif;
+}
+
+/* ── Fixed nav ───────────────────────────────────────────────────────────
+   Rides over the hero and stays for the section below. It does NOT fade
+   with the copy: a hero that scrubs away should still leave you a way out. */
+
+.nav {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 3;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.35rem clamp(1rem, 4vw, 2.75rem);
+  color: #fff;
+  /* Same reason as the title's: the gradient below has faded to almost
+     nothing by the time it reaches this text, so on a bright frame the links
+     were the first thing to disappear. `npm test` measures these too. */
+  text-shadow:
+    0 0 3px rgba(0, 0, 0, 0.95),
+    0 1px 4px rgba(0, 0, 0, 0.9),
+    0 2px 12px rgba(0, 0, 0, 0.75);
+}
+
+/* The nav has the same legibility problem as the title and needs the same
+   answer, in a lighter dose: a bright frame would otherwise swallow it. */
+.nav::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  /* Taller than the bar itself, so the text sits in the dense part of the
+     wash rather than in its tail — at the nav's own height the gradient had
+     already thinned to ~0.27 alpha where the words are. */
+  height: 190%;
+  z-index: -1;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.9) 0%,
+    rgba(0, 0, 0, 0.62) 42%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+.nav a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.nav a:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 4px;
+}
+
+.nav__brand {
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.nav__links {
+  display: flex;
+  gap: clamp(1rem, 2.5vw, 2rem);
+  font-size: 0.9rem;
+  font-weight: 400;
+}
+
+.nav__links a {
+  opacity: 0.92;
+}
+
+.nav__links a:hover {
+  opacity: 1;
+}
+
+/* The section is the scroll track: 200vh tall, of which the sticky stage
+   pins 100vh, so the sequence scrubs across exactly one viewport of scroll.
+   After that the stage unpins and scroll is ordinary again. */
+.hero {
+  position: relative;
+  height: 200vh;
+}
+
+.hero__stage {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: hidden;
+  background: #000;
+}
+
+.hero__poster,
+.hero__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.hero__poster {
+  object-fit: cover;
+}
+
+/* The canvas exists in the DOM from the first paint but stays hidden until
+   the component has drawn its first frame; the poster then steps back. Both
+   toggles hang off one attribute so they flip in the same frame. */
+.hero__canvas {
+  visibility: hidden;
+}
+
+.hero[data-state="ready"] .hero__canvas {
+  visibility: visible;
+}
+
+.hero[data-state="ready"] .hero__poster {
+  visibility: hidden;
+}
+
+/* The outro. Sits over the film and under the copy, and crossfades the last
+   stretch of the sequence into the section below's colour. Opacity is the
+   only thing that changes — no transform, nothing to lay out. */
+.hero__outro {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: var(--content-bg);
+  opacity: 0;
+  pointer-events: none;
+  will-change: opacity;
+}
+
+/* ── The copy over the film ──────────────────────────────────────────────
+   One layer holding the scrim and the words, so they fade as one thing:
+   a dark corner with nothing in it would be worse than no scrim at all.
+   `--hero-fade` is written by the component's rAF tick from raw scroll
+   progress; 1 is the resting value, which is also what the opt-outs and a
+   page with no JS get. */
+
+.hero__copy {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  opacity: var(--hero-fade, 1);
+  pointer-events: none;
+}
+
+/* Anchored in the bottom-left corner, where the words are, and reaching far
+   enough across to cover the longest line. Ellipse rather than a linear
+   wash: the title needs cover where it sits, not a band across the frame. */
+.hero__scrim {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    115% 85% at 0% 100%,
+    rgba(0, 0, 0, 0.6) 0%,
+    rgba(0, 0, 0, 0.44) 32%,
+    rgba(0, 0, 0, 0.16) 58%,
+    transparent 76%
+  );
+}
+
+.hero__words {
+  position: absolute;
+  left: 10%;
+  bottom: 10%;
+  right: 10%;
+  /* NOT `ch`: that unit resolves against this element's own font-size, which
+     is the inherited 16px, not the title's 84px — 22ch came out ~176px wide
+     and broke the title into four lines. rem is root-relative and says what
+     it means. */
+  max-width: min(52rem, 100%);
+  color: #fff;
+  /* The scrim handles the broad wash; this handles the worst case the scrim
+     cannot. Over a white frame a 60% scrim leaves the backdrop at 0.40
+     luminance — 2.1:1 against white text, unreadable — and deepening the
+     scrim enough to fix that (82%) would be a black box, not a gradient.
+     A tight dark ring at the glyph edge is what subtitles have always done:
+     invisible on dark footage, and what carries the text on bright.
+     `npm test` measures it; see "the copy survives the worst frame". */
+  text-shadow:
+    0 0 2px rgba(0, 0, 0, 0.95),
+    0 1px 3px rgba(0, 0, 0, 0.9),
+    0 2px 10px rgba(0, 0, 0, 0.78),
+    0 4px 26px rgba(0, 0, 0, 0.6);
+}
+
+.hero__title {
+  margin: 0;
+  font-size: clamp(2.4rem, 6.2vw, 5.25rem);
+  font-weight: 800;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+}
+
+.hero__subtitle {
+  margin: 1rem 0 0;
+  font-size: clamp(1rem, 1.5vw, 1.3rem);
+  /* Body size, so it answers to the 4.5:1 bar rather than the title's 3:1,
+     and it has thinner strokes to hold a shadow with. Full white and one
+     weight up are what buy that back; the step down from the title comes
+     from size, not from dimming the ink. */
+  font-weight: 500;
+  line-height: 1.35;
+  color: #fff;
+  text-shadow:
+    0 0 3px rgba(0, 0, 0, 1),
+    0 1px 4px rgba(0, 0, 0, 0.95),
+    0 2px 12px rgba(0, 0, 0, 0.8);
+}
+
+/* Reduced motion and narrow screens: no scroll track, no canvas, only the
+   poster at one viewport. The CSS decides the layout so nothing shifts when
+   the script arrives and reaches the same verdict. */
+@media (max-width: 767px), (prefers-reduced-motion: reduce) {
+  .hero {
+    height: 100vh;
+  }
+
+  .hero__canvas,
+  .hero[data-state="ready"] .hero__canvas {
+    display: none;
+  }
+
+  /* No long scroll, so there is no stretch to crossfade across. */
+  .hero__outro {
+    display: none;
+  }
+
+  .hero[data-state="ready"] .hero__poster {
+    visibility: visible;
+  }
+}
+
+/* The first content section. The film has already crossfaded to this colour
+   by the time the stage unpins, so the section arrives out of it rather than
+   after it — which is why there is no rule at the join. */
+.test-section {
+  height: 100vh;
+  display: grid;
+  place-items: center;
+  background: var(--content-bg);
+}

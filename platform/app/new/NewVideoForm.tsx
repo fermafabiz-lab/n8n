@@ -4,8 +4,12 @@ import { useActionState, useEffect, useState } from "react";
 import { createProject, type ActionResult } from "@/app/actions";
 import CategoryPicker, { type CategoryMeta } from "@/components/CategoryPicker";
 import { DEFAULT_CATEGORY, getCategory } from "@/lib/categories";
+import { TONES } from "@/lib/tones";
 import Toggle from "@/components/Toggle";
 import CaptionColorPicker from "@/components/CaptionColorPicker";
+import WatermarkOpenPicker from "@/components/WatermarkOpenPicker";
+import WatermarkSizePicker from "@/components/WatermarkSizePicker";
+import WatermarkPreview, { SAMPLE_SCENES } from "@/components/WatermarkPreview";
 import LanguagePicker from "@/components/LanguagePicker";
 import Link from "next/link";
 import { languageByCode, resolveLanguage } from "@/lib/languages";
@@ -16,32 +20,16 @@ import SpeedPicker from "@/components/SpeedPicker";
 import VoiceTonePicker from "@/components/VoiceTonePicker";
 import StyleRefPicker from "@/components/StyleRefPicker";
 import type { HookStyleChoice, VoiceTone } from "@/lib/data/derive";
-import { CREATORS, HOOK_STYLES, SPEED_BY_PACE, STORYTELLER_TONE } from "@/lib/data/derive";
+import { CREATORS, FLOW_ACCOUNTS_MAX, HOOK_STYLES, SPEED_BY_PACE, STORYTELLER_TONE } from "@/lib/data/derive";
 
 async function submit(_prev: ActionResult | null, formData: FormData) {
   return createProject(formData);
 }
 
-// Same option set as the n8n form — the site fully replaces it. Every name
-// here has a row in hov.genre_profile (matched case-insensitively) — a tone
-// without one is written with Scripting's built-in DOCUMENTARY fallback.
-const TONES = [
-  "Epic",
-  "Educativ",
-  "Cinematic",
-  "Corporate",
-  "Emotional",
-  "Dark",
-  "Conspiracy",
-  "Horror",
-  "Dramatic",
-  "Documentary",
-  "Motivational",
-  "Childish",
-];
-/** The tone a producer lands on before touching the row. */
-const DEFAULT_TONE = "Dark";
-
+// The tone chips are `TONES` from lib/tones.ts — same option set as the n8n
+// form, which the site fully replaces. There is no DEFAULT_TONE any more:
+// the tone a producer lands on is the CATEGORY's (`defaultTone`), so "what
+// kind of film" and "how it should feel" stop being two unrelated questions.
 
 /** Dashed suggestion chips under the subject — one click fills the field. */
 const SUGGESTIONS = [
@@ -286,7 +274,25 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
   // them can see who made what.
   const [createdBy, setCreatedBy] = useState("");
   const [name, setName] = useState("");
-  const [tone, setTone] = useState(series?.tone || DEFAULT_TONE);
+  // The category is chosen before the tone is (section 01 is above section
+  // 02), and it decides the tone — so the initial value has to be read from
+  // the SAME category the picker starts on, not from a constant. Computed
+  // once here because `category`'s own state is declared further down, and
+  // two `?? DEFAULT_CATEGORY` that could drift apart is how a form ends up
+  // starting on a tone no category asked for.
+  const initialCategory = series?.category ?? DEFAULT_CATEGORY;
+  const [tone, setTone] = useState(series?.tone || getCategory(initialCategory).defaultTone);
+  // Has the producer clicked a tone chip themselves? The effect below moves
+  // the tone with the category only while this is false.
+  //
+  // It has to be a flag rather than "is the tone still the default?", which
+  // is what the kids-only version of this used to test: now that every
+  // category has a default, that test cannot tell a producer who deliberately
+  // clicked "Epic" on a Story film from one who never touched the row — and
+  // would overwrite the first one's choice the moment they changed category.
+  // A series episode starts TOUCHED: the show's tone is a decision already
+  // made, recorded on the show, and nothing here may stomp it.
+  const [toneTouched, setToneTouched] = useState(Boolean(series?.tone));
   const [length, setLength] = useState(60);
   const [aspect, setAspect] = useState<"16:9" | "9:16">(series?.aspect ?? "16:9");
   // The rate is the state; the WORD the webhook wants is derived from it.
@@ -350,6 +356,14 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
   // Hex, or "" for the white default. Empty is not "unset" — it is the
   // choice most films should keep, so it is what the control starts on.
   const [captionColor, setCaptionColor] = useState("");
+  // How often the source badge opens into its full label. FALSE — every run
+  // of shots announces itself — is the default and has to stay so: a film
+  // that quietly stops naming its sources is the failure the whole overlay
+  // exists to prevent, so absence resolves to the louder choice everywhere.
+  const [watermarkOpenOnce, setWatermarkOpenOnce] = useState(false);
+  // How big the badge is drawn. 1 is the size every film before this was
+  // rendered at, and the slider's own default — see WATERMARK_SCALE.
+  const [watermarkScale, setWatermarkScale] = useState(1);
   const [style, setStyle] = useState("");
   // Hands-off mode: every gate signs itself off. Off by default — approving
   // unseen is a real trade, and it must never be the accident.
@@ -364,9 +378,15 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
   // Which Veo tier generates the clips. Free is the default and the business
   // model; a paid tier is a per-film decision, priced on the spot.
   const [videoModel, setVideoModel] = useState(series?.videoModel || "veo-3.1-lite-low-priority");
+  // Parallel clip generation. OFF by default on purpose: it has been measured
+  // on one disposable film, not on a real one, and it changes the failure
+  // shape as well as the speed — with three accounts running at once the
+  // SLOWEST account is the film, where the serial loop spreads a bad clip's
+  // cost out. Flip the default once a real film has gone through it.
+  const [parallelClips, setParallelClips] = useState(false);
   // The category selection lives here because BOTH halves of CategoryPicker
   // read it and they are rendered in different cards.
-  const [category, setCategory] = useState(series?.category ?? DEFAULT_CATEGORY);
+  const [category, setCategory] = useState(initialCategory);
   const [catValues, setCatValues] = useState<Record<string, string | boolean>>(
     series
       ? Object.fromEntries(
@@ -390,11 +410,13 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
       t.style === STORYTELLER_TONE.style && t.speakerBoost === STORYTELLER_TONE.speakerBoost;
     if (category === "kids" && voiceTone === null) setVoiceTone(STORYTELLER_TONE);
     else if (category !== "kids" && isStoryteller(voiceTone)) setVoiceTone(null);
-    // The tone moves with the category the same way: Kids story writes as a
-    // children's story (the Childish genre profile), and leaving it returns
-    // the default — unless the producer clicked a tone themselves.
-    if (category === "kids" && tone === DEFAULT_TONE) setTone("Childish");
-    else if (category !== "kids" && tone === "Childish") setTone(DEFAULT_TONE);
+    // The WRITING tone moves with the category the same way, and for every
+    // category rather than only Kids story: a Story film is Epic, a
+    // Documentary is Documentary, a Cinematic one is Cinematic, a Kids story
+    // is Childish. The chip lights up so the producer sees which profile will
+    // write the script, and one click overrides it for good — `toneTouched`
+    // is never cleared, so the category can no longer take the row back.
+    if (!toneTouched) setTone(getCategory(category).defaultTone);
     // Runs on the category, not on the tone: a producer switching the tone
     // away and back must not be fought by this effect.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -442,7 +464,12 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
   const silent = catMeta.voiceMode === "silent";
   const gates = silent ? 3 : 4;
   const finishList = FINISHES.filter(
-    (f) => finishes[f.name] && !(silent && f.name === "captions"),
+    (f) =>
+      finishes[f.name] &&
+      !(silent && f.name === "captions") &&
+      // Same gate as the row itself: the estimate must not promise "Source"
+      // on a film that will not draw it.
+      !(f.name === "source_watermark" && category !== "documentary"),
   )
     .map((f) => f.sheet)
     .join(" · ");
@@ -659,7 +686,19 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
                   <span className="no">02</span>
                 </header>
                 <div className="field">
-                  <label>Tone</label>
+                  <label>
+                    Tone{" "}
+                    {/* Which of the two states the row is in, said out loud.
+                        Without this the producer cannot tell a tone the
+                        category chose from one they chose — and so cannot
+                        tell that changing the category will, or will not,
+                        move it. The way back is the chips themselves. */}
+                    <span className="fhint">
+                      {toneTouched
+                        ? "your pick — it stays put if you change what kind of film this is"
+                        : `following ${getCategory(category).label} — change it and it stays where you put it`}
+                    </span>
+                  </label>
                   <input type="hidden" name="tone" value={tone} />
                   <div className="chiprow" role="group" aria-label="Tone">
                     {TONES.map((t) => (
@@ -667,7 +706,10 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
                         type="button"
                         key={t}
                         className={`pchip ${tone === t ? "on" : ""}`}
-                        onClick={() => setTone(t)}
+                        onClick={() => {
+                          setTone(t);
+                          setToneTouched(true);
+                        }}
                       >
                         {t}
                       </button>
@@ -759,6 +801,48 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
                         ? `Free tier — clips cost no credits (the opening teaser's few shots still render on Fast, ~40 credits). Fine for scenery and slow shots; complex motion (races, crowds, physical contact) is where it glitches.`
                         : `${t.note} ≈ ${total.toLocaleString("en-US")} credits for this film (${clips} clips × ${t.credits}), out of 25,050/month.`;
                     })()}
+                  </p>
+                </div>
+                <div className="frow">
+                  <label>Clip generation</label>
+                  {/* Three Google Flow accounts are linked, and until this
+                      control existed nothing on the site could reach them —
+                      the two keys had to be typed into Editing Options by
+                      hand. They move TOGETHER because apart neither does what
+                      the producer asked for: flow_accounts alone only spreads
+                      the scenes so useapi stops answering 429, and video_pool
+                      is the half that actually keeps several Veo jobs in
+                      flight. Clamped again in actions.ts. */}
+                  <input
+                    type="hidden"
+                    name="flow_accounts"
+                    value={parallelClips ? String(FLOW_ACCOUNTS_MAX) : "1"}
+                  />
+                  <input
+                    type="hidden"
+                    name="video_pool"
+                    value={parallelClips ? "yes" : "no"}
+                  />
+                  <div className="seg" role="group" aria-label="Clip generation">
+                    <button
+                      type="button"
+                      className={parallelClips ? "" : "on"}
+                      onClick={() => setParallelClips(false)}
+                    >
+                      One at a time
+                    </button>
+                    <button
+                      type="button"
+                      className={parallelClips ? "on" : ""}
+                      onClick={() => setParallelClips(true)}
+                    >
+                      All accounts at once
+                    </button>
+                  </div>
+                  <p className="fnote">
+                    {parallelClips
+                      ? `The scenes are cut into ${FLOW_ACCOUNTS_MAX} blocks, one per linked account, and a clip is kept generating on each at the same time. Measured on nine scenes: 10 minutes, against 13 one at a time. Two things worth knowing — a film whose character sheets and set plates come from an earlier pass drops back to one account by itself rather than risk mismatched references, and while the accounts run together the SLOWEST one decides when the film is done.`
+                      : `One clip is generated, then the next. Slower, and how every film has been made so far — pick this if anything looks wrong with the parallel runs.`}
                   </p>
                 </div>
               </section>
@@ -928,7 +1012,18 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
                   <span className="no">06</span>
                 </header>
                 <div className="swlist">
-                  {FINISHES.map((f, i) => {
+                  {/* Source labels are a Documentary feature (2026-09-19, the
+                      producer's call): every other category is wall-to-wall AI,
+                      so the badge drew one continuous AI GENERATED pill for the
+                      whole film and distinguished nothing. Dropped rather than
+                      disabled — and here, unlike at Final touches, no note is
+                      needed: the category control is a few rows up on this same
+                      screen, so picking Documentary brings the row straight
+                      back. The value is still POSTED, so switching category
+                      back and forth keeps what was chosen. */}
+                  {FINISHES.filter(
+                    (f) => !(f.name === "source_watermark" && category !== "documentary"),
+                  ).map((f, i) => {
                     const disabled = silent && f.name === "captions";
                     const on = !disabled && finishes[f.name];
                     return (
@@ -953,6 +1048,47 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
                               value={captionColor}
                               onChange={setCaptionColor}
                             />
+                          )}
+                          {/* Same rule as the volumes below: the choice is
+                              only shown while the badge is on, because how
+                              often a label opens when there is no label is a
+                              decision with no subject. The value is posted
+                              either way, so switching the watermark off and
+                              back on keeps what the producer picked. */}
+                          {f.name === "source_watermark" && on && (
+                            <div style={{ marginTop: 10 }}>
+                              <WatermarkOpenPicker
+                                value={watermarkOpenOnce}
+                                onChange={setWatermarkOpenOnce}
+                              />
+                              <div style={{ marginTop: 14 }}>
+                                <WatermarkSizePicker
+                                  value={watermarkScale}
+                                  onChange={setWatermarkScale}
+                                  portrait={aspect === "9:16"}
+                                  /* The full preview below already ends in an
+                                     actual-size strip. */
+                                  sample={false}
+                                />
+                              </div>
+                              {/* The SAME preview Final touches uses, on three
+                                  example shots over a blank frame — the brief
+                                  is specifying a film that does not exist, so
+                                  there is no still to put under it. One
+                                  component rather than two: a preview that
+                                  behaved differently on the two screens that
+                                  own this decision would be two features. */}
+                              <div style={{ marginTop: 14 }}>
+                                <WatermarkPreview
+                                  scenes={SAMPLE_SCENES}
+                                  aspectRatio={aspect}
+                                  showLabel
+                                  openOncePerOrigin={watermarkOpenOnce}
+                                  scale={watermarkScale}
+                                  sample
+                                />
+                              </div>
+                            </div>
                           )}
                           {f.name === "sfx" && on && (
                             <div style={{ marginTop: 10 }}>
@@ -1059,6 +1195,22 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
                     value={(musicLevel / 100).toFixed(2)}
                   />
                   <input type="hidden" name="caption_color" value={captionColor} />
+                  {/* The node reads `yes`, and STRICTLY that — see the
+                      orchestrator's Normalize Webhook Input. Posted whatever
+                      the watermark switch says, like the two levels above. */}
+                  <input
+                    type="hidden"
+                    name="watermark_open_once"
+                    value={watermarkOpenOnce ? "yes" : "no"}
+                  />
+                  {/* The multiplier itself, not a percentage: the same unit
+                      `Normalize Webhook Input`, derive.ts and the render all
+                      refuse out of range. */}
+                  <input
+                    type="hidden"
+                    name="watermark_scale"
+                    value={watermarkScale}
+                  />
                 </div>
                 <div className="frow" style={{ marginTop: 18 }}>
                   <label>Cold open</label>

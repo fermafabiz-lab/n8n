@@ -1711,7 +1711,11 @@ outside the gate cannot get there by driving in. The end frame is drawn by
 the same image model with the approved still as `reference_1`, so only what
 moves has moved; it is scaffolding, never stored or shown. **Its cost is
 queue time** — ~25-30s per scene, two image generations each paying a ~5.5s
-captcha — which is why `endFrame: false` exists.
+captcha — which is why a switch exists at all. **Read this paragraph as
+history: the end frame became opt-in on 2026-09-14 and the switch reversed to
+`endFrame: true`.** The "geometry not rhetoric" argument above did not survive
+contact — it was built on a cause the SAME afternoon's earlier fix had already
+removed, and it is answered in full under "When an end frame helps" below.
 
 **`reference_*` / `character_*` cannot be combined with `startImage` /
 `endImage`** — both trigger R2V (Ingredients) on Veo. So Flow Characters and
@@ -1984,3 +1988,253 @@ holds its three until those scenes' text is regenerated (which goes through
 copies #2/#3, both fixed). And this is a fix with a mechanism and no outcome
 until a film written after 2026-09-15 is measured — re-run the query in that
 README and the post-fix bucket should read zero, not 3.2%.
+
+### The script is checked against its own research before it is cut up — 2026-09-18, LIVE
+
+The producer pasted a Google Maps script this pipeline had written, alongside
+ChatGPT's reading of it, which listed four things in it that were not true —
+a product described as still being a desktop one after it had shipped, a
+launch attributed to the wrong platform, a motive attributed to a named
+engineer, and two people credited with leading a team. The ask: *"a system to
+check whether the information from the scripting part is accurate and rewrite
+it if not."*
+
+**It is tractable only because the retrieval half already existed.** `Research
+Tema` → `Extract Claims` already produces a numbered pack of sourced claims
+(E1…E20), each with a real URL, and the narration is written FROM that pack.
+So the question the checker asks is not the open-ended, hallucination-prone
+*"is this true?"* but the closed-book *"does any claim in this numbered list
+say this?"* — answerable from the text in front of the model, with no
+knowledge of the world required. Design anything of this kind the same way:
+**find the closed-book version of the question before reaching for a model
+that knows things.**
+
+Full account, the chain, the version ids and every verification run:
+`db/port/fact-check/README.md`. Three lessons belong here.
+
+**A story is not a film with errors in it.** Run the judge on "The Roman slave
+who conquered Egypt" and it flags 55 of its 56 statements. Every verdict is
+correct — nothing in a pack about Ptolemaic Egypt backs what an invented
+Lazarus did on a Tuesday — and the result is worthless; the rewrite would have
+been handed the whole film. The gate that was supposed to prevent this,
+"researched, with a pack", does not, because that film IS researched: fiction
+here is researched for its background. **Nor does the project's category**:
+`story` is the site's default, so the Burj Al Arab, Peking to Paris and Tupac
+documentaries all carry it too — of eleven researched films in the database
+only three say `documentary`. The only signal that separates a documentary
+from a dramatisation is the narration itself, so the judge is asked FIRST what
+it is reading and returns nothing for a story. **When a gate has to tell two
+kinds of content apart, check whether the metadata you were about to trust
+actually varies — a field whose default is one of the two answers is not a
+signal.**
+
+**Never let a corrector rewrite most of its input.** Past some share, a
+rewrite stops correcting the producer's script and starts replacing it, and no
+per-sentence safety check notices, because each sentence individually looks
+like a fair fix. `FC Resolve` therefore stops offering to rewrite at all when
+more than 60% of at least 8 checkable statements fail, and reports instead.
+The findings still reach the producer in full — that is the producer's own
+"warn loudly, never block" — but the film is returned untouched.
+
+**A correction has to be visible or it is a silent edit.** The rewrite lands
+BEFORE segmentation, deliberately: at that moment no scene and no voice take
+exists, so a changed line costs nothing and desynchronises nothing (the whole
+of "A line and its recording drift apart silently" is about the other case).
+But it also means the producer opens the script gate looking at text a model
+changed without being asked. The panel above the box says so in bold and shows
+each sentence AS IT WAS, because the new wording is already in the box: the
+only way to see what changed is to be shown what it used to say.
+
+**Where the error rate actually lands.** On the Burj Al Arab film — a real
+documentary, 6 chapters, an 18-claim pack — the judge found 47 checkable
+statements, the pack backed 31, a targeted search sourced 16 more from
+Jumeirah's own pages, CTBUH and a Washington Post archive piece, and 8 were
+rewritten. Two of the eight are worth knowing by name, because they are the
+shape of the problem: *"including documented use of 24-carat gold leaf"* (the
+word "documented" was doing work no source supported — though the search then
+found Jumeirah's own page saying 1,790 m² of it, so the sentence survived with
+a citation), and *"9,000 tonnes of WHITE steel"*, where the pack gives the
+tonnage and nothing gives the colour. Neither is a hallucination in the usual
+sense. Both are a writer adding a true-sounding adjective to a sourced fact,
+which is what this check is really for.
+
+### A sentence is only as sound as its weakest clause — 2026-09-19, LIVE
+
+The producer ran the first post-Deep-Search Google Maps script past ChatGPT
+and brought back four things it had let through, with the verdict that *"the
+chronology-checking component needs improvement — especially when several
+acquisitions/events happen close together."* All four were one fault, and
+it is worth stating precisely because **the check was doing exactly what it
+was told and what it was told was wrong.**
+
+The judge returned **one finding per sentence**, and a documentary sentence is
+almost never one assertion. *"Search and mapping were already moving together,
+while Where 2 still sat outside the browser"* has two: the pack backed the
+first and was silent on the second, and the sentence as a whole came back
+`supported`. The same shape produced the other three — *"reached … about 200
+million places"* ruled against a claim that Maps held "information, ratings
+and reviews FOR about 200 million places" (a quieter verb), and *"Lars
+Eilstrup Rasmussen worked in Noel Gordon's Sydney spare room"* against a claim
+that FOUR people founded the company there.
+
+**Ask a judge for a verdict on a unit bigger than the claim and it will rule
+on what the unit is mostly about.** The prompt now asks for one finding per
+ASSERTION, the same `quote` repeated as often as the sentence needs, with
+`claim` as what tells them apart. On the producer's own narration that went
+from 15 findings to 26 across 13 sentences, and all four misses came back
+`unsupported`.
+
+**A closed-book checker inherits its pack's errors, and that is not a bug it
+can be prompted out of.** The ZipDash one — *"Google acquired Where 2 and
+Keyhole that month, then bought ZipDash"*, when ZipDash came first, in
+September — was not missed. It was checked, against claim E5: *"Google
+acquired ZipDash in 2004 AFTER buying Where 2 Technologies and Keyhole."* The
+research asserted the order, the judge cited it, and both were wrong. Nothing
+about reading the narration more carefully finds that.
+
+What CAN be fixed is the judge treating an ordering as sourced because a claim
+phrased it confidently. **A claim's PROSE is not evidence; only its facts
+are.** E3 and E4 are dated October 2004, E5 says only "2004" — so the ORDER is
+unsupported however the claim words it, and an unsupported ordering goes to
+the live source lookup instead of being inherited. *Dates settle order.
+Sequence words do not.* The other half of the repair belongs upstream and is
+still owed: `Extract Claims` should be writing dates rather than "after".
+
+**And the arithmetic underneath moved with the prompt.** Twice as many
+findings for the same script meant `FC Resolve`'s "don't rewrite more than 60%
+of it" backstop was suddenly measuring a different thing, its fix list was
+asking for one sentence to be rewritten three times, and `FC Apply` would have
+reported one corrected sentence as three corrections. All three now count
+DISTINCT SENTENCES. The general form is worth carrying: **a ratio measured
+over units that a prompt defines is not a threshold, it is a coincidence** —
+change how finely the model is asked to slice and every number underneath
+moves with it, silently, in the direction that looks like nothing happened.
+
+**Then attribution walked straight around the order rule, and that is the
+sharper lesson** (same day, `3d1834f1`). The next film's writer had
+*attributed* the chronology — "Google acquired Where 2 in October 2004 and,
+**according to the same report**, added Keyhole and ZipDash" — so the
+assertion the judge extracted was a claim about what a report SAYS. The pack's
+E16 really does say it, the finding was correctly `supported`, and "dates
+settle order" never fired because no ordering claim was ever extracted at all.
+**Naming a source does not make a date right, and a viewer does not hear
+"this ordering is contested" — they hear the ordering.**
+
+The judge now rules on an attributed statement TWICE when the underlying fact
+is one somebody else could check — a date, an order, a count, a measurement —
+once on the attribution and once on the fact. The limit is as important as the
+rule and is written into the prompt: a party's claim about ITSELF ("Google said
+Maps had a billion monthly users") stays ONE claim, because what they said IS
+the fact and no outside source can settle their internal number. And the
+rewrite may no longer repair an ordering by attributing it: that leaves the
+same chronology in the viewer's ears with a citation in front of it, so an
+ordering goes to the ladder's second rung instead — name the period everything
+is agreed to have happened in, drop the sequence.
+
+**A rule that refuses is only useful if it still accepts.** The obvious
+failure mode here was a filter on the word "after", which would paint every
+acquisition documentary red. It did not happen: on the film that verified this
+live, *"Facebook completed the Instagram acquisition after the FTC closed its
+investigation"* came back `supported`, citing E5's August 22 2012 closure and
+E2's August 2012 completion — **the judge named the two dates as its
+justification.** Undated order refused, dated order accepted with its working
+shown. When you add a rule that says no, find the case where it should say yes
+and check that it still does.
+
+**The narration is also now checked against ITSELF**, which nothing in the
+chain could do before. The same film said "In early 2003, Lars and Jens started
+Where 2 Technologies in Sydney" and, three sentences later, "In 2004, two
+Australians and two Danes came together in Sydney" — one founding, two years,
+two counts — and the second sentence produced no finding at all, because "came
+together to develop" reads like scene-setting. It is not: it carries a date and
+a count. **A sentence that re-tells an event already narrated is always
+checkable**, and the judge is the only step that ever holds the whole script,
+so it is the only place this can be caught. It is the same fault that opened
+this entire story, when the first red-lit film's hook said April and its first
+chapter said October.
+
+### Deep Search is Documentary mode's feature, not the narration's — 2026-09-18
+
+The entry above says the project's `category` cannot tell a documentary from a
+dramatisation, and gives the evidence: `story` is the site's default, and of
+eleven researched films only three say `documentary` while the Burj Al Arab,
+Peking to Paris and Tupac films — all documentaries — say `story`.
+
+All of that is still true, and the producer gated on `category` anyway, the
+same afternoon: **"The new fact checking system has to be active only in
+documentary mode."** That is not a contradiction, it is a different question.
+The category is a REQUEST, not a description. Reading it as *"this film is
+factual"* is unsound. Reading it as *"this producer asked for the documentary
+treatment"* is exactly what it is for — it is the field that already decides
+archive footage, the source watermark and the end-screen credits, and Deep
+Search now joins that list.
+
+**What it costs, stated plainly because it is invisible from the screen**: a
+factual film created in Story mode gets nothing. Asking for Deep Search means
+choosing Documentary when the film is created.
+
+**The judge's own factual/story verdict is KEPT as an inner gate.** Two gates,
+one per failure mode: the category answers *was it asked for*, the judge
+answers *can it be done*. A documentary whose narration turns out to be a
+dramatisation is a real case and no category can catch it.
+
+**Every skip now carries a CODE as well as a sentence**, and that split is the
+point. `not-documentary` and `story` are normal; `no-mode`, `not-researched`,
+`no-pack`, `no-chapters` and anything unrecognised mean a film that asked for
+Deep Search and did not get it. The prose beside each one will be reworded; the
+code is what the site's red light is wired to, and `lib/deep-search.ts` is the
+only thing allowed to interpret it. **A code the site has never heard of fails
+CLOSED — red, not green** — because the alternative is a future workflow
+turning the alarm off by inventing a reason.
+
+### A word cap is obeyed or ignored according to how it is PHRASED — 2026-09-19
+
+The series recap (`db/port/series-recap/`) asked gpt-5.4 for *"two sentences, at
+most 60 words"* and got about a hundred, every time. Raised to 100 on the
+producer's call, it wrote 128. Two points, a clean third over on both, and the
+conclusion looked obvious: **a model overshoots any cap by about a third, so a
+number in a prompt is a dial, not a fence.** That is what this section said for
+an hour, and it was wrong — or rather, it was a law derived from one phrasing.
+
+The producer's answer to it is what found the fault: *"I don't want this limit
+to affect future episodes — leave it at 60-80 if you like, but make the workflow
+actually generate that much, because I'm not going to rephrase it by hand."*
+Which turns the question from *how much does it overshoot* into *what makes it
+not overshoot*. Four phrasings, same budget of 80 words, same two narrations —
+a 1.4 KB kids episode and the 11.4 KB Burj Al Arab documentary, the longest
+script in the database — three runs each (probe executions 15110, 15111):
+
+| phrasing | words written |
+|---|---|
+| `at most 80 words` (what it had) | 92, 97 |
+| `write between 55 and 80 words` | 79, 86 |
+| `a budget of 80 words you cannot spend` | 78, 77, 73, 81, 77, 77 |
+| **hard rule + count your draft + what happens if it is over** | **73, 75, 80, 71, 76, 72** |
+
+Eight of eight inside the budget, on the shortest and the longest material in
+the project. The number never mattered; the framing did. What does the work in
+the winning version is three things together: **length is named as a rule**
+rather than a preference, **the model is asked to count its draft before
+answering**, and **the consequence is stated** ("an answer longer than N words
+is rejected and useless"). Drop any one of them and it drifts — the range
+version has two of the three and went over once in two runs.
+
+So the rule for this pipeline is: **when a length matters, do not merely state
+it — make it a rule, ask for the count, and say what happens if it is broken.**
+And measure the phrasing, because *"at most N"* reads to a human like a hard
+limit and reads to a model like an aspiration.
+
+**A net still belongs under it, and it belongs at a sentence boundary.**
+`Parse Recap` trims to 25% over the budget by dropping whole sentences, never
+cutting inside one — a half sentence still reads like a recap, which is the
+silent failure. It logs `RECAP LONG` when it fires, and with the measured
+wording it never has: it exists so that a future model, or a future rewording,
+shows up in a log instead of in the producer's field. `node
+db/port/series-recap/check.mjs` (in `npm run check`) pins both halves — that the
+prompt still states the rule, asks for the count and names the consequence, and
+that the net still trims where it should.
+
+Live on the producer's own show the same afternoon: 71 words, 405 characters,
+where the 100-word cap had produced 717. At ~450 characters a line,
+`composeSeriesLore`'s 8,000-character Lore cap now starts dropping the oldest
+recap lines at about episode 17 rather than about 11.

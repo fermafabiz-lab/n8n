@@ -69,6 +69,17 @@ Full account: `db/port/created-by/README.md`.
   reference photo silently loses a refused watermark.** Not fixed: the cure is
   making that node re-read the record instead of rebuilding. Any new key the
   site merges right after creation has the same hole.
+  **`watermarkOpenOnce` is the worked example of taking the other road**
+  (2026-09-19, `db/port/watermark-open-once/README.md`): it sits in the SAME
+  row as `sourceWatermark` on both screens and rides the webhook body instead,
+  because a key added today has no history to protect and need not inherit the
+  defect. The two travelling differently is deliberate, and
+  `node db/port/watermark-open-once/check.mjs` pins the crossing — it runs the
+  orchestrator's real node body against fixtures and then checks the site's two
+  spellings against it, because a drift there has no loud failure anywhere and
+  looks exactly like "the feature does not work".
+  **Publish the n8n half before the site deploys**, or the brief posts a choice
+  nothing reads.
 - **The four names are whitelisted TWICE** — `CREATORS` in
   `platform/lib/data/derive.ts` and the same array in the orchestrator's
   Normalize node — because the value crosses a webhook body, a Code node and a
@@ -899,6 +910,114 @@ Full account: `db/port/created-by/README.md`.
   from `N8N_NEW_PROJECT_WEBHOOK_URL` by swapping the last path segment, and a
   copy that spells that segment differently fails silently against a host
   that answers 404.
+- **A notification that says what happened but does not GO there is the same
+  complaint one step further along** (2026-09-18, `lib/deep-link.ts`,
+  `npm run check:deeplink`). The chime was given words precisely because the
+  sound alone made the producer hunt the page; then the words said
+  "S10 finished" and clicking them did nothing — the toast was a plain `div`
+  with no handler, and the system notification's `onclick` called
+  `window.focus()` and stopped, landing the producer wherever they already
+  were. Every item now carries an `href` and both surfaces travel: the toast
+  is a button that routes, the notification focuses the tab and then routes.
+  What the fix turned on:
+  - **The step and the scene are two different vocabularies.** The page
+    derives a GATE name for the chime (`image-review`) and the stepper
+    navigates by STEP key (`images`). `GATE_STEP` maps one to the other, and
+    `STAGE_KEYS` moved beside it so the map cannot name a step the page does
+    not serve. A gate with no entry still produces a link, still navigates,
+    and still selects nothing — a failure that looks like success, which is
+    why the check reads both vocabularies out of the real sources instead of
+    restating them.
+  - **`?scene=` is an INSTRUCTION, not state, so reading it removes it.** The
+    project page re-renders itself every 10s; a param that stayed would drag
+    the producer back to scene 10 every time that fired, however many other
+    scenes they had clicked. `takeSceneParam` strips it with
+    `history.replaceState` — not `router.replace`, which on a `force-dynamic`
+    page is a full server round-trip to change nothing on screen.
+  - **…which is exactly why the board's selection had to be written down.**
+    Consuming the param and then losing the selection to the next remount
+    undoes the click ten seconds after it worked, which reads as the click
+    never having worked. `vf-scene-sel:<projectId>` in `sessionStorage`, the
+    same remedy the prompt drafts carry, restored in an effect rather than a
+    lazy initializer so the first client render cannot disagree with the
+    server's.
+  - **An empty destination must stay empty.** `withScene("", "S10")` returned
+    `"?scene=S10"` — truthy, so a caller's `|| undefined` never fired, and it
+    navigated to the CURRENT path. Found by writing the check, not by
+    clicking: it is invisible until an item without an `href` exists, and
+    then it looks like the page reloading itself for no reason.
+  The three review panels consume the param differently because they are
+  different shapes: `SceneBoard` selects the scene in its filmstrip;
+  `AudioReview` and `SceneReview` are lists, so they scroll the row into view
+  and ring it for 4.5s with the same accent outline a playing take wears —
+  long enough to survive the smooth scroll, short enough not to read as a
+  state. Verified in a real browser (Playwright against the demo backend):
+  the param is consumed, the toast navigates, the row is ringed, and × does
+  NOT travel.
+- **`.pj-shell` is a hero CARD, not a page wrapper — and using it as one
+  produces two faults that look unrelated** (2026-09-18, both series pages).
+  The producer reported them separately: "titlul e sus nu se vede, e sub
+  aceea bara de blur" and "marginea din stanga si cea din dreapta sunt
+  conturate urat". One cause. `.pj-shell` carries a 30px radius, a
+  background and `overflow: clip` — and **no padding**: every screen that
+  uses it supplies its own inner box (`.pj-hero` at 44px on the library,
+  `.wk-head` at 34px on the workspace) and keeps the rest of the page
+  OUTSIDE the card. `/series` and `/series/[id]` wrapped their whole
+  document in one instead, so:
+  - the shell began 82px down the page and its first line of text with it,
+    which is under the fixed 100px `.navfade` blur band. Measured, not
+    guessed: `h1` at y=120 before, y=192 after — the workspace's is 202.
+  - every horizontal rule ran flush into a rounded corner. There are more of
+    them than you would think: `.specs` has a border top AND bottom, and
+    `.fsec > header` one underneath, so a page of sections inside a clipped
+    card is a stack of lines dying into the radius. That is the whole of
+    "conturate urât".
+  Both pages now compose exactly like `/projects/[id]`: `.room` (44px top,
+  which is what clears the blur) → `.wk-shell` with `.arc wk-arc` and a
+  `.wk-head` → the `fsec` sections after it, on the page ground. Nothing
+  about the content changed. **The general rule: before reaching for a shell
+  class, find the padded box the screens that already use it put inside.**
+  Verified in a real browser at 1440 and 390: no horizontal overflow, the
+  title inset from the card on both, and the header now reads pixel-for-pixel
+  like the workspace's — including the lit band, which crosses the card the
+  same way there (checked, so it is the site's look and not a new fault).
+  There is no automated check for this one and that is deliberate: it is
+  visible the moment the page is opened, which is exactly what the checks in
+  this repo exist to substitute for when a fault is NOT.
+- **A link to the page you are already on is the hardest dead button to
+  see** (2026-09-18, `lib/library-filters.ts`). The producer's read of the
+  library hero was "butonul ăsta mi se pare cam useless", and it was worse
+  than useless: `Everything waiting on me` pointed at
+  `/projects?filter=wait`, which is the page it sat on, and `ProjectsGrid`
+  held its tab in `useState("all")` and never read a search param. So the
+  click navigated, the address bar changed, the page re-rendered, and
+  nothing whatsoever happened. Nothing errors, nothing logs, and the diff
+  that would have caught it is the one that never wrote the reader.
+  - **The reader is now pinned, not just the link.** `check:deeplink`
+    asserts every `?filter=` in `app/` and `components/` names a key in
+    `LIBRARY_FILTERS` — and greps `ProjectsGrid` for the `searchParams.get`
+    that consumes it. A grep is blunt, but the fault WAS a missing line, and
+    deleting it should now have to delete an assertion too.
+  - **`useSearchParams`, not a mount-time read of `location`.** The hero
+    link goes from /projects to /projects: a soft navigation that leaves the
+    grid mounted, so an effect with `[]` deps would never fire and the
+    button would still do nothing. This is the trap that makes "same page,
+    different query" links special.
+  - **Arriving with a filter scrolls to the list; choosing a tab does not.**
+    The grid is below the fold from the hero, so a filter applied silently
+    900px down is the same nothing. A tab clicked in the toolbar writes the
+    same param, so it is flagged first (`selfSet`) — the producer is already
+    looking at the list and yanking the viewport would be its own bug.
+    Measured: no scroll movement across eight 15s auto-refreshes.
+  - **The button itself now opens work.** It names and opens the film that
+    has been WAITING LONGEST, not the newest — the list is newest-first, so
+    the newest waiting film is the one the producer just made and already
+    knows about. Taking the oldest makes the button a queue: clear it, come
+    back, and it names the next. With one film waiting the lead line above
+    has already named it, so the label shrinks to "Review it"; with several
+    it names the one it opens and a second ghost offers "See all N".
+  Free side-effect of reading the param: the chosen tab now survives the
+  15s refresh, which used to drop it back to All.
 - `ProductionActivity` (project page) mirrors the batch rule from `Sort & Cap
   Scenes`: a scene is done for the batch once its clip exists, pending scenes
   sort first, and `MEDIA_BATCH_CAP` in `platform/lib/n8n.ts` is a display
@@ -1891,3 +2010,263 @@ production workflows by name.
   has no delete, and the site's API key is not reachable from a web session,
   so a probe's failed run stays in n8n's own list until it ages out of the
   24-hour window. Naming probes `zz …` is what keeps them off the site.
+### What was stopping production: the site's own restart button (2026-09-17)
+
+Three multi-account test runs died within minutes of starting, and the producer
+said it was not them. It was the site — `⟳ Restart this pass` in
+`ProductionActivity`.
+
+**How the cause was established, since executions carry no actor.** Only three
+code paths ever stop a Media Generation execution, and all three are behind a
+click: `pauseProduction` (Pause), `deleteProjects` (Delete), `restartProduction`
+(this button). There is no cron, no API route and no effect that fires any of
+them — `restart` is bound to `onClick` and nothing else.
+
+n8n's own record then says WHICH button, from the timing alone. The cancelled
+runs come in pairs where the next execution starts **1.7-5.3 s** after the
+previous one is stopped: `14215`→`14246` (1.8 s), `13033`→`13215` (5.3 s),
+`14371`→`14374` (1.7 s). That gap is machine-tight and is exactly
+`restartProduction`'s shape — pause, poll up to 6×1 s for the alive list to
+clear, fire `resume-project`. A human pressing Pause and then Resume cannot
+produce 1.7 s. And `14199` and `13978` were stopped in the **same 130 ms**
+(10:55:49.405 / .535) although `13978` had been running since the previous
+afternoon on a different project, which is the `pauseProduction` loop over the
+whole `running` list.
+
+**Why it kept happening with nobody meaning to.** `FROZEN_MIN` was 12 minutes.
+A real media pass runs for the best part of an hour — `lib/n8n.ts` says so in
+`STALL_AGE_MS`, which is **45**. So the panel offered the restart on every
+healthy pass, over copy asserting *"If nothing new has appeared in that time, it
+is wedged"*. Two constants making the same judgment disagreed by 4×, and the
+lower one was the one the producer read. `FROZEN_MIN` is now 45 and carries a
+comment naming its twin; **they must move together.**
+
+Two things the copy did not say and now does: the restart stops **every**
+execution n8n has running, another project's included, because the public API
+cannot map an execution to a project; and while saved assets are kept, anything
+mid-generation at Google is abandoned and made again — which on a long pass is
+most of the work the click was meant to rescue.
+
+**The dead guard, worth knowing before trusting it.** `nudgeProduction`,
+`resumeProject` and `restartScripting` each sweep `getStalledProduction()` and
+stop what it returns. That loop can never run: all three return early when
+`getAliveProduction()` is non-empty, and a stalled execution is by definition
+`running`, so it is always in the alive list first. The automatic stall-killer
+reads as a live safety net and is unreachable code. That is the safe direction
+to fail — but do not count it as protection that exists.
+
+### Deep Search — a warning with no button
+
+`DeepSearchPanel` sits above `ScriptReview`, reads `hov.fact_check` through
+`getDeepSearch`, and has no controls at all. That is deliberate and it was the
+producer's call: *warn loudly, never block*. The script gate works exactly as
+it did; this panel only tells the producer what the checker made of the text
+they are about to approve. Full account of the n8n side:
+`db/port/fact-check/README.md`, and `docs/lessons-pipeline.md` under "The
+script is checked against its own research".
+
+**Null draws nothing, and that is the important case.** Every film written
+before 2026-09-18 has no row, and so does every project on the frozen Airtable
+backend. "We never checked this" must not render as "this passed" — so a null
+report produces no panel, and a report that ran and found nothing produces one
+green line. Those are different pieces of news and the component keeps them
+apart, along with two more: `skipped` (fiction, or no research pack — said in
+its own words so it cannot read as a pass) and `overwhelmed` (too much
+unsupported for a correction to be safe, so nothing was changed).
+
+**The one that has to be said out loud is `corrected`.** The rewrite happens
+before segmentation, so by the time the producer sees the script gate the text
+in the box is not the text that was written. Nothing else on the page would
+ever tell them. The panel says it in bold, and each finding shows the sentence
+**as it stood**, since the new wording is already in the textarea below — the
+old one is the only way to see what moved.
+
+**The reader is deliberately permissive.** `DeepSearchReport` has no required
+fields and `getDeepSearch` passes the stored jsonb through without validating
+it. A report written by last month's version of the workflow has to render in
+today's panel: a reader that insists on a shape is how an old row becomes a
+crash on the page the producer needs. The query is also guarded by
+`tableReady`, like the stock tables — before `db/012` is applied an unguarded
+read would abort the transaction and take the whole project page with it.
+
+### A button that changes the page under you has to reload it — 2026-09-19
+
+The one control that panel now has is "⟳ Re-check this script", and the day it
+learned to CORRECT what it finds it acquired a failure mode the report-only
+version could not have. Three separate mechanisms conspire:
+
+1. The webhook answers `onReceived`, so the click returns in milliseconds and
+   the answer lands about a minute later. Nothing changes on screen.
+2. `AutoRefresh` does a `router.refresh()` every 10 s, so the REPORT updates by
+   itself — including the line *"the script below already contains the
+   corrections"*.
+3. `ScriptReview` seeds its textarea from `content` **once, on mount**, and
+   restores any `sessionStorage` draft over it on every remount.
+
+Put together: the panel announces a correction the box does not contain, and
+keeps announcing it for as long as the producer stays on the page. That is this
+project's oldest fault — *the artifact on screen outliving the fix* — in the one
+place where the artifact is the thing being judged.
+
+So `DeepSearchRerun` does not fire and forget. It captures the report's
+`checkedAt`, polls `router.refresh()` every 4 s, and when the stamp moves it
+either says *"nothing needed changing"* or, if `rewritten > 0`, **drops the
+stale draft key and does a full `window.location.reload()`**. A soft refresh
+cannot fix this, because React will not reset an uncontrolled textarea and the
+draft would be restored on top anyway. It gives up after three minutes with a
+message that says where to look, because a spinner that spins forever is a
+worse lie than an error.
+
+Two smaller pieces of the same thought. **The button arms when there is
+something to lose** — an unsaved draft means the re-check is about to read
+text the producer is not looking at and then reload over their typing, so it
+asks first, the same shape as Pause's *"sure?"*. And **the poll does NOT pause
+on a hidden tab**, unlike `AutoRefresh`: pressing this and switching away is
+the normal case, and the whole point is that the answer is there on return.
+
+### The all-clear is a sentence, not an absence
+
+The producer's words were *"daca dupa check nu apare nimic flagged atunci ar
+trebui sa apara un mesaj cu 'Everything seems fine and checked'"*, and the
+reason they had to ask is instructive: the panel already SAID so, in a chip
+reading "All checked" and a count of statements. A count is not a verdict. A
+producer who presses a button to find out whether anything is wrong should not
+have to infer "nothing is wrong" from the absence of red — they should read it.
+So `clean` and `corrected` now print one green line above the findings, and it
+names the hook when the report's `scope` is `final`, because "including the
+hook" is the specific reassurance this button exists to give.
+
+The same applies to the state that says nothing was fixed. A re-run on a film
+past its script gate checks in full and refuses to edit — `frozen` — and
+without a sentence explaining that, "3 unsupported" on an approved film reads
+as a correction that is still coming. It is not; the scenes hold the text by
+then. The detail line says so and points at the scenes.
+
+### A red light is only worth having if it is right in both directions
+
+The producer's whole brief for it was one sentence: *"In the case anything
+stops working I want the thing to become Red so I can tell you to solve it."*
+Three things fell out of taking that literally.
+
+**One owner, because the same verdict is drawn in three places** — the panel
+above the script gate, the Settings card, and the dot on the Settings hub.
+`lib/deep-search.ts` computes it and nothing else is allowed to; a light that
+is green on the hub and red on the film teaches the producer to ignore all
+three. `npm run check:deepsearch` pins every branch.
+
+**`red` means exactly one thing: this film asked for Deep Search and did not
+get it.** It is NOT set for a film that was never a candidate, and — the one
+that takes discipline — it is NOT set for a film that was checked and came back
+with problems. Unsupported statements are the feature working. A refused
+rewrite is the safety valve working. Colouring those red would make the alarm
+meaningless inside a week, and then the real one lands on a page nobody reads.
+
+**The detector is sound because of an ordering, not a guess.** `FC Save Report`
+runs before `Combine Chapters`, which runs before the script row is written.
+So by the time a script exists, a documentary's report exists too — and "a
+documentary with a script and no report" is a fault rather than a race. That is
+the whole of the red state, and it is why the panel takes `scriptExists`
+instead of trying to infer it.
+
+**A skip code the site has never heard of fails CLOSED.** An unknown reason is
+red, not green — otherwise a future version of the workflow could switch the
+alarm off by inventing a reason nobody taught the site about.
+
+One deliberate piece of restraint: the `off` state is a one-line note, never a
+card. Every film now gets a report row — a Story film's simply says
+"not-documentary" — so a card would put a grey Deep Search panel above the
+script of every film that was never going to be checked. The producer asked to
+see whether it is active; one line answers that, and a card would be in the way.
+
+**And the alarm must not fire on history.** Every documentary written before
+Deep Search existed has no report, which by the rule above is exactly the shape
+of a fault — so the very first thing the producer would have seen was a false
+one, on their own Google Maps film, whose script was written an hour before the
+chain went live. `DEEP_SEARCH_LIVE_AT` is a hardcoded instant for that reason.
+Inferring the cutoff from the oldest row in the table would have been tidier
+and wrong: it moves every time an old project is deleted, and would eventually
+start explaining real faults away as ancient history. An UNKNOWN creation date
+is not an excuse either — a backend that stopped returning the date would
+otherwise switch the alarm off everywhere at once.
+
+**The same sentence, three times over, reads as a bug** (2026-09-19). Since
+the judge started ruling on one ASSERTION at a time rather than one sentence —
+see `docs/lessons-pipeline.md`, "A sentence is only as sound as its weakest
+clause" — several findings arrive carrying the SAME `quote`, because that is
+what a compound sentence with three separate problems in it honestly looks
+like. Listed flat, the panel printed the identical line three times and a
+producer would reasonably conclude it was repeating itself. `groupBySentence`
+renders one entry per sentence with its assertions nested under it, each with
+its own chip and its own reason, and `claim` — which had been in the type and
+never on screen — is what distinguishes them.
+
+The header had to change with it, for a reason that is the same class of
+mistake as the link to the page you are already on: **`checked` counts
+statements and the script has sentences, and after the prompt change those are
+no longer the same number.** "26 statements were checked" above a script with
+thirteen flagged sentences in it is arithmetic the producer cannot make add
+up, so the panel says both — "26 statements across 13 sentences" — and says
+the second one only when it differs. `report.sentences` carries it, and the
+panel counts distinct quotes itself when the field is missing, because every
+report written before that day has no such field and an old film's panel still
+has to add up.
+
+### The tone is part of what kind of film it is (2026-09-19)
+
+The brief asked two questions that were really one. Section 01 asks **what kind
+of film** — Story, Documentary, Cinematic, Kids story — and section 02 asks
+**how it should feel**, a row of twelve tone chips that every film landed on
+`Dark` with, whatever had just been chosen above it. A documentary written in
+the Dark profile is not a small mismatch: the tone names a row in
+`hov.genre_profile`, and that row is the structure, the voice and the words per
+minute Claude Scripting writes the entire script with. So the default was
+quietly making a Documentary sound like a thriller unless the producer noticed
+the second row and corrected it.
+
+Each category now owns its tone — `defaultTone` on the entry in
+`lib/categories.ts`: Story is **Epic**, Documentary is **Documentary**,
+Cinematic is **Cinematic**, Kids story is **Childish**. It is the same contract
+`narratorVoice` already had: the chip lights up the moment the category is
+chosen, so it is a visible selection the producer can disagree with, never a
+hidden default applied at submit.
+
+Three things are worth carrying past this feature.
+
+**A required field is how a map stays total.** `defaultTone` is not optional
+and it is typed as `Tone` (from the new `lib/tones.ts`, which is now the one
+owner of the twelve names). A category added without one does not compile, and
+a misspelled tone does not compile either — which matters more than it sounds,
+because the failure it prevents is silent: Scripting matches the profile on
+`lower(tone)` and falls back to its built-in DOCUMENTARY profile when nothing
+matches, with no error, no log line and nothing on screen. The same reason
+`lib/tones.ts` carries the date its twelve rows were last measured against the
+database, and `check:tones` pins the list against that measurement.
+
+**"Is it still the default?" is not a test for "did anybody touch this".** The
+kids-only version of this effect asked exactly that — `tone === DEFAULT_TONE`
+— and it worked only because one category had a default and it differed from
+everyone else's. The moment all four have one, that test cannot tell a producer
+who deliberately clicked *Epic* on a Story film from one who never looked at
+the row, and would overwrite the first one's choice on the next category click.
+It takes an explicit `toneTouched` flag, set by the chips and never cleared.
+The general form: **a proxy for "untouched" that reads the value works only
+while the value is unique to being untouched** — the day a real choice can
+equal the default, the proxy starts lying, and it lies by throwing away
+somebody's work.
+
+**Two states need saying which one you are in.** The row now carries a hint
+that reads either *"following Story — change it and it stays where you put
+it"* or *"your pick — it stays put if you change what kind of film this is"*.
+Without it the two states are pixel-identical, and a producer cannot tell
+whether changing the category is about to move their tone. That is the same
+rule as the in-flight flags in `CLAUDE.md`, one step earlier: a state with no
+exit is a dead end, and a state you cannot see you are in is a surprise.
+
+Verified in real Chromium against `next dev`, not by reading the code: all four
+categories move the row, a hand-picked `Horror` survives three category
+changes, a reload starts following the category again, and Kids story still
+selects George and the Storyteller read beside its Childish tone (19/19). The
+server keeps the same backstop for a form that never rendered the row —
+`createProject` resolves an empty `tone` through `getCategory(...).defaultTone`
+rather than the old literal `"Dark"`, with `||` and not `??`, because `""`
+matches no profile either.

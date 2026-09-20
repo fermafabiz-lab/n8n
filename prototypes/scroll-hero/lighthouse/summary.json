@@ -1,0 +1,30 @@
+[
+  {
+    "run": "mobile",
+    "performance": 98,
+    "accessibility": 100,
+    "best-practices": 96,
+    "seo": 100,
+    "FCP": "771 ms",
+    "LCP": "2133 ms",
+    "TBT": "70 ms",
+    "CLS": "0",
+    "Speed Index": "771 ms",
+    "LCP element": "n/a",
+    "total bytes": "183 kB"
+  },
+  {
+    "run": "desktop-4g",
+    "performance": 89,
+    "accessibility": 100,
+    "best-practices": 100,
+    "seo": 100,
+    "FCP": "751 ms",
+    "LCP": "2114 ms",
+    "TBT": "70 ms",
+    "CLS": "0",
+    "Speed Index": "980 ms",
+    "LCP element": "n/a",
+    "total bytes": "1117 kB"
+  }
+]

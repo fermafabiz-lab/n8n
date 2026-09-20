@@ -44,6 +44,8 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 	showTextCards = true,
 	narrationIsSpoken = true,
 	showSourceWatermark = true,
+	watermarkOpenOnce = false,
+	watermarkScale = 1,
 }) => {
 	const {fps} = useVideoConfig();
 	const frame = useCurrentFrame();
@@ -276,6 +278,8 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 							scenes={scenes}
 							preset={preset}
 							showLabel={showSourceWatermark}
+							openOncePerOrigin={watermarkOpenOnce}
+							scale={watermarkScale}
 							portrait={aspectRatio === '9:16'}
 						/>
 					)}

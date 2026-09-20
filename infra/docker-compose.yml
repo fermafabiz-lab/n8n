@@ -77,12 +77,17 @@ services:
     environment:
       N8N_HOST: ${N8N_HOST}
       SITE_HOST: ${SITE_HOST}
+      SITE_DEV_HOST: ${SITE_DEV_HOST}
       DB_UI_HASH: ${DB_UI_HASH}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
       - ./media:/srv/media:ro
+      # Frame-urile WebP ale hero-ului de pe site-dev (/frames/*). Stau pe
+      # disc, nu in imaginea site-dev: o secventa noua e un `scp`, nu un
+      # build. Sursa in repo: prototypes/scroll-hero/public/frames.
+      - ./frames:/srv/frames:ro
     networks:
       - n8n_net
 
@@ -119,6 +124,30 @@ services:
       - ./media:/media
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/login"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - n8n_net
+
+  # Prototipul de hero cu scroll-scrub (prototypes/scroll-hero). Imaginea e
+  # construita in GitHub Actions (.github/workflows/deploy-site-dev.yml) si
+  # doar trasa aici, exact ca `web` — serverul nu construieste.
+  # Fara port pe host: se ajunge la el doar prin Caddy ({$SITE_DEV_HOST}).
+  # Frame-urile WebP (/frames/*) NU sunt in imagine — Caddy le serveste de pe
+  # disc, din ./frames (vezi volumul de pe caddy).
+  # Caddy nu depinde de el intentionat: un `up -d caddy` nu trebuie sa pice
+  # pentru ca lipseste imaginea unui prototip.
+  site-dev:
+    image: ghcr.io/fermafabiz-lab/n8n/site-dev:latest
+    container_name: site-dev
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      TZ: Europe/Bucharest
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
       interval: 30s
       timeout: 5s
       retries: 5

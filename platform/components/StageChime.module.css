@@ -1,0 +1,108 @@
+/* Toasts: the ding's words, bottom-right, gone in ~8s. The near-black panel
+   ground on purpose — these appear over any step's content, and the one
+   surface guaranteed to contrast with all of them is the same panel the
+   gates use. The entrance sets its resting state in the base rule (opacity
+   1), so reduced-motion users get the toast without the slide, never a
+   permanently invisible one — the * rule strips animations globally.
+
+   Moved out of globals.css when the toast became clickable, per the rule in
+   docs/lessons-site.md: a component's stylesheet travels with it, and a
+   generic name like `.toast` in a 5600-line unscoped sheet is a collision
+   waiting for its second claimant. */
+.stack {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  /* Above cinema mode (z 110): a "S7 finished" landing mid-screening is
+     still worth seeing over the dark. */
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: min(360px, calc(100vw - 36px));
+}
+.toast {
+  position: relative;
+  background: var(--panel);
+  color: var(--panel-body);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+  font-size: 12.5px;
+  line-height: 1.45;
+  opacity: 1;
+  animation: toastin 0.38s var(--ease);
+}
+/* The whole card is the target, not a link at the end of it: the producer is
+   reaching for a toast that is about to disappear, and a 40px word is a
+   worse aim than a 340px card. A button rather than an anchor because the
+   navigation is the router's — a full page load here would throw away the
+   scene selections and drafts the board is holding. */
+.go {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  padding: 12px 34px 12px 16px;
+  border-radius: inherit;
+  cursor: pointer;
+}
+.go:hover,
+.go:focus-visible {
+  background: color-mix(in srgb, var(--panel-ink) 8%, transparent);
+}
+/* A toast with nowhere to go keeps the old padding and no pointer — the
+   gates that say "Waiting on you" on the list page have no scene to aim at,
+   and a cursor promising a jump that does not happen is the same lie in a
+   smaller font. */
+.flat {
+  display: block;
+  padding: 12px 34px 12px 16px;
+}
+.title {
+  display: block;
+  color: var(--panel-ink);
+  font-size: 13px;
+  margin-bottom: 2px;
+}
+/* Says the card is a door, in the quietest way that still says it. */
+.cue {
+  display: block;
+  margin-top: 5px;
+  font-size: 11px;
+  color: var(--panel-ink);
+  opacity: 0.72;
+}
+/* Dismiss without travelling. Small on purpose: the toast leaves by itself
+   in 8s, so this is for the producer who wants the corner of the screen back
+   NOW and did not ask to be moved anywhere. */
+.x {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  background: none;
+  border: 0;
+  color: var(--panel-body);
+  opacity: 0.55;
+  font-size: 15px;
+  line-height: 1;
+  padding: 4px 5px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.x:hover,
+.x:focus-visible {
+  opacity: 1;
+}
+@keyframes toastin {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}

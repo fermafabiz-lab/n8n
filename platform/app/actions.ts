@@ -35,7 +35,9 @@ import {
   updateSeriesNotes,
   updateSeriesCharacter,
   updateSeriesBible,
+  getSeriesEpisodes,
   getSeriesRefsUnion,
+  getSheetMediaUrls,
 } from "@/lib/data";
 import {
   composeSeriesLore,
@@ -55,6 +57,7 @@ import {
 import {
   normalizeCaptionColor,
   normalizeCreatedBy,
+  normalizeFlowAccounts,
   normalizeHookStyle,
   normalizeMusicLevel,
   normalizeMusicTrack,
@@ -74,6 +77,7 @@ import {
 } from "@/lib/n8n";
 import { getCategory } from "@/lib/categories";
 import { normalizeStyleRefs } from "@/lib/style-refs";
+import { normalizeWatermarkScale } from "@/lib/provenance";
 import { attachArchiveAsset, DEFAULT_SECONDS } from "@/lib/archive/attach";
 import { detachStockFromScene, resetArchiveSuggestions } from "@/lib/data/stock";
 
@@ -102,6 +106,84 @@ async function fireArchiveSuggest(projectId: string): Promise<void> {
     });
   } catch (e) {
     console.warn(`archive-suggest webhook: ${(e as Error).message}`);
+  }
+}
+
+/**
+ * Re-run Deep Search over the script AS IT NOW STANDS.
+ *
+ * WHY THIS BUTTON EXISTS, and it is not "because a re-check is nice": the
+ * first pass physically cannot see two things. `Generate Hook` runs AFTER the
+ * whole Deep Search chain, so the hook — the two sentences a viewer is most
+ * likely to watch — has never been fact-checked on any film; and nothing
+ * re-reads what the REWRITE produced, so a correction can introduce a new
+ * unsourced claim or half-fix a contradiction and no one finds out. Both are
+ * the same shape: what the producer reads is not what was checked. The re-run
+ * reads `hov.script.content`, which is the finished text with the hook in it,
+ * so one press closes both. Full account: `db/port/fact-check/README.md` §7-8.
+ *
+ * FIRE AND FORGET, by necessity. `deep-search-rerun` answers `onReceived`
+ * because the run takes about half a minute to two minutes — a judge pass plus
+ * a live source lookup — and every other webhook here has a 15s budget. So
+ * this returns as soon as n8n has the request, the panel keeps showing the
+ * PREVIOUS report with its timestamp, and the new one appears on the next
+ * load. That is why the panel prints "Checked at …": it is the only way to
+ * tell which report you are reading.
+ *
+ * It never rewrites. The producer is looking at the script when they press
+ * this, and may well have edited it in the box below — changing text under
+ * someone who is reading it is the silent edit this whole panel exists to
+ * prevent. The re-run reports; the producer decides.
+ */
+async function fireDeepSearchRerunWebhook(projectId: string): Promise<"sent" | "off"> {
+  const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
+  const webhook =
+    process.env.N8N_DEEP_SEARCH_RERUN_WEBHOOK_URL ??
+    newProject?.replace(/new-project\/?$/, "deep-search-rerun");
+  if (!webhook?.includes("deep-search-rerun")) return "off";
+  const res = await fetch(webhook, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ project_id: projectId }),
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
+  return "sent";
+}
+
+export async function rerunDeepSearch(projectId: string): Promise<ActionResult> {
+  if (!isConfigured) return { ok: true, message: "Demo mode — nothing was checked." };
+  if (process.env.DATA_BACKEND !== "postgres") {
+    return { ok: false, message: "Deep Search needs the Postgres backend." };
+  }
+  try {
+    // The mode gate is n8n's to enforce — `DS Prep` writes a `not-documentary`
+    // row exactly like the first pass does, so the panel stays consistent
+    // whichever door the report came through. Answering here as well is only
+    // so the producer is not made to wait a minute to be told no.
+    const project = await getProject(projectId);
+    if (project?.category !== "documentary") {
+      return {
+        ok: false,
+        message: "Deep Search runs on Documentary films only, so there is nothing to re-check here.",
+      };
+    }
+    const sent = await fireDeepSearchRerunWebhook(projectId);
+    if (sent === "off") {
+      return {
+        ok: false,
+        message:
+          "No deep-search-rerun webhook is configured here, so there is nothing to ask — check N8N_NEW_PROJECT_WEBHOOK_URL.",
+      };
+    }
+    revalidatePath(`/projects/${projectId}`);
+    return {
+      ok: true,
+      message:
+        "Re-checking the script as it now stands, hook included — about a minute. Anything the sources cannot back is corrected, and this page reloads onto the corrected script when it lands.",
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
   }
 }
 
@@ -1500,6 +1582,12 @@ export async function confirmFinalSettings(
     /* Sent for the same reason as sfxLevel: this panel SHOWS the switch, so
        writing it back is a no-op unless the producer moved it. */
     sourceWatermark: boolean;
+    /* Same reason again — the panel shows the switch, so it writes it back. */
+    watermarkOpenOnce: boolean;
+    /* And the size, which is a setting of that same row. Refused rather than
+       clamped on the way in, so a value the slider could not have produced
+       resolves to the standard size instead of the nearest end. */
+    watermarkScale: number;
     /* NO `speed` here, on purpose. The pace is decided and signed off at the
        audio step, which is the only moment it is free to change, and this
        panel must not be able to move it — nor to reset it. Because
@@ -1544,6 +1632,10 @@ export async function confirmFinalSettings(
         // The LABEL only. Provenance stays stored and a licence credit still
         // prints — see docs/source-watermark-license-separation.md.
         sourceWatermark: settings.sourceWatermark !== false,
+        // Strictly `=== true`, matching normalizeEditing: a missing key must
+        // never quieten a film's provenance labels by itself.
+        watermarkOpenOnce: settings.watermarkOpenOnce === true,
+        watermarkScale: normalizeWatermarkScale(settings.watermarkScale),
       });
     }
     // Same merge, separate condition: the cards change even when no toggle
@@ -2338,7 +2430,16 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     cast_voices: cast,
     Language: String(formData.get("language") ?? "English"),
     Lenght: Number(formData.get("length") ?? 64),
-    Tonalitate: String(formData.get("tone") ?? "Dark"),
+    // The writing profile Claude Scripting loads (hov.genre_profile, matched
+    // case-insensitively). The brief lights the category's own tone the
+    // moment the category is chosen, so this is the backstop for a form that
+    // never rendered the chip row — from the same owner, so the two can't
+    // disagree. `||` and not `??`: an EMPTY tone field must fall back too,
+    // because "" matches no profile and is written with Scripting's silent
+    // DOCUMENTARY fallback. `getCategory` resolves an unknown id to Story.
+    Tonalitate: String(
+      formData.get("tone") || getCategory(String(formData.get("category") ?? "")).defaultTone,
+    ),
     Pace: String(formData.get("pace") ?? "Normal"),
     // The exact playback rate the brief's PACE control chose. `Pace` above is
     // still the word, because Claude Scripting interpolates it into two
@@ -2353,6 +2454,17 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     // unknown id must never travel, because Current Scene sends the string
     // to the Flow API verbatim. Absent/free posts "" and stores nothing.
     video_model: normalizeVideoModel(formData.get("video_model")) ?? "",
+    // Parallel clip generation across the linked Google Flow accounts. One
+    // switch on the form writes both keys, because separately they do not do
+    // what the producer asked for: spreading the scenes across accounts
+    // (flow_accounts) only avoids useapi's per-account 429s, and the pool
+    // (video_pool) is what actually holds several Veo jobs in flight at once.
+    // Measured on the same nine scenes, 2026-09-18: 10m05 with both on
+    // against 13m12 one clip at a time — db/port/parallel-accounts/etapa3.md.
+    // Clamped here as well as chosen in the form, so a tampered or stale
+    // field cannot ask for accounts that are not linked.
+    flow_accounts: normalizeFlowAccounts(formData.get("flow_accounts")),
+    video_pool: String(formData.get("video_pool") ?? "no"),
     // The producer's direction: the film's angle in their own words, plus up
     // to three mandatory beats. Normalize stores both in Editing Options
     // (producerBrief / mustInclude) so a script restart keeps them — the gap
@@ -2404,6 +2516,22 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     // NOTE: `source_watermark` is deliberately NOT in this payload. It is the
     // one finish the site stores itself — see the write after the record is
     // confirmed, below, and the note there for why.
+    //
+    // Its COMPANION does ride the webhook, and the difference is deliberate
+    // rather than an inconsistency. `Merge Ref Into Options` rebuilds the
+    // whole Editing Options blob from `Normalize Webhook Input`'s value
+    // seconds after this call answers, so anything the site merges in between
+    // is wiped on a film carrying a reference photo — which is exactly the
+    // hole `sourceWatermark` still has (docs/lessons-site.md, and the note
+    // below says as much). A key added today has no history to protect, so it
+    // travels the way `created_by` does instead of inheriting the defect.
+    // `Normalize Webhook Input` reads it strictly: only this exact 'yes'.
+    watermark_open_once: String(formData.get("watermark_open_once") ?? "no") === "yes" ? "yes" : "no",
+    // And how big it is drawn. Sent as the raw multiplier, refused rather
+    // than clamped at every stop on the way — an out-of-range number is a
+    // mistake, and a badge silently drawn at the maximum would be a worse
+    // answer than the standard one.
+    watermark_scale: normalizeWatermarkScale(formData.get("watermark_scale")),
     // How the narrator reads. OMITTED when the producer left it on "Voice
     // default", and that absence is the feature: every ElevenLabs voice has
     // its own stored settings, so sending an object we made up would override
@@ -2921,6 +3049,107 @@ export async function createSeriesFromProject(formData: FormData): Promise<void>
   redirect(`/series/${id}`);
 }
 
+/**
+ * Fire the standalone sheet-backfill webhook. One owner, same rule as every
+ * other: derived from `N8N_NEW_PROJECT_WEBHOOK_URL` by swapping the last path
+ * segment, so all seven live on one host and a copy that spells the segment
+ * differently fails against a 404.
+ *
+ * The timeout is minutes rather than the usual 15s because this one WAITS:
+ * n8n answers when the last node has run, which is one Flow call and one
+ * ingest per sheet. A show carries at most six cast sheets, ten plates and
+ * three objects, and ten of them measured 2.2s end to end.
+ */
+async function fireSheetBackfillWebhook(seriesId: string): Promise<"sent" | "off"> {
+  const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
+  const webhook =
+    process.env.N8N_SHEET_BACKFILL_WEBHOOK_URL ??
+    newProject?.replace(/new-project\/?$/, "sheet-backfill");
+  if (!webhook?.includes("sheet-backfill")) return "off";
+  const res = await fetch(webhook, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ series_id: seriesId }),
+    signal: AbortSignal.timeout(180_000),
+  });
+  if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
+  return "sent";
+}
+
+/** How many of this show's reference sheets we hold the bytes of. */
+async function countFaces(seriesId: string): Promise<{ referenced: number; kept: number }> {
+  const refs = await getSeriesRefsUnion(seriesId);
+  const ids = [
+    ...Object.values(refs.castSheets).map((c) => c.id),
+    ...Object.values(refs.locationPlates).map((p) => p.id),
+    ...Object.values(refs.objectRefs),
+  ].filter(Boolean);
+  const media = await getSheetMediaUrls(ids);
+  return { referenced: new Set(ids).size, kept: Object.keys(media).length };
+}
+
+/**
+ * Bring back the pictures of sheets whose bytes were never kept.
+ *
+ * The repo believed for two days that these were gone: Flow's signed URL dies
+ * within hours, so a sheet drawn before the ingest went live (2026-09-17
+ * 11:33 UTC) had no picture anyone could show. The URL dies; the ASSET does
+ * not — `GET api.useapi.net/v1/google-flow/assets/{mediaGenerationId}` mints a
+ * fresh one at any time. `db/port/sheet-backfill/README.md` has the account of
+ * how that was found, and the n8n workflow this fires is what uses it.
+ *
+ * The COUNT is taken here rather than read out of n8n's answer, and that is
+ * deliberate: the database is the thing the page renders from, so counting it
+ * before and after cannot disagree with what the producer then sees. n8n's
+ * body is advisory.
+ *
+ * Idempotent by construction — the worker's query only selects sheets with no
+ * `sheet_media` row — so pressing it twice is free, and pressing it on a show
+ * that has everything answers honestly instead of pretending to work.
+ */
+export async function bringBackFaces(seriesId: string): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was fetched." };
+  }
+  try {
+    const before = await countFaces(seriesId);
+    if (before.referenced === before.kept) {
+      return {
+        ok: true,
+        message: "Every sheet this show references already has its picture.",
+      };
+    }
+    const sent = await fireSheetBackfillWebhook(seriesId);
+    if (sent === "off") {
+      return {
+        ok: false,
+        message:
+          "No sheet-backfill webhook is configured here, so there is nothing to ask — check N8N_NEW_PROJECT_WEBHOOK_URL.",
+      };
+    }
+    const after = await countFaces(seriesId);
+    revalidatePath(`/series/${seriesId}`);
+    const brought = after.kept - before.kept;
+    const left = after.referenced - after.kept;
+    if (brought <= 0) {
+      return {
+        ok: false,
+        message:
+          "Flow did not hand those back. The sheets are still attached to every episode, so the films are unaffected — try again later, and see db/port/sheet-backfill if it keeps failing.",
+      };
+    }
+    return {
+      ok: true,
+      message:
+        left > 0
+          ? `${brought} picture${brought === 1 ? "" : "s"} came back. ${left} did not — Flow no longer answers for ${left === 1 ? "that one" : "those"}.`
+          : `${brought} picture${brought === 1 ? "" : "s"} came back.`,
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
 export async function saveSeriesNotes(
   seriesId: string,
   patch: { name?: string; premise?: string; previously?: string; channelName?: string },
@@ -2999,17 +3228,126 @@ async function onEpisodeScriptApproved(projectId: string): Promise<void> {
     revalidatePath(`/series/${series.id}`);
   }
 
+  await fireSeriesRecapWebhook(projectId);
+}
+
+/**
+ * Ask the pipeline to write one episode's recap line.
+ *
+ * `false` means no webhook is configured — which the caller must be able to
+ * tell apart from "asked and it failed", because one is a misconfiguration
+ * and the other is a bad afternoon at OpenAI.
+ *
+ * The webhook answers `onReceived`, the moment n8n starts the run. So a
+ * `true` here means the request was ACCEPTED, never that a line was written;
+ * anything that needs the line has to watch the row.
+ */
+async function fireSeriesRecapWebhook(projectId: string): Promise<boolean> {
   try {
     const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
-    const webhook = newProject?.replace(/new-project\/?$/, "series-recap");
-    if (!webhook?.includes("series-recap")) return;
+    const webhook =
+      process.env.N8N_SERIES_RECAP_WEBHOOK_URL ??
+      newProject?.replace(/new-project\/?$/, "series-recap");
+    if (!webhook?.includes("series-recap")) return false;
     await fetch(webhook, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ project_id: projectId }),
       signal: AbortSignal.timeout(8000),
     });
+    return true;
   } catch (e) {
     console.warn(`series-recap webhook: ${(e as Error).message}`);
+    return false;
+  }
+}
+
+/** A line the pipeline wrote, as opposed to a note the producer typed. */
+const RECAP_LINE = /^Episode\s+\d+\s+—/;
+const countRecapLines = (text: string): number =>
+  text.split("\n").filter((l) => RECAP_LINE.test(l.trim())).length;
+
+/**
+ * Write "what has happened so far" from the episodes, instead of by hand.
+ *
+ * The pipeline has written this line itself since 2026-09-16 — but only
+ * forward, at the moment an episode's script is approved. A show started
+ * from a film whose script was approved BEFORE the show existed therefore
+ * has an empty recap and no way to fill it except typing, which is exactly
+ * what the producer asked not to do. Episode 1 is that film in every show,
+ * so this is not an edge case; it is every show's first line.
+ *
+ * Safe to press repeatedly. `Append Recap` in the n8n chain replaces the
+ * line for an episode NUMBER rather than appending a second one, so a
+ * re-run rewrites in place — and a note the producer typed that is not in
+ * `Episode N — …` shape is left alone, because the replace is keyed on
+ * that shape.
+ *
+ * It WATCHES the row rather than trusting the answer: the webhook responds
+ * `onReceived`, so "ok" arrives long before the model has written anything.
+ */
+export async function writeRecapFromEpisodes(
+  seriesId: string,
+): Promise<ActionResult & { previously?: string }> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  try {
+    const episodes = await getSeriesEpisodes(seriesId);
+    if (episodes.length === 0) {
+      return { ok: false, message: "This show has no episodes yet, so there is nothing to recap." };
+    }
+    const before = (await getSeries(seriesId))?.previously ?? "";
+
+    let fired = 0;
+    for (const ep of episodes) {
+      if (await fireSeriesRecapWebhook(ep.id)) fired += 1;
+    }
+    if (fired === 0) {
+      return {
+        ok: false,
+        message:
+          "No series-recap webhook is configured here, so there is nothing to ask — check N8N_NEW_PROJECT_WEBHOOK_URL.",
+      };
+    }
+
+    /*
+     * One model call measured 2.4s on a throwaway, so a show of two or three
+     * episodes is done inside two polls. The clock, not a count, decides when
+     * to stop: an episode whose script was never approved produces NO line at
+     * all (the chain's own prompt node returns nothing), so waiting for one
+     * line per episode would hang on exactly the shows this is for.
+     */
+    let text = before;
+    for (let i = 0; i < 15; i++) {
+      await new Promise((r) => setTimeout(r, 2000));
+      text = (await getSeries(seriesId))?.previously ?? text;
+      if (countRecapLines(text) >= episodes.length) break;
+    }
+    revalidatePath(`/series/${seriesId}`);
+
+    if (text === before) {
+      return {
+        ok: false,
+        message:
+          "Nothing has come back yet. The writing runs in n8n and can outlast this wait — give it a minute and reload. If it stays empty, the episode probably has no approved script.",
+        previously: text,
+      };
+    }
+    const lines = countRecapLines(text);
+    const silent = episodes.length - lines;
+    const head = before.trim()
+      ? `Rewritten from ${episodes.length} episode${episodes.length === 1 ? "" : "s"}.`
+      : `Written from ${episodes.length} episode${episodes.length === 1 ? "" : "s"}.`;
+    return {
+      ok: true,
+      message:
+        silent > 0
+          ? `${head} ${silent} ${silent === 1 ? "has" : "have"} no approved script yet, so ${silent === 1 ? "it has" : "they have"} no line.`
+          : head,
+      previously: text,
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
   }
 }

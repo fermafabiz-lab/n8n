@@ -1,0 +1,1 @@
+={{ (() => { try { return Boolean($('Pool Tick').first().json.pool); } catch (e) { return false; } })() }}

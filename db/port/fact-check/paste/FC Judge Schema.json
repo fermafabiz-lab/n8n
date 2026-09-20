@@ -1,0 +1,19 @@
+{
+  "mode": "factual",
+  "findings": [
+    {
+      "quote": "In October 2004, Google acquired Where 2 Technologies and brought the project onto its engineering floor.",
+      "claim": "Google acquired Where 2 Technologies in October 2004.",
+      "verdict": "supported",
+      "ref": "E9",
+      "reason": "E9 states the acquisition and the month."
+    },
+    {
+      "quote": "Lars and Jens led the team into launch.",
+      "claim": "Lars and Jens Rasmussen led the Google Maps team through to launch.",
+      "verdict": "unsupported",
+      "ref": "",
+      "reason": "No claim describes who led the team; the pack covers the acquisition, not the reporting lines."
+    }
+  ]
+}

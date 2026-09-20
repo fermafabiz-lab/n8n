@@ -21,6 +21,7 @@ import { parseEditingOptionsShape } from "@/lib/editingOptionsShape";
 import {
   normalizeConfidence,
   normalizeVisualOrigin,
+  normalizeWatermarkScale,
   type VisualProvenance,
 } from "@/lib/provenance";
 
@@ -191,6 +192,34 @@ export interface EditingOptions {
    * obligation. See docs/source-watermark-license-separation.md.
    */
   sourceWatermark: boolean;
+  /**
+   * Open the provenance pill only the FIRST time each kind of source appears;
+   * every later band of that kind stays the small glyph.
+   *
+   * Strictly opt-in (`=== true`), so a film made before this existed, or one
+   * whose producer never touched the switch, keeps announcing each band in
+   * full. It is a quietening, and quietening a truthfulness overlay is a
+   * choice somebody has to make on purpose.
+   *
+   * It governs the LABEL only, like `sourceWatermark` above it: a credit a
+   * licence requires is drawn under a collapsed chip exactly as under an open
+   * pill. The "Source: …" courtesy line is part of the label and collapses
+   * with it — a long line under a small chip reads as a broken pill.
+   */
+  watermarkOpenOnce: boolean;
+  /**
+   * How big the badge is drawn, as a multiplier of its base size — the
+   * producer's answer to "quiet" being a judgement about a particular film on
+   * a particular screen rather than a constant.
+   *
+   * 1 is what every film rendered before this existed was drawn at, and what
+   * an absent or out-of-range value resolves to: `normalizeWatermarkScale`
+   * REFUSES rather than clamps, so a stored 4 is the default and not the
+   * maximum. The rule has three copies (lib/provenance.ts here,
+   * remotion/src/provenance.ts, Final Assembly's `Source Watermark` node) and
+   * they move together, or a film is drawn at a size the slider never offered.
+   */
+  watermarkScale: number;
   /**
    * Hands-off mode: the site signs off every gate by itself as the assets
    * land — script, scene texts, takes, images, clips — and presses the final
@@ -392,6 +421,32 @@ export function normalizeMusicLevel(value: unknown): number {
 }
 
 /**
+ * How many Google Flow accounts one film may spread its work across.
+ *
+ * Three are linked. The same list lives in `Assign Accounts` (Media
+ * Generation) as `ACCOUNTS` — change one, change both, and the order matters
+ * because a film's scenes are cut into consecutive blocks in that order.
+ *
+ * The number is a CEILING, never a promise. `Assign Accounts` lowers it by
+ * itself when the film's reference sheets have not been replicated onto every
+ * account, because a clip built from a sheet its own account does not own
+ * comes back `Email mismatch` from useapi. So asking for 3 on a film whose
+ * sheets are from an older pass quietly produces 1, and says so in the log.
+ *
+ * Refuse-then-clamp like every other Editing Options field: anything that is
+ * not an integer in range means ONE account, which is exactly how every film
+ * behaved before the accounts existed.
+ */
+export const FLOW_ACCOUNTS_MAX = 3;
+
+export function normalizeFlowAccounts(value: unknown): number {
+  const n = Number(value);
+  if (!Number.isInteger(n)) return 1;
+  if (n < 1 || n > FLOW_ACCOUNTS_MAX) return 1;
+  return n;
+}
+
+/**
  * A drawn card the pipeline chose for this film — a route chart, a departure
  * board — as stored on the project by Claude Scripting.
  *
@@ -444,7 +499,15 @@ export interface Project {
   progress: number; // 0..1
   finalVideoUrl: string | null;
   aspect: "16:9" | "9:16";
+  /**
+   * MISNAMED AND KEPT THAT WAY: this is the project's CREATION time, not its
+   * last write — `buildProject` has always set it from `createdAt`. Renaming it
+   * would touch every consumer for no behaviour change, so `createdAt` below
+   * is the honest one to read; this stays for the code that already uses it.
+   */
   updatedAt: string | null;
+  /** When the film was created. Deep Search uses it to spare older films. */
+  createdAt: string | null;
   /** First scene's generated image — the dashboard card cover. */
   coverUrl?: string | null;
   /** Overlay options, editable right up to final assembly. */
@@ -591,6 +654,127 @@ export interface ScriptInfo {
   id: string;
   content: string;
   status: string;
+}
+
+/**
+ * One statement Deep Search pulled out of the narration, and what became of
+ * it. Written by `FC Apply` in Claude Scripting; the full shape is documented
+ * in db/012_fact_check.sql.
+ *
+ * NAMING: the feature is called **Deep Search** (the producer named it on
+ * 2026-09-18). The n8n nodes are still prefixed `FC *` and the table is still
+ * `hov.fact_check` — renaming thirteen live nodes would mean rewriting every
+ * `$('FC …')` reference between them, and renaming a live table buys nothing.
+ * The mapping is: FC = Deep Search.
+ */
+export interface DeepSearchFinding {
+  /** The sentence as it stood in the draft, copied verbatim. */
+  quote: string;
+  /** The assertion inside it, isolated. */
+  claim?: string;
+  /**
+   * `redundant` (2026-09-19) means the sources DO back it — the fault is that
+   * the narration had already said it. It is deliberately not a sourcing
+   * verdict, so it must never be reported to the producer as "unsupported".
+   */
+  verdict: "supported" | "unsupported" | "contradicted" | "redundant";
+  /** The pack claim that settles it (E1, E12…), when one does. */
+  ref?: string;
+  reason?: string;
+  source?: string;
+  /** A primary source found for this statement specifically, if any. */
+  url?: string;
+  /** `kept` held up; `rewritten` was corrected; `flagged` still stands. */
+  /**
+   * What became of the sentence. `cut` was added 2026-09-19: the sources back
+   * the statement, but the narration had already made it, so the sentence was
+   * deleted rather than reworded. It is a RESOLVED action like `kept` and
+   * `rewritten`, not a problem still standing.
+   */
+  action?: "kept" | "rewritten" | "cut" | "flagged" | string;
+}
+
+/**
+ * EVERY FIELD IS OPTIONAL, on purpose. This row is written by a workflow that
+ * will keep changing, and a report saved by last month's version has to render
+ * in today's panel — a reader that insists on a shape is how an old row
+ * becomes a crash on a page the producer needs.
+ */
+export interface DeepSearchReport {
+  /** Checkable statements the judge extracted. */
+  checked?: number;
+  /**
+   * How many SENTENCES those statements came from. Since 2026-09-19 the judge
+   * rules on one assertion at a time, so a compound sentence yields several
+   * findings that all carry the same `quote` — `checked` counts assertions and
+   * this counts sentences, and the gap between them is the point. Absent on
+   * every report written before that day, which is why the panel falls back to
+   * counting distinct quotes itself.
+   */
+  sentences?: number;
+  /**
+   * Written by the RE-RUN rather than by the scripting pass. The two differ in
+   * what they could see: the first pass reads the narration before
+   * `Generate Hook` exists and before the rewrite has run, the re-run reads
+   * `hov.script.content`, which is the finished text with both. `scope:
+   * "final"` says so; absent means the ordinary first pass.
+   */
+  rerun?: boolean;
+  scope?: "final" | string;
+  /** How many of them the sources did not back. */
+  flagged?: number;
+  /** How many got a targeted primary-source lookup. */
+  searched?: number;
+  /** Sentences the rewrite actually changed. */
+  rewritten?: number;
+  /**
+   * Sentences DELETED because the narration already carried the fact. Counted
+   * apart from `rewritten` because it is different news: a correction has to
+   * be reread, a deletion does not.
+   */
+  deduped?: number;
+  /** Present only when the check did not run; says why, in prose. */
+  skipped?: string;
+  /**
+   * WHY it did not run, as a stable code rather than a sentence — this is what
+   * the status light reads. `not-documentary` and `story` are normal; every
+   * other value means a film that asked for Deep Search did not get it. See
+   * `lib/deep-search.ts`, which is the only thing allowed to interpret it.
+   */
+  skipCode?:
+    | "not-documentary"
+    | "story"
+    | "no-mode"
+    | "not-researched"
+    | "no-pack"
+    | "no-chapters"
+    | "unknown"
+    | string;
+  /** The mode the film was made in. Deep Search only runs on `documentary`. */
+  category?: string;
+  /** The narration is a story, so there was nothing to check it against. */
+  storyMode?: boolean;
+  /** Too much was unsupported to correct: reported, deliberately not rewritten. */
+  overwhelmed?: boolean;
+  /**
+   * The re-run CHECKED and refused to edit, because the film is past its
+   * script gate: the scenes carry their own copy of every line and their own
+   * recordings, so changing the script under them is the "a line and its
+   * recording drift apart silently" fault. Only a re-run can set this — the
+   * first pass runs before any scene exists.
+   */
+  frozen?: boolean;
+  /**
+   * The corrected hook was written to `Editing Options.hookPlan.beats` as well
+   * as to the script text. The hook lives twice and the beats are the copy the
+   * RENDER speaks, so a report that corrected the hook without this would mean
+   * the film still says the old line.
+   */
+  hookFixed?: boolean;
+  /** The rewrite was produced and refused; this says what was wrong with it. */
+  refused?: string;
+  findings?: DeepSearchFinding[];
+  checkedAt?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -1040,6 +1224,7 @@ export function buildProject(r: RawProject): Project {
     finalVideoUrl: r.finalVideoUrl,
     aspect: r.aspectRaw === "9:16" ? "9:16" : "16:9",
     updatedAt: r.createdAt,
+    createdAt: r.createdAt,
     coverUrl: r.coverUrl ?? null,
     seriesId: r.seriesId ?? null,
     episodeNo: Number.isInteger(r.episodeNo) && (r.episodeNo as number) > 0 ? (r.episodeNo as number) : null,
@@ -1087,6 +1272,10 @@ export function buildProject(r: RawProject): Project {
       // is what makes every existing film gain the label rather than quietly
       // shipping unlabelled. `sourceWatermark: false` is the only stored form.
       sourceWatermark: opts.sourceWatermark !== false,
+      // Strictly `=== true`: see the field's note. Absence must not quieten a
+      // film's provenance labels by itself.
+      watermarkOpenOnce: opts.watermarkOpenOnce === true,
+      watermarkScale: normalizeWatermarkScale(opts.watermarkScale),
       // Strictly opt-in, `=== true`: hands-off is a real trade (nothing gets
       // a human look) and must never switch itself on by absence.
       autoApprove: opts.autoApprove === true,

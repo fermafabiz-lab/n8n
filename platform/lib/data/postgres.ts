@@ -23,6 +23,7 @@ import {
   type RawScene,
   type Scene,
   type ScriptInfo,
+  type DeepSearchReport,
   type GenreProfile,
   type LibraryScript,
   type ScriptExample,
@@ -517,6 +518,65 @@ export async function getProjectEvidence(projectId: string): Promise<EvidenceRow
        from hov.evidence where project_id = $1 order by ref`,
     [projectId],
   );
+}
+
+/**
+ * The Deep Search report Claude Scripting wrote for this film, or null.
+ *
+ * `report` is stored as jsonb and read straight through: its shape is
+ * documented in db/012_fact_check.sql and written by `FC Apply`, and the panel
+ * tolerates any subset of it. Deliberately NOT modelled field by field here —
+ * a report written by an older version of the workflow must still render, and
+ * a reader that insists on a shape is how an old row becomes a crash.
+ *
+ * Guarded by `tableReady`, like the stock tables: this reads on every project
+ * page, and before db/012 is applied an unguarded query would abort and take
+ * the page with it.
+ */
+export async function getDeepSearch(projectId: string): Promise<DeepSearchReport | null> {
+  if (!(await tableReady("hov.fact_check"))) return null;
+  const rows = await query<{ report: unknown; checked_at: string | null }>(
+    `select report, checked_at from hov.fact_check where project_id = $1`,
+    [projectId],
+  );
+  const r = rows[0];
+  if (!r || !r.report || typeof r.report !== "object") return null;
+  return { ...(r.report as DeepSearchReport), checkedAt: r.checked_at ?? null };
+}
+
+/**
+ * Deep Search across the recent documentaries, for the Settings card.
+ *
+ * The question it answers is only ever "did a film that asked for Deep Search
+ * get it" — so it looks at DOCUMENTARIES THAT REACHED A SCRIPT, which is the
+ * exact moment a report is due. `FC Save Report` runs before `Combine
+ * Chapters`, which runs before the script row is written, so a documentary
+ * with a script and no report is a fault and not a race.
+ *
+ * `report` comes back whole; `lib/deep-search.ts` decides what it means. This
+ * function is not allowed an opinion, because the same opinion is drawn on the
+ * film's own page and the two must not disagree.
+ */
+export async function getDeepSearchHealth(limit = 12): Promise<DeepSearchFilm[]> {
+  if (!(await tableReady("hov.fact_check"))) return [];
+  return query<DeepSearchFilm>(
+    `select p.id, p.name, p.created_at as "createdAt", f.report, f.checked_at as "checkedAt"
+       from hov.project p
+       left join hov.fact_check f on f.project_id = p.id
+      where p.editing_options->>'category' = 'documentary'
+        and exists (select 1 from hov.script s where s.project_id = p.id)
+      order by p.created_at desc
+      limit $1`,
+    [limit],
+  );
+}
+
+export interface DeepSearchFilm {
+  id: string;
+  name: string;
+  createdAt: string;
+  report: DeepSearchReport | null;
+  checkedAt: string | null;
 }
 
 export async function findRecentProjectByName(

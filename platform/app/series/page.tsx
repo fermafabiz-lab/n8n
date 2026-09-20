@@ -23,18 +23,28 @@ export default async function SeriesIndex({
 
   return (
     <main className="page">
-      <div className="pj-shell">
-        <div className="eyebrow" style={{ marginBottom: 8 }}>
-          <span>Series</span>
+      {/* The header card, same as /series/[id] and the workspace — see the
+          comment there for what wrapping a whole page in `.pj-shell` did. */}
+      <div className="room">
+        <div className="wk-shell">
+          <div className="arc wk-arc" aria-hidden />
+          <div className="wk-head">
+            <div className="wk-id">
+              <div className="eyebrow" style={{ marginBottom: 16 }}>
+                <span>Series</span>
+              </div>
+              <h1 style={{ margin: 0 }}>The shows.</h1>
+              <p className={s.hint} style={{ maxWidth: 640, margin: "12px 0 0" }}>
+                A show keeps its characters, its places, its look and its voice from one film to the
+                next. Start one from a film you like; every episode after that begins with the same
+                cast.
+              </p>
+            </div>
+          </div>
         </div>
-        <h1 style={{ marginTop: 0 }}>The shows.</h1>
-        <p className={s.hint} style={{ maxWidth: 640, marginBottom: 28 }}>
-          A show keeps its characters, its places, its look and its voice from one film to the next.
-          Start one from a film you like; every episode after that begins with the same cast.
-        </p>
 
         {list.length > 0 && (
-          <div className={s.seriesgrid} style={{ marginBottom: 40 }}>
+          <div className={s.seriesgrid} style={{ marginTop: 40, marginBottom: 40 }}>
             {list.map((x) => {
               const cast = x.bible.characters.slice(0, 5);
               return (
@@ -67,7 +77,7 @@ export default async function SeriesIndex({
           </div>
         )}
 
-        <section className="fsec" style={{ marginTop: list.length ? 0 : 20 }}>
+        <section className="fsec" style={{ marginTop: list.length ? 0 : 44 }}>
           <header>
             <h2>Start a series</h2>
           </header>

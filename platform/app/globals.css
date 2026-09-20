@@ -3128,6 +3128,34 @@ body:has(.nb) .nav {
   letter-spacing: -0.02em;
   line-height: 1.15;
 }
+/* The one alarm on the Settings hub: Deep Search did not run on a film that
+   asked for it. `--red` is already a token and carries both themes, so this
+   needs no literal. It pulses so it reads as a live state rather than
+   decoration — and the pulse is dropped for anyone who asked for less motion. */
+.sdot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 9px;
+  vertical-align: 0.14em;
+  border-radius: 999px;
+  background: var(--red);
+  animation: sdot-pulse 2s ease-in-out infinite;
+}
+@keyframes sdot-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sdot {
+    animation: none;
+  }
+}
 /* --soft, not --dim: the note sits on the cushioned gradient, which ends
    darker than --card2, the only ground --faint is guaranteed on. */
 .snote {
@@ -5824,51 +5852,9 @@ body:has(.mkt) .vignette {
   box-shadow: var(--shadow-sm);
 }
 
-/* Toasts: the ding's words, bottom-right, gone in ~8s. The near-black panel
-   ground on purpose — these appear over any step's content, and the one
-   surface guaranteed to contrast with all of them is the same panel the
-   gates use. The entrance sets its resting state in the base rule (opacity
-   1), so reduced-motion users get the toast without the slide, never a
-   permanently invisible one — the * rule strips animations globally. */
-.toaststack {
-  position: fixed;
-  right: 18px;
-  bottom: 18px;
-  /* Above cinema mode (z 110): a "S7 finished" landing mid-screening is
-     still worth seeing over the dark. */
-  z-index: 120;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-width: min(360px, calc(100vw - 36px));
-}
-.toast {
-  background: var(--panel);
-  color: var(--panel-body);
-  border-radius: var(--r-md);
-  box-shadow: var(--shadow-lg);
-  padding: 12px 16px;
-  font-size: 12.5px;
-  line-height: 1.45;
-  opacity: 1;
-  animation: toastin 0.38s var(--ease);
-}
-.toast b {
-  display: block;
-  color: var(--panel-ink);
-  font-size: 13px;
-  margin-bottom: 2px;
-}
-@keyframes toastin {
-  from {
-    transform: translateY(10px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
+/* The toast stack lives in StageChime.module.css now — it moved there when
+   the toast became clickable, which is the moment the convention says to
+   move a block: while you are editing it anyway. */
 
 /* The hands-off banner: one quiet strip, always visible while the mode is on,
    because an automation that approves things unseen must never be invisible

@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getProject, getProjectScriptInfo, getScenes, type Scene } from "@/lib/data";
+import { getDeepSearch, getProject, getProjectScriptInfo, getScenes, type Scene } from "@/lib/data";
 import { getCategory } from "@/lib/categories";
 import { toneType } from "@/lib/tone-type";
 import SceneBoard from "@/components/SceneBoard";
 import ScriptReview from "@/components/ScriptReview";
+import DeepSearchPanel from "@/components/DeepSearchPanel";
 import SceneReview from "@/components/SceneReview";
 import AudioReview from "@/components/AudioReview";
 import FinalSettings from "@/components/FinalSettings";
@@ -28,6 +29,7 @@ import ProductionActivity from "@/components/ProductionActivity";
 import RoughCutButton from "@/components/RoughCutButton";
 import FilmCost from "@/components/FilmCost";
 import { StepCard, StageNavProvider } from "@/components/StageNav";
+import { GATE_STEP, projectHref, STAGE_KEYS, type StageKey } from "@/lib/deep-link";
 import {
   executionUrl,
   getAliveProduction,
@@ -152,23 +154,20 @@ function pipeline(
   ];
 }
 
-const STAGE_KEYS = [
-  "script",
-  "scenes",
-  "audio",
-  "images",
-  "video",
-  "final",
-  "assembly",
-] as const;
-type StageKey = (typeof STAGE_KEYS)[number];
+// STAGE_KEYS / StageKey now live in lib/deep-link.ts, next to the gate→step
+// map that has to name the same seven. They were declared here and the map
+// was written there, which is one vocabulary in two files — the shape that
+// drifts.
 
 export default async function ProductionRoom({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ stage?: string }>;
+  /** `scene` is read in the browser by whichever panel serves the step —
+   *  see `lib/deep-link.ts`. It is declared here so Next does not treat it
+   *  as an unexpected param. */
+  searchParams: Promise<{ stage?: string; scene?: string }>;
 }) {
   const { id } = await params;
   // Revisiting an earlier step. Without it the page shows only whatever the
@@ -331,6 +330,15 @@ export default async function ProductionRoom({
       ? scriptInfo
       : null;
 
+  // What Deep Search made of this narration. Fetched only when the panel it
+  // sits above will actually be drawn — it is one indexed read, but every
+  // avoidable query on this page is one the producer waits for on every click.
+  //
+  // A null answer is NOT the same as "fine": on a documentary that already has
+  // a script, no report means the chain did not run, and the panel says so in
+  // red. `lib/deep-search.ts` is what decides that, not this page.
+  const deepSearch = script ? await getDeepSearch(id).catch(() => null) : null;
+
   // What production is doing right now — drives Pause/Resume and the
   // activity panel. null = the n8n API didn't answer (distinct from "nothing
   // is running", which the panel is allowed to act on).
@@ -417,15 +425,20 @@ export default async function ProductionRoom({
           ProductionActivity states out loud, because the batch reports no
           per-scene progress. Takes are watched too; they never dinged before,
           which was simply a gap. */}
+      {/* `href` is where the click lands. A gate goes to the step that is
+          waiting; a `have:` item goes to its step and StageChime appends the
+          scene that just landed, so "S10 finished" opens on S10 rather than
+          on whatever the batch happens to be working. */}
       <StageChime
         quietGates={project.editing.autoApprove}
         items={[
-          { key: id, stage, label: project.name },
+          { key: id, stage, label: project.name, href: projectHref(id, GATE_STEP[stage]) },
           {
             key: `${id}:scenes`,
             stage: `have:${scenes.map((s) => s.label).join("|")}`,
             label: "Scenes",
             verb: "written",
+            href: projectHref(id, "scenes"),
           },
           ...(silent
             ? []
@@ -437,6 +450,7 @@ export default async function ProductionRoom({
                   total: scenes.length,
                   next: scenes.find((s) => !s.voiceUrl)?.label ?? null,
                   verb: "recorded",
+                  href: projectHref(id, "audio"),
                 },
               ]),
           {
@@ -445,6 +459,7 @@ export default async function ProductionRoom({
             label: "Images",
             total: scenes.length,
             next: scenes.find((s) => !s.imageUrl)?.label ?? null,
+            href: projectHref(id, "images"),
           },
           {
             key: `${id}:clips`,
@@ -452,6 +467,7 @@ export default async function ProductionRoom({
             label: "Video",
             total: scenes.length,
             next: scenes.find((s) => !s.videoUrl)?.label ?? null,
+            href: projectHref(id, "video"),
           },
         ]}
       />
@@ -695,13 +711,27 @@ export default async function ProductionRoom({
         )}
 
         {showing("script", !!script) && script && (
-          <ScriptReview
-            projectId={id}
-            scriptId={script.id}
-            content={script.content}
-            regenerating={scriptRewriting}
-            locked={scriptLocked}
-          />
+          <>
+            {/* Above the box, never inside it: the report is about the text,
+                and a warning under the Approve button is a warning nobody
+                read. It has no buttons — the producer's call was to warn
+                loudly and never block. */}
+            <DeepSearchPanel
+              report={deepSearch}
+              isDocumentary={project.category === "documentary"}
+              scriptExists
+              createdAt={project.createdAt}
+              projectId={id}
+              scriptId={script.id}
+            />
+            <ScriptReview
+              projectId={id}
+              scriptId={script.id}
+              content={script.content}
+              regenerating={scriptRewriting}
+              locked={scriptLocked}
+            />
+          </>
         )}
 
         {showing("final", project.awaitingFinalSettings) && (
@@ -711,6 +741,7 @@ export default async function ProductionRoom({
               initial={project.editing}
               motifCards={project.motifCards}
               silent={silent}
+              category={project.category}
               /* Documentary only: every other category is wall-to-wall AI, so
                  the preview would step through one band reading AI GENERATED
                  and teach the producer nothing they cannot read in the row. */

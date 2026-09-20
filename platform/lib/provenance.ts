@@ -414,7 +414,16 @@ export interface WatermarkGeometry {
   label: { fontSize: number; padding: string };
   source: { fontSize: number };
   credit: { fontSize: number };
+  /**
+   * The mark itself — the chip that opens into the pill. `height` is the
+   * chip's side AND the pill's height, so the shape is square when closed and
+   * a capsule when open. Mirrored from remotion/src/provenance.ts.
+   */
+  mark: { height: number; glyph: number; gap: number; padX: number };
 }
+
+/** Just the mark's own numbers, so the arithmetic below can be handed them. */
+export type WatermarkMark = WatermarkGeometry["mark"];
 
 export const WATERMARK_LAYOUT: { landscape: WatermarkGeometry; portrait: WatermarkGeometry } = {
   landscape: {
@@ -426,6 +435,7 @@ export const WATERMARK_LAYOUT: { landscape: WatermarkGeometry; portrait: Waterma
     label: { fontSize: 16, padding: "5px 12px" },
     source: { fontSize: 13 },
     credit: { fontSize: 12 },
+    mark: { height: 30, glyph: 15, gap: 8, padX: 10 },
   },
   portrait: {
     frame: { width: 720, height: 1280 },
@@ -436,6 +446,7 @@ export const WATERMARK_LAYOUT: { landscape: WatermarkGeometry; portrait: Waterma
     label: { fontSize: 17, padding: "5px 11px" },
     source: { fontSize: 14 },
     credit: { fontSize: 13 },
+    mark: { height: 32, glyph: 16, gap: 8, padX: 10 },
   },
 };
 
@@ -444,6 +455,10 @@ export const WATERMARK_STYLE = {
   peakOpacity: 0.88,
   labelWeight: 600,
   labelLetterSpacing: "0.14em",
+  /** The same value as a number: the pill does arithmetic with it, because
+   *  letter-spacing is added after the LAST character too and that trailing
+   *  dead air is not ink. Mirrored from remotion/src/provenance.ts. */
+  labelLetterSpacingEm: 0.14,
   labelColor: "#FFFFFF",
   labelBackground: "rgba(0,0,0,0.42)",
   labelBorder: "1px solid rgba(255,255,255,0.16)",
@@ -458,7 +473,307 @@ export const WATERMARK_STYLE = {
   linePadding: "3px 9px",
   lineLineHeight: 1.25,
   textShadow: "0 2px 8px rgba(0,0,0,0.75)",
+  /** The chip's corner as a fraction of its side; the pill's is a capsule. */
+  chipRadiusRatio: 0.3,
+  markBorderWidth: 1,
+  markBorderColor: "rgba(255,255,255,0.55)",
+  /** How the chip opens, in seconds. Mirrored — the preview animates the same
+   *  way the film does, or it is showing a different overlay. */
+  openDelaySeconds: 0.18,
+  openSeconds: 0.42,
+  /** The fade at each END of a band. Mirrored from remotion's copy, where it
+   *  lived inline in SourceWatermark.tsx until this preview learned to
+   *  animate and needed the same number. */
+  fadeSeconds: 0.2,
 } as const;
+
+/**
+ * The badge's easing, as a function of 0..1.
+ *
+ * The render animates on `CURVES.inOutCubic` = `Easing.bezier(0.65, 0, 0.35, 1)`,
+ * and this preview cannot import Remotion — so the same curve is solved by
+ * hand here. Verified against Remotion's own over 101 samples: largest
+ * disagreement 3.9e-16, which is float noise. Mirrored character for
+ * character from remotion/src/provenance.ts, and pinned on both sides.
+ *
+ * Newton-Raphson first because it converges in a few steps on a well-behaved
+ * curve, then bisection to finish — the fallback matters at the flat ends,
+ * where the derivative approaches zero and Newton stops making progress.
+ */
+const solveBezier = (x1: number, y1: number, x2: number, y2: number) => {
+  const A = (a: number, b: number) => 1 - 3 * b + 3 * a;
+  const B = (a: number, b: number) => 3 * b - 6 * a;
+  const C = (a: number) => 3 * a;
+  const calc = (t: number, a: number, b: number) => ((A(a, b) * t + B(a, b)) * t + C(a)) * t;
+  const slope = (t: number, a: number, b: number) => 3 * A(a, b) * t * t + 2 * B(a, b) * t + C(a);
+  return (x: number): number => {
+    if (x <= 0) return 0;
+    if (x >= 1) return 1;
+    let t = x;
+    for (let i = 0; i < 8; i++) {
+      const sl = slope(t, x1, x2);
+      if (sl === 0) break;
+      t -= (calc(t, x1, x2) - x) / sl;
+    }
+    let lo = 0;
+    let hi = 1;
+    for (let i = 0; i < 24 && (t < 0 || t > 1); i++) t = (lo + hi) / 2;
+    for (let i = 0; i < 24; i++) {
+      const cx = calc(t, x1, x2);
+      if (Math.abs(cx - x) < 1e-7) break;
+      if (cx < x) lo = t;
+      else hi = t;
+      t = (lo + hi) / 2;
+    }
+    return calc(t, y1, y2);
+  };
+};
+
+export const WATERMARK_EASE = solveBezier(0.65, 0, 0.35, 1);
+
+/** A clamped, eased 0..1 ramp — the shape `eased()` produces in the render. */
+const ramp = (input: number, span: number): number =>
+  span <= 0 ? (input >= 0 ? 1 : 0) : WATERMARK_EASE(Math.min(1, Math.max(0, input / span)));
+
+/**
+ * How long the opening takes on a band of `bandLength` seconds.
+ *
+ * A band shorter than the animation would otherwise be caught mid-open at its
+ * own fade-out, so the opening is COMPRESSED to fit rather than truncated. On
+ * any real film this is simply `openSeconds` — the shortest band is one
+ * scene, and a scene is eight seconds.
+ */
+export const markOpenSpan = (bandLength: number): number =>
+  Math.min(
+    WATERMARK_STYLE.openSeconds,
+    Math.max(0.12, bandLength - WATERMARK_STYLE.openDelaySeconds - WATERMARK_STYLE.fadeSeconds),
+  );
+
+/**
+ * How open the mark is, 0 (chip) to 1 (pill), `t` seconds into its band.
+ *
+ * It opens once, just after the fade has brought it up, and STAYS open for the
+ * rest of the band. A band that does not `expand` never opens at all: that is
+ * what "announce each source once" looks like from the second band on.
+ */
+export const markOpenAt = (t: number, bandLength: number, expand: boolean): number =>
+  expand ? ramp(t - WATERMARK_STYLE.openDelaySeconds, markOpenSpan(bandLength)) : 0;
+
+/**
+ * How far the label has uncovered, 0..1, from how open the mark is.
+ *
+ * A sub-range of the opening rather than its own clock: the text appears while
+ * the capsule is still widening, clipped by it, so it reads as the mark
+ * OPENING rather than as a second element arriving on top.
+ */
+export const markRevealAt = (open: number): number =>
+  Math.min(1, Math.max(0, (open - 0.25) / (0.85 - 0.25)));
+
+/** The whole badge's opacity `t` seconds into a band. Symmetric in and out. */
+export const bandOpacityAt = (t: number, bandLength: number): number =>
+  Math.min(ramp(t, WATERMARK_STYLE.fadeSeconds), ramp(bandLength - t, WATERMARK_STYLE.fadeSeconds)) *
+  WATERMARK_STYLE.peakOpacity;
+
+/** How long one band's animation takes to settle — what a preview that plays
+ *  it ONCE has to wait before it can stop the clock. */
+export const markSettleSeconds = (bandLength: number): number =>
+  WATERMARK_STYLE.openDelaySeconds + markOpenSpan(bandLength) + 0.05;
+
+/**
+ * The dead air CSS letter-spacing leaves AFTER the last character.
+ *
+ * Spacing is added following every character, the final one included, so a
+ * laid-out label is one whole letter-space wider than its own ink. Size a
+ * capsule to that width with equal padding on both sides and the right comes
+ * out a letter-space wider than the left — 1.6px on a 30px pill, which is the
+ * 5% that reads as "the text is not centred".
+ *
+ * The film subtracts it from a measured advance; this preview cancels it with
+ * a negative right margin. One function so they cannot disagree about how
+ * much it is. Mirrored from remotion/src/provenance.ts.
+ */
+export const labelTrailingSpace = (fontSize: number): number =>
+  fontSize * WATERMARK_STYLE.labelLetterSpacingEm;
+
+/**
+ * The open capsule's width, in border-box pixels, from a MEASURED label.
+ *
+ * The border is INSIDE this number (`box-sizing: border-box`), so the two 1px
+ * edges are added explicitly; and the padding is `padX` on both sides, where
+ * it used to be `padX * 1.15` on the right — a fudge compensating for the
+ * trailing letter-space above, two wrongs that did not quite make a right.
+ *
+ * This preview draws the pill at its natural width and so does not call this;
+ * it is mirrored because the render's animation interpolates to exactly this
+ * number, and a preview that disagreed would be showing a different overlay.
+ */
+export const markPillWidth = (
+  mark: WatermarkMark,
+  fontSize: number,
+  labelAdvance: number,
+): number =>
+  2 * WATERMARK_STYLE.markBorderWidth +
+  mark.padX +
+  mark.glyph +
+  mark.gap +
+  Math.max(0, Math.ceil(labelAdvance - labelTrailingSpace(fontSize))) +
+  mark.padX;
+
+/**
+ * The closed chip's left padding — what centres the glyph in the square.
+ *
+ * The borders are inside the box, so they come off the space the glyph has to
+ * sit in. Forgetting them is how the chip ended up half a pixel left of
+ * centre: visible on nothing, wrong on everything.
+ */
+export const markChipPadX = (mark: WatermarkMark): number =>
+  (mark.height - 2 * WATERMARK_STYLE.markBorderWidth - mark.glyph) / 2;
+
+/**
+ * How much bigger or smaller the whole badge is drawn.
+ *
+ * The badge is deliberately the least decorative element in the render — a
+ * claim about truthfulness that draws attention to itself stops being read as
+ * one — but "quiet" is a judgement about a particular film on a particular
+ * screen, not a constant. A documentary watched on a phone needs it larger
+ * than a 16:9 essay does, and the producer is the one looking at it.
+ *
+ * The ends are chosen rather than arbitrary. Below 0.7 the 15px glyph falls
+ * under 11px and the artwork's thin strokes start dropping out at 1080p;
+ * above 1.6 the capsule for the longest label ("ILLUSTRATIVE FOOTAGE", 280px
+ * at 1x) passes 448px and begins to read as a banner rather than a mark.
+ * `step` is the slider's grid and nothing else enforces it — an arbitrary
+ * value inside the range is honoured, because refusing one would be refusing
+ * a film that was rendered before the grid existed.
+ *
+ * Mirrored from remotion/src/provenance.ts.
+ */
+export const WATERMARK_SCALE = {
+  min: 0.7,
+  max: 1.6,
+  step: 0.05,
+  default: 1,
+} as const;
+
+/**
+ * The stored size, or the default — refuse-then-clamp, like every other
+ * Editing Options number (`normalize*` in lib/data/derive.ts).
+ *
+ * REFUSES rather than clamps, exactly as `normalizeSpeed` does: a value
+ * outside the range falls back to 1 instead of being pulled to the nearest
+ * end. A stored 4 is not "as big as possible", it is a mistake, and a badge
+ * silently drawn at the maximum would be a worse answer than the default one.
+ *
+ * Three copies in three languages — here, remotion/src/provenance.ts and
+ * Final Assembly's `Source Watermark` node. They move together or a film is
+ * drawn at a size the control never offered.
+ */
+export const normalizeWatermarkScale = (value: unknown): number => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return WATERMARK_SCALE.default;
+  if (n < WATERMARK_SCALE.min || n > WATERMARK_SCALE.max) return WATERMARK_SCALE.default;
+  return n;
+};
+
+/**
+ * The badge's geometry at a given size.
+ *
+ * Everything that is part of the MARK scales — its height, its glyph, the two
+ * paddings, the three font sizes and the gap between the stacked lines. What
+ * does NOT scale is where the badge sits: `left`, `bottom` and `frame` are
+ * about the composition, not about the mark, and a badge that walked towards
+ * the corner as it grew would be two decisions wearing one control.
+ * `maxWidth` is left alone for the same reason.
+ *
+ * Rounded to whole pixels because half a pixel of border is a grey smear
+ * rather than a hairline, and because `markChipPadX` centres the glyph inside
+ * the border by halving what is left. The border itself stays 1px at every
+ * size, deliberately: a hairline is a hairline, and scaling it would make the
+ * largest badge look heavy-handed.
+ *
+ * Mirrored from remotion/src/provenance.ts.
+ */
+export const scaleWatermark = (g: WatermarkGeometry, scale: unknown): WatermarkGeometry => {
+  const k = normalizeWatermarkScale(scale);
+  if (k === WATERMARK_SCALE.default) return g;
+  const px = (n: number) => Math.max(1, Math.round(n * k));
+  return {
+    ...g,
+    gap: px(g.gap),
+    label: { ...g.label, fontSize: px(g.label.fontSize) },
+    source: { fontSize: px(g.source.fontSize) },
+    credit: { fontSize: px(g.credit.fontSize) },
+    mark: {
+      height: px(g.mark.height),
+      glyph: px(g.mark.glyph),
+      gap: px(g.mark.gap),
+      padX: px(g.mark.padX),
+    },
+  };
+};
+
+/** The fields of a canvas `TextMetrics` this needs, and nothing else. */
+export type LabelMetrics = {
+  width: number;
+  actualBoundingBoxAscent: number;
+  actualBoundingBoxDescent: number;
+  fontBoundingBoxAscent: number;
+  fontBoundingBoxDescent: number;
+};
+
+/**
+ * How far an all-caps label has to be nudged DOWN to sit on the pill's
+ * midline. Positive means the ink is riding high, which it always is.
+ *
+ * `align-items: center` centres the LINE BOX, and a line box is built around
+ * the font's own ascent and descent — room for accents above and descenders
+ * below that an all-caps label never uses. "ARCHIVAL FOOTAGE" runs from the
+ * baseline up to the cap height with nothing hanging beneath it, so a box
+ * centred on the font leaves the letters high: measured at 1.5px in a 30px
+ * pill, a twentieth of its height, and obvious once seen.
+ *
+ * How high depends entirely on the typeface — the film's kicker font is a
+ * Google font chosen per preset, this preview falls back to whatever
+ * monospace the producer has — so it is computed from the REAL ink box rather
+ * than from a cap-height ratio, which is also why the preview runs it against
+ * its OWN font rather than copying the film's number.
+ *
+ * Note what does NOT appear here: `labelLineHeight`. The line box's own
+ * half-leading is distributed evenly above and below, so it falls out of the
+ * subtraction — which is also why changing the line height moves nothing.
+ *
+ * Returns 0 — the behaviour this badge had before the correction existed —
+ * whenever the answer cannot be trusted: a `TextMetrics` without the
+ * actual-bounding-box fields, or a canvas that resolved a DIFFERENT face than
+ * the DOM laid the label out in. A canvas draws no letter-spacing, so its
+ * width must come out exactly one space per character narrower than the
+ * span's; anything else means the two are not measuring the same typeface,
+ * and an ink box from the wrong font would push the text the wrong way by a
+ * font's worth of error. Mirrored from remotion/src/provenance.ts.
+ */
+export const labelInkDrop = (
+  m: LabelMetrics,
+  label: string,
+  fontSize: number,
+  /** The label span's own laid-out width, letter-spacing and all. */
+  advance: number,
+): number => {
+  const all = [
+    m.width,
+    m.actualBoundingBoxAscent,
+    m.actualBoundingBoxDescent,
+    m.fontBoundingBoxAscent,
+    m.fontBoundingBoxDescent,
+  ];
+  if (!all.every((n) => typeof n === "number" && Number.isFinite(n))) return 0;
+  const bare = advance - label.length * labelTrailingSpace(fontSize);
+  if (bare <= 0 || Math.abs(m.width - bare) > Math.max(2, bare * 0.08)) return 0;
+  // Both centres measured from the baseline, downward positive.
+  return (
+    (m.fontBoundingBoxDescent - m.fontBoundingBoxAscent) / 2 -
+    (m.actualBoundingBoxDescent - m.actualBoundingBoxAscent) / 2
+  );
+};
 
 /**
  * The credit a licence obliges us to print, or null.
@@ -502,16 +817,27 @@ export function attributionFor(p: VisualProvenance | null | undefined): string |
 export interface WatermarkBand {
   startSeconds: number;
   endSeconds: number;
+  /** Which mark to draw, and what the "open once" rule keys on. */
+  origin: VisualOrigin;
   label: string;
   source: string | null;
   credit: string | null;
+  /**
+   * Whether the badge opens into the full pill or stays the small chip.
+   * Always true unless `openOncePerOrigin` was asked for, in which case only
+   * the FIRST band of each origin opens.
+   */
+  expand: boolean;
 }
 
 export function planWatermarkBands(
   scenes: readonly { startSeconds: number; durationSeconds: number; provenance?: VisualProvenance | null }[],
-  opts: { showLabel: boolean },
+  opts: { showLabel: boolean; openOncePerOrigin?: boolean },
 ): WatermarkBand[] {
   const bands: WatermarkBand[] = [];
+  // Which origins have already had their say. Filled as the film runs, so
+  // order of first appearance is what decides.
+  const opened = new Set<VisualOrigin>();
   for (const s of scenes) {
     const p = s.provenance;
     if (!p) continue;
@@ -520,17 +846,23 @@ export function planWatermarkBands(
     // With the label switched off only the licence obligation remains, so a
     // scene that owes nothing draws nothing at all.
     if (!opts.showLabel && !credit) continue;
+    const origin: VisualOrigin = p.visualOrigin ?? "unknown";
     const band: WatermarkBand = {
       startSeconds: s.startSeconds,
       endSeconds: s.startSeconds + s.durationSeconds,
+      origin,
       label: opts.showLabel ? label : "",
       source: opts.showLabel ? source : null,
       credit,
+      // Decided AFTER the merge check below, so a band that merges into its
+      // predecessor cannot consume an origin's one opening.
+      expand: true,
     };
     const prev = bands[bands.length - 1];
     if (
       prev &&
       Math.abs(prev.endSeconds - band.startSeconds) < 1e-6 &&
+      prev.origin === band.origin &&
       prev.label === band.label &&
       prev.source === band.source &&
       prev.credit === band.credit
@@ -538,6 +870,10 @@ export function planWatermarkBands(
       prev.endSeconds = band.endSeconds;
       continue;
     }
+    if (opts.openOncePerOrigin) {
+      band.expand = !opened.has(origin);
+    }
+    opened.add(origin);
     bands.push(band);
   }
   return bands;

@@ -174,14 +174,21 @@ function trackBytes(page: Page) {
     let frames = 0;
     let poster = 0;
     let code = 0;
+    let media = 0;
     for (const [p, n] of seen) {
       // The poster lives in the frame directory now, so it has to be taken
       // out before the frames are counted, not after.
       if (p === POSTER_PATH) poster += n;
       else if (p.startsWith("/frames/")) frames += n;
+      // The example films are NOT part of the hero's budget: they are streamed
+      // on demand, only once one is on screen, and a single one of them is
+      // larger than everything else here put together. Counted and printed,
+      // never added in — a budget that silently absorbs video stops meaning
+      // anything.
+      else if (p.startsWith("/media/")) media += n;
       else code += n;
     }
-    return { frames, poster, code, total: frames + poster + code, requests: seen.size };
+    return { frames, poster, code, media, total: frames + poster + code, requests: seen.size };
   };
 }
 
@@ -220,16 +227,21 @@ test.describe("desktop", () => {
     await scrollToFrame(page, lowUp, count);
     await expect(hero(page)).toHaveAttribute("data-frame", String(lowUp));
 
-    // Past the track the stage unpins and the test section takes the viewport.
+    // Past the track the stage unpins and the examples take over — they are
+    // what follows the hero now, with the empty test section below them.
     const range = await scrubRange(page);
-    await page.evaluate((y) => window.scrollTo(0, y + window.innerHeight), range);
-    await expect(page.getByTestId("after-hero")).toBeInViewport({ ratio: 0.95 });
+    await page.evaluate((y) => window.scrollTo(0, y + window.innerHeight * 0.5), range);
+    // The section is several viewports tall, so "how much of it is on screen"
+    // can never be much: its HEADING arriving is what says the stage unpinned
+    // and the examples have begun.
+    await expect(page.locator(".examples__heading")).toBeInViewport();
     await page.screenshot({ path: path.join(SHOTS, "after-hero.png") });
 
     const b = bytes();
     console.log(
       `transfer: frames ${(b.frames / 1024).toFixed(0)} kB, poster ${(b.poster / 1024).toFixed(0)} kB, ` +
-        `code ${(b.code / 1024).toFixed(0)} kB, total ${(b.total / 1024 / 1024).toFixed(2)} MB over ${b.requests} requests`,
+        `code ${(b.code / 1024).toFixed(0)} kB, total ${(b.total / 1024 / 1024).toFixed(2)} MB over ${b.requests} requests` +
+        ` (example films, outside the budget: ${(b.media / 1024).toFixed(0)} kB)`,
     );
     expect(b.total).toBeLessThan(BUDGET_BYTES);
   });
@@ -402,10 +414,11 @@ test.describe("desktop", () => {
     expect(await outro.evaluate((el) => getComputedStyle(el).transform)).toBe("none");
 
     // And it is the colour the section below is painted in, so the join has
-    // nothing to show.
+    // nothing to show. "Below" means the examples now, which is the section
+    // the film actually hands off to.
     const outroColour = await outro.evaluate((el) => getComputedStyle(el).backgroundColor);
     const sectionColour = await page
-      .getByTestId("after-hero")
+      .getByTestId("examples")
       .evaluate((el) => getComputedStyle(el).backgroundColor);
     expect(sectionColour).toBe(outroColour);
 
@@ -482,6 +495,209 @@ test.describe("desktop", () => {
         }),
     );
     expect(observed.filter((f) => f !== "0")).toEqual([]);
+  });
+});
+
+test.describe("examples", () => {
+  test.use({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
+
+  // Every request for a clip, with the path exactly as it went over the wire —
+  // which is where a mis-encoded space would show up.
+  //
+  // Matched at the root of the path, not anywhere in the URL: Next serves its
+  // own fonts from /_next/static/media/, and a looser test counted those as
+  // films and called a clean page load a download of three.
+  const isClip = (url: string) => new URL(url).pathname.startsWith("/media/");
+
+  function trackMedia(page: Page) {
+    const urls: string[] = [];
+    const statuses = new Map<string, number>();
+    page.on("request", (r) => {
+      if (isClip(r.url())) urls.push(new URL(r.url()).pathname);
+    });
+    page.on("response", async (res) => {
+      if (isClip(res.url())) statuses.set(new URL(res.url()).pathname, res.status());
+    });
+    return { urls, statuses };
+  }
+
+  const reel = (page: Page) => page.locator(".example__video");
+
+  // Playback state straight off the elements, in document order.
+  const playing = (page: Page) =>
+    page.locator(".example__video").evaluateAll((els) =>
+      els.map((el) => {
+        const v = el as HTMLVideoElement;
+        return { paused: v.paused, currentTime: v.currentTime, readyState: v.readyState };
+      }),
+    );
+
+  test("fetches nothing until a clip is on screen, then plays only that one", async ({ page }) => {
+    const media = trackMedia(page);
+    await page.goto("/");
+    await expect(hero(page)).toHaveAttribute("data-state", "ready", { timeout: 15_000 });
+    await page.waitForTimeout(1_000);
+
+    // The whole point of preload="none": three films, none of them touched
+    // while the visitor is still looking at the hero.
+    expect(media.urls, "no clip may be fetched at page open").toEqual([]);
+    for (const state of await playing(page)) expect(state.paused).toBe(true);
+
+    // Scroll the first clip into view: it starts, and the ones below do not.
+    await reel(page).first().scrollIntoViewIfNeeded();
+    await expect
+      .poll(async () => (await playing(page))[0].currentTime, { timeout: 10_000 })
+      .toBeGreaterThan(0);
+
+    const afterFirst = await playing(page);
+    expect(afterFirst[0].paused, "the clip in view plays").toBe(false);
+    expect(afterFirst[2].paused, "a clip far below stays paused").toBe(true);
+    // By NAME, not by count: one playing film is several requests, because it
+    // is streamed in ranges rather than fetched whole. Counting requests made
+    // one clip look like three.
+    expect([...new Set(media.urls)], "only the clip on screen has been fetched").toEqual([
+      "/media/kidsstory.mp4",
+    ]);
+    // And the ones below have not started loading at all.
+    expect(afterFirst[2].readyState).toBe(0);
+
+    // Scroll past it: it stops rather than playing on in the background.
+    await reel(page).last().scrollIntoViewIfNeeded();
+    await expect.poll(async () => (await playing(page))[0].paused, { timeout: 10_000 }).toBe(true);
+    await expect.poll(async () => (await playing(page))[2].paused, { timeout: 10_000 }).toBe(false);
+
+    await page.screenshot({ path: path.join(SHOTS, "examples-playing.png") });
+  });
+
+  test("asks for the file that is really on disk, spaces and all", async ({ page }) => {
+    const media = trackMedia(page);
+    await page.goto("/");
+    await expect(hero(page)).toHaveAttribute("data-state", "ready", { timeout: 15_000 });
+
+    for (const i of [0, 1, 2]) {
+      await reel(page).nth(i).scrollIntoViewIfNeeded();
+      await expect.poll(async () => (await playing(page))[i].readyState, { timeout: 10_000 }).toBeGreaterThan(0);
+    }
+
+    // "m8 .mp4" has a space before the extension. It has to leave as %20 —
+    // a raw space is a malformed request line, and a `+` or an encoded slash
+    // is a 404. This is the one trap these three names carry.
+    expect(media.urls).toContain("/media/m8%20.mp4");
+    expect(media.urls).toContain("/media/roman%20empire.mp4");
+    expect(media.urls).toContain("/media/kidsstory.mp4");
+    for (const [pathname, status] of media.statuses) {
+      expect(status, `${pathname} should be served, not missing`).toBeLessThan(400);
+    }
+  });
+
+  test("plays muted, looping, inline, without controls", async ({ page }) => {
+    await page.goto("/");
+    const attrs = await reel(page).evaluateAll((els) =>
+      els.map((el) => {
+        const v = el as HTMLVideoElement;
+        return {
+          preload: v.getAttribute("preload"),
+          muted: v.muted,
+          loop: v.loop,
+          playsInline: v.playsInline,
+          controls: v.controls,
+          autoplayAttr: v.hasAttribute("autoplay"),
+        };
+      }),
+    );
+
+    expect(attrs).toHaveLength(3);
+    for (const a of attrs) {
+      expect(a.preload).toBe("none");
+      expect(a.muted).toBe(true);
+      expect(a.loop).toBe(true);
+      expect(a.playsInline).toBe(true);
+      expect(a.controls).toBe(false);
+      // The attribute would mean "load and start as soon as you can", which
+      // is exactly what preload="none" is here to prevent. The observer does
+      // the starting instead.
+      expect(a.autoplayAttr, "autoplay must come from the observer, not the attribute").toBe(false);
+    }
+  });
+
+  test("captions read theme · duration · platform, and the file has the last word", async ({ page }) => {
+    await page.goto("/");
+    const captions = page.locator(".example__caption");
+    await expect(captions).toHaveCount(3);
+
+    // Before anything is loaded the line already reads the measured duration
+    // of the real film on the box — 1:39 for the first one.
+    await expect(captions.first()).toContainText("Poveste pentru copii");
+    await expect(captions.first()).toContainText("1:39");
+    await expect(captions.first()).toContainText("YouTube");
+
+    // Once the clip loads, its own metadata wins. Locally that is the 4s
+    // placeholder, which is precisely why this can be asserted: the number on
+    // screen follows the file rather than the constant.
+    await reel(page).first().scrollIntoViewIfNeeded();
+    await expect(captions.first()).toContainText("0:04", { timeout: 10_000 });
+
+    console.log(`caption after load: ${await captions.first().innerText()}`);
+    await page.screenshot({ path: path.join(SHOTS, "examples-caption.png") });
+  });
+
+  test("one column, near the full width, on a phone", async ({ browser }) => {
+    const context = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      deviceScaleFactor: 3,
+      isMobile: true,
+      hasTouch: true,
+    });
+    const page = await context.newPage();
+    await page.goto("/");
+
+    const boxes = await page.locator(".example__video").evaluateAll((els) =>
+      els.map((el) => {
+        const r = el.getBoundingClientRect();
+        return { x: Math.round(r.x), width: Math.round(r.width), top: Math.round(r.top + window.scrollY) };
+      }),
+    );
+
+    expect(boxes).toHaveLength(3);
+    // One column: same left edge, each one below the last.
+    for (const b of boxes) expect(b.x).toBe(boxes[0].x);
+    expect(boxes[1].top).toBeGreaterThan(boxes[0].top);
+    expect(boxes[2].top).toBeGreaterThan(boxes[1].top);
+    // Near the full width, with only the section's gutter beside it.
+    for (const b of boxes) expect(b.width).toBeGreaterThan(390 * 0.85);
+
+    await page.locator(".example__video").first().scrollIntoViewIfNeeded();
+    await page.screenshot({ path: path.join(SHOTS, "examples-mobile.png"), fullPage: false });
+    await context.close();
+  });
+
+  test("prefers-reduced-motion: nothing plays itself, and the controls come back", async ({ browser }) => {
+    const context = await browser.newContext({
+      viewport: { width: 1280, height: 800 },
+      reducedMotion: "reduce",
+    });
+    const page = await context.newPage();
+    const mediaRequests: string[] = [];
+    page.on("request", (r) => {
+      if (isClip(r.url())) mediaRequests.push(new URL(r.url()).pathname);
+    });
+    await page.goto("/");
+
+    await page.locator(".example__video").first().scrollIntoViewIfNeeded();
+    await page.waitForTimeout(1_500);
+
+    const states = await page.locator(".example__video").evaluateAll((els) =>
+      els.map((el) => ({ paused: (el as HTMLVideoElement).paused, controls: (el as HTMLVideoElement).controls })),
+    );
+    for (const s of states) {
+      expect(s.paused, "a reader who opted out of motion gets no moving picture").toBe(true);
+      // Without controls there would be no way left to watch the film at all.
+      expect(s.controls).toBe(true);
+    }
+    expect(mediaRequests, "and still nothing is downloaded on its own").toEqual([]);
+
+    await page.screenshot({ path: path.join(SHOTS, "examples-reduced-motion.png") });
+    await context.close();
   });
 });
 

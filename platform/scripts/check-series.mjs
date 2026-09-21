@@ -107,4 +107,81 @@ ok('lore: a recap too long for the budget loses its OLDEST lines, never the newe
   assert.ok(l.includes('CHARACTERS') && l.includes('Pip the Fox; Momo; Zed'));
 });
 
+// --- the whole brief a show freezes ---
+ok('settings: a film becomes a format — length, look, overlays, levels, hands-off', () => {
+  const st = S.seriesSettingsFromProject(
+    {
+      category: 'kids', categoryOptions: { visual_style: 'clay' },
+      chapterCards: false, endScreen: true, sfx: true, drawnCards: false, music: true,
+      sourceWatermark: false, sfxLevel: 0.5, musicLevel: 0.3, captionColor: '#ffcc00',
+      autoApprove: true, speed: 0.9, hookStyle: 'teaser', videoModel: 'veo-3.1-fast',
+      multiVoiceMode: 'characters', cast: ['v1', 'v2'],
+    },
+    { lengthSeconds: 180, style: 'soft clay, warm light', noCaptions: false },
+  );
+  assert.equal(st.lengthSeconds, 180);
+  assert.equal(st.style, 'soft clay, warm light');
+  assert.equal(st.sfxLevel, 0.5);
+  assert.equal(st.musicLevel, 0.3);
+  assert.equal(st.captionColor, '#FFCC00');
+  assert.equal(st.autoApprove, true);
+  assert.equal(st.multiVoiceMode, 'characters');
+  assert.deepEqual(st.cast, ['v1', 'v2']);
+  // the FORM's field names, and captions read off the project's inverted column
+  assert.deepEqual(st.finishes, {
+    captions: true, chapter_cards: false, end_screen: true,
+    sfx: true, drawn_cards: false, music: true, source_watermark: false,
+  });
+});
+ok('settings: no_captions true means the switch is off', () => {
+  const st = S.seriesSettingsFromProject({}, { lengthSeconds: null, style: null, noCaptions: true });
+  assert.equal(st.finishes.captions, false);
+  // a film that answered nothing else leaves every other switch unstored,
+  // so the brief keeps its own default rather than inheriting a guess
+  assert.deepEqual(Object.keys(st.finishes), ['captions']);
+  assert.equal(st.lengthSeconds, null);
+  assert.equal(st.style, null);
+});
+ok('settings: a series stored before this opens exactly as a fresh brief', () => {
+  const st = S.normalizeSeriesSettings({ categoryOptions: { visual_style: 'cel' }, speed: 1 });
+  assert.deepEqual(st.finishes, {});
+  assert.equal(st.lengthSeconds, null);
+  assert.equal(st.sfxLevel, null);
+  assert.equal(st.musicLevel, null);
+  assert.equal(st.captionColor, null);
+  assert.equal(st.autoApprove, null);
+  assert.equal(st.style, null);
+});
+ok('settings: out-of-range levels and junk are refused, never clamped into a lie', () => {
+  const st = S.normalizeSeriesSettings({ sfxLevel: 4, musicLevel: 'loud', lengthSeconds: 99999, captionColor: 'red', autoApprove: 'yes', finishes: { music: 'on', nope: true } });
+  assert.equal(st.sfxLevel, null);
+  assert.equal(st.musicLevel, null);
+  assert.equal(st.lengthSeconds, null);
+  assert.equal(st.captionColor, null);
+  assert.equal(st.autoApprove, null);
+  assert.deepEqual(st.finishes, {});
+});
+
+// --- the prefill the brief opens with ---
+ok('prefill: carries the show, its people and the titles already used', () => {
+  const s = { id: 'recAAAAAAAAAAAAA1', name: 'Pip', premise: 'A fox.', previously: 'Episode 1 — One: it rained.', channelName: '', category: 'kids', tone: 'Childish', language: 'English', aspect: '16:9', voiceId: 'v', settings: S.seriesSettingsFromProject({ music: true }, { lengthSeconds: 120, style: 'clay', noCaptions: false }), bible, refs, sourceProjectId: null, createdAt: null, updatedAt: null };
+  const p = S.seriesPrefill(s, 4, ['One', 'Two', 'Three']);
+  assert.equal(p.episodeNo, 4);
+  assert.equal(p.lengthSeconds, 120);
+  assert.equal(p.style, 'clay');
+  assert.equal(p.finishes.music, true);
+  assert.deepEqual(p.characters, ['Pip the Fox', 'Momo', 'Zed']);
+  assert.deepEqual(p.episodeTitles, ['One', 'Two', 'Three']);
+  assert.equal(p.premise, 'A fox.');
+  assert.ok(p.previously.includes('it rained'));
+});
+ok('prefill: only the last twelve titles travel, and a show with none is fine', () => {
+  const s = { id: 'recAAAAAAAAAAAAA1', name: 'Pip', premise: '', previously: '', channelName: '', category: 'story', tone: null, language: 'English', aspect: '16:9', voiceId: '', settings: S.normalizeSeriesSettings({}), bible, refs, sourceProjectId: null, createdAt: null, updatedAt: null };
+  const many = Array.from({ length: 20 }, (_, i) => `Ep ${i + 1}`);
+  assert.deepEqual(S.seriesPrefill(s, 21, many).episodeTitles, many.slice(-12));
+  assert.deepEqual(S.seriesPrefill(s, 1).episodeTitles, []);
+  // premise falls back to the bible's logline, which is what the show is
+  assert.equal(S.seriesPrefill(s, 1).premise, bible.logline);
+});
+
 console.log(`${n}/${n} passed`);

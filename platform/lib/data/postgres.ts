@@ -1608,12 +1608,20 @@ export async function getProjectSeriesSource(projectId: string): Promise<{
   storyBible: unknown;
   editingOptions: unknown;
   seriesId: string | null;
+  // The three brief fields that are COLUMNS rather than Editing Options —
+  // a series has to freeze them too, or its episodes re-ask for the length,
+  // the look and the captions every time (`createSeriesFromProject`).
+  lengthSeconds: number | null;
+  style: string | null;
+  noCaptions: boolean;
 } | null> {
   const rows = await query<{
     id: string; name: string; tone: string | null; language: string; aspect: string;
     voice_id: string; story_bible: string | null; editing_options: unknown; series_id: string | null;
+    length_seconds: number | null; style: string | null; no_captions: boolean;
   }>(
-    `select id, name, tone, language, aspect, voice_id, story_bible, editing_options, series_id
+    `select id, name, tone, language, aspect, voice_id, story_bible, editing_options, series_id,
+            length_seconds, style, no_captions
        from hov.project where id = $1`,
     [projectId],
   );
@@ -1623,6 +1631,7 @@ export async function getProjectSeriesSource(projectId: string): Promise<{
     id: r.id, name: r.name, tone: r.tone, language: r.language ?? "", aspect: r.aspect,
     voiceId: r.voice_id ?? "", storyBible: r.story_bible, editingOptions: r.editing_options,
     seriesId: r.series_id,
+    lengthSeconds: r.length_seconds, style: r.style, noCaptions: Boolean(r.no_captions),
   };
 }
 

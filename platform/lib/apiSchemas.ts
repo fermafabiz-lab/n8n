@@ -55,6 +55,15 @@ export const ExpandBriefBody = z.object({
   language: z.string().optional().default("English"),
 });
 
+// app/api/series-next — the episode suggestion. Unlike ExpandBriefBody this
+// one REFUSES a bad body (the route answers 200 with nulls either way): the
+// whole request is one record id, and a request without a valid one has
+// nothing for n8n to look up.
+export const SeriesNextBody = z.object({
+  series_id: RecordId,
+  language: z.string().optional().default("English"),
+});
+
 // app/api/archive/search
 export const ArchiveSearchQuery = z.object({
   q: z

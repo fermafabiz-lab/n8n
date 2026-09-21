@@ -4444,6 +4444,18 @@ body:has(.mkt) .vignette {
   max-width: 480px;
   text-wrap: pretty;
 }
+/* The way back to the show, inside the episode's own sentence rather than
+   as a button beside it: on this page the series is the context, not an
+   action the producer came here to take. */
+.nb-serieslink {
+  color: var(--accent-ink);
+  text-decoration: none;
+  border-bottom: 1px solid var(--accent-a28);
+  white-space: nowrap;
+}
+.nb-serieslink:hover {
+  border-bottom-color: var(--accent);
+}
 .nb-pill {
   display: inline-flex;
   align-items: center;

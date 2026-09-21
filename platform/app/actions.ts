@@ -43,7 +43,7 @@ import {
   composeSeriesLore,
   normalizeSeriesBible,
   normalizeSeriesRefs,
-  normalizeSeriesSettings,
+  seriesSettingsFromProject,
   hasAnyRefs,
   reconcileRefsToBible,
   mergeBibles,
@@ -3027,7 +3027,14 @@ export async function createSeriesFromProject(formData: FormData): Promise<void>
   const bible = normalizeSeriesBible(src.storyBible);
   if (bible.characters.length === 0 && bible.locations.length === 0) redirect("/series?from=" + projectId);
   const refs = normalizeSeriesRefs(src.editingOptions);
-  const settings = normalizeSeriesSettings(src.editingOptions);
+  // The WHOLE brief, not just the category and the voice: length, look,
+  // overlays, levels and hands-off ride along, so the next episode opens
+  // pre-answered instead of blank. See seriesSettingsFromProject.
+  const settings = seriesSettingsFromProject(src.editingOptions, {
+    lengthSeconds: src.lengthSeconds,
+    style: src.style,
+    noCaptions: src.noCaptions,
+  });
   const opts = (src.editingOptions && typeof src.editingOptions === "object") ? (src.editingOptions as Record<string, unknown>) : {};
   const id = await insertSeries({
     name,

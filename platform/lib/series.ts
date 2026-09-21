@@ -60,7 +60,45 @@ export interface SeriesSettings {
   hookStyle: string | null;
   videoModel: string | null;
   speed: number | null;
+  // The rest of the brief. A show is a FORMAT — the same length, the same
+  // look, the same overlays every week — so an episode that made the
+  // producer re-pick all of it was not a series, it was a new film with a
+  // borrowed cast. Every one of these is nullable and every reader falls
+  // back to the form's own default: a series created before 2026-09-21 has
+  // none of them stored, and must keep opening exactly as it did.
+  /** Seconds. `project.length_seconds`, not an Editing Option. */
+  lengthSeconds: number | null;
+  /** `project.style` — the look line. */
+  style: string | null;
+  /** The overlay switches, by the FORM's field names, so the form can read them directly. */
+  finishes: Record<string, boolean>;
+  sfxLevel: number | null;
+  musicLevel: number | null;
+  /** `#RRGGBB`, or null for the white default. */
+  captionColor: string | null;
+  /** Hands-off mode. Stored, because a show the producer lets run is a property of the show. */
+  autoApprove: boolean | null;
 }
+
+/**
+ * The overlay switches a series remembers, as the pairs
+ * `form field name` → `Editing Options key`. The form's names are the
+ * contract with n8n (`createProject` posts exactly these), so they are what
+ * gets stored — a series row can then be read straight into the form's own
+ * `finishes` state with no translation at the other end.
+ *
+ * `captions` is the odd one: it lives on the project as `no_captions`, not
+ * in Editing Options, so `createSeriesFromProject` passes it in by hand.
+ */
+export const SERIES_FINISHES: Record<string, string> = {
+  captions: "captions",
+  chapter_cards: "chapterCards",
+  end_screen: "endScreen",
+  sfx: "sfx",
+  drawn_cards: "drawnCards",
+  music: "music",
+  source_watermark: "sourceWatermark",
+};
 
 export interface Series {
   id: string;
@@ -204,8 +242,61 @@ export function normalizeSeriesSettings(raw: unknown): SeriesSettings {
     hookStyle: str(o.hookStyle, 40) || null,
     videoModel: str(o.videoModel, 60) || null,
     speed: Number.isFinite(speed) && speed >= 0.5 && speed <= 2 ? speed : null,
+    lengthSeconds: lvl(o.lengthSeconds, 10, 900),
+    style: str(o.style, 400) || null,
+    // Only the seven known switches, and only real booleans: a key the form
+    // does not render would be dead weight in the row, and a truthy string
+    // would silently turn an overlay on.
+    finishes: Object.fromEntries(
+      Object.keys(SERIES_FINISHES)
+        .filter((k) => typeof (isObj(o.finishes) ? o.finishes : {})[k] === "boolean")
+        .map((k) => [k, Boolean((o.finishes as Record<string, unknown>)[k])]),
+    ),
+    sfxLevel: lvl(o.sfxLevel, 0.05, 1),
+    musicLevel: lvl(o.musicLevel, 0.05, 1),
+    captionColor: /^#[0-9a-f]{6}$/i.test(String(o.captionColor ?? "")) ? String(o.captionColor).toUpperCase() : null,
+    autoApprove: typeof o.autoApprove === "boolean" ? o.autoApprove : null,
   };
 }
+
+/**
+ * The settings a new series freezes from the film it is started from.
+ *
+ * Editing Options carries most of the brief, but three of its answers are
+ * COLUMNS on the project — the length, the look and whether captions are
+ * off — so they are passed in rather than dug out of the blob. The overlay
+ * switches are translated here, once, from the Editing Options spelling to
+ * the form's field names (`SERIES_FINISHES`): the series row is then in the
+ * form's own currency, and `NewVideoForm` reads it with no mapping of its
+ * own. An absent switch stays absent — the form's default is the right
+ * answer for a film that never touched it.
+ */
+export function seriesSettingsFromProject(
+  editingOptions: unknown,
+  project: { lengthSeconds: number | null; style: string | null; noCaptions: boolean },
+): SeriesSettings {
+  const o = isObj(editingOptions) ? editingOptions : {};
+  const finishes: Record<string, boolean> = {};
+  for (const [field, key] of Object.entries(SERIES_FINISHES)) {
+    if (field === "captions") continue;
+    if (typeof o[key] === "boolean") finishes[field] = Boolean(o[key]);
+  }
+  // Captions are stored inverted and on the project, so they are always
+  // known: `no_captions` is a NOT NULL boolean on every film.
+  finishes.captions = !project.noCaptions;
+  return normalizeSeriesSettings({
+    ...o,
+    finishes,
+    lengthSeconds: project.lengthSeconds,
+    style: project.style,
+  });
+}
+
+/** A number inside its range, or null — the same refuse-rather-than-guess rule as derive.ts. */
+const lvl = (v: unknown, min: number, max: number): number | null => {
+  const n = Number(v);
+  return Number.isFinite(n) && n >= min && n <= max ? n : null;
+};
 
 /**
  * The series as CANON for the next episode's Story Bible.
@@ -311,9 +402,31 @@ export interface SeriesPrefill {
   speed: number | null;
   hookStyle: string | null;
   videoModel: string | null;
+  lengthSeconds: number | null;
+  style: string | null;
+  finishes: Record<string, boolean>;
+  sfxLevel: number | null;
+  musicLevel: number | null;
+  captionColor: string | null;
+  autoApprove: boolean | null;
+  multiVoiceMode: string;
+  cast: string[];
+  // What makes the page read as an episode rather than an empty brief: who
+  // is in it, where it happens, and what has happened so far. Shown on the
+  // form; also what the "suggest the next episode" button sends.
+  characters: string[];
+  places: string[];
+  premise: string;
+  previously: string;
+  /** The titles already used, newest last — so a suggestion does not repeat one. */
+  episodeTitles: string[];
 }
 
-export function seriesPrefill(s: Series, episodeNo: number): SeriesPrefill {
+export function seriesPrefill(
+  s: Series,
+  episodeNo: number,
+  episodeTitles: string[] = [],
+): SeriesPrefill {
   return {
     id: s.id,
     name: s.name,
@@ -328,6 +441,20 @@ export function seriesPrefill(s: Series, episodeNo: number): SeriesPrefill {
     speed: s.settings.speed,
     hookStyle: s.settings.hookStyle,
     videoModel: s.settings.videoModel,
+    lengthSeconds: s.settings.lengthSeconds,
+    style: s.settings.style,
+    finishes: s.settings.finishes,
+    sfxLevel: s.settings.sfxLevel,
+    musicLevel: s.settings.musicLevel,
+    captionColor: s.settings.captionColor,
+    autoApprove: s.settings.autoApprove,
+    multiVoiceMode: s.settings.multiVoiceMode,
+    cast: s.settings.cast,
+    characters: s.bible.characters.map((c) => c.name),
+    places: s.bible.locations.map((l) => l.name),
+    premise: s.premise || s.bible.logline,
+    previously: s.previously,
+    episodeTitles: episodeTitles.slice(-12),
   };
 }
 

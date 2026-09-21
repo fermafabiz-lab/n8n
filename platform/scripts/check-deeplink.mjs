@@ -154,6 +154,44 @@ check('…and accepts the one the hero uses', isFilterKey('wait'), true);
 check('all is a tab, so a link can clear the filter', isFilterKey('all'), true);
 check('the tabs are unique', new Set(LIBRARY_FILTERS.map((f) => f.key)).size, LIBRARY_FILTERS.length);
 
+// --- the sections in the bar -------------------------------------------
+//
+// The same failure one level up: a destination that exists and cannot be
+// reached. The bar in app/layout.tsx had three links written out by hand and
+// the phone menu had four, so /series was reachable on a phone and, on a
+// laptop, only from a film that already belonged to a show. Nothing was
+// broken, nothing logged, and the producer's report was "it is very hard to
+// find". Both now read lib/nav.ts, and these assertions are what keeps a
+// fourth copy from being typed into the layout next time.
+const N = await import(join(root, 'lib', 'nav.ts'));
+const {SECTIONS, isOn} = N;
+const layout = readFileSync(join(root, 'app', 'layout.tsx'), 'utf8');
+const menu = readFileSync(join(root, 'components', 'NavMenu.tsx'), 'utf8');
+
+check('the sections are a list, not a literal in the bar', SECTIONS.length > 0, true);
+check(
+	'every section has a href, a label and a note for the phone',
+	SECTIONS.filter((x) => !x.href || !x.label || !x.note),
+	[],
+);
+check('Series is one of them', SECTIONS.some((x) => x.href === '/series'), true);
+check('the hrefs are unique', new Set(SECTIONS.map((x) => x.href)).size, SECTIONS.length);
+check('the bar draws them from the list', /<NavLinks\s*\/>/.test(layout), true);
+check('…and writes none of them out by hand', /className="navlink/.test(layout), false);
+check('the phone menu draws them from the same list', /SECTIONS\.map/.test(menu), true);
+check('…and keeps no list of its own', /const LINKS\s*=/.test(menu), false);
+
+// isOn is what lights the current section. Settings owns /admin/* except the
+// footage library, which has a link of its own — the case a plain prefix test
+// gets wrong in both directions.
+check('Series lights on its own page', isOn('/series', '/series'), true);
+check('…and on a show inside it', isOn('/series', '/series/recAbc'), true);
+check('…and nowhere else', isOn('/series', '/projects'), false);
+check('Settings does not light the footage library', isOn('/admin', '/admin/footage'), false);
+check('Footage does', isOn('/admin/footage', '/admin/footage'), true);
+check('Settings lights its own sub-pages', isOn('/admin', '/admin/customize'), true);
+check('nothing lights on the landing page', SECTIONS.filter((x) => isOn(x.href, '/')), []);
+
 // The link is only alive while something reads it. This is a grep, and a
 // grep is a blunt instrument — but the failure it guards is precisely that
 // nobody noticed the reader was missing, and a diff that deletes this line

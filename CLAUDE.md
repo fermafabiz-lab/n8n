@@ -349,11 +349,18 @@ the full entry in the file named:
   and read no param — a link to the page it was already on, with a query
   string nobody consumed. Destinations now have one owner each
   (`platform/lib/deep-link.ts` for the gate→step map and `?scene=`,
-  `platform/lib/library-filters.ts` for `?filter=`), and
-  `npm run check:deeplink` pins both halves: every link names a real key,
-  and the reader is still there. Full account: `docs/lessons-site.md`, "A
-  notification that says what happened but does not GO there" and "A link to
-  the page you are already on".
+  `platform/lib/library-filters.ts` for `?filter=`, `platform/lib/nav.ts` for
+  the sections in the bar), and `npm run check:deeplink` pins all of them:
+  every link names a real key, and the reader is still there. **The third one
+  was added 2026-09-21 for the same failure one level up**: the bar wrote its
+  links out by hand while `NavMenu` kept a list, the two disagreed, and
+  `/series` was unreachable on a laptop for five days — the producer's
+  "very hard to find" was literally "there is no link". The same edit killed a
+  `className="navlink on"` LITERAL that made Projects the current section on
+  every page of the site. Full account: `docs/lessons-site.md`, "A
+  notification that says what happened but does not GO there", "A link to
+  the page you are already on" and "A section nobody can reach does not
+  exist".
 - **Editing Options fields are refuse-then-clamp, never silently coerced** —
   the `normalize*` family in `platform/lib/data/derive.ts`, fixture-tested by
   `npm run check:normalize`. A value stored by the site, read by n8n and

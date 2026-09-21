@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { IBM_Plex_Mono, Inter, Outfit } from "next/font/google";
+import NavLinks from "@/components/NavLinks";
 import NavMenu from "@/components/NavMenu";
 import ProductionTicker from "@/components/ProductionTicker";
 import StaleCopyBanner from "@/components/StaleCopyBanner";
@@ -107,21 +108,18 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <span className="bmark" aria-hidden="true" />
               <span className="w1">House of Videos</span>
             </Link>
-            <Link href="/projects" className="navlink on">
-              Projects
-            </Link>
-            <Link href="/admin/footage" className="navlink">
-              Footage
-            </Link>
-            <Link href="/admin" className="navlink">
-              Settings
-            </Link>
+            {/* The sections, from lib/nav.ts — the same list the phone menu
+                folds away, so the two cannot drift apart again. They did:
+                the bar had three links hard-coded here and no Series at all,
+                while the menu had four, and Projects wore a literal `on`
+                that lit it from every page on the site. */}
+            <NavLinks />
             <span className="sp" />
             <ProductionTicker />
             <span className="sp" />
-            {/* Phone only (the module hides it above 720px): the three
-                section links above fold behind one button there, because
-                brand + "New video" already fill the pill at 390px. */}
+            {/* Phone only (the module hides it above 720px): the section
+                links above fold behind one button there, because brand +
+                "New video" already fill the pill at 390px. */}
             <NavMenu />
             <Link href="/new" className="btn gold navcta">
               New video

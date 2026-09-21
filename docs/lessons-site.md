@@ -1949,6 +1949,41 @@ has the whole mechanism). What the site learned building it:
   exactly where the recap sits, so a long-running show would have lost its
   latest episodes first. It now drops the oldest lines instead.
 
+### A section nobody can reach does not exist (2026-09-21)
+
+The producer's report was *"Series is very hard to find"*, and the reason was
+not design, layout or wording: **on a laptop there was no link to it at all.**
+
+`/series` had been built, linked from a film that already belonged to a show,
+and added to `NavMenu` — the phone's fold-away menu. The bar in
+`app/layout.tsx` was a separate thing entirely, three `<Link className="navlink">`
+written out by hand: Projects, Footage, Settings. So the two lists disagreed
+about how many sections the site has, and the one that was missing from the
+list nobody thought of as a list was the newest section. It cost nothing to
+find once looked at, and it had been invisible for five days.
+
+**Two copies of a navigation is one copy too many.** `lib/nav.ts` now owns the
+sections, `NavLinks` draws them in the bar, `NavMenu` folds the same array
+away under 720px, and `npm run check:deeplink` asserts the layout contains
+`<NavLinks />` and no hand-written `navlink` — the third destination owner
+beside `deep-link.ts` (gate → step) and `library-filters.ts` (`?filter=`).
+
+**The same edit fixed a bar that lied about where you were.** `Projects` wore
+`className="navlink on"` as a LITERAL, so it was the current section on every
+page of the site, Settings and Footage included. A static "you are here" is
+worse than none: it is confidently wrong, it survives every visual review
+because it looks exactly like a working highlight, and knowing where you are
+requires the path, which is only knowable in the browser — which is why
+`NavLinks` is the one client component in the layout.
+
+**And the link had to lead somewhere that answers.** `/series` throws by
+design without Postgres (`needPg` — the Airtable adapter predates series), so
+the moment the bar linked it from every page, a demo or preview deployment
+answered a click with a 500. `seriesAvailable` lets the index say that in a
+sentence instead; everything deeper keeps the guard, because nothing reaches
+it without passing the index. **Before you link a page from the chrome, open
+it in every state the deployment can be in.**
+
 ### The failure list: a stop by hand is not a failure (2026-09-16)
 
 The producer sent a screenshot of the health panel with three red "failed"

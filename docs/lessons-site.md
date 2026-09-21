@@ -1799,3 +1799,51 @@ production workflows by name.
   has no delete, and the site's API key is not reachable from a web session,
   so a probe's failed run stays in n8n's own list until it ages out of the
   24-hour window. Naming probes `zz …` is what keeps them off the site.
+
+### An episode has to look like an episode (2026-09-21)
+
+The series feature shipped working and still failed its producer: opening
+`/new?series=<id>` gave them a page headed "New project · Start a video"
+with a thin strip above it saying which show it belonged to, an empty title
+field, and every setting back at its factory default. *"Simt ca e foarte
+vag… vreau sa se simta ca face parte dintr-o serie, nu de parca ar fi un
+proces de a face un video complet nou."* Three things were wrong, and they
+are worth separating because only one of them is visual.
+
+- **The page said what it was, in the wrong place.** A banner above the
+  header does not change what a page IS; the header does. On an episode the
+  `h1` is now the show's name, the pill is `Episode N`, and under the
+  sentence sits the cast, the places and the LAST line of the recap — the
+  two facts that make this an episode rather than a film with a borrowed
+  look. The way back to the show is a link inside that sentence, not a
+  button beside it: on this page the series is the context, not an action
+  the producer came here to take.
+- **A series is a FORMAT, and only a third of it was being carried.**
+  `SeriesSettings` held the category, the voice and the video tier; the
+  length, the look, the seven overlay switches, the two levels, the caption
+  colour, hands-off, the cast and the multi-voice mode were all re-asked
+  every episode. Now the whole brief is frozen when the show is created
+  (`seriesSettingsFromProject`) and applied when it opens. Two details that
+  make it safe: every new field is NULLABLE and every reader falls back to
+  the form's own default, so a series stored before this opens exactly as
+  it did; and the overlays are stored under the FORM's field names
+  (`SERIES_FINISHES` maps them once, at freeze time), so `NewVideoForm`
+  reads `series.finishes[f.name]` with no translation of its own.
+  `check:series` pins both.
+  The one thing the show deliberately does NOT do is learn: a setting
+  changed on one episode's brief changes that episode only. Otherwise
+  shortening a single episode would quietly shorten the show.
+- **The stock title suggestions were noise on an episode.** "A documentary
+  about the last lighthouse keepers" is not episode 4 of anybody's series.
+  They are replaced by one button that asks the show what should happen
+  next (`series-next`, `db/port/series-next/`), which fills the title and —
+  only when the box is empty — the direction. A producer who already wrote
+  their own direction must not lose it to a suggestion they asked for about
+  the title.
+
+**The effect that follows the category had to be taught about episodes.**
+Kids story selects the Storyteller voice and the Childish tone when the
+producer has not touched them; on an episode NOTHING is untouched, because
+the show answered everything. It now returns early while the category still
+equals the series', and wakes up only if the producer moves this episode to
+another category.

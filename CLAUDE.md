@@ -117,7 +117,9 @@ Webhooks the site calls: `new-project`, `resume-project`, `restart-scripting`
 `assemble`, and the single-purpose ones — `expand-brief`, `yt-scene-titles`,
 `upscale-film`, `list-music`/`share-music`, `archive-suggest`, `hook-regen`,
 `series-recap` (its own workflow `4jVkQjpr7terqQhY`, fired by `approveScript`
-for an episode of a series — `db/port/series-recap/`). The site derives all of them from `N8N_NEW_PROJECT_WEBHOOK_URL`
+for an episode of a series — `db/port/series-recap/`) and `series-next`
+(`f3iV6hx39rSr0Dbx`, the brief's "Suggest episode N" button —
+`db/port/series-next/`). The site derives all of them from `N8N_NEW_PROJECT_WEBHOOK_URL`
 by string-replacing the last path segment, so they must live on the same host
 — and each new one must be a plain `path` with no path parameters, or the
 derived URL will not resolve.
@@ -342,6 +344,22 @@ expected and harmless for an app touching only its own Drive.
   names, same descriptions), check `SHEET PLAN` says the cast was skipped,
   not drawn again, and `SHEET KEEP` in the log of the first film that
   draws a sheet.
+  **An episode now opens as an episode (2026-09-21)** — the producer's
+  report was that `/new?series=` read as a brand-new film: "Start a video"
+  at the top, a blank title, and every setting to pick again. Three
+  changes, all in `platform/`: the page header IS the show (the series
+  name as the title, `Episode N` in the pill, the cast and the last recap
+  line under it); the WHOLE brief is pre-answered from the series row —
+  length, look, overlays, levels, caption colour, hands-off, cast and
+  multi-voice, on top of the category/tone/voice that already carried —
+  frozen by `seriesSettingsFromProject` when the show is created; and the
+  title field has **✨ Suggest episode N**, which asks the show itself
+  (`series-next`). Every new settings field is NULLABLE and every reader
+  falls back to the form's own default, so a series created before this
+  opens exactly as it did. `npm run check:series` pins the mapping.
+  **What the show does NOT learn**: changing a setting on one episode's
+  brief changes that episode only — the series keeps what it was frozen
+  with, so one short episode cannot silently shorten the show.
   **The bookkeeping after each episode is automatic since the same
   evening** (`db/port/series/README.md`, "What happens by itself"): when
   an episode's script is approved, the site re-keys the episode's sheets

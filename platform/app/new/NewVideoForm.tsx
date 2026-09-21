@@ -287,7 +287,7 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
   const [createdBy, setCreatedBy] = useState("");
   const [name, setName] = useState("");
   const [tone, setTone] = useState(series?.tone || DEFAULT_TONE);
-  const [length, setLength] = useState(60);
+  const [length, setLength] = useState(series?.lengthSeconds ?? 60);
   const [aspect, setAspect] = useState<"16:9" | "9:16">(series?.aspect ?? "16:9");
   // The rate is the state; the WORD the webhook wants is derived from it.
   // SPEED_BY_PACE maps the words to the gentle defaults, so Normal posts 1
@@ -328,8 +328,14 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
   const [language, setLanguage] = useState(
     (series?.language && resolveLanguage(series.language)?.code) || "en",
   );
+  // The overlays: each switch is the series' answer where the show has one,
+  // and the form's own default everywhere else. A series created before the
+  // settings were carried stores none of them and opens exactly as a fresh
+  // brief does.
   const [finishes, setFinishes] = useState<Record<string, boolean>>(
-    Object.fromEntries(FINISHES.map((f) => [f.name, f.default])),
+    Object.fromEntries(
+      FINISHES.map((f) => [f.name, series?.finishes?.[f.name] ?? f.default]),
+    ),
   );
   // How the film opens. `auto` — the default — lets Scripting choose among
   // the six styles; a named one forces it. Posted as `hook_style`, stored by
@@ -343,17 +349,21 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
   // percentage for the producer and 0–1 for the mixer. 35 is the level the
   // render used to hard-code, so leaving the slider alone reproduces every
   // film made before this control existed.
-  const [sfxLevel, setSfxLevel] = useState(SFX_LEVEL_PCT_DEFAULT);
+  const [sfxLevel, setSfxLevel] = useState(
+    series?.sfxLevel != null ? Math.round(series.sfxLevel * 100) : SFX_LEVEL_PCT_DEFAULT,
+  );
   // How loud the background track sits under the voice, same unit and same
   // rule as the effects — shown only while Music is on.
-  const [musicLevel, setMusicLevel] = useState(MUSIC_LEVEL_PCT_DEFAULT);
+  const [musicLevel, setMusicLevel] = useState(
+    series?.musicLevel != null ? Math.round(series.musicLevel * 100) : MUSIC_LEVEL_PCT_DEFAULT,
+  );
   // Hex, or "" for the white default. Empty is not "unset" — it is the
   // choice most films should keep, so it is what the control starts on.
-  const [captionColor, setCaptionColor] = useState("");
-  const [style, setStyle] = useState("");
+  const [captionColor, setCaptionColor] = useState(series?.captionColor ?? "");
+  const [style, setStyle] = useState(series?.style ?? "");
   // Hands-off mode: every gate signs itself off. Off by default — approving
   // unseen is a real trade, and it must never be the accident.
-  const [autoApprove, setAutoApprove] = useState(false);
+  const [autoApprove, setAutoApprove] = useState(series?.autoApprove ?? false);
   // The producer's direction: the film's angle in their own words, and up to
   // three mandatory beats (one per line). Both optional, both steer the
   // writer; the must-includes are verified by the Narration Guard.
@@ -361,6 +371,9 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
   const [mustHaves, setMustHaves] = useState("");
   const [expanding, setExpanding] = useState(false);
   const [expandNote, setExpandNote] = useState("");
+  // "✨ Suggest the next episode" — the series-only twin of Develop my idea.
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestNote, setSuggestNote] = useState("");
   // Which Veo tier generates the clips. Free is the default and the business
   // model; a paid tier is a per-film decision, priced on the spot.
   const [videoModel, setVideoModel] = useState(series?.videoModel || "veo-3.1-lite-low-priority");
@@ -385,6 +398,11 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
   // `createProject` keeps the same default as a backstop for a form that
   // never rendered the control, from the same constant.
   useEffect(() => {
+    // An episode arrives with the show's tone and voice already chosen, so
+    // there is nothing here to help with: this effect exists to follow an
+    // UNTOUCHED control, and on an episode none of them is untouched. It
+    // wakes up only if the producer moves this episode to another category.
+    if (series && category === series.category) return;
     const isStoryteller = (t: VoiceTone | null) =>
       !!t && t.stability === STORYTELLER_TONE.stability && t.similarity === STORYTELLER_TONE.similarity &&
       t.style === STORYTELLER_TONE.style && t.speakerBoost === STORYTELLER_TONE.speakerBoost;
@@ -435,6 +453,44 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
       setExpanding(false);
     }
   };
+
+  /** "✨ Suggest the next episode" — the button the empty title field needs
+   *  on a show. n8n's `series-next` webhook is given the premise, the cast,
+   *  the places, the recap and every title already used, and answers with a
+   *  title and a one-paragraph idea for episode N. Both land in the fields
+   *  and stay editable; a refusal leaves whatever was typed alone, exactly
+   *  like Develop my idea. The idea is only filled when the box is EMPTY —
+   *  a producer who has already written their own direction must not lose
+   *  it to a suggestion they asked for about the title. */
+  const suggestEpisode = async () => {
+    if (!series) return;
+    setSuggesting(true);
+    setSuggestNote("");
+    try {
+      const res = await fetch("/api/series-next", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ series_id: series.id, language: languageName }),
+      });
+      const out = (await res.json()) as { title?: string | null; idea?: string | null };
+      if (out.title) {
+        setName(out.title);
+        const keptBrief = brief.trim().length > 0;
+        if (out.idea && !keptBrief) setBrief(out.idea);
+        setSuggestNote(
+          keptBrief && out.idea
+            ? "Here is an episode — your own direction below was left as it is."
+            : "Here is an episode — edit both freely, they're yours now.",
+        );
+      } else {
+        setSuggestNote("Couldn't think of one right now — nothing was changed.");
+      }
+    } catch {
+      setSuggestNote("Couldn't think of one right now — nothing was changed.");
+    } finally {
+      setSuggesting(false);
+    }
+  };
   const scenes = Math.max(1, Math.round(length / 8));
   const words = scenes * 22;
   const chapters = Math.max(1, Math.ceil(length / 120));
@@ -482,35 +538,70 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
         >
           <div className="brief">
             <div className="form">
-              {series && (
-                <div className={sc.banner}>
-                  <div>
-                    <b>Episode {series.episodeNo} of {series.name}</b>
-                    <p>
-                      The cast, the places, the look and the voice carry over from the show.
-                      Give this episode its own title and idea.
-                    </p>
-                  </div>
-                  <Link href={`/series/${series.id}`} className="pj-ghost">
-                    Open the series
-                  </Link>
-                  <input type="hidden" name="series_id" value={series.id} />
-                </div>
-              )}
+              {series && <input type="hidden" name="series_id" value={series.id} />}
               {/* The header rides in the form column so the estimate rail
                   starts on the same line as the title rather than a header's
-                  height below it. */}
+                  height below it.
+
+                  On an episode it IS the show: the producer arrived here
+                  from a series and the page has to say so before it asks
+                  anything — the show's name where the page title goes, the
+                  episode number in the pill, and underneath the two facts
+                  that make it an episode rather than a film with a borrowed
+                  look: who is in it, and what happened last time. The old
+                  version kept "Start a video" at the top with a thin strip
+                  above it, and the producer read the whole page as a new
+                  film. */}
               <div className="nb-head">
                 <span className="nb-pill">
                   <i />
-                  New project
+                  {series ? `Episode ${series.episodeNo}` : "New project"}
                 </span>
-                <h1>Start a video</h1>
-                <p>
-                  Fill in the brief and the pipeline takes it from there.
-                  Everything after this happens without you — until the script
-                  and the scenes come back for approval.
-                </p>
+                <h1>{series ? series.name : "Start a video"}</h1>
+                {series ? (
+                  <p>
+                    The next episode of your show. Everything below is already
+                    answered the way the series is made — the cast, the places,
+                    the look, the length, the voice and the overlays — so change
+                    only what this episode needs.{" "}
+                    <Link href={`/series/${series.id}`} className="nb-serieslink">
+                      Open the series ↗
+                    </Link>
+                  </p>
+                ) : (
+                  <p>
+                    Fill in the brief and the pipeline takes it from there.
+                    Everything after this happens without you — until the script
+                    and the scenes come back for approval.
+                  </p>
+                )}
+                {series && (series.characters.length > 0 || series.previously) && (
+                  <div className={sc.banner} style={{ marginTop: 14 }}>
+                    <div>
+                      {series.characters.length > 0 && (
+                        <b>
+                          {series.characters.slice(0, 6).join(" · ")}
+                          {series.characters.length > 6 ? " · …" : ""}
+                        </b>
+                      )}
+                      {series.places.length > 0 && (
+                        <p>
+                          {series.places.slice(0, 4).join(" · ")}
+                          {series.places.length > 4 ? " · …" : ""}
+                        </p>
+                      )}
+                      {/* The last line of the recap, not the whole thing: it
+                          is here to remind, and the pipeline reads all of it
+                          anyway. */}
+                      {series.previously && (
+                        <p style={{ marginTop: 6 }}>
+                          <i>Last time:</i>{" "}
+                          {series.previously.split("\n").filter(Boolean).slice(-1)[0]}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Before anything about the film: who is making it. It sits
                     above the brief rather than inside a numbered section
@@ -579,13 +670,37 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
                       </>
                     )}
                   </p>
-                  <div className="sugrow" aria-label="Suggestions">
-                    {SUGGESTIONS.map((sg) => (
-                      <button type="button" key={sg} className="sug" onClick={() => setName(sg)}>
-                        {sg}
+                  {/* The stock suggestions are whole film ideas — a
+                      lighthouse documentary is not episode 4 of anybody's
+                      show, so on an episode they are replaced by the one
+                      button that IS useful here: ask the show what should
+                      happen next. */}
+                  {series ? (
+                    <div className="sugrow" aria-label="Episode suggestion">
+                      <button
+                        type="button"
+                        className="sug"
+                        onClick={suggestEpisode}
+                        disabled={suggesting}
+                        aria-busy={suggesting}
+                      >
+                        {suggesting ? "Thinking…" : `✨ Suggest episode ${series.episodeNo}`}
                       </button>
-                    ))}
-                  </div>
+                      {suggestNote && (
+                        <span style={{ fontSize: 12, color: "var(--dim)", alignSelf: "center" }}>
+                          {suggestNote}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="sugrow" aria-label="Suggestions">
+                      {SUGGESTIONS.map((sg) => (
+                        <button type="button" key={sg} className="sug" onClick={() => setName(sg)}>
+                          {sg}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 {/* The producer's direction — the cheapest quality lever there
                     is. A five-word title under-specifies a whole film; these

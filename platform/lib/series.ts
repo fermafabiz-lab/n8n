@@ -292,6 +292,55 @@ export function seriesSettingsFromProject(
   });
 }
 
+/**
+ * True when a series row carries the WHOLE brief, not just the third that
+ * was frozen before 2026-09-21. The test is `lengthSeconds`, because it is
+ * the one field every film has and no film can legitimately leave unset:
+ * `project.length_seconds` is NOT NULL-checked `> 0` on every project, so a
+ * series with none was frozen by the old code.
+ */
+export const hasFullSettings = (s: SeriesSettings): boolean => s.lengthSeconds != null;
+
+/**
+ * Fill what a series never froze, from what its first film answered — and
+ * touch nothing else.
+ *
+ * A show created before the whole brief was carried holds the category, the
+ * voice tone, the speed and the hook style, and NOTHING about length,
+ * overlays, levels or hands-off. Re-deriving the missing half from the film
+ * the show was started from is what makes an old series behave like a new
+ * one, with no migration and no producer typing it in again.
+ *
+ * `stored` always wins where it has an answer. That is the whole safety of
+ * this: it can only ever add, so a show whose settings someone edited is
+ * never overwritten by the film it came from.
+ */
+export function fillSeriesSettings(stored: SeriesSettings, derived: SeriesSettings): SeriesSettings {
+  const take = <T,>(a: T, b: T): T => (a === null || a === undefined ? b : a);
+  return {
+    ...stored,
+    categoryOptions: Object.keys(stored.categoryOptions).length ? stored.categoryOptions : derived.categoryOptions,
+    cast: stored.cast.length ? stored.cast : derived.cast,
+    voice: take(stored.voice, derived.voice),
+    hookStyle: take(stored.hookStyle, derived.hookStyle),
+    videoModel: take(stored.videoModel, derived.videoModel),
+    speed: take(stored.speed, derived.speed),
+    lengthSeconds: take(stored.lengthSeconds, derived.lengthSeconds),
+    style: take(stored.style, derived.style),
+    // Per SWITCH, not per map: a show that somehow froze two of the seven
+    // keeps those two and gains the other five.
+    finishes: { ...derived.finishes, ...stored.finishes },
+    sfxLevel: take(stored.sfxLevel, derived.sfxLevel),
+    musicLevel: take(stored.musicLevel, derived.musicLevel),
+    captionColor: take(stored.captionColor, derived.captionColor),
+    autoApprove: take(stored.autoApprove, derived.autoApprove),
+    // multiVoiceMode has no null: "off" is both the default and a real
+    // answer, so the stored one is taken as said unless it is the default
+    // and the film says otherwise.
+    multiVoiceMode: stored.multiVoiceMode !== "off" ? stored.multiVoiceMode : derived.multiVoiceMode,
+  };
+}
+
 /** A number inside its range, or null — the same refuse-rather-than-guess rule as derive.ts. */
 const lvl = (v: unknown, min: number, max: number): number | null => {
   const n = Number(v);

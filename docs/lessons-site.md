@@ -2364,6 +2364,19 @@ are worth separating because only one of them is visual.
   The one thing the show deliberately does NOT do is learn: a setting
   changed on one episode's brief changes that episode only. Otherwise
   shortening a single episode would quietly shorten the show.
+  **A freeze is a COPY, and shipping the wider copy does not widen the
+  copies already taken** — which is the half that would have made this look
+  broken. The producer's own show was frozen on 09-16 with seven keys; the
+  day the whole brief started being carried, their episode 2 still opened at
+  60 seconds with chapter cards on, because their ROW said nothing about
+  either. `backfillSeriesSettings` closes that where it is felt rather than
+  in a migration: the brief re-derives the missing half from the film the
+  show was started from, writes it back once, and never touches a key the
+  show already has. Measured on that show before shipping — 90 s not 60,
+  chapter cards off not on, drawn cards off not on, hands-off on not off.
+  **When a feature copies state at a moment, ask what the rows written
+  before it will do** — they will not error, they will quietly behave like
+  the old version.
 - **The stock title suggestions were noise on an episode.** "A documentary
   about the last lighthouse keepers" is not episode 4 of anybody's series.
   They are replaced by one button that asks the show what should happen

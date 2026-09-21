@@ -1,4 +1,4 @@
-import { getSeries, getSeriesEpisodes, nextEpisodeNo } from "@/lib/data";
+import { backfillSeriesSettings, getSeries, getSeriesEpisodes, nextEpisodeNo } from "@/lib/data";
 import { seriesPrefill, type SeriesPrefill } from "@/lib/series";
 import NewVideoForm from "./NewVideoForm";
 
@@ -22,7 +22,14 @@ export default async function NewVideo({
   const id = String(sp.series ?? "").trim();
   let series: SeriesPrefill | null = null;
   if (/^rec[A-Za-z0-9]{14}$/.test(id)) {
-    const s = await getSeries(id).catch(() => null);
+    // A show frozen before the whole brief was carried learns the rest from
+    // its first film, here, once — otherwise episode 2 of an older series
+    // still opens on the form's defaults and the producer re-answers every
+    // setting by hand, which is the complaint this whole page exists to
+    // answer. A show that already has everything is not touched.
+    const s = await getSeries(id)
+      .then((row) => (row ? backfillSeriesSettings(row) : null))
+      .catch(() => null);
     if (s) {
       // The titles already used travel with the prefill for one reason: the
       // "suggest the next episode" button must not propose one of them back.

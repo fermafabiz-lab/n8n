@@ -1583,3 +1583,7 @@ export async function getSeriesRefsUnion(seriesId: string) {
   needPg("getSeriesRefsUnion");
   return pgBackend.getSeriesRefsUnion(seriesId);
 }
+export async function backfillSeriesSettings(s: import("@/lib/series").Series) {
+  needPg("backfillSeriesSettings");
+  return pgBackend.backfillSeriesSettings(s);
+}

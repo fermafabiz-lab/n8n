@@ -54,6 +54,12 @@ export default function ThemePicker({ initial }: { initial: Theme }) {
   const [theme, setTheme] = useState<Theme>(initial);
   const [deviceDark, setDeviceDark] = useState<boolean | null>(null);
 
+  /* The bar's mark is a second control for this same setting (ThemeMark),
+     and its click refreshes the server tree — which arrives here as a new
+     `initial`. Without this the segment would keep showing what was chosen
+     before the mark was clicked: two controls, one setting, disagreeing. */
+  useEffect(() => setTheme(initial), [initial]);
+
   useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const read = () => setDeviceDark(mq.matches);

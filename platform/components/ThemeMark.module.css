@@ -1,0 +1,52 @@
+/* The brand mark as a control. Own stylesheet per the house rule —
+   globals.css is closed to new components — and no new colour: the disc is
+   the same two tokens `.wm .bmark` used, so it keeps flipping with the theme
+   for free and there is no second [data-theme] block to keep in step. */
+
+/* The padding is the hit area and the negative margin gives it back to the
+   layout: 7 + 17 + 7 = 31px of target where a 17px circle sat, with the
+   circle on exactly the same optical line as before. A 17px tap target on a
+   phone is not one. */
+.mark {
+  display: block;
+  flex: none;
+  padding: 7px;
+  margin: -7px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background var(--dur) var(--ease);
+}
+.mark:hover {
+  background: var(--accent-a12);
+}
+
+/* The mark itself, drawn exactly as the wordmark's: one circle split on the
+   diagonal, accent on the leading half, ink on the trailing one. */
+.disc {
+  display: block;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent) 0 50%, var(--ink) 50% 100%);
+  transition: transform 0.4s var(--ease);
+}
+/* The affordance. A mark that has always been decoration needs to say it is
+   a switch now, and the half-turn says it in the shape's own language: the
+   two halves trade places, which is what the click does to the page. The
+   title attribute carries the words for anyone who waits. */
+.mark:hover .disc,
+.mark:focus-visible .disc {
+  transform: rotate(180deg);
+}
+.mark:active .disc {
+  transform: rotate(180deg) scale(0.92);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .disc {
+    transition: none;
+  }
+}

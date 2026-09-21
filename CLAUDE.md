@@ -393,8 +393,13 @@ the full entry in the file named:
   allowed only on a surface that is the same in both themes — a video
   overlay, a film preview — and says so in a comment. Never add a second
   `[data-theme]` block of overrides: the token carries both values, which is
-  the whole point. `docs/lessons-site.md`, "Settings is a hub, and the site
-  has a night".
+  the whole point. **The brand mark in the bar is the switch since
+  2026-09-21** (`components/ThemeMark.tsx`) — it had to come OUT of the home
+  link to be a button, it flips against what is ON SCREEN so a click always
+  changes something (which leaves "Follow device" for good; `/admin/customize`
+  keeps all three), and `ThemePicker` now re-reads the server value so the two
+  controls cannot disagree. `docs/lessons-site.md`, "Settings is a hub, and the
+  site has a night" and "The mark in the bar is the switch".
 - **The genre profiles, script library and script examples have NO screen
   since 2026-09-15** (removed at the producer's call; Settings is a hub of
   Account / Billing / Notifications / Customize now). Claude Scripting still

@@ -1950,6 +1950,61 @@ then the device flipped under it — with the attribute, the cookie, the
 sentence saying which both-theme surface it sits on.** Anything else is a
 token, and a token is one `light-dark()` — never a second block.
 
+#### The mark in the bar is the switch (2026-09-21)
+
+The producer pointed at the split circle beside the wordmark and asked for it
+to become the light/dark button. It is a good instinct and worth writing down
+WHY: the mark is already a circle cut in half on the diagonal, accent against
+ink, which is the same shape every operating system draws for this setting —
+so it says what it does before anything is read. It is also the only element
+on the site that is on every screen and belongs to no screen, which is what a
+per-browser preference wants. The alternative, a fourth icon in the bar, buys
+nothing the mark does not already carry and costs a slot in a pill that is
+full at 390px.
+
+**Three things it took, none of them the onClick.**
+
+**A `<button>` cannot live inside an `<a>`**, and the mark was a decorative
+span inside the home link. So the link is around the WORDS now and the mark
+is its own control: two targets, one each. Making the whole brand one target
+that both navigates and flips the theme was never an option — a logo that
+navigates is the most fixed convention on the web, and a click that does two
+things is a coin toss. The wrapper keeps `brand wm`, so the row measures and
+sits exactly where it did.
+
+**The cookie has three values and a button has two.** On "Follow device" there
+is no honest "the other one", so the click is defined by what is ON SCREEN,
+not by what is stored: it flips to the opposite of what the device is
+currently showing, and that leaves `system` for good. That is the right trade
+for a one-tap control — **a click must always change what you see** — and
+`/admin/customize` keeps all three including the way back. The device is
+unknown until mount (`matchMedia` is client-only), so a `system` page renders
+the label for light and the effect corrects it a tick later; it moves the
+LABEL only, never the drawing, because the mark's two halves are `--accent`
+and `--ink` and flip with the tokens by themselves.
+
+**Two controls for one setting have to agree.** `ThemePicker` seeded its
+segment from the server once and never again, so clicking the mark while
+standing on Customize left the segment lit on the old choice. One line —
+`useEffect(() => setTheme(initial), [initial])` — because the mark's
+`router.refresh()` is what re-renders the layout with the new value. Add a
+second control for anything and check the first one still tells the truth.
+
+**The affordance is the shape's own.** A mark that has been decoration since
+the site existed has to say it is a switch now, so it takes a half turn on
+hover and focus: the two halves trade places, which is what the click does to
+the page. `title` carries the words for anyone who waits, `aria-label` for
+anyone who cannot see it, and the button pads 7px and gives it back with
+`margin: -7px` — 31px of target where a 17px circle sat, because a 17px tap
+target on a phone is not one. Own stylesheet (`ThemeMark.module.css`) per the
+house rule, and no new colour: the disc is the same two tokens the wordmark's
+mark used.
+
+**The mark is a switch in the app bar only.** The three in footers are inside
+plain spans and stay decoration; the landing page's is inside its own home
+link and stays a link, because that page is what someone sees before they are
+logged in.
+
 ### Series — the same cast, film after film (2026-09-16)
 
 A series is a film's Story Bible and its consistency references hoisted above

@@ -6,6 +6,7 @@ import NavLinks from "@/components/NavLinks";
 import NavMenu from "@/components/NavMenu";
 import ProductionTicker from "@/components/ProductionTicker";
 import StaleCopyBanner from "@/components/StaleCopyBanner";
+import ThemeMark from "@/components/ThemeMark";
 import { parseTheme, THEME_COLOR, THEME_COOKIE, themeAttribute } from "@/lib/theme";
 import "./globals.css";
 
@@ -103,11 +104,19 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 no italic, and asking for one makes the browser synthesise an
                 oblique by shearing the roman, which is the same fake-styling
                 trap as a synthesised bold. The mark carries the identity
-                instead: a circle split on the diagonal, accent against ink. */}
-            <Link href="/" className="brand wm">
-              <span className="bmark" aria-hidden="true" />
-              <span className="w1">House of Videos</span>
-            </Link>
+                instead: a circle split on the diagonal, accent against ink.
+
+                The mark is the theme switch since 2026-09-21, which is why
+                the link is now around the WORDS only: a <button> cannot live
+                inside an <a>, and one target that both navigates and flips
+                the theme is a coin toss. The wrapper keeps `brand wm`, so the
+                row measures and sits exactly as it did. */}
+            <span className="brand wm">
+              <ThemeMark initial={theme} />
+              <Link href="/" className="w1">
+                House of Videos
+              </Link>
+            </span>
             {/* The sections, from lib/nav.ts — the same list the phone menu
                 folds away, so the two cannot drift apart again. They did:
                 the bar had three links hard-coded here and no Series at all,

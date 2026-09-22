@@ -1310,8 +1310,22 @@ expected and harmless for an app touching only its own Drive.
   tone and style, so a category-keyed rule would never have fired — and add
   the speech cue, since Veo invents a soundtrack from the still and refuses
   it. That file is the plan for both the refusal rate and the pool's tail;
-  it names two decisions that are the producer's (D1: may the ladder replace
-  an approved still; D2: faces off by default on photorealistic films).
+  it names two decisions that were the producer's (D1: may the ladder replace
+  an approved still; D2: faces off by default on photorealistic films) and
+  both were taken the same day. **All four code steps are LIVE as of
+  2026-09-22 evening**: Media Generation `3c65295d` (1b, seed fresh after a
+  refusal) → `de198483` (1a, the ladder regenerates the STILL with a steer,
+  twice, then gives up) → `c22878a1` (2a, work stealing: an idle account
+  copies a still from the busiest queue and makes the clip there), and
+  Claude Scripting `f379e56d` (1c, the faces-and-speech block appended to
+  `segmentRules` in `Voice Mode` for every non-kids film; `Editing
+  Options.facesOff === false` switches it off, strict boolean, no site
+  control yet). Rollbacks `78bff76f` and `f86e6cc1`. **None of the four has
+  run on a real film.** What proves them is in the README's order table:
+  `AUTO-REWRITE-VIDEO (attempt N)` notes and `VP IMAGE … ready` lines for
+  1a, `POOL steal` lines and zero `Email mismatch` for 2a, the refusal rate
+  against 41% for 1c. Owed after that: 1d, 1e, 2b, the `facesOff` brief
+  control, and rotating the useapi token hard-coded in the steal nodes.
 - Scene 104/105 of `recCoZWsZBOrIU69L` are the first scenes to go through the
   new fal auto-rewrite path — worth watching once to confirm the rewritten
   prompt clears fal and the regen loop picks the scene up.

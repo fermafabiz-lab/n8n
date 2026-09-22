@@ -131,6 +131,27 @@ account** — three rapid probes during a live batch drew a 429 and then
 is deterministic for a still and attempt 1 of 1a should be dropped to save
 the generation. If any pass, attempt 1 pays for itself many times over.
 
+### 1b — DONE 2026-09-22, and the measurement changed 1a
+
+Media Generation **`3c65295d`** (rollback `78bff76f`): `Current Scene` mixes
+`VP Prep`'s per-scene refusal counter into the seed once it is non-zero;
+`Prep Video Regen` mixes `Date.now()` when the scene's note says the last
+attempt was refused. Everywhere else the seed is byte-identical.
+
+**The measurement: 7 of 7 refused.** Still `e09a4e10` (scene 106's original),
+three submits 60 s apart on `fermafabiz@gmail.com` with seeds 104729 and
+7919 (the third drew a 429 — **60 s between submits on one account is not
+enough**), plus the blank-prompt probe of the morning and the four pipeline
+attempts: every one `AUDIO_GENERATION_FILTERED`. And the response echoes a
+seed that is NOT the one sent (`generatedVideo.seed` 71345 and 73298 for
+104729 and 7919; 33150 when none was sent), so whether useapi passes our seed
+to `veo-3.1-lite-low-priority` at all is unknown — which also means the seed
+story in `Current Scene` ("a re-roll is a different take") may be true only
+because Google randomises anyway. **An audio refusal is deterministic for a
+still.** So attempt 1 of the ladder as planned above — same still, new seed —
+is a generation that cannot pay, and 1a is built without it: two new stills,
+then a human.
+
 ### 1c. Stop asking for the thing that gets refused
 
 **Node:** `Segment Chapter Into Scenes` (Claude Scripting), the rule block

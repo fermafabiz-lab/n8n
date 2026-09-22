@@ -70,7 +70,7 @@ const hash = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h
 // per-scene refusal counter (it is its own execution), but the machine note
 // the ladder leaves behind says the last attempt was refused; when it does,
 // the seed is deliberately fresh. Everywhere else it is what it always was.
-const wasRefused = /^(AUTO-REWRITE|REJECTED)/i.test(sceneNote);
+const wasRefused = /^(AUTO-|REJECTED)/i.test(sceneNote);
 const seed = hash(String(r.id || '') + ':' + takes + (wasRefused ? ':refused:' + Date.now() : '')) % 2147483647;
 console.log('VIDEO REGEN ' + r.id + ': ' + model + (model === base ? '' : ' (rescue after ' + takes + ' takes)') + ', seed ' + seed + (wasRefused ? ' (fresh — the last attempt was refused)' : ''));
 

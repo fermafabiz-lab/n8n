@@ -1,0 +1,26 @@
+--- the seed block in Current Scene, before → after (the only lines that change)
+
+BEFORE:
+// A seed makes a re-roll a DIFFERENT take rather than another coin flip, and
+// makes a first take reproducible. Derived from the scene id and the number
+// of takes already filed, so nothing has to be stored anywhere.
+const hash = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+const seed = hash(String($json.id || '') + ':' + takes) % 2147483647;
+
+AFTER:
+// A seed makes a re-roll a DIFFERENT take rather than another coin flip, and
+// makes a first take reproducible. Derived from the scene id and the number
+// of takes already filed, so nothing has to be stored anywhere.
+//
+// A SEED IS REPRODUCIBLE UNTIL IT IS REFUSED (2026-09-22). A clip the content
+// filter refuses files no take, so `takes` stays 0 and every resubmit the
+// rewrite ladder made carried the IDENTICAL seed — four attempts were one
+// attempt four times (db/port/audio-filter/README.md). `VP Prep` counts the
+// refusals per scene in static data; once that counter is non-zero it goes
+// into the hash, the same way `Motion Resubmit` mixes its own attempt in, so
+// each retry after a refusal is a different roll. Everywhere else the seed is
+// exactly what it was.
+const hash = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+let refused = 0;
+try { refused = Number((($getWorkflowStaticData('global').rewrites) || {})[String($json.id || '')] || 0) || 0; } catch (e) { refused = 0; }
+const seed = hash(String($json.id || '') + ':' + takes + (refused ? ':refused:' + refused : '')) % 2147483647;

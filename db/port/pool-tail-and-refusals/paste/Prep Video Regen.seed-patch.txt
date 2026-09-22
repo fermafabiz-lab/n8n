@@ -1,0 +1,57 @@
+--- the takes/seed block in Prep Video Regen, before → after (the only lines that change)
+
+BEFORE:
+// Takes already filed for this shot, read from the scene the gate fetched.
+let takes = 0;
+try {
+  // Same row, fetched by whichever entry point ran: the gate's
+  // `Fetch Scene Videos`, or `VRW Load Scene` one node upstream.
+  const fields = viaWebhook
+    ? ($json.sceneFields || {})
+    : (($('Fetch Scene Videos').all().find((x) => x.json && x.json.id === r.id) || { json: {} }).json.fields || {});
+  const v = fields['Versiuni Media'];
+  const list = Array.isArray(v) ? v : JSON.parse(String(v || '[]'));
+  takes = list.filter((e) => e && e.kind === 'video').length;
+} catch (e) { takes = 0; }
+
+// Two free takes the producer has already refused is the evidence that this
+// shot is not something the free tier can do. Everything before that is a
+// coin flip worth re-flipping for nothing.
+const rescue = opts.rescueVideoModel === undefined ? PAID : String(opts.rescueVideoModel);
+const model = (base === FREE && takes >= 2 && rescue && rescue !== FREE) ? rescue : base;
+const hash = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+const seed = hash(String(r.id || '') + ':' + takes) % 2147483647;
+console.log('VIDEO REGEN ' + r.id + ': ' + model + (model === base ? '' : ' (rescue after ' + takes + ' takes)') + ', seed ' + seed);
+
+AFTER:
+// Takes already filed for this shot, read from the scene the gate fetched.
+let takes = 0;
+let sceneNote = '';
+try {
+  // Same row, fetched by whichever entry point ran: the gate's
+  // `Fetch Scene Videos`, or `VRW Load Scene` one node upstream.
+  const fields = viaWebhook
+    ? ($json.sceneFields || {})
+    : (($('Fetch Scene Videos').all().find((x) => x.json && x.json.id === r.id) || { json: {} }).json.fields || {});
+  const v = fields['Versiuni Media'];
+  const list = Array.isArray(v) ? v : JSON.parse(String(v || '[]'));
+  takes = list.filter((e) => e && e.kind === 'video').length;
+  sceneNote = String(fields['Observații Scenă'] || '').trim();
+} catch (e) { takes = 0; }
+
+// Two free takes the producer has already refused is the evidence that this
+// shot is not something the free tier can do. Everything before that is a
+// coin flip worth re-flipping for nothing.
+const rescue = opts.rescueVideoModel === undefined ? PAID : String(opts.rescueVideoModel);
+const model = (base === FREE && takes >= 2 && rescue && rescue !== FREE) ? rescue : base;
+const hash = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+// A SEED IS REPRODUCIBLE UNTIL IT IS REFUSED (2026-09-22). A refused clip
+// files no take, so `takes` alone re-rolled the identical seed on every press
+// of "Regenerate video" after a filter refusal — the one case where
+// reproducing the last result is exactly what nobody wants. This path has no
+// per-scene refusal counter (it is its own execution), but the machine note
+// the ladder leaves behind says the last attempt was refused; when it does,
+// the seed is deliberately fresh. Everywhere else it is what it always was.
+const wasRefused = /^(AUTO-REWRITE|REJECTED)/i.test(sceneNote);
+const seed = hash(String(r.id || '') + ':' + takes + (wasRefused ? ':refused:' + Date.now() : '')) % 2147483647;
+console.log('VIDEO REGEN ' + r.id + ': ' + model + (model === base ? '' : ' (rescue after ' + takes + ' takes)') + ', seed ' + seed + (wasRefused ? ' (fresh — the last attempt was refused)' : ''));

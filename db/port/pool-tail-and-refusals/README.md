@@ -326,6 +326,49 @@ unchanged.
 Expected on this film: the last 14 clips spread across three accounts,
 roughly 20 minutes instead of 55.
 
+### 2a — APPLIED 2026-09-22, Media Generation `c22878a1` (rollback `de198483`)
+
+Exactly the shape above. `Pool Tick` gets a fourth action, `steal`, chosen
+only when no queued scene fits an account with room: the donor is the account
+with the longest queue (at least two scenes, so it keeps its head), the
+victim is the tail of that queue, the target is any account with a free slot.
+`Pool Route` routes it down a new row:
+
+```
+Steal Fresh Url  GET  assets/{poolImageId}        → { url }
+Steal Download   GET  {{ $json.url }}             → binary `data`
+Steal Upload     POST assets/{poolTo}, binaryData → { mediaGenerationId }
+Steal Record     decode the owner hex, and only if it IS the target:
+                 pool.stolen[id] = { image, account, from, original }
+                 queue entry's account := target
+                 → Pool Tick (which submits it next tick like any other scene)
+```
+
+`Submit Video` has one more `try {}` at the end of its chain: if
+`pool.stolen[cs.id]` exists, `startImage` is the copy, `email` is the
+target, and `endImage` is dropped (it would live on the original account).
+Polling is by `jobid` and the download by signed URL, so nothing after the
+submit knows or cares. **Nothing is written to the scene row**; the copy is a
+transient Flow asset.
+
+Every failure degrades to today: all three HTTP nodes carry `onError:
+continueRegularOutput`, `Steal Record` marks the scene `noSteal` and leaves
+it on its own account, and a copy that lands on the wrong account (the
+execution-14618 shape) is refused by the owner check. With one account the
+list has one entry and the branch never fires.
+
+Diff: 242 → 246 nodes, 3 changed (`Pool Tick`, `Submit Video`, `Pool Route`),
+4 added, one edge moved (`Pool Route`'s fallback from output 2 to 3 — a
+Switch's fallback index moves when a rule is added, and this is exactly the
+`sourceIndex` trap CLAUDE.md names, so every edge was read back), settings
+identical on every pre-existing node, bodies byte-equal to `paste/` and
+`ops.2a.json`.
+
+**Verification owed**: the log lines `POOL steal <id>: copying still … from
+X to Y` and `… still copied to Y as … — the clip will be made there` on the
+next pooled film, zero `Email mismatch`, and the tail measurement from
+`etapa3.md` re-run: the last quarter of clips no slower than the first.
+
 ### 2b. Then, and only then, two jobs per account
 
 `videoPoolPerAccount: 2` is still unmeasured. With the tail gone it becomes

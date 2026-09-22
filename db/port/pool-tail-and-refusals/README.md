@@ -252,6 +252,52 @@ with the number beside it. If they want faces, they get faces and the
 refusal rate that comes with them — but it is then a choice, not a
 surprise.
 
+### 1c — APPLIED 2026-09-22, Claude Scripting `f379e56d` (rollback `f86e6cc1`)
+
+D2 accepted by the producer as recommended: faces off by default on
+photorealistic films, per-film switch.
+
+**It landed in `Voice Mode`, not in `Segment Chapter Into Scenes`.** The
+segmenter's prompt is assembled from `segmentRules`, which `Voice Mode`
+composes and the segmenter reads by expression — the same place the kids
+block and the closing-scene block already live. So the rule is one string
+appended to `segmentRules` (`paste/Voice Mode.js`, lines 93-109, the
+`facesSegment` block), and the 14 KB segmenter prompt is untouched, which
+is what keeps the change to one node body a web session can byte-compare.
+
+**The style test is rule 3 of the segmenter itself**: every non-kids image
+prompt ends "cinematic, photorealistic, 8k", so *non-kids* IS
+*photorealistic* today. The block therefore fires on every film except the
+eight kids styles — Story, Documentary, Cinematic alike — and the plan's
+"gate on style, not category" holds without a separate style field.
+`Editing Options.facesOff === false` switches it off for one film; a strict
+boolean, like `endFrame`, so a hand-typed `"false"` leaves it ON. The node
+also emits `facesOff` so the segmenter's log can echo what it decided.
+
+What the block says, in the shape this repo has learned to write prompts:
+people from behind, in profile at a distance, as silhouettes, as hands and
+objects, or small in a wide shot; a call or a conversation as the screen
+seen over a shoulder, the desk before or after, the headset on the desk, the
+back of the listener; *the speaker's mouth stays out of frame*. It is phrased
+as what the frame CONTAINS, and it says in as many words that an instruction
+written as an absence summons the thing it names. It overrides the face half
+of rule 2 (weave clothing, hair, build and posture in; keep the face turned
+away) rather than contradicting it.
+
+Diff: 136 → 136 nodes, changed 1 (`Voice Mode`), connections identical,
+settings identical on every node, body byte-equal to `paste/Voice Mode.js`,
+nothing running at publish (16:2x UTC). Cast sheets are NOT touched: they are
+where a face is supposed to be, and `Cast Sheet Prep` draws them from the
+bible, not from scene prompts.
+
+**Owed**: the site half — a `facesOff` control on the brief and its
+`normalize*` rule in `derive.ts` (`grep -rn facesOff platform/` is empty
+today, so the switch is reachable only by hand in `Editing Options`); and
+the measurement — the next photorealistic real film's refusal rate against
+this film's 41%, with the producer's eye on the look beside the number.
+Films scripted before 16:20 UTC keep their prompts; only a text
+regeneration or a new film gets the rule.
+
 ### 1d. Measure whether our own prompt tail summons speech (no change)
 
 Every clip this pipeline submits ends
@@ -400,7 +446,7 @@ deepen the tail.
 | 1 | 1b seed | `Current Scene`, `Prep Video Regen` | 3 seeds on still `e09a4e10` in a quiet window; any pass → keep attempt 1 |
 | 2 | 1a ladder | `VP *`, `Submit Video`, `IR Build Request`, +4 nodes | a disposable film with a still known to be refused; note reads the right advice; ≤ 3 generations per refused scene |
 | 3 | 2a stealing | `Pool Tick`, `Pool Record`, `Submit Video`, +5 nodes | a disposable film with deliberately uneven blocks; `POOL steal` lines; zero `Email mismatch`; last quarter of clips no slower than the first |
-| 4 | 1c faces/speech rule | `Segment Chapter Into Scenes` (+ switch in `derive.ts`) | the next photorealistic real film: refusal rate and the producer's eye, side by side |
+| 4 | 1c faces/speech rule — **live `f379e56d`** | `Voice Mode` (segmentRules), switch in `derive.ts` still owed | the next photorealistic real film: refusal rate and the producer's eye, side by side |
 | 5 | 1d, 1e | measurements | numbers before any change |
 | 6 | 2b `per: 2` | `Editing Options` only | submit-to-land per clip vs 86 s |
 
@@ -412,4 +458,5 @@ Every node body comes from a committed file in `paste/` here, every publish
 is diffed against the version it was built on with `--expect`, node settings
 compared by hand, and nothing is published over a running batch's regen path
 without checking `search_executions` first. The two decisions above (D1, D2)
-are the producer's, and steps 2 and 4 wait on them.
+were the producer's, and both were taken as recommended on 2026-09-22;
+steps 1-4 are live, 5 and 6 are what is left.

@@ -1304,6 +1304,14 @@ expected and harmless for an app touching only its own Drive.
 - Test `chapters` multi-voice on a project with 2+ chapters (over 120s), which
   is the branch the per-scene rotation does *not* cover.
 - Codify the "no visible faces" rule into Documentary image prompts.
+  **Superseded 2026-09-22 by `db/port/pool-tail-and-refusals/README.md`,
+  step 1c**: gate it on STYLE (photorealistic), not on category — the film
+  that measured a 41% refusal rate was `category: story` with Documentary
+  tone and style, so a category-keyed rule would never have fired — and add
+  the speech cue, since Veo invents a soundtrack from the still and refuses
+  it. That file is the plan for both the refusal rate and the pool's tail;
+  it names two decisions that are the producer's (D1: may the ladder replace
+  an approved still; D2: faces off by default on photorealistic films).
 - Scene 104/105 of `recCoZWsZBOrIU69L` are the first scenes to go through the
   new fal auto-rewrite path — worth watching once to confirm the rewritten
   prompt clears fal and the regen loop picks the scene up.

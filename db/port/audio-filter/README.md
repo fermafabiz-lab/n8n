@@ -112,6 +112,46 @@ Note the old motion prompt has **no `Negative:` tail**, unlike its
 neighbours — it is the rewrite ladder's own output, and the ladder drops the
 tail.
 
+**It worked on the first attempt.** The image regeneration landed
+`…-image:bb1a623d-8810-40ae-ba32-d686bfd78a02` in about 50 seconds, and
+`scene-video-regen` (execution 16104, 11:49:46 → 11:50:59, **1m13**) came
+back with a clip and an empty note where five previous submissions had all
+been refused. The scene reads `Așteaptă Aprobare Video` and is waiting for
+the producer, like every other scene on the film.
+
+That is the confirmation the diagnosis needed: same account, same model,
+same prompt tail, same deterministic seed — **only the still changed**, and
+the refusal went away. The audio was being conditioned by the picture.
+
+## The classification fix is live
+
+Media Generation **`78bff76f`**, rollback **`2d3f0f86`**. Two nodes:
+
+- **`VP Prep`** grows an audio arm. `AUDIO_GENERATION_FILTERED` /
+  `AUDIO_FILTERED` is now named as itself, and the node emits an `advice`
+  string that fits the refusal it actually saw.
+- **`Mark Video Prompt Rejected`** prints `advice` instead of the one
+  hardcoded sentence about faces.
+
+The detection window also grows from 2,000 to 20,000 characters. The marker
+that says WHICH filter fired lives in `media[0].mediaStatus`, past a
+kilobyte of echoed request, so on a long response the old window cut it off
+and **every** refusal read as the generic one — which means the
+`PROMINENT` and `MINOR` arms were unreliable too, not just the missing
+audio one.
+
+Diff before publishing: 234 → 234 nodes, added 0, removed 0, changed 2, the
+only two named in `--expect`, connections identical, no dangling
+references, no Drive regression. Node `settings`, `type`, `typeVersion`,
+`credentials` and `notes` compared by hand across all 234 nodes and
+identical — `diff-workflow.mjs` is blind to those.
+
+**The rewrite ladder is deliberately unchanged.** Skipping straight to
+"give up" on an audio refusal would save three pointless generations, but
+only if the filter is deterministic, and that is exactly what is not known
+(see the seed note above). Reporting it correctly costs nothing and is
+right either way.
+
 ## What is owed
 
 1. **Give `VP Prep` an audio arm.** `AUDIO_FILTERED` / `AUDIO_GENERATION_FILTERED`

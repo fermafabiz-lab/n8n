@@ -792,6 +792,41 @@ expected and harmless for an app touching only its own Drive.
   cannot see this; only the returned `mediaGenerationId`'s hex-encoded owner can,
   which is why `Collect Replicated` files every copy by it.
 
+- **A clip Google refuses for its AUDIO was being diagnosed as a picture
+  problem, and the ladder that "fixed" it rewrote the wrong thing**
+  (2026-09-22, Media Generation `78bff76f`, rollback `2d3f0f86`; full
+  account `db/port/audio-filter/README.md`). Scene 7 of the producer's New
+  York film would not generate: the rewrite ladder had spent four motion
+  rewrites on it and left a note saying *"The START IMAGE is most likely
+  what Google refuses: regenerate the image so no face or real person is in
+  frame"* — on a start image that is an extreme close-up of a HAND, with no
+  face anywhere in it. Submitting that same image with a deliberately blank
+  prompt returns `PUBLIC_ERROR_AUDIO_FILTERED` / `AUDIO_GENERATION_FILTERED`.
+  **Veo 3.1 generates a soundtrack alongside the picture and Google refuses
+  that soundtrack on its own terms**; the string contains `FILTER`, so
+  `Filter Failure?` routed it into the ladder that rewrites the MOTION
+  prompt — the one thing that was not refused. `VP Prep` now has an audio
+  arm and carries the advice that fits the refusal. **Three things close off
+  the obvious escapes.** `generateAudio` is not a parameter useapi accepts
+  (`400 Parameter generateAudio not supported`), so a silent clip cannot be
+  asked for. The detection window was `slice(0, 2000)` while the marker sits
+  past a kilobyte of echoed request, so **the `PROMINENT` and `MINOR` arms
+  were unreliable too** — it is 20,000 now. And **retrying is not a second
+  roll of the dice**: both submit paths derive the seed as
+  `hash(sceneId + ':' + takes)`, a refused clip files no take, so `takes`
+  stays 0 and every rewrite and every press of "Regenerate video" re-rolls
+  the IDENTICAL seed. Four attempts were one attempt four times, and a scene
+  that fails the filter before it ever produces a clip cannot escape by
+  retrying. **The fix that worked was a different still** — the same desk in
+  the same light with no person and no hand, so the audio model has nothing
+  to speak; it passed on the first submit (execution 16104, 1m13) after five
+  straight refusals. **What is owed**: vary the seed per attempt, and measure
+  whether an audio refusal is deterministic at all. Also worth a
+  measurement — every clip this pipeline submits ends
+  `"Negative: speech, voices, dialogue, singing, narration, music, …"`, and
+  this repo's own expensive lesson is that naming a thing in a Veo prompt
+  summons it.
+
 - **The parallel-accounts work is reachable from the site since 2026-09-20**
   (`db/port/flow-accounts-ui/README.md`; orchestrator `4f022248`, rollback
   `fec6369c`). The brief has a **Clip generation** control next to Video

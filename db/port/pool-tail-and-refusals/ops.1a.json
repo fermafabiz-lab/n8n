@@ -1,0 +1,360 @@
+[
+ {
+  "type": "removeConnection",
+  "source": "VP Give Up?",
+  "sourceIndex": 1,
+  "target": "VP Rewrite AI"
+ },
+ {
+  "type": "setNodeParameter",
+  "nodeName": "VP Prep",
+  "path": "/jsCode",
+  "value": "// The video filter refused this scene's clip. Count the attempt PER SCENE\n// (static data): the START IMAGE is regenerated with a steer and the SAME\n// scene resubmitted in place, up to MAX_ATTEMPTS times, the second steer\n// stronger than the first. Only after that does the scene get marked rejected\n// and the loop move on.\n//\n// WHY THE STILL AND NOT THE PROMPT (2026-09-22). This ladder used to rewrite\n// the MOTION prompt four times on one seed. Both refusal classes that matter\n// are triggered by the picture, not the words: `PROMINENT` was proven so in\n// docs/lessons-pipeline.md (\"a fully generic prompt with no names still failed\n// on the same image\"), and `AUDIO_GENERATION_FILTERED` on 2026-09-22 — seven\n// generations of one still, three of them with a blank prompt and different\n// seeds, all refused; a different still of the same desk passed first time\n// (db/port/audio-filter/README.md, db/port/pool-tail-and-refusals/README.md).\n// So the ladder now asks for a new still through the same `scene-image-regen`\n// webhook the site's Regenerate button fires, waits for it to land, and\n// resubmits. The motion prompt is rewritten only when the reason names a\n// PERSON, since a real name in the direction re-triggers regardless of the\n// still.\nconst sd = $getWorkflowStaticData('global');\nsd.rewrites = sd.rewrites || {};\nconst cur = $('Current Scene').first().json || {};\nconst f = cur.fields || {};\nconst sceneId = cur.id;\nconst n = (sd.rewrites[sceneId] || 0) + 1;\nsd.rewrites[sceneId] = n;\nconst MAX_ATTEMPTS = 2;\n// NOT slice(0, 2000). The marker that says WHICH filter fired sits inside\n// `media[0].mediaStatus`, past a kilobyte of request echo, and on a longer\n// response the old 2,000-character window cut it off — so every refusal read\n// as the generic one. 2026-09-22.\nconst errText = JSON.stringify($json).slice(0, 20000);\nconst audioFiltered = errText.includes('AUDIO_GENERATION_FILTERED') || errText.includes('AUDIO_FILTERED');\nconst prominent = errText.includes('PROMINENT');\nconst minor = errText.includes('MINOR');\nlet reason = 'Google video content filter';\nif (prominent) reason = 'the shot shows or names a recognizable real person';\nelse if (minor) reason = 'the shot places a child on screen';\nelse if (audioFiltered) reason = 'Google refused the generated AUDIO track, not the picture (AUDIO_GENERATION_FILTERED)';\nconst kind = prominent ? 'person' : (minor ? 'minor' : (audioFiltered ? 'audio' : 'generic'));\n\n// The steer rides to the image model as `Observații Scenă`, which\n// `IR Build Request` appends to the stored image prompt as an ADJUSTMENT\n// REQUEST — the same slot the producer's own correction uses. The `AUTO-`\n// prefix is what tells every other reader of that field (`VRW Build Regen`,\n// `Evaluate Image Approval`, `Prep Video Regen`) it is machine text, and\n// `IR Write Image` clears it when the new still lands. Phrased as what the\n// frame CONTAINS, since an instruction written as an absence is the documented\n// way to get the thing named.\nconst STEER = {\n  audio: 'Keep the same moment, place and light, framed on the setting, the objects and the hands: any person is seen from behind or stands outside the frame, every mouth out of view, so the still reads as a quiet room rather than someone about to speak.',\n  person: 'Keep the same moment, place and light, with every face turned away from the camera or outside the frame: people from behind, in profile at a distance, or a detail insert of hands and objects.',\n  minor: 'Keep the same moment, place and light, with adults only or the empty setting, every child outside the frame.',\n  generic: 'Keep the same moment, place and light, framed on the setting, the objects and the light, with any person seen from behind or outside the frame.',\n};\nconst STRONGER = 'Keep the same place and light as a still life: the setting, the objects and the light only, every person outside the frame.';\nconst steer = 'AUTO-STEER: ' + (n >= 2 ? STRONGER : STEER[kind]);\n\n// What the give-up note tells the producer to DO. `Mark Video Prompt\n// Rejected` prints this verbatim after the reason.\nconst advice = audioFiltered\n  ? 'Two new stills were tried automatically and Google still refused the soundtrack it invents for them. Write the image prompt as a moment with nobody about to speak — the room, the objects, hands — regenerate the image, approve it, then press Regenerate video.'\n  : 'Two new stills were tried automatically and Google still refused. The picture is what it refuses: rewrite the image prompt so no face or real person is in frame, regenerate the image, approve it, then press Regenerate video.';\n\nconsole.log('Scene ' + sceneId + ': video filter refusal (' + reason + '), attempt ' + n + '/' + MAX_ATTEMPTS + (n > MAX_ATTEMPTS ? ' — giving up' : ' — regenerating the still'));\nreturn [{ json: {\n  sceneId,\n  imageId: String(f['Image Media ID'] || ''),\n  prompt: String(f['Video Scenă URL'] || ''),\n  note: String(f['Observații Scenă'] || ''),\n  reason,\n  kind,\n  advice,\n  steer,\n  audioFiltered,\n  attempt: n,\n  giveUp: n > MAX_ATTEMPTS,\n} }];\n"
+ },
+ {
+  "type": "setNodeParameter",
+  "nodeName": "Pool Record",
+  "path": "/jsCode",
+  "value": "// Fold the result of ONE tick back into the pool, then hand control to Pool Tick.\n//\n// Five edges arrive here, and they mean different things. They are told apart by\n// $prevNode.name rather than by sniffing the item's shape, because the shapes\n// are whatever the previous node happened to return (an HTTP response, a\n// Postgres result, Current Scene's object) and a shape test would silently\n// mis-read the day one of them changes.\n//\n// With the pool OFF this node is a pass-through: Pool Tick never ran, so there\n// is no state, and Pool Return? sends the item on to Loop Scenes exactly as\n// before. Nothing about the serial path changes.\n\nlet pool = null;\ntry { pool = $('Pool Tick').first().json.pool || null; } catch (e) { pool = null; }\n\nif (!pool) {\n  // Pool is off. Pass the item through untouched.\n  return $input.all();\n}\n\nlet from = '';\ntry { from = String($prevNode.name || ''); } catch (e) { from = ''; }\n\nlet scene = null;\ntry { scene = $('Current Scene').first().json; } catch (e) { scene = null; }\nconst sceneId = String((scene && scene.id) || '');\n\nconst inflight = pool.inflight || [];\nconst queue = pool.queue || [];\nconst done = pool.done || [];\n\nconst drop = function (id) {\n  pool.inflight = inflight.filter(function (j) { return j.id !== id; });\n};\nconst unqueue = function (id) {\n  pool.queue = queue.filter(function (q) { return q.id !== id; });\n};\n\nif (from === 'Pool Submitted?') {\n  // A job was accepted by Flow. This covers the first submit of a scene AND a\n  // motion re-roll, which resubmits from inside a POLL tick — so the entry is\n  // replaced rather than added, and the poll counter starts again.\n  let jobid = '';\n  try { jobid = String($('Submit Video').first().json.jobid || ''); } catch (e) { jobid = '';}\n  const q = queue.find(function (x) { return x.id === sceneId; });\n  // A resubmit from inside a poll tick — a motion re-roll, or the refusal\n  // ladder after a new still — arrives on a RELOADED scene row that carries no\n  // poolAccount, and its queue entry was removed on the first submit. Before\n  // 2026-09-22 that filed the new job under account '' and freed the real\n  // account's slot while the job was still running, so the pool could put a\n  // second job on that account. The entry being replaced knows the account.\n  const prev = inflight.find(function (x) { return x.id === sceneId; });\n  const account = (q && q.account) || (scene && scene.poolAccount) || (prev && prev.account) || '';\n  drop(sceneId);\n  unqueue(sceneId);\n  if (jobid) {\n    pool.inflight.push({ id: sceneId, account: account, jobid: jobid, polls: 0, lastPollAt: Date.now() });\n    console.log('POOL submit ' + sceneId + ' on ' + (account || '(primary)') + ' → job ' + jobid + ' (' + pool.inflight.length + ' in flight)');\n  } else {\n    // Accepted with no jobid is not something to retry blindly — the scene is\n    // set aside and the next pass will find it without a clip.\n    done.push(sceneId);\n    pool.done = done;\n    console.log('POOL submit ' + sceneId + ': no jobid in the response, setting the scene aside');\n  }\n} else if (from === 'Pool Retry?') {\n  // The job exists and is not finished yet. Only the counters move.\n  const j = inflight.find(function (x) { return x.id === sceneId; });\n  if (j) {\n    j.polls = Number(j.polls || 0) + 1;\n    j.lastPollAt = Date.now();\n  }\n} else {\n  // Update Scene Record (the clip landed), Mark Video Prompt Rejected (given up\n  // on), or Needs Clip? saying this scene already had one. Either way the scene\n  // is off the pool's books and its account slot is free.\n  drop(sceneId);\n  unqueue(sceneId);\n  if (done.indexOf(sceneId) < 0) done.push(sceneId);\n  pool.done = done;\n  console.log('POOL settled ' + sceneId + ' via ' + (from || '?') + ' (' + pool.inflight.length + ' in flight, ' + (pool.queue || []).length + ' queued)');\n}\n\nreturn [{ json: { pool: pool } }];\n"
+ },
+ {
+  "type": "setNodeParameter",
+  "nodeName": "VRW Build Regen",
+  "path": "/jsCode",
+  "value": "// Turn one webhook POST into the payload the `RG *` tail already eats.\n//\n// The site fires { scene_id } and this decides whether that scene can be\n// re-shot at all, then hands `Prep Video Regen` exactly what\n// `Evaluate Video Approval` hands it on the batch path — the same\n// { id, motionPrompt, imageId, voiceUrl } — plus the project and scene rows\n// the batch path gets from `IMG Load Project` and `Fetch Scene Videos`.\n//\n// WHY IT REFUSES RATHER THAN THROWS. `Prep Video Regen` throws on a scene with\n// no Flow asset id or no motion prompt, and it carries no onError, so on the\n// batch path that throw kills the whole execution. On this path a throw would\n// be worse in a quieter way: the webhook run would die with `Regenerează\n// Video` still true and nobody left to clear it, which is the stranded-flag\n// dead end CLAUDE.md warns about once per in-flight flag. So every reason to\n// stop is decided HERE, before the tail, and each one either clears the flag\n// with an explanation or leaves a flag that was already gone alone.\n// The POST, read from the webhook node by name rather than from $json:\n// $json here is VRW Load Scene's row, and a body that arrived through a\n// column alias would be a coupling nobody would expect to matter until the\n// day someone renamed a column.\nconst hook = $('Video Regen Webhook').first().json;\nconst post = hook.body || hook;\nconst sceneId = String(post.scene_id || post.sceneId || '').trim();\nconst row = $input.all()[0] ? $input.all()[0].json : null;\n\nconst refuse = (reason, write) => [{ json: { ok: false, write: !!write, sceneId, reason } }];\n\nif (!sceneId) throw new Error('VRW: no scene_id in the webhook body — nothing to regenerate.');\n// A scene id that matches no row is the one case worth throwing on: there is\n// no flag to clear and no row to write a reason onto, so failing loudly is\n// the only way it is ever noticed.\nif (!row || !row.scene) throw new Error('VRW: scene ' + sceneId + ' not found.');\n\nconst f = row.scene || {};\nconst projF = row.project || {};\nconst projectId = String(row.project_id || '');\n\n// The flag is the request. If it is already false, either the producer\n// cancelled it or a batch got there first — either way there is nothing to do\n// and nothing to write. Ending quietly here is what makes the webhook safe to\n// fire twice, which the site does whenever an approved image queues a clip\n// and the producer also presses Regenerate.\nif (f['Regenerează Video'] !== true) return refuse('the scene is not asking for a new clip (Regenerează Video is already false)', false);\n\n// These two ARE the reasons `Prep Video Regen` throws. Catching them here\n// turns \"the film dies\" into \"the scene comes back with a sentence\".\nif (!f['Image Media ID']) return refuse('this scene has no Flow image id, so there is no still for Veo to animate — regenerate and approve its image first', true);\nif (!String(f['Video Scenă URL'] || '').trim()) return refuse('this scene has no shot direction (Video Scenă URL), so there is nothing to shoot — write one in the Video step', true);\n\n// `Observații Scenă` IS NOT A PRODUCER-ONLY FIELD, and that is what makes\n// the reordering below dangerous without this line. Five nodes in this\n// workflow write MACHINE text into it and none of them ever clears it:\n// `VP Apply` (\"AUTO-REWRITE-VIDEO (attempt N): the video filter refused\n// this scene — …\"), `Apply Rewritten Prompt`, `Mark Flow Upload Rejected`,\n// `Mark Video Prompt Rejected` and `Mark Regen Filtered` (all \"REJECTED by\n// …\"). `VP Apply` writes that note AND sets `Regenerează Video: true` in\n// the same statement, so the very next poll arrives here with a machine\n// sentence sitting in the producer's feedback slot.\n//\n// Before the reordering this was hidden by a bug: the note was appended\n// after the legacy \"Negative:\" tail and `Submit Video Regen` cut it off.\n// Strip-then-append fixes the producer's case and would have handed Veo\n// \"the new video MUST follow this: AUTO-REWRITE-VIDEO (attempt 2): the\n// video filter refused this scene …\" as a mandatory instruction. Worse, it\n// would persist: nothing clears the field, so every later regeneration of\n// that scene would carry it again.\n//\n// `Evaluate Image Approval` one gate upstream already solves this with the\n// same test, and this is deliberately the same shape so the two stay\n// greppable together. Extend BOTH if a sixth machine writer appears.\nlet feedback = String(f['Observații Scenă'] || '').trim();\nif (/^(AUTO-|REJECTED)/i.test(feedback)) feedback = '';\n// 2026-09-13 — WHERE THE PRODUCER'S CORRECTION LANDS IN THE PROMPT.\n//\n// `Video Scenă URL` holds the motion PROMPT, not a URL (historic field\n// name, same everywhere in this workflow).\n//\n// This node used to build the regeneration brief in this order:\n//\n//     <stored prompt, legacy \"Negative: …\" tail and all>\n//       + ' ADJUSTMENT REQUEST — the new video MUST follow this: …'\n//\n// which put the one piece of text a human actually typed AFTER the token\n// \"Negative:\", i.e. inside a list of prohibitions. A producer typing \"she\n// should keep holding the stack\" was handing the model one more thing to\n// avoid.\n//\n// And it was worse than badly placed: it was DELETED. `Submit Video\n// Regen` strips the legacy tail with split(/\\s*Negative:\\s*/i)[0] before\n// composing today's guardrails, so on any scene whose stored prompt still\n// carries that tail — 368 of the 504 rows written in the three weeks up to\n// today — the split cut the prompt at \"Negative:\" and took everything\n// BEFORE it, throwing the ADJUSTMENT REQUEST away with the tail. The\n// producer rejected a clip, wrote what was wrong with it, waited a minute\n// and a half, and got a re-roll of the identical brief. That is the shape\n// of \"regenerate does nothing\".\n//\n// So: strip FIRST, then append the correction. The stored prompt is\n// reduced to the ACTION ONLY with the same canonical split used by\n// `Current Scene`, `End Frame Prompt` and (as an instruction) `VP Rewrite\n// AI`, and the producer's words become part of that action. The\n// guardrails — shot rules in front, world rules and the trailing noun\n// list behind — are composed at submit time by `Submit Video Regen` and\n// must not be here.\n//\n// Two downstream readers get this for free, and both already claimed it\n// in their own comments:\n//   - `RG End Frame Prompt` draws the after-frame from `motionPrompt` and\n//     does NOT strip anything itself, so it was handing nano-banana-2\n//     \"no subtitles, no lip movement\" as drawing instructions.\n//   - `RG Motion Prep` judges the finished clip against `motionPrompt`.\n//     The brief it scores is now the action plus the human's correction,\n//     which is what its comment says it is.\n//\n// The 'ADJUSTMENT REQUEST — the new video MUST follow this: ' wording is\n// quoted verbatim in both of those nodes' comments. If it ever changes,\n// change it in all three.\n//\n// The tail-only edge must NEVER produce an empty prompt. `Prep Video\n// Regen` throws \"has no motion prompt\" on one, and it carries no onError\n// setting, so that throw aborts the WHOLE Media Generation execution —\n// the batch loop, the image gate and the video gate for every other scene\n// — and strands `Regenerează Video` true with no writer left inside the\n// run to clear it. A row whose stored prompt is nothing but a tail is\n// rare, but \"rare\" and \"takes the film down with it\" is not a trade worth\n// making for tidiness. Falling back to the raw stored string restores\n// exactly the pre-2026-09-13 behaviour for that one case and can only be\n// better than nothing.\nconst storedPrompt = String(f['Video Scenă URL'] || '');\nconst action = storedPrompt.split(/\\s*Negative:\\s*/i)[0].trim();\nlet motionPrompt = action || storedPrompt.trim();\nif (feedback) {\n  // Defensive, and only against the literal section token: if a producer\n  // types \"Negative:\" in their note, the submit-time split would truncate\n  // the prompt at their own words. Softening the colon keeps every word\n  // they wrote and leaves nothing downstream can read as a header.\n  const note = feedback.replace(/\\bNegative\\s*:/gi, 'Negative,');\n  motionPrompt += ' ADJUSTMENT REQUEST — the new video MUST follow this: ' + note + '.';\n}\n\nconst regen = { id: sceneId, motionPrompt, imageId: f['Image Media ID'] || '', voiceUrl: f['Voiceover URL'] || '' };\n\nconsole.log('VRW ' + sceneId + ': regenerating, ' + motionPrompt.length + ' chars of brief' + (feedback ? ', with the producer\\'s correction' : ''));\n\nreturn [{\n  json: {\n    ok: true,\n    sceneId,\n    projectId,\n    regen,\n    // What `Prep Video Regen` reads instead of IMG Load Project / Fetch Scene\n    // Videos / Receive Batch Input when it sees this entry point.\n    sceneFields: f,\n    projectFields: projF,\n    aspectRatio: String(projF['Format'] || '16:9') === '9:16' ? '9:16' : '16:9',\n  },\n}];\n"
+ },
+ {
+  "type": "setNodeParameter",
+  "nodeName": "Evaluate Image Approval",
+  "path": "/jsCode",
+  "value": "// ---------------------------------------------------------------------------\n// REFERENCE ASSEMBLY — shared word for word by Build Image Request (batch),\n// Evaluate Image Approval (the gate's regen) and IR Build Request (the site's\n// regen). Change one, change all three: a re-rolled picture built from\n// different references than its neighbours is the drift this exists to stop.\n//\n// Consistency comes from PICTURES the model is anchored to, never from prose:\n//   - cast sheets   (castRefs / castSheets)   one per character, turnaround or portrait\n//   - object sheets (objectRefs)              one per hero object (a car, a machine)\n//   - set plates    (locationRefs)            one per bible location, wide, empty\n//   - the producer's own photo                ground truth on scene 1\n//   - the previous frame                      LAST, palette only\n// Who and where come from the scene's own tags (`char:`, `obj:`, `loc:`),\n// written by the segmenter; films made before the tags existed fall back to\n// name matching on Prompt Vizual, exactly as the cast sheet did.\nconst CONS = (function () {\n  const norm = (s) => String(s ?? '').normalize('NFD').replace(/\\p{M}/gu, '').toLowerCase().trim();\n  const esc = (s) => s.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');\n  const tagsOf = (f) => (Array.isArray(f['Tag-uri Scenă']) ? f['Tag-uri Scenă'] : []).map((t) => String(t));\n  const tagged = (f, prefix) => tagsOf(f).filter((t) => t.startsWith(prefix)).map((t) => t.slice(prefix.length).trim()).filter(Boolean);\n  const mentions = (text, name, allGivens) => {\n    const full = norm(name);\n    const given = norm(name.split(/\\s+/)[0] || '');\n    const keys = (allGivens || []).filter((g) => g && g === given).length > 1 ? [full] : [full, given];\n    return keys.some((k) => k.length > 2 && new RegExp('\\\\b' + esc(k) + '\\\\b').test(text));\n  };\n  // Which bible entries are IN this scene: tags first (exact names the\n  // segmenter chose from the bible), name matching second.\n  function present(f, entries, prefix, textFields) {\n    const names = entries.map((e) => String((e || {}).name || '').trim()).filter(Boolean);\n    const fromTags = tagged(f, prefix).map(norm);\n    if (fromTags.length) return names.filter((n) => fromTags.includes(norm(n)));\n    const text = ' ' + norm(textFields.map((k) => f[k] || '').join(' ')) + ' ';\n    const givens = names.map((n) => norm(n.split(/\\s+/)[0] || ''));\n    return names.filter((n) => mentions(text, n, givens));\n  }\n  function plan(a) {\n    // a: { f, opts, bible, prompt, prevId, userRefId, isFirstScene, afterRefusal, strict, strictNotes }\n    const opts = a.opts || {}, bible = a.bible || {}, f = a.f || {};\n    const castRefs = (opts.castRefs && typeof opts.castRefs === 'object') ? opts.castRefs : {};\n    const castSheets = (opts.castSheets && typeof opts.castSheets === 'object') ? opts.castSheets : {};\n    const objectRefs = (opts.objectRefs && typeof opts.objectRefs === 'object') ? opts.objectRefs : {};\n    const locationRefs = (opts.locationRefs && typeof opts.locationRefs === 'object') ? opts.locationRefs : {};\n    const chars = Array.isArray(bible.characters) ? bible.characters : [];\n    const objs = Array.isArray(bible.objects) ? bible.objects : [];\n    const locs = Array.isArray(bible.locations) ? bible.locations : [];\n    const refs = []; // {id, role, name}\n    const used = { cast: [], objects: [], location: '', user: false, palette: false };\n    if (a.afterRefusal) {\n      // A refusal is likeliest about a face; nothing is attached, the prompt\n      // rewrite alone carries the retry. Same rule as before the sheets.\n      return { refs, used, prompt: a.prompt };\n    }\n    const protagonist = (() => {\n      const byRole = chars.find((c) => /protagonist|lead|main|hero/i.test(String((c || {}).role || '')));\n      return String(((byRole || chars[0]) || {}).name || '');\n    })();\n    if (a.isFirstScene && a.userRefId) { refs.push({ id: a.userRefId, role: 'user', name: protagonist }); used.user = true; }\n    // Cast: leads (turnaround sheets) first, then portraits; two at most —\n    // a third sheet crowds the composition (measured on the cast sheet port).\n    const inScene = present(f, chars, 'char:', ['Prompt Vizual']).filter((n) => castRefs[n]);\n    inScene.sort((x, y) => ((castSheets[y] || {}).kind === 'turnaround') - ((castSheets[x] || {}).kind === 'turnaround'));\n    for (const n of inScene) {\n      if (used.user && norm(n) === norm(protagonist)) continue; // the photo is truer than the sheet\n      if (used.cast.length >= 2) break;\n      refs.push({ id: castRefs[n], role: 'cast', name: n }); used.cast.push(n);\n    }\n    const objsIn = present(f, objs, 'obj:', ['Prompt Vizual', 'Imagine First Frame']).filter((n) => objectRefs[n]);\n    for (const n of objsIn) { if (used.objects.length >= 1) break; refs.push({ id: objectRefs[n], role: 'object', name: n }); used.objects.push(n); }\n    const locIn = present(f, locs, 'loc:', ['Prompt Vizual', 'Imagine First Frame']).filter((n) => locationRefs[n]);\n    if (locIn.length) { refs.push({ id: locationRefs[locIn[0]], role: 'place', name: locIn[0] }); used.location = locIn[0]; }\n    // The previous frame, last, palette only — and only when there is room.\n    if (a.prevId && refs.length < 5 && !refs.some((r) => r.id === a.prevId)) { refs.push({ id: a.prevId, role: 'palette', name: '' }); used.palette = true; }\n    // The sentence names the references BY POSITION, so it is built from the\n    // list rather than assumed.\n    const parts = [];\n    refs.forEach((r, i) => {\n      const k = i + 1;\n      if (r.role === 'user') parts.push('Reference image ' + k + ' is the producer\\'s own photo and is GROUND TRUTH for that character: exactly the same face, hair, body and outfit.');\n      else if (r.role === 'cast') parts.push('Reference image ' + k + ' is a character sheet of ' + r.name + ' shown from several angles: this character (a person, an animal or a creature, whatever the sheet shows) in the shot has EXACTLY that face or head, hair or markings, colours, build and wardrobe. Render ONE view of them inside the scene — never the sheet layout, never several copies, never the neutral backdrop.');\n      else if (r.role === 'object') parts.push('Reference image ' + k + ' is a reference sheet of ' + r.name + ': the same object in the shot has exactly that design, colours, markings and materials — one instance, placed in the scene.');\n      else if (r.role === 'place') parts.push('Reference image ' + k + ' is the PLACE (' + r.name + '): the same architecture, layout, landmarks, materials and the same arrangement of what stands where. Light, weather and time of day follow the text, not the plate; the plate is empty of people and its framing is not this shot\\'s framing.');\n      else if (r.role === 'palette') parts.push('The LAST reference image is only for colour palette and film look, never for layout and never for who or where anyone is.');\n    });\n    let prompt = a.prompt;\n    if (parts.length) {\n      prompt = parts.join(' ') + ' Compose the shot described here, which may place its subjects at any distance, angle or part of the location: ' + a.prompt;\n      if (a.strict) prompt = 'STRICT MATCH — the previous attempt drifted from the references (' + String(a.strictNotes || 'identity or place did not match') + '). Wherever the text and the references disagree about how a person, object or place LOOKS, the references win. ' + prompt;\n    }\n    return { refs, used, prompt };\n  }\n  function apply(body, planned) {\n    planned.refs.forEach((r, i) => { body['reference_' + (i + 1)] = r.id; });\n    body.prompt = planned.prompt;\n    return body;\n  }\n  return { norm, plan, apply, tagged };\n})();\n// ---------------------------------------------------------------------------\nconst expected = $('Sort & Cap Scenes').all().map(s => s.json.id);\nconst order = {};\nexpected.forEach((id, i) => order[id] = i);\nconst seen = new Set();\nconst recs = $input.all()\n  .filter(r => order[r.json.id] !== undefined)\n  .filter(r => { if (seen.has(r.json.id)) return false; seen.add(r.json.id); return true; })\n  .slice()\n  .sort((a, b) => order[a.json.id] - order[b.json.id]);\nconst regen = [];\n// The gate's regen builds the SAME reference set the batch loop builds —\n// sheets, object sheets, the set plate, the previous scene's picture last —\n// through the shared assembler below, so a re-rolled picture is anchored\n// exactly like its neighbours. After a REJECTED / AUTO-REWRITE note nothing\n// is attached (the reference may hold what was refused).\nconst projF = ($('IMG Load Project').first().json.fields || {});\nlet regenOpts = {}; try { regenOpts = JSON.parse(projF['Editing Options'] || '{}') || {}; } catch (e) { regenOpts = {}; }\nlet regenBible = {}; try { regenBible = JSON.parse(projF['Story Bible'] || '{}') || {}; } catch (e) { regenBible = {}; }\ntry { if ($('Save Cast Refs').isExecuted) { const j = $('Save Cast Refs').first().json; if (j.cast_refs) regenOpts.castRefs = j.cast_refs; if (j.cast_sheets) regenOpts.castSheets = j.cast_sheets; if (j.object_refs) regenOpts.objectRefs = j.object_refs; } } catch (e) {}\ntry { if ($('Save Set Plates').isExecuted) { const j = $('Save Set Plates').first().json; if (j.location_refs) regenOpts.locationRefs = j.location_refs; } } catch (e) {}\nconst regenAspect = ($('Receive Batch Input').first().json.Aspect_Ratio === '9:16' ? '9:16' : '16:9');\nrecs.forEach((r, i) => {\n  const f = r.json.fields || {};\n  if (f['Regenerează Imagine'] === true) {\n    const prevId = i > 0 ? String(((recs[i-1].json.fields || {})['Image Media ID']) || '') : '';\n    let feedback = String(f['Observații Scenă'] || '').trim();\n    const rejected = /^(AUTO-|REJECTED|Image regeneration REJECTED)/i.test(feedback);\n    if (rejected) feedback = '';\n    let prompt = f['Imagine First Frame'] || f['Prompt Vizual'] || '';\n    if (feedback) prompt += '\\n\\nADJUSTMENT REQUEST — the new image MUST follow this: ' + feedback;\n    const planned = CONS.plan({ f: f, opts: regenOpts, bible: regenBible, prompt: prompt, prevId: prevId, userRefId: '', isFirstScene: false, afterRefusal: rejected, strict: false, strictNotes: '' });\n    const requestBody = CONS.apply({ email: 'fermafabiz@gmail.com', model: 'nano-banana-2', prompt: prompt, aspectRatio: regenAspect, count: 1, captchaRetry: 1 }, planned);\n    regen.push({ id: r.json.id, prompt, prevId, requestBody, refs: planned.refs });\n  }\n});\nconst total = recs.length;\n// This is the COMBINED asset gate. Takes and images are generated in one\n// uninterrupted pass (audio loop first, image loop second) and reviewed\n// together here, so the producer makes one visit instead of two before the\n// expensive video stage. Voice regeneration is NOT dispatched from here —\n// the standalone scene-voice-regen webhook covers it, exactly as it covered\n// the old separate voice gate. Image regeneration keeps its in-batch chain\n// (If Any Regen).\n//\n// A scene only counts as approved when its asset actually EXISTS — bulk\n// approving before generation finished must not open the gate.\nconst imagesApproved = recs.filter(r => {\n  const f = r.json.fields || {};\n  const att = f['Imagine Scenă'];\n  return f['Aprobare Imagine'] === true && Array.isArray(att) && att.length > 0;\n}).length;\n// Cinematic (silent) projects never synthesize: the pre-checked Aprobare\n// Voce alone passes. AB Load Project runs whenever any scene lacked audio\n// this pass; when it never ran (every scene already voiced) the catch\n// leaves noSpeech false, which is correct for a project that has takes.\nlet noSpeech = false;\ntry { noSpeech = JSON.parse((($('AB Load Project').first().json.fields || {})['Editing Options']) || '{}').category === 'cinematic'; } catch (e) {}\nconst voicesApproved = recs.filter(r => {\n  const f = r.json.fields || {};\n  // A scene with NO narration at all (a silent hook shot — see Save scenes To\n  // Airtable1's [SILENT] rule) never gets a take, so its approval cannot wait\n  // for one; it is created approved, exactly like every scene of a silent film.\n  const silentScene = String(f['Script Scenă'] || '').trim() === '';\n  return f['Aprobare Voce'] === true && (noSpeech || silentScene || String(f['Voiceover URL'] || '') !== '');\n}).length;\nconst allApproved = total > 0 && imagesApproved === total && voicesApproved === total;\nreturn [{ json: { anyRegen: regen.length > 0, allApproved, regen, total, approved: imagesApproved, imagesApproved, voicesApproved } }];"
+ },
+ {
+  "type": "setNodeParameter",
+  "nodeName": "Prep Video Regen",
+  "path": "/jsCode",
+  "value": "const r = $json.regen;\nif (!r) throw new Error('No regen payload.');\nif (!r.imageId) throw new Error('Scene ' + r.id + ' has no Image Media ID — cannot regenerate its video (regenerate/approve its image first).');\nif (!r.motionPrompt) throw new Error('Scene ' + r.id + ' has no motion prompt (Video Scenă URL).');\n\n// Which model this re-roll deserves. Same rule as Current Scene, and the two\n// must keep agreeing — a rescued clip that obeys a different rule from its\n// neighbours is a new inconsistency.\n//\n// This is where the rescue actually fires: the main path only submits scenes\n// with NO clip at all, so a scene on its third attempt can only arrive here.\n// TWO ENTRY POINTS (2026-09-17), and this node is the only one that can\n// tell them apart. Everything below it reads its context off THIS node's\n// output, which is why the rest of the tail has no outside reference left\n// and can be reached from a webhook at all.\nconst viaWebhook = (() => { try { return $('Video Regen Webhook').isExecuted; } catch (e) { return false; } })();\n\n// The project row. On the batch path it is the one `IMG Load Project` fetched\n// at the top of the run; on the webhook path `VRW Build Regen` carries the\n// same row, read from hov.at_project in the same query as the scene. Both are\n// the Airtable-shaped `fields` object, so everything after this is identical.\nlet projF = {};\ntry {\n  projF = viaWebhook ? ($json.projectFields || {}) : ($('IMG Load Project').first().json.fields || {});\n} catch (e) { projF = {}; }\nlet opts = {};\ntry { opts = JSON.parse(projF['Editing Options'] || '{}') || {}; } catch (e) { opts = {}; }\n\n// 16:9 or 9:16, for `RG End Frame Prompt` and `Submit Video Regen`. The batch\n// is told by the orchestrator's workflow input; a webhook run has no\n// orchestrator, so it reads the project's own `Format` — which is the very\n// field the orchestrator itself reads on Resume and Restart\n// (`Fetch Project For Resume`: fields['Format'] || '16:9').\nlet aspectRatio = '16:9';\ntry {\n  aspectRatio = viaWebhook\n    ? String($json.aspectRatio || projF['Format'] || '16:9')\n    : String($('Receive Batch Input').first().json.Aspect_Ratio || '16:9');\n} catch (e) { aspectRatio = '16:9'; }\nif (aspectRatio !== '9:16') aspectRatio = '16:9';\nconst FREE = 'veo-3.1-lite-low-priority';\nconst PAID = 'veo-3.1-quality';\nconst base = String(opts.videoModel || FREE);\n\n// Takes already filed for this shot, read from the scene the gate fetched.\nlet takes = 0;\nlet sceneNote = '';\ntry {\n  // Same row, fetched by whichever entry point ran: the gate's\n  // `Fetch Scene Videos`, or `VRW Load Scene` one node upstream.\n  const fields = viaWebhook\n    ? ($json.sceneFields || {})\n    : (($('Fetch Scene Videos').all().find((x) => x.json && x.json.id === r.id) || { json: {} }).json.fields || {});\n  const v = fields['Versiuni Media'];\n  const list = Array.isArray(v) ? v : JSON.parse(String(v || '[]'));\n  takes = list.filter((e) => e && e.kind === 'video').length;\n  sceneNote = String(fields['Observații Scenă'] || '').trim();\n} catch (e) { takes = 0; }\n\n// Two free takes the producer has already refused is the evidence that this\n// shot is not something the free tier can do. Everything before that is a\n// coin flip worth re-flipping for nothing.\nconst rescue = opts.rescueVideoModel === undefined ? PAID : String(opts.rescueVideoModel);\nconst model = (base === FREE && takes >= 2 && rescue && rescue !== FREE) ? rescue : base;\nconst hash = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };\n// A SEED IS REPRODUCIBLE UNTIL IT IS REFUSED (2026-09-22). A refused clip\n// files no take, so `takes` alone re-rolled the identical seed on every press\n// of \"Regenerate video\" after a filter refusal — the one case where\n// reproducing the last result is exactly what nobody wants. This path has no\n// per-scene refusal counter (it is its own execution), but the machine note\n// the ladder leaves behind says the last attempt was refused; when it does,\n// the seed is deliberately fresh. Everywhere else it is what it always was.\nconst wasRefused = /^(AUTO-|REJECTED)/i.test(sceneNote);\nconst seed = hash(String(r.id || '') + ':' + takes + (wasRefused ? ':refused:' + Date.now() : '')) % 2147483647;\nconsole.log('VIDEO REGEN ' + r.id + ': ' + model + (model === base ? '' : ' (rescue after ' + takes + ' takes)') + ', seed ' + seed + (wasRefused ? ' (fresh — the last attempt was refused)' : ''));\n\n// `opts`, `aspectRatio` and `viaWebhook` ride along so that NOTHING after\n// this node has to ask the outside world. `RG End Frame Prompt` and\n// `RG Motion Prep` used to parse Editing Options out of `IMG Load Project`\n// themselves and `Submit Video Regen` used to read the aspect off\n// `Receive Batch Input`; all three now read them here.\nreturn [{ json: Object.assign({}, r, { model: model, seed: seed, takes: takes, opts: opts, aspectRatio: aspectRatio, viaWebhook: viaWebhook }) }];"
+ },
+ {
+  "type": "setNodeParameter",
+  "nodeName": "VP Apply",
+  "path": "/query",
+  "value": "select * from hov.at_write($hov$scene$hov$, $hov${{ $('VP Prep').first().json.sceneId }}$hov$,\n  $hov${{ JSON.stringify({ \"Video Scenă URL\": ($json.choices && $json.choices[0] && $json.choices[0].message && $json.choices[0].message.content || '').trim() || $('VP Prep').first().json.prompt, \"Regenerează Video\": true, \"Aprobare Video\": false, \"Status Producție Scenă\": \"Generare Video\", \"Observații Scenă\": 'AUTO-REWRITE-VIDEO (attempt ' + $('VP Prep').first().json.attempt + '): the video filter refused this scene — ' + $('VP Prep').first().json.reason + '. The start image was regenerated and the motion prompt rewritten automatically, and the clip resubmitted.' }) }}$hov$::jsonb)"
+ },
+ {
+  "type": "setNodeParameter",
+  "nodeName": "Mark Video Prompt Rejected",
+  "path": "/query",
+  "value": "select * from hov.at_write($hov$scene$hov$, $hov${{ $('VP Prep').first().json.sceneId }}$hov$,\n  $hov${{ JSON.stringify({ \"Regenerează Video\": false, \"Regenerează Imagine\": false, \"Status Producție Scenă\": \"Generare Video\", \"Observații Scenă\": 'REJECTED by the video filter after ' + Math.max(0, Number($('VP Prep').first().json.attempt) - 1) + ' automatically regenerated still(s) — ' + $('VP Prep').first().json.reason + '. ' + $('VP Prep').first().json.advice }) }}$hov$::jsonb)"
+ },
+ {
+  "type": "addNode",
+  "node": {
+   "name": "VP Steer",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.6,
+   "position": [
+    -80,
+    1232
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "eRjiNDQFuDSTJpGK",
+     "name": "HOV Postgres"
+    }
+   },
+   "parameters": {
+    "operation": "executeQuery",
+    "options": {},
+    "query": "select * from hov.at_write($hov$scene$hov$, $hov${{ $('VP Prep').first().json.sceneId }}$hov$,\n  $hov${{ JSON.stringify({ \"Observații Scenă\": $('VP Prep').first().json.steer, \"Regenerează Imagine\": true, \"Aprobare Imagine\": false }) }}$hov$::jsonb)"
+   },
+   "notes": "Refusal ladder, attempt N: write the steer into the note slot IR Build Request appends to the image prompt, and arm the image regen flag."
+  }
+ },
+ {
+  "type": "addNode",
+  "node": {
+   "name": "VP Fire Image Regen",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    80,
+    1232
+   ],
+   "parameters": {
+    "method": "POST",
+    "url": "http://localhost:5678/webhook/scene-image-regen",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Content-Type",
+       "value": "application/json"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={{ { scene_id: $('VP Prep').first().json.sceneId } }}",
+    "options": {
+     "timeout": 30000
+    }
+   },
+   "notes": "The same webhook the site's Regenerate image button fires. Answers \"Workflow was started\"; the new still lands in ~50 s."
+  }
+ },
+ {
+  "type": "addNode",
+  "node": {
+   "name": "VP Image Wait",
+   "type": "n8n-nodes-base.wait",
+   "typeVersion": 1.1,
+   "position": [
+    240,
+    1232
+   ],
+   "parameters": {
+    "amount": 15
+   }
+  }
+ },
+ {
+  "type": "addNode",
+  "node": {
+   "name": "VP Image Check",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.6,
+   "position": [
+    400,
+    1232
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "eRjiNDQFuDSTJpGK",
+     "name": "HOV Postgres"
+    }
+   },
+   "parameters": {
+    "operation": "executeQuery",
+    "options": {},
+    "query": "select image_media_id, regen_image, coalesce(note, '') as note from hov.scene where id = $hov${{ String($('VP Prep').first().json.sceneId || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 40) }}$hov$"
+   }
+  }
+ },
+ {
+  "type": "addNode",
+  "node": {
+   "name": "VP Image Ready",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    560,
+    1232
+   ],
+   "parameters": {
+    "jsCode": "// Has the new still landed? `VP Fire Image Regen` posted the scene to the\n// `scene-image-regen` webhook, which answers \"Workflow was started\" and runs on\n// its own execution for ~50 s. This node reads the scene row `VP Image Check`\n// just fetched and decides: ready, wait, or give up.\n//\n// Polls are counted PER SCENE AND ATTEMPT in static data, not with $runIndex\n// (which counts every run in the execution across all scenes).\nconst sd = $getWorkflowStaticData('global');\nsd.imageWaits = sd.imageWaits || {};\nconst vp = $('VP Prep').first().json || {};\nconst id = String(vp.sceneId || '');\nconst key = id + ':' + String(vp.attempt || 0);\nsd.imageWaits[key] = (sd.imageWaits[key] || 0) + 1;\nconst polls = sd.imageWaits[key];\n// 16 × 15 s = 4 minutes. The regeneration lands in about 50 s; a run that\n// died leaves the flag up, and four minutes is long enough to be sure.\nconst MAX_WAITS = 16;\n\nconst row = $input.first().json || {};\nconst oldId = String(vp.imageId || '');\nconst newId = String(row.image_media_id || '');\nconst flagUp = row.regen_image === true;\nconst note = String(row.note || '');\n\n// `IR Write Image` writes the new id, clears the flag and empties the note in\n// one PATCH — so a changed id with the flag down is the whole signal.\nconst ready = newId !== '' && newId !== oldId && !flagUp;\n// `IR Mark Rejected` clears the flag and writes a REJECTED note without\n// changing the id: Flow refused the new still too. Nothing more to wait for.\nconst refused = !flagUp && newId === oldId && /^(Image regeneration REJECTED|REJECTED)/i.test(note);\n\nlet state = 'wait';\nif (ready) state = 'ready';\nelse if (refused) state = 'timeout';\nelse if (polls >= MAX_WAITS) state = 'timeout';\n\nconsole.log('VP IMAGE ' + id + ' attempt ' + vp.attempt + ': ' + state + ' after ' + polls + ' poll(s)' + (ready ? ' — new still ' + newId.slice(-12) : (refused ? ' — Flow refused the new still too' : '')));\nreturn [{ json: { state: state, polls: polls, newImageId: ready ? newId : '' } }];\n"
+   }
+  }
+ },
+ {
+  "type": "addNode",
+  "node": {
+   "name": "VP Image Route",
+   "type": "n8n-nodes-base.switch",
+   "typeVersion": 3.2,
+   "position": [
+    720,
+    1232
+   ],
+   "parameters": {
+    "rules": {
+     "values": [
+      {
+       "outputKey": "ready",
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "leftValue": "",
+         "typeValidation": "loose",
+         "version": 3
+        },
+        "conditions": [
+         {
+          "id": "vp-img-ready",
+          "leftValue": "={{ $json.state }}",
+          "rightValue": "ready",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          }
+         }
+        ],
+        "combinator": "and"
+       }
+      },
+      {
+       "outputKey": "wait",
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "leftValue": "",
+         "typeValidation": "loose",
+         "version": 3
+        },
+        "conditions": [
+         {
+          "id": "vp-img-wait",
+          "leftValue": "={{ $json.state }}",
+          "rightValue": "wait",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          }
+         }
+        ],
+        "combinator": "and"
+       }
+      }
+     ]
+    },
+    "options": {
+     "fallbackOutput": "extra",
+     "renameFallbackOutput": "timeout"
+    }
+   }
+  }
+ },
+ {
+  "type": "addNode",
+  "node": {
+   "name": "VP Prompt Fix?",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2,
+   "position": [
+    880,
+    1232
+   ],
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "loose",
+      "version": 3
+     },
+     "conditions": [
+      {
+       "id": "vp-prompt-fix",
+       "leftValue": "={{ $('VP Prep').first().json.kind === 'person' }}",
+       "rightValue": true,
+       "operator": {
+        "type": "boolean",
+        "operation": "true",
+        "singleValue": true
+       }
+      }
+     ],
+     "combinator": "and"
+    },
+    "options": {}
+   },
+   "notes": "Only a refusal that names a PERSON also gets the motion prompt rewritten: a real name in the direction re-triggers regardless of the still."
+  }
+ },
+ {
+  "type": "addNode",
+  "node": {
+   "name": "VP Note Still",
+   "type": "n8n-nodes-base.postgres",
+   "typeVersion": 2.6,
+   "position": [
+    880,
+    1376
+   ],
+   "credentials": {
+    "postgres": {
+     "id": "eRjiNDQFuDSTJpGK",
+     "name": "HOV Postgres"
+    }
+   },
+   "parameters": {
+    "operation": "executeQuery",
+    "options": {},
+    "query": "select * from hov.at_write($hov$scene$hov$, $hov${{ $('VP Prep').first().json.sceneId }}$hov$,\n  $hov${{ JSON.stringify({ \"Regenerează Video\": true, \"Aprobare Video\": false, \"Status Producție Scenă\": \"Generare Video\", \"Observații Scenă\": 'AUTO-REWRITE-VIDEO (attempt ' + $('VP Prep').first().json.attempt + '): the video filter refused this scene — ' + $('VP Prep').first().json.reason + '. The start image was regenerated automatically and the clip resubmitted.' }) }}$hov$::jsonb)"
+   }
+  }
+ },
+ {
+  "type": "addConnection",
+  "source": "VP Give Up?",
+  "sourceIndex": 1,
+  "target": "VP Steer"
+ },
+ {
+  "type": "addConnection",
+  "source": "VP Steer",
+  "target": "VP Fire Image Regen"
+ },
+ {
+  "type": "addConnection",
+  "source": "VP Fire Image Regen",
+  "target": "VP Image Wait"
+ },
+ {
+  "type": "addConnection",
+  "source": "VP Image Wait",
+  "target": "VP Image Check"
+ },
+ {
+  "type": "addConnection",
+  "source": "VP Image Check",
+  "target": "VP Image Ready"
+ },
+ {
+  "type": "addConnection",
+  "source": "VP Image Ready",
+  "target": "VP Image Route"
+ },
+ {
+  "type": "addConnection",
+  "source": "VP Image Route",
+  "sourceIndex": 0,
+  "target": "VP Prompt Fix?"
+ },
+ {
+  "type": "addConnection",
+  "source": "VP Image Route",
+  "sourceIndex": 1,
+  "target": "VP Image Wait"
+ },
+ {
+  "type": "addConnection",
+  "source": "VP Image Route",
+  "sourceIndex": 2,
+  "target": "Mark Video Prompt Rejected"
+ },
+ {
+  "type": "addConnection",
+  "source": "VP Prompt Fix?",
+  "sourceIndex": 0,
+  "target": "VP Rewrite AI"
+ },
+ {
+  "type": "addConnection",
+  "source": "VP Prompt Fix?",
+  "sourceIndex": 1,
+  "target": "VP Note Still"
+ },
+ {
+  "type": "addConnection",
+  "source": "VP Note Still",
+  "target": "VP Reload Scene"
+ },
+ {
+  "type": "setNodeSettings",
+  "nodeName": "VP Fire Image Regen",
+  "settings": {
+   "onError": "continueRegularOutput"
+  }
+ }
+]

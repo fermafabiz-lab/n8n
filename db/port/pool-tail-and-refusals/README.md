@@ -106,6 +106,65 @@ has ALREADY APPROVED, without asking. The honest options:
 Recommended: (a). The producer's stated goal is a film that finishes sooner,
 and the alternative is a scene that waits for a human at 2 a.m.
 
+### 1a — APPLIED 2026-09-22, Media Generation `de198483` (rollback `3c65295d`)
+
+Built without the "new seed" attempt, because the measurement under 1b made
+it a generation that cannot pay. The live ladder, on `Filter Failure?`[0]:
+
+```
+VP Prep → VP Give Up? →[yes] Mark Video Prompt Rejected → Pool Record
+                      →[no]  VP Steer → VP Fire Image Regen → VP Image Wait (15 s)
+                             → VP Image Check → VP Image Ready → VP Image Route
+                                  ready   → VP Prompt Fix? →[person] VP Rewrite AI → VP Apply → VP Reload Scene
+                                                           →[else]   VP Note Still → VP Reload Scene
+                                  wait    → VP Image Wait
+                                  timeout → Mark Video Prompt Rejected
+```
+
+- `VP Prep` classifies (person / minor / audio / generic), writes a steer per
+  class — the second attempt's steer is the still-life one — and gives up
+  after `MAX_ATTEMPTS = 2`.
+- `VP Steer` writes the steer into `Observații Scenă` with the `AUTO-STEER:`
+  prefix, sets `Regenerează Imagine` and clears `Aprobare Imagine`.
+  `IR Build Request` (Claude Scripting, untouched) appends the note to the
+  image prompt as an ADJUSTMENT REQUEST — it skips only `REJECTED|FAILED|
+  AUTO-REWRITE` — and `IR Write Image` clears it when the still lands.
+- `VP Fire Image Regen` POSTs `{scene_id}` to `localhost:5678/webhook/
+  scene-image-regen`, exactly as the site's button does; `onError:
+  continueRegularOutput`, so a webhook that fails to fire becomes a timeout
+  rather than a dead batch.
+- `VP Image Ready` counts polls per scene and attempt in static data; `ready`
+  is a changed `image_media_id` with the flag down; `timeout` is 16 polls or
+  an `IR Mark Rejected` note with the id unchanged.
+- **`Pool Record` keeps the account on a resubmit from inside a poll tick.**
+  Before, a resubmit arrived on a reloaded row with no `poolAccount` and its
+  queue entry already gone, so the new job was filed under `''` and the real
+  account's slot was freed while the job still ran — the pool could then put
+  a second job on that account. Plausibly one source of the 429s on the
+  first real film. The entry being replaced knows the account.
+- `AUTO-` is now the machine-text prefix in all three readers
+  (`Evaluate Image Approval`, `VRW Build Regen`, `Prep Video Regen`), so a
+  stranded steer is never read as the producer's feedback.
+
+D1 is taken as (a): the new still lands un-approved (`IR Write Image` does
+that itself), so the scene reappears at the image gate. **The old still is
+NOT filed as a draft on this path** — `autoKeep` is site-side only — and the
+old still is the one Google refused, so nothing worth keeping is lost.
+
+Diff: 234 → 242 nodes, 7 changed (the seven named), 8 added, 1 edge removed
+and 12 added with the indices read back edge by edge, settings identical on
+every pre-existing node, every body and query byte-equal to the files in
+`paste/` and `ops.1a.json`. The three new Postgres nodes had HOV Postgres
+set again with `setNodeCredential` after the publish, because the API
+redacts the binding and a Postgres node without one would end the batch on
+the first refusal.
+
+**Verification owed**: the batch path only — the webhook regen path keeps
+its own `Mark Regen Filtered` — so the proof is the next film's notes:
+`AUTO-REWRITE-VIDEO (attempt N): … The start image was regenerated
+automatically and the clip resubmitted.` on a scene that then has a clip, and
+`VP IMAGE <id> attempt 1: ready after N poll(s)` in the execution log.
+
 ### 1b. A seed is reproducible until it is refused
 
 **Nodes:** `Current Scene` (batch), `Prep Video Regen` (gate + webhook).
@@ -130,6 +189,27 @@ account** — three rapid probes during a live batch drew a 429 and then
 `PUBLIC_ERROR_UNUSUAL_ACTIVITY` on 09-22. If 0 of 3 pass, the audio refusal
 is deterministic for a still and attempt 1 of 1a should be dropped to save
 the generation. If any pass, attempt 1 pays for itself many times over.
+
+### 1b — DONE 2026-09-22, and the measurement changed 1a
+
+Media Generation **`3c65295d`** (rollback `78bff76f`): `Current Scene` mixes
+`VP Prep`'s per-scene refusal counter into the seed once it is non-zero;
+`Prep Video Regen` mixes `Date.now()` when the scene's note says the last
+attempt was refused. Everywhere else the seed is byte-identical.
+
+**The measurement: 7 of 7 refused.** Still `e09a4e10` (scene 106's original),
+three submits 60 s apart on `fermafabiz@gmail.com` with seeds 104729 and
+7919 (the third drew a 429 — **60 s between submits on one account is not
+enough**), plus the blank-prompt probe of the morning and the four pipeline
+attempts: every one `AUDIO_GENERATION_FILTERED`. And the response echoes a
+seed that is NOT the one sent (`generatedVideo.seed` 71345 and 73298 for
+104729 and 7919; 33150 when none was sent), so whether useapi passes our seed
+to `veo-3.1-lite-low-priority` at all is unknown — which also means the seed
+story in `Current Scene` ("a re-roll is a different take") may be true only
+because Google randomises anyway. **An audio refusal is deterministic for a
+still.** So attempt 1 of the ladder as planned above — same still, new seed —
+is a generation that cannot pay, and 1a is built without it: two new stills,
+then a human.
 
 ### 1c. Stop asking for the thing that gets refused
 

@@ -1150,6 +1150,58 @@ picked the asset, not signed it off. Final Assembly receives an ordinary mp4.
   true when written and was, for video, the sentence that sent them to the
   destructive button. Full account:
   `db/port/video-regen-webhook/README.md`.
+- **A player that "corrects" drift on a timer will destroy a slow source
+  (2026-09-20).** Scene review had become unusable — press play, the clip
+  loads, then either freezes or loads slower than it plays until the two
+  collide. It was not element count (one `MediaPlayer` mounts at a time) and
+  it was not the clip (48 of 48 are on the box; Caddy answered a byte range in
+  **25 ms**). It was the VOICEOVER, which no path has ever kept locally —
+  `hov.attachment` holds 850 `image` rows and 775 `video` rows and has no
+  audio field, so every take of every film is still fetched from Drive, where
+  the same range measured **593–1383 ms**. Twenty to fifty times slower, and
+  `/api/media` marked each 206 `no-store`, so a re-watch paid again.
+  **The amplifier is the lesson**: `MediaPlayer` hard-set `a.currentTime`
+  whenever the take drifted past 0.15 s, on `timeupdate`, which fires four
+  times a second. Setting `currentTime` is a SEEK; each seek threw away the
+  audio's buffer and cost a second of Drive; during that second the drift grew
+  past the threshold again. The loop could not converge — 0.15 s is tighter
+  than the media clock's own resolution — so the correction WAS the stall, and
+  the video was dragged along by it. **Correct on deliberate moments (play,
+  the user scrubbing); take ordinary drift out with `playbackRate`, which
+  discards nothing; keep one rate-limited hard seek for real desync; and never
+  correct while the element says `waiting` or `stalled`.** The other half of
+  the fix is that `/api/media` now keeps what it fetches — the whole file on a
+  miss, content-addressed by the Drive id under `/media/_drive/`, every later
+  request served off disk with real ranges. A take is also `preload="auto"`
+  now: tens of kilobytes is one request, where `metadata` left the browser
+  ranging its way through a source that answers each range in about a second.
+  Byte-range arithmetic is pinned by `npm run check:media-range` (49 checks) —
+  an off-by-one there looks like "plays but will not seek", never like an
+  off-by-one.
+  **The proxy cache that shipped alongside it was WITHDRAWN the same hour,
+  and the way it failed is the lesson.** Attempt one made the request that
+  missed do the downloading, which is invisible on a 40 kB take — every test
+  used one — and fatal on a film, where the browser got nothing until the
+  server held the last byte and a player that used to start immediately never
+  started. **A cache is not allowed to be slower than no cache.** Attempt two
+  moved the fill off the request path, correctly, and still did not help:
+  checked through Caddy, `/media/_drive/` answered 404 for every id, so the
+  cache had never written a byte — `writeCached` swallows its own failure by
+  design, and `mkdir` at the volume root is not something the `web`
+  container's `group_add: "2000"` actually permits. Two regressions, no
+  benefit, a component that never once worked; removed rather than repaired.
+  **The measured win for scene review was the player fix alone.**
+  It also left a trap on the way out: twelve minutes of `Cache-Control:
+  private, max-age=31536000, immutable`, which tells a browser not to
+  revalidate at all, so a truncated response was pinned for a year and a
+  normal reload was exactly what `immutable` says to skip. `mediaSrc` appends
+  `&v=2` now — a different URL cannot match a poisoned entry. **Never send
+  `immutable` from a route that can answer with a partial or an error.**
+  What to do instead, if a local copy of takes is ever wanted: an attachment
+  row through `/api/media/ingest`, the path that has worked for 850 images
+  and 775 clips. Prefer the path that already works, even when it is slower
+  to arrive.
+  Full account and the numbers: `db/port/scene-lag/README.md`.
 - **The video-regen trap, and three guards for it.** A stock scene has no
   Flow asset to regenerate from, and `Prep Video Regen` THROWS without an
   `Image Media ID` — a throw that kills the whole batch, not the scene. So
@@ -1949,6 +2001,41 @@ has the whole mechanism). What the site learned building it:
   exactly where the recap sits, so a long-running show would have lost its
   latest episodes first. It now drops the oldest lines instead.
 
+### A section nobody can reach does not exist (2026-09-21)
+
+The producer's report was *"Series is very hard to find"*, and the reason was
+not design, layout or wording: **on a laptop there was no link to it at all.**
+
+`/series` had been built, linked from a film that already belonged to a show,
+and added to `NavMenu` — the phone's fold-away menu. The bar in
+`app/layout.tsx` was a separate thing entirely, three `<Link className="navlink">`
+written out by hand: Projects, Footage, Settings. So the two lists disagreed
+about how many sections the site has, and the one that was missing from the
+list nobody thought of as a list was the newest section. It cost nothing to
+find once looked at, and it had been invisible for five days.
+
+**Two copies of a navigation is one copy too many.** `lib/nav.ts` now owns the
+sections, `NavLinks` draws them in the bar, `NavMenu` folds the same array
+away under 720px, and `npm run check:deeplink` asserts the layout contains
+`<NavLinks />` and no hand-written `navlink` — the third destination owner
+beside `deep-link.ts` (gate → step) and `library-filters.ts` (`?filter=`).
+
+**The same edit fixed a bar that lied about where you were.** `Projects` wore
+`className="navlink on"` as a LITERAL, so it was the current section on every
+page of the site, Settings and Footage included. A static "you are here" is
+worse than none: it is confidently wrong, it survives every visual review
+because it looks exactly like a working highlight, and knowing where you are
+requires the path, which is only knowable in the browser — which is why
+`NavLinks` is the one client component in the layout.
+
+**And the link had to lead somewhere that answers.** `/series` throws by
+design without Postgres (`needPg` — the Airtable adapter predates series), so
+the moment the bar linked it from every page, a demo or preview deployment
+answered a click with a 500. `seriesAvailable` lets the index say that in a
+sentence instead; everything deeper keeps the guard, because nothing reaches
+it without passing the index. **Before you link a page from the chrome, open
+it in every state the deployment can be in.**
+
 ### The failure list: a stop by hand is not a failure (2026-09-16)
 
 The producer sent a screenshot of the health panel with three red "failed"
@@ -2242,3 +2329,69 @@ server keeps the same backstop for a form that never rendered the row —
 `createProject` resolves an empty `tone` through `getCategory(...).defaultTone`
 rather than the old literal `"Dark"`, with `||` and not `??`, because `""`
 matches no profile either.
+
+
+### An episode has to look like an episode (2026-09-21)
+
+The series feature shipped working and still failed its producer: opening
+`/new?series=<id>` gave them a page headed "New project · Start a video"
+with a thin strip above it saying which show it belonged to, an empty title
+field, and every setting back at its factory default. *"Simt ca e foarte
+vag… vreau sa se simta ca face parte dintr-o serie, nu de parca ar fi un
+proces de a face un video complet nou."* Three things were wrong, and they
+are worth separating because only one of them is visual.
+
+- **The page said what it was, in the wrong place.** A banner above the
+  header does not change what a page IS; the header does. On an episode the
+  `h1` is now the show's name, the pill is `Episode N`, and under the
+  sentence sits the cast, the places and the LAST line of the recap — the
+  two facts that make this an episode rather than a film with a borrowed
+  look. The way back to the show is a link inside that sentence, not a
+  button beside it: on this page the series is the context, not an action
+  the producer came here to take.
+- **A series is a FORMAT, and only a third of it was being carried.**
+  `SeriesSettings` held the category, the voice and the video tier; the
+  length, the look, the seven overlay switches, the two levels, the caption
+  colour, hands-off, the cast and the multi-voice mode were all re-asked
+  every episode. Now the whole brief is frozen when the show is created
+  (`seriesSettingsFromProject`) and applied when it opens. Two details that
+  make it safe: every new field is NULLABLE and every reader falls back to
+  the form's own default, so a series stored before this opens exactly as
+  it did; and the overlays are stored under the FORM's field names
+  (`SERIES_FINISHES` maps them once, at freeze time), so `NewVideoForm`
+  reads `series.finishes[f.name]` with no translation of its own.
+  `check:series` pins both.
+  The one thing the show deliberately does NOT do is learn: a setting
+  changed on one episode's brief changes that episode only. Otherwise
+  shortening a single episode would quietly shorten the show.
+  **A freeze is a COPY, and shipping the wider copy does not widen the
+  copies already taken** — which is the half that would have made this look
+  broken. The producer's own show was frozen on 09-16 with seven keys; the
+  day the whole brief started being carried, their episode 2 still opened at
+  60 seconds with chapter cards on, because their ROW said nothing about
+  either. `backfillSeriesSettings` closes that where it is felt rather than
+  in a migration: the brief re-derives the missing half from the film the
+  show was started from, writes it back once, and never touches a key the
+  show already has. Measured on that show before shipping — 90 s not 60,
+  chapter cards off not on, drawn cards off not on, hands-off on not off.
+  **When a feature copies state at a moment, ask what the rows written
+  before it will do** — they will not error, they will quietly behave like
+  the old version.
+- **The stock title suggestions were noise on an episode.** "A documentary
+  about the last lighthouse keepers" is not episode 4 of anybody's series.
+  They are replaced by one button that asks the show what should happen
+  next (`series-next`, `db/port/series-next/`), which fills the title and —
+  only when the box is empty — the direction. A producer who already wrote
+  their own direction must not lose it to a suggestion they asked for about
+  the title.
+
+**The effect that follows the category had to be taught about episodes.**
+Kids story selects the Storyteller VOICE when the producer has not touched
+it — and a show that deliberately reads in the plain voice stores exactly
+the same `null` as a producer who has not touched anything, so on an
+episode the effect cannot tell them apart and must not guess. It returns
+early while the category still equals the series', and wakes only if the
+producer moves this episode to a different one. The writing tone needs no
+guard: the tone row's own `toneTouched` flag (added the same week, for the
+unrelated reason that every category now has a default tone) starts TRUE on
+an episode whose show has one.

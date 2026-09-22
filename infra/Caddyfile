@@ -105,6 +105,22 @@
 		file_server
 	}
 
+	# Filmele din sectiunea de exemple (/media/*). Acelasi director ca pe
+	# {$SITE_HOST} — volumul ./media e deja montat pe containerul caddy, deci
+	# aici nu se adauga niciun mount, doar ruta. Fara ea, /media/... cade pe
+	# reverse proxy si Next raspunde 404: exact ce s-a masurat pe 2026-09-20.
+	#
+	# NU `immutable`, spre deosebire de blocul de pe {$SITE_HOST}: acolo
+	# caile sunt hash-uri de continut, deci un nume nu isi schimba niciodata
+	# intelesul. Aici fisierele sunt puse de mana ("kidsstory.mp4"), iar un
+	# film inlocuit sub acelasi nume ar ramane invizibil un an intreg. O ora
+	# e destul cat sa nu se refaca cererea la fiecare scroll.
+	handle_path /media/* {
+		root * /srv/media
+		header Cache-Control "public, max-age=3600"
+		file_server
+	}
+
 	handle {
 		reverse_proxy site-dev:3000 {
 			header_up X-Forwarded-Proto {scheme}

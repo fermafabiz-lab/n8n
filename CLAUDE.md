@@ -120,7 +120,9 @@ Webhooks the site calls: `new-project`, `resume-project`, `restart-scripting`
 outlives the site's 15-second fetch), `assemble`, and the single-purpose ones — `expand-brief`, `yt-scene-titles`,
 `upscale-film`, `list-music`/`share-music`, `archive-suggest`, `hook-regen`,
 `series-recap` (its own workflow `4jVkQjpr7terqQhY`, fired by `approveScript`
-for an episode of a series — `db/port/series-recap/`), `deep-search-rerun`
+for an episode of a series — `db/port/series-recap/`), `series-next`
+(`f3iV6hx39rSr0Dbx`, the brief's "Suggest episode N" button —
+`db/port/series-next/`), `deep-search-rerun`
 (on **Claude Scripting**, the "⟳ Re-check this script" button above the script
 gate — nine `DS *` nodes that re-check the FINISHED script including the hook;
 answers `onReceived` because the run outlives the site's 15-second fetch —
@@ -214,14 +216,34 @@ the full entry in the file named:
   `updateNodeParameters` MERGES rather than replaces, which is what lets one
   key be edited without re-sending a node's unredacted API tokens. Full
   account: `db/port/video-regen-webhook/README.md`.
+- **A scene preview is TWO media elements, and only one of them is local.**
+  Clips and stills are kept on the box by `/api/media/ingest`; VOICEOVERS
+  never were (`hov.attachment` has no audio field), so they come from Google
+  Drive at 593-1383 ms a range against 25 ms for a local file. Anything that
+  "corrects" audio/video drift on a timer will therefore seek a stalling
+  source four times a second and block playback outright — which is what made
+  scene review unusable on 2026-09-20. `MediaPlayer` nudges `playbackRate`
+  instead of seeking, which is the whole of the fix that worked. A disk cache
+  in `/api/media` was tried the same day, broke the final video twice, turned
+  out never to have written a single byte, and was withdrawn — **and it left
+  browsers poisoned with a year-long `immutable` header, which is why
+  `mediaSrc` now carries `&v=2`. Never send `immutable` from a route that can
+  answer with a partial or an error.** Full account:
+  `db/port/scene-lag/README.md`; lesson in `docs/lessons-site.md`.
 - **A pipeline fix does not reach a batch that is already running, and the
-  regenerate buttons hide that.** Executions are version-pinned; video regen is
-  the batch's own job, not a webhook. So a producer clicking "regenerate" during
-  a 12-hour-old batch is served 12-hour-old code and is given no sign of it —
-  which looks exactly like "your fix did not work". Repaired STORED PROMPTS do
-  reach it (read fresh per submit); node bodies do not. Check
-  `search_executions` before claiming a fix is live. Full account:
-  `db/port/motion-permanence/stale-execution/` and `docs/lessons-n8n.md`.
+  regenerate buttons hide that.** Executions are version-pinned, so a producer
+  clicking "regenerate" during a 12-hour-old batch is served 12-hour-old code
+  and is given no sign of it — which looks exactly like "your fix did not
+  work". Repaired STORED PROMPTS do reach it (read fresh per submit); node
+  bodies do not. Check `search_executions` before claiming a fix is live.
+  Full account: `db/port/motion-permanence/stale-execution/` and
+  `docs/lessons-n8n.md`.
+  **One clause of that entry has been out of date since 2026-09-17**: it said
+  video regen "is the batch's own job, not a webhook". It has `scene-video-regen`
+  now (`db/port/video-regen-webhook/`), so a video regeneration runs on its own
+  execution and therefore on the CURRENTLY PUBLISHED version — it is the one
+  regenerate button the stale-batch trap no longer applies to. The trap is
+  entirely real for everything still inside the batch.
 - **`runData` is EMPTY for the whole life of a healthy running execution.**
   You cannot watch progress through the API — wait for it to end.
   `docs/lessons-n8n.md`, "n8n" section.
@@ -329,11 +351,18 @@ the full entry in the file named:
   and read no param — a link to the page it was already on, with a query
   string nobody consumed. Destinations now have one owner each
   (`platform/lib/deep-link.ts` for the gate→step map and `?scene=`,
-  `platform/lib/library-filters.ts` for `?filter=`), and
-  `npm run check:deeplink` pins both halves: every link names a real key,
-  and the reader is still there. Full account: `docs/lessons-site.md`, "A
-  notification that says what happened but does not GO there" and "A link to
-  the page you are already on".
+  `platform/lib/library-filters.ts` for `?filter=`, `platform/lib/nav.ts` for
+  the sections in the bar), and `npm run check:deeplink` pins all of them:
+  every link names a real key, and the reader is still there. **The third one
+  was added 2026-09-21 for the same failure one level up**: the bar wrote its
+  links out by hand while `NavMenu` kept a list, the two disagreed, and
+  `/series` was unreachable on a laptop for five days — the producer's
+  "very hard to find" was literally "there is no link". The same edit killed a
+  `className="navlink on"` LITERAL that made Projects the current section on
+  every page of the site. Full account: `docs/lessons-site.md`, "A
+  notification that says what happened but does not GO there", "A link to
+  the page you are already on" and "A section nobody can reach does not
+  exist".
 - **Editing Options fields are refuse-then-clamp, never silently coerced** —
   the `normalize*` family in `platform/lib/data/derive.ts`, fixture-tested by
   `npm run check:normalize`. A value stored by the site, read by n8n and
@@ -706,6 +735,22 @@ expected and harmless for an app touching only its own Drive.
   names, same descriptions), check `SHEET PLAN` says the cast was skipped,
   not drawn again, and `SHEET KEEP` in the log of the first film that
   draws a sheet.
+  **An episode now opens as an episode (2026-09-21)** — the producer's
+  report was that `/new?series=` read as a brand-new film: "Start a video"
+  at the top, a blank title, and every setting to pick again. Three
+  changes, all in `platform/`: the page header IS the show (the series
+  name as the title, `Episode N` in the pill, the cast and the last recap
+  line under it); the WHOLE brief is pre-answered from the series row —
+  length, look, overlays, levels, caption colour, hands-off, cast and
+  multi-voice, on top of the category/tone/voice that already carried —
+  frozen by `seriesSettingsFromProject` when the show is created; and the
+  title field has **✨ Suggest episode N**, which asks the show itself
+  (`series-next`). Every new settings field is NULLABLE and every reader
+  falls back to the form's own default, so a series created before this
+  opens exactly as it did. `npm run check:series` pins the mapping.
+  **What the show does NOT learn**: changing a setting on one episode's
+  brief changes that episode only — the series keeps what it was frozen
+  with, so one short episode cannot silently shorten the show.
   **The bookkeeping after each episode is automatic since the same
   evening** (`db/port/series/README.md`, "What happens by itself"): when
   an episode's script is approved, the site re-keys the episode's sheets
@@ -1240,6 +1285,14 @@ expected and harmless for an app touching only its own Drive.
 - Optional: `channelName: 'Video Factory'` → `'House of Videos'` in
   `remotion/src/types.ts` and the n8n "Build Remotion Props" node (affects
   rendered end screens).
+- **Give voiceovers a real attachment row** (`field: 'voice'` through
+  `/api/media/ingest`, a `storedVoiceUrl` beside `storedVideoUrl`), so new
+  films never reach Drive for playback at all, and backfill the existing
+  ones. Since 2026-09-20 the proxy's disk cache makes this an optimisation
+  rather than a fix — `db/port/scene-lag/README.md` explains why the cache
+  was done first (it heals films that already exist; the attachment row
+  would need three n8n nodes changed and a backfill before it helped
+  anything). Also owed there: watch one scene play on the deployed site.
 - Rotate the ai33 / Railway / useapi keys. Discord webhook URLs are still empty.
 
 ## Working language

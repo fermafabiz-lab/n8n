@@ -1489,10 +1489,13 @@ export const saveScriptExample = (id: string, patch: Record<string, unknown>) =>
 // ---------------------------------------------------------------------------
 
 import {
+  fillSeriesSettings,
+  hasFullSettings,
   mergeRefs,
   normalizeSeriesBible,
   normalizeSeriesRefs,
   normalizeSeriesSettings,
+  seriesSettingsFromProject,
   type Series,
   type SeriesBible,
   type SeriesRefs,
@@ -1608,12 +1611,20 @@ export async function getProjectSeriesSource(projectId: string): Promise<{
   storyBible: unknown;
   editingOptions: unknown;
   seriesId: string | null;
+  // The three brief fields that are COLUMNS rather than Editing Options —
+  // a series has to freeze them too, or its episodes re-ask for the length,
+  // the look and the captions every time (`createSeriesFromProject`).
+  lengthSeconds: number | null;
+  style: string | null;
+  noCaptions: boolean;
 } | null> {
   const rows = await query<{
     id: string; name: string; tone: string | null; language: string; aspect: string;
     voice_id: string; story_bible: string | null; editing_options: unknown; series_id: string | null;
+    length_seconds: number | null; style: string | null; no_captions: boolean;
   }>(
-    `select id, name, tone, language, aspect, voice_id, story_bible, editing_options, series_id
+    `select id, name, tone, language, aspect, voice_id, story_bible, editing_options, series_id,
+            length_seconds, style, no_captions
        from hov.project where id = $1`,
     [projectId],
   );
@@ -1623,6 +1634,7 @@ export async function getProjectSeriesSource(projectId: string): Promise<{
     id: r.id, name: r.name, tone: r.tone, language: r.language ?? "", aspect: r.aspect,
     voiceId: r.voice_id ?? "", storyBible: r.story_bible, editingOptions: r.editing_options,
     seriesId: r.series_id,
+    lengthSeconds: r.length_seconds, style: r.style, noCaptions: Boolean(r.no_captions),
   };
 }
 
@@ -1753,6 +1765,42 @@ export async function upsertSheetMedia(m: {
 /** The whole bible of a show rewritten — the write-back after an episode adds to it. */
 export async function updateSeriesBible(id: string, bible: SeriesBible): Promise<void> {
   await query(`update hov.series set bible = $1::jsonb where id = $2`, [JSON.stringify(seriesBibleToStored(bible)), id]);
+}
+
+/**
+ * A show that was frozen before the whole brief was carried learns the rest
+ * from its first film, the first time an episode is started from it.
+ *
+ * This exists because the freeze is a COPY: a series created on 09-16 holds
+ * the category and the voice and nothing about length, overlays or levels,
+ * and no amount of shipping new code changes a row that was written before
+ * it. Rather than a migration, the gap is closed where it is felt — the
+ * brief — and closed for good, because the filled settings are written
+ * back.
+ *
+ * It can only ever ADD (`fillSeriesSettings` takes the stored answer
+ * wherever there is one), so a show is never overwritten by the film it
+ * came from, and a show that already has everything is not read or written
+ * at all. Any failure leaves the series exactly as it was and the brief
+ * opens on its own defaults, which is what it did before this existed.
+ */
+export async function backfillSeriesSettings(s: Series): Promise<Series> {
+  if (hasFullSettings(s.settings) || !s.sourceProjectId) return s;
+  const src = await getProjectSeriesSource(s.sourceProjectId).catch(() => null);
+  if (!src) return s;
+  const settings = fillSeriesSettings(
+    s.settings,
+    seriesSettingsFromProject(src.editingOptions, {
+      lengthSeconds: src.lengthSeconds,
+      style: src.style,
+      noCaptions: src.noCaptions,
+    }),
+  );
+  if (!hasFullSettings(settings)) return s;
+  await query(`update hov.series set settings = $1::jsonb where id = $2`, [JSON.stringify(settings), s.id]).catch(
+    () => {},
+  );
+  return { ...s, settings };
 }
 
 /**

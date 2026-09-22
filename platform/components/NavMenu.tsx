@@ -3,28 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { SECTIONS, isOn } from "@/lib/nav";
 import s from "./NavMenu.module.css";
 
-const LINKS = [
-  { href: "/projects", label: "Projects", note: "the floor" },
-  { href: "/series", label: "Series", note: "the shows" },
-  { href: "/admin/footage", label: "Footage", note: "archive library" },
-  { href: "/admin", label: "Settings", note: "account, appearance" },
-];
-
 /**
- * Which link the current path belongs to. Settings owns everything under
- * /admin EXCEPT the footage library, which has its own link — a plain
- * prefix test would light both for /admin/footage and neither for
- * /admin/customize.
- */
-function isOn(href: string, path: string): boolean {
-  if (href === "/admin") return path === "/admin" || (path.startsWith("/admin/") && !path.startsWith("/admin/footage"));
-  return path === href || path.startsWith(href + "/");
-}
-
-/**
- * The phone's way into the three sections the bar has no room for at 390px
+ * The phone's way into the sections the bar has no room for at 390px
  * (brand + "New video" already fill it — measured 368 in a 368 box). One
  * button, one panel under the pill, closed by a tap outside, by Escape, or
  * by the navigation it just started. Desktop never renders it: the module
@@ -75,7 +58,7 @@ export default function NavMenu() {
       </button>
       {open && (
         <span className={s.panel} role="menu">
-          {LINKS.map((l) => (
+          {SECTIONS.map((l) => (
             <Link
               key={l.href}
               href={l.href}

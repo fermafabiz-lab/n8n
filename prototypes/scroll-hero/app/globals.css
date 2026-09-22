@@ -250,9 +250,86 @@ body {
   }
 }
 
-/* The first content section. The film has already crossfaded to this colour
-   by the time the stage unpins, so the section arrives out of it rather than
-   after it — which is why there is no rule at the join. */
+/* ── The examples ────────────────────────────────────────────────────────
+   Three finished films, one under the other, each near the full width. The
+   film has already crossfaded to this section's colour by the time the stage
+   unpins, so it arrives out of the hero rather than after it — which is why
+   there is no rule at the join. */
+
+.examples {
+  background: var(--content-bg);
+  padding: clamp(4rem, 10vh, 8rem) clamp(1rem, 4vw, 2.75rem);
+}
+
+.examples__heading {
+  margin: 0 auto clamp(2rem, 5vh, 3.5rem);
+  max-width: 1200px;
+  font-size: clamp(1.5rem, 3vw, 2.25rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+
+.examples__list {
+  display: grid;
+  /* One column, on every width: all three films are horizontal and asked for
+     nearly the full width, so there is no second column to fall back from on
+     a phone. The mobile rule is the gap, not the count. */
+  grid-template-columns: 1fr;
+  gap: clamp(3rem, 8vh, 5.5rem);
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.example {
+  margin: 0;
+}
+
+.example__video {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* The box is the right shape before a single byte is fetched, so nothing
+     jumps when a clip starts: preload="none" means the element has no
+     metadata of its own until then. */
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background: #000;
+  border-radius: 12px;
+}
+
+.example__caption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+  font-size: 0.95rem;
+  color: #cfcfd2;
+}
+
+.example__theme {
+  font-weight: 600;
+  color: #fff;
+}
+
+.example__dot,
+.example__meta {
+  color: #9b9ba1;
+}
+
+@media (max-width: 767px) {
+  .example__video {
+    border-radius: 8px;
+  }
+
+  .example__caption {
+    font-size: 0.875rem;
+  }
+}
+
+/* The empty section that used to sit directly under the hero. It stays as the
+   "ordinary scroll resumes here" marker, now below the examples. */
 .test-section {
   height: 100vh;
   display: grid;

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getSeriesCandidates, getSeriesList, getSheetMediaUrls } from "@/lib/data";
+import { getSeriesCandidates, getSeriesList, getSheetMediaUrls, seriesAvailable } from "@/lib/data";
 import SeriesStarter from "@/components/SeriesStarter";
 import { initials } from "@/lib/series";
 import s from "@/components/SeriesCast.module.css";
@@ -16,10 +16,15 @@ export default async function SeriesIndex({
   searchParams: Promise<{ from?: string }>;
 }) {
   const sp = await searchParams;
-  const [list, candidates] = await Promise.all([getSeriesList(), getSeriesCandidates()]);
+  // Series are a Postgres feature (db/012) and the Airtable adapter predates
+  // them. Production is Postgres, so this is the demo/preview case — but it is
+  // reached by clicking a link in the bar, so it answers in words.
+  const [list, candidates] = seriesAvailable
+    ? await Promise.all([getSeriesList(), getSeriesCandidates()])
+    : [[], []];
   // One lookup for every face on the page.
   const flowIds = list.flatMap((x) => Object.values(x.refs.castSheets).map((c) => c.id));
-  const faces = await getSheetMediaUrls(flowIds);
+  const faces = seriesAvailable ? await getSheetMediaUrls(flowIds) : {};
 
   return (
     <main className="page">
@@ -77,12 +82,21 @@ export default async function SeriesIndex({
           </div>
         )}
 
-        <section className="fsec" style={{ marginTop: list.length ? 0 : 44 }}>
-          <header>
-            <h2>Start a series</h2>
-          </header>
-          <SeriesStarter candidates={candidates} preselect={sp.from ?? ""} />
-        </section>
+        {seriesAvailable ? (
+          <section className="fsec" style={{ marginTop: list.length ? 0 : 44 }}>
+            <header>
+              <h2>Start a series</h2>
+            </header>
+            <SeriesStarter candidates={candidates} preselect={sp.from ?? ""} />
+          </section>
+        ) : (
+          <div className="setupnote" style={{ marginTop: 44 }}>
+            <b>Series need the Postgres backend.</b> This copy of the site is
+            reading demo data, and a show lives in <code>hov.series</code> — set{" "}
+            <code>DATA_BACKEND=postgres</code> and <code>DATABASE_URL</code> and
+            the shows appear here.
+          </div>
+        )}
       </div>
     </main>
   );

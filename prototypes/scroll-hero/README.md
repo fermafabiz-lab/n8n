@@ -1,9 +1,9 @@
 # Scroll-scrub hero — isolated prototype
 
-A standalone Next.js (App Router, TypeScript) app with one thing in it: a
-hero that draws a WebP frame sequence onto a `<canvas>`, scrubbed by the
-scroll position, followed by an empty test section. No brand, no content,
-no scroll library. It lives under `prototypes/` on purpose: nothing here is
+A standalone Next.js (App Router, TypeScript) app: a hero that draws a WebP
+frame sequence onto a `<canvas>`, scrubbed by the scroll position, then an
+examples section playing three finished films, then an empty test section.
+No scroll library. It lives under `prototypes/` on purpose: nothing here is
 under `platform/**` or `remotion/**`, so pushing it deploys nothing.
 
 ## Run it
@@ -13,6 +13,7 @@ cd prototypes/scroll-hero
 npm install
 npm run frames      # regenerates the sequence (110 frames, poster, manifest)
 npm run frames -- 48   # …or any other length
+npm run media       # placeholder clips for the examples section
 npm run build && npm run start
 ```
 
@@ -29,9 +30,11 @@ npm run build && npm run start
 | File | What |
 |---|---|
 | `components/ScrollHero.tsx` | The whole mechanic. Client component, one `useEffect`. |
-| `app/globals.css` | 200vh track + sticky 100vh stage; the opt-outs collapse it to 100vh in CSS. |
-| `app/page.tsx` | Hero + the empty test section. |
+| `components/ExampleReel.tsx` | The examples section: three clips, one IntersectionObserver, and `EXAMPLES` — the one place the captions are edited. |
+| `app/globals.css` | 200vh track + sticky 100vh stage; the opt-outs collapse it to 100vh in CSS. Then the examples, then the test section. |
+| `app/page.tsx` | Hero + examples + the empty test section. |
 | `scripts/make-frames.mjs` | Synthetic frames that print their own number (sharp), plus the poster and `manifest.json`. Takes the count: `npm run frames -- 48`. Swap in real frames with the same names. |
+| `scripts/make-media.mjs` | Placeholder clips under `public/media`, recorded from a canvas by Chromium's MediaRecorder (there is no ffmpeg here). Same file names as the real films, spaces and all. |
 | `tests/hero.spec.ts` | Playwright checks listed above. |
 | `scripts/lighthouse.mjs` | Mobile run (Lighthouse default: slow 4G, 4× CPU) and a desktop run with the same slow-4G simulation. |
 
@@ -95,14 +98,23 @@ npm run build && npm run start
 `data-loaded` and `data-count` on the `<section>` exist for the tests; they
 are cheap attribute writes and can go when the mechanic moves into the site.
 
-## Results (2026-09-18, production build, preinstalled Chromium)
+## Results (2026-09-20, production build, preinstalled Chromium)
 
-**Playwright** — 10 of 10 passing. `shots/frame-000.png` … `frame-109.png` show
+**Playwright** — 16 of 16 passing. `shots/frame-000.png` … `frame-109.png` show
 frames 0001, 0028, 0056, 0083 and 0110 at the five scroll checkpoints;
 `held-at-19.png` shows frame 0020 held with frames 21+ stalled at the
-network layer; `after-hero.png` is the test section filling the viewport;
+network layer; `after-hero.png` is the examples arriving under the hero;
 `mobile.png` and `reduced-motion.png` are poster-only; `outro-090.png` …
-`outro-100.png` walk the crossfade at the end.
+`outro-100.png` walk the crossfade at the end; `examples-playing.png`,
+`examples-mobile.png` and `examples-reduced-motion.png` are the section.
+
+**The suite used to test whatever was last built.** `webServer.command` was
+`npm run start` under a comment claiming it built first, with
+`reuseExistingServer: true` — so a run would start (or reuse) a server
+holding an older `.next` and pass cheerfully against it. That is how a first
+run of the examples tests reported eight failures whose real cause was that
+the section was not in the build. It now runs `npm run build && npm run
+start` and refuses to reuse a server it did not start.
 
 **A shot named after a frame lifts the outro overlay, and only that shot.**
 The overlay is fully opaque at 100% of the scrub, which is where the
@@ -133,8 +145,86 @@ below resolves to the same colour.
 | JS + CSS + HTML + webfont | 168 kB |
 | **total** | **1.58 MB** of the 3 MB budget |
 
+The example films are counted and printed beside that total, never added
+into it: they are streamed on demand, and one of them on its own is a
+hundred times the whole budget. A budget that quietly absorbs video stops
+meaning anything.
+
 The frames above are synthetic gradients at ~13 kB each, which is why that
 total looks comfortable. **It is not what the real sequence costs.**
+
+## The examples section
+
+Three films under the hero, each near the full width, one under the other on
+every screen width — there is no second column for a phone to fall back
+from, because all three are horizontal.
+
+- **Nothing is fetched until a clip is on screen.** `preload="none"` on the
+  elements, and one `IntersectionObserver` starts a clip at a quarter
+  visible and pauses it when it leaves. Measured: at page open, zero
+  requests to `/media/`; after scrolling the first clip into view, exactly
+  one file has been asked for and the third is still at `readyState: 0`.
+- **There is deliberately no `autoplay` ATTRIBUTE.** It means "start as soon
+  as you can", which makes the browser begin loading at once and throws away
+  the point of `preload="none"`. The observer does the starting; the clips
+  are `muted` + `playsInline` so a browser grants it without a click. The
+  test asserts the attribute is absent, so nobody "fixes" this back.
+- **A playing clip is many requests, not one.** It is streamed in ranges —
+  one clip produced five. An early version of the test counted requests and
+  read one playing film as three loading ones.
+- **The caption is theme · duration · platform**, and the duration comes off
+  the file: `EXAMPLES` carries the value measured on the box so the line is
+  right before anything loads, and `loadedmetadata` overrides it. That is
+  visible in the shots — the reduced-motion one reads `1:39`, the real
+  film's length, because it never loaded; the playing one reads `0:04`, the
+  placeholder's.
+- **Theme and platform are placeholders**, taken from the file names, which
+  is all this prototype knows about the films. One constant, `EXAMPLES` in
+  `components/ExampleReel.tsx`, is the only place to edit them.
+- **`prefers-reduced-motion: reduce` gets no moving picture**, and gets the
+  controls back in exchange — without them there would be no way left to
+  watch a film at all.
+
+### What the three files actually are (measured 2026-09-20)
+
+Read off the real files on the box, by HTTP probes from n8n (a Claude web
+session has no outbound HTTP of its own), including the mp4 headers:
+
+| file | size | duration | `moov` |
+|---|---|---|---|
+| `kidsstory.mp4` | 56.4 MB | 1:39 | at byte 36 — streams immediately |
+| `m8 .mp4` | 3.3 MB | 0:08 | at the END — the browser must fetch the tail first |
+| `roman empire.mp4` | 321.3 MB | 6:41 | at byte 36 |
+
+Two things follow, neither of them fixable in this code:
+
+**321 MB is not a web clip.** At 6:41 it is ~6.4 Mbps, and `loop` means a
+visitor who leaves the tab open keeps pulling it. `kidsstory` is ~4.6 Mbps.
+The section is built so only what is on screen streams, which is the best
+the page can do — the rest is an encode: 1280×720 at ~1.5 Mbps with
+`-movflags +faststart`, or better for a showcase, a 10–20 second excerpt of
+each, which lands around 2–4 MB apiece. There is no ffmpeg in this
+environment; the Railway render server has one.
+
+**`m8 .mp4` has its `moov` atom at the end**, so a browser has to fetch the
+file's tail before it can start. At 3.3 MB that is one extra round trip and
+no more, but the same file at 300 MB would be unplayable. `+faststart` is
+the same one-line fix.
+
+### The clips 404 on site-dev until Caddy is told about them
+
+They answer 200 on `house-of-videos.com/media/...` and **404 on
+`dev.house-of-videos.com/media/...`**: that host's Caddy block routes
+`/frames/*` and nothing else, so `/media/...` falls through to Next. The
+block that fixes it is in `infra/Caddyfile` in this repo, but **applying it
+needs a key on the box** — `docker compose up -d caddy` in `/opt/n8n`, not a
+reload. Until then the section renders black. See `infra/README.md`.
+
+Locally the same paths are served from `public/media`, which `npm run media`
+fills with 4-second placeholders — recorded from a canvas by Chromium's
+MediaRecorder, since there is no ffmpeg here. They carry the real names,
+spaces and all, so the URL encoding is exercised: `m8 .mp4` has to leave as
+`m8%20.mp4`, and the test asserts exactly that.
 
 ### The real sequence is well over the 3 MB budget (re-measured 2026-09-18)
 

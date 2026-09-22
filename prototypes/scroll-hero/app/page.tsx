@@ -1,3 +1,4 @@
+import ExampleReel from "@/components/ExampleReel";
 import ScrollHero from "@/components/ScrollHero";
 
 export default function Page() {
@@ -16,6 +17,9 @@ export default function Page() {
       </header>
       <main>
         <ScrollHero />
+        {/* The first content section, and so the one the hero's outro fades
+            into: it is painted --content-bg, same as the overlay. */}
+        <ExampleReel />
         <section className="test-section" data-testid="after-hero">
           <p>Test section — ordinary scroll resumes here.</p>
         </section>

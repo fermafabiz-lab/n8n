@@ -1519,6 +1519,16 @@ const needPg = (what: string) => {
   if (!USE_PG) throw new Error(`${what} needs the Postgres backend (DATABASE_URL)`);
 };
 
+/**
+ * Whether this deployment has series at all. The guard above is right to
+ * throw — an Airtable deployment genuinely has nowhere to keep a show — but
+ * the SECTION is now linked from the bar on every page, and a producer who
+ * clicks it deserves a sentence rather than a 500. The index asks this first
+ * and says so; everything deeper keeps the guard, because nothing can reach
+ * it without passing the index.
+ */
+export const seriesAvailable = USE_PG;
+
 export type { Series } from "@/lib/series";
 
 export async function getSeriesList() {
@@ -1572,4 +1582,8 @@ export async function updateSeriesBible(id: string, bible: import("@/lib/series"
 export async function getSeriesRefsUnion(seriesId: string) {
   needPg("getSeriesRefsUnion");
   return pgBackend.getSeriesRefsUnion(seriesId);
+}
+export async function backfillSeriesSettings(s: import("@/lib/series").Series) {
+  needPg("backfillSeriesSettings");
+  return pgBackend.backfillSeriesSettings(s);
 }

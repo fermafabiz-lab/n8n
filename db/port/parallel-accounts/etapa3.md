@@ -460,3 +460,109 @@ quiet instance or a real film left alone. The producer's own real film that
 evening (`rec0w52EKvBoBlBLF`, made through the new brief with
 `flow_accounts: 1, video_pool: "no"` in its payload — the first proof the
 control is live) ran serially by their choice.
+
+---
+
+## The first REAL film through the pool, 2026-09-22
+
+`rec7U8PbMS8MUYQcW`, "The everyday life of an employee working remotely in
+New York". 54 scenes, 600 seconds, `flowAccounts: 3`, `videoPool: true`,
+started from the brief's own Clip generation control. It finished:
+`Finalizat`, final video present, Final Assembly `16113` 12:05:24 → 12:37:23.
+
+**The split is exact.** Decoding the account out of each scene's
+`image_media_id` hex:
+
+| account | scenes | clips |
+|---|---|---|
+| `fermafabiz@gmail.com` | 18 | 18 |
+| `houseofvideos01@gmail.com` | 18 | 18 |
+| `houseofvideos02@gmail.com` | 18 | 18 |
+
+54 of 54 landed, every one on the account that minted its image, zero
+`Email mismatch`. **Etapa 1 and the path-form upload are confirmed on a real
+film**, which is what "Run a film with the path-form upload live and confirm
+the three-way split" was asking for.
+
+### The phases, measured
+
+| phase | window | duration |
+|---|---|---|
+| scripting (`15882`) | 19:08:16 → 19:17:50 | **9.5 min** |
+| images + voices | 19:17:51 → 20:12:41 | **55 min** |
+| clips | 20:12:41 → 21:57:10 | **105 min** (49 of 54) |
+| final render (`16113`) | 12:05:24 → 12:37:23 | **32 min** |
+
+**This is the number the parallelisation question needed.** Images and voices
+together are 55 minutes against 105 for the clips, so the clip phase is about
+two thirds of the machine time on a 10-minute film. Parallelising images would
+buy at most a third, for the cost named in the plan above (the 38-node tail, the
+eleven `$('Current Scene').first()` readers). Clips remain where the money is.
+
+### The pool works, and then it stops working
+
+Clips landed per 10-minute window, evening burst:
+
+```
+20:12  10  all three
+20:22   7  all three
+20:32   7  all three
+20:42   5  ferma, hov01
+20:52   6  all three
+21:02   4  hov02 only
+21:12   3  hov02 only
+21:22   1  hov02 only
+21:32   0
+21:42   4  hov01 only
+21:52   2  ferma, hov01
+```
+
+For the first **50 minutes** all three accounts are busy and 35 clips land, a
+clip every **86 seconds** wall-clock — very close to the 9-scene A/B's pooled
+rate and about 3x a serial account. Then it collapses: the last 14 clips take
+**55 minutes**, one account at a time.
+
+**That is the tail, and it is the structural cost of contiguous blocks.** A
+block that finishes early leaves its account idle while the slowest block runs
+alone, so the film ends at serial speed. On 9 scenes this was invisible; on 54
+it is half the clip phase. **The fix is work stealing, not more accounts** —
+an idle account should take the next unstarted scene from any block rather
+than only from its own. That is a change to `Assign Accounts` and the pool
+tick, and it is now the highest-value item here, ahead of raising
+`videoPoolPerAccount`.
+
+### What actually ate the time
+
+**22 of 54 scenes (41%) were refused by Google's content filter at least
+once.** The note records only the last attempt, so counting by attempt number:
+
+| last attempt recorded | scenes |
+|---|---|
+| 1 | 15 |
+| 2 | 3 |
+| 3 | 2 |
+| 4 | 2 |
+
+That is **~35 wasted generations** on the scenes that eventually passed, plus
+4 each on the two that gave up entirely (orders 106 and 508) — call it **43
+refused generations against 54 successful ones, an 80% overhead**. At the
+measured parallel rate that is most of an hour thrown away on one film.
+
+Of the refusals the note could classify, 7 said "recognizable real person" and
+15 said the generic "Google video content filter". **Per
+`db/port/audio-filter/README.md`, that generic bucket is where
+`AUDIO_GENERATION_FILTERED` was hiding**, and the detection window was too
+short to classify reliably at all — both fixed the same day in `78bff76f`.
+
+**So the honest reading of this film is that the pool is not the bottleneck
+and neither is Google's speed. The refusal rate is.** Cutting it would buy
+more than any amount of extra concurrency, and the next film's notes will say
+whether the audio arm has made it legible.
+
+### The wall-clock was 17 hours and none of that is the pipeline's fault
+
+The film was created 09-21 19:08 and marked `Finalizat` 09-22 12:37. Between
+them: a 12h39 overnight gap with the batch left running (`15885`, cancelled by
+hand at 10:30:50 the next morning), a second cancel at 11:04:53 (`16070`), and
+three scenes plus the stuck order 106 finished on the morning run (`16078`,
+11:04:55 → 12:05:34). **Only ~3 hours of that was work.**

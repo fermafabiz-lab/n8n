@@ -872,6 +872,33 @@ expected and harmless for an app touching only its own Drive.
   this repo's own expensive lesson is that naming a thing in a Veo prompt
   summons it.
 
+- **The first REAL film through the three-account pool is measured, and the
+  bottleneck is neither the pool nor Google** (2026-09-22, `rec7U8PbMS8MUYQcW`,
+  54 scenes, 10 minutes; full account `db/port/parallel-accounts/etapa3.md`,
+  "The first REAL film through the pool"). **The split is exact — 18 / 18 / 18**,
+  every clip on the account that minted its image, zero `Email mismatch`, so
+  Etapa 1 and the path-form upload are confirmed on a real film. The phases:
+  scripting 9.5 min, images + voices **55 min**, clips **105 min**, final
+  render 32 min — which finally answers whether parallelising images is worth
+  it (clips are two thirds of the machine time, so images could buy a third at
+  most, for the 38-node tail duplication the plan prices). **Two findings
+  matter more than the totals.** First, the pool delivers a clip every **86
+  seconds** while all three accounts are busy — about 3x serial, better than
+  the 9-scene A/B suggested — and then **collapses to one account at a time
+  for the last 14 clips, 55 of the 105 minutes**. That is the TAIL: contiguous
+  blocks mean an account that finishes early sits idle while the slowest block
+  runs alone, so the film ends at serial speed. **The fix is work stealing, not
+  more accounts or a bigger `videoPoolPerAccount`** — an idle account should
+  take the next unstarted scene from ANY block. Second, **22 of 54 scenes (41%)
+  were refused by the content filter at least once**, roughly 43 refused
+  generations against 54 successful ones — an 80% overhead, most of an hour on
+  this film. Fifteen of those refusals were filed as the generic "Google video
+  content filter", which is exactly where `AUDIO_GENERATION_FILTERED` was
+  hiding (see the audio entry above). **Cutting the refusal rate buys more than
+  any amount of extra concurrency.** Note also that the film's 17-hour
+  wall-clock is ~3 hours of work plus an overnight gap and two manual cancels;
+  do not read it as a pipeline figure.
+
 - **The parallel-accounts work is reachable from the site since 2026-09-20**
   (`db/port/flow-accounts-ui/README.md`; orchestrator `4f022248`, rollback
   `fec6369c`). The brief has a **Clip generation** control next to Video

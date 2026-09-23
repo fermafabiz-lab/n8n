@@ -258,6 +258,8 @@ const fill = {
   narration: output,
   packList: fc.packList || '',
   usedRefs,
+  // The first pass has no earlier presses, so nothing has been rejected yet.
+  rejected: [],
   chapters,
 };
 

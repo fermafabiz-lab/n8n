@@ -242,6 +242,12 @@ function topUp(chaptersIn, fill, raw) {
   const existing = [];
   for (const c of chapters) for (const s of sentencesOf(c.narrator_script)) existing.push(contentWords(s));
 
+  // NEVER BACK AGAIN. A sentence the top-up added on an earlier press and the
+  // fact-checker has since flagged. Without this the re-check button
+  // ping-pongs it: one press adds it, the next cuts it, which reopens the gap,
+  // and the press after that adds it back.
+  const rejected = (Array.isArray(fill.rejected) ? fill.rejected : []).map(contentWords).filter((w) => w.size);
+
   const added = [];
   const dropped = {};
   const drop = (why) => {
@@ -297,6 +303,15 @@ function topUp(chaptersIn, fill, raw) {
       }
     }
     if (repeat) { drop('repeats the script'); continue; }
+    let again = false;
+    if (words.size >= 3) {
+      for (const other of rejected) {
+        let k = 0;
+        for (const w of words) if (other.has(w)) k++;
+        if (k / words.size >= REPEAT_SHARE) { again = true; break; }
+      }
+    }
+    if (again) { drop('rejected by the fact-checker before'); continue; }
 
     // WHERE IT GOES, and whether it may go there at all — out of date order, or
     // in front of a pronoun it would steal, is a sentence that changes what the

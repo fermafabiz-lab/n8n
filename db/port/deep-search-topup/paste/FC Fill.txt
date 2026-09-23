@@ -10,6 +10,8 @@ SOURCED CLAIMS gathered for this film when it was researched:
 
 ALREADY USED BY THE SCRIPT — the fact-checker matched these to sentences the script contains, so do not add them again: {{ ($json.fill.usedRefs || []).join(', ') || 'none recorded' }}
 
+ADDED BEFORE AND REJECTED BY THE FACT-CHECKER — never propose these again, in any wording: {{ ($json.fill.rejected || []).join(' | ') || 'none' }}
+
 YOUR BUDGET: at most {{ $json.fill.gapWords }} words in total, across every sentence you add.
 
 WHERE THE FACTS COME FROM, in this order:
@@ -18,7 +20,7 @@ WHERE THE FACTS COME FROM, in this order:
 
 WHAT EVERY SENTENCE YOU ADD MUST BE:
 - ONE FACT FROM ITS SOURCE — an event, a date, a number, a name, something someone did or said. If you cannot point at the source that states it, do not write the sentence.
-- NEW TO THE FILM. Nothing the script already says, in any chapter, in any wording. If the only thing you can source is something the script has already told the viewer, stop.
+- NEW TO THE FILM. Nothing the script already says, in any chapter, in any wording. NEW means a new EVENT or a new NUMBER — not the same people or the same event described again from another source. If the script already says who founded the company and where, a claim describing those founders in other words is not new, however it is worded or dated. If the only thing you can source is something the script has already told the viewer, stop.
 - ABOUT WHAT HAPPENED, never about what the picture shows. No light, weather, colour, texture, sound, room, street or landscape. No camera, frame or shot. No sentence that opens on scenery.
 - A STATEMENT, not a comment. No "this is how", "the lesson is", "what matters is", "in many ways", "a turning point". Never mention the film, the viewer, a chapter or the story itself.
 - NOT A DEFINITION. Never "X is a Y that…" or "that means…".

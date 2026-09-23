@@ -1661,6 +1661,48 @@ const gmFill = (line) =>
   ok('past every pronoun in a row', !chap(out, 1).includes(GOOD_LIVE + ' It had') && !chap(out, 1).includes(GOOD_LIVE + ' Their'));
 }
 
+console.log('Top-up — what the fact-checker rejects stays out');
+{
+  // THE LOOP THIS EXISTS TO STOP. Press N adds a sourced sentence; press N+1's
+  // judge rules it redundant and the rewrite cuts it; the gap reopens; press
+  // N+2 would add it straight back. The rejection has to outlive the press.
+  const added = DS_GOOD; // stands for a sentence an earlier top-up put in
+  const judged = dsResolve(
+    [{ quote: added, claim: added, verdict: 'redundant', ref: 'E1', reason: 'already said' }],
+    { prevAdded: [added], prevRejected: ['An older rejected sentence about 2004.'] },
+  );
+  const out = dsApply(judged);
+  ok('a sentence an earlier top-up added, now flagged, is rejected for good', out.fill.rejected.includes(added));
+  ok('earlier rejections are carried forward, not replaced', out.fill.rejected.includes('An older rejected sentence about 2004.'));
+  ok('and the list is written into the report for the next press', out.fcReport.rejected && out.fcReport.rejected.includes(added));
+}
+{
+  const kept = dsResolve([{ ...dsFindings()[1] }], { prevAdded: [DS_GOOD] });
+  const out = dsApply(kept);
+  ok('an added sentence the judge SUPPORTS is not rejected', !out.fill.rejected.includes(DS_GOOD) && out.fcReport.rejected === undefined);
+}
+{
+  const REJ = 'In 2004, Google said, two Aussies and two Danes in Sydney created the technology that underpinned Google Maps.';
+  const out = fcFill(
+    [ADD(1, 'END', 'LIVE', 'In 2004, two Aussies and two Danes in Sydney created the technology that underpinned Google Maps.', { url: LIVE_URL })],
+    { rejected: [REJ] },
+  );
+  ok('the top-up will not propose a rejected sentence again, even reworded', out.fcReport.filled.sentences === 0 && out.fcReport.filled.dropped['rejected by the fact-checker before'] === 1);
+}
+{
+  const row = dsRow({ prev_added: JSON.stringify([{ sentence: 'A added.', ref: 'E1' }]), prev_rejected: JSON.stringify(['B rejected.']) });
+  const out = runNode('DS Prep.js', { json: row, dir: DS });
+  ok('DS Prep carries last press\'s additions', out.fc.prevAdded.length === 1 && out.fc.prevAdded[0] === 'A added.');
+  ok('and the rejected list', out.fc.prevRejected.length === 1 && out.fc.prevRejected[0] === 'B rejected.');
+  const bad = runNode('DS Prep.js', { json: dsRow({ prev_added: '{not json', prev_rejected: null }), dir: DS });
+  ok('and survives a malformed old report', Array.isArray(bad.fc.prevAdded) && bad.fc.prevAdded.length === 0 && bad.fc.prevRejected.length === 0);
+}
+{
+  const load = readFileSync(join(DS, 'DS Load.sql'), 'utf8');
+  ok('DS Load reads what the top-up added last time', load.includes("f.report->'filled'->'added'") && load.includes('as prev_added'));
+  ok('and what has been rejected so far', load.includes("f.report->'rejected'") && load.includes('as prev_rejected'));
+}
+
 console.log('Top-up — what it hands on');
 {
   const out = fcFill([ADD(2, TU_P1, 'E3', GOOD_E3)]);
@@ -1750,6 +1792,11 @@ console.log('Top-up — the prompt, and the writers around it');
   ok('it asks for facts the story turns on, not details that change nothing', p.includes("WORTH THE VIEWER'S TIME"));
   ok('it states the date-order rule the guard enforces', p.includes('IN DATE ORDER.'));
   ok('and the pronoun rule the guard enforces', p.includes('NEVER IN FRONT OF A PRONOUN.'));
+  // THE FOURTH PROBE (execution 16448) re-described the four founders the
+  // script already names, dated 2004 and attributed — sourced, and not new.
+  // Word overlap cannot see a paraphrase; the prompt has to say it.
+  ok('NEW means a new event or number, not the same people described again', p.includes('NEW means a new EVENT or a new NUMBER'));
+  ok('and the model is shown what the fact-checker rejected before', p.includes('ADDED BEFORE AND REJECTED BY THE FACT-CHECKER') && p.includes('$json.fill.rejected'));
   ok('it carries the relationship rule the judge enforces', p.includes('the RELATIONSHIP the sentence asserts'));
   ok('it forbids the picture, commentary and the film itself', p.includes('never about what the picture shows') && p.includes('A STATEMENT, not a comment'));
   ok('it protects the closing line and the hook', p.includes('Never after the LAST sentence of the LAST chapter') && p.includes('Never in CHAPTER 0'));

@@ -248,6 +248,22 @@ const usedRefs = [
       .map((r) => r.toUpperCase()),
   ),
 ];
+// A SENTENCE THE TOP-UP ADDED ON AN EARLIER PRESS, THAT THE JUDGE NOW FLAGS,
+// is rejected for good. Without this the button ping-pongs it: one press adds
+// a sourced sentence, the next press's judge rules it redundant and cuts it,
+// the gap reopens, and the press after that adds it straight back. Matched by
+// normalised text, because the judge quotes the sentence exactly as it sits.
+const normS = (x) => String(x || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+const flaggedNow = findings.filter((f) => f.verdict !== 'supported').map((f) => normS(f.quote)).filter(Boolean);
+const newlyRejected = (Array.isArray(fc.prevAdded) ? fc.prevAdded : []).filter((s) => {
+  const n = normS(s);
+  return n && flaggedNow.some((q) => q.includes(n) || n.includes(q));
+});
+const rejected = [...new Set([...(Array.isArray(fc.prevRejected) ? fc.prevRejected : []), ...newlyRejected])];
+if (newlyRejected.length) {
+  console.log('DEEP SEARCH re-run: the fact-checker rejected ' + newlyRejected.length + ' sentence(s) an earlier top-up added; they will not be added again.');
+}
+
 const fill = {
   run: !!ran && fc.mayRewrite !== false && gapWords >= FILL_MIN_GAP,
   gapWords,
@@ -257,6 +273,7 @@ const fill = {
   narration: script,
   packList: fc.packList || '',
   usedRefs,
+  rejected,
   chapters,
 };
 
@@ -270,6 +287,8 @@ const report = ran
       rewritten,
       // Carried forward, so the next press measures against the same length.
       preCheckWords,
+      // Carried forward too: sentences the top-up may never add again.
+      rejected: rejected.length ? rejected : undefined,
       // The corrected narration is under the film's ordered length. Not a
       // failure and never a refusal — a statement about how much of this film
       // its research can actually support.

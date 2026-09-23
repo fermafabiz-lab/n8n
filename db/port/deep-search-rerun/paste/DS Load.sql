@@ -49,6 +49,15 @@ select
      from hov.fact_check f
     where f.project_id = p.id
       and f.report->>'preCheckWords' ~ '^[0-9]+$')    as pre_check_words,
+  -- WHAT THE TOP-UP ADDED LAST TIME, and what the fact-checker has rejected of
+  -- it so far. `DS Apply` compares the first against this press's findings, so
+  -- a sentence the judge now flags joins the second and is never added again.
+  (select coalesce(f.report->'filled'->'added', '[]'::jsonb)::text
+     from hov.fact_check f
+    where f.project_id = p.id)                     as prev_added,
+  (select coalesce(f.report->'rejected', '[]'::jsonb)::text
+     from hov.fact_check f
+    where f.project_id = p.id)                     as prev_rejected,
   coalesce(
     (select json_agg(
        json_build_object(

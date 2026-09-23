@@ -287,8 +287,9 @@ console.log(
 
 const b64 = (s) => Buffer.from(String(s), 'utf8').toString('base64');
 
-// `DS Apply`'s shape exactly — `DS Write` and `DS Save` read `$json`. The hook
-// is never touched here, so `hookChanged` and `editing64` pass straight through.
+// `DS Apply`'s shape exactly — `DS Write` reads it off `$json`, and `DS Save`
+// reads this node by name when it ran. The hook is never touched here, so
+// `hookChanged` and `editing64` pass straight through.
 return [
   {
     json: {

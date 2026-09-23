@@ -154,4 +154,6 @@ per render (the correlated `max(updated_at)` in `PROJECT_ACTIVITY_SQL`), so
 the day) on every render of /projects, beside `hov.playlist`'s +1. Baseline
 after the restart and before anyone had opened the page: `hov.chapter`
 idx_scan 2357 / seq_scan 57, `hov.playlist` seq_scan 36 (13:59:46). A Postgres
-restart resets the counters.
+restart resets the counters. **Seen at 14:02:55**: `hov.playlist` 36 → 38 and
+`hov.chapter` idx_scan 2357 → 2517 — two renders of /projects, and exactly
+2 × 80 chapter reads, which only the new query makes. The served page runs it.

@@ -725,6 +725,19 @@ expected and harmless for an app touching only its own Drive.
   account from the owner hex-encoded in the start image, so a moved still never
   meets `Email mismatch`. A running batch keeps the old version: Pause and
   Resume to pick it up.
+  **And then all three accounts refused at once, which is what corrected the
+  diagnosis** (Media Generation `c8e6df0c`, `db/port/captcha-retry/`): the
+  403 `PUBLIC_ERROR_UNUSUAL_ACTIVITY` is not an account flag but a reCAPTCHA
+  token Google rejected (useapi's own docs; `captcha-stats` counts it against
+  the provider, CapSolver at 66.67%, `avg_attempt: 1`). The pipeline had sent
+  **`captchaRetry: 1` since 2026-09-02** to "save spend" — a fraction of a
+  cent — and turned every weak token into a 1-5 minute wait. Every Flow body
+  now ends `captchaRetry = 5`, which also rotates to the second configured
+  provider. **Still owed**: the same line in Claude Scripting's
+  `IR Generate Image` (left alone because another session was publishing
+  there), and watch for `PUBLIC_ERROR_MODEL_ACCESS_DENIED` on clips from
+  `01`/`02` — useapi says `veo-3.1-lite-low-priority` left invited family
+  members on 2026-09-23, and our three accounts share one credit pool.
 - **Drawn cards: one accepted motif card used to SILENCE every derived card,
   and the validator refused chapter-start cards on films with chapter cards
   OFF** (2026-09-23, `db/port/motif-more-cards/README.md`). The New York

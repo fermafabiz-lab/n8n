@@ -443,6 +443,18 @@ To confirm a change is live, read the deploy's commit and the container's
 restart time (`c3e72b8` at 11:16:18 → container back at 11:17:35 is the shape
 of a healthy one), rather than assuming a green push means a served build.
 
+**A GitHub Actions run status read from a web session can be served STALE for
+a quarter of an hour, and it looks exactly like a slow build.** On 2026-09-23
+run 179 finished at 12:18:25; `actions_get` and `actions_list` both kept
+answering `status: "in_progress"` with "Build and push" still running until
+about 12:35, and a session sat waiting on it and told the producer the deploy
+was still going twenty minutes after it had succeeded. **The tell is
+`updated_at`**: it stayed frozen at `12:16:13` across every poll, which a
+genuinely advancing run's does not. So when a run looks stuck, check whether
+its `updated_at` has moved at all before believing the status — an unchanged
+timestamp means you are reading a cache, not a build. Poll less often and read
+the STEP timestamps, which are authoritative the moment they appear.
+
 **A branch that is pushed is not a branch that is deployed**, and the gap is
 invisible from here: a session told to develop on its own `claude/*` branch
 will push, report success, and leave the producer reloading a build that never

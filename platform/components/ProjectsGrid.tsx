@@ -14,6 +14,8 @@ import ExpandableTitle from "@/components/ExpandableTitle";
 import PlaylistBar from "@/components/PlaylistBar";
 import AddToPlaylist from "@/components/AddToPlaylist";
 import { films, sortPlaylists, type Playlist } from "@/lib/playlists";
+import { CATEGORIES } from "@/lib/categories";
+import { categoryLists, isCategoryListId, resolveCategoryList } from "@/lib/category-lists";
 import { orderLibrary, type LibraryOrder } from "@/lib/library-order";
 import type { Project, StatusKind } from "@/lib/data";
 import { LIBRARY_FILTERS as FILTERS, isFilterKey, type FilterKey } from "@/lib/library-filters";
@@ -296,8 +298,25 @@ export default function ProjectsGrid({
   const listCounts = new Map(
     (pls ?? []).map((pl) => [pl.id, pl.projectIds.filter((id) => libraryIds.has(id)).length] as const),
   );
-  const active = listId ? (pls?.find((pl) => pl.id === listId) ?? null) : null;
-  const staleList = listId !== null && pls !== null && active === null;
+  /*
+   * The site's own lists, one per category with a film (lib/category-lists.ts)
+   * — derived from the library on every render, so there is nothing to keep
+   * in step and a new film is in its category the moment it exists. They open
+   * exactly like a playlist (`?playlist=category:<id>`), which is what lets
+   * every line below serve both without knowing the difference; only the
+   * lines that WRITE a playlist — Remove, Rename, Delete, "Add films to it" —
+   * check which kind is open.
+   */
+  const catLists = categoryLists(projects, CATEGORIES);
+  const activeCategory = isCategoryListId(listId) ? resolveCategoryList(listId, projects, CATEGORIES) : null;
+  const active: Playlist | null = isCategoryListId(listId)
+    ? activeCategory
+    : listId
+      ? (pls?.find((pl) => pl.id === listId) ?? null)
+      : null;
+  // A category list is never unreadable, so an unknown one is stale even
+  // while the producer's playlists could not be loaded.
+  const staleList = listId !== null && active === null && (pls !== null || isCategoryListId(listId));
   const inActive = active ? new Set(active.projectIds) : null;
   // The whole library in the chosen order, BEFORE any scoping — so the same
   // order carries into playlists, tabs, search and pages (the producer's
@@ -509,7 +528,9 @@ export default function ProjectsGrid({
   /** Take the ticked films out of the playlist on screen — never out of
    *  the library. Offers Undo, because it is one click with no arming. */
   const removeFromActive = () => {
-    if (!active) return;
+    // A film leaves a category by being filed as another kind, in its brief —
+    // never from here.
+    if (!active || activeCategory) return;
     const pl = { id: active.id, name: active.name };
     const ids = [...selected];
     startTransition(async () => {
@@ -570,6 +591,7 @@ export default function ProjectsGrid({
       ) : (
         <PlaylistBar
           playlists={pls}
+          categories={catLists}
           counts={listCounts}
           active={active}
           stale={staleList}
@@ -720,7 +742,7 @@ export default function ProjectsGrid({
                       onDone={onAddedToPlaylist}
                     />
                   )}
-                  {active && (
+                  {active && !activeCategory && (
                     <button
                       className="abtn"
                       disabled={pending || selected.size === 0}
@@ -804,7 +826,13 @@ export default function ProjectsGrid({
       </div>
 
       {shown.length === 0 ? (
-        active && scoped.length === 0 ? (
+        activeCategory && scoped.length === 0 ? (
+          // Reachable only by an old link: a category with no films has no
+          // chip. Nothing to fill — a film joins by being made as one.
+          <div className="empty" style={{ padding: "50px 0" }}>
+            <p style={{ margin: 0 }}>No {activeCategory.name} films yet.</p>
+          </div>
+        ) : active && scoped.length === 0 ? (
           // An empty playlist is not "nothing in this state": it is a
           // playlist waiting for its first films, and the way to add them
           // should be right here rather than a Select-and-menu away.
@@ -990,7 +1018,7 @@ export default function ProjectsGrid({
             Showing {from + 1}–{from + shown.length} of {matched.length}
             {active ? ` in “${short(active.name, 32)}”` : ""}
             {matched.length !== scoped.length
-              ? ` (${scoped.length} ${active ? "in the playlist" : "total"})`
+              ? ` (${scoped.length} ${active ? (activeCategory ? `in ${activeCategory.name}` : "in the playlist") : "total"})`
               : ""}
           </span>
           {/* Who made what, for the set on screen. Absent entirely until at

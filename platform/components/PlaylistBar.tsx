@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPlaylist, deletePlaylist, renamePlaylist } from "@/app/actions";
+import { isCategoryListId, type CategoryList } from "@/lib/category-lists";
 import { PLAYLIST_NAME_MAX, films, normalizePlaylistName, type Playlist } from "@/lib/playlists";
 import s from "./PlaylistBar.module.css";
 
@@ -9,6 +10,11 @@ import s from "./PlaylistBar.module.css";
  * The playlist row above the library toolbar: every playlist as a chip with
  * its count, "All films" to leave them, "+ New playlist", and — for the one
  * on screen — Rename and Delete.
+ *
+ * Before the producer's own playlists come the CATEGORY chips (Story,
+ * Documentary, …; lib/category-lists.ts): one per category that has a film,
+ * kept by the site, marked with the category's icon, and never renamed or
+ * deleted — so the tools below simply do not appear for them.
  *
  * It owns only its own typing and arming. Which playlist is open, what is
  * selected and what the message says all live in ProjectsGrid, which is the
@@ -18,6 +24,7 @@ import s from "./PlaylistBar.module.css";
  */
 export default function PlaylistBar({
   playlists,
+  categories,
   counts,
   active,
   stale,
@@ -29,10 +36,13 @@ export default function PlaylistBar({
 }: {
   /** Already in chip order (sortPlaylists). */
   playlists: Playlist[];
+  /** The categories that have films, in the brief's order (categoryLists). */
+  categories: CategoryList[];
   /** Films per playlist, counted against the library the grid holds — so a
    *  chip's number is always the number of cards it opens to. */
   counts: Map<string, number>;
-  /** The playlist on screen, or null for the whole library. */
+  /** The playlist on screen — the producer's own or a category's — or null
+   *  for the whole library. */
   active: Playlist | null;
   /** The address named a playlist that no longer exists. */
   stale: boolean;
@@ -48,6 +58,9 @@ export default function PlaylistBar({
   const [armed, setArmed] = useState(false);
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
+  // Rename and Delete belong to the producer's own playlists only — a
+  // category list is the site's, and there is nothing of it to rename.
+  const own = active !== null && !isCategoryListId(active.id) ? active : null;
 
   // Whatever was half-done belongs to the playlist it was started on.
   useEffect(() => {
@@ -76,17 +89,17 @@ export default function PlaylistBar({
   };
 
   const rename = (raw: string) => {
-    if (!active) return;
+    if (!own) return;
     const check = normalizePlaylistName(raw);
     if (!check.ok) return setError(check.message);
-    if (check.name === active.name) {
+    if (check.name === own.name) {
       setRenaming(false);
       return setError("");
     }
-    const clash = takenBy(check.name, active.id);
+    const clash = takenBy(check.name, own.id);
     if (clash) return setError(`There is already a playlist called “${clash.name}”.`);
     setError("");
-    const id = active.id;
+    const id = own.id;
     startTransition(async () => {
       const r = await renamePlaylist(id, check.name);
       if (!r.ok) return setError(r.message);
@@ -96,13 +109,13 @@ export default function PlaylistBar({
   };
 
   const remove = () => {
-    if (!active) return;
+    if (!own) return;
     if (!armed) {
       setArmed(true);
       setTimeout(() => setArmed(false), 5000);
       return;
     }
-    const id = active.id;
+    const id = own.id;
     startTransition(async () => {
       const r = await deletePlaylist(id);
       setArmed(false);
@@ -111,15 +124,15 @@ export default function PlaylistBar({
     });
   };
 
-  const activeCount = active ? (counts.get(active.id) ?? 0) : 0;
+  const activeCount = own ? (counts.get(own.id) ?? 0) : 0;
 
   return (
     <div className={s.bar} role="group" aria-label="Playlists">
       <span className={s.label}>Playlists</span>
 
-      {/* With no playlists there is nothing to switch between, so "All
-          films" would be a chip that is always on and does nothing. */}
-      {playlists.length > 0 && (
+      {/* With no chips there is nothing to switch between, so "All films"
+          would be a chip that is always on and does nothing. */}
+      {(playlists.length > 0 || categories.length > 0) && (
         <button
           type="button"
           className={`${s.chip} ${active === null ? s.on : ""}`}
@@ -130,6 +143,25 @@ export default function PlaylistBar({
           <span className={s.count}>{total}</span>
         </button>
       )}
+
+      {categories.map((c) => (
+        <button
+          type="button"
+          key={c.id}
+          className={`${s.chip} ${s.cat} ${active?.id === c.id ? s.on : ""}`}
+          aria-pressed={active?.id === c.id}
+          title={`Every ${c.name} film — kept up to date by the site`}
+          onClick={() => onChoose(active?.id === c.id ? null : c.id)}
+        >
+          <span className={s.icon} aria-hidden="true">
+            {c.icon}
+          </span>
+          <span className={s.name}>{c.name}</span>
+          <span className={s.count}>{c.projectIds.length}</span>
+        </button>
+      ))}
+      {/* The line between the site's lists and the producer's own. */}
+      {categories.length > 0 && playlists.length > 0 && <span className={s.sep} aria-hidden="true" />}
 
       {playlists.map((p) =>
         renaming && active?.id === p.id ? (
@@ -189,7 +221,7 @@ export default function PlaylistBar({
         <span className={s.hint}>Name one, then tick the films to put in it.</span>
       )}
 
-      {active && !renaming && (
+      {own && !renaming && (
         <span className={s.tools}>
           <button
             type="button"

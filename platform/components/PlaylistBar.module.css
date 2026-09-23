@@ -63,6 +63,24 @@
   white-space: nowrap;
   max-width: 26ch;
 }
+/* A category's own list (lib/category-lists.ts): the same chip, led by the
+   category's icon — the one mark that says "the site keeps this one". */
+.cat {
+  gap: 6px;
+}
+.icon {
+  font-size: 14px;
+  line-height: 1;
+}
+/* Between the site's lists and the producer's own. A rule, not a gap, so the
+   two groups read as two even when the row wraps on a laptop. */
+.sep {
+  align-self: stretch;
+  width: 1px;
+  margin: 4px 4px;
+  background: var(--line2);
+}
+
 /* --accent-ink, not --accent: the toolbar's counts use --accent, which
    measures 4.09:1 on a chip's --card2 at night. --accent-ink is 9.65:1 by day
    and 6.77:1 by night. */
@@ -202,6 +220,11 @@
   }
   .name {
     max-width: 18ch;
+  }
+  /* On a phone the row wraps anyway, and a rule at the start of a line is
+     a stray mark rather than a divider. */
+  .sep {
+    display: none;
   }
   /* On a phone the tools get their own line rather than squeezing between
      chips — margin-left:auto on a wrapped line would strand them right. */

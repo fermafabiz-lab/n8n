@@ -29,6 +29,14 @@ try {
 } catch (e) {
   raw = '';
 }
+// `FC Fill Check` is `continueRegularOutput` too: an editor that errored hands
+// on no verdicts, and then nothing is added.
+let checkRaw = '';
+try {
+  checkRaw = String($('FC Fill Check').first().json.output || '');
+} catch (e) {
+  checkRaw = '';
+}
 
 // ── SHARED GUARD ── byte-identical in `FC Fill Apply` and `DS Fill Apply`.
 // `scripts/check-fact-check.mjs` asserts the two copies match, so change both.
@@ -117,20 +125,45 @@ const parsePack = (packList) => {
 // search the web (`Research Model`) answers in text, not through a structured
 // parser. SENTENCE comes LAST and runs to the end of the line, so a sentence
 // that happens to contain a pipe still arrives whole.
-const parseProposals = (raw) => {
-  const out = [];
-  const re = /ADD:\s*(\d+)\s*\|\s*AFTER:\s*([^|\n]*?)\s*\|\s*REF:\s*([^|\n]*?)\s*\|\s*SOURCE:\s*([^|\n]*?)\s*\|\s*URL:\s*([^|\s]*)\s*\|\s*SENTENCE:\s*([^\n]+)/gi;
-  let m;
-  while ((m = re.exec(String(raw || ''))) !== null) {
-    out.push({
-      chapter: Number(m[1]),
-      after: m[2].trim(),
-      ref: m[3].trim().toUpperCase(),
-      source: m[4].trim(),
-      url: m[5].trim().replace(/[).,\]]+$/, ''),
-      sentence: m[6].trim(),
+//
+// PARSED LINE BY LINE, NUMBERED BY LINE. `Fill Check` numbers the proposals by
+// taking every line that starts with `ADD:`, in order — and a verdict is only
+// useful if it lands on the proposal it was about. A regex over the whole text
+// would skip a malformed line and shift every verdict after it by one.
+const ADD_LINE = /^ADD:\s*(\d+)\s*\|\s*AFTER:\s*([^|\n]*?)\s*\|\s*REF:\s*([^|\n]*?)\s*\|\s*SOURCE:\s*([^|\n]*?)\s*\|\s*URL:\s*([^|\s]*)\s*\|\s*SENTENCE:\s*(.+)$/i;
+const parseProposals = (raw) =>
+  String(raw || '')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.startsWith('ADD:'))
+    .map((l, i) => {
+      const m = l.match(ADD_LINE);
+      if (!m) return { index: i + 1, ok: false };
+      return {
+        index: i + 1,
+        ok: true,
+        chapter: Number(m[1]),
+        after: m[2].trim(),
+        ref: m[3].trim().toUpperCase(),
+        source: m[4].trim(),
+        url: m[5].trim().replace(/[).,\]]+$/, ''),
+        sentence: m[6].trim(),
+      };
     });
-  }
+
+// THE EDITOR'S VERDICTS, by proposal number. Five probes on the producer's
+// Google Maps film (2026-09-23) showed what the rules above cannot see: of the
+// sentences they would have kept, one was a real milestone and two were the
+// script again — the four founders re-described, and two known dates restated
+// as "a research repository document states that…". Word overlap reads that as
+// 41% new. Only a reader can tell, so `Fill Check` reads, and ONLY `keep` gets
+// through. No verdict at all means nothing is added: the producer would rather
+// have a shorter film than an unchecked one.
+const parseChecks = (raw) => {
+  const out = new Map();
+  const re = /CHECK:\s*(\d+)\s*\|\s*VERDICT:\s*(keep|repeat|minor|overreach)\b/gi;
+  let m;
+  while ((m = re.exec(String(raw || ''))) !== null) out.set(Number(m[1]), m[2].toLowerCase());
   return out;
 };
 
@@ -230,13 +263,14 @@ const place = (text, after, sentence, isLast) => {
   return { text: t.slice(0, ends[i]) + ' ' + sentence + t.slice(ends[i]) };
 };
 
-function topUp(chaptersIn, fill, raw) {
+function topUp(chaptersIn, fill, raw, checkRaw) {
   const chapters = (Array.isArray(chaptersIn) ? chaptersIn : []).map((c) => ({ ...c }));
   const byNum = new Map(chapters.map((c) => [Number(c.chapter_number), c]));
   const lastChapter = Math.max(0, ...chapters.map((c) => Number(c.chapter_number) || 0));
   const pack = parsePack(fill.packList);
   const budget = Math.max(0, Number(fill.gapWords) || 0);
   const proposals = parseProposals(raw);
+  const checks = parseChecks(checkRaw);
   const exhausted = /DONE:\s*exhausted/i.test(String(raw || ''));
 
   const existing = [];
@@ -262,6 +296,7 @@ function topUp(chaptersIn, fill, raw) {
       drop('over budget');
       continue;
     }
+    if (!p.ok) { drop('malformed'); continue; }
     let sentence = p.sentence.replace(/\s+/g, ' ').trim();
     if (sentence && !/[.!?…]["”’)]*$/.test(sentence)) sentence += '.';
     const n = wc(sentence);
@@ -313,6 +348,11 @@ function topUp(chaptersIn, fill, raw) {
     }
     if (again) { drop('rejected by the fact-checker before'); continue; }
 
+    // THE EDITOR'S CALL, after every rule code can check for itself — so a
+    // sentence dropped here is one the rules above had let through.
+    const verdict = checks.get(p.index);
+    if (verdict !== 'keep') { drop(verdict ? 'judged ' + verdict : 'not checked'); continue; }
+
     // WHERE IT GOES, and whether it may go there at all — out of date order, or
     // in front of a pronoun it would steal, is a sentence that changes what the
     // script says around it.
@@ -341,7 +381,7 @@ function topUp(chaptersIn, fill, raw) {
 }
 // ── END SHARED GUARD ──
 
-const result = topUp(fill.chapters, fill, raw);
+const result = topUp(fill.chapters, fill, raw, checkRaw);
 const chapters = result.chapters;
 
 // The Narration Guard shape again, rebuilt from the chapters as they now stand,

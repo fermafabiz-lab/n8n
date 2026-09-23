@@ -380,6 +380,14 @@ the full entry in the file named:
   makes it possible to run the SITE against a real Postgres engine from a web
   session: `db/port/lib/local-pg.mjs` (PGlite with the repo's own migrations,
   served over the wire protocol). See `db/port/lib/README.md`.
+  **A session can Resume a film but cannot Pause or Restart one** (met
+  2026-09-23, asked to "restart the projects that are running"): stopping an
+  execution needs the n8n public API key, which only the site holds (GitHub
+  Secret `N8N_API_KEY`) — the n8n MCP connector has no stop tool and n8n
+  keeps no `n8nApi` credential of its own. What a session CAN do is the
+  resume half, a POST to `resume-project` from a throwaway, and only once
+  nothing of the film is alive, or it starts a duplicate batch. The stop half
+  is the producer's Restart button; say so rather than promising it.
 - **Any Code-node body or prompt edited through MCP must come from a real,
   committed file first** (`db/port/<feature>/paste/<Node Name>.js`), never
   composed inline in the tool call. `db/port/lib/README.md`.
@@ -516,7 +524,11 @@ expected and harmless for an app touching only its own Drive.
   first. The grid holds its order while pointed at or in Select, so a card never
   moves under a click. **`getProjects` selects `p.activity_at` with no fallback:
   db/014 must precede the site code on any database**, or the library does not
-  load. Pinned by `npm run check:activity` (32) and, on a real engine,
+  load. **Both halves are live**: db/014 applied in execution 16480, the site
+  in deploy #181 at 13:58:36 UTC (merge `31f3a82`) — how to prove the served
+  page runs it without shell access (`hov.chapter` scans jump by the film
+  count per render of /projects) is in the README. Pinned by
+  `npm run check:activity` (32) and, on a real engine,
   `db/port/activity-order/check-trigger.mjs` (17). **Any new table that belongs
   to a film** needs adding to `PROJECT_ACTIVITY_SQL` if its writes should count.
 - **Playlists exist on the projects page since 2026-09-23**

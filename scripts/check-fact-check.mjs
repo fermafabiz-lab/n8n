@@ -516,8 +516,8 @@ const FIXED_CH1 = 'Google acquired Where 2 Technologies in October 2004. Google 
       },
     },
   });
-  ok('refuses a rewrite that shortened a chapter past the window', out.chapters[0].narrator_script === CH1);
-  ok('and names the word counts', /went from \d+ to \d+ words/.test(out.fcReport.refused || ''));
+  ok('refuses a rewrite that gutted a chapter', out.chapters[0].narrator_script === CH1);
+  ok('and says it reads as a re-telling, not a correction', /lost more than half its words/.test(out.fcReport.refused || ''));
 }
 {
   const out = runNode('FC Apply.js', {
@@ -885,7 +885,7 @@ const DS_FIXED_HOOK = 'Lars faced a hard problem in 2003.\nThe Sydney team held 
     ['a chapter short', [{ chapter_number: 0, narrator_script: DS_HOOK }], /returned 1 chapters for 2/],
     ['a chapter renumbered', [{ chapter_number: 0, narrator_script: DS_HOOK }, { chapter_number: 9, narrator_script: DS_CH1 }], /chapter 1 is missing/],
     ['a chapter emptied', [{ chapter_number: 0, narrator_script: DS_HOOK }, { chapter_number: 1, narrator_script: '' }], /chapter 1 came back empty/],
-    ['a chapter re-told', [{ chapter_number: 0, narrator_script: 'Lars.' }, { chapter_number: 1, narrator_script: DS_CH1 }], /chapter 0 went from 13 to 1 words/],
+    ['a chapter re-told', [{ chapter_number: 0, narrator_script: 'Lars.' }, { chapter_number: 1, narrator_script: DS_CH1 }], /chapter 0 lost more than half its words/],
     ['a clean chapter edited', [{ chapter_number: 0, narrator_script: DS_FIXED_HOOK }, { chapter_number: 1, narrator_script: 'The map went live in February 2006.' }], /chapter 1 was changed but had nothing flagged/],
   ]) {
     // A FRESH `resolved` EACH TIME. `DS Apply` settles each finding's `action`
@@ -915,6 +915,110 @@ const DS_FIXED_HOOK = 'Lars faced a hard problem in 2003.\nThe Sydney team held 
   ok('a skipped re-run still writes its row', out.fcReport.skipCode === 'not-documentary' && out.fcReport.checked === 0);
   ok('and is still marked a re-run', out.fcReport.rerun === true && out.fcReport.scope === 'final');
   ok('and writes no script', out.scriptChanged === false && out.hookChanged === false);
+}
+
+console.log('FC — a correction is allowed to make the film shorter');
+
+// THE REAL FILM THIS COMES FROM. On 2026-09-23 the producer's Google Maps
+// documentary had five unsourceable statements in an eleven-sentence script.
+// The rewrite cut them, 178 words became 128, and the whole correction was
+// thrown away by a symmetric +/-20% band — so the producer kept all five.
+// `Narration Guard` settled the principle for the project on 2026-09-13:
+// "a film shorter than ordered is correct". This is that, applied here.
+{
+  // A third of the chapter goes, because a third of it was unsourceable.
+  const out = runNode('FC Apply.js', {
+    json: {},
+    nodes: {
+      'FC Prep': prepped(),
+      'FC Resolve': resolved([{ ...UNSUPPORTED(), action: 'rewrite' }]),
+      'FC Rewrite': {
+        output: {
+          chapters: [
+            { chapter_number: 1, chapter_title: 'The acquisition', narrator_script: 'Google acquired Where 2 Technologies in October 2004.' },
+            { chapter_number: 2, chapter_title: 'Launch', narrator_script: CH2 },
+          ],
+        },
+      },
+    },
+  });
+  ok('a correction that shortens a chapter is ACCEPTED', out.fcReport.refused === undefined);
+  ok('and the unsourced sentence is gone', !out.output.includes('Lars and Jens led the team into launch.'));
+  ok('while the sourced one stays', out.output.includes('Google acquired Where 2 Technologies in October 2004.'));
+}
+{
+  // Padding is still refused. A rewrite may never GROW a chapter — that is how
+  // the narration used to reach a word count, and it is what made the film say
+  // the same thing four times.
+  const out = runNode('FC Apply.js', {
+    json: {},
+    nodes: {
+      'FC Prep': prepped(),
+      'FC Resolve': resolved([{ ...UNSUPPORTED(), action: 'rewrite' }]),
+      'FC Rewrite': {
+        output: {
+          chapters: [
+            { chapter_number: 1, chapter_title: 'The acquisition', narrator_script: CH1 + ' ' + CH1 + ' ' + CH1 },
+            { chapter_number: 2, chapter_title: 'Launch', narrator_script: CH2 },
+          ],
+        },
+      },
+    },
+  });
+  ok('a rewrite that PADS a chapter is still refused', /grew from \d+ to \d+ words/.test(out.fcReport.refused || ''));
+}
+{
+  // Shorter is allowed; SILENTLY shorter is not. The word count decides the
+  // runtime and the scene count, so a film whose research cannot fill its
+  // running time has to say so — the answer is more research or a shorter
+  // film, and neither is this chain's to choose.
+  const out = runNode('FC Apply.js', {
+    json: {},
+    nodes: {
+      'FC Prep': prepped(),
+      'FC Resolve': resolved([{ ...UNSUPPORTED(), action: 'rewrite' }]),
+      'FC Rewrite': {
+        output: {
+          chapters: [
+            { chapter_number: 1, chapter_title: 'The acquisition', narrator_script: 'Google acquired Where 2 Technologies in October 2004.' },
+            { chapter_number: 2, chapter_title: 'Launch', narrator_script: CH2 },
+          ],
+        },
+      },
+    },
+  });
+  ok('going under the film\'s ordered length is RECORDED', out.fcReport.short && out.fcReport.short.min === 27);
+  ok('and names what it now weighs', out.fcReport.short.words < 27 && out.fcReport.short.words > 0);
+  ok('but is never a refusal', out.fcReport.refused === undefined);
+}
+{
+  // A film that stays long enough says nothing about length at all, so an
+  // ordinary correction does not raise a false alarm.
+  const out = runNode('FC Apply.js', {
+    json: {},
+    nodes: {
+      'FC Prep': prepped(),
+      'FC Resolve': resolved([{ ...UNSUPPORTED(), action: 'rewrite' }]),
+      'FC Rewrite': {
+        output: {
+          chapters: [
+            { chapter_number: 1, chapter_title: 'The acquisition', narrator_script: CH1.replace('Lars and Jens led the team into launch.', 'Google said the team led it into launch.') },
+            { chapter_number: 2, chapter_title: 'Launch', narrator_script: CH2 },
+          ],
+        },
+      },
+    },
+  });
+  ok('a film still at its length says nothing about it', out.fcReport.short === undefined);
+}
+{
+  // The rewrite never ran, so there is nothing to be short ABOUT — `short`
+  // describes a correction that landed, not a script that arrived thin.
+  const out = runNode('FC Apply.js', {
+    json: {},
+    nodes: { 'FC Prep': prepped(), 'FC Resolve': resolved([{ ...UNSUPPORTED(), action: 'rewrite' }]) },
+  });
+  ok('a refused rewrite reports no shortness', out.fcReport.short === undefined);
 }
 
 console.log('DS — a sentence the narration already made');
@@ -1026,7 +1130,7 @@ const dupResolve = (findings) => {
       ],
     },
   });
-  ok('a chapter with no cut still refuses a re-telling', /chapter 0 went from 13 to 1 words/.test(out.fcReport.refused || ''));
+  ok('a chapter with no cut still refuses a re-telling', /chapter 0 lost more than half its words/.test(out.fcReport.refused || ''));
 }
 {
   // Several findings can share one quote. Counting its words once per finding
@@ -1171,6 +1275,36 @@ console.log('DS Prep — the floor it computes');
 {
   const out = runNode('DS Prep.js', { json: dsRow(), dir: DS });
   ok('a film with no stored length falls back to the guard default', out.fc.lengthSeconds === 64);
+}
+
+console.log('FC Judge — the rules it must still carry');
+
+// The judge prompt is a PROMPT: nothing here proves the model obeys it. What
+// these assertions do is stop a rule being lost in a later edit of an 18 KB
+// file, which is the failure this project has actually had — a clause removed
+// while adding a paragraph, noticed weeks later by a reader rather than a run.
+{
+  const judge = readFileSync(join(PASTE, 'FC Judge.txt'), 'utf8');
+  const has = (needle) => judge.includes(needle);
+
+  ok('a fourth verdict for a sentence the narration already made', has('`redundant`'));
+  ok('a transition is its own assertion', has('A TRANSITION IS ITS OWN ASSERTION'));
+  // 2026-09-23: the general form of that rule. The judge passed "gained the
+  // scale it had lacked" while its own `claim` named the comparison and its
+  // own `reason` covered only half of it.
+  ok('and so is every other relationship', has('the RELATIONSHIP the sentence asserts between them'));
+  ok('with the before-and-after named as the sharpest case', has('BEFORE-AND-AFTER'));
+  ok('and the self-check that catches it', has('When your reason covers less than your claim says, the verdict is unsupported'));
+  for (const kind of ['COMPARISON and CHANGE OF STATE', 'INTENTION and MOTIVE', 'LIMITATION and INABILITY', 'CONSEQUENCE']) {
+    ok(`the ${kind.toLowerCase()} case is spelled out`, has(kind));
+  }
+  ok('order is taken from dates, never from wording', has('ORDER OF EVENTS IS CHECKED AGAINST DATES'));
+  ok('attribution does not settle an order', has('ATTRIBUTION DOES NOT SETTLE AN ORDER EITHER'));
+  ok('the narration is checked against itself', has('THE NARRATION MUST ALSO AGREE WITH ITSELF'));
+  ok('a bookend and a hook are not repetition', has('TWO ECHOES ARE NOT REPETITION'));
+  ok('scope is part of the assertion', has('SCOPE IS PART OF THE ASSERTION'));
+  ok('a counterfactual cannot be supported', has('A COUNTERFACTUAL CANNOT BE SUPPORTED BY ANYTHING'));
+  ok('one assertion at a time', has('ONE ASSERTION AT A TIME'));
 }
 
 console.log('DS Rewrite, DS Write, DS Save, DS Load');

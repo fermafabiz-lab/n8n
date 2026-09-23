@@ -1,0 +1,1 @@
+={{ (() => { const r = Object.assign({}, $('RG End Frame Prompt').first().json.efRequest); try { const h = String(r.reference_1 || '').match(/-email:([0-9a-f]+)-/i); if (h) { let e = ''; for (let i = 0; i < h[1].length; i += 2) e += String.fromCharCode(parseInt(h[1].substr(i, 2), 16)); if (e.indexOf('@') > 0) r.email = e; } } catch (err) {} r.captchaRetry = 5; return r; })() }}

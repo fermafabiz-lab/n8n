@@ -790,6 +790,22 @@ expected and harmless for an app touching only its own Drive.
   **Owed**: the hold has never been heard on a render, and the
   `Rewrite Script` path (producer rejects with feedback) still carries
   neither the spine nor these rules.
+- **A Google-flagged Flow account stalled the whole image phase, and `health`
+  said OK** (2026-09-23, Media Generation `f7f03638`, rollback `c22878a1`,
+  `db/port/image-failover/README.md`). The Rome film's images took minutes
+  each: `houseofvideos01` answered 12 of 22 image requests with `403
+  PUBLIC_ERROR_UNUSUAL_ACTIVITY`, and each refusal held the film five minutes
+  (images are serial for the whole film) while the other two accounts idled.
+  **The evidence lives at useapi, not in n8n**: `GET
+  /v1/google-flow/accounts/captcha-stats` lists every request of the last hour
+  with account, status and Google's reason, read-only — use it before guessing
+  at a slow batch. Fixed by routing around: `IMG Cooldown Guard` marks a
+  throttled account avoided for 30 min and retries in 5 s on another account
+  the film runs on (new node `IMG Account` picks it), and **the clip follows
+  the image** — `Pool Tick`, `Submit Video` and `Generate End Frame` take the
+  account from the owner hex-encoded in the start image, so a moved still never
+  meets `Email mismatch`. A running batch keeps the old version: Pause and
+  Resume to pick it up.
 - **Drawn cards: one accepted motif card used to SILENCE every derived card,
   and the validator refused chapter-start cards on films with chapter cards
   OFF** (2026-09-23, `db/port/motif-more-cards/README.md`). The New York

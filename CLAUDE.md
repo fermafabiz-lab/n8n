@@ -546,7 +546,8 @@ expected and harmless for an app touching only its own Drive.
   library on every render, never stored and never written to (no Rename,
   Delete or Remove), opened as `?playlist=category:<id>`. A film with no
   category, or an unknown one, is under Story — `getCategory`'s rule, not a
-  second one. `npm run check:category-lists` (30).
+  second one. `npm run check:category-lists` (30). Live since deploy #182
+  (merge `11be573`, 14:21 UTC).
   **`db/013` is applied on the live database** (execution 16435: two tables,
   both keys cascading — deleting a playlist never deletes a film). **Not in
   `project.tags`**: that is n8n's Airtable-compat field. Verified end to end

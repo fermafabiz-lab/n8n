@@ -145,7 +145,12 @@ image cooldown cannot be read from outside a running execution. The
 producer's instruction had covered exactly this — "restart the projects that
 are running after the deploy" — and it was the one half this session could
 not do: stopping an execution needs the n8n API key, which only the site
-holds. The Restart press went back to the producer.
+holds. The Restart press went back to the producer. **It was not dead**: the
+same run wrote stills 21 and 22 by 14:09:34 without anyone touching it, so
+the silence was a hold inside the run — the image cooldowns another session
+was fixing that same hour (`db/port/image-failover/`, then `captchaRetry`) —
+not the deploy killing it. The restart came at 14:21, after the next deploy,
+through the door built for it (`db/port/ops-restart/`).
 
 **Proving the live page runs the new code, without shell access.** The old
 library query never read `hov.chapter`; the new one reads it once per film

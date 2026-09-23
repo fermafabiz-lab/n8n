@@ -206,6 +206,9 @@ export default async function ProductionRoom({
   // Cinematic and anything else marked noNarration: no TTS ever runs, so
   // every voice gate on this page has to be treated as already passed.
   const silent = getCategory(project.category).noNarration === true;
+  // No cold open for this kind of film (Cinematic): Scripting writes none, so
+  // the panel that shows and rewrites one would only offer to add it back.
+  const noHook = getCategory(project.category).noHook === true;
   const steps = pipeline(
     scenes,
     project.statusKind === "done",
@@ -706,7 +709,7 @@ export default async function ProductionRoom({
 
         {/* A hook rewrite that is in flight follows the producer, because
             the only two ways to cancel or re-send it are on this panel. */}
-        {project.hookRegen && !hookOnScenesStep && !hookOnFinalStep && (
+        {!noHook && project.hookRegen && !hookOnScenesStep && !hookOnFinalStep && (
           <HookPanel {...hookPanel} />
         )}
 
@@ -760,7 +763,7 @@ export default async function ProductionRoom({
             {/* The cold open, beside Final touches for the same reason the
                 music picker is: rewriting it is a self-saving action that
                 must not arm the render button. Here it also costs new shots. */}
-            <HookPanel {...hookPanel} />
+            {!noHook && <HookPanel {...hookPanel} />}
             {/* Deliberately beside FinalSettings, not a row inside it: that
                 panel batches choices into one confirm that also STARTS the
                 render, while pinning a track is a self-saving audition. */}
@@ -900,7 +903,7 @@ export default async function ProductionRoom({
           // is shown first: this is the one moment a rewrite costs only a
           // model call, before any of its shots has a picture.
           <>
-            <HookPanel {...hookPanel} />
+            {!noHook && <HookPanel {...hookPanel} />}
             <SceneReview projectId={id} scenes={scenes} />
           </>
         ) : scenes.length > 0 &&

@@ -34,6 +34,16 @@ export interface Category {
    *  off — the film carries only its own sound effects. */
   noNarration?: boolean;
   /**
+   * No cold open: the film starts on its first shot. Claude Scripting skips
+   * the hook for such a film (the `Hook Wanted?` branch, which reads the same
+   * category) and gives the scene the teaser would have taken back to the
+   * film, so the brief drops its Cold open row and the film page never shows
+   * the hook panel. Cinematic since 2026-09-23 — the producer's call: a film
+   * whose whole point is continuity cannot open on shots from its own middle.
+   * db/port/cinematic-continuity/README.md.
+   */
+  noHook?: boolean;
+  /**
    * The narrator this category picks by itself, as the prefixed id the
    * picker stores — selected on screen the moment the category is chosen,
    * so the producer sees who will read and can change it like any other
@@ -136,6 +146,7 @@ export const CATEGORIES: Category[] = [
       "No narration at all — a pure visual film carried by its own sound: engines, tires, rain, impacts. For car scenes, action sequences, atmosphere pieces.",
     ready: true,
     noNarration: true,
+    noHook: true,
     defaultTone: "Cinematic",
     options: [],
   },

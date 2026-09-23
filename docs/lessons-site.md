@@ -2410,3 +2410,76 @@ producer moves this episode to a different one. The writing tone needs no
 guard: the tone row's own `toneTouched` flag (added the same week, for the
 unrelated reason that every category now has a default tone) starts TRUE on
 an episode whose show has one.
+
+### Playlists — the library, organised by the producer (2026-09-23)
+
+A playlist row above the library toolbar: the producer's own named sets of
+films, filled with the library's existing ☑ Select. The whole account — model,
+flows, apply record — is `db/port/playlists/README.md`; what belongs here is
+what the site taught while it was built, because every one of these is a
+general rule wearing a playlist costume.
+
+**A refresh you start is a response whose arrival you do not control.** The
+first version called `router.refresh()` after each playlist write. Creating a
+playlist and then filling it fired two refreshes, and the one fired FIRST came
+back LAST: a playlist just given three films showed 0 until the next refresh.
+Nothing was wrong with either write, and a reload always looked right, so no
+report would ever have narrowed it down. The fix is to let the server action
+revalidate the page itself (`revalidatePath("/projects")`): the fresh tree then
+rides back in the action's own response, through the router's action queue,
+which runs one thing at a time. **Anything that writes and then asks for a
+re-read should make the write carry the re-read.** Pinned by
+`check:playlists`, which also asserts the grid no longer calls
+`router.refresh()`.
+
+**A test that samples once samples the lucky moment.** The race above was
+caught only because the check read the count 700 ms after the click; it now
+samples every 50 ms for three seconds and fails if the count EVER falls back
+after reaching its value. A single read after a fixed pause passes whenever
+the pause happens to outlast the race.
+
+**`<button>` resets `text-transform`; `<span>` inherits it.** The toolbar
+(`.eyebrow.prow`) is uppercase with 0.14em tracking. The browser's own
+stylesheet gives every button `text-transform: none` — measured, no site rule
+does it — so button labels were never at risk, but the result line is a
+`<span>` and inherited the capitals: "ADDED 3 FILMS TO “GOOGLE MAPS”", a
+playlist name the producer did not type. It opts out now (`ASIS` in
+ProjectsGrid), which also puts the existing delete message back in sentence
+case. Anything that shows the producer's own words inside that toolbar must do
+the same. The menu resets it in its module CSS for the same reason.
+
+**A panel hung from a button in a row that WRAPS has no fixed side to hang
+from.** The select bar wraps at every laptop width in select mode (112px tall
+at 1280, 1440 and 1600 — measured before this change too), which can put
+"+ Add to playlist" at the far left of a row; a panel anchored `right: 0`
+opened 40px off the screen with the playlist names cut in half. It measures
+the button in a layout effect and clamps itself 16px inside the viewport,
+before paint. `position: fixed` is not the escape it looks like: the toolbar's
+`backdrop-filter` makes it the containing block for fixed descendants.
+
+**One more control in a `nowrap` row is a phone bug.** Inside a playlist the
+select bar holds five controls, and `.ptools` was `nowrap`: on a 390px phone
+they ran to x=464, Cancel off the screen, the page scrolling sideways. Found by
+walking every element whose right edge passed the viewport, not by eye. It
+wraps now, and only a row that does not fit ever does.
+
+**Two first-pick colours failed at night.** White on `var(--accent)` and white
+on `var(--red)` read fine by day and measured 3.29:1 and 3.12:1 in the dark
+theme, where both tokens get lighter. A filled surface that carries white text
+should be one that is the SAME in both themes (the `.abtn.ok` gradient, 5.01:1;
+a fixed `#b3372e`, 6.00:1) — which is also the only kind the colour convention
+allows a literal on. Measured with a script over the token values, then again
+on the rendered page; the two agreed to the hundredth.
+
+**A web session can run the site against a real Postgres.** PGlite (Postgres
+compiled to WebAssembly, from npm — which the session can reach) with the
+repo's own migrations, served over the wire protocol so the unmodified `pg`
+Pool connects: `db/port/lib/local-pg.mjs`. Until now a site feature that writes
+the database could be checked only by reading its SQL or by shipping it.
+
+**Noticed and deliberately not changed**: the library toolbar sticks at
+`top: 10px` UNDER the nav (which ends at 72px, z-index 100 vs 5), so once
+scrolled it is hidden except for a wrapped second row. It predates playlists;
+`top: 84px` — the offset its own `scroll-margin-top` already uses — is the
+likely fix, and it is the producer's call because it changes how the whole
+library scrolls.

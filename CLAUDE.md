@@ -375,8 +375,11 @@ the full entry in the file named:
   that needs `wf7.house-of-videos.com`, the site, an external API or a real
   render must be done through the n8n MCP connector, a throwaway workflow, or
   Railway's own tools — never a direct `fetch()`/`curl` from this
-  environment. `api.github.com` is the one exception and answers normally.
-  See `db/port/lib/README.md`.
+  environment. `api.github.com` answers normally, and so does the npm
+  registry (measured 2026-09-23, `registry.npmjs.org` 200) — which is what
+  makes it possible to run the SITE against a real Postgres engine from a web
+  session: `db/port/lib/local-pg.mjs` (PGlite with the repo's own migrations,
+  served over the wire protocol). See `db/port/lib/README.md`.
 - **Any Code-node body or prompt edited through MCP must come from a real,
   committed file first** (`db/port/<feature>/paste/<Node Name>.js`), never
   composed inline in the tool call. `db/port/lib/README.md`.
@@ -499,6 +502,22 @@ expected and harmless for an app touching only its own Drive.
 
 ## Open work
 
+- **Playlists exist on the projects page since 2026-09-23**
+  (`db/port/playlists/README.md`; lessons in `docs/lessons-site.md` under
+  "Playlists — the library, organised by the producer"). A playlist row above
+  the library toolbar — one chip per playlist, "+ New playlist", Rename,
+  Delete playlist — filled with the existing ☑ Select ("+ Add to playlist",
+  "− Remove from …" with Undo); a film can be in any number of them, and
+  everything below the row counts inside the chosen one (`?playlist=<id>`).
+  **`db/013` is applied on the live database** (execution 16435: two tables,
+  both keys cascading — deleting a playlist never deletes a film). **Not in
+  `project.tags`**: that is n8n's Airtable-compat field. Verified end to end
+  against a real Postgres engine in Chromium (`db/port/lib/local-pg.mjs` +
+  `db/port/playlists/browser/`), pinned by `npm run check:playlists` (38).
+  **What is owed**: the producer's first real playlist. **Noticed, not
+  changed**: the library toolbar sticks at `top: 10px` UNDER a nav that ends
+  at 72px, so once scrolled it is hidden except a wrapped second row —
+  pre-existing; `top: 84px` is the likely fix and the producer's call.
 - **Deep Search is live; what is owed is a film somebody keeps**
   (2026-09-18, Claude Scripting `b927a298`; full account
   `db/port/fact-check/README.md`, lessons in `docs/lessons-pipeline.md` under
@@ -1186,7 +1205,9 @@ expected and harmless for an app touching only its own Drive.
   all answer `000`. So `curl` cannot reach the site, wf7 or any external API —
   but the entry here used to say "every host answers 000", which is no longer
   true and would send a session looking for a workaround it does not need for
-  GitHub. For everything else the MCP connectors are the only way out. To run a query or fire a webhook, create a throwaway workflow
+  GitHub. (The npm registry answers too — measured 2026-09-23 — so a session
+  can install tools that are not the site's dependencies, like the WASM
+  Postgres behind `db/port/lib/local-pg.mjs`.) For everything else the MCP connectors are the only way out. To run a query or fire a webhook, create a throwaway workflow
   (manual trigger → Postgres, or → an HTTP node posting to
   `http://localhost:5678/webhook/<path>`), `execute_workflow` it, read the
   result, then `archive_workflow`. n8n can reach itself and the database

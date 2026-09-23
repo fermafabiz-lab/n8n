@@ -1587,3 +1587,40 @@ export async function backfillSeriesSettings(s: import("@/lib/series").Series) {
   needPg("backfillSeriesSettings");
   return pgBackend.backfillSeriesSettings(s);
 }
+
+// ---------------------------------------------------------------------------
+// Playlists (db/013). Postgres only, like series — the Airtable adapter never
+// gets them. The difference is demo mode: the library page READS playlists on
+// every render, so demo data answers "none" instead of throwing and taking the
+// page down with it. The writes are never reached there; every playlist
+// action checks `isConfigured` first and says "Demo mode", like
+// deleteProjects does.
+// ---------------------------------------------------------------------------
+
+export type { Playlist } from "@/lib/playlists";
+
+export async function getPlaylists() {
+  if (!isConfigured) return [];
+  needPg("getPlaylists");
+  return pgBackend.getPlaylists();
+}
+export const insertPlaylist: typeof pgBackend.insertPlaylist = (name, projectIds) => {
+  needPg("insertPlaylist");
+  return pgBackend.insertPlaylist(name, projectIds);
+};
+export const addPlaylistMembers: typeof pgBackend.addPlaylistMembers = (playlistId, projectIds) => {
+  needPg("addPlaylistMembers");
+  return pgBackend.addPlaylistMembers(playlistId, projectIds);
+};
+export const removePlaylistMembers: typeof pgBackend.removePlaylistMembers = (playlistId, projectIds) => {
+  needPg("removePlaylistMembers");
+  return pgBackend.removePlaylistMembers(playlistId, projectIds);
+};
+export const renamePlaylistRow: typeof pgBackend.renamePlaylistRow = (playlistId, name) => {
+  needPg("renamePlaylistRow");
+  return pgBackend.renamePlaylistRow(playlistId, name);
+};
+export const deletePlaylistRow: typeof pgBackend.deletePlaylistRow = (playlistId) => {
+  needPg("deletePlaylistRow");
+  return pgBackend.deletePlaylistRow(playlistId);
+};

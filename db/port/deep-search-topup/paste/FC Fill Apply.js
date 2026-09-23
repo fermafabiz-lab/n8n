@@ -134,36 +134,100 @@ const parseProposals = (raw) => {
   return out;
 };
 
-// WHERE A SENTENCE LANDS. After the sentence it names, when that sentence is
-// found verbatim; otherwise at the end of its chapter. The LAST chapter's final
-// sentence is the exception, because it is the film's closing line: nothing is
-// ever placed after it, and END in that chapter lands just before it.
+// WHERE A SENTENCE LANDS, and whether it may land at all. After the sentence it
+// names; otherwise at the end of its chapter. The LAST chapter's final sentence
+// is the film's closing line: nothing is ever placed after it, and END in that
+// chapter lands just before it — the same unit `DS Resolve` protects as
+// `closingSentence`, because this chain only ever runs on documentaries and a
+// documentary's last paragraph often holds its last event (the Google Maps
+// probe, 2026-09-23: protecting the whole paragraph pushed a sentence about the
+// API in front of the sentence that introduces the API).
 //
-// THE LINE, NOT THE PARAGRAPH — the same unit `DS Resolve` protects as
-// `closingSentence`. The first version protected the whole final paragraph, and
-// on the producer's Google Maps film (probe, 2026-09-23) that pushed a sentence
-// about the API into the paragraph BEFORE the one that introduces the API: a
-// documentary's last paragraph is often where its last event happens, and the
-// resolution rule `db/port/story-close/` exists for is a Story and Kids rule,
-// while this chain only ever runs on documentaries.
+// Positions are END INDICES in the original text, so whatever stood after a
+// sentence — a space or a paragraph break — is kept exactly.
+const endsOf = (t) => {
+  const ends = [];
+  const re = /[.!?…]["”’)]*(?=\s|$)/g;
+  let m;
+  while ((m = re.exec(t)) !== null) ends.push(m.index + m[0].length);
+  if (!ends.length || ends[ends.length - 1] < t.length) ends.push(t.length);
+  return ends;
+};
+
+// A NEW SENTENCE MUST NOT TAKE THE NEXT ONE'S SUBJECT. Inserted just before a
+// sentence that opens on "It", "This", "They"…, it becomes what that word
+// points at. Measured on the same probe: "In November 2005, Google created the
+// Google Maps API Blog." placed before the closing line "It had become a
+// platform other people could build on" would have made the film's last line
+// a sentence about a blog.
+const PRONOUN_OPEN = /^(?:It|Its|This|These|That|Those|They|Their|Them|He|His|She|Her)\b/;
+
+// A DATE, as a range, from the first date a sentence names — to catch a
+// sentence placed out of date order. Only a DEFINITE contradiction counts: a
+// bare year spans the whole year, "early/mid/late" a third of it.
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const dateOf = (s) => {
+  const t = String(s || '');
+  let m = t.match(/\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),?\s+(\d{4})\b/);
+  if (m) {
+    const v = Number(m[3]) * 10000 + (MONTHS.indexOf(m[1]) + 1) * 100 + Number(m[2]);
+    return { lo: v, hi: v };
+  }
+  m = t.match(/\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})\b/);
+  if (m) {
+    const b = Number(m[2]) * 10000 + (MONTHS.indexOf(m[1]) + 1) * 100;
+    return { lo: b + 1, hi: b + 31 };
+  }
+  m = t.match(/\b(early|mid|late)[-\s](\d{4})\b/i);
+  if (m) {
+    const y = Number(m[2]) * 10000;
+    const r = { early: [101, 430], mid: [401, 930], late: [901, 1231] }[m[1].toLowerCase()];
+    return { lo: y + r[0], hi: y + r[1] };
+  }
+  m = t.match(/\b(1[5-9]\d\d|20\d\d)\b/);
+  if (m) {
+    const y = Number(m[1]) * 10000;
+    return { lo: y + 101, hi: y + 1231 };
+  }
+  return null;
+};
+
 const place = (text, after, sentence, isLast) => {
   const t = String(text || '').trim();
-  const lastSentence = sentencesOf(t).pop() || '';
+  const ends = endsOf(t);
+  const starts = ends.map((e, i) => {
+    if (i === 0) return 0;
+    let k = ends[i - 1];
+    while (k < t.length && /\s/.test(t[k])) k++;
+    return k;
+  });
+  const n = ends.length;
+  const at = (i) => t.slice(starts[i], ends[i]);
+  // Insert AFTER sentence i; -1 means before the first. The closing line of the
+  // last chapter may never have anything after it.
+  const lastAllowed = isLast ? n - 2 : n - 1;
   const a = String(after || '').trim();
-  const anchorIsEnding = isLast && norm(a) === norm(lastSentence);
-  if (a && a.toUpperCase() !== 'END' && t.includes(a) && !anchorIsEnding) {
-    const at = t.indexOf(a) + a.length;
-    return t.slice(0, at) + ' ' + sentence + t.slice(at);
+  const aIdx = a && a.toUpperCase() !== 'END' ? t.indexOf(a) : -1;
+  let i = lastAllowed;
+  if (aIdx >= 0) {
+    const aEnd = aIdx + a.length;
+    i = ends.findIndex((e) => e >= aEnd);
+    if (i < 0 || i > lastAllowed) i = lastAllowed;
   }
-  if (!isLast) return t + ' ' + sentence;
-  // Just before the closing line, keeping whatever whitespace stood there — a
-  // paragraph break stays a paragraph break, with the new sentence opening it.
-  const boundary = /[.!?…]["”’)]*\s+(?=\S)/g;
-  let start = -1;
-  let m;
-  while ((m = boundary.exec(t)) !== null) start = m.index + m[0].length;
-  if (start > 0) return t.slice(0, start) + sentence + ' ' + t.slice(start);
-  return sentence + ' ' + t;
+  while (i + 1 < n && PRONOUN_OPEN.test(at(i + 1))) i++;
+  if (i > lastAllowed) return { drop: "would take the next sentence's subject" };
+
+  const mine = dateOf(sentence);
+  if (mine) {
+    let before = null;
+    for (let j = i; j >= 0 && !before; j--) before = dateOf(at(j));
+    let later = null;
+    for (let j = i + 1; j < n && !later; j++) later = dateOf(at(j));
+    if ((before && mine.hi < before.lo) || (later && mine.lo > later.hi)) return { drop: 'out of date order' };
+  }
+
+  if (i < 0) return { text: sentence + ' ' + t };
+  return { text: t.slice(0, ends[i]) + ' ' + sentence + t.slice(ends[i]) };
 };
 
 function topUp(chaptersIn, fill, raw) {
@@ -234,11 +298,17 @@ function topUp(chaptersIn, fill, raw) {
     }
     if (repeat) { drop('repeats the script'); continue; }
 
+    // WHERE IT GOES, and whether it may go there at all — out of date order, or
+    // in front of a pronoun it would steal, is a sentence that changes what the
+    // script says around it.
+    const placed = place(ch.narrator_script, p.after, sentence, Number(ch.chapter_number) === lastChapter);
+    if (placed.drop) { drop(placed.drop); continue; }
+
     // THE BUDGET IS A CEILING, cut from the LAST proposal — which is what the
     // prompt tells the model, so the facts it chose to write first survive.
     if (spent + n > budget) { budgetHit = true; drop('over budget'); continue; }
 
-    ch.narrator_script = place(ch.narrator_script, p.after, sentence, Number(ch.chapter_number) === lastChapter);
+    ch.narrator_script = placed.text;
     spent += n;
     existing.push(words);
     if (!live) usedRefs.add(p.ref);

@@ -1528,7 +1528,7 @@ for (const [label, line, why] of [
   // ONE CLAIM, ONE SENTENCE. Stretching a single fact across two sentences is
   // how a narration reaches a word count without saying more.
   const out = fcFill([
-    ADD(2, TU_P1, 'E5', 'In April 2005, Google Maps added satellite pictures drawn from Keyhole.'),
+    ADD(2, 'Google Maps launched on February 8, 2005.', 'E5', 'In April 2005, Google Maps added satellite pictures drawn from Keyhole.'),
     ADD(1, 'END', 'E5', 'Keyhole imagery reached Google Maps users in April 2005 across the United States.'),
   ]);
   ok('a second sentence from the same claim is deleted', out.fcReport.filled.sentences === 1 && out.fcReport.filled.dropped['one claim stretched into two sentences'] === 1);
@@ -1612,6 +1612,53 @@ console.log('Top-up — the closing line stays the closing line');
 {
   const out = fcFill([ADD(1, 'END', 'LIVE', GOOD_LIVE, { url: LIVE_URL })]);
   ok('a chapter that is not the last takes END at its end', chap(out, 1) === TU_CH1 + ' ' + GOOD_LIVE);
+}
+
+console.log('Top-up — a sentence may not change what the script around it says');
+// Both cases are the SECOND probe's real output (execution 16442, 2026-09-23),
+// read as prose rather than counted — which is the only way either was seen.
+const GM_API = 'On June 29, 2005, Google released the Google Maps API for external use.';
+const GM_CLOSE = 'It had become a platform other people could build on, and its later reach still lay ahead.';
+const GM_LAUNCH = 'On February 8, 2005, Google Maps launched for desktop as a new solution, Google said, to help people get from point A to point B.';
+const GM_INSIDE = 'Inside Google, the Sydney software became part of Google Maps.';
+const gmChapters = () => [
+  { chapter_number: 0, chapter_title: 'HOOK', narrator_script: 'In October 2004, Google acquired Where 2 Technologies.' },
+  { chapter_number: 1, chapter_title: 'Sydney', narrator_script: GM_INSIDE + ' ' + GM_LAUNCH + '\n\n' + GM_API + ' ' + GM_CLOSE },
+];
+const gmFill = (line) =>
+  runNode('FC Fill Apply.js', {
+    dir: TOPUP,
+    nodes: { 'FC Apply': { output: 'x', chapters: gmChapters(), min: 40, fcReport: {}, fill: tuFill({ chapters: gmChapters() }) }, 'FC Fill': { output: line } },
+  });
+{
+  // "It had become a platform" would have become a sentence about a BLOG.
+  const out = gmFill(ADD(1, GM_API, 'LIVE', 'In November 2005, Google created the Google Maps API Blog.', { url: LIVE_URL }));
+  ok('a sentence that would steal the closing line\'s "It" is deleted', out.fcReport.filled.sentences === 0 && out.fcReport.filled.dropped["would take the next sentence's subject"] === 1);
+  ok('and the closing line still means what it meant', chap(out, 1).endsWith(GM_API + ' ' + GM_CLOSE));
+}
+{
+  // A February 16 fact in front of the February 8 launch.
+  const out = gmFill(ADD(1, GM_INSIDE, 'LIVE', 'On February 16, 2005, Google released a beta Toolbar that turned web page addresses into online map links.', { url: LIVE_URL }));
+  ok('a sentence placed before an earlier date is deleted', out.fcReport.filled.sentences === 0 && out.fcReport.filled.dropped['out of date order'] === 1);
+}
+{
+  // The same fact, anchored where it belongs, is kept.
+  const TOOLBAR = 'On February 16, 2005, Google released a beta Toolbar that turned web page addresses into online map links.';
+  const out = gmFill(ADD(1, GM_LAUNCH, 'LIVE', TOOLBAR, { url: LIVE_URL }));
+  ok('the same fact in date order is kept', out.fcReport.filled.sentences === 1 && chap(out, 1).includes(GM_LAUNCH + ' ' + TOOLBAR));
+  ok('closing the paragraph it belongs to', chap(out, 1).split(/\n\s*\n/)[0].endsWith(TOOLBAR));
+}
+{
+  // A pronoun that is NOT the closing line: the sentence moves past it rather
+  // than being lost.
+  const ch = tuChapters();
+  ch[1].narrator_script = 'Where 2 Technologies was founded in Sydney in 2003. It had four founders. Their prototype ran in a browser.';
+  const out = runNode('FC Fill Apply.js', {
+    dir: TOPUP,
+    nodes: { 'FC Apply': { output: 'x', chapters: ch, min: 40, fcReport: {}, fill: tuFill({ chapters: ch }) }, 'FC Fill': { output: ADD(1, 'Where 2 Technologies was founded in Sydney in 2003.', 'LIVE', GOOD_LIVE, { url: LIVE_URL }) } },
+  });
+  ok('a sentence in front of a pronoun moves past it instead of stealing it', chap(out, 1) === ch[1].narrator_script + ' ' + GOOD_LIVE && out.fcReport.filled.sentences === 1);
+  ok('past every pronoun in a row', !chap(out, 1).includes(GOOD_LIVE + ' It had') && !chap(out, 1).includes(GOOD_LIVE + ' Their'));
 }
 
 console.log('Top-up — what it hands on');
@@ -1700,6 +1747,9 @@ console.log('Top-up — the prompt, and the writers around it');
   ok('searching is expected, not a last resort', p.includes('That is expected, not a last resort'));
   ok('and "exhausted" is only true once it has searched', p.includes('Write DONE: exhausted only AFTER you have searched the web'));
   ok('a sentence goes after what it talks about, never before it', p.includes('AFTER the sentence that introduces what it talks about, never before it'));
+  ok('it asks for facts the story turns on, not details that change nothing', p.includes("WORTH THE VIEWER'S TIME"));
+  ok('it states the date-order rule the guard enforces', p.includes('IN DATE ORDER.'));
+  ok('and the pronoun rule the guard enforces', p.includes('NEVER IN FRONT OF A PRONOUN.'));
   ok('it carries the relationship rule the judge enforces', p.includes('the RELATIONSHIP the sentence asserts'));
   ok('it forbids the picture, commentary and the film itself', p.includes('never about what the picture shows') && p.includes('A STATEMENT, not a comment'));
   ok('it protects the closing line and the hook', p.includes('Never after the LAST sentence of the LAST chapter') && p.includes('Never in CHAPTER 0'));

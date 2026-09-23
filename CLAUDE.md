@@ -747,10 +747,15 @@ expected and harmless for an app touching only its own Drive.
   everything**: with "a detail the story does not turn on" as `minor`, it
   ruled Keyhole minor too; doubt now resolves by kind (novelty → repeat,
   relevance → minor). Calibrated on nine real proposals, 9 of 9 three times.
-  **Owed**: the first pass (`FC Fill*`) has not run on a new film yet; and the
-  same press exposed a hole that is NOT the top-up's — `DS Rewrite` dropped a
-  sentence the judge had ruled `supported` and `DS Apply` accepted it, because
-  no refusal checks that supported sentences survive. Put to the producer.
+  **The same press exposed a hole in the valve, closed at the producer's
+  call** (Claude Scripting `538a914c`): `DS Rewrite` had dropped a sentence the
+  judge ruled `supported` and `DS Apply` accepted it, because no refusal
+  checked that sourced sentences survive. `FC Apply` and `DS Apply` now refuse
+  a rewrite that loses any sentence on which EVERY finding is `supported`
+  (compound sentences with an unsourced part stay rewritable). The cost,
+  chosen knowingly: such a refusal leaves the unsourced sentences flagged on
+  the panel instead of corrected. The harness replays 16463 verbatim.
+  **Owed**: the first pass (`FC Fill*`) has not run on a new film yet.
 - **A Flow refusal that arrives as HTTP 200 no longer kills the film**
   (2026-09-17, Media Generation `6735a96a`, `db/port/regen-unstick/README.md`,
   lesson in `docs/lessons-pipeline.md` under "Flow refuses twice"). **What is

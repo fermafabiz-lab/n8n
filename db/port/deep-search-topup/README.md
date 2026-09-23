@@ -168,7 +168,14 @@ growth, halving and untouched chapters, and **none of them checks that a
 film does not lose the fact, but its body does. The obvious guard — refuse a
 rewrite that drops a sentence the judge found fully supported — changes what
 the valve accepts on every documentary, so it was put to the producer rather
-than slipped in.
+than slipped in. **They chose it**, and it is live as `538a914c` in both
+valves: a sentence on which EVERY finding is `supported` must come back
+verbatim (modulo whitespace), or the whole rewrite is refused and says which
+sentence it lost. A compound sentence with one unsourced assertion stays
+rewritable, a `redundant` one stays cuttable, and a quote the judge got wrong
+(not found in the original) is not enforced. The harness replays 16463
+verbatim — that rewrite is refused, the fix it should have made is accepted —
+and with the rule switched off five checks fail.
 
 ## The ping-pong
 
@@ -221,7 +228,8 @@ alone, so a press that only cut a repeat left the old wording in the box under
 
 | Version | What |
 |---|---|
-| `8c317407` | the proposer must search and name its searches, `exhausted` believed only with one, an aim is `minor` — **published 2026-09-23 13:40, live** |
+| `538a914c` | both valves refuse a rewrite that drops a sentence the sources back — **published 2026-09-23 ~13:55, live** |
+| `8c317407` | the proposer must search and name its searches, `exhausted` believed only with one, an aim is `minor` — published 2026-09-23 13:40 |
 | `a2d2328d` | the top-up with its editor — published 2026-09-23 13:28 |
 | `94643a37` … `cecd24de` | the four drafts that built the first iteration (no editor); never published |
 | `8186ec33` | the version this was built on (another session's motif-card change) — **the rollback** |
@@ -253,8 +261,8 @@ presses (16463, 16478) through an HTTP node — the only writes it ever made.
   February, dated only by its bare year, which spans the whole year and so
   contradicts nothing. That sentence is itself a leftover of the first press,
   added before the editor learned that an aim is `minor`.
-- **The Google Maps film carries three marks of the verification presses**, all
-  now visible in its script box: that aim sentence; *"The prototype became part
-  of Google Maps."*, the rewrite's near-copy of the sentence after it; and the
-  body's loss of *"In October 2004, Google acquired Where 2 Technologies to
-  create Google Maps."* (still in the hook). Offered to the producer to repair.
+- ~~**The Google Maps film carries three marks of the verification presses.**~~
+  **Repaired at the producer's request** (`repair/recSFjNpnuA0ylZAi.sql`, a
+  guarded one-off update, 13:49): the aim sentence is gone, and the acquisition
+  sentence is back where the rewrite's near-copy stood. The Keyhole sentence
+  the second press added stays.

@@ -1387,6 +1387,135 @@ function runFill(file, opts) {
 }
 const wcount = (s) => String(s || '').split(/\s+/).filter(Boolean).length;
 
+console.log('A sentence the sources back survives the rewrite');
+{
+  // FC: the rewrite fixed the flagged sentence AND dropped the supported one.
+  const out = runNode('FC Apply.js', {
+    json: {},
+    nodes: {
+      'FC Resolve': resolved([{ ...SUPPORTED(), action: 'keep' }, { ...UNSUPPORTED(), action: 'rewrite' }]),
+      'FC Rewrite': {
+        output: {
+          chapters: [
+            { chapter_number: 1, chapter_title: 'The acquisition', narrator_script: 'Where 2 joined Google that autumn. Google said the brothers stayed with the project through launch.' },
+            { chapter_number: 2, chapter_title: 'Launch', narrator_script: CH2 },
+          ],
+        },
+      },
+    },
+  });
+  ok('a rewrite that loses a sourced sentence is refused', out.chapters[0].narrator_script === CH1);
+  ok('and the refusal names the sentence it lost', /removed a sentence the sources back/.test(out.fcReport.refused || '') && (out.fcReport.refused || '').includes('Google acquired Where 2 Technologies in October 2004.'));
+  ok('and the flagged sentence reads as still standing, not as fixed', out.fcReport.rewritten === 0 && out.fcReport.findings[1].action === 'flagged');
+}
+{
+  // A COMPOUND SENTENCE with one unsourced assertion is exactly what the
+  // rewrite is for — its supported half must not protect it.
+  const q = UNSUPPORTED().quote;
+  const out = runNode('FC Apply.js', {
+    json: {},
+    nodes: {
+      'FC Resolve': resolved([
+        { ...SUPPORTED(), action: 'keep' },
+        { ...SUPPORTED(), quote: q, claim: 'Lars and Jens were on the team.', action: 'keep' },
+        { ...UNSUPPORTED(), action: 'rewrite' },
+      ]),
+      'FC Rewrite': {
+        output: {
+          chapters: [
+            { chapter_number: 1, chapter_title: 'The acquisition', narrator_script: FIXED_CH1 },
+            { chapter_number: 2, chapter_title: 'Launch', narrator_script: CH2 },
+          ],
+        },
+      },
+    },
+  });
+  ok('a sentence with any unsourced assertion may still be rewritten', out.fcReport.refused === undefined && out.chapters[0].narrator_script === FIXED_CH1);
+}
+{
+  // A JUDGE THAT MISQUOTED a supported sentence cannot make a good rewrite
+  // fail: only quotes found in the original are enforced.
+  const out = runNode('FC Apply.js', {
+    json: {},
+    nodes: {
+      'FC Resolve': resolved([
+        { ...SUPPORTED(), quote: 'Google bought Where 2 in October 2004.', action: 'keep' },
+        { ...UNSUPPORTED(), action: 'rewrite' },
+      ]),
+      'FC Rewrite': {
+        output: {
+          chapters: [
+            { chapter_number: 1, chapter_title: 'The acquisition', narrator_script: FIXED_CH1 },
+            { chapter_number: 2, chapter_title: 'Launch', narrator_script: CH2 },
+          ],
+        },
+      },
+    },
+  });
+  ok('a misquoted supported sentence does not block the rewrite', out.fcReport.refused === undefined && out.fcReport.rewritten === 1);
+}
+{
+  // Whitespace is not a change: the rewrite may move a paragraph break.
+  const out = runNode('FC Apply.js', {
+    json: {},
+    nodes: {
+      'FC Resolve': resolved([{ ...SUPPORTED(), action: 'keep' }, { ...UNSUPPORTED(), action: 'rewrite' }]),
+      'FC Rewrite': {
+        output: {
+          chapters: [
+            { chapter_number: 1, chapter_title: 'The acquisition', narrator_script: FIXED_CH1.replace('2004. ', '2004.\n\n') },
+            { chapter_number: 2, chapter_title: 'Launch', narrator_script: CH2 },
+          ],
+        },
+      },
+    },
+  });
+  ok('a new paragraph break around a sourced sentence is not a loss', out.fcReport.refused === undefined);
+}
+{
+  // THE CASE THAT CAUSED IT, verbatim: the producer's Google Maps film,
+  // re-check 16463 on 2026-09-23. Asked to fix "The prototype proved the
+  // idea.", `DS Rewrite` replaced it together with the supported acquisition
+  // sentence after it, and `DS Apply` accepted the result.
+  const HOOK = 'In October 2004, Google acquired Where 2 Technologies.';
+  const P1 = 'In 2003, Where 2 Technologies was founded in Sydney by Lars Eilstrup Rasmussen, Jens Eilstrup Rasmussen, Noel Gordon, and Stephen Ma. They built a map that replaced clicking arrows and waiting with dragging under a mouse, while it rendered smoothly and quickly.';
+  const P3 = 'Inside Google, the Sydney software became part of Google Maps. On February 8, 2005, Google Maps launched for desktop as a new solution, Google said, to help people get from point A to point B. The work that began in Sydney had become a public map service.';
+  const PROVED = 'The prototype proved the idea.';
+  const ACQ = 'In October 2004, Google acquired Where 2 Technologies to create Google Maps.';
+  const CLOSE = 'It had become a platform other people could build on, and its later reach still lay ahead.';
+  const before = `${P1}\n\n${PROVED} ${ACQ}\n\n${P3}\n\nOn June 29, 2005, Google released the Google Maps API for external use. ${CLOSE}`;
+  const script = `[CHAPTER 0: HOOK]\n${HOOK}\n\n[CHAPTER 1: From Sydney Prototype to Public Platform]\n${before}`;
+  const prep = runNode('DS Prep.js', {
+    json: dsRow({ script, length_seconds: 90, editing_options: JSON.stringify({ category: 'documentary', hookPlan: { beats: [HOOK] } }) }),
+    dir: DS,
+  });
+  const S = (quote, claim) => ({ quote, claim, verdict: 'supported', ref: 'E2', reason: 'E2 states it.' });
+  const U = (quote, claim) => ({ quote, claim, verdict: 'unsupported', ref: '', reason: 'Nothing states it.' });
+  const findings = [
+    S(HOOK, 'Google acquired Where 2 Technologies in October 2004.'),
+    S(PROVED, 'There was a prototype.'),
+    U(PROVED, 'The prototype proved the idea.'),
+    S(ACQ, 'Google acquired Where 2 Technologies in October 2004.'),
+    S(ACQ, 'Google acquired Where 2 Technologies to create Google Maps.'),
+    S('Inside Google, the Sydney software became part of Google Maps.', 'The Sydney software became part of Google Maps.'),
+    S(CLOSE, 'Google Maps had become a platform other people could build on.'),
+    U(CLOSE, 'Its later reach still lay ahead.'),
+  ];
+  // Fresh findings for every case: `DS Apply` marks each finding's `action` in
+  // place, so a resolved payload reused across two runs is not the same input.
+  const resolveFresh = () => {
+    const judged = { output: { mode: 'factual', findings: JSON.parse(JSON.stringify(findings)) } };
+    return runNode('DS Resolve.js', { json: judged, nodes: { 'DS Prep': JSON.parse(JSON.stringify(prep)), 'DS Judge': judged }, dir: DS });
+  };
+  const rewriteWith = (body) =>
+    dsApply(resolveFresh(), { output: { chapters: [{ chapter_number: 0, narrator_script: HOOK }, { chapter_number: 1, narrator_script: body }] } });
+  const what16463Did = rewriteWith(`${P1}\n\nThe prototype became part of Google Maps.\n\n${P3}\n\nOn June 29, 2005, Google released the Google Maps API for external use. It had become a platform other people could build on.`);
+  ok('the 16463 rewrite is refused now', what16463Did.scriptChanged === false && (what16463Did.fcReport.refused || '').includes('In October 2004, Google acquired Where 2 Technologies to create Google Maps.'));
+  ok('so the acquisition sentence stays in the film', what16463Did.script.includes(ACQ));
+  const theRightFix = rewriteWith(`${P1}\n\n${ACQ}\n\n${P3}\n\nOn June 29, 2005, Google released the Google Maps API for external use. It had become a platform other people could build on.`);
+  ok('while the fix it should have made is accepted', theRightFix.fcReport.refused === undefined && theRightFix.fcReport.rewritten === 2 && theRightFix.script.includes(ACQ) && !theRightFix.script.includes(PROVED));
+}
+
 console.log('Top-up — the gap is measured in the valve');
 {
   // A chapter that loses three of its six sentences: a real cut, well past the

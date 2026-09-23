@@ -514,7 +514,19 @@ expected and harmless for an app touching only its own Drive.
   `project.tags`**: that is n8n's Airtable-compat field. Verified end to end
   against a real Postgres engine in Chromium (`db/port/lib/local-pg.mjs` +
   `db/port/playlists/browser/`), pinned by `npm run check:playlists` (38).
-  **What is owed**: the producer's first real playlist. **Noticed, not
+  **Live since deploy #180, 13:02:08 UTC** (merge `e804ae6`, the trunk tip).
+  It was deployed **over a running Media Generation, at the producer's
+  explicit request** after being told the risk: `16430` ("How Rome fed a
+  million people") was parked at the approval gates — 15 scenes waiting on
+  voice approval, 11 on image approval, nothing written since 12:56 — and
+  it was still `running` four minutes after `web` restarted. One data point,
+  on a run that was only WAITING; it does not relax the rule for a run that
+  is generating. **What is owed**: the producer's first real playlist, and
+  proof the site serves it — `pg_stat_user_tables` for `hov.playlist` counts
+  a read on every render of /projects and nothing else reads that table, so
+  a counter above 4 (3 at apply time — the primary-key and name-index builds
+  and the verify query — plus one probe's `count(*)` at 13:04) is the live page
+  running the new code. A Postgres restart resets the counters. **Noticed, not
   changed**: the library toolbar sticks at `top: 10px` UNDER a nav that ends
   at 72px, so once scrolled it is hidden except a wrapped second row —
   pre-existing; `top: 84px` is the likely fix and the producer's call.

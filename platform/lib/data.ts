@@ -60,6 +60,8 @@ export type {
   ScriptInfo,
   DeepSearchReport,
   DeepSearchFinding,
+  DeepSearchAddition,
+  DeepSearchFilled,
   GenreProfile,
   LibraryScript,
   ScriptExample,

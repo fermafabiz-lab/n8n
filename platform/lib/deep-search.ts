@@ -180,7 +180,9 @@ export function deepSearchState({
   const standing = findings.filter((f) => !settled.has(String(f.action))).length;
   const rewritten = report.rewritten ?? 0;
   const deduped = report.deduped ?? 0;
-  const s = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  // "-es" after a sibilant: the corrected chip read "3 fixs" on every film with
+  // more than one correction until the top-up's checks asserted the label.
+  const s = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : /(?:s|x|z|ch|sh)$/.test(w) ? "es" : "s"}`;
 
   // A DELETION IS NEWS TOO, and it is different news from a correction: the
   // producer does not have to reread a sentence that is gone, but they should

@@ -1784,7 +1784,18 @@ for (const v of ['minor', 'overreach']) {
   ok('reads the script and research from whichever chain it sits in', c.includes("($('DS Apply').isExecuted ? $('DS Apply') : $('FC Apply')).first().json.fill.narration"));
   ok('treats an attributed known fact as a repeat', c.includes('merely ATTRIBUTED'));
   ok('treats the same people described again as a repeat', c.includes('The same people described again'));
-  ok('and keeps only when sure', c.includes('When you are unsure between `keep` and anything else, do not choose `keep`.'));
+  // CALIBRATED ON THE EIGHT REAL PROPOSALS (executions 16452/16453): with a
+  // blanket "unsure → not keep" and "a detail the story does not turn on" as
+  // `minor`, the editor ruled every new fact minor — Keyhole's satellite
+  // imagery included — and the top-up could never add anything. Doubt now
+  // resolves by KIND: doubt about novelty is a repeat, doubt about relevance is
+  // minor, and a step of the subject's own story is keep even if the script
+  // could do without it.
+  ok('doubt about novelty resolves to repeat', c.includes('When you are unsure whether the script already tells the viewer something, it does: choose `repeat`.'));
+  ok('doubt about relevance resolves to minor', c.includes('When you are unsure whether a sentence is part of the subject\'s story or beside it, choose `minor`.'));
+  ok('minor means BESIDE the subject, not merely dispensable', c.includes('BESIDE the film\'s subject rather than part of its story'));
+  ok('a step the script could be told without is still keep', c.includes('A step the script could be told without is still `keep`'));
+  ok('the blanket "unsure → not keep" is gone', !c.includes('When you are unsure between `keep` and anything else'));
   ok('in the line format the guard parses', c.includes('CHECK: <number> | VERDICT: <keep|repeat|minor|overreach> | WHY:'));
 }
 

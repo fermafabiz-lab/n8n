@@ -88,7 +88,10 @@ for (const p of planned) {
     problems.push(`Sequence ${p.chapter_number} has ${c.lines.length} shot line(s); the treatment gives it exactly ${p.shots}. One line is one 8-second shot, so the count is the film's running time.`);
   }
 }
-const SPEECH = /["“”„]|\b(says?|said|tells?|told|asks?|asked|whispers?|whispered|shouts?|shouted|replies|replied|calls out|speaks?|spoke|narrat\w*|voice-?over)\b/i;
+// Words only a PERSON does. "whisper" was here and came out after probe
+// 16583, where it flagged "Sound: drone hover, scanner whisper" twice — a
+// machine's sound, the kind of line this film is supposed to have.
+const SPEECH = /["“”„]|\b(says?|said|tells?|told|asks?|asked|shouts?|shouted|replies|replied|calls out|speaks?|spoke|narrat\w*|voice-?over)\b/i;
 // Lengths are measured where they mean something. The whole line carries
 // four fields of framing, light and sound around the action and runs 42-70
 // words on a good list (probe 16582), so a ceiling on the WHOLE line only

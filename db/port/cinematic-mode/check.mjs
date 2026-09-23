@@ -178,6 +178,11 @@ const rich = 'WIDE, LATERAL LOW TRACKING · fast track with wheelbarrow · Bungo
 r = run(cg, { nodes: nodesCG, json: { output: good.replace(S('Daisy', 5), rich) } })[0].json;
 eq(r.retry, false, 'Cine Guard: a rich five-field line is not "too long"');
 
+// Probe 16583's false positive: a machine that "whispers" is a sound, not speech.
+const machine = 'MEDIUM, CAVE-MOUTH INTERIOR · gentle follow in · Astra enters first moving away from camera, delicate amber beams grazing slick obsidian walls and shallow water just inside the slit · blue-green cavern glow with thin amber scan accents over wet black stone · Sound: drone hover, scanner whisper, hollow resonance';
+r = run(cg, { nodes: nodesCG, json: { output: good.replace(S('Daisy', 5), machine) } })[0].json;
+eq(r.retry, false, 'Cine Guard: "scanner whisper" is a sound, not speech');
+
 // Shots before any marker belong to sequence 1.
 r = run(cg, { nodes: nodesCG, json: { output: `${S('a', 1)}\n${S('b', 2)}\n${S('c', 3)}\n[CHAPTER 2: Door]\n${S('d', 4)}\n${S('e', 5)}` } })[0].json;
 eq(r.retry, false, 'Cine Guard: a forgotten first marker is not a failure');

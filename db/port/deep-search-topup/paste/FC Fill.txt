@@ -1,0 +1,43 @@
+=You are adding facts to a documentary script that a fact-checker has just corrected. The corrections removed sentences nothing could back, and the film is now shorter than the length it was written at. Your job is to give some of that running time back — with NEW, SOURCED facts, and with nothing else.
+
+WHY THIS STEP EXISTS, and what it must never do. Earlier versions of this pipeline reached a word count by describing what the viewer can already see — the light, the weather, the room, the texture of things — and by explaining what a moment meant. The producer does not want that back. **A film that is shorter because it says only what it can back is correct. A sentence added to reach a number is the exact failure this step exists to avoid.** Adding nothing is a perfectly good answer.
+
+THE SCRIPT AS IT NOW STANDS:
+{{ $json.fill.narration }}
+
+SOURCED CLAIMS gathered for this film when it was researched:
+{{ $json.fill.packList }}
+
+ALREADY USED BY THE SCRIPT — the fact-checker matched these to sentences the script contains, so do not add them again: {{ ($json.fill.usedRefs || []).join(', ') || 'none recorded' }}
+
+YOUR BUDGET: at most {{ $json.fill.gapWords }} words in total, across every sentence you add.
+
+WHERE THE FACTS COME FROM, in this order:
+1. A claim from the list above that the script does not already state. Cite it by its number, for example REF: E7. Read the whole script first: a claim the script already carries in other words is used, even if it is not in the ALREADY USED list.
+2. Only when the list has nothing left to give, search the web for a fact about the same subject, the same people and the same period the script covers. Cite it as REF: LIVE with the URL you actually retrieved. Prefer the organisation's or person's own record, then contemporaneous reporting from a named publication. Never a Wikipedia mirror.
+
+WHAT EVERY SENTENCE YOU ADD MUST BE:
+- ONE FACT FROM ITS SOURCE — an event, a date, a number, a name, something someone did or said. If you cannot point at the source that states it, do not write the sentence.
+- NEW TO THE FILM. Nothing the script already says, in any chapter, in any wording. If the only thing you can source is something the script has already told the viewer, stop.
+- ABOUT WHAT HAPPENED, never about what the picture shows. No light, weather, colour, texture, sound, room, street or landscape. No camera, frame or shot. No sentence that opens on scenery.
+- A STATEMENT, not a comment. No "this is how", "the lesson is", "what matters is", "in many ways", "a turning point". Never mention the film, the viewer, a chapter or the story itself.
+- NOT A DEFINITION. Never "X is a Y that…" or "that means…".
+- NO MORE THAN ITS SOURCE STATES. A source must back not only the nouns and dates in a sentence but the RELATIONSHIP the sentence asserts between them — cause, intention, limitation, comparison, order, consequence. "They wanted", "which meant", "for the first time", "could not", "after" are each a claim of their own, and they need a source of their own. The fact-checker has just removed sentences for exactly this; do not put them back.
+- IN THE SCRIPT'S VOICE — same tense, same register, same rhythm. A sentence of roughly 10 to 30 words.
+- ONE SENTENCE PER CLAIM. Do not stretch a single claim into two sentences.
+
+WHERE EACH SENTENCE GOES. Name the sentence it should follow, copied character for character from the script above, so it lands where it belongs in time. Never after the LAST sentence of the LAST chapter — that is the film's ending and it stays the ending. Never in CHAPTER 0, which is the hook. If no single sentence is the right anchor, write END and it will be placed at the end of that chapter.
+
+THE LENGTH IS A RULE, NOT A TARGET. Your budget is {{ $json.fill.gapWords }} words and it is the most you may add, not the amount you should add. Count the words of your sentences before you answer. Anything over the budget is cut in code, starting from your LAST sentence, so the facts you wrote last are the ones lost. Every sentence you add is also checked in code for its source, for repeating the script, and for describing the picture; one that fails is deleted and costs you nothing but the space.
+
+OUTPUT exactly one line per sentence you add, in this format, and nothing else:
+
+ADD: <chapter number> | AFTER: <the exact sentence it follows, or END> | REF: <E-number, or LIVE> | SOURCE: <publication or organisation> | URL: <direct url, or empty for an E-number> | SENTENCE: <the sentence to add>
+
+Then one final line:
+
+DONE: <enough|exhausted>
+
+Write DONE: exhausted when there were not enough new, sourced facts to fill the budget — that tells the producer this film's subject is fully told at this length, which is what they need to know. Write DONE: enough when you had more than you needed.
+
+If there is nothing new and sourced to add, output only the line DONE: exhausted.

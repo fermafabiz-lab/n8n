@@ -176,6 +176,9 @@ return [
         minWords,
         bodyWords,
         closingSentence,
+        // The length before Deep Search first touched this film, recorded by the
+        // first pass. Zero when the report predates the top-up.
+        preCheckWords: Number(row.pre_check_words) || 0,
       },
       editing,
       projectId: String(row.project_id || ''),

@@ -41,6 +41,14 @@ select
   -- it the dedupe is bounded per press and unbounded across presses: two
   -- presses took one chapter from 185 words to 101 on 2026-09-19.
   coalesce(p.length_seconds, 64) as length_seconds,
+  -- WHAT THE FILM WEIGHED BEFORE DEEP SEARCH TOUCHED IT, off the report this
+  -- re-check is about to replace. The re-check rewrites `hov.script` in place,
+  -- so after the first press this row is the only place that number survives;
+  -- read it BEFORE `DS Save` overwrites it, and `DS Apply` writes it forward.
+  (select (f.report->>'preCheckWords')::int
+     from hov.fact_check f
+    where f.project_id = p.id
+      and f.report->>'preCheckWords' ~ '^[0-9]+$')    as pre_check_words,
   coalesce(
     (select json_agg(
        json_build_object(

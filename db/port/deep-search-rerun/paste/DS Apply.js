@@ -223,6 +223,43 @@ const deduped = cutSentences.size;
 
 const ran = fc.run && !fc.storyMode;
 
+// THE TOP-UP'S ARITHMETIC — see `FC Apply` for why it lives in the valve.
+//
+// THE TARGET IS `preCheckWords`: the body before Deep Search ever touched this
+// film, written by the first pass and carried forward by every re-check. A
+// report from before 2026-09-23 has none, and then the anchor is what THIS
+// press started with — the conservative choice, because it can never lengthen
+// a film past a length it actually had.
+//
+// NOT gated on a correction landing this press. A film shortened by an EARLIER
+// press is still short, and the producer asked for its running time back.
+//
+// PAST THE SCRIPT GATE, NEVER: the scenes carry their own copy of every line.
+const FILL_MIN_GAP = 25;
+const preCheckWords = Number(fc.preCheckWords) > 0 ? Number(fc.preCheckWords) : Number(fc.bodyWords) || 0;
+const gapWords = Math.max(0, preCheckWords - bodyNow);
+const usedRefs = [
+  ...new Set(
+    findings
+      .map((f) => String(f.ref || ''))
+      .join(',')
+      .split(/[^A-Za-z0-9]+/)
+      .filter((r) => /^[A-Za-z]*\d+$/.test(r))
+      .map((r) => r.toUpperCase()),
+  ),
+];
+const fill = {
+  run: !!ran && fc.mayRewrite !== false && gapWords >= FILL_MIN_GAP,
+  gapWords,
+  preCheckWords,
+  nowWords: bodyNow,
+  min: floorWords,
+  narration: script,
+  packList: fc.packList || '',
+  usedRefs,
+  chapters,
+};
+
 const report = ran
   ? {
       category: fc.category || '',
@@ -231,6 +268,8 @@ const report = ran
       sentences: fc.sentences || 0,
       searched: fc.searched || 0,
       rewritten,
+      // Carried forward, so the next press measures against the same length.
+      preCheckWords,
       // The corrected narration is under the film's ordered length. Not a
       // failure and never a refusal — a statement about how much of this film
       // its research can actually support.
@@ -304,6 +343,10 @@ return [
       fcReport64: b64(JSON.stringify(report)),
       script64: b64(script),
       editing64: b64(JSON.stringify(nextEditing)),
+      // For `DS Top Up?` / `DS Fill` / `DS Fill Apply`. `DS Write` and
+      // `DS Save` read only the keys above, so it rides along harmlessly on the
+      // path where the top-up does not run.
+      fill,
     },
   },
 ];

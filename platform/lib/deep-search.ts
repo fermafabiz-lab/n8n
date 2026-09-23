@@ -213,7 +213,13 @@ export function deepSearchState({
   const stillShort = report.filled?.shortBy ?? 0;
   const lengthNote =
     !report.short && stillShort >= 25
-      ? ` The script is still about ${stillShort} words shorter than it was before Deep Search${report.filled?.exhausted ? " — there was nothing more to add that its sources back" : ""}.`
+      ? ` The script is still about ${stillShort} words shorter than it was before Deep Search${
+          report.filled?.exhausted
+            ? " — there was nothing more to add that its sources back"
+            : report.filled?.looked === false
+              ? " — the web was not searched for more this time, so ⟳ Re-check may find some"
+              : ""
+        }.`
       : "";
 
 

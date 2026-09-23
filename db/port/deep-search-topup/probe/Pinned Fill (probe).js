@@ -13,5 +13,9 @@ const lines = [
   'ADD: 1 | AFTER: They built a map that replaced clicking arrows and waiting with dragging under a mouse, while it rendered smoothly and quickly. | REF: E5 | SOURCE: Google Blog | URL:  | SENTENCE: In 2004, Google said, two Aussies and two Danes in Sydney created the technology that underpinned Google Maps.',
   'ADD: 1 | AFTER: In October 2004, Google acquired Where 2 Technologies to create Google Maps. | REF: E15 | SOURCE: Australian National University Open Research Repository | URL:  | SENTENCE: An Australian National University research repository document states that Google acquired Where 2 Technologies in October 2004 and launched Google Maps in February 2005.',
   'ADD: 1 | AFTER: On June 29, 2005, Google released the Google Maps API for external use. | REF: LIVE | SOURCE: Google Developers Blog | URL: https://developers.googleblog.com/google-releases-maps-api-for-external-use/ | SENTENCE: Google said the API let people post interactive, draggable, zoomable maps with satellite imagery on personal websites.',
+  // 9 — the one sentence the FIRST LIVE PRESS added (execution 16463). Sourced
+  // (E11), and a statement of aim rather than a step in the story: expected
+  // `minor` once the editor is told an aim or a focus is not a step.
+  'ADD: 1 | AFTER: On February 8, 2005, Google Maps launched for desktop as a new solution, Google said, to help people get from point A to point B. | REF: E11 | SOURCE: Google Blog | URL:  | SENTENCE: When Google Maps first launched in 2005, the team was focused on “mapping the world.”',
 ];
 return [{ json: { output: lines.join('\n') + '\nDONE: exhausted' } }];

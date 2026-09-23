@@ -1513,7 +1513,7 @@ console.log('Top-up — what a sentence needs to be kept');
   ok('counting what it gave back', out.fcReport.filled.words === wcount(GOOD_E3) && out.fcReport.filled.shortBy === 60 - wcount(GOOD_E3));
 }
 {
-  const out = fcFill([ADD(1, 'END', 'LIVE', GOOD_LIVE, { url: LIVE_URL }), 'DONE: exhausted']);
+  const out = fcFill([ADD(1, 'END', 'LIVE', GOOD_LIVE, { url: LIVE_URL }), 'SEARCHED: google maps 2005; keyhole satellite imagery', 'DONE: exhausted']);
   ok('a fact found by a live search is added when it brings its URL', chap(out, 1).endsWith(GOOD_LIVE));
   ok('and is counted as a live find', out.fcReport.filled.live === 1 && out.fcReport.filled.added[0].url === LIVE_URL);
   ok('"the research ran out" reaches the report', out.fcReport.filled.exhausted === true);
@@ -1575,9 +1575,23 @@ for (const [label, line, why] of [
   ok('a rejected sentence does not take the next one with it', out.fcReport.filled.sentences === 1 && chap(out, 2).includes(GOOD_E3));
 }
 {
-  const out = fcFill('DONE: exhausted');
+  const out = fcFill('SEARCHED: google maps 2005; where 2 technologies acquisition\nDONE: exhausted');
   ok('nothing to add leaves the narration exactly as it was', out.chapters.every((c, i) => c.narrator_script === tuChapters()[i].narrator_script));
-  ok('and says the research ran out, with the whole gap still open', out.fcReport.filled.sentences === 0 && out.fcReport.filled.exhausted === true && out.fcReport.filled.shortBy === 60);
+  ok('and says the research ran out, with the whole gap still open', out.fcReport.filled.sentences === 0 && out.fcReport.filled.exhausted === true && out.fcReport.filled.shortBy === 60 && out.fcReport.filled.looked === true);
+}
+{
+  // THE FIRST LIVE PRESS (execution 16463): one leftover pack claim, no search
+  // at all, DONE: exhausted in five seconds — on a film whose probes had found
+  // Keyhole on the web. "Nothing more exists" is believed only with a search
+  // behind it.
+  const silent = fcFill('DONE: exhausted');
+  ok('"exhausted" with no search named is NOT believed', silent.fcReport.filled.exhausted === undefined && silent.fcReport.filled.looked === false);
+  const none = fcFill('SEARCHED: none\nDONE: exhausted');
+  ok('nor with "SEARCHED: none"', none.fcReport.filled.exhausted === undefined && none.fcReport.filled.looked === false);
+  const blank = fcFill('SEARCHED:\nDONE: exhausted');
+  ok('nor with an empty SEARCHED line', blank.fcReport.filled.exhausted === undefined && blank.fcReport.filled.looked === false);
+  const enough = fcFill([ADD(2, TU_P1, 'E3', GOOD_E3), 'SEARCHED: google maps 2005', 'DONE: enough']);
+  ok('a search with DONE: enough is looked, not exhausted', enough.fcReport.filled.looked === true && enough.fcReport.filled.exhausted === undefined);
 }
 {
   // `FC Fill` is `continueRegularOutput`: an agent that errors hands on no
@@ -1796,6 +1810,9 @@ for (const v of ['minor', 'overreach']) {
   ok('minor means BESIDE the subject, not merely dispensable', c.includes('BESIDE the film\'s subject rather than part of its story'));
   ok('a step the script could be told without is still keep', c.includes('A step the script could be told without is still `keep`'));
   ok('the blanket "unsure → not keep" is gone', !c.includes('When you are unsure between `keep` and anything else'));
+  // THE FIRST LIVE PRESS kept "the team was focused on 'mapping the world'" —
+  // sourced, and a statement of aim rather than a step in the story.
+  ok('an aim, a focus or a motto is minor', c.includes('An aim, a focus, a vision or a motto is `minor` too'));
   ok('in the line format the guard parses', c.includes('CHECK: <number> | VERDICT: <keep|repeat|minor|overreach> | WHY:'));
 }
 
@@ -1876,13 +1893,19 @@ console.log('Top-up — the prompt, and the writers around it');
   ok('the budget is named as a RULE', p.includes('THE LENGTH IS A RULE, NOT A TARGET'));
   ok('the model is asked to count before it answers', p.includes('Count the words of your sentences before you answer'));
   ok('and told the consequence, cut from its LAST sentence', p.includes('cut in code, starting from your LAST sentence'));
-  ok('the unused pack comes before a live search', /1\. A claim from the list above[\s\S]*2\. When no claim like that is left, SEARCH THE WEB/.test(p));
+  ok('the unused pack comes before a live search', /1\. A claim from the list above[\s\S]*2\. Then SEARCH THE WEB/.test(p));
   // THE PROBE FOUND THIS (2026-09-23): told to search "only when the list has
   // nothing left", the model spent its budget on the pack's leftovers — which
   // restated the script — and declared the research exhausted in 3 seconds
   // without searching at all.
   ok('a claim the viewer can WORK OUT from the script counts as used', p.includes('also when the viewer can work it out from what the script says'));
-  ok('searching is expected, not a last resort', p.includes('That is expected, not a last resort'));
+  ok('searching is expected, not a last resort', p.includes('This is not optional and it is not a last resort'));
+  ok('and runs every time the leftover claims do not fill the budget', p.includes('every time, unless the claims you took from the list already fill the whole budget'));
+  ok('the proposer names the searches it ran, so "exhausted" can be believed', p.includes('SEARCHED: <search; search; search>') && p.includes('is read in code as "nobody looked"'));
+  // PROBE 16471: it searched, found nothing it proposed, and filled its answer
+  // with the list's weakest leftovers. Proposing is free; withholding is not.
+  ok('what the search found is proposed alongside the leftovers', p.includes('3. PROPOSE WHAT THE SEARCH FOUND, alongside anything from the list'));
+  ok('"enough" means the proposals come near the budget', p.includes('Write DONE: enough only when the sentences you proposed, counted, come close to the budget.'));
   ok('and "exhausted" is only true once it has searched', p.includes('Write DONE: exhausted only AFTER you have searched the web'));
   ok('a sentence goes after what it talks about, never before it', p.includes('AFTER the sentence that introduces what it talks about, never before it'));
   ok('it asks for facts the story turns on, not details that change nothing', p.includes("WORTH THE VIEWER'S TIME"));

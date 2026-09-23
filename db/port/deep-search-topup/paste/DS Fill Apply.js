@@ -266,7 +266,16 @@ function topUp(chaptersIn, fill, raw, checkRaw) {
   const budget = Math.max(0, Number(fill.gapWords) || 0);
   const proposals = parseProposals(raw);
   const checks = parseChecks(checkRaw);
-  const exhausted = /DONE:\s*exhausted/i.test(String(raw || ''));
+  // "EXHAUSTED" IS BELIEVED ONLY WITH A SEARCH BEHIND IT. On the first live
+  // press (execution 16463) the proposer took one leftover pack claim, ran no
+  // search at all and wrote DONE: exhausted in five seconds — for the same
+  // film on which the probes had found Keyhole's satellite imagery on the web.
+  // Believed, it would have told the producer that nothing more exists. It must
+  // now name the searches it ran; with none, `looked` is false and the report
+  // says the research was never finished rather than that it ran out.
+  const searchedLine = String(raw || '').match(/^[ \t]*SEARCHED:[ \t]*(.*)$/im);
+  const looked = !!searchedLine && !/^\s*(?:none\b|n\/a\b|-*\s*$)/i.test(searchedLine[1]);
+  const exhausted = looked && /DONE:\s*exhausted/i.test(String(raw || ''));
 
   const existing = [];
   for (const c of chapters) for (const s of sentencesOf(c.narrator_script)) existing.push(contentWords(s));
@@ -372,6 +381,7 @@ function topUp(chaptersIn, fill, raw, checkRaw) {
     proposed: proposals.length,
     dropped,
     exhausted,
+    looked,
   };
 }
 // ── END SHARED GUARD ──
@@ -397,6 +407,9 @@ report.filled = {
   // before the film got its length back. Not a failure — the subject is told
   // in full at this length.
   exhausted: result.exhausted || undefined,
+  // Whether the proposer says it searched the web at all. `false` is what the
+  // panel reads to say "nobody looked" instead of "nothing more exists".
+  looked: result.looked,
   shortBy: Math.max(0, (Number(fill.gapWords) || 0) - result.addedWords) || undefined,
   proposed: result.proposed,
   dropped: Object.keys(result.dropped).length ? result.dropped : undefined,

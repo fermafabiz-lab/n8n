@@ -725,8 +725,17 @@ export interface DeepSearchFilled {
   words: number;
   /** How many of them came from a live search rather than the research pack. */
   live?: number;
-  /** The model said nothing more that fits exists. Its claim, not a measurement. */
+  /**
+   * The model said nothing more that fits exists — believed only when it also
+   * named the web searches it ran (`looked`). Its claim, not a measurement.
+   */
   exhausted?: boolean;
+  /**
+   * Whether the proposer says it searched the web at all. `false` means the
+   * gap is still open because nobody LOOKED, not because nothing exists — the
+   * first live press (2026-09-23) claimed "exhausted" without one search.
+   */
+  looked?: boolean;
   /** MEASURED: words still missing against the length before Deep Search. */
   shortBy?: number;
   proposed?: number;

@@ -303,6 +303,14 @@ console.log("The top-up — sourced sentences added back");
     scriptExists: true,
   });
   ok("but never claims the sources ran out when nobody said so", /30 words shorter/.test(notSaid.detail) && !/nothing more to add/.test(notSaid.detail));
+  // THE FIRST LIVE PRESS: "exhausted" with no search behind it. The guard no
+  // longer believes it, and the panel says the one true thing — nobody looked.
+  const unlooked = deepSearchState({
+    report: { checked: 12, rewritten: 2, filled: { sentences: 1, words: 15, shortBy: 44, looked: false }, findings: [finding("rewritten")] },
+    isDocumentary: true,
+    scriptExists: true,
+  });
+  ok("a gap nobody searched for says so, and points at the button", /web was not searched for more/.test(unlooked.detail) && /Re-check may find some/.test(unlooked.detail) && !/nothing more to add/.test(unlooked.detail));
   const small = deepSearchState({
     report: { checked: 12, rewritten: 3, filled: { sentences: 1, words: 15, shortBy: 12 }, findings: [finding("rewritten")] },
     isDocumentary: true,

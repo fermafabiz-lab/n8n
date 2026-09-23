@@ -16,7 +16,8 @@ YOUR BUDGET: at most {{ $json.fill.gapWords }} words in total, across every sent
 
 WHERE THE FACTS COME FROM, in this order:
 1. A claim from the list above that tells the viewer something the script does NOT already tell them. Cite it by its number, for example REF: E7. Read the whole script first. A claim is USED, and off limits, when the script already states it in other words — and also when the viewer can work it out from what the script says: if the script gives two dates, a claim that one came "a few months after" the other tells them nothing new. The ALREADY USED list is where that starts, not the whole of it.
-2. When no claim like that is left, SEARCH THE WEB. That is expected, not a last resort — a film whose research has run out is exactly the film this step exists for. Look for what happened in the same story, to the same people, in the same period the script covers: an event, who did it, when, with a number where there is one. Cite it as REF: LIVE with the URL you actually retrieved. Prefer the organisation's or person's own record, then contemporaneous reporting from a named publication. Never a Wikipedia mirror.
+2. Then SEARCH THE WEB — every time, unless the claims you took from the list already fill the whole budget. This is not optional and it is not a last resort: a film whose research has run out is exactly the film this step exists for, and a leftover claim or two from the list almost never fills the gap. Look for what happened in the same story, to the same people, in the same period the script covers: an event, who did it, when, with a number where there is one. Cite it as REF: LIVE with the URL you actually retrieved. Prefer the organisation's or person's own record, then contemporaneous reporting from a named publication. Never a Wikipedia mirror.
+3. PROPOSE WHAT THE SEARCH FOUND, alongside anything from the list. A leftover claim from the list is never a reason to hold back a milestone the web gave you: every proposal is checked after you answer, and one the checks reject costs nothing but its line — while a milestone you found and did not propose is lost to the film.
 
 WHAT EVERY SENTENCE YOU ADD MUST BE:
 - ONE FACT FROM ITS SOURCE — an event, a date, a number, a name, something someone did or said. If you cannot point at the source that states it, do not write the sentence.
@@ -39,10 +40,14 @@ OUTPUT exactly one line per sentence you add, in this format, and nothing else:
 
 ADD: <chapter number> | AFTER: <the exact sentence it follows, or END> | REF: <E-number, or LIVE> | SOURCE: <publication or organisation> | URL: <direct url, or empty for an E-number> | SENTENCE: <the sentence to add>
 
+Then one line naming the web searches you actually ran, separated by semicolons — or none if you ran none:
+
+SEARCHED: <search; search; search>
+
 Then one final line:
 
 DONE: <enough|exhausted>
 
-Write DONE: exhausted only AFTER you have searched the web and still found nothing new that fits — that tells the producer this film's subject is fully told at this length, which is what they need to know, and it is only true once you have looked. Write DONE: enough when you had more than you needed.
+Write DONE: exhausted only AFTER you have searched the web and still found nothing new that fits — that tells the producer this film's subject is fully told at this length, which is what they need to know, and it is only true once you have looked. A DONE: exhausted after SEARCHED: none is read in code as "nobody looked", and the producer is told the research was never finished. Write DONE: enough only when the sentences you proposed, counted, come close to the budget.
 
-If there is nothing new and sourced to add, output only the line DONE: exhausted.
+If there is nothing new and sourced to add, output only the SEARCHED line and the line DONE: exhausted.

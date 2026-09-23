@@ -37,6 +37,8 @@ So the tools here split cleanly by **who can run them**:
 | Tool | Runs from | Needs |
 |---|---|---|
 | `diff-workflow.mjs` | a Claude Code session, or anywhere | two JSON files already on disk, nothing else |
+| `local-pg.mjs` | a Claude Code session, or anywhere | `@electric-sql/pglite` + `pglite-socket` installed in a scratch dir (the npm registry answers from a session) |
+| `make-apply.mjs` | a Claude Code session, or anywhere | a committed `db/NNN_*.sql` and a verify query; writes the throwaway workflow that applies it through the n8n connector, the file embedded byte for byte (first used for db/014) |
 | `n8n-api.mjs`, `apply-workflow.mjs` | an operator's machine, or a future network-enabled environment | `N8N_API_URL` + `N8N_API_KEY`, real network to the n8n host |
 
 Never ask a Claude session to run `apply-workflow.mjs` or anything that
@@ -201,3 +203,27 @@ own `manifest.json` — the reference implementation. It is **not** a
 retrofit: the other 16 `db/port/*/` folders that have no script keep not
 having one until the work in them is touched again. New work adopts this
 pattern; old work is not rewritten just to match it.
+
+## `local-pg.mjs` — the site on a real Postgres, from a web session
+
+    mkdir -p /tmp/pg && cd /tmp/pg && npm init -y >/dev/null \
+      && npm i @electric-sql/pglite @electric-sql/pglite-socket
+    LOCAL_PG_DEPS=/tmp/pg node db/port/lib/local-pg.mjs          # from the repo root
+    cd platform && DATA_BACKEND=postgres \
+      DATABASE_URL=postgres://postgres:postgres@127.0.0.1:55432/postgres npx next dev -p 3211
+
+The session cannot reach the `hov` database and demo mode has none, so a site
+feature that WRITES Postgres used to be checkable only by reading its SQL.
+This runs PGlite (Postgres compiled to WebAssembly) with every `db/NNN_*.sql`
+applied in file order — the real migrations, not a copy — seeds 22 projects
+across every status bucket and more than one page, and serves the wire
+protocol, so the site's unmodified `pg` Pool connects and `psql` (installed)
+can read what the page wrote. In memory: stopping it forgets everything, and
+nothing in it can reach the box. First used for the playlists
+(`db/port/playlists/`), whose browser scripts show the pattern for driving the
+page in Chromium against it.
+
+Two traps met while building it: `pkill -f <pattern>` from a Bash tool call
+kills the tool's own shell when the pattern is in its command line — kill by
+pid; and `next build` shares `.next/` with a running `next dev` — stop the dev
+server first.

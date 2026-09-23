@@ -21,8 +21,9 @@ import type {EvidenceClaim, SceneCaption, TextCardSpec} from './types';
  *              read 38%.
  *
  * Both are derived in CODE, with no model involved, so a card can never be
- * invented. When Scripting eventually writes cards deliberately, an explicit
- * `textCards` prop bypasses all of this.
+ * invented. The cards Scripting writes deliberately (the motif cards) arrive
+ * as the explicit `textCards` prop and are merged with these, one card per
+ * scene, the explicit one winning its scene — see `buildTextCards`.
  */
 
 /** Pipeline speaker tags are never printed, exactly as both TTS paths strip them. */
@@ -198,6 +199,16 @@ export type BuildCardsOptions = {
 /**
  * The cards this project actually gets, in timeline order. Placement is the
  * planner's job — this decides only what exists and how long it needs.
+ *
+ * Explicit cards (the motif cards Scripting chose and validated) and derived
+ * cards (claims and figures) are MERGED, not either/or. Until 2026-09-23 a
+ * non-empty explicit list bypassed the derivation entirely, which meant a film
+ * where the motif chain half-succeeded got FEWER cards than one where it
+ * failed: the New York remote-work film spoke some twenty figures and got one
+ * card in six minutes, because one compare card had been accepted and it
+ * silenced every figure card the render would otherwise have drawn. A motif
+ * card wins its own scene; every other scene is derived exactly as before, and
+ * the planner's gap and budget rules keep the total in check.
  */
 export const buildTextCards = (o: BuildCardsOptions): TextCardSpec[] => {
 	const {
@@ -208,18 +219,35 @@ export const buildTextCards = (o: BuildCardsOptions): TextCardSpec[] => {
 		hookSeconds,
 		narrationIsSpoken = true,
 	} = o;
-	if (explicit?.length) return [...explicit].sort((a, b) => a.sceneIndex - b.sceneIndex);
+
+	const isChapterStart = (i: number) =>
+		i > 0 && (scenes[i].chapter ?? 0) !== (scenes[i - 1].chapter ?? 0);
+
+	// An explicit card was validated at scripting time against the settings of
+	// THAT moment. Chapter cards can be switched on in Final touches long after,
+	// so the one-owner rule is re-checked here: a card on a chapter's first
+	// scene is dropped only while the impact card owns that frame. Anything else
+	// about the card (its sources, its scene) was Scripting's to judge.
+	const taken = new Set<number>();
+	const out: TextCardSpec[] = [];
+	for (const card of [...(explicit ?? [])].sort((a, b) => a.sceneIndex - b.sceneIndex)) {
+		const i = card.sceneIndex;
+		if (!Number.isInteger(i) || i < 0 || i >= scenes.length) continue;
+		if (taken.has(i)) continue;
+		if (isChapterStart(i) && chapterCardsOn) continue;
+		taken.add(i);
+		out.push(card);
+	}
 
 	const byRef = new Map<string, EvidenceClaim>();
 	for (const e of evidence) if (e.ref) byRef.set(e.ref, e);
 
-	const out: TextCardSpec[] = [];
 	scenes.forEach((scene, i) => {
+		if (taken.has(i)) return;
 		// Never under the opening title, and never on a chapter's first scene
 		// when the impact card already owns that frame.
 		if (scene.startSeconds < hookSeconds + 0.5) return;
-		const isChapterStart = i > 0 && (scene.chapter ?? 0) !== (scenes[i - 1].chapter ?? 0);
-		if (isChapterStart && chapterCardsOn) return;
+		if (isChapterStart(i) && chapterCardsOn) return;
 		// A sourced claim outranks a figure: it carries an attribution, which is
 		// information the audience has no other way to get.
 		const card =
@@ -227,7 +255,7 @@ export const buildTextCards = (o: BuildCardsOptions): TextCardSpec[] => {
 			(narrationIsSpoken ? figureCardFor(scene, i) : null);
 		if (card) out.push(card);
 	});
-	return out;
+	return out.sort((a, b) => a.sceneIndex - b.sceneIndex);
 };
 
 /**

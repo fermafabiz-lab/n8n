@@ -71,5 +71,23 @@ const check = (name, got, want) => {
   check("media/ingest POST with no key configured -> 500 (MEDIA_INGEST_KEY not set)", res.status, 500);
 }
 
+// --- ops/restart — the ⟳ Restart button's door for a session with no
+// browser. The key before everything, then the id, and only then the action.
+{
+  const { POST } = await import("../app/api/ops/restart/route.ts");
+  const call = (headers, body) =>
+    POST(new Request("http://x/api/ops/restart", { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body }));
+  const saved = process.env.MEDIA_INGEST_KEY;
+  delete process.env.MEDIA_INGEST_KEY;
+  check("ops/restart with no key configured -> 500 (never open by default)", (await call({ "x-hov-key": "" }, "{}")).status, 500);
+  process.env.MEDIA_INGEST_KEY = "check-key";
+  check("ops/restart with the wrong key -> 401", (await call({ "x-hov-key": "nope" }, JSON.stringify({ projectId: "recABCDEFGHIJKLMN" }))).status, 401);
+  check("ops/restart with no key header -> 401", (await call({}, JSON.stringify({ projectId: "recABCDEFGHIJKLMN" }))).status, 401);
+  check("ops/restart, right key, body not JSON -> 400", (await call({ "x-hov-key": "check-key" }, "not json")).status, 400);
+  check("ops/restart, right key, projectId not a record id -> 400", (await call({ "x-hov-key": "check-key" }, JSON.stringify({ projectId: "category:story" }))).status, 400);
+  if (saved === undefined) delete process.env.MEDIA_INGEST_KEY;
+  else process.env.MEDIA_INGEST_KEY = saved;
+}
+
 console.log(`\n${results.filter(Boolean).length}/${results.length} passed`);
 process.exit(results.every(Boolean) ? 0 : 1);

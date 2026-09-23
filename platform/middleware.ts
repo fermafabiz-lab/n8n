@@ -24,7 +24,10 @@ export function middleware(req: NextRequest) {
     (req.nextUrl.pathname.startsWith("/api/archive/") ||
       req.nextUrl.pathname.startsWith("/api/footage/") ||
       // Claude Scripting's `Fetch Style Card` reads its library rows here.
-      req.nextUrl.pathname === "/api/style-refs") &&
+      req.nextUrl.pathname === "/api/style-refs" ||
+      // The ⟳ Restart button, for a session that has no browser — the route
+      // takes the key and nothing else (app/api/ops/restart/route.ts).
+      req.nextUrl.pathname === "/api/ops/restart") &&
     process.env.MEDIA_INGEST_KEY &&
     req.headers.get("x-hov-key") === process.env.MEDIA_INGEST_KEY
   ) {

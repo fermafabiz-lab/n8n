@@ -1,0 +1,235 @@
+/*
+ * The playlist row above the library toolbar.
+ *
+ * It sits OUTSIDE the frosted toolbar on purpose: the toolbar filters what is
+ * on screen (status, search, view), while this row chooses WHICH films the
+ * toolbar is filtering — a collection, not a filter. Two levels, two rows.
+ *
+ * Chips instead of tabs because a playlist name is the producer's own words
+ * and can be long; a tab row with an underline reads as a fixed vocabulary.
+ * Every colour is a token, so the night theme needs nothing here.
+ */
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 22px;
+  padding: 0 4px;
+}
+
+/* Same voice as the toolbar's "Projects" label below it (.eyebrow.prow). */
+.label {
+  font-family: var(--f-ui), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-right: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  padding: 7px 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line2);
+  background: var(--card2);
+  color: var(--soft);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.chip:hover {
+  color: var(--ink);
+  background: var(--hover-fill);
+}
+.chip.on {
+  color: var(--ink);
+  background: var(--accent-a12);
+  border-color: var(--accent-a28);
+}
+/* A playlist name is the producer's own words and can run long; the chip
+   keeps a readable width and the full name rides in its title. */
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 26ch;
+}
+/* A category's own list (lib/category-lists.ts): the same chip, led by the
+   category's icon — the one mark that says "the site keeps this one". */
+.cat {
+  gap: 6px;
+}
+.icon {
+  font-size: 14px;
+  line-height: 1;
+}
+/* Between the site's lists and the producer's own. A rule, not a gap, so the
+   two groups read as two even when the row wraps on a laptop. */
+.sep {
+  align-self: stretch;
+  width: 1px;
+  margin: 4px 4px;
+  background: var(--line2);
+}
+
+/* --accent-ink, not --accent: the toolbar's counts use --accent, which
+   measures 4.09:1 on a chip's --card2 at night. --accent-ink is 9.65:1 by day
+   and 6.77:1 by night. */
+.count {
+  color: var(--accent-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.newBtn {
+  composes: chip;
+  border-style: dashed;
+  border-color: var(--accent-a28);
+  background: transparent;
+  color: var(--accent-ink);
+}
+.newBtn:hover {
+  background: var(--accent-a08);
+  color: var(--accent-ink);
+}
+
+/* The inline name field — "+ New playlist" and "Rename" both become one. */
+.form {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.input {
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--ink);
+  background: var(--input-fill);
+  border: 1px solid var(--accent-a28);
+  border-radius: var(--r-pill);
+  padding: 7px 14px;
+  width: min(260px, 70vw);
+  outline: none;
+}
+.input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-a16);
+}
+.small {
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 7px 13px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line2);
+  background: var(--card2);
+  color: var(--ink);
+  cursor: pointer;
+}
+.small:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+/* The site's primary-button surface (.abtn.ok), which is the SAME in both
+   themes — that is what allows literal colours here. Not var(--accent) with
+   white on it: the night accent is lighter, and white on it measured 3.29:1.
+   This pair measures 5.01:1 at the gradient's lighter end. */
+.primary {
+  composes: small;
+  border-color: transparent;
+  background: linear-gradient(135deg, #7a4fd6, #4d3484);
+  color: #f7f7f8;
+}
+
+/* What you can do to the playlist you are looking at. Pushed to the end of
+   the row, and quiet — renaming and deleting are rare, choosing is not. */
+.tools {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.link {
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 550;
+  color: var(--dim);
+  background: none;
+  border: none;
+  border-radius: var(--r-pill);
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.link:hover {
+  color: var(--ink);
+  background: var(--hover-fill);
+}
+.danger {
+  composes: link;
+  color: var(--red-ink);
+}
+.danger:hover {
+  color: var(--red-ink);
+}
+/* Armed: the second click deletes. Filled so it cannot be mistaken for the
+   resting state it replaced, and it says what survives. A literal red that
+   is the same in both themes, for the same reason as .primary: white on
+   var(--red) measured 3.12:1 at night. This pair is 6.00:1. */
+.armed {
+  composes: link;
+  color: #fff;
+  background: #b3372e;
+}
+.armed:hover {
+  color: #fff;
+  background: #b3372e;
+}
+
+.hint {
+  font-size: 12.5px;
+  color: var(--dim);
+}
+.err {
+  flex-basis: 100%;
+  font-size: 12.5px;
+  color: var(--red-ink);
+  padding: 0 6px;
+}
+
+@media (max-width: 720px) {
+  .bar {
+    margin-top: 18px;
+    gap: 6px;
+  }
+  .label {
+    flex-basis: 100%;
+    margin: 0 0 2px;
+  }
+  .chip {
+    padding: 7px 12px;
+    font-size: 13px;
+  }
+  .name {
+    max-width: 18ch;
+  }
+  /* On a phone the row wraps anyway, and a rule at the start of a line is
+     a stray mark rather than a divider. */
+  .sep {
+    display: none;
+  }
+  /* On a phone the tools get their own line rather than squeezing between
+     chips — margin-left:auto on a wrapped line would strand them right. */
+  .tools {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+}

@@ -29,6 +29,8 @@ import {
   type ScriptExample,
 } from "./derive";
 import { classifyVisualOrigin } from "@/lib/provenance";
+import { sortPlaylists, type Playlist } from "@/lib/playlists";
+import { PROJECT_ACTIVITY_SQL } from "./activity-sql";
 
 // ---------------------------------------------------------------------------
 // Connection
@@ -127,6 +129,8 @@ interface ProjectRow {
   voice_id: string;
   pace: string | null;
   created_at: Date | null;
+  /** Only where the query selected PROJECT_ACTIVITY_SQL (getProjects). */
+  activity_at?: Date | null;
   cover_path?: string | null;
   series_id?: string | null;
   episode_no?: number | null;
@@ -151,6 +155,7 @@ function toRawProject(r: ProjectRow): RawProject {
     voiceId: r.voice_id ?? "",
     paceRaw: r.pace,
     createdAt: r.created_at ? r.created_at.toISOString() : null,
+    activityAt: r.activity_at ? r.activity_at.toISOString() : null,
     coverUrl: mediaUrl(r.cover_path ?? null),
     seriesId: r.series_id ?? null,
     episodeNo: r.episode_no ?? null,
@@ -462,6 +467,9 @@ export async function getProjects(): Promise<Project[]> {
   // The cover is the earliest scene (by order) that has an image. One
   // correlated sub-select beats the Airtable adapter's full sweep of the
   // Scene table, which it had to do because Airtable cannot join.
+  // The ORDER stays by creation: that is the library's "Newest first" and the
+  // hero's and the chime's order. "Recently worked on" is applied by the grid
+  // (lib/library-order.ts) from activity_at, which rides along here.
   const rows = await query<ProjectRow>(`
     select ${PROJECT_COLS},
       (select a.path
@@ -469,7 +477,8 @@ export async function getProjects(): Promise<Project[]> {
          join hov.attachment a on a.scene_id = s.id and a.field = 'image'
         where s.project_id = p.id
         order by s.scene_order
-        limit 1) as cover_path
+        limit 1) as cover_path,
+      ${PROJECT_ACTIVITY_SQL} as activity_at
     from hov.project p
     order by p.created_at desc`);
   return rows.map((r) => buildProject(toRawProject(r)));
@@ -1819,4 +1828,183 @@ export async function getSeriesRefsUnion(seriesId: string): Promise<SeriesRefs> 
   let refs = s.refs;
   for (const r of rows) refs = mergeRefs(refs, normalizeSeriesRefs(r.editing_options));
   return refs;
+}
+
+// ---------------------------------------------------------------------------
+// Playlists (db/013)
+//
+// A playlist is a named set of films, and a film can sit in any number of
+// them. The site is the only reader and the only writer — nothing in n8n
+// knows these tables exist. Names arrive already normalised
+// (normalizePlaylistName, lib/playlists.ts); the table's check is only the
+// backstop.
+//
+// The one rule the DATABASE answers is the unique index on lower(name), and
+// it answers with SQLSTATE 23505. That is turned into a result here rather
+// than left as an exception, because "there is already a playlist called
+// that" is something the producer should read, not a crash they should
+// report. Every write names the playlist it touched in its result, so a
+// message can say which one without a second read.
+// ---------------------------------------------------------------------------
+
+const isUniqueViolation = (e: unknown) => (e as { code?: string } | null)?.code === "23505";
+
+/** Every playlist with the ids of its films, in the order the chips draw. */
+export async function getPlaylists(): Promise<Playlist[]> {
+  const rows = await query<{ id: string; name: string; project_ids: string[] | null }>(
+    `select pl.id, pl.name,
+            coalesce(array_agg(pp.project_id order by pp.added_at, pp.project_id)
+                       filter (where pp.project_id is not null),
+                     '{}') as project_ids
+       from hov.playlist pl
+       left join hov.playlist_project pp on pp.playlist_id = pl.id
+      group by pl.id, pl.name`,
+  );
+  return sortPlaylists(rows.map((r) => ({ id: r.id, name: r.name, projectIds: r.project_ids ?? [] })));
+}
+
+/**
+ * Put films into a playlist inside an open transaction. Only ids that are
+ * still projects are inserted — the list comes from a page that may be a
+ * refresh old, and one film deleted in the meantime must not fail the whole
+ * batch on the foreign key. Films already in it are skipped, not errors.
+ * Returns how many were actually added.
+ */
+async function insertMembers(
+  q: <R = Record<string, unknown>>(sql: string, params?: unknown[]) => Promise<R[]>,
+  playlistId: string,
+  projectIds: string[],
+): Promise<number> {
+  if (projectIds.length === 0) return 0;
+  const rows = await q(
+    `insert into hov.playlist_project (playlist_id, project_id)
+     select $1, p.id from hov.project p where p.id = any($2::text[])
+     on conflict do nothing
+     returning project_id`,
+    [playlistId, projectIds],
+  );
+  return rows.length;
+}
+
+export type PlaylistCreated =
+  | { ok: true; id: string; name: string; added: number }
+  | { ok: false; reason: "name-taken" };
+
+/** A new playlist, with its first films in it if any were chosen. */
+export async function insertPlaylist(name: string, projectIds: string[]): Promise<PlaylistCreated> {
+  try {
+    return await withTransaction(async (q) => {
+      const [pl] = await q<{ id: string; name: string }>(
+        `insert into hov.playlist (name) values ($1) returning id, name`,
+        [name],
+      );
+      const added = await insertMembers(q, pl.id, projectIds);
+      return { ok: true as const, id: pl.id, name: pl.name, added };
+    });
+  } catch (e) {
+    if (isUniqueViolation(e)) return { ok: false, reason: "name-taken" };
+    throw e;
+  }
+}
+
+export type PlaylistAdded =
+  | { ok: true; name: string; added: number; already: number }
+  | { ok: false; reason: "missing" };
+
+/**
+ * Add films to an existing playlist. `already` counts the chosen films that
+ * were in it before — "3 added, 2 were already there" is the honest answer to
+ * a selection that overlapped, where "5 added" would be a lie and "3 added"
+ * alone would read as two films going missing.
+ */
+export async function addPlaylistMembers(playlistId: string, projectIds: string[]): Promise<PlaylistAdded> {
+  return withTransaction(async (q) => {
+    // FOR UPDATE: a delete of the same playlist in another tab waits for this
+    // rather than cascading away rows this is in the middle of inserting.
+    const [pl] = await q<{ name: string }>(`select name from hov.playlist where id = $1 for update`, [playlistId]);
+    if (!pl) return { ok: false as const, reason: "missing" as const };
+    const added = await insertMembers(q, playlistId, projectIds);
+    const [{ n }] = await q<{ n: number }>(
+      `select count(*)::int as n from hov.playlist_project where playlist_id = $1 and project_id = any($2::text[])`,
+      [playlistId, projectIds],
+    );
+    return { ok: true as const, name: pl.name, added, already: n - added };
+  });
+}
+
+export type PlaylistRemoved = { ok: true; name: string; removed: string[] } | { ok: false; reason: "missing" };
+
+/**
+ * Take films out of a playlist. The films themselves are untouched — this
+ * never goes near `hov.project`. Returns the ids actually removed, which is
+ * exactly what an Undo needs to put back.
+ */
+export async function removePlaylistMembers(playlistId: string, projectIds: string[]): Promise<PlaylistRemoved> {
+  return withTransaction(async (q) => {
+    const [pl] = await q<{ name: string }>(`select name from hov.playlist where id = $1 for update`, [playlistId]);
+    if (!pl) return { ok: false as const, reason: "missing" as const };
+    const gone = await q<{ project_id: string }>(
+      `delete from hov.playlist_project
+        where playlist_id = $1 and project_id = any($2::text[])
+        returning project_id`,
+      [playlistId, projectIds],
+    );
+    return { ok: true as const, name: pl.name, removed: gone.map((r) => r.project_id) };
+  });
+}
+
+export type PlaylistRenamed =
+  | { ok: true; before: string; name: string }
+  | { ok: false; reason: "missing" | "name-taken" };
+
+/** A new name for a playlist. Changing only its case is allowed: the unique
+ *  index compares the row against OTHER rows, never against itself. */
+export async function renamePlaylistRow(playlistId: string, name: string): Promise<PlaylistRenamed> {
+  try {
+    return await withTransaction(async (q) => {
+      const [pl] = await q<{ name: string }>(`select name from hov.playlist where id = $1 for update`, [playlistId]);
+      if (!pl) return { ok: false as const, reason: "missing" as const };
+      await q(`update hov.playlist set name = $2 where id = $1`, [playlistId, name]);
+      return { ok: true as const, before: pl.name, name };
+    });
+  } catch (e) {
+    if (isUniqueViolation(e)) return { ok: false, reason: "name-taken" };
+    throw e;
+  }
+}
+
+export type PlaylistDeleted = { ok: true; name: string; films: number } | { ok: false; reason: "missing" };
+
+/**
+ * Delete a playlist. Its memberships go with it (ON DELETE CASCADE); its
+ * FILMS do not, and nothing here is able to touch them — which is the whole
+ * difference between this and `deleteProjectDeep`, and the reason the two
+ * never share a button.
+ */
+export async function deletePlaylistRow(playlistId: string): Promise<PlaylistDeleted> {
+  return withTransaction(async (q) => {
+    const [pl] = await q<{ name: string; films: number }>(
+      `select pl.name, (select count(*)::int from hov.playlist_project pp where pp.playlist_id = pl.id) as films
+         from hov.playlist pl where pl.id = $1 for update`,
+      [playlistId],
+    );
+    if (!pl) return { ok: false as const, reason: "missing" as const };
+    await q(`delete from hov.playlist where id = $1`, [playlistId]);
+    return { ok: true as const, name: pl.name, films: pl.films };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Activity (db/014)
+//
+// Almost every change a film goes through stamps its own activity: the
+// project_activity trigger for the row, updated_at for its scenes, chapters
+// and scripts. Pause, resume and restart are the exception — they talk to n8n
+// and change nothing in the database, yet the producer counts them as
+// working on the film. So those actions stamp it here, and the trigger lets an
+// explicit value through untouched.
+// ---------------------------------------------------------------------------
+
+export async function touchProjectActivity(projectId: string): Promise<void> {
+  await query(`update hov.project set activity_at = now() where id = $1`, [projectId]);
 }

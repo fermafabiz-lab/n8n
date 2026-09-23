@@ -2153,6 +2153,84 @@ so it is the only place this can be caught. It is the same fault that opened
 this entire story, when the first red-lit film's hook said April and its first
 chapter said October.
 
+### A source must back the RELATIONSHIP, not only the nouns — 2026-09-23, LIVE
+
+`7a865309`, `db/port/fact-check/README.md` §10. The entry above taught the
+judge that `A BECAME B` is not sourced by a source for B. That was the right
+rule in one special case, and the general one took another four days and a
+second reader to find:
+
+> **A source must support not only the nouns, dates and events in a sentence,
+> but the relationship the sentence asserts between them — causation,
+> intention, limitation, comparison, chronology and consequence.**
+
+The sentence that exposed it was *"Inside Google, the Sydney software gained
+the scale it had lacked"*, and what makes it worth reading twice is that **the
+judge's own output convicted it.** It returned `supported` with
+`claim: "gained scale it had previously lacked"` and
+`reason: "gained scale inside Google"` — a justification narrower than the
+claim it was justifying, written down, in the same object. So the cheapest fix
+was not a new rule at all but a self-check: **when your reason covers less than
+your claim says, the verdict is unsupported.**
+
+**A before-and-after is the sharpest case because half of it is invisible.**
+"gained the scale it had lacked" asserts something about the period BEFORE, and
+a source about the after settles none of it. The same shape hides in *no
+longer*, *still*, *for the first time*, *finally*, *kept*, *lost* — every one
+of them a claim about two moments wearing the clothes of a claim about one.
+
+Measured on the producer's film (execution 16421): the sentence now returns two
+findings, one `supported` and one `unsupported`, and **all four sentences the
+rewrite removed are from the family the rule names** — an intention (*"the aim
+was practical"*), an inability (*"the startup could not deliver it worldwide on
+its own"*), a comparison (*"gained the scale it had lacked"*) and a change of
+state (*"was no longer only a startup tool"*). Four for four is the evidence
+that the rule is finding its category rather than flagging more or less at
+random.
+
+**The diagnosis that came with it points upstream, and is the real work.** The
+reader's summary was *"the problem is mostly the script generator adding
+cinematic connective language that outruns the evidence, not the checker being
+too strict"* — and that is right. `Write Full Narration` and `Edit Full
+Narration` produce the connective prose; the judge then catches it one sentence
+at a time, after the fact, on documentaries only. Constraining the writer is
+cheaper than checking the writing. It has not been done, because those two
+nodes are on the main path of every film in every category and a change there
+needs its own verification.
+
+### A guard that re-derives a decision drifts from the node that owns it — 2026-09-23
+
+Same publish, and the more expensive of the two. `FC Apply` is the safety valve
+between the fact-checker and the film: nothing the chain writes reaches the
+script unless it passes there. It measured a rewritten chapter against a
+**symmetric** band — a fifth either way — and on the producer's Google Maps
+documentary it therefore threw away a correction that cut five unsourceable
+statements, because cutting five sentences out of eleven made chapter 1 28%
+shorter. **Every other part of the chain worked.** The judge found them, the
+rewrite fixed them, the row said `refused: "chapter 1 went from 178 to 128
+words"`, and the producer kept all five.
+
+**This project had already settled the question a fortnight earlier.**
+`Narration Guard`, 2026-09-13: *the length is a CEILING — a film shorter than
+ordered is correct, and only a draft under 55% of its target, a broken one
+rather than a short one, goes back for length.* The valve had a second, private
+answer to the same question and nobody noticed, because a guard that refuses
+things only announces itself when it refuses something correct — and then it
+reads as the checker being wrong, not the guard.
+
+The band is one-sided now: grow past a fifth and it is refused (padding is how
+a narration used to reach a word count), lose more than HALF a chapter and it
+is refused (that is a re-telling), everything between is accepted. And
+**shorter is allowed, silently shorter is not** — both copies compare the
+result against `Narration Guard`'s own `min` and write `short: {words, min}`
+into the report, which is never a refusal. It says the film has not got enough
+SOURCED material for the running time ordered, and the answer is more research
+or a shorter film. Neither is a choice this chain gets to make.
+
+**The rule: when a decision has an owner, READ it, do not re-derive it.** A
+second copy of "how short is too short" cannot be kept in step by intention,
+and the failure is silent in the one direction that matters.
+
 ### Deep Search is Documentary mode's feature, not the narration's — 2026-09-18
 
 The entry above says the project's `category` cannot tell a documentary from a

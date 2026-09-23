@@ -94,7 +94,7 @@ Every word on a card must be lifted from its own quote, unbroken and in that ord
 
 A card may not use a word the film has not spoken yet: quote only from the card's own scene or an earlier one. The ONE exception is a route, which is a map of a whole journey — its later stops are places the film reaches after the card is shown, so quote them from wherever they are spoken and place the card where the journey BEGINS, not where it ends. A map shown after the arrival is a summary, not a map. Write each string in the film's own words; a card that says "Feribot" while the film has only said "ferry" is wrong even though it means the same.
 
-Aim for one to three cards on every film. This pipeline wants animations in its videos, so look hard: a journey with named legs, two times set against each other, a run of dates a listener cannot space out in their head, two quantities of the same kind, a sequence of beats across several scenes. Take the best one or two even when neither is spectacular. Note that the last of those, steps, can be drawn from almost any story that goes somewhere — so a film that offers none of the other four usually still offers this one, and returning nothing on such a film is a miss rather than restraint.
+Aim for one card in roughly every two minutes of film — the brief states the length: one or two on a short film, five or six on a ten-minute one, and a film with many spoken figures or several legs can carry one more. Spread them across the film rather than stacking them in one chapter. This pipeline wants animations in its videos, so look hard: a journey with named legs, two times set against each other, a run of dates a listener cannot space out in their head, two quantities of the same kind, a sequence of beats across several scenes. Take the best ones even when none is spectacular. Note that the last of those, steps, can be drawn from almost any story that goes somewhere — so a film that offers none of the other four usually still offers this one, and returning nothing on such a film is a miss rather than restraint.
 
 But never force one. If the script genuinely offers nothing that any motif can draw truthfully, return an empty array and say so in "none_because" — one line naming what the film DID offer that you had no motif for. That line is the most useful thing you can return on such a film: it is how the next motif gets chosen and built. Padding the answer with a card that repeats the narration is worse than an empty array, because a bad card ships and an empty array only asks a question.
 
@@ -129,15 +129,25 @@ try { research = String($('Extract Claims').first().json.output || ''); } catch 
 
 let title = '';
 let tone = '';
+// The film's length, so the writer can size its answer: the prompt asks for
+// one card in roughly every two minutes, and a model shown 54 scenes with no
+// length still answered "one to three". \`Lenght\` (sic) is one of the trigger's
+// declared fields, in seconds.
+let minutes = 0;
 try {
   const p = $('Receive Project Data').first().json || {};
   title = String(p['Nume Proiect'] || p.name || p.Tema || '');
   tone = String(p.Tonalitate || p.tone || '');
+  minutes = Math.round(Number(p.Lenght || p.Length || 0) / 60);
 } catch (e) {}
+const lengthLine = minutes > 0
+  ? \`LENGTH: about \${minutes} minute\${minutes === 1 ? '' : 's'}, \${scenes.length} scenes\`
+  : \`LENGTH: \${scenes.length} scenes (about \${Math.max(1, Math.round(scenes.length * 7 / 60))} minutes)\`;
 
 const brief = [
   \`FILM: \${title}\`,
   \`TONE: \${tone}\`,
+  lengthLine,
   '',
   'SCENES (index · narration · what the shot will show)',
   ...scenes.map((s) => [
@@ -190,7 +200,32 @@ try {
   evidence = $('Extract Claims').first().json.claims || [];
 } catch (e) {}
 
-const { accepted, report } = validateMotifCards({ cards: proposed, scenes, evidence });
+// Whether a chapter's first scene is already owned by an impact card is the
+// FILM's setting, not a constant. Until 2026-09-23 this call passed nothing
+// and the validator's default (true) refused a route card on a film whose
+// chapter cards were off — "a chapter card already owns this scene" on a scene
+// no chapter card would ever touch. Read from the same node and the same key
+// \`Draw Cards?\` reads its own switch from; absent means on, the render's
+// default. The render re-checks the rule at assembly time in case Final touches
+// flips the switch later (src/textCards.ts).
+let chapterCardsOn = true;
+try {
+  if ($('Fetch Project Record').isExecuted) {
+    const o = JSON.parse(($('Fetch Project Record').first().json.fields || {})['Editing Options'] || '{}') || {};
+    chapterCardsOn = o.chapterCards !== false;
+  }
+} catch (e) { chapterCardsOn = true; }
+
+// The cap scales with the film: one card in roughly every two minutes, never
+// under three. \`Lenght\` is the trigger's declared length in seconds; a film
+// without one is sized from its scene count at ~7 s a scene.
+let filmMinutes = 0;
+try { filmMinutes = Number($('Receive Project Data').first().json.Lenght || 0) / 60; } catch (e) {}
+if (!(filmMinutes > 0)) filmMinutes = scenes.length * 7 / 60;
+const maxCards = maxCardsFor(filmMinutes);
+
+const { accepted, report } = validateMotifCards({ cards: proposed, scenes, evidence, chapterCardsOn, maxCards });
+console.log(\`MOTIF cap \${maxCards} card(s) for \${Math.round(filmMinutes)} min; chapter cards \${chapterCardsOn ? 'on' : 'off'} — a card on a chapter's first scene is \${chapterCardsOn ? 'refused' : 'allowed'}\`);
 
 // The report is the only record of WHY a card did not make it, and a dropped
 // card is invisible on screen by definition. Log it or the next person debugs

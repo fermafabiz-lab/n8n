@@ -109,15 +109,35 @@ if (!fc.needsRewrite) {
       }
       const wasWords = wc(c.narrator_script);
       const nowWords = wc(text);
-      // A fifth either way, measured against what the chapter SHOULD now weigh:
-      // what it arrived at, minus any sentence the judge asked to have cut.
-      // Wide enough that attributing or cutting one sentence passes; narrow
-      // enough that a rewrite which re-tells the chapter does not.
       const expectWords = Math.max(1, wasWords - (cutWordsFor.get(Number(c.chapter_number)) || 0));
-      if (wasWords && (nowWords < expectWords * 0.8 || nowWords > expectWords * 1.2)) {
+
+      // THE BAND IS NOT SYMMETRIC, and making it so cost a real film its
+      // correction. A rewrite may never GROW a chapter — padding is how the
+      // narration used to reach a word count, and the fifth above is what
+      // stops it. But a rewrite that SHORTENS is usually doing exactly what it
+      // was asked to: a sentence nothing can back is cut, and the chapter
+      // weighs less afterwards because the film now says less.
+      //
+      // `Narration Guard` settled this for the whole project on 2026-09-13 —
+      // "the length is a CEILING: a film shorter than ordered is correct" —
+      // and this guard was still treating it as a two-sided constraint. On
+      // 2026-09-23 that refused a correct fix on the producer's Google Maps
+      // film: five unsourceable statements in an eleven-sentence script, the
+      // rewrite cut them, 178 words became 128, and the whole correction was
+      // thrown away for being 28% shorter. The producer kept all five.
+      //
+      // What survives is the check against a chapter being RE-TOLD rather than
+      // corrected, which is what losing more than half of it looks like.
+      if (wasWords && nowWords > expectWords * 1.2) {
         refusal =
-          'chapter ' + c.chapter_number + ' went from ' + wasWords + ' to ' + nowWords + ' words' +
+          'chapter ' + c.chapter_number + ' grew from ' + wasWords + ' to ' + nowWords + ' words' +
           (expectWords !== wasWords ? ' (about ' + expectWords + ' expected after the cut)' : '');
+        break;
+      }
+      if (wasWords && nowWords < expectWords * 0.5) {
+        refusal =
+          'chapter ' + c.chapter_number + ' lost more than half its words (' + wasWords + ' to ' + nowWords +
+          '), which is a re-telling rather than a correction';
         break;
       }
       if (!touched.has(Number(c.chapter_number)) && text !== String(c.narrator_script || '').trim()) {
@@ -182,6 +202,26 @@ const output = chapters
   .join('\n\n');
 const words = chapters.reduce((n, c) => n + wc(c.narrator_script), 0);
 
+// SHORTER IS ALLOWED; SILENTLY SHORTER IS NOT. The guard above no longer
+// refuses a rewrite for shrinking, because a film that says only what it can
+// back is the point. But the word count is what decides the runtime and the
+// scene count, so a correction that takes the narration under the length the
+// producer ordered is news they have to be given: it means the film does not
+// have enough SOURCED material to fill its running time, and the answer is
+// more research or a shorter film — neither of which this chain can choose.
+//
+// `min` is `Narration Guard`'s own floor (55% of the target it derived from
+// the ordered length), read from the payload rather than recomputed, so the
+// two cannot disagree about the same film.
+const floorWords = Number(g.min) || 0;
+const wentShort = next && floorWords > 0 && words < floorWords;
+if (wentShort) {
+  console.log(
+    'DEEP SEARCH the corrected narration is ' + words + ' words, under the ' + floorWords +
+      ' this film\'s length needs — it does not have enough sourced material to fill its running time.',
+  );
+}
+
 const report = fc.run
   ? {
       // The mode the film was made in, carried so the panel can say it back
@@ -196,6 +236,10 @@ const report = fc.run
       sentences: fc.sentences || new Set(findings.map((f) => String(f.quote || '').trim())).size,
       searched: fc.searched || 0,
       rewritten,
+      // The corrected narration is under the film's ordered length. Not a
+      // failure and never a refusal — a statement about how much of this film
+      // its research can actually support.
+      short: wentShort ? { words, min: floorWords } : undefined,
       // Sentences removed because the narration already carried the fact.
       // Undefined rather than 0 when there were none, so an older report and a
       // clean new one read the same on the panel.

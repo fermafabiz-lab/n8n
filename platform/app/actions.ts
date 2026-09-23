@@ -38,7 +38,14 @@ import {
   getSeriesEpisodes,
   getSeriesRefsUnion,
   getSheetMediaUrls,
+  insertPlaylist,
+  addPlaylistMembers,
+  removePlaylistMembers,
+  renamePlaylistRow,
+  deletePlaylistRow,
+  touchProjectActivity,
 } from "@/lib/data";
+import { cleanProjectIds, films, isRecordId, normalizePlaylistName } from "@/lib/playlists";
 import {
   composeSeriesLore,
   normalizeSeriesBible,
@@ -2734,6 +2741,161 @@ export async function deleteProjects(projectIds: string[]): Promise<ActionResult
   }
 }
 
+/*
+ * Playlists — the producer's own organisation of the library (db/013,
+ * lib/playlists.ts).
+ *
+ * Five small actions, and NONE of them can reach a film: creating, filling,
+ * emptying, renaming and deleting a playlist only ever touch hov.playlist and
+ * hov.playlist_project. That is worth saying out loud because they live in the
+ * same select bar as `deleteProjects`, one button away — and that one deletes
+ * films for good, after stopping every running workflow on the instance.
+ *
+ * Every argument is checked here, typed or not: a server action is an HTTP
+ * endpoint, and its TypeScript signature is a promise nobody enforces.
+ *
+ * Every write ends in revalidatePath("/projects"), and that is load-bearing
+ * rather than tidy: it makes the fresh library ride back in the SAME response
+ * as the result, through the router's action queue. The first version had the
+ * grid call router.refresh() after each write instead, and a refresh from one
+ * write could land after the next write's — measured in Chromium: a playlist
+ * given three films showed 0 for a moment, because the refresh fired by its
+ * creation arrived last. The queue runs one action at a time, so a response
+ * that started earlier can no longer finish later.
+ */
+
+export interface PlaylistResult extends ActionResult {
+  /** The playlist the action created or touched, when there is one. */
+  playlistId?: string;
+  /** The films an action took out — exactly what an Undo puts back. */
+  removed?: string[];
+}
+
+const PLAYLISTS_DEMO = "Demo mode — playlists need the database, so nothing was saved.";
+/** A playlist that is gone by the time the write lands — deleted in another
+ *  tab, or by someone else. The page is re-rendered with it, so the chip that
+ *  was clicked disappears and the message's "refreshed" is true. */
+const playlistMissing = (): PlaylistResult => {
+  revalidatePath("/projects");
+  return {
+    ok: false,
+    message: "That playlist no longer exists — someone may have deleted it in another tab. The list has been refreshed.",
+  };
+};
+const nameTaken = (name: string) =>
+  `There is already a playlist called “${name}”. Pick it from the list, or give this one another name.`;
+/** Films that were chosen but are gone by the time the write lands — deleted
+ *  in another tab between the page's last refresh and this click. */
+const vanished = (n: number) =>
+  n > 0 ? ` ${n === 1 ? "One film no longer exists" : `${n} films no longer exist`} and ${n === 1 ? "was" : "were"} skipped.` : "";
+
+export async function createPlaylist(name: string, projectIds: string[] = []): Promise<PlaylistResult> {
+  if (!isConfigured) return { ok: false, message: PLAYLISTS_DEMO };
+  const check = normalizePlaylistName(name);
+  if (!check.ok) return { ok: false, message: check.message };
+  const ids = cleanProjectIds(projectIds);
+  try {
+    const r = await insertPlaylist(check.name, ids);
+    if (!r.ok) return { ok: false, message: nameTaken(check.name) };
+    revalidatePath("/projects");
+    return {
+      ok: true,
+      playlistId: r.id,
+      message:
+        ids.length === 0
+          ? `Created “${r.name}”.`
+          : `Created “${r.name}” with ${films(r.added)} in it.${vanished(ids.length - r.added)}`,
+    };
+  } catch (e) {
+    return { ok: false, message: `The playlist was not created: ${friendlyError(e)}` };
+  }
+}
+
+export async function addToPlaylist(playlistId: string, projectIds: string[]): Promise<PlaylistResult> {
+  if (!isConfigured) return { ok: false, message: PLAYLISTS_DEMO };
+  if (!isRecordId(playlistId)) return playlistMissing();
+  const ids = cleanProjectIds(projectIds);
+  if (ids.length === 0) return { ok: false, message: "Select at least one film first." };
+  try {
+    const r = await addPlaylistMembers(playlistId, ids);
+    if (!r.ok) return playlistMissing();
+    const gone = ids.length - r.added - r.already;
+    const message =
+      r.added === 0
+        ? r.already > 0
+          ? `${r.already === ids.length && ids.length > 1 ? "All " : ""}${films(r.already)} ${r.already === 1 ? "was" : "were"} already in “${r.name}”.${vanished(gone)}`
+          : `Nothing was added to “${r.name}”.${vanished(gone)}`
+        : `Added ${films(r.added)} to “${r.name}”${r.already > 0 ? ` — ${r.already} ${r.already === 1 ? "was" : "were"} already there` : ""}.${vanished(gone)}`;
+    revalidatePath("/projects");
+    return { ok: true, playlistId, message };
+  } catch (e) {
+    return { ok: false, message: `Nothing was added: ${friendlyError(e)}` };
+  }
+}
+
+export async function removeFromPlaylist(playlistId: string, projectIds: string[]): Promise<PlaylistResult> {
+  if (!isConfigured) return { ok: false, message: PLAYLISTS_DEMO };
+  if (!isRecordId(playlistId)) return playlistMissing();
+  const ids = cleanProjectIds(projectIds);
+  if (ids.length === 0) return { ok: false, message: "Select at least one film first." };
+  try {
+    const r = await removePlaylistMembers(playlistId, ids);
+    if (!r.ok) return playlistMissing();
+    revalidatePath("/projects");
+    return {
+      ok: true,
+      playlistId,
+      removed: r.removed,
+      message:
+        r.removed.length === 0
+          ? `None of those films were in “${r.name}”.`
+          : `Took ${films(r.removed.length)} out of “${r.name}”. The films themselves are untouched.`,
+    };
+  } catch (e) {
+    return { ok: false, message: `Nothing was taken out: ${friendlyError(e)}` };
+  }
+}
+
+export async function renamePlaylist(playlistId: string, name: string): Promise<PlaylistResult> {
+  if (!isConfigured) return { ok: false, message: PLAYLISTS_DEMO };
+  if (!isRecordId(playlistId)) return playlistMissing();
+  const check = normalizePlaylistName(name);
+  if (!check.ok) return { ok: false, message: check.message };
+  try {
+    const r = await renamePlaylistRow(playlistId, check.name);
+    if (!r.ok) {
+      return r.reason === "name-taken" ? { ok: false, message: nameTaken(check.name) } : playlistMissing();
+    }
+    revalidatePath("/projects");
+    return {
+      ok: true,
+      playlistId,
+      message: r.before === r.name ? `“${r.name}” kept its name.` : `Renamed “${r.before}” to “${r.name}”.`,
+    };
+  } catch (e) {
+    return { ok: false, message: `The playlist was not renamed: ${friendlyError(e)}` };
+  }
+}
+
+export async function deletePlaylist(playlistId: string): Promise<PlaylistResult> {
+  if (!isConfigured) return { ok: false, message: PLAYLISTS_DEMO };
+  if (!isRecordId(playlistId)) return playlistMissing();
+  try {
+    const r = await deletePlaylistRow(playlistId);
+    if (!r.ok) return playlistMissing();
+    revalidatePath("/projects");
+    return {
+      ok: true,
+      message:
+        r.films === 0
+          ? `Deleted the empty playlist “${r.name}”.`
+          : `Deleted the playlist “${r.name}”. Its ${films(r.films)} ${r.films === 1 ? "is" : "are"} still in the library.`,
+    };
+  } catch (e) {
+    return { ok: false, message: `The playlist was not deleted: ${friendlyError(e)}` };
+  }
+}
+
 /**
  * Restart the WRITING of a project — the script, and the split of each
  * chapter into scenes.
@@ -2782,6 +2944,7 @@ export async function restartScripting(projectId: string): Promise<ActionResult>
       };
     }
     if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
+    await touchProjectActivity(projectId).catch(() => {});
     revalidatePath(`/projects/${projectId}`);
     return {
       ok: true,
@@ -2832,6 +2995,9 @@ export async function resumeProject(projectId: string): Promise<ActionResult> {
       body: JSON.stringify({ project_id: projectId }),
     });
     if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
+    // Stamped here and not left to the pipeline: the resume run may take a
+    // while to write its first row, and the film should rise when it is pressed.
+    await touchProjectActivity(projectId).catch(() => {});
     revalidatePath(`/projects/${projectId}`);
     return {
       ok: true,
@@ -2914,6 +3080,9 @@ export async function pauseProduction(projectId: string): Promise<ActionResult> 
       const res = await stopExecution(r.id);
       if (res.ok) stopped++;
     }
+    // Pausing is working on the film (the producer's rule, 2026-09-23), but
+    // it changes nothing in the database, so nothing else would stamp it.
+    await touchProjectActivity(projectId).catch(() => {});
     revalidatePath(`/projects/${projectId}`);
     revalidatePath("/");
     const lost =

@@ -465,6 +465,7 @@ const DEMO_PROJECTS: Project[] = [
     aspect: "16:9" as const,
     updatedAt: null,
     createdAt: null,
+    activityAt: null,
     editing: { captions: true, hookStyle: "auto", chapterCards: true, endScreen: true, sfx: true, sfxLevel: 0.35, music: false, musicTrack: null, musicLevel: 0.22, styleRefs: [], drawnCards: true, captionColor: null, videoModel: null, speed: 1, speedLocked: false, sourceWatermark: true, watermarkOpenOnce: false, watermarkScale: 1, voice: null, autoApprove: false },
     awaitingFinalSettings: false,
     category: "story",
@@ -494,6 +495,7 @@ const DEMO_PROJECTS: Project[] = [
     aspect: "16:9" as const,
     updatedAt: null,
     createdAt: null,
+    activityAt: null,
     editing: { captions: true, hookStyle: "auto", chapterCards: true, endScreen: true, sfx: true, sfxLevel: 0.35, music: false, musicTrack: null, musicLevel: 0.22, styleRefs: [], drawnCards: true, captionColor: null, videoModel: null, speed: 1, speedLocked: false, sourceWatermark: true, watermarkOpenOnce: false, watermarkScale: 1, voice: null, autoApprove: false },
     awaitingFinalSettings: false,
     category: "story",
@@ -523,6 +525,7 @@ const DEMO_PROJECTS: Project[] = [
     aspect: "16:9" as const,
     updatedAt: null,
     createdAt: null,
+    activityAt: null,
     editing: { captions: true, hookStyle: "auto", chapterCards: true, endScreen: true, sfx: true, sfxLevel: 0.35, music: false, musicTrack: null, musicLevel: 0.22, styleRefs: [], drawnCards: true, captionColor: null, videoModel: null, speed: 1, speedLocked: false, sourceWatermark: true, watermarkOpenOnce: false, watermarkScale: 1, voice: null, autoApprove: false },
     awaitingFinalSettings: false,
     category: "story",
@@ -552,6 +555,7 @@ const DEMO_PROJECTS: Project[] = [
     aspect: "16:9" as const,
     updatedAt: null,
     createdAt: null,
+    activityAt: null,
     editing: { captions: true, hookStyle: "auto", chapterCards: true, endScreen: true, sfx: true, sfxLevel: 0.35, music: false, musicTrack: null, musicLevel: 0.22, styleRefs: [], drawnCards: true, captionColor: null, videoModel: null, speed: 1, speedLocked: false, sourceWatermark: true, watermarkOpenOnce: false, watermarkScale: 1, voice: null, autoApprove: false },
     awaitingFinalSettings: false,
     category: "story",
@@ -1586,4 +1590,51 @@ export async function getSeriesRefsUnion(seriesId: string) {
 export async function backfillSeriesSettings(s: import("@/lib/series").Series) {
   needPg("backfillSeriesSettings");
   return pgBackend.backfillSeriesSettings(s);
+}
+
+// ---------------------------------------------------------------------------
+// Playlists (db/013). Postgres only, like series — the Airtable adapter never
+// gets them. The difference is demo mode: the library page READS playlists on
+// every render, so demo data answers "none" instead of throwing and taking the
+// page down with it. The writes are never reached there; every playlist
+// action checks `isConfigured` first and says "Demo mode", like
+// deleteProjects does.
+// ---------------------------------------------------------------------------
+
+export type { Playlist } from "@/lib/playlists";
+
+export async function getPlaylists() {
+  if (!isConfigured) return [];
+  needPg("getPlaylists");
+  return pgBackend.getPlaylists();
+}
+export const insertPlaylist: typeof pgBackend.insertPlaylist = (name, projectIds) => {
+  needPg("insertPlaylist");
+  return pgBackend.insertPlaylist(name, projectIds);
+};
+export const addPlaylistMembers: typeof pgBackend.addPlaylistMembers = (playlistId, projectIds) => {
+  needPg("addPlaylistMembers");
+  return pgBackend.addPlaylistMembers(playlistId, projectIds);
+};
+export const removePlaylistMembers: typeof pgBackend.removePlaylistMembers = (playlistId, projectIds) => {
+  needPg("removePlaylistMembers");
+  return pgBackend.removePlaylistMembers(playlistId, projectIds);
+};
+export const renamePlaylistRow: typeof pgBackend.renamePlaylistRow = (playlistId, name) => {
+  needPg("renamePlaylistRow");
+  return pgBackend.renamePlaylistRow(playlistId, name);
+};
+export const deletePlaylistRow: typeof pgBackend.deletePlaylistRow = (playlistId) => {
+  needPg("deletePlaylistRow");
+  return pgBackend.deletePlaylistRow(playlistId);
+};
+
+// ---------------------------------------------------------------------------
+// Activity (db/014). Postgres only; elsewhere there is nothing to stamp, and a
+// stamp is never worth failing the action it rides on — callers catch.
+// ---------------------------------------------------------------------------
+
+export async function touchProjectActivity(projectId: string): Promise<void> {
+  if (!USE_PG || !isConfigured) return;
+  return pgBackend.touchProjectActivity(projectId);
 }

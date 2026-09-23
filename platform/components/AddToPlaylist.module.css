@@ -1,0 +1,133 @@
+/*
+ * "+ Add to playlist" in the library's select bar, and the small panel it
+ * opens. The panel lives INSIDE the frosted toolbar (.eyebrow.prow), which is
+ * uppercase and tracked 0.14em for its labels — every one of those is
+ * inherited, so the panel resets them: a playlist name is the producer's own
+ * words and is shown exactly as typed.
+ */
+
+.root {
+  position: relative;
+  display: inline-flex;
+}
+
+.pop {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 30;
+  width: min(330px, calc(100vw - 32px));
+  padding: 12px;
+  border-radius: var(--r-md);
+  background: var(--glass-solid);
+  backdrop-filter: blur(18px);
+  border: 1px solid var(--line2);
+  box-shadow: var(--shadow-lg);
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink);
+  text-align: left;
+}
+
+.head {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dim);
+  padding: 2px 6px 8px;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 9px 10px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.item:hover:not(:disabled) {
+  background: var(--accent-a08);
+}
+.item:disabled {
+  cursor: default;
+  color: var(--dim);
+}
+.itemName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.itemNote {
+  flex: none;
+  font-size: 12px;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.sep {
+  height: 1px;
+  margin: 10px 4px;
+  background: var(--line);
+}
+
+.form {
+  display: flex;
+  gap: 6px;
+}
+.input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  color: var(--ink);
+  background: var(--input-fill);
+  border: 1px solid var(--line2);
+  border-radius: var(--r-pill);
+  padding: 8px 14px;
+  outline: none;
+}
+.input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-a16);
+}
+/* The site's primary-button surface, same in both themes (see
+   PlaylistBar.module.css for the measurement): 5.01:1 at the lighter end. */
+.create {
+  flex: none;
+  font: inherit;
+  font-weight: 650;
+  padding: 8px 14px;
+  border: none;
+  border-radius: var(--r-pill);
+  background: linear-gradient(135deg, #7a4fd6, #4d3484);
+  color: #f7f7f8;
+  cursor: pointer;
+}
+.create:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.err {
+  margin: 8px 6px 0;
+  font-size: 12.5px;
+  color: var(--red-ink);
+}

@@ -503,18 +503,25 @@ repeat of the hook's four-person team — which it is, and which is also what a
 closing bookend IS. The rule as written cannot tell a deliberate echo from an
 accidental one, and the last line of a film is the likeliest place to find one.
 
-**What is owed, in this order:**
+**All three are paid.** ~~What is owed, in this order:~~
 
-1. **A floor the cuts cannot go under.** The principled anchor already exists:
-   the narration guard computes `target` / `min` / `max` words from the film's
-   length, and `DS Load` does not read them. A re-run should refuse to cut
-   below `min`, and say so, instead of trusting a per-press percentage.
-2. **Exempt the last sentence of the last chapter**, or teach the judge that a
-   closing echo is structure rather than repetition. Until then a re-check can
-   quietly remove a film's resolution — and `db/port/story-close/` exists
-   precisely because that resolution was worth adding.
-3. Until 1 ships, **pressing the button repeatedly shortens the film.** It is
-   not idempotent in length even though it now converges in findings.
+1. ~~**A floor the cuts cannot go under.**~~ **Shipped.** `DS Load` reads
+   `length_seconds`, `DS Prep` re-derives `Narration Guard`'s own arithmetic
+   from it, and `DS Resolve` spends a budget of `bodyWords − minWords` in
+   script order, one charge per sentence. A repeat that does not fit is
+   REPORTED and not removed, so the producer can still cut it by hand. **No
+   floor means no limit, not a limit of zero** — a film with no stored length
+   would otherwise have the whole feature switched off silently, which looks
+   exactly like a judge that found nothing.
+2. ~~**Exempt the last sentence of the last chapter.**~~ **Shipped, in both
+   halves.** The judge is told that a closing echo is a bookend and the hook is
+   a teaser (`TWO ECHOES ARE NOT REPETITION`), and `DS Resolve` spares both
+   again in code — belt and braces, because cutting a hook line would cost more
+   than the line: `DS Apply` refuses any rewrite that changes the hook's line
+   count, so one hook cut throws away every other correction in the same press.
+3. ~~Until 1 ships, pressing the button repeatedly shortens the film.~~ The
+   floor is measured against the script AS IT NOW STANDS rather than per press,
+   so ten presses cannot take the film under it.
 
 ### What that change moved underneath everything else
 
@@ -537,6 +544,94 @@ over units a PROMPT defines is not a threshold, it is a coincidence — change
 how finely the model is asked to slice and every number underneath moves with
 it, silently and in the direction that looks like nothing happened.
 
+## 10. The checker was right and the valve threw the answer away
+
+Found 2026-09-23, on the producer's own Google Maps documentary, and it is the
+cheapest kind of fault to miss: **every part of the chain did its job, and the
+film still shipped with five unsourceable statements in it.**
+
+The row in `hov.fact_check` said so out loud and nobody read the field:
+
+    checked 18, flagged 5, rewritten 0,
+    refused: "chapter 1 went from 178 to 128 words"
+
+`FC Judge` found five statements the pack cannot back. `FC Rewrite` cut them.
+`FC Apply` measured the result against a **symmetric** band — a fifth either
+way around what the chapter should weigh — found it 28% shorter, and threw the
+whole correction away. The producer kept all five sentences, and the panel told
+them a correction had been written and rejected, which is true and useless.
+
+**The band should never have been symmetric, and this project had already
+decided that.** `Narration Guard` settled it on 2026-09-13: *the length is a
+CEILING — a film shorter than ordered is correct, and only a draft under 55% of
+its target, a broken one rather than a short one, goes back for length.* The
+valve was still treating length as a two-sided constraint a fortnight later.
+Nothing linked the two; the guard's rule lived in its own node and its own
+paragraph of `docs/lessons-pipeline.md`.
+
+The band is one-sided now, in `FC Apply` and `DS Apply` alike:
+
+| Direction | Verdict | Why |
+|---|---|---|
+| grew past **+20%** | refused | padding is how a narration used to reach a word count |
+| anywhere between | **accepted** | a film that says only what it can back is the point |
+| lost more than **half** a chapter | refused | that is a re-telling, not a correction |
+
+**Shorter is allowed; SILENTLY shorter is not.** Both nodes now compare the
+corrected narration against `Narration Guard`'s own `min` and write
+`short: {words, min}` into the report when it lands under. It is never a
+refusal. It is a fact the producer has to be given, because the word count is
+what sets the runtime and the scene count: it means the film does not have
+enough SOURCED material to fill the length ordered, and the answer is more
+research or a shorter film — neither of which this chain gets to choose. The
+panel says exactly that.
+
+**The general lesson is about where a rule lives.** "How short is too short"
+had one owner, and a second node was quietly answering the same question
+differently. A guard that re-derives a project-wide decision instead of reading
+it will drift from it, and the drift is invisible until it refuses something
+correct — at which point it looks like the checker being wrong rather than the
+valve being wrong.
+
+### The relationship a sentence asserts is an assertion too
+
+Same film, same day, the other half. The producer put the checked script in
+front of a second reader, which agreed with all five `unsupported` verdicts and
+then questioned one `supported` one:
+
+> *"Inside Google, the Sydney software gained the scale it had lacked."*
+
+Two assertions. That it had scale inside Google — the pack backs that — and
+that it had **LACKED** scale before, which nothing anywhere says. **The judge's
+own output convicted it**: `claim` read *"gained scale it had previously
+lacked"* and `reason` justified only *"gained scale inside Google"*. It wrote
+down a narrower justification than its own claim and passed anyway.
+
+`A TRANSITION IS ITS OWN ASSERTION` (§4) was the same rule in one special case.
+The general form is now in the prompt: **a source must support not only the
+nouns, dates and events in a sentence, but the RELATIONSHIP it asserts between
+them** — cause, intention, limitation, comparison, order, consequence. The
+family is enumerated so none is missed, with the before-and-after case worked
+through because half of it is invisible: a comparison asserts what was true
+BEFORE as well as after, and a claim about the after settles nothing about the
+before. The self-check is one line and does the most work — **when your reason
+covers less than your claim says, the verdict is unsupported.**
+
+The reader's own summary of why this is worth having is worth keeping:
+
+> *"I wouldn't weaken the checker because it produced five unsupported
+> statements. The problem is mostly the script generator adding cinematic
+> connective language that outruns the evidence, not the checker being too
+> strict."*
+
+**That points at the next piece of work, and it is not in this chain.**
+`Write Full Narration` and `Edit Full Narration` produce the connective prose —
+*became*, *gained*, *could not*, *which meant* — that this judge then has to
+catch one sentence at a time. Constraining the writer is cheaper than checking
+the writing, but those two nodes are on the main path of EVERY film in every
+category, so it needs its own verification and it is not a change to make in
+the same afternoon as this one.
+
 ## What is verified, and how
 
 | Claim | Evidence |
@@ -554,6 +649,10 @@ it, silently and in the direction that looks like nothing happened.
 | **…and an ordering that IS dated still passes, which is the half that matters** | execution **15074**, a whole pipeline fired at `new-project` at 11:14:43 — after the 11:14 publish — for the disposable documentary `recKMOrar94pZqq6j` (Facebook/Instagram/WhatsApp/Oculus, chosen because its acquisitions cluster). Row at 11:16:05: `{checked: 15, sentences: 7, flagged: 0, searched: 5, rewritten: 0}`. The finding to read is *"Facebook completed the Instagram acquisition after the FTC closed its investigation"* → **`supported`, ref `E2, E5`**, reason *"E5 dates the FTC closure to August 22, 2012, and E2 says the acquisition was completed in August 2012, establishing that the closure came first"*. **The judge cited the two dates as its justification.** That is the rule behaving as designed rather than as a blunt instrument: an undated ordering (ZipDash) is refused, a dated one is accepted and says which dates settled it. The obvious failure mode — flagging every sentence containing "after" — did not happen, and five statements the pack did not cover were all sourced live from Facebook's own announcements and Meta's Form 10-K |
 | **One assertion at a time, on the producer's own film** | execution **15034**, the new `FC Judge` prompt run against `recJiAdwRqaeg8DnR`'s real narration and real pack: 26 findings across **13 distinct sentences** (was 15 findings, one per sentence), and all four of ChatGPT's reported misses come back `unsupported` — the ZipDash ordering (*"the claims date Where 2 and Keyhole to October 2004, but ZipDash is only dated to 2004"*), the browser clause, *"reached … 200 million places"*, and the spare-room narrowing |
 | **The PUBLISHED chain runs one-assertion-at-a-time on a real film** | execution **15039**, a whole pipeline fired at `new-project` at 09:38:19 — **after** `63d21d49` went live at 09:37, which is the point — for the disposable documentary `recF5TgqBT8nBwea5` (YouTube, February 2005 to November 2006). Row written 09:40:08: `{category: "documentary", checked: 21, sentences: 10, flagged: 2, searched: 8, rewritten: 2}`, and `count(distinct quote) = 10` against 21 findings, so eleven of them share a sentence with another. The two unsupported ones are the exact shape the producer reported: *"On February 14, 2005, youtube.com was registered, **giving Chad Hurley a real address for an unproven company**"* (E1 backs the date, nothing backs the rest) and *"YouTube said it was founded that month by PayPal veterans, **with Hurley alongside Steve Chen and Jawed Karim**"* (E2 backs "PayPal veterans", nothing names the three). **Under the old prompt both sentences would have come back `supported`.** The row right below it is the producer's own 09:18 film on the previous version: `checked: 15`, `sentences: null`, 15 findings over 15 distinct quotes — one per sentence |
+| **§10, both halves, on the film that caused them** | execution **16421**, a real `deep-search-rerun` on the producer's `recSFjNpnuA0ylZAi` at 12:11, fired **after** `7a865309` went live at 12:08. Before: `{checked: 18, flagged: 5, rewritten: 0, refused: "chapter 1 went from 178 to 128 words"}` — the correct fix written and thrown away. After: `{checked: 22, flagged: 5, rewritten: 4, refused: null}`, every finding's `action` now `kept` or `rewritten`, none left `flagged`. **The same rewrite the old band rejected was accepted** |
+| **…and the relationship rule split the sentence the reader questioned** | same run: *"Inside Google, the Sydney software gained the scale it had lacked"* was ONE `supported` finding before and is TWO now — `supported :: "Inside Google, the Sydney software gained scale."` and `unsupported :: "Before Google acquired it, the Sydney software had lacked scale."` It reads as the prompt's own worked example because it IS the prompt's own worked example |
+| **…and all four sentences it removed are from the named family** | intention (*"The aim was practical: make street finding work as continuous space"*), inability (*"the startup could not deliver it worldwide on its own"*), comparison (*"gained the scale it had lacked"*) and change of state (*"was no longer only a startup tool"*). Four for four — the rule is finding the category it was written for, not flagging at random |
+| **…and the floor held without needing to refuse anything** | the corrected body is **137 words against a floor of 133** (90 s → 11 scenes → 242 target → 55% = 133), so `short` is absent and nothing was withheld. One more press would report it rather than shrink the film past it |
 | `FC Resolve`, `FC Apply`, `FC Done` behave | `node scripts/check-fact-check.mjs` — 71 assertions over the committed bodies, including every refusal branch, the multi-finding sentence, the grouped fix list, and that a finely sliced sentence does not trip the overwhelmed backstop |
 
 `scripts/check-fact-check.mjs` runs the real `db/port/fact-check/paste/*.js`
@@ -580,7 +679,10 @@ arrive at the gate covered in red.
 
 | Version | What |
 |---|---|
-| `a9ecfbb4` | §7 hook constraint + counterfactuals and whole-category scope are checkable — **published 2026-09-19 11:30, and what is live** |
+| `7a865309` | §10 — the one-sided length band, the `short` record, and the judge ruling on the RELATIONSHIP a sentence asserts — **published 2026-09-23 12:08, and what is live** |
+| `f379e56d` | the floor the dedupe cuts cannot go under, and the two echoes it spares |
+| `dfc81d23` | §9 — `redundant`, and the rewrite that manufactured four copies of one sentence |
+| `a9ecfbb4` | §7 hook constraint + counterfactuals and whole-category scope are checkable — published 2026-09-19 11:30 |
 | `3d1834f1` | §6 — attribution does not settle an order, and the narration must agree with itself — published 2026-09-19 11:14 |
 | `63d21d49` | one assertion at a time, dates settle order, the counts move to sentences — published 2026-09-19 09:37 |
 | `b927a298` | the skip path writes its report too — published 2026-09-18 19:32 |

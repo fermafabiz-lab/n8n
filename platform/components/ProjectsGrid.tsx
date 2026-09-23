@@ -3,8 +3,20 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useSearchParams } from "next/navigation";
-import { deleteProjects, type ActionResult } from "@/app/actions";
+import {
+  addToPlaylist,
+  deleteProjects,
+  removeFromPlaylist,
+  type ActionResult,
+  type PlaylistResult,
+} from "@/app/actions";
 import ExpandableTitle from "@/components/ExpandableTitle";
+import PlaylistBar from "@/components/PlaylistBar";
+import AddToPlaylist from "@/components/AddToPlaylist";
+import { films, sortPlaylists, type Playlist } from "@/lib/playlists";
+import { CATEGORIES } from "@/lib/categories";
+import { categoryLists, isCategoryListId, resolveCategoryList } from "@/lib/category-lists";
+import { orderLibrary, type LibraryOrder } from "@/lib/library-order";
 import type { Project, StatusKind } from "@/lib/data";
 import { LIBRARY_FILTERS as FILTERS, isFilterKey, type FilterKey } from "@/lib/library-filters";
 import { CREATORS } from "@/lib/data/derive";
@@ -56,11 +68,27 @@ const short = (s: string, n: number) =>
   s.length > n ? s.slice(0, n).trimEnd() + "…" : s;
 
 /**
+ * The toolbar (.eyebrow.prow) sets everything in it in capitals with 0.14em
+ * tracking — right for its own labels, wrong for a playlist name, which is
+ * the producer's own words: "iPhone stories" is not "IPHONE STORIES".
+ * Buttons are safe already (the browser's own stylesheet gives every
+ * <button> `text-transform: none`, measured), but the result line is a plain
+ * <span> and inherits the capitals — so it opts out, and a sentence reads as
+ * one rather than as a label.
+ */
+const ASIS: React.CSSProperties = { textTransform: "none", letterSpacing: "normal" };
+
+/**
  * Dashboard projects: filter tabs (a hundred projects is a wall without
  * them), a grid/index view toggle — the index being the editorial list that
  * makes that wall scannable — and a manage mode where Select turns entries
  * into checkboxes and a two-step Delete removes every selected project
  * (scenes + scripts + project record; Drive media stays).
+ *
+ * Above the toolbar sits the playlist row (PlaylistBar): the producer's own
+ * named sets of films, one chip each. Choosing one narrows everything below
+ * it; the same Select fills and empties them ("Add to playlist" / "Remove
+ * from"), and neither of those can ever delete a film.
  */
 /** Projects per page. */
 const PAGE_SIZE = 15;
@@ -118,13 +146,64 @@ function agoOf(iso: string | null): string {
   return d === 1 ? "yesterday" : `${d} days ago`;
 }
 
-export default function ProjectsGrid({ projects }: { projects: Project[] }) {
+/**
+ * A result line in the toolbar, optionally with the one thing worth doing
+ * next — "Undo" after films leave a playlist, "Open" after they join one.
+ */
+type LibraryMsg = ActionResult & { action?: { label: string; run: () => void } };
+
+export default function ProjectsGrid({
+  projects,
+  playlists,
+  order = "activity",
+}: {
+  /** In the server's creation order, newest first. */
+  projects: Project[];
+  /** Null when they could not be read — the library still works without
+   *  them, it just cannot offer them (see app/projects/page.tsx). */
+  playlists: Playlist[] | null;
+  /** Recently worked on, or Newest first — per device, Settings → Customize
+   *  (lib/library-order.ts). */
+  order?: LibraryOrder;
+}) {
   const [manage, setManage] = useState(false);
+  /**
+   * The pointer is over the cards. While it is — or while Select is on —
+   * the order holds still (orderLibrary's `hold`): with the pipeline counting
+   * as activity a film can rise at any refresh, and a card that moves under a
+   * click opens or ticks the wrong film.
+   */
+  const [pointing, setPointing] = useState(false);
+  const shownOrder = useRef<string[] | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [armed, setArmed] = useState(false);
-  const [msg, setMsg] = useState<ActionResult | null>(null);
+  const [msg, setMsg] = useState<LibraryMsg | null>(null);
   const [pending, startTransition] = useTransition();
   const [filter, setFilter] = useState<FilterKey>("all");
+  /**
+   * The playlists as this page last knew them. A copy of the prop rather than
+   * the prop itself so a write shows at once, before the refresh that
+   * follows it lands — and reset from the prop on every refresh, so the
+   * server's answer always has the last word (another tab, another person).
+   */
+  const [pls, setPls] = useState<Playlist[] | null>(playlists);
+  useEffect(() => setPls(playlists), [playlists]);
+  /**
+   * The playlist on screen, from `?playlist=` — the same arrangement as the
+   * tabs' `?filter=` below, and for the same reasons: a playlist can be
+   * linked to, and the 15s refresh must not drop the producer back to All.
+   * Held as whatever the URL said, valid or not: a link to a playlist that
+   * has since been deleted must SAY so rather than quietly show everything.
+   */
+  const [listId, setListId] = useState<string | null>(null);
+  const selfSetList = useRef(false);
+  /**
+   * Select mode with a destination already chosen: set by "+ New playlist"
+   * (and by an empty playlist's "Add films"). The select bar then offers one
+   * thing — "Add N to <it>" — instead of the menu, because the question the
+   * menu asks has just been answered.
+   */
+  const [target, setTarget] = useState<{ id: string; name: string } | null>(null);
   /**
    * The chosen tab lives in the URL, which is what makes it linkable.
    *
@@ -143,6 +222,7 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
    */
   const searchParams = useSearchParams();
   const urlFilter = searchParams.get("filter");
+  const urlPlaylist = searchParams.get("playlist");
   /** Set by our own tab clicks, so they do not count as "take me there". */
   const selfSet = useRef(false);
   const [view, setView] = useState<"grid" | "list">("grid");
@@ -204,15 +284,59 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
     } catch {}
   };
 
-  const counts = new Map<string, number>([["all", projects.length]]);
-  for (const p of projects) counts.set(p.statusKind, (counts.get(p.statusKind) ?? 0) + 1);
-  counts.set("topost", projects.filter(isToPost).length);
+  /*
+   * The playlist narrows the library FIRST, and everything below — the tab
+   * counts, the search, the pages, the per-person score — answers inside it.
+   * So "Needs you 2" on a playlist means two films in THAT playlist need you,
+   * which is the question somebody looking at a playlist is asking.
+   *
+   * A chip's count is taken against the same library the grid holds rather
+   * than read off the playlist, so the number on the chip is always the
+   * number of cards it opens to.
+   */
+  const libraryIds = new Set(projects.map((p) => p.id));
+  const listCounts = new Map(
+    (pls ?? []).map((pl) => [pl.id, pl.projectIds.filter((id) => libraryIds.has(id)).length] as const),
+  );
+  /*
+   * The site's own lists, one per category with a film (lib/category-lists.ts)
+   * — derived from the library on every render, so there is nothing to keep
+   * in step and a new film is in its category the moment it exists. They open
+   * exactly like a playlist (`?playlist=category:<id>`), which is what lets
+   * every line below serve both without knowing the difference; only the
+   * lines that WRITE a playlist — Remove, Rename, Delete, "Add films to it" —
+   * check which kind is open.
+   */
+  const catLists = categoryLists(projects, CATEGORIES);
+  const activeCategory = isCategoryListId(listId) ? resolveCategoryList(listId, projects, CATEGORIES) : null;
+  const active: Playlist | null = isCategoryListId(listId)
+    ? activeCategory
+    : listId
+      ? (pls?.find((pl) => pl.id === listId) ?? null)
+      : null;
+  // A category list is never unreadable, so an unknown one is stale even
+  // while the producer's playlists could not be loaded.
+  const staleList = listId !== null && active === null && (pls !== null || isCategoryListId(listId));
+  const inActive = active ? new Set(active.projectIds) : null;
+  // The whole library in the chosen order, BEFORE any scoping — so the same
+  // order carries into playlists, tabs, search and pages (the producer's
+  // answer: "the same everywhere"). Held still while pointing or selecting.
+  const holding = pointing || manage;
+  const ordered = orderLibrary(projects, order, holding ? shownOrder.current : null);
+  useEffect(() => {
+    shownOrder.current = ordered.map((p) => p.id);
+  });
+  const scoped = inActive ? ordered.filter((p) => inActive.has(p.id)) : ordered;
+
+  const counts = new Map<string, number>([["all", scoped.length]]);
+  for (const p of scoped) counts.set(p.statusKind, (counts.get(p.statusKind) ?? 0) + 1);
+  counts.set("topost", scoped.filter(isToPost).length);
   const q = query.trim().toLowerCase();
   const matched = (filter === "all"
-    ? projects
+    ? scoped
     : filter === "topost"
-      ? projects.filter(isToPost)
-      : projects.filter((p) => p.statusKind === filter))
+      ? scoped.filter(isToPost)
+      : scoped.filter((p) => p.statusKind === filter))
     // Title AND category, because a producer looking for "the nature one" is
     // as likely to remember the kind of film as its name.
     .filter(
@@ -287,6 +411,36 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
     }
   };
 
+  // The playlist follows the address the same way the tab does. A missing
+  // param means the whole library — so the hero's "See all N" link, which
+  // names only a filter, also leaves whatever playlist was open.
+  useEffect(() => {
+    setListId(urlPlaylist || null);
+    setPage(1);
+    if (selfSetList.current) {
+      selfSetList.current = false;
+      return;
+    }
+    if (urlPlaylist) headRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [urlPlaylist]);
+
+  /** Open a playlist (or the whole library), and say so in the URL. */
+  const choosePlaylist = (id: string | null) => {
+    setListId(id);
+    setPage(1);
+    try {
+      const url = new URL(window.location.href);
+      // Flag only a change the effect will actually see — a flag left up by
+      // a no-op would swallow the scroll of the next real link.
+      if (url.searchParams.get("playlist") !== id) selfSetList.current = true;
+      if (id) url.searchParams.set("playlist", id);
+      else url.searchParams.delete("playlist");
+      window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    } catch {
+      selfSetList.current = false;
+    }
+  };
+
   const toggle = (id: string) =>
     setSelected((prev) => {
       const next = new Set(prev);
@@ -299,6 +453,113 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
     setManage(false);
     setSelected(new Set());
     setArmed(false);
+    setTarget(null);
+  };
+
+  /** Put films into a playlist in the local copy — new playlist or old. */
+  const patchAdd = (id: string, name: string, ids: string[]) =>
+    setPls((prev) => {
+      const list = prev ?? [];
+      const known = list.some((pl) => pl.id === id);
+      return sortPlaylists(
+        known
+          ? list.map((pl) =>
+              pl.id === id ? { ...pl, projectIds: [...new Set([...pl.projectIds, ...ids])] } : pl,
+            )
+          : [...list, { id, name, projectIds: ids }],
+      );
+    });
+
+  /** The select bar's menu landed films in a playlist (maybe a new one). */
+  const onAddedToPlaylist = (r: PlaylistResult, name: string) => {
+    const ids = [...selected];
+    if (r.playlistId) patchAdd(r.playlistId, name, ids);
+    exitManage();
+    const where = r.playlistId;
+    setMsg({
+      ...r,
+      // Offered only when the films went somewhere other than the screen.
+      action:
+        where && where !== listId
+          ? { label: `Open “${short(name, 24)}”`, run: () => (choosePlaylist(where), setMsg(null)) }
+          : undefined,
+    });
+  };
+
+  /** "+ Add N to <target>" — the second half of "+ New playlist". */
+  const addToTarget = () => {
+    if (!target) return;
+    const t = target;
+    const ids = [...selected];
+    startTransition(async () => {
+      const r = await addToPlaylist(t.id, ids);
+      if (!r.ok) {
+        setMsg(r);
+        return;
+      }
+      patchAdd(t.id, t.name, ids);
+      exitManage();
+      // Straight to the result: the playlist the producer just made, full.
+      choosePlaylist(t.id);
+      setMsg(r);
+    });
+  };
+
+  /** Start filling a playlist: the whole library, select mode, target set.
+   *  An empty playlist cannot be filled from inside itself — the films to
+   *  choose from are out in the library. */
+  const startFilling = (pl: { id: string; name: string }, justCreated = false) => {
+    choosePlaylist(null);
+    setTarget(pl);
+    setManage(true);
+    setSelected(new Set());
+    setArmed(false);
+    // Short on purpose: this line rides in the sticky toolbar while the
+    // producer scrolls through the cards, next to a button that already
+    // names the playlist.
+    setMsg({
+      ok: true,
+      message: justCreated
+        ? `Created “${pl.name}” — now tick the films to put in it.`
+        : `Tick the films to put in “${pl.name}”.`,
+    });
+  };
+
+  /** Take the ticked films out of the playlist on screen — never out of
+   *  the library. Offers Undo, because it is one click with no arming. */
+  const removeFromActive = () => {
+    // A film leaves a category by being filed as another kind, in its brief —
+    // never from here.
+    if (!active || activeCategory) return;
+    const pl = { id: active.id, name: active.name };
+    const ids = [...selected];
+    startTransition(async () => {
+      const r = await removeFromPlaylist(pl.id, ids);
+      if (!r.ok) {
+        setMsg(r);
+        return;
+      }
+      const gone = r.removed ?? [];
+      const out = new Set(gone);
+      setPls((prev) =>
+        prev
+          ? prev.map((p) => (p.id === pl.id ? { ...p, projectIds: p.projectIds.filter((id) => !out.has(id)) } : p))
+          : prev,
+      );
+      exitManage();
+      setMsg({
+        ...r,
+        action: gone.length > 0 ? { label: "Undo", run: () => putBack(pl, gone) } : undefined,
+      });
+    });
+  };
+
+  const putBack = (pl: { id: string; name: string }, ids: string[]) => {
+    startTransition(async () => {
+      const r = await addToPlaylist(pl.id, ids);
+      if (r.ok) patchAdd(pl.id, pl.name, ids);
+      setMsg(r.ok ? { ok: true, message: `Put ${films(ids.length)} back in “${pl.name}”.` } : r);
+    });
   };
 
   const onCardClick = (e: React.MouseEvent, id: string) => {
@@ -321,6 +582,41 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
 
   return (
     <>
+      {pls === null ? (
+        // Unreadable is said, not hidden: a row that silently vanished would
+        // read as the playlists having been deleted.
+        <p style={{ margin: "22px 4px 0", fontSize: 12.5, color: "var(--dim)" }}>
+          Playlists could not be loaded just now — the library below is complete.
+        </p>
+      ) : (
+        <PlaylistBar
+          playlists={pls}
+          categories={catLists}
+          counts={listCounts}
+          active={active}
+          stale={staleList}
+          total={projects.length}
+          onChoose={(id) => {
+            setMsg(null);
+            choosePlaylist(id);
+          }}
+          onCreated={(pl) => {
+            patchAdd(pl.id, pl.name, []);
+            startFilling(pl, true);
+          }}
+          onRenamed={(id, name, message) => {
+            setPls((prev) => (prev ? sortPlaylists(prev.map((p) => (p.id === id ? { ...p, name } : p))) : prev));
+            if (target?.id === id) setTarget({ id, name });
+            setMsg({ ok: true, message });
+          }}
+          onDeleted={(id, message) => {
+            setPls((prev) => (prev ? prev.filter((p) => p.id !== id) : prev));
+            if (target?.id === id) exitManage();
+            choosePlaylist(null);
+            setMsg({ ok: true, message });
+          }}
+        />
+      )}
       {/* `prow` is a modifier, not a look of its own: the projects bar
           wears the page's own typeface instead of the mono used by every
           other eyebrow. `.eyebrow` is app-wide, so this has to be scoped or
@@ -379,11 +675,37 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
         </span>
         {/* alignSelf pulls this off the baseline: the buttons' descent would
             otherwise stretch the flex line and float the active tab's amber
-            underline ~6px above the eyebrow hairline. */}
-        <span className="ptools">
+            underline ~6px above the eyebrow hairline.
+
+            It WRAPS, since the playlists: inside a playlist the select bar
+            holds five things (count, Add to playlist, Remove from, Delete,
+            Cancel), and on a 390px phone they ran to x=464 — Cancel off the
+            screen, the page scrolling sideways. Measured, not guessed; only a
+            row that does not fit ever wraps, so a laptop sees no change. */}
+        <span className="ptools" style={{ flexWrap: "wrap", justifyContent: "flex-end", rowGap: 8 }}>
           {msg && (
-            <span className={`formmsg ${msg.ok ? "ok" : "err"}`} style={{ margin: 0 }}>
+            <span className={`formmsg ${msg.ok ? "ok" : "err"}`} style={{ margin: 0, ...ASIS }}>
               {msg.message}
+              {msg.action && (
+                <button
+                  type="button"
+                  onClick={msg.action.run}
+                  style={{
+                    marginLeft: 10,
+                    font: "inherit",
+                    fontWeight: 700,
+                    color: "inherit",
+                    background: "none",
+                    border: "none",
+                    padding: 0,
+                    textDecoration: "underline",
+                    textUnderlineOffset: 3,
+                    cursor: "pointer",
+                  }}
+                >
+                  {msg.action.label}
+                </button>
+              )}
             </span>
           )}
           {manage ? (
@@ -391,40 +713,99 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
               <span style={{ fontSize: 13, color: "var(--soft)" }}>
                 {selected.size} selected
               </span>
-              <button
-                className="abtn"
-                disabled={pending || selected.size === 0}
-                style={{
-                  borderColor: "rgba(216, 72, 61,0.45)",
-                  color: armed ? "#fff" : "var(--red)",
-                  background: armed ? "rgba(216, 72, 61,0.85)" : undefined,
-                  fontSize: 12,
-                  padding: "7px 14px",
-                }}
-                onClick={() => {
-                  if (!armed) {
-                    setArmed(true);
-                    setTimeout(() => setArmed(false), 5000);
-                    return;
-                  }
-                  startTransition(async () => {
-                    const r = await deleteProjects([...selected]);
-                    setMsg(r);
-                    if (r.ok) exitManage();
-                    else setArmed(false);
-                  });
-                }}
-              >
-                {pending
-                  ? "Deleting…"
-                  : armed
-                    ? `Click again — delete ${selected.size} forever`
-                    : `🗑 Delete selected`}
-              </button>
+              {target ? (
+                // "+ New playlist" already chose where these go, so the one
+                // action left is to send them — nothing else competes with it,
+                // Delete least of all.
+                <button
+                  className="abtn ok"
+                  disabled={pending || selected.size === 0}
+                  style={{ fontSize: 12, padding: "7px 14px" }}
+                  onClick={addToTarget}
+                >
+                  {pending ? (
+                    "Adding…"
+                  ) : (
+                    <>
+                      ＋ Add {selected.size > 0 ? `${selected.size} ` : ""}to{" "}
+                      “{short(target.name, 28)}”
+                    </>
+                  )}
+                </button>
+              ) : (
+                <>
+                  {pls && (
+                    <AddToPlaylist
+                      playlists={pls}
+                      selected={[...selected]}
+                      disabled={pending}
+                      onDone={onAddedToPlaylist}
+                    />
+                  )}
+                  {active && !activeCategory && (
+                    <button
+                      className="abtn"
+                      disabled={pending || selected.size === 0}
+                      style={{ fontSize: 12, padding: "7px 14px" }}
+                      onClick={removeFromActive}
+                      title="Takes the ticked films out of this playlist. They stay in the library."
+                    >
+                      − Remove from “{short(active.name, 24)}”
+                    </button>
+                  )}
+                  <button
+                    className="abtn"
+                    disabled={pending || selected.size === 0}
+                    style={{
+                      borderColor: "rgba(216, 72, 61,0.45)",
+                      color: armed ? "#fff" : "var(--red)",
+                      background: armed ? "rgba(216, 72, 61,0.85)" : undefined,
+                      fontSize: 12,
+                      padding: "7px 14px",
+                    }}
+                    onClick={() => {
+                      if (!armed) {
+                        setArmed(true);
+                        setTimeout(() => setArmed(false), 5000);
+                        return;
+                      }
+                      startTransition(async () => {
+                        const r = await deleteProjects([...selected]);
+                        setMsg(r);
+                        if (r.ok) exitManage();
+                        else setArmed(false);
+                      });
+                    }}
+                  >
+                    {/* Inside a playlist "Delete" sits next to "Remove", and
+                        the two must never be confused: this one deletes the
+                        FILMS, from everywhere, for good. So it says so. */}
+                    {pending
+                      ? "Deleting…"
+                      : armed
+                        ? active
+                          ? `Click again — delete ${selected.size} from the whole library, forever`
+                          : `Click again — delete ${selected.size} forever`
+                        : active
+                          ? "🗑 Delete films"
+                          : "🗑 Delete selected"}
+                  </button>
+                </>
+              )}
               <button
                 className="abtn"
                 style={{ fontSize: 12, padding: "7px 14px" }}
-                onClick={exitManage}
+                onClick={() => {
+                  // Leaving "fill the new playlist" with nothing in it leaves
+                  // an empty playlist behind — say where it is, not nothing.
+                  if (target) {
+                    setMsg({
+                      ok: true,
+                      message: `“${target.name}” is empty for now — tick films and use Add to playlist any time.`,
+                    });
+                  }
+                  exitManage();
+                }}
               >
                 Cancel
               </button>
@@ -445,11 +826,35 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
       </div>
 
       {shown.length === 0 ? (
-        <div className="empty" style={{ padding: "50px 0" }}>
-          <p style={{ margin: 0 }}>Nothing in this state right now.</p>
-        </div>
+        activeCategory && scoped.length === 0 ? (
+          // Reachable only by an old link: a category with no films has no
+          // chip. Nothing to fill — a film joins by being made as one.
+          <div className="empty" style={{ padding: "50px 0" }}>
+            <p style={{ margin: 0 }}>No {activeCategory.name} films yet.</p>
+          </div>
+        ) : active && scoped.length === 0 ? (
+          // An empty playlist is not "nothing in this state": it is a
+          // playlist waiting for its first films, and the way to add them
+          // should be right here rather than a Select-and-menu away.
+          <div className="empty" style={{ padding: "50px 0" }}>
+            <p style={{ margin: "0 0 16px" }}>“{active.name}” has no films yet.</p>
+            {!manage && (
+              <button
+                className="abtn ok"
+                style={{ fontSize: 13, padding: "9px 18px" }}
+                onClick={() => startFilling({ id: active.id, name: active.name })}
+              >
+                ＋ Add films to it
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="empty" style={{ padding: "50px 0" }}>
+            <p style={{ margin: 0 }}>Nothing in this state right now.</p>
+          </div>
+        )
       ) : view === "grid" ? (
-        <div className="projects">
+        <div className="projects" onPointerEnter={() => setPointing(true)} onPointerLeave={() => setPointing(false)} data-holding={holding ? "" : undefined}>
           {shown.map((p, i) => (
             <Link
               href={`/projects/${p.id}`}
@@ -538,7 +943,15 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
                       show the time, exactly as they did before. */}
                   <span>
                     {p.createdBy ? `${p.createdBy} · ` : ""}
-                    {agoOf(p.updatedAt) || p.status}
+                    {/* The time the ORDER uses, or the list would look
+                        shuffled: sorted by last change but labelled with
+                        creation, the top card could read "3 days ago" above
+                        one that reads "2 min ago". */}
+                    {order === "activity"
+                      ? agoOf(p.activityAt)
+                        ? `updated ${agoOf(p.activityAt)}`
+                        : p.status
+                      : agoOf(p.updatedAt) || p.status}
                   </span>
                   <span className="go">
                     {manage
@@ -555,7 +968,7 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
           ))}
         </div>
       ) : (
-        <div className="plist">
+        <div className="plist" onPointerEnter={() => setPointing(true)} onPointerLeave={() => setPointing(false)} data-holding={holding ? "" : undefined}>
           {shown.map((p, i) => (
             <Link
               href={`/projects/${p.id}`}
@@ -603,7 +1016,10 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
         <div className="pshowing">
           <span>
             Showing {from + 1}–{from + shown.length} of {matched.length}
-            {matched.length !== projects.length ? ` (${projects.length} total)` : ""}
+            {active ? ` in “${short(active.name, 32)}”` : ""}
+            {matched.length !== scoped.length
+              ? ` (${scoped.length} ${active ? (activeCategory ? `in ${activeCategory.name}` : "in the playlist") : "total"})`
+              : ""}
           </span>
           {/* Who made what, for the set on screen. Absent entirely until at
               least one film carries a name, so a library of older projects

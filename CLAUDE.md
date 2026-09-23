@@ -375,8 +375,22 @@ the full entry in the file named:
   that needs `wf7.house-of-videos.com`, the site, an external API or a real
   render must be done through the n8n MCP connector, a throwaway workflow, or
   Railway's own tools — never a direct `fetch()`/`curl` from this
-  environment. `api.github.com` is the one exception and answers normally.
-  See `db/port/lib/README.md`.
+  environment. `api.github.com` answers normally, and so does the npm
+  registry (measured 2026-09-23, `registry.npmjs.org` 200) — which is what
+  makes it possible to run the SITE against a real Postgres engine from a web
+  session: `db/port/lib/local-pg.mjs` (PGlite with the repo's own migrations,
+  served over the wire protocol). See `db/port/lib/README.md`.
+  **A session restarts a film through the site's own door, never by itself**
+  (2026-09-23, asked twice to "restart the projects that are running"):
+  stopping an execution needs the n8n public API key, which only the site
+  holds (GitHub Secret `N8N_API_KEY`) — the n8n MCP connector has no stop tool
+  and n8n keeps no `n8nApi` credential of its own. So the site grew
+  `POST /api/ops/restart` — the ⟳ Restart button's own `restartProduction`
+  behind the n8n→site key — and `db/port/ops-restart/` has the throwaway that
+  calls it. **Judge it by the new executions**: Pause stops every running
+  execution, the caller included, so the throwaway may come back canceled
+  while the restart completes; and it is one film per call, as the buttons
+  have always been.
 - **Any Code-node body or prompt edited through MCP must come from a real,
   committed file first** (`db/port/<feature>/paste/<Node Name>.js`), never
   composed inline in the tool call. `db/port/lib/README.md`.
@@ -448,6 +462,18 @@ To confirm a change is live, read the deploy's commit and the container's
 restart time (`c3e72b8` at 11:16:18 → container back at 11:17:35 is the shape
 of a healthy one), rather than assuming a green push means a served build.
 
+**A GitHub Actions run status read from a web session can be served STALE for
+a quarter of an hour, and it looks exactly like a slow build.** On 2026-09-23
+run 179 finished at 12:18:25; `actions_get` and `actions_list` both kept
+answering `status: "in_progress"` with "Build and push" still running until
+about 12:35, and a session sat waiting on it and told the producer the deploy
+was still going twenty minutes after it had succeeded. **The tell is
+`updated_at`**: it stayed frozen at `12:16:13` across every poll, which a
+genuinely advancing run's does not. So when a run looks stuck, check whether
+its `updated_at` has moved at all before believing the status — an unchanged
+timestamp means you are reading a cache, not a build. Poll less often and read
+the STEP timestamps, which are authoritative the moment they appear.
+
 **A branch that is pushed is not a branch that is deployed**, and the gap is
 invisible from here: a session told to develop on its own `claude/*` branch
 will push, report success, and leave the producer reloading a build that never
@@ -492,6 +518,62 @@ expected and harmless for an app touching only its own Drive.
 
 ## Open work
 
+- **The library is ordered by last activity since 2026-09-23** ("Recently
+  worked on"; `db/port/activity-order/README.md`, lessons in
+  `docs/lessons-site.md`). What counts was the producer's call, asked before
+  building: anything that changes the film — people on the site, **the pipeline
+  by itself**, hands-off approvals, pause/resume/restart — but **not** the
+  Publishing panel, **not** playlists, and never merely opening it. One column
+  and one trigger (`db/014`: `project.activity_at`, bumped by any project UPDATE
+  except `editing_options.publishing`), the children's own `updated_at` read on
+  top (`PROJECT_ACTIVITY_SQL`, one owner), and an explicit stamp from the three
+  actions that write nothing. Same order for the whole team; a **per-device**
+  switch in Settings → Customize (cookie `hov-library-order`) restores Newest
+  first. The grid holds its order while pointed at or in Select, so a card never
+  moves under a click. **`getProjects` selects `p.activity_at` with no fallback:
+  db/014 must precede the site code on any database**, or the library does not
+  load. **Both halves are live**: db/014 applied in execution 16480, the site
+  in deploy #181 at 13:58:36 UTC (merge `31f3a82`) — how to prove the served
+  page runs it without shell access (`hov.chapter` scans jump by the film
+  count per render of /projects) is in the README. Pinned by
+  `npm run check:activity` (32) and, on a real engine,
+  `db/port/activity-order/check-trigger.mjs` (17). **Any new table that belongs
+  to a film** needs adding to `PROJECT_ACTIVITY_SQL` if its writes should count.
+- **Playlists exist on the projects page since 2026-09-23**
+  (`db/port/playlists/README.md`; lessons in `docs/lessons-site.md` under
+  "Playlists — the library, organised by the producer"). A playlist row above
+  the library toolbar — one chip per playlist, "+ New playlist", Rename,
+  Delete playlist — filled with the existing ☑ Select ("+ Add to playlist",
+  "− Remove from …" with Undo); a film can be in any number of them, and
+  everything below the row counts inside the chosen one (`?playlist=<id>`).
+  **Beside them, one chip per CATEGORY that has a film** (Story, Documentary,
+  Cinematic, Kids story — `db/port/category-lists/README.md`): derived from the
+  library on every render, never stored and never written to (no Rename,
+  Delete or Remove), opened as `?playlist=category:<id>`. A film with no
+  category, or an unknown one, is under Story — `getCategory`'s rule, not a
+  second one. `npm run check:category-lists` (30). Live since deploy #182
+  (merge `11be573`, 14:21 UTC).
+  **`db/013` is applied on the live database** (execution 16435: two tables,
+  both keys cascading — deleting a playlist never deletes a film). **Not in
+  `project.tags`**: that is n8n's Airtable-compat field. Verified end to end
+  against a real Postgres engine in Chromium (`db/port/lib/local-pg.mjs` +
+  `db/port/playlists/browser/`), pinned by `npm run check:playlists` (38).
+  **Live since deploy #180, 13:02:08 UTC** (merge `e804ae6`, the trunk tip).
+  It was deployed **over a running Media Generation, at the producer's
+  explicit request** after being told the risk: `16430` ("How Rome fed a
+  million people") was parked at the approval gates — 15 scenes waiting on
+  voice approval, 11 on image approval, nothing written since 12:56 — and
+  it was still `running` four minutes after `web` restarted. One data point,
+  on a run that was only WAITING; it does not relax the rule for a run that
+  is generating. **What is owed**: the producer's first real playlist, and
+  proof the site serves it — `pg_stat_user_tables` for `hov.playlist` counts
+  a read on every render of /projects and nothing else reads that table, so
+  a counter above 4 (3 at apply time — the primary-key and name-index builds
+  and the verify query — plus one probe's `count(*)` at 13:04) is the live page
+  running the new code. A Postgres restart resets the counters. **Noticed, not
+  changed**: the library toolbar sticks at `top: 10px` UNDER a nav that ends
+  at 72px, so once scrolled it is hidden except a wrapped second row —
+  pre-existing; `top: 84px` is the likely fix and the producer's call.
 - **Deep Search is live; what is owed is a film somebody keeps**
   (2026-09-18, Claude Scripting `b927a298`; full account
   `db/port/fact-check/README.md`, lessons in `docs/lessons-pipeline.md` under
@@ -670,15 +752,53 @@ expected and harmless for an app touching only its own Drive.
   Verified on that film (15228, 15231) — two presses removed all four copies,
   including one where the judge correctly split an attributed sentence into its
   attribution (`supported`) and its underlying fact (`redundant`).
-  **THE BILL IS UNPAID: chapter 1 went from 185 words to 101, a 45% cut, and
-  nothing measures that.** The guard is per press and per chapter, so two
-  presses at a quarter each pass individually and halve the chapter together —
-  and the word count is what sets the film's runtime and scene count. The film
-  also lost its closing bookend, cut as a repeat of the hook, which is what a
-  bookend IS. **So the button is idempotent in findings and NOT in length; do
-  not press it repeatedly.** The fix is a floor read from the narration guard's
-  own `min` words, which `DS Load` does not yet fetch — full account and the
-  ordered owed list in `db/port/fact-check/README.md` §9.
+  ~~**THE BILL IS UNPAID: chapter 1 went from 185 words to 101, a 45% cut, and
+  nothing measures that.**~~ **Paid, 2026-09-23.** The bill was real — the guard
+  was per press and per chapter, so two presses at a quarter each passed
+  individually and halved the chapter together, and that film also lost its
+  closing bookend, cut as a repeat of the hook, which is what a bookend IS.
+  Both are closed: `DS Load` fetches `length_seconds`, `DS Prep` re-derives
+  `Narration Guard`'s own arithmetic from it, and `DS Resolve` spends a budget
+  of `bodyWords − minWords` measured against the script AS IT NOW STANDS, so
+  the button is idempotent in length across any number of presses; the closing
+  line and the hook are spared in the prompt AND again in code. **No floor
+  means no limit, not a limit of zero** — failing closed there would switch the
+  whole feature off silently and look exactly like a judge that found nothing.
+
+  **AND THE SAFETY VALVE WAS REFUSING THE CORRECT FIX** (2026-09-23,
+  `7a865309`, `db/port/fact-check/README.md` §10). The producer's Google Maps
+  film reached them with five unsourceable statements in it while the row said
+  `refused: "chapter 1 went from 178 to 128 words"` — the judge found them, the
+  rewrite cut them, and `FC Apply` threw the whole correction away for being
+  28% shorter. **This project had already decided that question**:
+  `Narration Guard` settled on 2026-09-13 that the length is a CEILING and a
+  film shorter than ordered is correct. The valve was re-deriving a
+  project-wide rule instead of reading it, and drifted from it invisibly until
+  it refused something right — which looks like the checker being wrong.
+  The band is one-sided now in both copies: **growth past a fifth refused,
+  losing more than HALF a chapter refused as a re-telling, everything between
+  accepted**, and a corrected narration that lands under the floor writes
+  `short: {words, min}` into the report — never a refusal, a statement that the
+  research does not cover the running time ordered. The general rule worth
+  carrying: **a guard that re-derives a decision another node owns will drift
+  from it, and the drift only shows when it rejects something correct.**
+
+  **The judge rules on the RELATIONSHIP a sentence asserts, not only its nouns
+  and dates** (same publish). *"Inside Google, the Sydney software gained the
+  scale it had lacked"* passed `supported` while the judge's own `claim` field
+  read "gained scale it had previously lacked" and its `reason` justified only
+  the half after the comma — so the prompt now carries the general form of the
+  transition rule (cause, intention, limitation, comparison, order,
+  consequence, each its own assertion) and one self-check that does most of the
+  work: **when your reason covers less than your claim says, the verdict is
+  unsupported.** Verified on that film, execution 16421 after the publish: the
+  sentence is two findings now, the rewrite was ACCEPTED where it had been
+  refused, and all four sentences removed are from the named family.
+  **What is owed is upstream**: `Write Full Narration` / `Edit Full Narration`
+  produce the connective prose this judge then catches one sentence at a time.
+  Constraining the writer is cheaper than checking the writing — but those two
+  nodes are on the main path of EVERY film in every category, so it needs its
+  own verification and its own day.
 - **A Flow refusal that arrives as HTTP 200 no longer kills the film**
   (2026-09-17, Media Generation `6735a96a`, `db/port/regen-unstick/README.md`,
   lesson in `docs/lessons-pipeline.md` under "Flow refuses twice"). **What is
@@ -714,6 +834,57 @@ expected and harmless for an app touching only its own Drive.
   **Owed**: the hold has never been heard on a render, and the
   `Rewrite Script` path (producer rejects with feedback) still carries
   neither the spine nor these rules.
+- **A Google-flagged Flow account stalled the whole image phase, and `health`
+  said OK** (2026-09-23, Media Generation `f7f03638`, rollback `c22878a1`,
+  `db/port/image-failover/README.md`). The Rome film's images took minutes
+  each: `houseofvideos01` answered 12 of 22 image requests with `403
+  PUBLIC_ERROR_UNUSUAL_ACTIVITY`, and each refusal held the film five minutes
+  (images are serial for the whole film) while the other two accounts idled.
+  **The evidence lives at useapi, not in n8n**: `GET
+  /v1/google-flow/accounts/captcha-stats` lists every request of the last hour
+  with account, status and Google's reason, read-only — use it before guessing
+  at a slow batch. Fixed by routing around: `IMG Cooldown Guard` marks a
+  throttled account avoided for 30 min and retries in 5 s on another account
+  the film runs on (new node `IMG Account` picks it), and **the clip follows
+  the image** — `Pool Tick`, `Submit Video` and `Generate End Frame` take the
+  account from the owner hex-encoded in the start image, so a moved still never
+  meets `Email mismatch`. A running batch keeps the old version: Pause and
+  Resume to pick it up.
+  **And then all three accounts refused at once, which is what corrected the
+  diagnosis** (Media Generation `c8e6df0c`, `db/port/captcha-retry/`): the
+  403 `PUBLIC_ERROR_UNUSUAL_ACTIVITY` is not an account flag but a reCAPTCHA
+  token Google rejected (useapi's own docs; `captcha-stats` counts it against
+  the provider, CapSolver at 66.67%, `avg_attempt: 1`). The pipeline had sent
+  **`captchaRetry: 1` since 2026-09-02** to "save spend" — a fraction of a
+  cent — and turned every weak token into a 1-5 minute wait. Every Flow body
+  now ends `captchaRetry = 5`, which also rotates to the second configured
+  provider. **Still owed**: the same line in Claude Scripting's
+  `IR Generate Image` (left alone because another session was publishing
+  there), and watch for `PUBLIC_ERROR_MODEL_ACCESS_DENIED` on clips from
+  `01`/`02` — useapi says `veo-3.1-lite-low-priority` left invited family
+  members on 2026-09-23, and our three accounts share one credit pool.
+- **Drawn cards: one accepted motif card used to SILENCE every derived card,
+  and the validator refused chapter-start cards on films with chapter cards
+  OFF** (2026-09-23, `db/port/motif-more-cards/README.md`). The New York
+  remote-work film shipped with ONE card in six minutes: Scripting's best
+  proposal, a Brooklyn → Manhattan route, died as "a chapter card already
+  owns this scene" because `Validate Motif Cards` never passed the film's
+  `chapterCards` setting (default true, for every film ever); the one card
+  that survived then bypassed the render's own figure-card derivation, which
+  would have drawn the film's twenty spoken figures. Fixed on both sides:
+  `buildTextCards` MERGES explicit and derived cards (one per scene, explicit
+  wins; `npm run check:cards`), and Claude Scripting `8186ec33` reads
+  `chapterCards` off `Fetch Project Record`, sizes the cap by length
+  (`maxCardsFor`: one card per ~2 minutes, never under 3, in
+  `remotion/motif/validate.mjs`), puts `LENGTH:` in the writer's brief and
+  asks for that many. **Measure before believing the frame count**: the first
+  inspection here pulled frames from the MONTAGE (`Check Render`'s
+  `outputUrl`) and saw no captions either — the delivered film is the
+  GRAPHICS job's output (`Check Graphics`), and `/inspect` needs the
+  `x-api-key` header the live nodes carry. **Owed**: the next film's
+  `motifReport` read against its delivered cut, and whether one card every
+  two minutes reads as rhythm or interruption — the number was chosen, not
+  measured.
 - **Series exist since 2026-09-16** (`db/port/series/README.md`; lessons in
   `docs/lessons-site.md` under "Series — the same cast, film after film").
   `/series` lists the shows, a show is started from any film with a Story
@@ -841,6 +1012,68 @@ expected and harmless for an app touching only its own Drive.
   kind to notice. `scripts/check-n8n.mjs` block 7 checks account health but
   cannot see this; only the returned `mediaGenerationId`'s hex-encoded owner can,
   which is why `Collect Replicated` files every copy by it.
+
+- **A clip Google refuses for its AUDIO was being diagnosed as a picture
+  problem, and the ladder that "fixed" it rewrote the wrong thing**
+  (2026-09-22, Media Generation `78bff76f`, rollback `2d3f0f86`; full
+  account `db/port/audio-filter/README.md`). Scene 7 of the producer's New
+  York film would not generate: the rewrite ladder had spent four motion
+  rewrites on it and left a note saying *"The START IMAGE is most likely
+  what Google refuses: regenerate the image so no face or real person is in
+  frame"* — on a start image that is an extreme close-up of a HAND, with no
+  face anywhere in it. Submitting that same image with a deliberately blank
+  prompt returns `PUBLIC_ERROR_AUDIO_FILTERED` / `AUDIO_GENERATION_FILTERED`.
+  **Veo 3.1 generates a soundtrack alongside the picture and Google refuses
+  that soundtrack on its own terms**; the string contains `FILTER`, so
+  `Filter Failure?` routed it into the ladder that rewrites the MOTION
+  prompt — the one thing that was not refused. `VP Prep` now has an audio
+  arm and carries the advice that fits the refusal. **Three things close off
+  the obvious escapes.** `generateAudio` is not a parameter useapi accepts
+  (`400 Parameter generateAudio not supported`), so a silent clip cannot be
+  asked for. The detection window was `slice(0, 2000)` while the marker sits
+  past a kilobyte of echoed request, so **the `PROMINENT` and `MINOR` arms
+  were unreliable too** — it is 20,000 now. And **retrying is not a second
+  roll of the dice**: both submit paths derive the seed as
+  `hash(sceneId + ':' + takes)`, a refused clip files no take, so `takes`
+  stays 0 and every rewrite and every press of "Regenerate video" re-rolls
+  the IDENTICAL seed. Four attempts were one attempt four times, and a scene
+  that fails the filter before it ever produces a clip cannot escape by
+  retrying. **The fix that worked was a different still** — the same desk in
+  the same light with no person and no hand, so the audio model has nothing
+  to speak; it passed on the first submit (execution 16104, 1m13) after five
+  straight refusals. **What is owed**: vary the seed per attempt, and measure
+  whether an audio refusal is deterministic at all. Also worth a
+  measurement — every clip this pipeline submits ends
+  `"Negative: speech, voices, dialogue, singing, narration, music, …"`, and
+  this repo's own expensive lesson is that naming a thing in a Veo prompt
+  summons it.
+
+- **The first REAL film through the three-account pool is measured, and the
+  bottleneck is neither the pool nor Google** (2026-09-22, `rec7U8PbMS8MUYQcW`,
+  54 scenes, 10 minutes; full account `db/port/parallel-accounts/etapa3.md`,
+  "The first REAL film through the pool"). **The split is exact — 18 / 18 / 18**,
+  every clip on the account that minted its image, zero `Email mismatch`, so
+  Etapa 1 and the path-form upload are confirmed on a real film. The phases:
+  scripting 9.5 min, images + voices **55 min**, clips **105 min**, final
+  render 32 min — which finally answers whether parallelising images is worth
+  it (clips are two thirds of the machine time, so images could buy a third at
+  most, for the 38-node tail duplication the plan prices). **Two findings
+  matter more than the totals.** First, the pool delivers a clip every **86
+  seconds** while all three accounts are busy — about 3x serial, better than
+  the 9-scene A/B suggested — and then **collapses to one account at a time
+  for the last 14 clips, 55 of the 105 minutes**. That is the TAIL: contiguous
+  blocks mean an account that finishes early sits idle while the slowest block
+  runs alone, so the film ends at serial speed. **The fix is work stealing, not
+  more accounts or a bigger `videoPoolPerAccount`** — an idle account should
+  take the next unstarted scene from ANY block. Second, **22 of 54 scenes (41%)
+  were refused by the content filter at least once**, roughly 43 refused
+  generations against 54 successful ones — an 80% overhead, most of an hour on
+  this film. Fifteen of those refusals were filed as the generic "Google video
+  content filter", which is exactly where `AUDIO_GENERATION_FILTERED` was
+  hiding (see the audio entry above). **Cutting the refusal rate buys more than
+  any amount of extra concurrency.** Note also that the film's 17-hour
+  wall-clock is ~3 hours of work plus an overnight gap and two manual cancels;
+  do not read it as a pipeline figure.
 
 - **The parallel-accounts work is reachable from the site since 2026-09-20**
   (`db/port/flow-accounts-ui/README.md`; orchestrator `4f022248`, rollback
@@ -1057,7 +1290,9 @@ expected and harmless for an app touching only its own Drive.
   all answer `000`. So `curl` cannot reach the site, wf7 or any external API —
   but the entry here used to say "every host answers 000", which is no longer
   true and would send a session looking for a workaround it does not need for
-  GitHub. For everything else the MCP connectors are the only way out. To run a query or fire a webhook, create a throwaway workflow
+  GitHub. (The npm registry answers too — measured 2026-09-23 — so a session
+  can install tools that are not the site's dependencies, like the WASM
+  Postgres behind `db/port/lib/local-pg.mjs`.) For everything else the MCP connectors are the only way out. To run a query or fire a webhook, create a throwaway workflow
   (manual trigger → Postgres, or → an HTTP node posting to
   `http://localhost:5678/webhook/<path>`), `execute_workflow` it, read the
   result, then `archive_workflow`. n8n can reach itself and the database
@@ -1247,6 +1482,28 @@ expected and harmless for an app touching only its own Drive.
 - Test `chapters` multi-voice on a project with 2+ chapters (over 120s), which
   is the branch the per-scene rotation does *not* cover.
 - Codify the "no visible faces" rule into Documentary image prompts.
+  **Superseded 2026-09-22 by `db/port/pool-tail-and-refusals/README.md`,
+  step 1c**: gate it on STYLE (photorealistic), not on category — the film
+  that measured a 41% refusal rate was `category: story` with Documentary
+  tone and style, so a category-keyed rule would never have fired — and add
+  the speech cue, since Veo invents a soundtrack from the still and refuses
+  it. That file is the plan for both the refusal rate and the pool's tail;
+  it names two decisions that were the producer's (D1: may the ladder replace
+  an approved still; D2: faces off by default on photorealistic films) and
+  both were taken the same day. **All four code steps are LIVE as of
+  2026-09-22 evening**: Media Generation `3c65295d` (1b, seed fresh after a
+  refusal) → `de198483` (1a, the ladder regenerates the STILL with a steer,
+  twice, then gives up) → `c22878a1` (2a, work stealing: an idle account
+  copies a still from the busiest queue and makes the clip there), and
+  Claude Scripting `f379e56d` (1c, the faces-and-speech block appended to
+  `segmentRules` in `Voice Mode` for every non-kids film; `Editing
+  Options.facesOff === false` switches it off, strict boolean, no site
+  control yet). Rollbacks `78bff76f` and `f86e6cc1`. **None of the four has
+  run on a real film.** What proves them is in the README's order table:
+  `AUTO-REWRITE-VIDEO (attempt N)` notes and `VP IMAGE … ready` lines for
+  1a, `POOL steal` lines and zero `Email mismatch` for 2a, the refusal rate
+  against 41% for 1c. Owed after that: 1d, 1e, 2b, the `facesOff` brief
+  control, and rotating the useapi token hard-coded in the steal nodes.
 - Scene 104/105 of `recCoZWsZBOrIU69L` are the first scenes to go through the
   new fal auto-rewrite path — worth watching once to confirm the rewritten
   prompt clears fal and the regen loop picks the scene up.

@@ -210,6 +210,47 @@ console.log("Ran");
   ok("and points at the scenes, which is where the text now lives", /scenes/i.test(s.detail));
 }
 
+console.log("A correction that made the film shorter than it was ordered");
+{
+  // NEVER A REFUSAL AND NEVER RED. `short` says the research does not cover the
+  // running time the producer asked for — a decision for them (more research,
+  // or a shorter film), not a fault in the chain. It rides along with whatever
+  // the report's real verdict is.
+  const s = deepSearchState({
+    report: {
+      checked: 22,
+      rewritten: 4,
+      short: { words: 137, min: 133 },
+      findings: [finding("rewritten"), finding("kept", "supported")],
+    },
+    isDocumentary: true,
+    scriptExists: true,
+  });
+  ok("a short correction is still a correction", s.status === "corrected" && s.red === false);
+  ok("and the producer is told the film came up short", /137 words against the 133/.test(s.detail));
+  ok("and told what to do about it", /more|shorter/i.test(s.detail));
+}
+{
+  // The same note has to reach the producer when statements are still standing,
+  // which is the case where they are most likely to act on it.
+  const s = deepSearchState({
+    report: { checked: 22, rewritten: 2, short: { words: 90, min: 133 }, findings: [finding("flagged")] },
+    isDocumentary: true,
+    scriptExists: true,
+  });
+  ok("the shortness note survives a flagged report", /90 words against the 133/.test(s.detail));
+}
+{
+  // ABSENT MEANS NOTHING TO SAY. A report from before `short` existed, and a
+  // correction that stayed inside the window, must read identically.
+  const s = deepSearchState({
+    report: { checked: 22, rewritten: 4, findings: [finding("rewritten")] },
+    isDocumentary: true,
+    scriptExists: true,
+  });
+  ok("no shortness, no sentence about it", !/words against the/.test(s.detail));
+}
+
 console.log("Tone");
 {
   ok("broken is the error tone", deepSearchTone("broken") === "err");

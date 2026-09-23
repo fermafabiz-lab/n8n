@@ -636,15 +636,53 @@ expected and harmless for an app touching only its own Drive.
   Verified on that film (15228, 15231) — two presses removed all four copies,
   including one where the judge correctly split an attributed sentence into its
   attribution (`supported`) and its underlying fact (`redundant`).
-  **THE BILL IS UNPAID: chapter 1 went from 185 words to 101, a 45% cut, and
-  nothing measures that.** The guard is per press and per chapter, so two
-  presses at a quarter each pass individually and halve the chapter together —
-  and the word count is what sets the film's runtime and scene count. The film
-  also lost its closing bookend, cut as a repeat of the hook, which is what a
-  bookend IS. **So the button is idempotent in findings and NOT in length; do
-  not press it repeatedly.** The fix is a floor read from the narration guard's
-  own `min` words, which `DS Load` does not yet fetch — full account and the
-  ordered owed list in `db/port/fact-check/README.md` §9.
+  ~~**THE BILL IS UNPAID: chapter 1 went from 185 words to 101, a 45% cut, and
+  nothing measures that.**~~ **Paid, 2026-09-23.** The bill was real — the guard
+  was per press and per chapter, so two presses at a quarter each passed
+  individually and halved the chapter together, and that film also lost its
+  closing bookend, cut as a repeat of the hook, which is what a bookend IS.
+  Both are closed: `DS Load` fetches `length_seconds`, `DS Prep` re-derives
+  `Narration Guard`'s own arithmetic from it, and `DS Resolve` spends a budget
+  of `bodyWords − minWords` measured against the script AS IT NOW STANDS, so
+  the button is idempotent in length across any number of presses; the closing
+  line and the hook are spared in the prompt AND again in code. **No floor
+  means no limit, not a limit of zero** — failing closed there would switch the
+  whole feature off silently and look exactly like a judge that found nothing.
+
+  **AND THE SAFETY VALVE WAS REFUSING THE CORRECT FIX** (2026-09-23,
+  `7a865309`, `db/port/fact-check/README.md` §10). The producer's Google Maps
+  film reached them with five unsourceable statements in it while the row said
+  `refused: "chapter 1 went from 178 to 128 words"` — the judge found them, the
+  rewrite cut them, and `FC Apply` threw the whole correction away for being
+  28% shorter. **This project had already decided that question**:
+  `Narration Guard` settled on 2026-09-13 that the length is a CEILING and a
+  film shorter than ordered is correct. The valve was re-deriving a
+  project-wide rule instead of reading it, and drifted from it invisibly until
+  it refused something right — which looks like the checker being wrong.
+  The band is one-sided now in both copies: **growth past a fifth refused,
+  losing more than HALF a chapter refused as a re-telling, everything between
+  accepted**, and a corrected narration that lands under the floor writes
+  `short: {words, min}` into the report — never a refusal, a statement that the
+  research does not cover the running time ordered. The general rule worth
+  carrying: **a guard that re-derives a decision another node owns will drift
+  from it, and the drift only shows when it rejects something correct.**
+
+  **The judge rules on the RELATIONSHIP a sentence asserts, not only its nouns
+  and dates** (same publish). *"Inside Google, the Sydney software gained the
+  scale it had lacked"* passed `supported` while the judge's own `claim` field
+  read "gained scale it had previously lacked" and its `reason` justified only
+  the half after the comma — so the prompt now carries the general form of the
+  transition rule (cause, intention, limitation, comparison, order,
+  consequence, each its own assertion) and one self-check that does most of the
+  work: **when your reason covers less than your claim says, the verdict is
+  unsupported.** Verified on that film, execution 16421 after the publish: the
+  sentence is two findings now, the rewrite was ACCEPTED where it had been
+  refused, and all four sentences removed are from the named family.
+  **What is owed is upstream**: `Write Full Narration` / `Edit Full Narration`
+  produce the connective prose this judge then catches one sentence at a time.
+  Constraining the writer is cheaper than checking the writing — but those two
+  nodes are on the main path of EVERY film in every category, so it needs its
+  own verification and its own day.
 - **A Flow refusal that arrives as HTTP 200 no longer kills the film**
   (2026-09-17, Media Generation `6735a96a`, `db/port/regen-unstick/README.md`,
   lesson in `docs/lessons-pipeline.md` under "Flow refuses twice"). **What is

@@ -1365,10 +1365,13 @@ each piece handles it:
 - **Site**: the category has `noNarration: true` in `categories.ts` — no
   narrator/cast pickers; `createProject` force-clears `voice_id`/`cast` and
   forces captions off server-side.
-- **Scripting**: `Voice Mode` emits silent-film rules. The "narration" is
-  written anyway but as an unspoken VISUAL BEAT SHEET — the word-count
-  math still drives scene count, so do not remove it. Scenes are created
-  with **`Aprobare Voce` already checked**.
+- **Scripting**: since 2026-09-23 a Cinematic film has its OWN writing
+  path. It is a director's treatment and a shot list, one line per shot,
+  and the line count (not a word count) is the scene count. See "A silent
+  film is not a story with the voice removed" below. Until then it
+  was the Story chain with a "no voice" paragraph appended, and that is
+  the bullet this one replaces. Scenes are still created with
+  **`Aprobare Voce` already checked**.
 - **Media Generation**: `AB No Speech?` (after `AB Load Project`) loops
   past TTS entirely; the combined asset gate (`Evaluate Image Approval`)
   waives the Voiceover-URL requirement for cinematic. The audio stage
@@ -1424,6 +1427,57 @@ each piece handles it:
   "Working engine" (`recrlkONIpkgkYxzw`), whose single scene was reopened and
   never moved again. `reopenStep` now reads the project's category and leaves
   the voice alone on a silent film. **Any new cascade must do the same.**
+
+### A silent film is not a story with the voice removed (2026-09-23)
+
+The producer said Cinematic *"face scriptingul pe baza de story … si doar
+nu mai adauga dialogul"*. That was literally true, and the live prompts show
+why. Full account: `db/port/cinematic-mode/README.md`.
+
+- **The mode was a paragraph, not a path.** Voice Mode appended "SILENT
+  FILM MODE" to ONE prompt, the writer's. The outline never saw it: it
+  built a protagonist/want/obstacle spine and was told *"a STORY plan, not
+  a shot list — never say how anything looks"*. The editor never saw it
+  either. **A mode that changes what the text IS has to reach every node
+  that shapes the text**, or the first node that does not know undoes it.
+- **A later rule in a shared node reversed it silently.** The 09-13
+  anti-bland pass gave the editor rule 2b (replace any sentence describing
+  the picture with the stake or the cost), and the Cinematic genre profile
+  got *"THE VOICE SAYS WHAT THE PICTURE CANNOT"*. Both are right for
+  narration. For a film with no voice they are exactly backwards, and
+  nobody checked, because Cinematic was nobody's test case. The Hobbit film
+  of 09-20 is the result: narrated prose, unspoken. **When a shared prompt
+  gains a rule, ask which categories flow through it.** Here the answer
+  included one whose whole text is description.
+- **The fix is a branch, not more paragraphs.** `Cinematic?` after
+  `Save Story Bible` sends the film to `Cine Treatment` (concept, visual
+  arc, signature images, sound world, ending image, sequences with shot
+  counts) and `Cine Shot List`. That writes one line per shot, in five
+  fields: `SIZE · MOVE · ACTION · LIGHT · Sound:`. `Cine Guard` then checks
+  it and emits Narration Guard's shape, so the path rejoins at `FC Prep`
+  and nothing downstream changed. **The visual arc replaces the plot**: the
+  treatment is asked how the picture changes from the first shot to the
+  last (hour, light, scale, palette, energy), and that is what moves the
+  film forward.
+- **The shot count is decided, never derived.** On the Story path, scenes
+  came from ~22-word chunks. A Cinematic chapter is cut on its lines
+  (`Plan Scene Splits`), so a shot is what the director wrote, not what
+  word arithmetic produced.
+- **Measure a line where the fault shows.** The first guard capped the
+  whole line at 70 words. On a good list (probe 16582) the lines ran 42-70
+  words, because four of the five fields are framing, light and sound, so
+  the cap only punished the richest shot and forced a retry that fixed
+  nothing. The action field is where "two shots in one line" shows. The
+  guard now caps that at 40 words and flags a `then` inside it, which is
+  the segmenter's own rule 6b (one action per 8-second clip) checked
+  before a model is asked to obey it.
+- **Every edited shared node is proven unchanged for everyone else.**
+  `db/port/cinematic-mode/check.mjs` runs the original and new bodies of
+  Voice Mode, Plan Scene Splits, Combine Chapters and Rewrite Script on the
+  same real inputs and requires deep-equal output for Story, Documentary,
+  Kids, dialogue and faces-off projects. That is the cheap version of
+  "published after the run that verified it is unverified". The run
+  verifies the new path; the equality proves the old ones did not move.
 
 ### Kids story is a real category now (2026-09-07)
 

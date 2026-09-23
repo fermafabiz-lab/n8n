@@ -24,8 +24,20 @@
  * cannot drift — a hand-copied projection is a mirror, and mirrors go stale.
  */
 
-/** No film gets more than this, whatever the model proposes. */
+/**
+ * The floor of the per-film cap, whatever the model proposes. Since 2026-09-23
+ * the cap is sized by the film: `maxCardsFor(minutes)` gives one card for
+ * roughly every two minutes, never under this. It was a flat 3 before, which
+ * on a ten-minute film with twenty spoken figures meant one card every three
+ * minutes at best — and the writer's prompt, told "one to three", never
+ * proposed more for the validator to refuse.
+ */
 export const MAX_CARDS = 3;
+export const maxCardsFor = (minutes) => {
+	const m = Number(minutes);
+	if (!Number.isFinite(m) || m <= 0) return MAX_CARDS;
+	return Math.max(MAX_CARDS, Math.round(m / 2) + 1);
+};
 /** The motifs that exist. A variant not on this list cannot be drawn. */
 export const VARIANTS = ['route', 'schedule', 'timeline', 'compare', 'steps'];
 
@@ -330,10 +342,12 @@ const durationFor = (card) => {
  * @param {any[]} o.scenes     the film's scenes, in order
  * @param {any[]} [o.evidence] research rows, each {ref, claim, source}
  * @param {boolean} [o.chapterCardsOn] a chapter's first scene is already owned
+ * @param {number} [o.maxCards] the per-film cap, see `maxCardsFor`
  * @returns {{accepted: any[], report: any[]}}
  */
 export function validateMotifCards(o) {
 	const {cards = [], scenes = [], evidence = [], chapterCardsOn = true} = o;
+	const maxCards = Number.isInteger(o.maxCards) && o.maxCards > 0 ? o.maxCards : MAX_CARDS;
 	const byRef = new Map(evidence.filter((e) => e?.ref).map((e) => [String(e.ref), e]));
 	const report = [];
 	const accepted = [];
@@ -636,8 +650,8 @@ export function validateMotifCards(o) {
 			drop(failed);
 			continue;
 		}
-		if (accepted.length >= MAX_CARDS) {
-			drop(`over the ${MAX_CARDS}-card limit for one film`);
+		if (accepted.length >= maxCards) {
+			drop(`over the ${maxCards}-card limit for this film`);
 			continue;
 		}
 

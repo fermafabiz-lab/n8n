@@ -709,6 +709,28 @@ expected and harmless for an app touching only its own Drive.
   **Owed**: the hold has never been heard on a render, and the
   `Rewrite Script` path (producer rejects with feedback) still carries
   neither the spine nor these rules.
+- **Drawn cards: one accepted motif card used to SILENCE every derived card,
+  and the validator refused chapter-start cards on films with chapter cards
+  OFF** (2026-09-23, `db/port/motif-more-cards/README.md`). The New York
+  remote-work film shipped with ONE card in six minutes: Scripting's best
+  proposal, a Brooklyn → Manhattan route, died as "a chapter card already
+  owns this scene" because `Validate Motif Cards` never passed the film's
+  `chapterCards` setting (default true, for every film ever); the one card
+  that survived then bypassed the render's own figure-card derivation, which
+  would have drawn the film's twenty spoken figures. Fixed on both sides:
+  `buildTextCards` MERGES explicit and derived cards (one per scene, explicit
+  wins; `npm run check:cards`), and Claude Scripting `8186ec33` reads
+  `chapterCards` off `Fetch Project Record`, sizes the cap by length
+  (`maxCardsFor`: one card per ~2 minutes, never under 3, in
+  `remotion/motif/validate.mjs`), puts `LENGTH:` in the writer's brief and
+  asks for that many. **Measure before believing the frame count**: the first
+  inspection here pulled frames from the MONTAGE (`Check Render`'s
+  `outputUrl`) and saw no captions either — the delivered film is the
+  GRAPHICS job's output (`Check Graphics`), and `/inspect` needs the
+  `x-api-key` header the live nodes carry. **Owed**: the next film's
+  `motifReport` read against its delivered cut, and whether one card every
+  two minutes reads as rhythm or interruption — the number was chosen, not
+  measured.
 - **Series exist since 2026-09-16** (`db/port/series/README.md`; lessons in
   `docs/lessons-site.md` under "Series — the same cast, film after film").
   `/series` lists the shows, a show is started from any film with a Story

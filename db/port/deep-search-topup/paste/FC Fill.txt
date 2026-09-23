@@ -13,8 +13,8 @@ ALREADY USED BY THE SCRIPT — the fact-checker matched these to sentences the s
 YOUR BUDGET: at most {{ $json.fill.gapWords }} words in total, across every sentence you add.
 
 WHERE THE FACTS COME FROM, in this order:
-1. A claim from the list above that the script does not already state. Cite it by its number, for example REF: E7. Read the whole script first: a claim the script already carries in other words is used, even if it is not in the ALREADY USED list.
-2. Only when the list has nothing left to give, search the web for a fact about the same subject, the same people and the same period the script covers. Cite it as REF: LIVE with the URL you actually retrieved. Prefer the organisation's or person's own record, then contemporaneous reporting from a named publication. Never a Wikipedia mirror.
+1. A claim from the list above that tells the viewer something the script does NOT already tell them. Cite it by its number, for example REF: E7. Read the whole script first. A claim is USED, and off limits, when the script already states it in other words — and also when the viewer can work it out from what the script says: if the script gives two dates, a claim that one came "a few months after" the other tells them nothing new. The ALREADY USED list is where that starts, not the whole of it.
+2. When no claim like that is left, SEARCH THE WEB. That is expected, not a last resort — a film whose research has run out is exactly the film this step exists for. Look for what happened in the same story, to the same people, in the same period the script covers: an event, who did it, when, with a number where there is one. Cite it as REF: LIVE with the URL you actually retrieved. Prefer the organisation's or person's own record, then contemporaneous reporting from a named publication. Never a Wikipedia mirror.
 
 WHAT EVERY SENTENCE YOU ADD MUST BE:
 - ONE FACT FROM ITS SOURCE — an event, a date, a number, a name, something someone did or said. If you cannot point at the source that states it, do not write the sentence.
@@ -26,7 +26,7 @@ WHAT EVERY SENTENCE YOU ADD MUST BE:
 - IN THE SCRIPT'S VOICE — same tense, same register, same rhythm. A sentence of roughly 10 to 30 words.
 - ONE SENTENCE PER CLAIM. Do not stretch a single claim into two sentences.
 
-WHERE EACH SENTENCE GOES. Name the sentence it should follow, copied character for character from the script above, so it lands where it belongs in time. Never after the LAST sentence of the LAST chapter — that is the film's ending and it stays the ending. Never in CHAPTER 0, which is the hook. If no single sentence is the right anchor, write END and it will be placed at the end of that chapter.
+WHERE EACH SENTENCE GOES. Name the sentence it should follow, copied character for character from the script above, so it lands where it belongs in time — AFTER the sentence that introduces what it talks about, never before it. Never after the LAST sentence of the LAST chapter — that is the film's closing line and it stays the closing line. Never in CHAPTER 0, which is the hook. If no single sentence is the right anchor, write END and it will be placed at the end of that chapter, or just before the closing line in the last one.
 
 THE LENGTH IS A RULE, NOT A TARGET. Your budget is {{ $json.fill.gapWords }} words and it is the most you may add, not the amount you should add. Count the words of your sentences before you answer. Anything over the budget is cut in code, starting from your LAST sentence, so the facts you wrote last are the ones lost. Every sentence you add is also checked in code for its source, for repeating the script, and for describing the picture; one that fails is deleted and costs you nothing but the space.
 
@@ -38,6 +38,6 @@ Then one final line:
 
 DONE: <enough|exhausted>
 
-Write DONE: exhausted when there were not enough new, sourced facts to fill the budget — that tells the producer this film's subject is fully told at this length, which is what they need to know. Write DONE: enough when you had more than you needed.
+Write DONE: exhausted only AFTER you have searched the web and still found nothing new that fits — that tells the producer this film's subject is fully told at this length, which is what they need to know, and it is only true once you have looked. Write DONE: enough when you had more than you needed.
 
 If there is nothing new and sourced to add, output only the line DONE: exhausted.

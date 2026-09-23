@@ -135,29 +135,34 @@ const parseProposals = (raw) => {
 };
 
 // WHERE A SENTENCE LANDS. After the sentence it names, when that sentence is
-// found verbatim; otherwise at the end of its chapter. The LAST chapter is the
-// exception, because its end is the film's ending: nothing is ever placed
-// after its final sentence, and nothing lands inside its final paragraph when
-// it has more than one — that paragraph is the resolution `db/port/story-close/`
-// exists to protect.
+// found verbatim; otherwise at the end of its chapter. The LAST chapter's final
+// sentence is the exception, because it is the film's closing line: nothing is
+// ever placed after it, and END in that chapter lands just before it.
+//
+// THE LINE, NOT THE PARAGRAPH — the same unit `DS Resolve` protects as
+// `closingSentence`. The first version protected the whole final paragraph, and
+// on the producer's Google Maps film (probe, 2026-09-23) that pushed a sentence
+// about the API into the paragraph BEFORE the one that introduces the API: a
+// documentary's last paragraph is often where its last event happens, and the
+// resolution rule `db/port/story-close/` exists for is a Story and Kids rule,
+// while this chain only ever runs on documentaries.
 const place = (text, after, sentence, isLast) => {
   const t = String(text || '').trim();
-  const paras = t.split(/\n\s*\n/);
-  const lastPara = paras[paras.length - 1] || '';
-  const lastSentence = sentencesOf(lastPara).pop() || '';
+  const lastSentence = sentencesOf(t).pop() || '';
   const a = String(after || '').trim();
-  const anchorIsEnding = isLast && (norm(a) === norm(lastSentence) || (paras.length >= 2 && lastPara.includes(a)));
+  const anchorIsEnding = isLast && norm(a) === norm(lastSentence);
   if (a && a.toUpperCase() !== 'END' && t.includes(a) && !anchorIsEnding) {
     const at = t.indexOf(a) + a.length;
     return t.slice(0, at) + ' ' + sentence + t.slice(at);
   }
   if (!isLast) return t + ' ' + sentence;
-  if (paras.length >= 2) {
-    paras[paras.length - 2] = paras[paras.length - 2].trim() + ' ' + sentence;
-    return paras.join('\n\n');
-  }
-  const cut = t.lastIndexOf(lastSentence);
-  if (lastSentence && cut > 0) return t.slice(0, cut).trimEnd() + ' ' + sentence + ' ' + t.slice(cut);
+  // Just before the closing line, keeping whatever whitespace stood there — a
+  // paragraph break stays a paragraph break, with the new sentence opening it.
+  const boundary = /[.!?…]["”’)]*\s+(?=\S)/g;
+  let start = -1;
+  let m;
+  while ((m = boundary.exec(t)) !== null) start = m.index + m[0].length;
+  if (start > 0) return t.slice(0, start) + sentence + ' ' + t.slice(start);
   return sentence + ' ' + t;
 };
 

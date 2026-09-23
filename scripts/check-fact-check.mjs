@@ -1571,28 +1571,43 @@ for (const [label, line, why] of [
   ok('a failed agent changes nothing and throws nothing', out.chapters.length === 3 && out.fcReport.filled.sentences === 0);
 }
 
-console.log('Top-up — the ending stays the ending');
+console.log('Top-up — the closing line stays the closing line');
 {
-  // Asked to follow the film's LAST sentence, it lands before the resolution.
+  // Asked to follow the film's LAST sentence, it lands just before it.
   const out = fcFill([ADD(2, TU_END, 'E3', GOOD_E3)]);
   ok('nothing is ever placed after the last sentence of the film', chap(out, 2).endsWith(TU_END));
-  ok('and the resolution paragraph is left exactly as it was', chap(out, 2).split(/\n\s*\n/).pop() === TU_P2);
-  ok('the new sentence closes the paragraph before it', chap(out, 2).split(/\n\s*\n/)[0].endsWith(GOOD_E3));
+  ok('the new sentence sits directly before the closing line', chap(out, 2).endsWith(GOOD_E3 + ' ' + TU_END));
+  ok('and the paragraph break before the final paragraph is kept', chap(out, 2).split(/\n\s*\n/).length === 2);
 }
 {
-  // An anchor INSIDE the resolution paragraph is refused for the same reason.
+  // THE PROBE'S OWN CASE (2026-09-23): an anchor in the final paragraph that is
+  // NOT the closing line. The first version protected the whole paragraph and
+  // pushed the sentence into the paragraph BEFORE the one that introduces what
+  // it talks about. A sentence goes after its antecedent, never before it.
   const out = fcFill([ADD(2, 'Google Maps launched on February 8, 2005.', 'E3', GOOD_E3)]);
-  ok('an anchor inside the resolution is moved out of it', chap(out, 2).split(/\n\s*\n/).pop() === TU_P2);
+  ok('an anchor inside the final paragraph is honoured', chap(out, 2).includes('Google Maps launched on February 8, 2005. ' + GOOD_E3));
+  ok('and the closing line still closes', chap(out, 2).endsWith(TU_END));
 }
 {
-  // A last chapter that is one paragraph still keeps its closing line last.
+  // A last chapter that is one paragraph still keeps its last line last.
   const one = tuChapters();
   one[2].narrator_script = TU_P1 + ' ' + TU_P2;
   const out = runNode('FC Fill Apply.js', {
     dir: TOPUP,
     nodes: { 'FC Apply': { output: 'x', chapters: one, min: 40, fcReport: {}, fill: tuFill({ chapters: one }) }, 'FC Fill': { output: ADD(2, 'END', 'E3', GOOD_E3) } },
   });
-  ok('a one-paragraph ending keeps its last line last', chap(out, 2).endsWith(TU_END) && chap(out, 2).includes(GOOD_E3 + ' ' + TU_END));
+  ok('END in the last chapter lands just before its closing line', chap(out, 2).endsWith(GOOD_E3 + ' ' + TU_END));
+}
+{
+  // A last chapter of ONE sentence: the only place that is not after the
+  // closing line is before it.
+  const solo = tuChapters();
+  solo[2].narrator_script = TU_END;
+  const out = runNode('FC Fill Apply.js', {
+    dir: TOPUP,
+    nodes: { 'FC Apply': { output: 'x', chapters: solo, min: 40, fcReport: {}, fill: tuFill({ chapters: solo }) }, 'FC Fill': { output: ADD(2, 'END', 'E3', GOOD_E3) } },
+  });
+  ok('a one-sentence ending still ends the film', chap(out, 2) === GOOD_E3 + ' ' + TU_END);
 }
 {
   const out = fcFill([ADD(1, 'END', 'LIVE', GOOD_LIVE, { url: LIVE_URL })]);
@@ -1676,10 +1691,18 @@ console.log('Top-up — the prompt, and the writers around it');
   ok('the budget is named as a RULE', p.includes('THE LENGTH IS A RULE, NOT A TARGET'));
   ok('the model is asked to count before it answers', p.includes('Count the words of your sentences before you answer'));
   ok('and told the consequence, cut from its LAST sentence', p.includes('cut in code, starting from your LAST sentence'));
-  ok('the unused pack comes before a live search', /1\. A claim from the list above[\s\S]*2\. Only when the list has nothing left/.test(p));
+  ok('the unused pack comes before a live search', /1\. A claim from the list above[\s\S]*2\. When no claim like that is left, SEARCH THE WEB/.test(p));
+  // THE PROBE FOUND THIS (2026-09-23): told to search "only when the list has
+  // nothing left", the model spent its budget on the pack's leftovers — which
+  // restated the script — and declared the research exhausted in 3 seconds
+  // without searching at all.
+  ok('a claim the viewer can WORK OUT from the script counts as used', p.includes('also when the viewer can work it out from what the script says'));
+  ok('searching is expected, not a last resort', p.includes('That is expected, not a last resort'));
+  ok('and "exhausted" is only true once it has searched', p.includes('Write DONE: exhausted only AFTER you have searched the web'));
+  ok('a sentence goes after what it talks about, never before it', p.includes('AFTER the sentence that introduces what it talks about, never before it'));
   ok('it carries the relationship rule the judge enforces', p.includes('the RELATIONSHIP the sentence asserts'));
   ok('it forbids the picture, commentary and the film itself', p.includes('never about what the picture shows') && p.includes('A STATEMENT, not a comment'));
-  ok('it protects the ending and the hook', p.includes('Never after the LAST sentence of the LAST chapter') && p.includes('Never in CHAPTER 0'));
+  ok('it protects the closing line and the hook', p.includes('Never after the LAST sentence of the LAST chapter') && p.includes('Never in CHAPTER 0'));
   ok('its line format is the one the guard parses, SENTENCE last', p.includes('ADD: <chapter number> | AFTER: ') && p.includes('| SENTENCE: <the sentence to add>') && p.includes('DONE: <enough|exhausted>'));
 }
 {

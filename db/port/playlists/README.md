@@ -92,6 +92,18 @@ halfway through the script: nothing remained.
 with no other grants on any of them — so whatever role lets the site write
 `project` and `series` every day lets it write these.
 
+**The site half: deploy #180, live 13:02:08 UTC** on merge `e804ae6` (the
+trunk tip, checked by ancestry). Deployed at the producer's explicit request
+over a running Media Generation — `16430`, parked at the approval gates with
+15 voices and 11 images awaiting review and nothing written since 12:56 — and
+still `running` four minutes after `web` restarted. Proof that the live page
+runs the new code: `pg_stat_user_tables` counts a read of `hov.playlist` on
+every render of /projects, and nothing else reads that table. It stood at 3
+after the apply (the primary-key and name-index builds, the verify query) and
+4 after the first live probe's own `count(*)` at 13:04; it was still 4 at
+13:05:50, so nobody had opened the page yet. Anything above 4 is the page —
+until a Postgres restart, which resets the counters.
+
 **Rollback**, should it ever be wanted: `drop table hov.playlist_project;
 drop table hov.playlist;` — nothing else references them, and no film is
 touched.

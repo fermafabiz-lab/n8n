@@ -114,7 +114,7 @@ Generation already skips TTS for a silent film.
 | `build-paste.mjs` | original/ → paste/ for the four edited nodes; every edit anchored to exactly one occurrence |
 | `build-ops.mjs` | paste/ → `ops.json`, the `update_workflow` operations |
 | `simulate.mjs` | ops.json applied offline to `cs.live.json` → `cs.expected.json`, plus the path walks |
-| `check.mjs` | 81 assertions: non-Cinematic byte-identity, Cinematic behaviour, guard fixtures, both prompts compile |
+| `check.mjs` | 85 assertions: non-Cinematic byte-identity, Cinematic behaviour, guard fixtures, both prompts compile |
 | `probe.mjs` | the throwaway that runs the real prompts on a real film's bible |
 | `fixtures.json` | text from the two real films |
 
@@ -144,3 +144,59 @@ its length (95 s → 11 shots) and its brief. It took 48 s end to end.
   That cap was miscalibrated, not the list (good lines run 42-70 words), so
   the ceiling moved to the action field (40) and a `then` check was added.
   Two lines in this run chained actions ("run the wheelbarrow … then tip").
+
+**Probe 16583**, on the same throwaway, used the astronaut film's bible at
+300 s: 37 shots in 6 sequences, 37 of 37 written. The arc runs noon on the
+plain → prismatic basin → copper ridge → blue hour at the fissure →
+bioluminescent cavern. Screen direction holds left to right through the
+first three sequences. The retry fixed a chained `then`. The guard also
+flagged *"Sound: drone hover, scanner whisper"* as speech twice, so
+`whisper` left the speech list, and `check.mjs` pins that line (85
+assertions).
+
+**Published** as Claude Scripting **`e45ef4c1`** (rollback **`538a914c`**).
+It was applied through `update_workflow` from `ops.json`. Before the
+publish, the draft was read back and diffed against `cs.expected.json`:
+152 = 152 nodes, **changed 0**, connections identical, both If nodes on the
+right outputs. Nothing was running on Claude Scripting at either moment.
+
+**End to end on the live version**, disposable film **`reczDC7RrgnX8SKsq`**
+(*"ZZ DELETE cinematic path - Bag End"*: the Hobbit film's Tema and brief,
+95 s). It was fired at the real `new-project` webhook (runner
+`noKc2QTFxUrl9wKs`, archived) as scripting execution **16589**:
+
+- The script parked at the gate **~2 minutes** after the POST. It had two
+  sequences (6 + 5 shots), every line in the five-field form, and a silent
+  cliffhanger hook. `hov.fact_check` got its `not-documentary` row, which
+  proves the path runs through Deep Search and writes the report as every
+  film must.
+- The script was approved by SQL (runner `VvlbxrFBvlpIMxRG`, archived), and
+  the real segmenter wrote **14 scenes** (3 hook + 11), one per shot line.
+  Every `Script Scenă` is the shot line verbatim. Every image prompt opens
+  with the designed size ("Wide low Hobbit-eye shot…", "Close-up low side
+  angle…"). Every motion prompt uses the designed camera move and carries
+  the Sound field ("the chip of iron into wet clay and a dull tear of
+  turf"). The place states come in order: untouched → open excavation →
+  half-built smial → finished. `Aprobare Voce` is pre-checked on all 14.
+- The film ends on the treatment's ending image, a held centered axis down
+  the finished hall with the open green door in golden morning light.
+
+The execution sits in `Wait For Scene Approval`, as every unapproved film
+does. The project is disposable and can be deleted.
+
+## What is owed
+
+- **One real Cinematic film watched end to end**, made by the producer.
+  The clips have not been generated. What to watch for: whether a
+  five-field shot line survives Veo as the shot it designs (the camera move
+  in particular), and whether 8-second shots that follow coverage read as
+  a cut rather than a slideshow.
+- **The hook still speaks Story.** `Generate Hook` receives the concept in
+  place of a story spine and keeps its silent styles. But its "action"
+  style says *"the climax IN MOTION — what the protagonist does at the
+  peak"*, and a cinematic film may have neither. It worked here (three
+  concrete shot notes), but it is a Story instruction.
+- **`Rewrite Scene Text` / `Rewrite Scene Standalone`** (the per-scene "✎
+  rewrite" buttons) were not touched. On a Cinematic scene they rewrite the
+  image and motion prompts and keep the line, which is the right behaviour,
+  but nobody has pressed one on a shot line yet.

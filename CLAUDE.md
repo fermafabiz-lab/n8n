@@ -518,6 +518,28 @@ expected and harmless for an app touching only its own Drive.
 
 ## Open work
 
+- **Cinematic films have their own writing path since 2026-09-23** (Claude
+  Scripting `e45ef4c1`, rollback `538a914c`; full account
+  `db/port/cinematic-mode/README.md`, lesson in `docs/lessons-pipeline.md`
+  under "A silent film is not a story with the voice removed"). The
+  producer's complaint was literal: a Cinematic film ran the Story chain
+  with "no voice" appended to ONE prompt. The outline built a protagonist
+  spine and was forbidden to think in pictures. The editor never saw the
+  silent rules, and its 09-13 rule 2b rewrote every visual sentence into
+  "the stake, the cost", so the Hobbit film of 09-20 was narrated prose shown
+  with the voice off. Now `Cinematic?` (after `Save Story Bible`) sends it to
+  `Cine Treatment` (concept, visual arc, signature images, sequences with
+  shot counts) → `Cine Shot List` (one five-field shot per line) →
+  `Cine Guard` → rejoin at `FC Prep`. One line is one scene
+  (`Plan Scene Splits`). **Voice Mode, Plan Scene Splits, Combine Chapters
+  and Rewrite Script changed only on their Cinematic arm**, proven
+  byte-identical for every other category by
+  `node db/port/cinematic-mode/check.mjs` (85). Verified live on the
+  disposable `reczDC7RrgnX8SKsq` (delete it): 11 designed shots → 14 scenes,
+  each image prompt opening with the designed shot size. **Owed**: one real
+  Cinematic film watched after its clips exist, and the hook's "action" style
+  still says "protagonist" and "climax".
+
 - **The library is ordered by last activity since 2026-09-23** ("Recently
   worked on"; `db/port/activity-order/README.md`, lessons in
   `docs/lessons-site.md`). What counts was the producer's call, asked before

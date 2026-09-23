@@ -213,12 +213,16 @@ alone, so a press that only cut a repeat left the old wording in the box under
 | The editor tells a new step from a repeat and a side detail | the eight real proposals, 16454-16456, table above |
 | The live draft is the committed files | all twelve node bodies byte-compared against `paste/` before publish; `diff-workflow.mjs` — only the expected nodes differ, no dangling `$('…')`; every one of the 16 edge changes read back by hand with its output index |
 | The site half | `npm run check:deepsearch` (the chip, the notes, the reload sum, the panel wiring), `tsc` clean |
+| The whole re-check chain runs on the published version | **16463** on `a2d2328d`: gap 59, one sentence added and placed, `filled` saved through `DS Save`'s `.isExecuted`, `preCheckWords: 178` carried, `short` lifted (119 + 15 ≥ 133). It is also the run that exposed the unsearched "exhausted" and the kept aim — above |
+| The proposer searches now | probes **16469-16475**: six of six named their searches (three to eight each), against one of three before the change; the Keyhole milestone, the March 2005 Google Local integration and the API's commercial terms among what came back |
+| **…and the fix holds on the published version** | **16478** on `8c317407`, the second press on the same film: judge 13 statements, 0 flagged; proposer `SEARCHED` three queries and proposed Keyhole (LIVE, with its 2005 press release) and a 2020 usage figure; editor kept both; the guard ADDED Keyhole after the February 8 launch and DROPPED the figure because it would have sat in front of the closing line's "It". Report: `{sentences: 1, live: 1, looked: true, shortBy: 29}` — the gap is said, and nothing claims the subject is exhausted |
 
 ## Version ids
 
 | Version | What |
 |---|---|
-| `a2d2328d` | the top-up with its editor — **published 2026-09-23, live** |
+| `8c317407` | the proposer must search and name its searches, `exhausted` believed only with one, an aim is `minor` — **published 2026-09-23 13:40, live** |
+| `a2d2328d` | the top-up with its editor — published 2026-09-23 13:28 |
 | `94643a37` … `cecd24de` | the four drafts that built the first iteration (no editor); never published |
 | `8186ec33` | the version this was built on (another session's motif-card change) — **the rollback** |
 
@@ -227,10 +231,12 @@ else moves.
 
 ## The probe
 
-`zz probe top-up` (`R913CsV2sXEavLwd`) ran the real prompts against the real
-film without writing anywhere: `probe/DS Apply (probe).js` stands in for the
-live valve, `probe/Pinned Fill (probe).js` feeds the editor the eight real
-proposals. Archive it when nothing more is owed.
+`zz probe top-up` (`R913CsV2sXEavLwd`, archived) ran the real prompts against
+the real film without writing anywhere: `probe/DS Apply (probe).js` stands in
+for the live valve, `probe/Pinned Fill (probe).js` feeds the editor the nine
+real proposals. Rebuild it from those two files to re-calibrate. It also wrote
+`preCheckWords: 178` into the Google Maps film's report and fired the two live
+presses (16463, 16478) through an HTTP node — the only writes it ever made.
 
 ## What is owed
 
@@ -238,6 +244,17 @@ proposals. Archive it when nothing more is owed.
   exercised live; `FC Fill` → `FC Fill Apply` → `FC Done` has only run in the
   harness. The next documentary written after `a2d2328d` is the proof — read its
   `hov.fact_check.report.filled`, and read the added sentences as prose.
-- **`minor` vs `keep` was calibrated on one film.** Eight proposals about one
+- **`minor` vs `keep` was calibrated on one film.** Nine proposals about one
   subject. Watch the first few reports' `dropped` counts: a film where
   everything is `judged minor` is the old failure back.
+- **The date check cannot see "when it first launched".** The second press put
+  the April 3 Keyhole sentence in front of *"When Google Maps first launched in
+  2005, the team was focused on 'mapping the world'"* — a sentence that means
+  February, dated only by its bare year, which spans the whole year and so
+  contradicts nothing. That sentence is itself a leftover of the first press,
+  added before the editor learned that an aim is `minor`.
+- **The Google Maps film carries three marks of the verification presses**, all
+  now visible in its script box: that aim sentence; *"The prototype became part
+  of Google Maps."*, the rewrite's near-copy of the sentence after it; and the
+  body's loss of *"In October 2004, Google acquired Where 2 Technologies to
+  create Google Maps."* (still in the hook). Offered to the producer to repair.

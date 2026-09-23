@@ -724,6 +724,33 @@ expected and harmless for an app touching only its own Drive.
   Constraining the writer is cheaper than checking the writing — but those two
   nodes are on the main path of EVERY film in every category, so it needs its
   own verification and its own day.
+
+  **A film Deep Search shortened gets its running time back with SOURCED
+  facts, and nothing else** (2026-09-23, Claude Scripting `8c317407`, rollback
+  `8186ec33`; full account `db/port/deep-search-topup/README.md`). The
+  producer's words: give the length back *"dar daca nu mai exista informatii
+  utile nu as vrea sa adauge filler … sa stea sa descrie scena"*. After the
+  valve, on both the first pass and ⟳ Re-check: `FC/DS Top Up?` (gap ≥ 25
+  words against `preCheckWords`, the body before Deep Search touched the film,
+  recorded in the report and carried forward) → `FC/DS Fill` (Research Model,
+  pack first then a web search) → `FC/DS Fill Check` (an editor: keep / repeat
+  / minor / overreach) → `FC/DS Fill Apply` (the guard: `Narration Guard`'s own
+  filler regexes, a source, a date/number/name, no repeat, never re-adding what
+  the judge rejected, only the editor's `keep`, no insertion before a pronoun
+  or out of date order, never after the closing line, the budget as a
+  ceiling). Every agent fails closed: an error adds nothing. **Two lessons
+  that outlive it.** An LLM's "there is nothing more" is a claim, not a
+  measurement: the first live press declared the research exhausted in 5.3 s
+  without one search, on a film whose probes had found Keyhole on the web —
+  so the proposer now names its searches and the code believes `exhausted`
+  only with one named. And **an editor calibrated only against junk rejects
+  everything**: with "a detail the story does not turn on" as `minor`, it
+  ruled Keyhole minor too; doubt now resolves by kind (novelty → repeat,
+  relevance → minor). Calibrated on nine real proposals, 9 of 9 three times.
+  **Owed**: the first pass (`FC Fill*`) has not run on a new film yet; and the
+  same press exposed a hole that is NOT the top-up's — `DS Rewrite` dropped a
+  sentence the judge had ruled `supported` and `DS Apply` accepted it, because
+  no refusal checks that supported sentences survive. Put to the producer.
 - **A Flow refusal that arrives as HTTP 200 no longer kills the film**
   (2026-09-17, Media Generation `6735a96a`, `db/port/regen-unstick/README.md`,
   lesson in `docs/lessons-pipeline.md` under "Flow refuses twice"). **What is

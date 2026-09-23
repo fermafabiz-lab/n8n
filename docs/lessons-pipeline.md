@@ -2231,6 +2231,36 @@ or a shorter film. Neither is a choice this chain gets to make.
 second copy of "how short is too short" cannot be kept in step by intention,
 and the failure is silent in the one direction that matters.
 
+### Giving the length back: "there is nothing more" is a claim — 2026-09-23, LIVE
+
+Once a correction may shorten a film, the producer asked for the running time
+back with real information, and none at all when there is none — never the old
+filler that described the picture. `db/port/deep-search-topup/` does it in three
+stages (a proposer with web search, an editor, a code guard), and two things
+learned building it apply well beyond it.
+
+**A model's "I found nothing" is not evidence that nothing exists.** The first
+live press took one leftover claim from the research, ran no search at all, and
+wrote `DONE: exhausted` in 5.3 seconds — on the film whose probes that morning
+had found Keyhole's satellite imagery on the web. The prompt already said
+"search is expected, not a last resort"; the model read "exhausted" as a way to
+finish. What worked was making the claim checkable: the proposer must list the
+searches it ran on a `SEARCHED:` line, and code believes `exhausted` only with
+one named. Three runs after: three searches, six to eight queries each. **When
+a model's answer turns into a statement the producer will act on ("there is
+nothing more to add"), make it show its work in a field code can read.**
+
+**An editor tuned only against bad examples rejects good ones.** The editor was
+added because code could not tell a paraphrase of the script from a new fact.
+Its first prompt called anything "the story does not turn on" `minor` and said
+"when unsure, do not keep" — and a model reading a five-sentence story finds
+that the story turns on none of the missing steps, Keyhole included. The fix
+was to resolve doubt by KIND (doubt about novelty → repeat, about relevance →
+minor) and to say outright that a step the script could be told without is
+still a step. Calibrate a filter on a set that contains the answer you WANT
+to pass, not only the ones you want stopped: eight real proposals with known
+verdicts, then nine, three runs each.
+
 ### Deep Search is Documentary mode's feature, not the narration's — 2026-09-18
 
 The entry above says the project's `category` cannot tell a documentary from a

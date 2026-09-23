@@ -19,6 +19,16 @@ const wc = (s) => String(s || '').split(/\s+/).filter(Boolean).length;
 
 // Which chapters were allowed to change: the ones containing a flagged quote.
 const toFix = findings.filter((f) => f.action === 'rewrite');
+
+// THE SENTENCES THE JUDGE FOUND SOURCED, which a rewrite must hand back
+// untouched. A sentence is protected only when EVERY finding on it is
+// `supported`: a compound sentence with one unsourced assertion in it is
+// exactly what the rewrite is for, and a `redundant` one is there to be cut.
+const flat = (s) => String(s || '').replace(/\s+/g, ' ').trim();
+const fixQuotes = new Set(toFix.map((f) => flat(f.quote)));
+const keptQuotes = [
+  ...new Set(findings.filter((f) => f.verdict === 'supported').map((f) => flat(f.quote))),
+].filter((q) => q && !fixQuotes.has(q));
 const touched = new Set();
 for (const f of toFix) {
   for (const c of original) {
@@ -134,6 +144,26 @@ if (!fc.needsRewrite) {
       }
       merged.push({ ...c, narrator_script: text });
     }
+    // A SENTENCE THE JUDGE FOUND SOURCED MUST SURVIVE THE REWRITE, word for
+    // word. The producer's Google Maps film (re-check 16463, 2026-09-23): asked
+    // to fix "The prototype proved the idea.", the rewrite replaced it TOGETHER
+    // with the sentence after it — "In October 2004, Google acquired Where 2
+    // Technologies to create Google Maps.", ruled supported on E2 — and wrote a
+    // near-copy of the sentence after that. Every check above passed: the
+    // chapter had something flagged in it, and it lost a fifth of its words, not
+    // half. The producer chose the cost knowingly: a rewrite refused here leaves
+    // the unsourced sentences flagged on the panel instead of corrected.
+    //
+    // Only quotes found in the ORIGINAL are enforced, so a judge that misquoted
+    // a sentence cannot make a good rewrite fail.
+    if (!refusal) {
+      const before = flat(original.map((c) => c.narrator_script).join(' '));
+      const after = flat(merged.map((c) => c.narrator_script).join(' '));
+      const lost = keptQuotes.find((q) => before.includes(q) && !after.includes(q));
+      if (lost) {
+        refusal = 'the rewrite removed a sentence the sources back ("' + (lost.length > 80 ? lost.slice(0, 77) + '…' : lost) + '")';
+      }
+    }
     if (!refusal) next = merged;
   }
 }
@@ -223,6 +253,60 @@ const deduped = cutSentences.size;
 
 const ran = fc.run && !fc.storyMode;
 
+// THE TOP-UP'S ARITHMETIC — see `FC Apply` for why it lives in the valve.
+//
+// THE TARGET IS `preCheckWords`: the body before Deep Search ever touched this
+// film, written by the first pass and carried forward by every re-check. A
+// report from before 2026-09-23 has none, and then the anchor is what THIS
+// press started with — the conservative choice, because it can never lengthen
+// a film past a length it actually had.
+//
+// NOT gated on a correction landing this press. A film shortened by an EARLIER
+// press is still short, and the producer asked for its running time back.
+//
+// PAST THE SCRIPT GATE, NEVER: the scenes carry their own copy of every line.
+const FILL_MIN_GAP = 25;
+const preCheckWords = Number(fc.preCheckWords) > 0 ? Number(fc.preCheckWords) : Number(fc.bodyWords) || 0;
+const gapWords = Math.max(0, preCheckWords - bodyNow);
+const usedRefs = [
+  ...new Set(
+    findings
+      .map((f) => String(f.ref || ''))
+      .join(',')
+      .split(/[^A-Za-z0-9]+/)
+      .filter((r) => /^[A-Za-z]*\d+$/.test(r))
+      .map((r) => r.toUpperCase()),
+  ),
+];
+// A SENTENCE THE TOP-UP ADDED ON AN EARLIER PRESS, THAT THE JUDGE NOW FLAGS,
+// is rejected for good. Without this the button ping-pongs it: one press adds
+// a sourced sentence, the next press's judge rules it redundant and cuts it,
+// the gap reopens, and the press after that adds it straight back. Matched by
+// normalised text, because the judge quotes the sentence exactly as it sits.
+const normS = (x) => String(x || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+const flaggedNow = findings.filter((f) => f.verdict !== 'supported').map((f) => normS(f.quote)).filter(Boolean);
+const newlyRejected = (Array.isArray(fc.prevAdded) ? fc.prevAdded : []).filter((s) => {
+  const n = normS(s);
+  return n && flaggedNow.some((q) => q.includes(n) || n.includes(q));
+});
+const rejected = [...new Set([...(Array.isArray(fc.prevRejected) ? fc.prevRejected : []), ...newlyRejected])];
+if (newlyRejected.length) {
+  console.log('DEEP SEARCH re-run: the fact-checker rejected ' + newlyRejected.length + ' sentence(s) an earlier top-up added; they will not be added again.');
+}
+
+const fill = {
+  run: !!ran && fc.mayRewrite !== false && gapWords >= FILL_MIN_GAP,
+  gapWords,
+  preCheckWords,
+  nowWords: bodyNow,
+  min: floorWords,
+  narration: script,
+  packList: fc.packList || '',
+  usedRefs,
+  rejected,
+  chapters,
+};
+
 const report = ran
   ? {
       category: fc.category || '',
@@ -231,6 +315,10 @@ const report = ran
       sentences: fc.sentences || 0,
       searched: fc.searched || 0,
       rewritten,
+      // Carried forward, so the next press measures against the same length.
+      preCheckWords,
+      // Carried forward too: sentences the top-up may never add again.
+      rejected: rejected.length ? rejected : undefined,
       // The corrected narration is under the film's ordered length. Not a
       // failure and never a refusal — a statement about how much of this film
       // its research can actually support.
@@ -304,6 +392,10 @@ return [
       fcReport64: b64(JSON.stringify(report)),
       script64: b64(script),
       editing64: b64(JSON.stringify(nextEditing)),
+      // For `DS Top Up?` / `DS Fill` / `DS Fill Apply`. `DS Write` and
+      // `DS Save` read only the keys above, so it rides along harmlessly on the
+      // path where the top-up does not run.
+      fill,
     },
   },
 ];

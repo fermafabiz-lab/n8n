@@ -180,7 +180,9 @@ export function deepSearchState({
   const standing = findings.filter((f) => !settled.has(String(f.action))).length;
   const rewritten = report.rewritten ?? 0;
   const deduped = report.deduped ?? 0;
-  const s = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  // "-es" after a sibilant: the corrected chip read "3 fixs" on every film with
+  // more than one correction until the top-up's checks asserted the label.
+  const s = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : /(?:s|x|z|ch|sh)$/.test(w) ? "es" : "s"}`;
 
   // A DELETION IS NEWS TOO, and it is different news from a correction: the
   // producer does not have to reread a sentence that is gone, but they should
@@ -194,6 +196,31 @@ export function deepSearchState({
   const shortNote = report.short
     ? ` The corrected script is ${report.short.words} words against the ${report.short.min} this film's length needs — its research does not cover the whole running time, so either give it more or order it shorter.`
     : "";
+
+  // THE TOP-UP, said as what it did to the text. Added sentences are new words
+  // in a script the producer is about to approve, so they are named — and it is
+  // said plainly that the judge has not read them yet, because it has not: they
+  // are added after it runs, and the next re-check is what reads them.
+  const added = report.filled?.sentences ?? 0;
+  const fillNote =
+    added > 0
+      ? ` ${s(added, "sourced sentence")} ${added === 1 ? "was" : "were"} added to give back running time the corrections took — ${added === 1 ? "it names its" : "each names its"} source, and the next re-check reads ${added === 1 ? "it" : "them"} like everything else.`
+      : "";
+  // STILL SHORT, from the MEASURED gap rather than the model's own claim that it
+  // ran out — the probe had a model say "enough" with two thirds of the gap still
+  // open. Only a gap worth a sentence or two is mentioned, the same threshold the
+  // top-up itself uses, and never on top of `short`, which already says more.
+  const stillShort = report.filled?.shortBy ?? 0;
+  const lengthNote =
+    !report.short && stillShort >= 25
+      ? ` The script is still about ${stillShort} words shorter than it was before Deep Search${
+          report.filled?.exhausted
+            ? " — there was nothing more to add that its sources back"
+            : report.filled?.looked === false
+              ? " — the web was not searched for more this time, so ⟳ Re-check may find some"
+              : ""
+        }.`
+      : "";
 
 
   if (standing > 0) {
@@ -211,7 +238,7 @@ export function deepSearchState({
           ? `${s(standing, "statement")} have nothing behind ${standing === 1 ? "it" : "them"}. This film is past its script gate — the scenes already carry these lines — so nothing was changed for you; edit the scenes that say ${standing === 1 ? "it" : "them"}.`
           : report.refused
             ? `A correction was written and rejected (${report.refused}), so ${s(standing, "statement")} still stand as written.`
-            : `${s(standing, "statement")} in this script have nothing behind ${standing === 1 ? "it" : "them"}.${shortNote}`,
+            : `${s(standing, "statement")} in this script have nothing behind ${standing === 1 ? "it" : "them"}.${shortNote}${fillNote}${lengthNote}`,
       red: false,
     };
   }
@@ -219,7 +246,7 @@ export function deepSearchState({
     return {
       status: "corrected",
       label: `${s(rewritten, "fix")}`,
-      detail: `Deep Search corrected ${s(rewritten, "sentence")} before you saw this script, and everything else checked out.${cutNote}${shortNote}`,
+      detail: `Deep Search corrected ${s(rewritten, "sentence")} before you saw this script, and everything else checked out.${cutNote}${shortNote}${fillNote}${lengthNote}`,
       red: false,
     };
   }
@@ -227,16 +254,38 @@ export function deepSearchState({
     return {
       status: "corrected",
       label: deduped === 1 ? "1 cut" : `${deduped} cut`,
-      detail: `Every statement in this script is backed by the film's sources.${cutNote}${shortNote}`,
+      detail: `Every statement in this script is backed by the film's sources.${cutNote}${shortNote}${fillNote}${lengthNote}`,
+      red: false,
+    };
+  }
+  if (added > 0) {
+    return {
+      status: "corrected",
+      label: `${added} added`,
+      detail: `Every statement Deep Search checked is backed by the film's sources.${fillNote}${lengthNote}`,
       red: false,
     };
   }
   return {
     status: "clean",
     label: "All checked",
-    detail: `All ${s(checked, "statement")} in this script are backed by the film's sources.`,
+    detail: `All ${s(checked, "statement")} in this script are backed by the film's sources.${lengthNote}`,
     red: false,
   };
+}
+
+/**
+ * HOW MANY SENTENCES THIS REPORT CHANGED IN THE SCRIPT, of any kind — corrected,
+ * cut as a repeat, or added by the top-up. One owner, because it decides
+ * whether the page must RELOAD after a re-check: `ScriptReview` seeds its
+ * textarea once, so a soft refresh leaves the old wording on screen under a
+ * report announcing the change. It used to be read off `rewritten` alone, so a
+ * press that only cut a repeat — and now one that only added a sentence — left
+ * the stale text in the box and said "Nothing needed changing".
+ */
+export function scriptChangesIn(report: DeepSearchReport | null | undefined): number {
+  if (!report) return 0;
+  return (report.rewritten ?? 0) + (report.deduped ?? 0) + (report.filled?.sentences ?? 0);
 }
 
 /** The chip class the shared stylesheet already defines. */

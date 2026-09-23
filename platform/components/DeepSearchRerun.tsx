@@ -41,7 +41,7 @@ export default function DeepSearchRerun({
   projectId,
   scriptId,
   checkedAt,
-  rewritten,
+  changed,
 }: {
   projectId: string;
   /**
@@ -53,8 +53,11 @@ export default function DeepSearchRerun({
   scriptId?: string;
   /** When the report on screen was written. The thing we watch for. */
   checkedAt?: string | null;
-  /** Sentences the report on screen says were corrected. */
-  rewritten?: number;
+  /**
+   * Sentences the report on screen says it changed in the script — corrected,
+   * cut as a repeat, or added by the top-up. `scriptChangesIn` owns the sum.
+   */
+  changed?: number;
 }) {
   const [pending, start] = useTransition();
   const [said, setSaid] = useState<ActionResult | null>(null);
@@ -112,8 +115,11 @@ export default function DeepSearchRerun({
     // restores any sessionStorage draft over it — so a soft refresh leaves the
     // old wording in the box under a report announcing the correction. A full
     // reload with the stale draft dropped is the only way the producer reads
-    // what was actually written.
-    if ((rewritten ?? 0) > 0) {
+    // what was actually written. ANY change counts, not only a correction: a
+    // press that only cut a repeat, or only added a sourced sentence, moved the
+    // text just as much, and used to leave the old wording in the box under
+    // "Nothing needed changing".
+    if ((changed ?? 0) > 0) {
       if (draftKey) {
         try {
           sessionStorage.removeItem(draftKey);
@@ -128,7 +134,7 @@ export default function DeepSearchRerun({
       message: "Re-checked. Nothing needed changing — the report below is the new one.",
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [checkedAt, rewritten, waiting]);
+  }, [checkedAt, changed, waiting]);
 
   const fire = () =>
     start(async () => {

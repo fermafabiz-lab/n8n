@@ -1,7 +1,12 @@
 import Disclosure from "@/components/Disclosure";
 import DeepSearchRerun from "@/components/DeepSearchRerun";
-import { deepSearchState, deepSearchTone, type DeepSearchInput } from "@/lib/deep-search";
-import type { DeepSearchFinding } from "@/lib/data";
+import {
+  deepSearchState,
+  deepSearchTone,
+  scriptChangesIn,
+  type DeepSearchInput,
+} from "@/lib/deep-search";
+import type { DeepSearchAddition, DeepSearchFinding } from "@/lib/data";
 
 /**
  * What Deep Search made of this script, shown above the script gate.
@@ -74,6 +79,14 @@ export default function DeepSearchPanel(
   const sentenceCount =
     report?.sentences ?? new Set(findings.map((f) => (f.quote || "").trim()).filter(Boolean)).size;
 
+  // WHAT THE TOP-UP ADDED. New words in a script the producer is about to
+  // approve, written by a model after the judge had finished — so they are
+  // listed one by one with the source each one names, and never folded into
+  // the all-clear, which is a statement about what the judge READ.
+  const additions: DeepSearchAddition[] = Array.isArray(report?.filled?.added)
+    ? report!.filled!.added!.filter((a) => a && a.sentence)
+    : [];
+
   return (
     <div className={`card${state.red ? " errcard" : ""}`} style={{ marginBottom: 20 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -132,9 +145,40 @@ export default function DeepSearchPanel(
             color: "var(--green)",
           }}
         >
-          ✓ Everything in this script is checked and holds up
-          {readTheFinalScript ? ", the opening hook included" : ""} — nothing is flagged.
+          {additions.length > 0 ? (
+            <>
+              ✓ Everything Deep Search checked holds up — nothing is flagged. The{" "}
+              {additions.length === 1 ? "sentence" : `${additions.length} sentences`} added below came
+              after the check, from the sources {additions.length === 1 ? "it names" : "they name"}.
+            </>
+          ) : (
+            <>
+              ✓ Everything in this script is checked and holds up
+              {readTheFinalScript ? ", the opening hook included" : ""} — nothing is flagged.
+            </>
+          )}
         </p>
+      )}
+
+      {additions.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <Disclosure
+            storageKey="deepsearch-added"
+            defaultOpen
+            summary={
+              <span>
+                What was added ({additions.length}) — the script below already contains{" "}
+                {additions.length === 1 ? "it" : "them"}
+              </span>
+            }
+          >
+            <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 12 }}>
+              {additions.map((a, i) => (
+                <Addition key={i} a={a} />
+              ))}
+            </ul>
+          </Disclosure>
+        </div>
       )}
 
       {/* The one thing the first pass could not tell you. Said only on a
@@ -172,7 +216,7 @@ export default function DeepSearchPanel(
           projectId={projectId}
           scriptId={scriptId}
           checkedAt={report?.checkedAt}
-          rewritten={report?.rewritten}
+          changed={scriptChangesIn(report)}
         />
       )}
     </div>
@@ -226,6 +270,45 @@ function labelFor(f: DeepSearchFinding): { label: string; tone: string } {
   // "unsupported" would be a lie — the problem is that the film says it twice.
   if (f.verdict === "redundant") return { label: "REPEATED", tone: "wait" };
   return { label: "UNSUPPORTED", tone: "wait" };
+}
+
+/**
+ * One sentence the top-up added. The sentence as it now reads in the script,
+ * and where it came from — the film's own research (`E7`) or a web search,
+ * which is said in words because "LIVE" means nothing to a producer.
+ */
+function Addition({ a }: { a: DeepSearchAddition }) {
+  const fromSearch = (a.ref || "").toUpperCase() === "LIVE";
+  return (
+    <li style={{ borderLeft: "2px solid var(--line2)", paddingLeft: 12 }}>
+      <div style={{ fontSize: 13, lineHeight: 1.5 }}>&ldquo;{a.sentence}&rdquo;</div>
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          alignItems: "baseline",
+          flexWrap: "wrap",
+          marginTop: 5,
+        }}
+      >
+        <span className="chip run" style={{ fontSize: 10 }}>
+          ADDED
+        </span>
+        <span style={{ fontSize: 12, color: "var(--soft)", lineHeight: 1.5 }}>
+          {fromSearch ? "found by a web search" : `from this film's research, ${a.ref}`}
+          {a.source ? ` — ${a.source}` : ""}
+          {a.url && (
+            <>
+              {" "}
+              <a href={a.url} target="_blank" rel="noopener noreferrer" className="linkish">
+                source ↗
+              </a>
+            </>
+          )}
+        </span>
+      </div>
+    </li>
+  );
 }
 
 function Finding({ group }: { group: DeepSearchFinding[] }) {

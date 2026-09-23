@@ -679,7 +679,9 @@ arrive at the gate covered in red.
 
 | Version | What |
 |---|---|
-| `7a865309` | §10 — the one-sided length band, the `short` record, and the judge ruling on the RELATIONSHIP a sentence asserts — **published 2026-09-23 12:08, and what is live** |
+| `538a914c` | the valve refuses a rewrite that drops a sentence the sources back (re-check 16463) — **published 2026-09-23 ~13:55, and what is live**; account in `db/port/deep-search-topup/README.md` |
+| `8c317407` | the TOP-UP — sourced running time back after a correction, on both chains — published 2026-09-23 13:40; its own account is `db/port/deep-search-topup/README.md` |
+| `7a865309` | §10 — the one-sided length band, the `short` record, and the judge ruling on the RELATIONSHIP a sentence asserts — published 2026-09-23 12:08 |
 | `f379e56d` | the floor the dedupe cuts cannot go under, and the two echoes it spares |
 | `dfc81d23` | §9 — `redundant`, and the rewrite that manufactured four copies of one sentence |
 | `a9ecfbb4` | §7 hook constraint + counterfactuals and whole-category scope are checkable — published 2026-09-19 11:30 |

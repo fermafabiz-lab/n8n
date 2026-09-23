@@ -42,6 +42,16 @@ const wc = (s) => String(s || '').split(/\s+/).filter(Boolean).length;
 
 // Which chapters were allowed to change: the ones containing a flagged quote.
 const toFix = findings.filter((f) => f.action === 'rewrite');
+
+// THE SENTENCES THE JUDGE FOUND SOURCED, which a rewrite must hand back
+// untouched. A sentence is protected only when EVERY finding on it is
+// `supported`: a compound sentence with one unsourced assertion in it is
+// exactly what the rewrite is for, and a `redundant` one is there to be cut.
+const flat = (s) => String(s || '').replace(/\s+/g, ' ').trim();
+const fixQuotes = new Set(toFix.map((f) => flat(f.quote)));
+const keptQuotes = [
+  ...new Set(findings.filter((f) => f.verdict === 'supported').map((f) => flat(f.quote))),
+].filter((q) => q && !fixQuotes.has(q));
 const touched = new Set();
 for (const f of toFix) {
   for (const c of original) {
@@ -146,6 +156,26 @@ if (!fc.needsRewrite) {
       }
       merged.push({ ...c, narrator_script: text });
     }
+    // A SENTENCE THE JUDGE FOUND SOURCED MUST SURVIVE THE REWRITE, word for
+    // word. The producer's Google Maps film (re-check 16463, 2026-09-23): asked
+    // to fix "The prototype proved the idea.", the rewrite replaced it TOGETHER
+    // with the sentence after it — "In October 2004, Google acquired Where 2
+    // Technologies to create Google Maps.", ruled supported on E2 — and wrote a
+    // near-copy of the sentence after that. Every check above passed: the
+    // chapter had something flagged in it, and it lost a fifth of its words, not
+    // half. The producer chose the cost knowingly: a rewrite refused here leaves
+    // the unsourced sentences flagged on the panel instead of corrected.
+    //
+    // Only quotes found in the ORIGINAL are enforced, so a judge that misquoted
+    // a sentence cannot make a good rewrite fail.
+    if (!refusal) {
+      const before = flat(original.map((c) => c.narrator_script).join(' '));
+      const after = flat(merged.map((c) => c.narrator_script).join(' '));
+      const lost = keptQuotes.find((q) => before.includes(q) && !after.includes(q));
+      if (lost) {
+        refusal = 'the rewrite removed a sentence the sources back ("' + (lost.length > 80 ? lost.slice(0, 77) + '…' : lost) + '")';
+      }
+    }
     if (!refusal) next = merged;
   }
 }
@@ -222,6 +252,47 @@ if (wentShort) {
   );
 }
 
+// THE TOP-UP'S ARITHMETIC, done here because this is the one node that holds
+// both what the narration weighed when it arrived and what it weighs now.
+//
+// `preCheckWords` IS WHAT THE FILM WEIGHED BEFORE DEEP SEARCH TOUCHED IT, and
+// on the first pass that is simply the body `Narration Guard` handed over. It
+// is written into the report so that every later re-check measures against the
+// same number: the re-check rewrites the script row in place, and without this
+// the length before the first correction would be gone after the first press.
+// A distinct name on purpose — `fc.originalWords` already exists and counts the
+// RENDERED text, chapter markers included, which is a different quantity.
+//
+// The top-up runs only for a gap worth a sentence or two. Under that, the film
+// is within the noise of its own length and adding a sentence to close it is
+// exactly the padding the producer asked to be spared.
+const FILL_MIN_GAP = 25;
+const preCheckWords = original.reduce((n, c) => n + wc(c.narrator_script), 0);
+const gapWords = Math.max(0, preCheckWords - words);
+const usedRefs = [
+  ...new Set(
+    findings
+      .map((f) => String(f.ref || ''))
+      .join(',')
+      .split(/[^A-Za-z0-9]+/)
+      .filter((r) => /^[A-Za-z]*\d+$/.test(r))
+      .map((r) => r.toUpperCase()),
+  ),
+];
+const fill = {
+  run: !!fc.run && !fc.storyMode && gapWords >= FILL_MIN_GAP,
+  gapWords,
+  preCheckWords,
+  nowWords: words,
+  min: floorWords,
+  narration: output,
+  packList: fc.packList || '',
+  usedRefs,
+  // The first pass has no earlier presses, so nothing has been rejected yet.
+  rejected: [],
+  chapters,
+};
+
 const report = fc.run
   ? {
       // The mode the film was made in, carried so the panel can say it back
@@ -236,6 +307,9 @@ const report = fc.run
       sentences: fc.sentences || new Set(findings.map((f) => String(f.quote || '').trim())).size,
       searched: fc.searched || 0,
       rewritten,
+      // What the narration weighed before Deep Search touched it — the length
+      // the top-up restores toward, carried forward by every re-check.
+      preCheckWords,
       // The corrected narration is under the film's ordered length. Not a
       // failure and never a refusal — a statement about how much of this film
       // its research can actually support.
@@ -300,6 +374,9 @@ return [
       max: g.max,
       fcReport: report,
       fcReport64,
+      // For `FC Top Up?` / `FC Fill` / `FC Fill Apply`. `FC Done` strips it
+      // again before `Combine Chapters`, so nothing downstream carries it.
+      fill,
     },
   },
 ];

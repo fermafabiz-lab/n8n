@@ -15,7 +15,8 @@
 //
 // So every branch is asserted here, including the ones that must NOT be red.
 
-import { deepSearchState, deepSearchTone } from "../lib/deep-search.ts";
+import { readFileSync } from "node:fs";
+import { deepSearchState, deepSearchTone, scriptChangesIn } from "../lib/deep-search.ts";
 
 let failures = 0;
 const ok = (label, cond, detail) => {
@@ -249,6 +250,111 @@ console.log("A correction that made the film shorter than it was ordered");
     scriptExists: true,
   });
   ok("no shortness, no sentence about it", !/words against the/.test(s.detail));
+}
+
+console.log("The top-up — sourced sentences added back");
+{
+  // ADDED WORDS ARE A CHANGE TO THE TEXT, so a report whose only change is an
+  // addition must not read as "All checked": the producer is about to approve
+  // a script with sentences in it the judge has not read.
+  const s = deepSearchState({
+    report: {
+      checked: 12,
+      rewritten: 0,
+      filled: { sentences: 2, words: 31, added: [{ chapter: 1, sentence: "x", ref: "LIVE" }] },
+      findings: [finding("kept", "supported")],
+    },
+    isDocumentary: true,
+    scriptExists: true,
+  });
+  ok("an addition alone is a change, not a clean bill", s.status === "corrected" && s.red === false);
+  ok("and the chip counts what was added", s.label === "2 added");
+  ok("and the detail says so, and that each names its source", /2 sourced sentences were added/.test(s.detail) && /names its source/.test(s.detail));
+}
+{
+  // ALONGSIDE A CORRECTION the correction keeps the chip; the addition is said
+  // in the detail rather than lost.
+  const s = deepSearchState({
+    report: {
+      checked: 12,
+      rewritten: 3,
+      filled: { sentences: 1, words: 15 },
+      findings: [finding("rewritten")],
+    },
+    isDocumentary: true,
+    scriptExists: true,
+  });
+  ok("a correction keeps its own label", s.label === "3 fixes");
+  ok("and the addition rides in the detail", /1 sourced sentence was added/.test(s.detail));
+}
+{
+  // STILL SHORT, AND WHY — from the MEASURED gap, with "nothing more to add"
+  // only when the model actually said it ran out.
+  const exhausted = deepSearchState({
+    report: { checked: 12, rewritten: 3, filled: { sentences: 0, words: 0, shortBy: 48, exhausted: true }, findings: [finding("rewritten")] },
+    isDocumentary: true,
+    scriptExists: true,
+  });
+  ok("a film still short is told how short", /about 48 words shorter than it was before Deep Search/.test(exhausted.detail));
+  ok("and that its sources had nothing more, when that was said", /nothing more to add that its sources back/.test(exhausted.detail));
+  const notSaid = deepSearchState({
+    report: { checked: 12, rewritten: 3, filled: { sentences: 1, words: 15, shortBy: 30 }, findings: [finding("rewritten")] },
+    isDocumentary: true,
+    scriptExists: true,
+  });
+  ok("but never claims the sources ran out when nobody said so", /30 words shorter/.test(notSaid.detail) && !/nothing more to add/.test(notSaid.detail));
+  // THE FIRST LIVE PRESS: "exhausted" with no search behind it. The guard no
+  // longer believes it, and the panel says the one true thing — nobody looked.
+  const unlooked = deepSearchState({
+    report: { checked: 12, rewritten: 2, filled: { sentences: 1, words: 15, shortBy: 44, looked: false }, findings: [finding("rewritten")] },
+    isDocumentary: true,
+    scriptExists: true,
+  });
+  ok("a gap nobody searched for says so, and points at the button", /web was not searched for more/.test(unlooked.detail) && /Re-check may find some/.test(unlooked.detail) && !/nothing more to add/.test(unlooked.detail));
+  const small = deepSearchState({
+    report: { checked: 12, rewritten: 3, filled: { sentences: 1, words: 15, shortBy: 12 }, findings: [finding("rewritten")] },
+    isDocumentary: true,
+    scriptExists: true,
+  });
+  ok("a gap under a sentence or two is not worth a line", !/shorter than it was/.test(small.detail));
+  const both = deepSearchState({
+    report: { checked: 12, rewritten: 3, short: { words: 90, min: 133 }, filled: { sentences: 0, words: 0, shortBy: 60 }, findings: [finding("rewritten")] },
+    isDocumentary: true,
+    scriptExists: true,
+  });
+  ok("and never on top of `short`, which already says more", /90 words against the 133/.test(both.detail) && !/shorter than it was before/.test(both.detail));
+}
+{
+  // A report from before the top-up existed must read exactly as it did.
+  const s = deepSearchState({
+    report: { checked: 12, rewritten: 0, findings: [finding("kept", "supported")] },
+    isDocumentary: true,
+    scriptExists: true,
+  });
+  ok("no `filled`, no mention of it", s.status === "clean" && !/added|shorter than it was/.test(s.detail));
+}
+
+console.log("What makes the page reload after a re-check");
+{
+  // THE BUTTON'S RELOAD DECISION. `ScriptReview` seeds its textarea once, so
+  // any change to the text needs a real reload — and it used to be read off
+  // `rewritten` alone, so a press that only cut a repeat left the old wording
+  // on screen under "Nothing needed changing". Every kind of change counts.
+  ok("nothing changed, no reload", scriptChangesIn({ checked: 5, rewritten: 0 }) === 0);
+  ok("a correction reloads", scriptChangesIn({ rewritten: 2 }) === 2);
+  ok("a cut repeat alone reloads", scriptChangesIn({ rewritten: 0, deduped: 1 }) === 1);
+  ok("an addition alone reloads", scriptChangesIn({ filled: { sentences: 2, words: 30 } }) === 2);
+  ok("all three add up", scriptChangesIn({ rewritten: 1, deduped: 1, filled: { sentences: 1, words: 15 } }) === 3);
+  ok("no report, no reload", scriptChangesIn(null) === 0);
+}
+{
+  // The button must be handed that sum, not `rewritten`.
+  const panel = readFileSync(new URL("../components/DeepSearchPanel.tsx", import.meta.url), "utf8");
+  const button = readFileSync(new URL("../components/DeepSearchRerun.tsx", import.meta.url), "utf8");
+  ok("the panel hands the button every change", panel.includes("changed={scriptChangesIn(report)}"));
+  ok("and the button reloads on it", button.includes("if ((changed ?? 0) > 0) {") && !/rewritten\s*\?\?\s*0\)\s*>\s*0/.test(button));
+  ok("the panel lists what was added, with its source", panel.includes("function Addition(") && panel.includes("found by a web search"));
+  ok("and the all-clear no longer claims the judge read the additions", panel.includes("came\n              after the check"));
 }
 
 console.log("Tone");

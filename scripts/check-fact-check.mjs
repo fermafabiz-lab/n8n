@@ -1337,12 +1337,12 @@ console.log('DS Rewrite, DS Write, DS Save, DS Load');
 }
 {
   const sql = readFileSync(join(DS, 'DS Save.sql'), 'utf8');
-  ok('decodes the report in Postgres rather than inlining prose', /decode\('\{\{ \$\("DS Apply"\)\.first\(\)\.json\.fcReport64 \}\}',\s*'base64'\)/.test(sql));
+  ok('decodes the report in Postgres rather than inlining prose', /decode\('\{\{ \(\$\("DS Fill Apply"\)\.isExecuted \? \$\("DS Fill Apply"\) : \$\("DS Apply"\)\)\.first\(\)\.json\.fcReport64 \}\}',\s*'base64'\)/.test(sql) && !/\.fcReport \}\}/.test(sql));
   // BY NAME, NOT `$json`. `DS Write` runs between `DS Apply` and this node and
   // emits `{script_rows, hook_rows}`, so `$json.fcReport64` is undefined and
   // the node dies with "invalid base64 end sequence" — execution 15202, where
   // the correction was written and the report describing it was not.
-  ok('reads the report off `DS Apply`, which `DS Write` does not pass through', !/\$json\.fcReport64/.test(sql) && !/\$json\.projectId/.test(sql));
+  ok('reads the report BY NAME, never off `$json`, which `DS Write` does not pass through', !/\$json\.fcReport64/.test(sql) && !/\$json\.projectId/.test(sql));
   ok('whitelists the project id rather than quoting around it', sql.includes('replace(/[^A-Za-z0-9_-]/g'));
   ok('upserts on the project', /on conflict \(project_id\) do update/.test(sql));
 }
@@ -1355,6 +1355,706 @@ console.log('DS Rewrite, DS Write, DS Save, DS Load');
   // Without the ordered length there is no floor, and the cuts are bounded
   // per press and unbounded across presses.
   ok('and reads the ordered length, which is what floors the cuts', /coalesce\(p\.length_seconds, 64\) as length_seconds/.test(sql));
+}
+
+// ---------------------------------------------------------------------------
+// THE TOP-UP — `db/port/deep-search-topup/`. When the corrections leave a film
+// short of what it weighed before Deep Search touched it, `FC Fill` / `DS Fill`
+// propose SOURCED facts and `FC Fill Apply` / `DS Fill Apply` delete every one
+// that is filler. The producer's two conditions, verbatim: give the running
+// time back, "dar daca nu mai exista informatii utile nu as vrea sa adauge
+// filler asa cum facea inainte si sa stea sa descrie scena".
+// ---------------------------------------------------------------------------
+
+const TOPUP = join(here, '..', 'db', 'port', 'deep-search-topup', 'paste');
+
+// THE EDITOR (`Fill Check`) stands in here as a reader that says `keep` to
+// every proposal, unless a test hands it verdicts of its own. That way the
+// tests written for the code rules still test the code rules: a proposal they
+// expect deleted is deleted by the rule they name, not by a missing verdict.
+const keepAll = (raw) =>
+  String(raw || '')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.startsWith('ADD:'))
+    .map((l, i) => `CHECK: ${i + 1} | VERDICT: keep | WHY: fixture`)
+    .join('\n');
+function runFill(file, opts) {
+  const nodes = { ...(opts.nodes || {}) };
+  const [fillNode, checkNode] = file.startsWith('DS') ? ['DS Fill', 'DS Fill Check'] : ['FC Fill', 'FC Fill Check'];
+  if (!(checkNode in nodes) && fillNode in nodes) nodes[checkNode] = { output: keepAll((nodes[fillNode] || {}).output) };
+  return runNode(file, { ...opts, nodes });
+}
+const wcount = (s) => String(s || '').split(/\s+/).filter(Boolean).length;
+
+console.log('A sentence the sources back survives the rewrite');
+{
+  // FC: the rewrite fixed the flagged sentence AND dropped the supported one.
+  const out = runNode('FC Apply.js', {
+    json: {},
+    nodes: {
+      'FC Resolve': resolved([{ ...SUPPORTED(), action: 'keep' }, { ...UNSUPPORTED(), action: 'rewrite' }]),
+      'FC Rewrite': {
+        output: {
+          chapters: [
+            { chapter_number: 1, chapter_title: 'The acquisition', narrator_script: 'Where 2 joined Google that autumn. Google said the brothers stayed with the project through launch.' },
+            { chapter_number: 2, chapter_title: 'Launch', narrator_script: CH2 },
+          ],
+        },
+      },
+    },
+  });
+  ok('a rewrite that loses a sourced sentence is refused', out.chapters[0].narrator_script === CH1);
+  ok('and the refusal names the sentence it lost', /removed a sentence the sources back/.test(out.fcReport.refused || '') && (out.fcReport.refused || '').includes('Google acquired Where 2 Technologies in October 2004.'));
+  ok('and the flagged sentence reads as still standing, not as fixed', out.fcReport.rewritten === 0 && out.fcReport.findings[1].action === 'flagged');
+}
+{
+  // A COMPOUND SENTENCE with one unsourced assertion is exactly what the
+  // rewrite is for — its supported half must not protect it.
+  const q = UNSUPPORTED().quote;
+  const out = runNode('FC Apply.js', {
+    json: {},
+    nodes: {
+      'FC Resolve': resolved([
+        { ...SUPPORTED(), action: 'keep' },
+        { ...SUPPORTED(), quote: q, claim: 'Lars and Jens were on the team.', action: 'keep' },
+        { ...UNSUPPORTED(), action: 'rewrite' },
+      ]),
+      'FC Rewrite': {
+        output: {
+          chapters: [
+            { chapter_number: 1, chapter_title: 'The acquisition', narrator_script: FIXED_CH1 },
+            { chapter_number: 2, chapter_title: 'Launch', narrator_script: CH2 },
+          ],
+        },
+      },
+    },
+  });
+  ok('a sentence with any unsourced assertion may still be rewritten', out.fcReport.refused === undefined && out.chapters[0].narrator_script === FIXED_CH1);
+}
+{
+  // A JUDGE THAT MISQUOTED a supported sentence cannot make a good rewrite
+  // fail: only quotes found in the original are enforced.
+  const out = runNode('FC Apply.js', {
+    json: {},
+    nodes: {
+      'FC Resolve': resolved([
+        { ...SUPPORTED(), quote: 'Google bought Where 2 in October 2004.', action: 'keep' },
+        { ...UNSUPPORTED(), action: 'rewrite' },
+      ]),
+      'FC Rewrite': {
+        output: {
+          chapters: [
+            { chapter_number: 1, chapter_title: 'The acquisition', narrator_script: FIXED_CH1 },
+            { chapter_number: 2, chapter_title: 'Launch', narrator_script: CH2 },
+          ],
+        },
+      },
+    },
+  });
+  ok('a misquoted supported sentence does not block the rewrite', out.fcReport.refused === undefined && out.fcReport.rewritten === 1);
+}
+{
+  // Whitespace is not a change: the rewrite may move a paragraph break.
+  const out = runNode('FC Apply.js', {
+    json: {},
+    nodes: {
+      'FC Resolve': resolved([{ ...SUPPORTED(), action: 'keep' }, { ...UNSUPPORTED(), action: 'rewrite' }]),
+      'FC Rewrite': {
+        output: {
+          chapters: [
+            { chapter_number: 1, chapter_title: 'The acquisition', narrator_script: FIXED_CH1.replace('2004. ', '2004.\n\n') },
+            { chapter_number: 2, chapter_title: 'Launch', narrator_script: CH2 },
+          ],
+        },
+      },
+    },
+  });
+  ok('a new paragraph break around a sourced sentence is not a loss', out.fcReport.refused === undefined);
+}
+{
+  // THE CASE THAT CAUSED IT, verbatim: the producer's Google Maps film,
+  // re-check 16463 on 2026-09-23. Asked to fix "The prototype proved the
+  // idea.", `DS Rewrite` replaced it together with the supported acquisition
+  // sentence after it, and `DS Apply` accepted the result.
+  const HOOK = 'In October 2004, Google acquired Where 2 Technologies.';
+  const P1 = 'In 2003, Where 2 Technologies was founded in Sydney by Lars Eilstrup Rasmussen, Jens Eilstrup Rasmussen, Noel Gordon, and Stephen Ma. They built a map that replaced clicking arrows and waiting with dragging under a mouse, while it rendered smoothly and quickly.';
+  const P3 = 'Inside Google, the Sydney software became part of Google Maps. On February 8, 2005, Google Maps launched for desktop as a new solution, Google said, to help people get from point A to point B. The work that began in Sydney had become a public map service.';
+  const PROVED = 'The prototype proved the idea.';
+  const ACQ = 'In October 2004, Google acquired Where 2 Technologies to create Google Maps.';
+  const CLOSE = 'It had become a platform other people could build on, and its later reach still lay ahead.';
+  const before = `${P1}\n\n${PROVED} ${ACQ}\n\n${P3}\n\nOn June 29, 2005, Google released the Google Maps API for external use. ${CLOSE}`;
+  const script = `[CHAPTER 0: HOOK]\n${HOOK}\n\n[CHAPTER 1: From Sydney Prototype to Public Platform]\n${before}`;
+  const prep = runNode('DS Prep.js', {
+    json: dsRow({ script, length_seconds: 90, editing_options: JSON.stringify({ category: 'documentary', hookPlan: { beats: [HOOK] } }) }),
+    dir: DS,
+  });
+  const S = (quote, claim) => ({ quote, claim, verdict: 'supported', ref: 'E2', reason: 'E2 states it.' });
+  const U = (quote, claim) => ({ quote, claim, verdict: 'unsupported', ref: '', reason: 'Nothing states it.' });
+  const findings = [
+    S(HOOK, 'Google acquired Where 2 Technologies in October 2004.'),
+    S(PROVED, 'There was a prototype.'),
+    U(PROVED, 'The prototype proved the idea.'),
+    S(ACQ, 'Google acquired Where 2 Technologies in October 2004.'),
+    S(ACQ, 'Google acquired Where 2 Technologies to create Google Maps.'),
+    S('Inside Google, the Sydney software became part of Google Maps.', 'The Sydney software became part of Google Maps.'),
+    S(CLOSE, 'Google Maps had become a platform other people could build on.'),
+    U(CLOSE, 'Its later reach still lay ahead.'),
+  ];
+  // Fresh findings for every case: `DS Apply` marks each finding's `action` in
+  // place, so a resolved payload reused across two runs is not the same input.
+  const resolveFresh = () => {
+    const judged = { output: { mode: 'factual', findings: JSON.parse(JSON.stringify(findings)) } };
+    return runNode('DS Resolve.js', { json: judged, nodes: { 'DS Prep': JSON.parse(JSON.stringify(prep)), 'DS Judge': judged }, dir: DS });
+  };
+  const rewriteWith = (body) =>
+    dsApply(resolveFresh(), { output: { chapters: [{ chapter_number: 0, narrator_script: HOOK }, { chapter_number: 1, narrator_script: body }] } });
+  const what16463Did = rewriteWith(`${P1}\n\nThe prototype became part of Google Maps.\n\n${P3}\n\nOn June 29, 2005, Google released the Google Maps API for external use. It had become a platform other people could build on.`);
+  ok('the 16463 rewrite is refused now', what16463Did.scriptChanged === false && (what16463Did.fcReport.refused || '').includes('In October 2004, Google acquired Where 2 Technologies to create Google Maps.'));
+  ok('so the acquisition sentence stays in the film', what16463Did.script.includes(ACQ));
+  const theRightFix = rewriteWith(`${P1}\n\n${ACQ}\n\n${P3}\n\nOn June 29, 2005, Google released the Google Maps API for external use. It had become a platform other people could build on.`);
+  ok('while the fix it should have made is accepted', theRightFix.fcReport.refused === undefined && theRightFix.fcReport.rewritten === 2 && theRightFix.script.includes(ACQ) && !theRightFix.script.includes(PROVED));
+}
+
+console.log('Top-up — the gap is measured in the valve');
+{
+  // A chapter that loses three of its six sentences: a real cut, well past the
+  // 25-word threshold and still inside the "lost more than half" refusal.
+  const S = (i) => `Source ${i} records that the company filed its patent number ${1000 + i} in 2004.`;
+  const long = [1, 2, 3, 4, 5, 6].map(S).join(' ');
+  const kept = [1, 3, 5].map(S).join(' ');
+  const cut = [2, 4, 6].map((i) => ({ quote: S(i), claim: S(i), verdict: 'unsupported', ref: '', reason: 'x', action: 'rewrite' }));
+  const base = resolved([...cut, { ...SUPPORTED(), quote: S(1), ref: 'E1, E3', action: 'keep' }]);
+  base.chapters = [{ chapter_number: 1, chapter_title: 'The patent', narrator_script: long }];
+  const out = runNode('FC Apply.js', {
+    json: {},
+    nodes: {
+      'FC Resolve': base,
+      'FC Rewrite': { output: { chapters: [{ chapter_number: 1, chapter_title: 'The patent', narrator_script: kept }] } },
+    },
+  });
+  ok('the correction lands', out.fcReport.refused === undefined && out.output.includes(S(1)) && !out.output.includes(S(2)));
+  ok('the length before Deep Search is the body that ARRIVED', out.fill.preCheckWords === wcount(long));
+  ok('and it is written into the report, so every re-check measures against it', out.fcReport.preCheckWords === wcount(long));
+  ok('the gap is exactly what the correction removed', out.fill.gapWords === wcount(long) - wcount(kept));
+  ok('a gap worth two sentences switches the top-up on', out.fill.run === true);
+  ok('it is handed the CORRECTED chapters, not the draft', out.fill.chapters[0].narrator_script === kept);
+  ok('and the narration in the shape the prompt reads', out.fill.narration === out.output);
+  ok('and the pack, so it can reach for claims the script has not used', out.fill.packList.includes('E1.'));
+  ok('refs the judge cited are listed as already used, split and upper-cased', out.fill.usedRefs.includes('E1') && out.fill.usedRefs.includes('E3'));
+}
+{
+  // Under the threshold the film is within the noise of its own length, and a
+  // sentence added to close it is exactly the padding the producer refused.
+  const out = runNode('FC Apply.js', {
+    json: {},
+    nodes: {
+      'FC Resolve': resolved([{ ...UNSUPPORTED(), action: 'rewrite' }]),
+      'FC Rewrite': { output: { chapters: [
+        { chapter_number: 1, chapter_title: 'The acquisition', narrator_script: 'Google acquired Where 2 Technologies in October 2004.' },
+        { chapter_number: 2, chapter_title: 'Launch', narrator_script: CH2 },
+      ] } },
+    },
+  });
+  ok('a gap of a few words does not start the top-up', out.fill.gapWords > 0 && out.fill.gapWords < 25 && out.fill.run === false);
+}
+{
+  // A film Deep Search declined has nothing to restore.
+  const out = runNode('FC Apply.js', { json: {}, nodes: { 'FC Prep': prepped({ run: false, skipCode: 'not-documentary' }) } });
+  ok('a skipped film never tops up', out.fill.run === false && out.fill.gapWords === 0);
+}
+{
+  // THE RE-CHECK MEASURES AGAINST THE RECORDED LENGTH, not against what this
+  // press started with. A film an earlier press shortened is still short, and
+  // this press may find nothing new to correct at all.
+  const clean = dsResolve([dsFindings()[1]], { bodyWords: 5, preCheckWords: 200, minWords: 10 });
+  const out = dsApply(clean);
+  ok('nothing corrected this press', out.fcReport.rewritten === 0);
+  ok('but the film is measured against what it weighed before Deep Search', out.fill.preCheckWords === 200 && out.fill.gapWords === 200 - out.fill.nowWords);
+  ok('so the top-up runs anyway', out.fill.run === true);
+  ok('and the recorded length is carried forward in the new report', out.fcReport.preCheckWords === 200);
+  ok('the hook is not counted, because Narration Guard did not count it', out.fill.nowWords === wcount(DS_CH1));
+}
+{
+  // A report from before the top-up existed has no recorded length. Then the
+  // anchor is this press's own starting point — which can never lengthen a
+  // film beyond a length it actually had.
+  const clean = dsResolve([dsFindings()[1]], { bodyWords: wcount(DS_CH1), minWords: 1 });
+  const out = dsApply(clean);
+  ok('no recorded length falls back to this press, not to the ordered target', out.fill.preCheckWords === wcount(DS_CH1) && out.fill.run === false);
+}
+{
+  // PAST THE SCRIPT GATE THE SCENES CARRY THEIR OWN COPY OF EVERY LINE.
+  const frozen = dsResolve([dsFindings()[1]], { bodyWords: 5, preCheckWords: 200, minWords: 10, mayRewrite: false, sceneCount: 12 });
+  const out = dsApply(frozen);
+  ok('a film past its script gate is never topped up', out.fill.gapWords > 25 && out.fill.run === false);
+}
+{
+  const out = runNode('DS Prep.js', { json: dsRow({ pre_check_words: 178 }), dir: DS });
+  ok('DS Prep carries the recorded length off the old report', out.fc.preCheckWords === 178);
+  const none = runNode('DS Prep.js', { json: dsRow(), dir: DS });
+  ok('and zero when the report predates it', none.fc.preCheckWords === 0);
+}
+
+// The fixture every guard test below starts from: a hook, a founding chapter,
+// and a last chapter with its resolution set apart as its own paragraph.
+const TU_HOOK = 'In 2003, two brothers in Sydney drew a map that moved.';
+const TU_CH1 = 'In early 2003, Lars Rasmussen and Jens Rasmussen founded Where 2 Technologies in Sydney. Their prototype let a user drag a map inside a web browser.';
+const TU_P1 = 'Google acquired Where 2 Technologies in October 2004.';
+const TU_END = 'The work that began in Sydney had become a public map service.';
+const TU_P2 = 'Google Maps launched on February 8, 2005. ' + TU_END;
+const TU_CH2 = TU_P1 + '\n\n' + TU_P2;
+const TU_PACK = [
+  'E1. Where 2 Technologies was founded in Sydney in 2003 by Lars and Jens Rasmussen. [Google, 2005 — https://example.org/1]',
+  'E2. Google acquired Where 2 Technologies in October 2004. [Google, 2004 — https://example.org/2]',
+  'E3. Google acquired Keyhole, a satellite imagery company, in October 2004. [Google, 2004 — https://example.org/3]',
+  'E4. Google acquired ZipDash, a traffic analysis company, in 2004. [TechCrunch, 2004 — https://example.org/4]',
+  'E5. Google Maps added satellite imagery from Keyhole in April 2005. [Google, 2005 — https://example.org/5]',
+].join('\n');
+const tuChapters = () => [
+  { chapter_number: 0, chapter_title: 'HOOK', narrator_script: TU_HOOK },
+  { chapter_number: 1, chapter_title: 'Sydney', narrator_script: TU_CH1 },
+  { chapter_number: 2, chapter_title: 'Google', narrator_script: TU_CH2 },
+];
+const tuFill = (over = {}) => ({ run: true, gapWords: 60, preCheckWords: 140, nowWords: 80, min: 40, narration: 'x', packList: TU_PACK, usedRefs: ['E1', 'E2'], chapters: tuChapters(), ...over });
+const ADD = (ch, after, ref, sentence, { source = ref === 'LIVE' ? 'Google' : '', url = '' } = {}) =>
+  `ADD: ${ch} | AFTER: ${after} | REF: ${ref} | SOURCE: ${source} | URL: ${url} | SENTENCE: ${sentence}`;
+const fcFill = (lines, fillOver = {}, reportOver = {}) =>
+  runFill('FC Fill Apply.js', {
+    dir: TOPUP,
+    nodes: {
+      'FC Apply': { output: 'x', retry: false, chapters: tuChapters(), words: 0, target: 100, min: 40, max: 112, fcReport: { checked: 5, rewritten: 1, preCheckWords: 140, findings: [], ...reportOver }, fcReport64: '', fill: tuFill(fillOver) },
+      'FC Fill': { output: Array.isArray(lines) ? lines.join('\n') : lines },
+    },
+  });
+const chap = (out, n) => out.chapters.find((c) => Number(c.chapter_number) === n).narrator_script;
+
+const GOOD_E3 = 'The same month, Google also bought Keyhole, a satellite imagery company.';
+const GOOD_LIVE = 'In 2004, Where 2 Technologies showed its prototype to Google in Mountain View.';
+const LIVE_URL = 'https://googleblog.blogspot.com/2005/02/mapping-your-way.html';
+
+console.log('Top-up — what a sentence needs to be kept');
+{
+  const out = fcFill([ADD(2, TU_P1, 'E3', GOOD_E3), 'DONE: enough']);
+  ok('a new fact from an unused claim is added', chap(out, 2).includes(GOOD_E3));
+  ok('right after the sentence it names, where it belongs in time', chap(out, 2).includes(TU_P1 + ' ' + GOOD_E3));
+  ok('and the report names it, its claim and its source', out.fcReport.filled.sentences === 1 && out.fcReport.filled.added[0].ref === 'E3' && out.fcReport.filled.added[0].sentence === GOOD_E3);
+  ok('counting what it gave back', out.fcReport.filled.words === wcount(GOOD_E3) && out.fcReport.filled.shortBy === 60 - wcount(GOOD_E3));
+}
+{
+  const out = fcFill([ADD(1, 'END', 'LIVE', GOOD_LIVE, { url: LIVE_URL }), 'SEARCHED: google maps 2005; keyhole satellite imagery', 'DONE: exhausted']);
+  ok('a fact found by a live search is added when it brings its URL', chap(out, 1).endsWith(GOOD_LIVE));
+  ok('and is counted as a live find', out.fcReport.filled.live === 1 && out.fcReport.filled.added[0].url === LIVE_URL);
+  ok('"the research ran out" reaches the report', out.fcReport.filled.exhausted === true);
+}
+
+console.log('Top-up — what gets deleted, one sentence at a time');
+const dropReason = (line) => {
+  const out = fcFill([line]);
+  const d = out.fcReport.filled.dropped || {};
+  return { out, why: Object.keys(d)[0], untouched: out.chapters.every((c, i) => c.narrator_script === tuChapters()[i].narrator_script) };
+};
+for (const [label, line, why] of [
+  ['a claim that is not in the pack', ADD(1, 'END', 'E99', 'Lars Rasmussen later joined Facebook in 2010 after leaving.'), 'no source'],
+  ['a live find with no URL', ADD(1, 'END', 'LIVE', GOOD_LIVE, { url: '' }), 'no source'],
+  ['the light on the scene (texture)', ADD(1, 'END', 'E1', 'The harbour light glowed over Sydney while the Rasmussen brothers worked in 2003.'), 'describes the picture'],
+  ['a sentence that opens on scenery', ADD(1, 'END', 'E1', 'Rain fell on Sydney while the Rasmussen brothers coded through 2003.'), 'describes the picture'],
+  ['a camera line', ADD(1, 'END', 'E1', 'A close-up shows the Rasmussen brothers at their Sydney desk in 2003.'), 'describes the picture'],
+  ['commentary on what it meant', ADD(1, 'END', 'E1', 'That is how two brothers in Sydney started a company in 2003.'), 'comments instead of telling'],
+  ['a sentence about the film itself', ADD(1, 'END', 'E1', 'In this film, the Rasmussen brothers found Where 2 in Sydney in 2003.'), 'comments instead of telling'],
+  ['a sentence with no date, number or name', ADD(1, 'END', 'LIVE', 'the team worked on the idea for many long months together.', { url: LIVE_URL }), 'no date, number or name'],
+  ['a sentence that cites a claim it does not carry', ADD(1, 'END', 'E4', 'Microsoft launched its own web map service in 2005 as well.'), 'does not carry its claim'],
+  ['a restatement of the script', ADD(1, 'END', 'E2', 'In October 2004, Google acquired Where 2 Technologies.'), 'repeats the script'],
+  ['anything in the hook', ADD(0, 'END', 'E1', 'Where 2 Technologies began in Sydney in 2003 with two brothers.'), 'no such chapter, or the hook'],
+  ['a fragment', ADD(1, 'END', 'E1', 'Sydney, 2003.'), 'not one sentence of fact'],
+]) {
+  const r = dropReason(line);
+  ok(`${label} is deleted (${why})`, r.why === why && r.untouched, `got ${r.why}`);
+}
+{
+  // ONE CLAIM, ONE SENTENCE. Stretching a single fact across two sentences is
+  // how a narration reaches a word count without saying more.
+  const out = fcFill([
+    ADD(2, 'Google Maps launched on February 8, 2005.', 'E5', 'In April 2005, Google Maps added satellite pictures drawn from Keyhole.'),
+    ADD(1, 'END', 'E5', 'Keyhole imagery reached Google Maps users in April 2005 across the United States.'),
+  ]);
+  ok('a second sentence from the same claim is deleted', out.fcReport.filled.sentences === 1 && (out.fcReport.filled.dropped || {})['one claim stretched into two sentences'] === 1);
+}
+{
+  // Two additions may not repeat EACH OTHER either.
+  const out = fcFill([
+    ADD(2, TU_P1, 'E3', GOOD_E3),
+    ADD(1, 'END', 'LIVE', 'That same month, Google also bought Keyhole, the satellite imagery company.', { url: LIVE_URL }),
+  ]);
+  ok('an addition that repeats an earlier addition is deleted', out.fcReport.filled.sentences === 1 && (out.fcReport.filled.dropped || {})['repeats the script'] === 1);
+}
+{
+  // THE BUDGET IS A CEILING, cut from the LAST proposal — so the facts the
+  // model chose to write first are the ones that survive, as the prompt says.
+  const out = fcFill([ADD(2, TU_P1, 'E3', GOOD_E3), ADD(1, 'END', 'LIVE', GOOD_LIVE, { url: LIVE_URL })], { gapWords: wcount(GOOD_E3) + 3 });
+  ok('what would overshoot the original length is deleted', out.fcReport.filled.sentences === 1 && out.fcReport.filled.added[0].ref === 'E3' && (out.fcReport.filled.dropped || {})['over budget'] === 1);
+  ok('and the film never ends up longer than it was before Deep Search', out.fcReport.filled.words <= wcount(GOOD_E3) + 3);
+}
+{
+  // One bad sentence never costs the good ones.
+  const out = fcFill([
+    ADD(1, 'END', 'E1', 'The harbour light glowed over Sydney while the Rasmussen brothers worked in 2003.'),
+    ADD(2, TU_P1, 'E3', GOOD_E3),
+  ]);
+  ok('a rejected sentence does not take the next one with it', out.fcReport.filled.sentences === 1 && chap(out, 2).includes(GOOD_E3));
+}
+{
+  const out = fcFill('SEARCHED: google maps 2005; where 2 technologies acquisition\nDONE: exhausted');
+  ok('nothing to add leaves the narration exactly as it was', out.chapters.every((c, i) => c.narrator_script === tuChapters()[i].narrator_script));
+  ok('and says the research ran out, with the whole gap still open', out.fcReport.filled.sentences === 0 && out.fcReport.filled.exhausted === true && out.fcReport.filled.shortBy === 60 && out.fcReport.filled.looked === true);
+}
+{
+  // THE FIRST LIVE PRESS (execution 16463): one leftover pack claim, no search
+  // at all, DONE: exhausted in five seconds — on a film whose probes had found
+  // Keyhole on the web. "Nothing more exists" is believed only with a search
+  // behind it.
+  const silent = fcFill('DONE: exhausted');
+  ok('"exhausted" with no search named is NOT believed', silent.fcReport.filled.exhausted === undefined && silent.fcReport.filled.looked === false);
+  const none = fcFill('SEARCHED: none\nDONE: exhausted');
+  ok('nor with "SEARCHED: none"', none.fcReport.filled.exhausted === undefined && none.fcReport.filled.looked === false);
+  const blank = fcFill('SEARCHED:\nDONE: exhausted');
+  ok('nor with an empty SEARCHED line', blank.fcReport.filled.exhausted === undefined && blank.fcReport.filled.looked === false);
+  const enough = fcFill([ADD(2, TU_P1, 'E3', GOOD_E3), 'SEARCHED: google maps 2005', 'DONE: enough']);
+  ok('a search with DONE: enough is looked, not exhausted', enough.fcReport.filled.looked === true && enough.fcReport.filled.exhausted === undefined);
+}
+{
+  // `FC Fill` is `continueRegularOutput`: an agent that errors hands on no
+  // `output` at all, and that must be an empty top-up, not a dead film.
+  const out = runFill('FC Fill Apply.js', {
+    dir: TOPUP,
+    nodes: { 'FC Apply': { output: 'x', chapters: tuChapters(), min: 40, fcReport: {}, fill: tuFill() }, 'FC Fill': { error: 'timeout' } },
+  });
+  ok('a failed agent changes nothing and throws nothing', out.chapters.length === 3 && out.fcReport.filled.sentences === 0);
+}
+
+console.log('Top-up — the closing line stays the closing line');
+{
+  // Asked to follow the film's LAST sentence, it lands just before it.
+  const out = fcFill([ADD(2, TU_END, 'E3', GOOD_E3)]);
+  ok('nothing is ever placed after the last sentence of the film', chap(out, 2).endsWith(TU_END));
+  ok('the new sentence sits directly before the closing line', chap(out, 2).endsWith(GOOD_E3 + ' ' + TU_END));
+  ok('and the paragraph break before the final paragraph is kept', chap(out, 2).split(/\n\s*\n/).length === 2);
+}
+{
+  // THE PROBE'S OWN CASE (2026-09-23): an anchor in the final paragraph that is
+  // NOT the closing line. The first version protected the whole paragraph and
+  // pushed the sentence into the paragraph BEFORE the one that introduces what
+  // it talks about. A sentence goes after its antecedent, never before it.
+  const out = fcFill([ADD(2, 'Google Maps launched on February 8, 2005.', 'E3', GOOD_E3)]);
+  ok('an anchor inside the final paragraph is honoured', chap(out, 2).includes('Google Maps launched on February 8, 2005. ' + GOOD_E3));
+  ok('and the closing line still closes', chap(out, 2).endsWith(TU_END));
+}
+{
+  // A last chapter that is one paragraph still keeps its last line last.
+  const one = tuChapters();
+  one[2].narrator_script = TU_P1 + ' ' + TU_P2;
+  const out = runFill('FC Fill Apply.js', {
+    dir: TOPUP,
+    nodes: { 'FC Apply': { output: 'x', chapters: one, min: 40, fcReport: {}, fill: tuFill({ chapters: one }) }, 'FC Fill': { output: ADD(2, 'END', 'E3', GOOD_E3) } },
+  });
+  ok('END in the last chapter lands just before its closing line', chap(out, 2).endsWith(GOOD_E3 + ' ' + TU_END));
+}
+{
+  // A last chapter of ONE sentence: the only place that is not after the
+  // closing line is before it.
+  const solo = tuChapters();
+  solo[2].narrator_script = TU_END;
+  const out = runFill('FC Fill Apply.js', {
+    dir: TOPUP,
+    nodes: { 'FC Apply': { output: 'x', chapters: solo, min: 40, fcReport: {}, fill: tuFill({ chapters: solo }) }, 'FC Fill': { output: ADD(2, 'END', 'E3', GOOD_E3) } },
+  });
+  ok('a one-sentence ending still ends the film', chap(out, 2) === GOOD_E3 + ' ' + TU_END);
+}
+{
+  const out = fcFill([ADD(1, 'END', 'LIVE', GOOD_LIVE, { url: LIVE_URL })]);
+  ok('a chapter that is not the last takes END at its end', chap(out, 1) === TU_CH1 + ' ' + GOOD_LIVE);
+}
+
+console.log('Top-up — a sentence may not change what the script around it says');
+// Both cases are the SECOND probe's real output (execution 16442, 2026-09-23),
+// read as prose rather than counted — which is the only way either was seen.
+const GM_API = 'On June 29, 2005, Google released the Google Maps API for external use.';
+const GM_CLOSE = 'It had become a platform other people could build on, and its later reach still lay ahead.';
+const GM_LAUNCH = 'On February 8, 2005, Google Maps launched for desktop as a new solution, Google said, to help people get from point A to point B.';
+const GM_INSIDE = 'Inside Google, the Sydney software became part of Google Maps.';
+const gmChapters = () => [
+  { chapter_number: 0, chapter_title: 'HOOK', narrator_script: 'In October 2004, Google acquired Where 2 Technologies.' },
+  { chapter_number: 1, chapter_title: 'Sydney', narrator_script: GM_INSIDE + ' ' + GM_LAUNCH + '\n\n' + GM_API + ' ' + GM_CLOSE },
+];
+const gmFill = (line) =>
+  runFill('FC Fill Apply.js', {
+    dir: TOPUP,
+    nodes: { 'FC Apply': { output: 'x', chapters: gmChapters(), min: 40, fcReport: {}, fill: tuFill({ chapters: gmChapters() }) }, 'FC Fill': { output: line } },
+  });
+{
+  // "It had become a platform" would have become a sentence about a BLOG.
+  const out = gmFill(ADD(1, GM_API, 'LIVE', 'In November 2005, Google created the Google Maps API Blog.', { url: LIVE_URL }));
+  ok('a sentence that would steal the closing line\'s "It" is deleted', out.fcReport.filled.sentences === 0 && (out.fcReport.filled.dropped || {})["would take the next sentence's subject"] === 1);
+  ok('and the closing line still means what it meant', chap(out, 1).endsWith(GM_API + ' ' + GM_CLOSE));
+}
+{
+  // A February 16 fact in front of the February 8 launch.
+  const out = gmFill(ADD(1, GM_INSIDE, 'LIVE', 'On February 16, 2005, Google released a beta Toolbar that turned web page addresses into online map links.', { url: LIVE_URL }));
+  ok('a sentence placed before an earlier date is deleted', out.fcReport.filled.sentences === 0 && (out.fcReport.filled.dropped || {})['out of date order'] === 1);
+}
+{
+  // The same fact, anchored where it belongs, is kept.
+  const TOOLBAR = 'On February 16, 2005, Google released a beta Toolbar that turned web page addresses into online map links.';
+  const out = gmFill(ADD(1, GM_LAUNCH, 'LIVE', TOOLBAR, { url: LIVE_URL }));
+  ok('the same fact in date order is kept', out.fcReport.filled.sentences === 1 && chap(out, 1).includes(GM_LAUNCH + ' ' + TOOLBAR));
+  ok('closing the paragraph it belongs to', chap(out, 1).split(/\n\s*\n/)[0].endsWith(TOOLBAR));
+}
+{
+  // A pronoun that is NOT the closing line: the sentence moves past it rather
+  // than being lost.
+  const ch = tuChapters();
+  ch[1].narrator_script = 'Where 2 Technologies was founded in Sydney in 2003. It had four founders. Their prototype ran in a browser.';
+  const out = runFill('FC Fill Apply.js', {
+    dir: TOPUP,
+    nodes: { 'FC Apply': { output: 'x', chapters: ch, min: 40, fcReport: {}, fill: tuFill({ chapters: ch }) }, 'FC Fill': { output: ADD(1, 'Where 2 Technologies was founded in Sydney in 2003.', 'LIVE', GOOD_LIVE, { url: LIVE_URL }) } },
+  });
+  ok('a sentence in front of a pronoun moves past it instead of stealing it', chap(out, 1) === ch[1].narrator_script + ' ' + GOOD_LIVE && out.fcReport.filled.sentences === 1);
+  ok('past every pronoun in a row', !chap(out, 1).includes(GOOD_LIVE + ' It had') && !chap(out, 1).includes(GOOD_LIVE + ' Their'));
+}
+
+console.log('Top-up — what the fact-checker rejects stays out');
+{
+  // THE LOOP THIS EXISTS TO STOP. Press N adds a sourced sentence; press N+1's
+  // judge rules it redundant and the rewrite cuts it; the gap reopens; press
+  // N+2 would add it straight back. The rejection has to outlive the press.
+  const added = DS_GOOD; // stands for a sentence an earlier top-up put in
+  const judged = dsResolve(
+    [{ quote: added, claim: added, verdict: 'redundant', ref: 'E1', reason: 'already said' }],
+    { prevAdded: [added], prevRejected: ['An older rejected sentence about 2004.'] },
+  );
+  const out = dsApply(judged);
+  ok('a sentence an earlier top-up added, now flagged, is rejected for good', out.fill.rejected.includes(added));
+  ok('earlier rejections are carried forward, not replaced', out.fill.rejected.includes('An older rejected sentence about 2004.'));
+  ok('and the list is written into the report for the next press', out.fcReport.rejected && out.fcReport.rejected.includes(added));
+}
+{
+  const kept = dsResolve([{ ...dsFindings()[1] }], { prevAdded: [DS_GOOD] });
+  const out = dsApply(kept);
+  ok('an added sentence the judge SUPPORTS is not rejected', !out.fill.rejected.includes(DS_GOOD) && out.fcReport.rejected === undefined);
+}
+{
+  const REJ = 'In 2004, Google said, two Aussies and two Danes in Sydney created the technology that underpinned Google Maps.';
+  const out = fcFill(
+    [ADD(1, 'END', 'LIVE', 'In 2004, two Aussies and two Danes in Sydney created the technology that underpinned Google Maps.', { url: LIVE_URL })],
+    { rejected: [REJ] },
+  );
+  ok('the top-up will not propose a rejected sentence again, even reworded', out.fcReport.filled.sentences === 0 && (out.fcReport.filled.dropped || {})['rejected by the fact-checker before'] === 1);
+}
+{
+  const row = dsRow({ prev_added: JSON.stringify([{ sentence: 'A added.', ref: 'E1' }]), prev_rejected: JSON.stringify(['B rejected.']) });
+  const out = runNode('DS Prep.js', { json: row, dir: DS });
+  ok('DS Prep carries last press\'s additions', out.fc.prevAdded.length === 1 && out.fc.prevAdded[0] === 'A added.');
+  ok('and the rejected list', out.fc.prevRejected.length === 1 && out.fc.prevRejected[0] === 'B rejected.');
+  const bad = runNode('DS Prep.js', { json: dsRow({ prev_added: '{not json', prev_rejected: null }), dir: DS });
+  ok('and survives a malformed old report', Array.isArray(bad.fc.prevAdded) && bad.fc.prevAdded.length === 0 && bad.fc.prevRejected.length === 0);
+}
+{
+  const load = readFileSync(join(DS, 'DS Load.sql'), 'utf8');
+  ok('DS Load reads what the top-up added last time', load.includes("f.report->'filled'->'added'") && load.includes('as prev_added'));
+  ok('and what has been rejected so far', load.includes("f.report->'rejected'") && load.includes('as prev_rejected'));
+}
+
+console.log('Top-up — the editor decides what is worth adding');
+// FIVE PROBES on the producer's Google Maps film (2026-09-23) found that the
+// code rules, which reliably stop description and commentary, cannot tell a
+// new fact from the script said again in other words. These are the probes'
+// own sentences, with the editor's verdicts standing in.
+{
+  const ANU = 'An Australian National University research repository document states that Google acquired Where 2 Technologies in October 2004 and launched Google Maps in February 2005.';
+  const out = runFill('FC Fill Apply.js', {
+    dir: TOPUP,
+    nodes: {
+      'FC Apply': { output: 'x', chapters: tuChapters(), min: 40, fcReport: {}, fill: tuFill() },
+      'FC Fill': { output: [ADD(2, TU_P1, 'E2', ANU), ADD(2, TU_P1, 'E3', GOOD_E3)].join('\n') },
+      'FC Fill Check': { output: 'CHECK: 1 | VERDICT: repeat | WHY: both dates are already in the script, now only attributed\nCHECK: 2 | VERDICT: keep | WHY: new' },
+    },
+  });
+  ok('a known fact restated behind an attribution is kept out when the editor says repeat', !chap(out, 2).includes('Australian National University') && (out.fcReport.filled.dropped || {})['judged repeat'] === 1);
+  ok('while the proposal the editor keeps goes in', chap(out, 2).includes(GOOD_E3) && out.fcReport.filled.sentences === 1);
+}
+for (const v of ['minor', 'overreach']) {
+  const out = runFill('FC Fill Apply.js', {
+    dir: TOPUP,
+    nodes: {
+      'FC Apply': { output: 'x', chapters: tuChapters(), min: 40, fcReport: {}, fill: tuFill() },
+      'FC Fill': { output: ADD(2, TU_P1, 'E3', GOOD_E3) },
+      'FC Fill Check': { output: `CHECK: 1 | VERDICT: ${v} | WHY: x` },
+    },
+  });
+  ok(`a proposal the editor calls ${v} is not added`, out.fcReport.filled.sentences === 0 && (out.fcReport.filled.dropped || {})['judged ' + v] === 1);
+}
+{
+  // NO VERDICT, NOTHING ADDED. An editor that errored (`continueRegularOutput`)
+  // or skipped a line fails CLOSED: the film stays short and the report says why.
+  const out = runFill('FC Fill Apply.js', {
+    dir: TOPUP,
+    nodes: {
+      'FC Apply': { output: 'x', chapters: tuChapters(), min: 40, fcReport: {}, fill: tuFill() },
+      'FC Fill': { output: ADD(2, TU_P1, 'E3', GOOD_E3) },
+      'FC Fill Check': { error: 'timeout' },
+    },
+  });
+  ok('with no verdict from the editor nothing is added', out.fcReport.filled.sentences === 0 && (out.fcReport.filled.dropped || {})['not checked'] === 1);
+}
+{
+  // THE NUMBERING HOLDS across a malformed line: the editor numbers every
+  // `ADD:` line, so the guard must too, or every verdict after it lands on the
+  // wrong sentence.
+  const out = runFill('FC Fill Apply.js', {
+    dir: TOPUP,
+    nodes: {
+      'FC Apply': { output: 'x', chapters: tuChapters(), min: 40, fcReport: {}, fill: tuFill() },
+      'FC Fill': { output: ['ADD: 2 | this line lost its fields', ADD(2, TU_P1, 'E3', GOOD_E3)].join('\n') },
+      'FC Fill Check': { output: 'CHECK: 1 | VERDICT: keep | WHY: x\nCHECK: 2 | VERDICT: repeat | WHY: x' },
+    },
+  });
+  ok('a malformed line is dropped as malformed', (out.fcReport.filled.dropped || {})['malformed'] === 1);
+  ok('and the verdict after it still lands on its own sentence', out.fcReport.filled.sentences === 0 && (out.fcReport.filled.dropped || {})['judged repeat'] === 1);
+}
+{
+  const c = readFileSync(join(TOPUP, 'FC Fill Check.txt'), 'utf8');
+  ok('the editor numbers proposals exactly as the guard does', c.includes(".filter((l) => l.startsWith('ADD:')).map((l, i) => (i + 1) + '. ' + l)"));
+  ok('reads the script and research from whichever chain it sits in', c.includes("($('DS Apply').isExecuted ? $('DS Apply') : $('FC Apply')).first().json.fill.narration"));
+  ok('treats an attributed known fact as a repeat', c.includes('merely ATTRIBUTED'));
+  ok('treats the same people described again as a repeat', c.includes('The same people described again'));
+  // CALIBRATED ON THE EIGHT REAL PROPOSALS (executions 16452/16453): with a
+  // blanket "unsure → not keep" and "a detail the story does not turn on" as
+  // `minor`, the editor ruled every new fact minor — Keyhole's satellite
+  // imagery included — and the top-up could never add anything. Doubt now
+  // resolves by KIND: doubt about novelty is a repeat, doubt about relevance is
+  // minor, and a step of the subject's own story is keep even if the script
+  // could do without it.
+  ok('doubt about novelty resolves to repeat', c.includes('When you are unsure whether the script already tells the viewer something, it does: choose `repeat`.'));
+  ok('doubt about relevance resolves to minor', c.includes('When you are unsure whether a sentence is part of the subject\'s story or beside it, choose `minor`.'));
+  ok('minor means BESIDE the subject, not merely dispensable', c.includes('BESIDE the film\'s subject rather than part of its story'));
+  ok('a step the script could be told without is still keep', c.includes('A step the script could be told without is still `keep`'));
+  ok('the blanket "unsure → not keep" is gone', !c.includes('When you are unsure between `keep` and anything else'));
+  // THE FIRST LIVE PRESS kept "the team was focused on 'mapping the world'" —
+  // sourced, and a statement of aim rather than a step in the story.
+  ok('an aim, a focus or a motto is minor', c.includes('An aim, a focus, a vision or a motto is `minor` too'));
+  ok('in the line format the guard parses', c.includes('CHECK: <number> | VERDICT: <keep|repeat|minor|overreach> | WHY:'));
+}
+
+console.log('Top-up — what it hands on');
+{
+  const out = fcFill([ADD(2, TU_P1, 'E3', GOOD_E3)]);
+  ok('`FC Fill Apply` speaks Narration Guard\'s shape, like `FC Apply`', 'output' in out && out.retry === false && out.min === 40 && out.target === 100);
+  ok('the narration is rebuilt from the chapters as they now stand', out.output.includes(GOOD_E3) && out.output.startsWith('[CHAPTER 0: HOOK]'));
+  ok('and so is the word count', out.words === out.chapters.reduce((n, c) => n + wcount(c.narrator_script), 0));
+  ok('the report round-trips through base64 for the writer', JSON.parse(Buffer.from(out.fcReport64, 'base64').toString('utf8')).filled.sentences === 1);
+  ok('carrying the recorded length forward', out.fcReport.preCheckWords === 140);
+}
+{
+  // `short` belongs to the valve. The top-up may lift it back over the floor.
+  const words = tuChapters().reduce((n, c) => n + wcount(c.narrator_script), 0);
+  const lifted = fcFill([ADD(2, TU_P1, 'E3', GOOD_E3)], {}, { short: { words, min: words + 5 } });
+  ok('a top-up that brings the film back over its floor clears `short`', lifted.fcReport.short === undefined);
+  const still = fcFill('DONE: exhausted', {}, { short: { words, min: words + 50 } });
+  ok('one that cannot keeps it, with the new count', still.fcReport.short && still.fcReport.short.min === words + 50);
+  const never = fcFill('DONE: exhausted', {}, {});
+  ok('and it never invents one', never.fcReport.short === undefined);
+}
+{
+  // DS FILL APPLY hands back `DS Apply`'s shape, because `DS Write` and
+  // `DS Save` read it off `$json` and by name respectively.
+  const dsg = {
+    projectId: 'rec1', projectName: 'A film', scriptChanged: false, hookChanged: false, script: 'x',
+    fcReport: { rerun: true, preCheckWords: 140 }, fcReport64: '', script64: '', editing64: 'RURJVElORw==',
+    fill: tuFill(),
+  };
+  const out = runFill('DS Fill Apply.js', { dir: TOPUP, nodes: { 'DS Apply': dsg, 'DS Fill': { output: ADD(2, TU_P1, 'E3', GOOD_E3) } } });
+  ok('the re-check\'s top-up writes the script with the new sentence in it', out.script.includes(GOOD_E3) && Buffer.from(out.script64, 'base64').toString('utf8') === out.script);
+  ok('and says the script changed, so the reload sees it', out.scriptChanged === true);
+  ok('the hook is never touched, so its spoken copy is left alone', out.script.startsWith('[CHAPTER 0: HOOK]\n' + TU_HOOK + '\n\n') && out.editing64 === 'RURJVElORw==' && out.hookChanged === false);
+  ok('the project id and name pass straight through', out.projectId === 'rec1' && out.projectName === 'A film');
+  ok('and the report it saves says what was added', JSON.parse(Buffer.from(out.fcReport64, 'base64').toString('utf8')).filled.added[0].ref === 'E3');
+  const none = runFill('DS Fill Apply.js', { dir: TOPUP, nodes: { 'DS Apply': dsg, 'DS Fill': { output: 'DONE: exhausted' } } });
+  ok('an empty top-up leaves `scriptChanged` as the valve set it', none.scriptChanged === false);
+}
+{
+  // FC DONE HAS TWO DOORS NOW. Reading `FC Apply` unconditionally, as it used
+  // to, would throw the added sentences away one node before `Combine Chapters`.
+  const applied = { output: 'before', retry: false, chapters: chapters(), words: 30, fcReport: {}, fcReport64: '', fill: { run: true } };
+  const filled = { output: 'after', retry: false, chapters: chapters(), words: 42, fcReport: {}, fcReport64: '' };
+  const withFill = runNode('FC Done.js', { json: {}, nodes: { 'FC Apply': applied, 'FC Fill Apply': filled } });
+  ok('`FC Done` hands on the TOP-UP when it ran', withFill.output === 'after' && withFill.words === 42);
+  const without = runNode('FC Done.js', { json: {}, nodes: { 'FC Apply': applied } });
+  ok('and `FC Apply` when it did not', without.output === 'before');
+  ok('and never passes the top-up\'s inputs on to `Combine Chapters`', !('fill' in without) && !('fill' in withFill));
+}
+
+console.log('Top-up — one guard in two nodes, and it is Narration Guard\'s');
+{
+  const block = (f) => {
+    const s = readFileSync(join(TOPUP, f), 'utf8');
+    return s.slice(s.indexOf('// ── SHARED GUARD ──'), s.indexOf('// ── END SHARED GUARD ──'));
+  };
+  const fcB = block('FC Fill Apply.js');
+  const dsB = block('DS Fill Apply.js');
+  ok('the guard is byte-identical in `FC Fill Apply` and `DS Fill Apply`', fcB.length > 5000 && fcB === dsB);
+  // THE FILLER DETECTORS ARE NOT A SECOND OPINION. `Narration Guard` measured
+  // them against real scripts; if its list changes, the top-up must follow.
+  const guardSrc = readFileSync(join(here, '..', 'db', 'port', 'story-close', 'paste', 'cs-Narration_Guard.js'), 'utf8');
+  for (const name of ['TEXTURE', 'CAMERA', 'SCENERY', 'COMMENTARY', 'DEFINITION', 'META']) {
+    const re = new RegExp(`const ${name} = /.*/i;`);
+    const theirs = (guardSrc.match(re) || [])[0];
+    const mine = (fcB.match(re) || [])[0];
+    ok(`${name} is Narration Guard's own, byte for byte`, !!theirs && theirs === mine);
+  }
+}
+
+console.log('Top-up — the prompt, and the writers around it');
+{
+  const p = readFileSync(join(TOPUP, 'FC Fill.txt'), 'utf8');
+  ok('it says adding nothing is a good answer', p.includes('Adding nothing is a perfectly good answer'));
+  // The three parts that make a length obeyed rather than ignored (CLAUDE.md,
+  // "A length in a prompt is obeyed or ignored according to how it is PHRASED").
+  ok('the budget is named as a RULE', p.includes('THE LENGTH IS A RULE, NOT A TARGET'));
+  ok('the model is asked to count before it answers', p.includes('Count the words of your sentences before you answer'));
+  ok('and told the consequence, cut from its LAST sentence', p.includes('cut in code, starting from your LAST sentence'));
+  ok('the unused pack comes before a live search', /1\. A claim from the list above[\s\S]*2\. Then SEARCH THE WEB/.test(p));
+  // THE PROBE FOUND THIS (2026-09-23): told to search "only when the list has
+  // nothing left", the model spent its budget on the pack's leftovers — which
+  // restated the script — and declared the research exhausted in 3 seconds
+  // without searching at all.
+  ok('a claim the viewer can WORK OUT from the script counts as used', p.includes('also when the viewer can work it out from what the script says'));
+  ok('searching is expected, not a last resort', p.includes('This is not optional and it is not a last resort'));
+  ok('and runs every time the leftover claims do not fill the budget', p.includes('every time, unless the claims you took from the list already fill the whole budget'));
+  ok('the proposer names the searches it ran, so "exhausted" can be believed', p.includes('SEARCHED: <search; search; search>') && p.includes('is read in code as "nobody looked"'));
+  // PROBE 16471: it searched, found nothing it proposed, and filled its answer
+  // with the list's weakest leftovers. Proposing is free; withholding is not.
+  ok('what the search found is proposed alongside the leftovers', p.includes('3. PROPOSE WHAT THE SEARCH FOUND, alongside anything from the list'));
+  ok('"enough" means the proposals come near the budget', p.includes('Write DONE: enough only when the sentences you proposed, counted, come close to the budget.'));
+  ok('and "exhausted" is only true once it has searched', p.includes('Write DONE: exhausted only AFTER you have searched the web'));
+  ok('a sentence goes after what it talks about, never before it', p.includes('AFTER the sentence that introduces what it talks about, never before it'));
+  ok('it asks for facts the story turns on, not details that change nothing', p.includes("WORTH THE VIEWER'S TIME"));
+  ok('it states the date-order rule the guard enforces', p.includes('IN DATE ORDER.'));
+  ok('and the pronoun rule the guard enforces', p.includes('NEVER IN FRONT OF A PRONOUN.'));
+  // THE FOURTH PROBE (execution 16448) re-described the four founders the
+  // script already names, dated 2004 and attributed — sourced, and not new.
+  // Word overlap cannot see a paraphrase; the prompt has to say it.
+  ok('NEW means a new event or number, not the same people described again', p.includes('NEW means a new EVENT or a new NUMBER'));
+  ok('and the model is shown what the fact-checker rejected before', p.includes('ADDED BEFORE AND REJECTED BY THE FACT-CHECKER') && p.includes('$json.fill.rejected'));
+  ok('it carries the relationship rule the judge enforces', p.includes('the RELATIONSHIP the sentence asserts'));
+  ok('it forbids the picture, commentary and the film itself', p.includes('never about what the picture shows') && p.includes('A STATEMENT, not a comment'));
+  ok('it protects the closing line and the hook', p.includes('Never after the LAST sentence of the LAST chapter') && p.includes('Never in CHAPTER 0'));
+  ok('its line format is the one the guard parses, SENTENCE last', p.includes('ADD: <chapter number> | AFTER: ') && p.includes('| SENTENCE: <the sentence to add>') && p.includes('DONE: <enough|exhausted>'));
+}
+{
+  const sql = readFileSync(join(DS, 'DS Save.sql'), 'utf8');
+  ok('`DS Save` saves the TOP-UP\'s report when it ran', sql.includes('($("DS Fill Apply").isExecuted ? $("DS Fill Apply") : $("DS Apply")).first().json.fcReport64'));
+  const load = readFileSync(join(DS, 'DS Load.sql'), 'utf8');
+  ok('`DS Load` reads the recorded length off the report it is about to replace', /report->>'preCheckWords'/.test(load) && load.includes('as pre_check_words'));
 }
 
 console.log('');

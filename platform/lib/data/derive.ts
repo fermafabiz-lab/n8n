@@ -709,6 +709,50 @@ export interface DeepSearchFinding {
  * in today's panel — a reader that insists on a shape is how an old row
  * becomes a crash on a page the producer needs.
  */
+/** One sentence the top-up added, with the source it cites. */
+export interface DeepSearchAddition {
+  chapter: number;
+  sentence: string;
+  /** A research-pack claim (`E7`), or `LIVE` for a fact a web search found. */
+  ref: string;
+  source?: string;
+  url?: string;
+}
+
+/**
+ * What the TOP-UP did (2026-09-23, `db/port/deep-search-topup/`). When the
+ * corrections leave a film short of what it weighed before Deep Search touched
+ * it, sourced facts are added back — from the film's own research first, a web
+ * search when that runs dry — and every proposed sentence that is filler,
+ * unsourced, a repeat, out of date order or in front of a pronoun it would
+ * steal is deleted before it lands. The producer's condition, verbatim: no
+ * filler "asa cum facea inainte si sa stea sa descrie scena".
+ */
+export interface DeepSearchFilled {
+  /** Sentences actually added. */
+  sentences: number;
+  words: number;
+  /** How many of them came from a live search rather than the research pack. */
+  live?: number;
+  /**
+   * The model said nothing more that fits exists — believed only when it also
+   * named the web searches it ran (`looked`). Its claim, not a measurement.
+   */
+  exhausted?: boolean;
+  /**
+   * Whether the proposer says it searched the web at all. `false` means the
+   * gap is still open because nobody LOOKED, not because nothing exists — the
+   * first live press (2026-09-23) claimed "exhausted" without one search.
+   */
+  looked?: boolean;
+  /** MEASURED: words still missing against the length before Deep Search. */
+  shortBy?: number;
+  proposed?: number;
+  /** Why each deleted proposal was deleted, counted by reason. */
+  dropped?: Record<string, number>;
+  added?: DeepSearchAddition[];
+}
+
 export interface DeepSearchReport {
   /** Checkable statements the judge extracted. */
   checked?: number;
@@ -791,6 +835,21 @@ export interface DeepSearchReport {
   short?: { words: number; min: number };
   /** The rewrite was produced and refused; this says what was wrong with it. */
   refused?: string;
+  /**
+   * What the narration weighed before Deep Search first touched it — the
+   * length the top-up restores toward. Recorded by the first pass and carried
+   * forward by every re-check, because the re-check rewrites the script in
+   * place and would otherwise lose it after the first press.
+   */
+  preCheckWords?: number;
+  /** What the top-up added. Absent when it did not run. */
+  filled?: DeepSearchFilled;
+  /**
+   * Sentences a top-up added that a later re-check's judge rejected. Carried
+   * forward so the top-up never adds them back — without it the button would
+   * add, cut and re-add the same sentence on successive presses.
+   */
+  rejected?: string[];
   findings?: DeepSearchFinding[];
   checkedAt?: string | null;
 }

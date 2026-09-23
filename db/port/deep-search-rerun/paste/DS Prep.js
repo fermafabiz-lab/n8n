@@ -176,6 +176,27 @@ return [
         minWords,
         bodyWords,
         closingSentence,
+        // The length before Deep Search first touched this film, recorded by the
+        // first pass. Zero when the report predates the top-up.
+        preCheckWords: Number(row.pre_check_words) || 0,
+        // What the top-up added on the last press, and every sentence of its the
+        // fact-checker has rejected since — see `DS Apply`.
+        prevAdded: (() => {
+          try {
+            const a = JSON.parse(row.prev_added || '[]');
+            return Array.isArray(a) ? a.map((x) => String((x && x.sentence) || x || '')).filter(Boolean) : [];
+          } catch (e) {
+            return [];
+          }
+        })(),
+        prevRejected: (() => {
+          try {
+            const r = JSON.parse(row.prev_rejected || '[]');
+            return Array.isArray(r) ? r.map(String).filter(Boolean) : [];
+          } catch (e) {
+            return [];
+          }
+        })(),
       },
       editing,
       projectId: String(row.project_id || ''),

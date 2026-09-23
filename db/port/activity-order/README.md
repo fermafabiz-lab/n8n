@@ -117,3 +117,41 @@ wrapped in `set local lock_timeout = '5s'` — the ALTER takes a brief lock on
 `hov.project` that pipeline writes queue behind — and `reset search_path`.
 Rehearsed on the local engine including a failure forced halfway (nothing
 remained) and a re-apply (skips only).
+
+**Applied live: execution 16480.** The verify read `column_present 1`,
+`column_default now()`, `trigger_present 1`, `rows_stamped_since 0`,
+`projects 80` — the column, its default and the trigger, and not one existing
+film stamped. Two checks on the live engine after it: a same-value UPDATE on
+the disposable `recGea91h5CGUvTeB` (execution 16484) went through, pinned the
+film's history (`activity_at` = its last write, 2026-09-20 20:05:01) and did
+not move it; and the Rome film's own pipeline write at 13:47:28 left
+`activity_at` equal to `updated_at` to the microsecond — the trigger bumping
+on a real write. The orchestrator error at 13:43:47 that same film shows is
+NOT this migration: it is `ManualExecutionCancelledError` raised through the
+public API's `stopExecution`, i.e. the site's Restart, with the resume webhook
+two seconds behind it.
+
+**The site half: deploy #181, live 13:58:36 UTC** on merge `31f3a82` (the
+trunk tip; it contains `4987b26`). Build 13:56:14 → 13:58:18, "Write env,
+pull and restart on Hetzner" 13:58:18 → 13:58:36. Deployed at the producer's
+explicit request over a running Media Generation — `16497`, the Rome film on
+Media Generation `f7f03638` — and unlike the playlists deploy this run was
+GENERATING, not parked: a still a minute (scene 206 at 13:55:53, 207 at
+13:56:54, 208 at 13:57:52). It survived as an execution — still `running`
+afterwards — but wrote nothing from 13:57:52 on: three and a half minutes of
+silence by 14:01:28 where it had been writing one still a minute, the gap
+opening just as `web` went down. Whether it was caught mid-call or sat in an
+image cooldown cannot be read from outside a running execution. The
+producer's instruction had covered exactly this — "restart the projects that
+are running after the deploy" — and it was the one half this session could
+not do: stopping an execution needs the n8n API key, which only the site
+holds. The Restart press went back to the producer.
+
+**Proving the live page runs the new code, without shell access.** The old
+library query never read `hov.chapter`; the new one reads it once per film
+per render (the correlated `max(updated_at)` in `PROJECT_ACTIVITY_SQL`), so
+`pg_stat_user_tables` for `hov.chapter` jumps by the number of films (80 on
+the day) on every render of /projects, beside `hov.playlist`'s +1. Baseline
+after the restart and before anyone had opened the page: `hov.chapter`
+idx_scan 2357 / seq_scan 57, `hov.playlist` seq_scan 36 (13:59:46). A Postgres
+restart resets the counters.

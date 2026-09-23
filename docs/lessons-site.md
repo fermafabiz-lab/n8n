@@ -2483,3 +2483,46 @@ scrolled it is hidden except for a wrapped second row. It predates playlists;
 `top: 84px` — the offset its own `scroll-margin-top` already uses — is the
 likely fix, and it is the producer's call because it changes how the whole
 library scrolls.
+
+### "Recently worked on" — the library in order of last activity (2026-09-23)
+
+The film last worked on comes first — everywhere in the library, with a
+per-device switch in Settings back to creation order. The account is
+`db/port/activity-order/README.md`; these are the parts that generalise.
+
+**Ask what counts BEFORE deciding how to record it.** The producer's rule was
+"not when you look at it, but when you change something". Whether the
+PIPELINE's changes count turned out to be the whole architecture: people-only
+would have meant a stamp in each of ~40 site actions and a way to tell them
+from n8n's writes; with the pipeline counting (their answer) activity is simply
+the last change to the film, and one trigger plus the children's own
+`updated_at` covers every writer that exists and every one added later.
+
+**`updated_at` knows WHEN, never WHO or WHY.** It could not be used alone,
+because the Publishing panel (excluded) writes the same row as everything
+included. The trigger compares OLD and NEW with that one key removed — the
+Publishing panel writes exactly `editing_options.publishing`, verified before
+relying on it — and ignores a write that re-sends identical values.
+
+**A list that re-sorts itself must hold still under the pointer.** Once the
+pipeline counts, a card can move at any 15-second refresh, and a card that
+moves between the mouse arriving and the click landing opens or ticks the
+wrong film. The grid holds its order while pointed at or in Select, sends new
+arrivals to the END (nothing on screen shifts), and says `data-holding`.
+
+**A pointer test must hover what it thinks it hovers.** The first hold test
+moved the mouse to the grid's bounding box, which started at y=943 in a 900px
+viewport: it hovered empty space, the order correctly did not hold, and the
+test reported the product broken. `locator.hover()` scrolls first; `:hover`
+and the element's own `data-holding` are how to know.
+
+**A test that writes a value that is already there tests nothing on its
+second run** — here doubly, because "a re-sent identical value is not
+activity" is one of the rules. The browser test toggles the statuses it
+writes, and passes twice in a row against the same database.
+
+**A check that matches either side of a comparison lets a one-sided break
+through.** The publishing exclusion lives on both OLD and NEW; the first
+static check was satisfied by either, and a mutation dropping it from NEW —
+which makes every publishing mark count — passed. It now requires both, and
+the real-engine test fails four ways when either side goes.

@@ -38,6 +38,7 @@ So the tools here split cleanly by **who can run them**:
 |---|---|---|
 | `diff-workflow.mjs` | a Claude Code session, or anywhere | two JSON files already on disk, nothing else |
 | `local-pg.mjs` | a Claude Code session, or anywhere | `@electric-sql/pglite` + `pglite-socket` installed in a scratch dir (the npm registry answers from a session) |
+| `make-apply.mjs` | a Claude Code session, or anywhere | a committed `db/NNN_*.sql` and a verify query; writes the throwaway workflow that applies it through the n8n connector, the file embedded byte for byte (first used for db/014) |
 | `n8n-api.mjs`, `apply-workflow.mjs` | an operator's machine, or a future network-enabled environment | `N8N_API_URL` + `N8N_API_KEY`, real network to the n8n host |
 
 Never ask a Claude session to run `apply-workflow.mjs` or anything that

@@ -1,4 +1,6 @@
+import { cookies } from "next/headers";
 import { getPlaylists, getProjects, isConfigured, type StatusKind } from "@/lib/data";
+import { LIBRARY_ORDER_COOKIE, parseLibraryOrder } from "@/lib/library-order";
 import AutoRefresh from "@/components/AutoRefresh";
 import OpsPanel from "@/components/OpsPanel";
 import StageChime from "@/components/StageChime";
@@ -20,6 +22,10 @@ export default async function Dashboard() {
       return null;
     }),
   ]);
+  // Recently worked on (the default) or Newest first — chosen per device in
+  // Settings → Customize. Read here, on the server, so the grid arrives in its
+  // final order instead of re-sorting after the first paint.
+  const libraryOrder = parseLibraryOrder((await cookies()).get(LIBRARY_ORDER_COOKIE)?.value);
   const waiting = projects.filter((p) => p.statusKind === "wait");
 
   /**
@@ -272,7 +278,7 @@ export default async function Dashboard() {
           </div>
         </>
       ) : (
-        <ProjectsGrid projects={projects} playlists={playlists} />
+        <ProjectsGrid projects={projects} playlists={playlists} order={libraryOrder} />
       )}
 
       <footer className="pj-foot">

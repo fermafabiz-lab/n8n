@@ -182,6 +182,20 @@ export function deepSearchState({
   const deduped = report.deduped ?? 0;
   const s = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
+  // A DELETION IS NEWS TOO, and it is different news from a correction: the
+  // producer does not have to reread a sentence that is gone, but they should
+  // know the film got shorter and why.
+  const cutNote = deduped > 0 ? ` ${s(deduped, "sentence")} that repeated something said earlier ${deduped === 1 ? "was" : "were"} cut.` : "";
+
+  // A CORRECTION IS ALLOWED TO SHORTEN THE FILM, and the producer has to be
+  // told when it did. The narration now says only what the research backs, and
+  // that turned out to be less than the running time they ordered — which is a
+  // decision for them (more research, or a shorter film), not for the chain.
+  const shortNote = report.short
+    ? ` The corrected script is ${report.short.words} words against the ${report.short.min} this film's length needs — its research does not cover the whole running time, so either give it more or order it shorter.`
+    : "";
+
+
   if (standing > 0) {
     return {
       status: "flagged",
@@ -197,20 +211,15 @@ export function deepSearchState({
           ? `${s(standing, "statement")} have nothing behind ${standing === 1 ? "it" : "them"}. This film is past its script gate — the scenes already carry these lines — so nothing was changed for you; edit the scenes that say ${standing === 1 ? "it" : "them"}.`
           : report.refused
             ? `A correction was written and rejected (${report.refused}), so ${s(standing, "statement")} still stand as written.`
-            : `${s(standing, "statement")} in this script have nothing behind ${standing === 1 ? "it" : "them"}.`,
+            : `${s(standing, "statement")} in this script have nothing behind ${standing === 1 ? "it" : "them"}.${shortNote}`,
       red: false,
     };
   }
-  // A DELETION IS NEWS TOO, and it is different news from a correction: the
-  // producer does not have to reread a sentence that is gone, but they should
-  // know the film got shorter and why.
-  const cutNote = deduped > 0 ? ` ${s(deduped, "sentence")} that repeated something said earlier ${deduped === 1 ? "was" : "were"} cut.` : "";
-
   if (rewritten > 0) {
     return {
       status: "corrected",
       label: `${s(rewritten, "fix")}`,
-      detail: `Deep Search corrected ${s(rewritten, "sentence")} before you saw this script, and everything else checked out.${cutNote}`,
+      detail: `Deep Search corrected ${s(rewritten, "sentence")} before you saw this script, and everything else checked out.${cutNote}${shortNote}`,
       red: false,
     };
   }
@@ -218,7 +227,7 @@ export function deepSearchState({
     return {
       status: "corrected",
       label: deduped === 1 ? "1 cut" : `${deduped} cut`,
-      detail: `Every statement in this script is backed by the film's sources.${cutNote}`,
+      detail: `Every statement in this script is backed by the film's sources.${cutNote}${shortNote}`,
       red: false,
     };
   }

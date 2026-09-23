@@ -745,6 +745,15 @@ export interface DeepSearchReport {
    * the film still says the old line.
    */
   hookFixed?: boolean;
+  /**
+   * The corrected narration came out UNDER the length the film was ordered at.
+   * Never a failure and never a refusal — a correction that shortens is the
+   * feature working, since a film may only say what it can back. It is news
+   * because the word count sets the runtime and the scene count: the film does
+   * not have enough sourced material to fill its running time, and the answer
+   * is more research or a shorter film.
+   */
+  short?: { words: number; min: number };
   /** The rewrite was produced and refused; this says what was wrong with it. */
   refused?: string;
   findings?: DeepSearchFinding[];

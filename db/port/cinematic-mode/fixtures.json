@@ -1,0 +1,140 @@
+{
+ "hobbitChapter1": "On Hobbiton Hill, Bungo Baggins cuts Bag End into living earth because he means to house his family under the hill, not on it. By the late Third Age, most hobbits build with wood or brick, so every stroke here must justify the older way. Each barrow of spoil goes down by hand, or the slope above Bagshot Row chokes on its own digging. Minto Bracegirdle marks the front for the round door. Daisy Noakes takes the first spoil below and gives the dumped earth a use. Midway through the first opening, the bank breaks. Wet soil pours into the cut and destroys the entrance shape Bungo has already paid for. He abandons width before the hill takes more. Daisy turns the spoil into terraces and kitchen beds for the holes beneath. Minto holds the doorway line. Bungo drives deeper and higher until the hill offers firmer ground. That saves the shell and costs him space, because the deeper chamber runs damp. Inside the half-made smial, he cuts a proper drain and raises the floor, giving up breadth so the house can stay dry. Minto hangs the round front door in its set frame, and Bag End ceases to be an open excavation. It stands shut under Hobbiton Hill, with dry rooms behind it and the best left-hand side opening toward the gardens, meadows, and The Water.",
+ "hobbitHook": "[SILENT] Wet earth cascades into Bungo’s half-excavated cut, threatening to bury the progress.\n[SILENT] Bungo grips the edge, straining with the weight of a collapsing hillside.\n[SILENT] The unfinished doorway looms, fragile against the shifting hill.",
+ "astroChapter1": "Commander Elian Voss moves away from the half-buried lander, boots punching pale dust across the open plain.\nHis off-white suit cuts small beneath ribbed stone arches and the low ringed planet overhead.\nThe astronaut visor is not see through; it stays black with reflection, and his face is never shown.\nAstra rises from the hull and sweeps amber beams across the mineral flats ahead.\nElian drops to one knee beside a dark outcrop and braces one glove against the ground.\nBeyond the first crystal teeth, a blue-green pulse flickers once, faint and irregular, then disappears.\nHe tilts his helmet toward the lander for a beat.\nHis hand leaves the rock. He stands, turns from the ship, and starts toward the distant flash.\nThe ash plain hardens into smooth shelves where shallow reflective patches catch his moving silhouette.\nHe steps into the Crystal Basin, and turquoise and violet spires close around him in tall walls.\nPrismatic bands slide across his chest panel while Astra threads ahead between the formations.\nAt a still mirror pool, he unclips the slim scanner and lowers it near the glassy surface.\nAmber lines crawl through the reflection, mapping dust, stone, and the route he has been following.\nThe image splits at the center and reveals a deep concealed fracture running under the pale crust.\nHis next step stops above the hidden break instead of crossing into it.\nHe lifts the scanner, looks along the blocked line, then angles his helmet toward a tighter corridor left.\nAstra slips away between crystal columns, vanishing and reappearing as amber scans stitch through drifting dust.\nElian waits beside the pool until the drone projects a narrow route hugging the basin wall.\nThe side path is longer and raised above the drop, but it avoids the buried crack.\nHe clips the scanner back to his belt and climbs toward the ledge without looking behind him.\nCrystal walls rise on both sides, turning the sky into a hard blue ribbon overhead.\nHe steps onto the narrow terrace between the glowing spires as the pulse flashes again somewhere ahead.",
+ "hobbitBible": {
+  "logline": "On Hobbiton Hill in the late Third Age, Bungo Baggins patiently carves Bag End into the living earth, from the first cut of turf and the hauling of spoil down to Bagshot Row to the final lamplit reveal of a dry, round-doored smial whose warm left-hand rooms look out across gardens, meadows, and The Water.",
+  "characters": [
+   {
+    "name": "Bungo Baggins",
+    "role": "Builder of Bag End and wealthy Shire hobbit patriarch",
+    "visual_description": "Male hobbit, late 40s, short and broad with a sturdy barrel chest and thick forearms, rosy fair skin, round face, short brown curling hair, tidy side-whiskers, bright hazel eyes, large hairy bare feet furred from the ankle down, calm practical expression. He wears a dark moss-green wool jacket with a soft turned-down collar, brass buttons, and long sleeves; beneath it a mustard-yellow waistcoat with small polished brass buttons; beneath that a cream linen shirt with a band collar and narrow cuffs; green velvet knee-breeches fastened with small horn buttons just below the knee; a dark brown leather belt with simple brass buckle; and a dark green hooded cloak clasped with a plain brass hook when outdoors in wind or rain. For work he adds a natural undyed linen waist apron tied at the back, a worn brown leather tool belt with iron trowel, small mallet, folding measuring rule, and cord line."
+   },
+   {
+    "name": "Minto Bracegirdle",
+    "role": "Hobbit carpenter and joiner assisting the build",
+    "visual_description": "Male hobbit, early 30s, compact and wiry with quick hands, warm ruddy skin, narrow jaw, straight nose, brown curling hair cut short around the ears, clean-shaven face, grey-brown eyes, hairy bare feet furred from the ankle down. He wears a russet-red wool waistcoat with brass buttons, a muted olive wool jacket worn open with long sleeves pushed to the forearms, a pale oat linen shirt with a soft collar, tan knee-breeches tied below the knee with brown cord, and a weathered brown leather belt holding a wooden folding ruler, awl, and small hammer. He also wears a short chestnut-brown canvas half-apron tied at the waist and a dark olive hood pulled up only in rain."
+   },
+   {
+    "name": "Daisy Noakes",
+    "role": "Hobbit gardener and earthworker shaping the spoil into terraces and kitchen gardens below the smial",
+    "visual_description": "Female hobbit, late 30s, short and strong-backed with broad hips and muscular forearms, sun-warmed fair skin with freckles, heart-shaped face, thick brown curly hair braided into a crown around the head, lively dark eyes, hairy bare feet furred from the ankle down. She wears a faded marigold bodice laced at the front over a cream linen blouse with rolled sleeves, a deep green wool skirt falling to mid-calf, a brown homespun petticoat visible at the hem, and a stout brown waist apron with large patch pockets holding seeds, twine, and a hand trowel. In cold weather she adds a short brown wool shawl pinned at the chest with a simple brass pin."
+   }
+  ],
+  "objects": [
+   {
+    "name": "Bag End round front door",
+    "visual_description": "A perfectly round timber front door painted rich deep green, thick plank construction hidden beneath smooth finished boards, a polished brass knob fixed at the exact center, narrow brass key plate directly below the knob, black iron strap hinges concealed from the front edge, set within a circular cream-plastered doorway ringed by neat red-brown brickwork. The green paint is satin rather than glossy, and the door must always read as the unmistakable signature face of Bag End."
+   },
+   {
+    "name": "Hobbit earthwork wheelbarrow",
+    "visual_description": "Handmade single-wheel wheelbarrow sized for hobbits, ash-wood tray with rounded sides, dark iron-rimmed wooden wheel, two smooth chestnut handles, iron strap braces, and caked brown soil packed into the joints. The left handle has a visible rawhide repair wrap and the tray front bears a shallow gouge shaped like a crescent."
+   },
+   {
+    "name": "Bungo's builder's toolkit",
+    "visual_description": "A recurring set of hand tools carried together in a worn honey-brown leather roll and belt: iron spade with short ash shaft, square iron shovel, iron mattock with oak handle, small iron trowel, wooden mallet with darker replaced head, chalk line reel, hemp measuring cord, and a folding wooden rule with brass hinges. All metal is hand-forged dark iron with rubbed bright edges from use."
+   }
+  ],
+  "locations": [
+   {
+    "name": "Hobbiton Hill — untouched hillside",
+    "visual_description": "A sunlit grassy shoulder of Hobbiton Hill before excavation, steep but gentle enough for hand work, with the future Bag End site cut into the middle of the slope. At the center stands a chalk-marked circular stake pattern showing the future door and straight entrance hall line into the hill. On the left, a winding dirt path climbs toward the crest under low hedges and wildflowers; on the right, the land falls away toward a rough spoil path leading downslope. In the background are patchwork meadows, kitchen gardens, The Water glinting beyond, and the distant Old Mill with Hobbiton scattered across rolling green hills. The earth is deep brown beneath dense turf, and there are no built openings yet, only untouched grass, daisies, and a few stacked timber posts."
+   },
+   {
+    "name": "Hobbiton Hill — excavation and spoil terraces",
+    "visual_description": "The same shoulder of Hobbiton Hill during active digging, now dominated at the center by a raw oval bite cut into the slope where the future round doorway and tunnel mouth are being opened. Fresh dark soil banks and clay piles flank the opening, and plank ramps descend from the cut. On the left, the marked line of the straight smial passage continues inward beneath rough timber shoring set into the earth; on the right, wheelbarrow tracks run down to newly formed spoil terraces. In the background below, the first earth walls and kitchen garden plots of Bagshot Row are visibly taking shape from dumped spoil, with stacked sod, wattled edges, and vegetable beds. What is different from the previous state is the exposed tunnel mouth, shored earth, spoil mounds, timber braces, ramps, and the first man-shaped terraces below."
+   },
+   {
+    "name": "Bag End — half-finished smial shell",
+    "visual_description": "The same site after the main hollowing of the smial, with the centered entrance now a fully circular masonry opening set into the hill but still lacking the finished green door. A straight round-ceilinged hall runs inward from center frame, its walls packed earth over partially plastered surfaces, while branch rooms open off both sides as dark circular mouths. On the left side of the hall, deep-set round window openings have been cut through to daylight and look across gardens, meadows, and The Water; on the right side, interior storerooms remain dim and unfinished. The floor is tamped earth covered with reed mats and boards, stacks of red-brown bricks and lime plaster buckets sit along the walls, and timber pegs mark future built-in shelves. Outside the opening are neater garden terraces and retaining earthworks below. What is different from the previous state is the complete tunnel geometry, formed room branches, masonry entrance ring, carved left-side windows, and partially plastered interior surfaces."
+   },
+   {
+    "name": "Bag End — completed house interior and facade",
+    "visual_description": "The finished Bag End embedded seamlessly into Hobbiton Hill, centered on the iconic perfectly round green front door with a brass knob in the exact middle set in a cream-plastered circular frame. A clipped path and flower-bordered lawn lead to the door; on the left are deep-set round windows opening from the best rooms over lush gardens, meadows, and The Water; on the right, lower service windows and pantry vents tuck into the hillside under turf and herbs. Inside, the straight tunnel-like hall is round-walled, warm cream plaster over brick and earth, polished wooden floorboards with braided runners, pegged coat hooks, framed pantry doors, and practical compact rooms branching off. The left-hand rooms are bright and comfortable with round windows, wooden tables, shelves, food stores, and domestic warmth; the whole smial is dry, orderly, prosperous, and fully furnished. What is different from the previous state is the installed green door, finished plaster and woodwork, dressed floors, complete windows, planted gardens, and the fully provisioned lived-in interior."
+   }
+  ],
+  "era_setting": "Late Third Age of Middle-earth, years before the events of The Hobbit and The Lord of the Rings, in Hobbiton in the Shire during the original construction of Bag End by Bungo Baggins; the world is wholly pre-industrial, agrarian, and Tolkien-canonical.",
+  "visual_style": {
+   "palette": "moss green, rich earth brown, cream plaster, brass gold, weathered red brick",
+   "lighting": "Chapters 1-2 use crisp spring morning light with dew on grass and soft sun across Hobbiton Hill; chapters 3-5 shift to hard noon glare and warm dust-haze during the heaviest digging and hauling; chapters 6-8 move into overcast afternoon and brief rain with muted bounce light on raw earth and wet timber; chapters 9-10 play in golden dusk with practical lanterns and hearth-glow beginning to define the smial interior; chapters 11-12 end in blue hour outside and warm amber lamplight inside the completed Bag End, with deep black shadows in the tunnel edges.",
+   "camera": "Anamorphic 2.39:1 framing, 40mm and 65mm lens bias for intimate environmental portraiture, low hobbit-height camera placement, wide establishing plates anchored to each location state, slow dolly moves through tunnels, gentle lateral tracking beside wheelbarrows and terraced earthworks, occasional locked symmetrical compositions on the round door and central hall, shallow depth of field for hands, tools, soil, and food-centered details while always keeping spatial relation of character to architecture legible.",
+   "film_look": "Cinematic naturalism with soft anamorphic oval bokeh, subtle edge halation on brass and lantern flame, fine film grain, dense blacks in tunnel recesses, slight moisture bloom in rain scenes, tactile textures in plaster, turf, velvet, wood, and hand-worked earth."
+  },
+  "motifs": [
+   "round geometry repeated in door, windows, tunnel mouths, plates, and tools",
+   "earth becoming home through patient hand labor",
+   "spoil from the hill transforming into Bagshot Row terraces and gardens",
+   "left-side daylight rooms as the reward of careful planning",
+   "food, storage, and domestic comfort as the true measure of prosperity",
+   "weather passing over the hill as a construction clock"
+  ],
+  "continuity_rules": [
+   "Keep Bungo Baggins in the exact same outfit, hair, and tool belt in every appearance.",
+   "Round doors, round windows, and rounded passage geometry must dominate all Bag End design.",
+   "Show all construction as hand-made and pre-industrial: no steel machines, no modern fasteners, no industrial lighting.",
+   "The location states must appear only in chronological order: untouched hillside, excavation and spoil terraces, half-finished smial shell, completed house interior and facade.",
+   "The green round front door with centered brass knob appears only in the final completed state.",
+   "The best domestic rooms must always be on the left side of the main hall and visibly receive daylight through deep-set round windows.",
+   "Excavated earth must consistently reappear downslope as terraces, earth walls, and gardens forming Bagshot Row.",
+   "Keep the Shire lush, cultivated, and comfortable rather than wild or ruined, with agriculture and domestic detail visible in every exterior view."
+  ]
+ },
+ "astroBible": {
+  "logline": "A lone astronaut crosses the breathtaking wilderness of a faraway planet, moving through crystal basins, basalt ridges, and bioluminescent caverns as awe slowly overtakes isolation.",
+  "characters": [
+   {
+    "name": "Commander Elian Voss",
+    "role": "Lone astronaut explorer and emotional center of the film",
+    "visual_description": "A 38-year-old man with a lean athletic build, light olive skin, a narrow angular face, short dark brown hair visible only through the helmet rim, strong brow, straight nose, and faint stubble. He wears a fitted off-white EVA spacesuit with matte graphite joint sections, muted cobalt blue life-support lines, a rectangular chest control panel with tiny amber indicator lights, reinforced dust-scuffed boots, dark gray gloves, and a compact white backpack life-support unit. His helmet is a clear bubble visor with a thin graphite frame and subtle surface scratches, and he carries a slim silver multisensor scanner clipped to his belt."
+   },
+   {
+    "name": "Astra",
+    "role": "Small survey drone companion",
+    "visual_description": "A palm-sized spherical survey drone with a brushed white titanium shell, three black lens apertures arranged in a triangular pattern, tiny articulated stabilizer fins, a thin cobalt status ring that glows softly, and faint dust scratches across its surface. It hovers with near-silent precision and projects delicate amber scanning beams."
+   }
+  ],
+  "locations": [
+   {
+    "name": "Landing Expanse",
+    "visual_description": "A vast alien plain of pale ash-colored dust and dark volcanic rock stretching beneath an immense sky, scattered with rib-like stone arches, shallow reflective mineral flats, and the astronaut's compact silver landing craft half-buried in powdery regolith. The horizon is dominated by distant jagged mountains and a giant ringed planet hanging low in the sky."
+   },
+   {
+    "name": "Crystal Basin",
+    "visual_description": "A breathtaking depression filled with towering translucent mineral spires in shades of turquoise and violet, mirror-like pools of liquid reflecting the sky, and smooth wind-carved stone terraces dusted with shimmering white particles. Sunlight fractures through the crystal formations into prismatic streaks that cut across the ground."
+   },
+   {
+    "name": "Basalt Ridge",
+    "visual_description": "A high black ridge of fractured volcanic stone overlooking endless canyons, with narrow paths, steep cliffs, natural stone bridges, and scattered metallic-looking alien flora that catch the light like burnished copper. The wind drives fine dust through the air in long cinematic veils."
+   },
+   {
+    "name": "Luminous Cavern",
+    "visual_description": "An enormous subterranean chamber with cathedral-scale ceilings, slick obsidian walls, glowing blue-green bioluminescent veins, hanging mineral formations, shallow still water, and drifting particulate mist that catches shafts of light from cracks above. The darkness is deep and velvety, broken by organic pulses of cold radiant color."
+   }
+  ],
+  "era_setting": "Far future deep-space exploration era on an uncharted exoplanet, with advanced but utilitarian human expedition technology and no visible alien civilization.",
+  "visual_style": {
+   "palette": "off-white, graphite gray, cobalt blue, turquoise, violet",
+   "lighting": "Motivated natural light from a harsh alien sun, cold reflected glow from minerals and water, and sparse suit practicals; high-contrast cinematic lighting that emphasizes scale, solitude, and wonder.",
+   "camera": "Anamorphic widescreen compositions with shallow depth of field in close details, wide environmental frames that place the astronaut small against immense landscapes, low-angle hero silhouettes, slow push-ins, measured tracking shots, drifting orbital moves around the explorer, and occasional handheld micro-instability inside intimate visor-level moments.",
+   "film_look": "Clean high-end sci-fi cinema with subtle 35mm grain, gentle halation on highlights, crisp atmospheric perspective, soft lens breathing, and restrained bloom around bioluminescent elements."
+  },
+  "motifs": [
+   "A lone human figure dwarfed by impossible planetary scale",
+   "Prismatic light refracting through alien crystals",
+   "Fine dust drifting across black stone under vast skies",
+   "Reflections in visor glass, water, and mineral surfaces",
+   "Blue-green bioluminescence turning darkness into beauty",
+   "Silence, stillness, and slow discovery over danger"
+  ],
+  "continuity_rules": [
+   "Commander Elian Voss always wears the same off-white EVA suit with graphite joints and cobalt details.",
+   "Astra always appears as a small white spherical drone with a cobalt status ring.",
+   "The ringed planet must be visible in every exterior sky shot.",
+   "All environments must emphasize awe, beauty, and isolation rather than combat or horror.",
+   "Use anamorphic widescreen framing with the explorer visually anchored against large spaces.",
+   "Keep alien technology absent except for human gear, lander, and drone.",
+   "Dust, reflections, and atmospheric particles should be present in nearly every scene.",
+   "Exterior light is harsh and directional; subterranean light is bioluminescent and cold."
+  ]
+ }
+}

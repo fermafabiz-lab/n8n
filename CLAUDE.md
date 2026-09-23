@@ -1556,11 +1556,12 @@ expected and harmless for an app touching only its own Drive.
 - **Give voiceovers a real attachment row** (`field: 'voice'` through
   `/api/media/ingest`, a `storedVoiceUrl` beside `storedVideoUrl`), so new
   films never reach Drive for playback at all, and backfill the existing
-  ones. Since 2026-09-20 the proxy's disk cache makes this an optimisation
-  rather than a fix — `db/port/scene-lag/README.md` explains why the cache
-  was done first (it heals films that already exist; the attachment row
-  would need three n8n nodes changed and a backfill before it helped
-  anything). Also owed there: watch one scene play on the deployed site.
+  ones. This is the real fix for voiceover latency now: the proxy disk cache
+  that was meant to make it an optimisation was withdrawn on 2026-09-20
+  (it never wrote a byte and broke the final video — see
+  `db/port/scene-lag/README.md`), so the `MediaPlayer` rate-nudge is the only
+  thing standing between a Drive-served take and a stall. It needs three
+  n8n nodes changed and a backfill.
 - Rotate the ai33 / Railway / useapi keys. Discord webhook URLs are still empty.
 
 ## Working language

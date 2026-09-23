@@ -735,9 +735,18 @@ expected and harmless for an app touching only its own Drive.
   now ends `captchaRetry = 5`, which also rotates to the second configured
   provider. **Still owed**: the same line in Claude Scripting's
   `IR Generate Image` (left alone because another session was publishing
-  there), and watch for `PUBLIC_ERROR_MODEL_ACCESS_DENIED` on clips from
-  `01`/`02` — useapi says `veo-3.1-lite-low-priority` left invited family
-  members on 2026-09-23, and our three accounts share one credit pool.
+  there).
+  **The same evening it happened: the free clip model left the invited
+  accounts** (Media Generation `b9527072`, `db/port/family-model/`). From
+  2026-09-23 Google serves `veo-3.1-lite-low-priority` only to the Ultra
+  family MANAGER; `houseofvideos01` answered every Rome clip with `403
+  PUBLIC_ERROR_MODEL_ACCESS_DENIED` while its model list still showed the
+  key (the list follows the plan, not what Google serves). `Submit Video` and
+  `Submit Video Regen` now send `veo-3.1-lite` (same model, normal priority, 5
+  credits a clip) to any account but `fermafabiz@gmail.com`. **Still owed**:
+  `Submit Cooldown Guard` loops in place on a refusing account, which stops the
+  pool from polling clips already in flight — the producer saw that as "stuck
+  on scene 1".
 - **Drawn cards: one accepted motif card used to SILENCE every derived card,
   and the validator refused chapter-start cards on films with chapter cards
   OFF** (2026-09-23, `db/port/motif-more-cards/README.md`). The New York

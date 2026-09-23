@@ -508,6 +508,15 @@ export interface Project {
   updatedAt: string | null;
   /** When the film was created. Deep Search uses it to spare older films. */
   createdAt: string | null;
+  /**
+   * The last time anything about the film changed — a person on the site, the
+   * pipeline by itself, hands-off, pause/resume/restart — EXCEPT the
+   * Publishing panel and playlists, and never merely by being looked at
+   * (db/014_project_activity.sql has the reasoning). What the library's
+   * "recently worked on" order sorts by. Falls back to `createdAt` where the
+   * backend cannot say (Airtable, demo data).
+   */
+  activityAt: string | null;
   /** First scene's generated image — the dashboard card cover. */
   coverUrl?: string | null;
   /** Overlay options, editable right up to final assembly. */
@@ -805,6 +814,8 @@ export interface RawProject {
   language: string;
   voiceId: string;
   createdAt: string | null;
+  /** Postgres only (db/014) — see Project.activityAt. */
+  activityAt?: string | null;
   coverUrl?: string | null;
   /** The creation form's PACE choice ("Slow" | "Normal" | "Fast"). It is the
    *  DEFAULT for editing.speed — see the fallback in buildProject. */
@@ -1234,6 +1245,7 @@ export function buildProject(r: RawProject): Project {
     aspect: r.aspectRaw === "9:16" ? "9:16" : "16:9",
     updatedAt: r.createdAt,
     createdAt: r.createdAt,
+    activityAt: r.activityAt ?? r.createdAt ?? null,
     coverUrl: r.coverUrl ?? null,
     seriesId: r.seriesId ?? null,
     episodeNo: Number.isInteger(r.episodeNo) && (r.episodeNo as number) > 0 ? (r.episodeNo as number) : null,

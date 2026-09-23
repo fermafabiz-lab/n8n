@@ -43,6 +43,7 @@ import {
   removePlaylistMembers,
   renamePlaylistRow,
   deletePlaylistRow,
+  touchProjectActivity,
 } from "@/lib/data";
 import { cleanProjectIds, films, isRecordId, normalizePlaylistName } from "@/lib/playlists";
 import {
@@ -2943,6 +2944,7 @@ export async function restartScripting(projectId: string): Promise<ActionResult>
       };
     }
     if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
+    await touchProjectActivity(projectId).catch(() => {});
     revalidatePath(`/projects/${projectId}`);
     return {
       ok: true,
@@ -2993,6 +2995,9 @@ export async function resumeProject(projectId: string): Promise<ActionResult> {
       body: JSON.stringify({ project_id: projectId }),
     });
     if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
+    // Stamped here and not left to the pipeline: the resume run may take a
+    // while to write its first row, and the film should rise when it is pressed.
+    await touchProjectActivity(projectId).catch(() => {});
     revalidatePath(`/projects/${projectId}`);
     return {
       ok: true,
@@ -3075,6 +3080,9 @@ export async function pauseProduction(projectId: string): Promise<ActionResult> 
       const res = await stopExecution(r.id);
       if (res.ok) stopped++;
     }
+    // Pausing is working on the film (the producer's rule, 2026-09-23), but
+    // it changes nothing in the database, so nothing else would stamp it.
+    await touchProjectActivity(projectId).catch(() => {});
     revalidatePath(`/projects/${projectId}`);
     revalidatePath("/");
     const lost =

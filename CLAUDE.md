@@ -502,6 +502,23 @@ expected and harmless for an app touching only its own Drive.
 
 ## Open work
 
+- **The library is ordered by last activity since 2026-09-23** ("Recently
+  worked on"; `db/port/activity-order/README.md`, lessons in
+  `docs/lessons-site.md`). What counts was the producer's call, asked before
+  building: anything that changes the film — people on the site, **the pipeline
+  by itself**, hands-off approvals, pause/resume/restart — but **not** the
+  Publishing panel, **not** playlists, and never merely opening it. One column
+  and one trigger (`db/014`: `project.activity_at`, bumped by any project UPDATE
+  except `editing_options.publishing`), the children's own `updated_at` read on
+  top (`PROJECT_ACTIVITY_SQL`, one owner), and an explicit stamp from the three
+  actions that write nothing. Same order for the whole team; a **per-device**
+  switch in Settings → Customize (cookie `hov-library-order`) restores Newest
+  first. The grid holds its order while pointed at or in Select, so a card never
+  moves under a click. **`getProjects` selects `p.activity_at` with no fallback:
+  db/014 must precede the site code on any database**, or the library does not
+  load. Pinned by `npm run check:activity` (32) and, on a real engine,
+  `db/port/activity-order/check-trigger.mjs` (17). **Any new table that belongs
+  to a film** needs adding to `PROJECT_ACTIVITY_SQL` if its writes should count.
 - **Playlists exist on the projects page since 2026-09-23**
   (`db/port/playlists/README.md`; lessons in `docs/lessons-site.md` under
   "Playlists — the library, organised by the producer"). A playlist row above

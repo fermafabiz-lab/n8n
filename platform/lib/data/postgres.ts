@@ -30,6 +30,7 @@ import {
 } from "./derive";
 import { classifyVisualOrigin } from "@/lib/provenance";
 import { sortPlaylists, type Playlist } from "@/lib/playlists";
+import { PROJECT_ACTIVITY_SQL } from "./activity-sql";
 
 // ---------------------------------------------------------------------------
 // Connection
@@ -128,6 +129,8 @@ interface ProjectRow {
   voice_id: string;
   pace: string | null;
   created_at: Date | null;
+  /** Only where the query selected PROJECT_ACTIVITY_SQL (getProjects). */
+  activity_at?: Date | null;
   cover_path?: string | null;
   series_id?: string | null;
   episode_no?: number | null;
@@ -152,6 +155,7 @@ function toRawProject(r: ProjectRow): RawProject {
     voiceId: r.voice_id ?? "",
     paceRaw: r.pace,
     createdAt: r.created_at ? r.created_at.toISOString() : null,
+    activityAt: r.activity_at ? r.activity_at.toISOString() : null,
     coverUrl: mediaUrl(r.cover_path ?? null),
     seriesId: r.series_id ?? null,
     episodeNo: r.episode_no ?? null,
@@ -463,6 +467,9 @@ export async function getProjects(): Promise<Project[]> {
   // The cover is the earliest scene (by order) that has an image. One
   // correlated sub-select beats the Airtable adapter's full sweep of the
   // Scene table, which it had to do because Airtable cannot join.
+  // The ORDER stays by creation: that is the library's "Newest first" and the
+  // hero's and the chime's order. "Recently worked on" is applied by the grid
+  // (lib/library-order.ts) from activity_at, which rides along here.
   const rows = await query<ProjectRow>(`
     select ${PROJECT_COLS},
       (select a.path
@@ -470,7 +477,8 @@ export async function getProjects(): Promise<Project[]> {
          join hov.attachment a on a.scene_id = s.id and a.field = 'image'
         where s.project_id = p.id
         order by s.scene_order
-        limit 1) as cover_path
+        limit 1) as cover_path,
+      ${PROJECT_ACTIVITY_SQL} as activity_at
     from hov.project p
     order by p.created_at desc`);
   return rows.map((r) => buildProject(toRawProject(r)));
@@ -1984,4 +1992,19 @@ export async function deletePlaylistRow(playlistId: string): Promise<PlaylistDel
     await q(`delete from hov.playlist where id = $1`, [playlistId]);
     return { ok: true as const, name: pl.name, films: pl.films };
   });
+}
+
+// ---------------------------------------------------------------------------
+// Activity (db/014)
+//
+// Almost every change a film goes through stamps its own activity: the
+// project_activity trigger for the row, updated_at for its scenes, chapters
+// and scripts. Pause, resume and restart are the exception — they talk to n8n
+// and change nothing in the database, yet the producer counts them as
+// working on the film. So those actions stamp it here, and the trigger lets an
+// explicit value through untouched.
+// ---------------------------------------------------------------------------
+
+export async function touchProjectActivity(projectId: string): Promise<void> {
+  await query(`update hov.project set activity_at = now() where id = $1`, [projectId]);
 }

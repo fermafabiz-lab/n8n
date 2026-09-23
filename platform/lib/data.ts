@@ -465,6 +465,7 @@ const DEMO_PROJECTS: Project[] = [
     aspect: "16:9" as const,
     updatedAt: null,
     createdAt: null,
+    activityAt: null,
     editing: { captions: true, hookStyle: "auto", chapterCards: true, endScreen: true, sfx: true, sfxLevel: 0.35, music: false, musicTrack: null, musicLevel: 0.22, styleRefs: [], drawnCards: true, captionColor: null, videoModel: null, speed: 1, speedLocked: false, sourceWatermark: true, watermarkOpenOnce: false, watermarkScale: 1, voice: null, autoApprove: false },
     awaitingFinalSettings: false,
     category: "story",
@@ -494,6 +495,7 @@ const DEMO_PROJECTS: Project[] = [
     aspect: "16:9" as const,
     updatedAt: null,
     createdAt: null,
+    activityAt: null,
     editing: { captions: true, hookStyle: "auto", chapterCards: true, endScreen: true, sfx: true, sfxLevel: 0.35, music: false, musicTrack: null, musicLevel: 0.22, styleRefs: [], drawnCards: true, captionColor: null, videoModel: null, speed: 1, speedLocked: false, sourceWatermark: true, watermarkOpenOnce: false, watermarkScale: 1, voice: null, autoApprove: false },
     awaitingFinalSettings: false,
     category: "story",
@@ -523,6 +525,7 @@ const DEMO_PROJECTS: Project[] = [
     aspect: "16:9" as const,
     updatedAt: null,
     createdAt: null,
+    activityAt: null,
     editing: { captions: true, hookStyle: "auto", chapterCards: true, endScreen: true, sfx: true, sfxLevel: 0.35, music: false, musicTrack: null, musicLevel: 0.22, styleRefs: [], drawnCards: true, captionColor: null, videoModel: null, speed: 1, speedLocked: false, sourceWatermark: true, watermarkOpenOnce: false, watermarkScale: 1, voice: null, autoApprove: false },
     awaitingFinalSettings: false,
     category: "story",
@@ -552,6 +555,7 @@ const DEMO_PROJECTS: Project[] = [
     aspect: "16:9" as const,
     updatedAt: null,
     createdAt: null,
+    activityAt: null,
     editing: { captions: true, hookStyle: "auto", chapterCards: true, endScreen: true, sfx: true, sfxLevel: 0.35, music: false, musicTrack: null, musicLevel: 0.22, styleRefs: [], drawnCards: true, captionColor: null, videoModel: null, speed: 1, speedLocked: false, sourceWatermark: true, watermarkOpenOnce: false, watermarkScale: 1, voice: null, autoApprove: false },
     awaitingFinalSettings: false,
     category: "story",
@@ -1624,3 +1628,13 @@ export const deletePlaylistRow: typeof pgBackend.deletePlaylistRow = (playlistId
   needPg("deletePlaylistRow");
   return pgBackend.deletePlaylistRow(playlistId);
 };
+
+// ---------------------------------------------------------------------------
+// Activity (db/014). Postgres only; elsewhere there is nothing to stamp, and a
+// stamp is never worth failing the action it rides on — callers catch.
+// ---------------------------------------------------------------------------
+
+export async function touchProjectActivity(projectId: string): Promise<void> {
+  if (!USE_PG || !isConfigured) return;
+  return pgBackend.touchProjectActivity(projectId);
+}

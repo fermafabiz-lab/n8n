@@ -14,6 +14,7 @@ import ExpandableTitle from "@/components/ExpandableTitle";
 import PlaylistBar from "@/components/PlaylistBar";
 import AddToPlaylist from "@/components/AddToPlaylist";
 import { films, sortPlaylists, type Playlist } from "@/lib/playlists";
+import { orderLibrary, type LibraryOrder } from "@/lib/library-order";
 import type { Project, StatusKind } from "@/lib/data";
 import { LIBRARY_FILTERS as FILTERS, isFilterKey, type FilterKey } from "@/lib/library-filters";
 import { CREATORS } from "@/lib/data/derive";
@@ -152,13 +153,26 @@ type LibraryMsg = ActionResult & { action?: { label: string; run: () => void } }
 export default function ProjectsGrid({
   projects,
   playlists,
+  order = "activity",
 }: {
+  /** In the server's creation order, newest first. */
   projects: Project[];
   /** Null when they could not be read — the library still works without
    *  them, it just cannot offer them (see app/projects/page.tsx). */
   playlists: Playlist[] | null;
+  /** Recently worked on, or Newest first — per device, Settings → Customize
+   *  (lib/library-order.ts). */
+  order?: LibraryOrder;
 }) {
   const [manage, setManage] = useState(false);
+  /**
+   * The pointer is over the cards. While it is — or while Select is on —
+   * the order holds still (orderLibrary's `hold`): with the pipeline counting
+   * as activity a film can rise at any refresh, and a card that moves under a
+   * click opens or ticks the wrong film.
+   */
+  const [pointing, setPointing] = useState(false);
+  const shownOrder = useRef<string[] | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [armed, setArmed] = useState(false);
   const [msg, setMsg] = useState<LibraryMsg | null>(null);
@@ -285,7 +299,15 @@ export default function ProjectsGrid({
   const active = listId ? (pls?.find((pl) => pl.id === listId) ?? null) : null;
   const staleList = listId !== null && pls !== null && active === null;
   const inActive = active ? new Set(active.projectIds) : null;
-  const scoped = inActive ? projects.filter((p) => inActive.has(p.id)) : projects;
+  // The whole library in the chosen order, BEFORE any scoping — so the same
+  // order carries into playlists, tabs, search and pages (the producer's
+  // answer: "the same everywhere"). Held still while pointing or selecting.
+  const holding = pointing || manage;
+  const ordered = orderLibrary(projects, order, holding ? shownOrder.current : null);
+  useEffect(() => {
+    shownOrder.current = ordered.map((p) => p.id);
+  });
+  const scoped = inActive ? ordered.filter((p) => inActive.has(p.id)) : ordered;
 
   const counts = new Map<string, number>([["all", scoped.length]]);
   for (const p of scoped) counts.set(p.statusKind, (counts.get(p.statusKind) ?? 0) + 1);
@@ -804,7 +826,7 @@ export default function ProjectsGrid({
           </div>
         )
       ) : view === "grid" ? (
-        <div className="projects">
+        <div className="projects" onPointerEnter={() => setPointing(true)} onPointerLeave={() => setPointing(false)} data-holding={holding ? "" : undefined}>
           {shown.map((p, i) => (
             <Link
               href={`/projects/${p.id}`}
@@ -893,7 +915,15 @@ export default function ProjectsGrid({
                       show the time, exactly as they did before. */}
                   <span>
                     {p.createdBy ? `${p.createdBy} · ` : ""}
-                    {agoOf(p.updatedAt) || p.status}
+                    {/* The time the ORDER uses, or the list would look
+                        shuffled: sorted by last change but labelled with
+                        creation, the top card could read "3 days ago" above
+                        one that reads "2 min ago". */}
+                    {order === "activity"
+                      ? agoOf(p.activityAt)
+                        ? `updated ${agoOf(p.activityAt)}`
+                        : p.status
+                      : agoOf(p.updatedAt) || p.status}
                   </span>
                   <span className="go">
                     {manage
@@ -910,7 +940,7 @@ export default function ProjectsGrid({
           ))}
         </div>
       ) : (
-        <div className="plist">
+        <div className="plist" onPointerEnter={() => setPointing(true)} onPointerLeave={() => setPointing(false)} data-holding={holding ? "" : undefined}>
           {shown.map((p, i) => (
             <Link
               href={`/projects/${p.id}`}

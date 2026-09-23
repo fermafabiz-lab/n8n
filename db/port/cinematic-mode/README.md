@@ -123,4 +123,24 @@ header parameters the API does not redact.
 
 ## Verification
 
-(filled in below as it happens)
+**Probe 16582** (throwaway `tUwzERABvH7FO64n`). These are the committed
+prompts on gpt-5.4, fed the Hobbit film's real Story Bible from Postgres,
+its length (95 s → 11 shots) and its brief. It took 48 s end to end.
+
+- The treatment was titled *Under the Hill*. Its visual arc runs "crisp
+  spring morning … hard noon excavation … overcast and rain-dark as the
+  smial shell takes shape … golden dusk and finally blue hour outside with
+  warm amber lamplight inside". It had five signature images and two
+  sequences (6 + 5 shots), and the brief's "every step" was honoured in
+  order: mark, measure, sight, turf, mattock, barrow, then shell, plaster,
+  door, finished rooms.
+- The shot list came back 11 of 11, every line in the five-field form, and
+  the sequences are joined by a match cut: spoil tipped into the terraces,
+  then *"Wet packed earth fills the frame … lifts to reveal the
+  half-finished circular masonry opening"*. For comparison, the live
+  pipeline wrote *"By the late Third Age, most hobbits build with wood or
+  brick…"* for the same film.
+- The first pass was sent back by the old whole-line ceiling of 70 words.
+  That cap was miscalibrated, not the list (good lines run 42-70 words), so
+  the ceiling moved to the action field (40) and a `then` check was added.
+  Two lines in this run chained actions ("run the wheelbarrow … then tip").

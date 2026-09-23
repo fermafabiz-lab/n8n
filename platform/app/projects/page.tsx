@@ -1,4 +1,4 @@
-import { getProjects, isConfigured, type StatusKind } from "@/lib/data";
+import { getPlaylists, getProjects, isConfigured, type StatusKind } from "@/lib/data";
 import AutoRefresh from "@/components/AutoRefresh";
 import OpsPanel from "@/components/OpsPanel";
 import StageChime from "@/components/StageChime";
@@ -9,7 +9,17 @@ import Link from "next/link";
 export const dynamic = "force-dynamic";
 
 export default async function Dashboard() {
-  const projects = await getProjects();
+  // Playlists are an organisation layered ON the library, never a condition
+  // for seeing it: a failure to read them (a database that has not had
+  // db/013 yet, a bad moment) costs the playlist row and nothing else, and
+  // the grid says so rather than dropping the row without a word.
+  const [projects, playlists] = await Promise.all([
+    getProjects(),
+    getPlaylists().catch((e) => {
+      console.error("[projects] playlists could not be read:", e);
+      return null;
+    }),
+  ]);
   const waiting = projects.filter((p) => p.statusKind === "wait");
 
   /**
@@ -262,7 +272,7 @@ export default async function Dashboard() {
           </div>
         </>
       ) : (
-        <ProjectsGrid projects={projects} />
+        <ProjectsGrid projects={projects} playlists={playlists} />
       )}
 
       <footer className="pj-foot">

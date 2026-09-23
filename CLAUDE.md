@@ -380,14 +380,17 @@ the full entry in the file named:
   makes it possible to run the SITE against a real Postgres engine from a web
   session: `db/port/lib/local-pg.mjs` (PGlite with the repo's own migrations,
   served over the wire protocol). See `db/port/lib/README.md`.
-  **A session can Resume a film but cannot Pause or Restart one** (met
-  2026-09-23, asked to "restart the projects that are running"): stopping an
-  execution needs the n8n public API key, which only the site holds (GitHub
-  Secret `N8N_API_KEY`) — the n8n MCP connector has no stop tool and n8n
-  keeps no `n8nApi` credential of its own. What a session CAN do is the
-  resume half, a POST to `resume-project` from a throwaway, and only once
-  nothing of the film is alive, or it starts a duplicate batch. The stop half
-  is the producer's Restart button; say so rather than promising it.
+  **A session restarts a film through the site's own door, never by itself**
+  (2026-09-23, asked twice to "restart the projects that are running"):
+  stopping an execution needs the n8n public API key, which only the site
+  holds (GitHub Secret `N8N_API_KEY`) — the n8n MCP connector has no stop tool
+  and n8n keeps no `n8nApi` credential of its own. So the site grew
+  `POST /api/ops/restart` — the ⟳ Restart button's own `restartProduction`
+  behind the n8n→site key — and `db/port/ops-restart/` has the throwaway that
+  calls it. **Judge it by the new executions**: Pause stops every running
+  execution, the caller included, so the throwaway may come back canceled
+  while the restart completes; and it is one film per call, as the buttons
+  have always been.
 - **Any Code-node body or prompt edited through MCP must come from a real,
   committed file first** (`db/port/<feature>/paste/<Node Name>.js`), never
   composed inline in the tool call. `db/port/lib/README.md`.
@@ -538,6 +541,12 @@ expected and harmless for an app touching only its own Drive.
   Delete playlist — filled with the existing ☑ Select ("+ Add to playlist",
   "− Remove from …" with Undo); a film can be in any number of them, and
   everything below the row counts inside the chosen one (`?playlist=<id>`).
+  **Beside them, one chip per CATEGORY that has a film** (Story, Documentary,
+  Cinematic, Kids story — `db/port/category-lists/README.md`): derived from the
+  library on every render, never stored and never written to (no Rename,
+  Delete or Remove), opened as `?playlist=category:<id>`. A film with no
+  category, or an unknown one, is under Story — `getCategory`'s rule, not a
+  second one. `npm run check:category-lists` (30).
   **`db/013` is applied on the live database** (execution 16435: two tables,
   both keys cascading — deleting a playlist never deletes a film). **Not in
   `project.tags`**: that is n8n's Airtable-compat field. Verified end to end

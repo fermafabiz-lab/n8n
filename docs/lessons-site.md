@@ -2526,3 +2526,30 @@ through.** The publishing exclusion lives on both OLD and NEW; the first
 static check was satisfied by either, and a mutation dropping it from NEW —
 which makes every publishing mark count — passed. It now requires both, and
 the real-engine test fails four ways when either side goes.
+
+### Category playlists — the site's own lists beside the producer's (2026-09-23)
+
+The producer asked for a button per category (Story, Documentary, Cinematic,
+Kids story) once it has a film. Full account `db/port/category-lists/README.md`.
+
+**A list the site can derive is a list it should not store.** The tempting
+build is four rows in `hov.playlist` kept in step by every place that creates
+a film or changes its category — and every one of those is a place to forget.
+Computed from the library on each render there is nothing to keep in step,
+and the one owner of "which category is this film" stays `getCategory`: a film
+with no category, or one this site no longer knows, lands under Story because
+that function already says so, not because a second rule here agrees with it.
+
+**Make it BE the thing the page already understands, then forbid only the
+writes.** A category list is shaped like a playlist and opens through the same
+`?playlist=` — so tabs, counts, search, pages and the activity order work inside
+it without a line of new code. What had to change were exactly the lines that
+WRITE a playlist: Rename, Delete, "− Remove from", "Add films to it". Each now
+checks which kind is open, and `check:category-lists` pins all four; breaking
+any of them was caught.
+
+**The restart door shipped in the same deploy**, for a reason worth keeping:
+the producer had asked twice for "restart what is running after the deploy",
+and a session could not — the stop needs the n8n API key and only the site
+holds it. `POST /api/ops/restart` is the ⟳ Restart button's own
+`restartProduction` behind the n8n→site key; `db/port/ops-restart/`.

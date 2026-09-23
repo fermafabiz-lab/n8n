@@ -191,11 +191,8 @@ does. The project is disposable and can be deleted.
   five-field shot line survives Veo as the shot it designs (the camera move
   in particular), and whether 8-second shots that follow coverage read as
   a cut rather than a slideshow.
-- **The hook still speaks Story.** `Generate Hook` receives the concept in
-  place of a story spine and keeps its silent styles. But its "action"
-  style says *"the climax IN MOTION — what the protagonist does at the
-  peak"*, and a cinematic film may have neither. It worked here (three
-  concrete shot notes), but it is a Story instruction.
+- ~~**The hook still speaks Story.**~~ Moot since the same evening: a
+  Cinematic film has no hook (`db/port/cinematic-continuity/`).
 - **`Rewrite Scene Text` / `Rewrite Scene Standalone`** (the per-scene "✎
   rewrite" buttons) were not touched. On a Cinematic scene they rewrite the
   image and motion prompts and keep the line, which is the right behaviour,

@@ -126,4 +126,78 @@ left off.
 
 ## Verification
 
-(below)
+**Probe 16598** (throwaway, archived). The new treatment and shot list ran on
+the Hobbit film's real bible at 95 s. The result was 12 shots, clean on the
+first pass, with lines that start where the last one ended: *"From where the
+cord settled…"*, *"Where the barrow stopped…"*, *"Match on the terrace
+curve…"*. (An earlier run, 16596, died at `Cine Treatment Parser` because
+the model returned an empty answer, 0 completion tokens. It was a one-off,
+but the production agents have no `retryOnFail`.)
+
+**Applied** through `update_workflow` from `ops-cs.json` (in three batches,
+since it is too large for one call) and `ops-mg.json`. Each draft was read
+back and diffed against the simulation before it was published:
+
+| Workflow | Draft = published | Rollback | Diff against `*.expected.json` |
+|---|---|---|---|
+| Claude Scripting | `ca03c4d1` | `e45ef4c1` | 155 nodes, changed 0, connections identical |
+| Media Generation | `8dc9f448` | `b9527072` | 247 nodes, changed 0, connections identical; against live only `Build Image Request` and `Evaluate Image Approval` differ |
+
+Nobody else had edited either workflow since the versions this was built on.
+The real film on Media Generation (16578) was running at publish time and
+keeps the version it started with.
+
+**End to end on the live versions**, disposable film **`rec7Fb9iLTFviELpp`**
+(*"ZZ DELETE cinematic continuity - Bag End"*). It uses the same Tema, brief
+and 95 s as the first Cinematic check (`reczDC7RrgnX8SKsq`), so the two can
+be read side by side. Scripting ran as execution 16603; the script was
+approved by SQL and the real segmenter ran.
+
+- **No hook.** `editing_options.hookPlan` is null. The script starts at
+  `[CHAPTER 1: Breaking the Hill]`, with no chapter 0. The scenes are
+  **101-106 and 201-206: 12 = ceil(95/8)**. The first check had 3 hook
+  scenes plus 11 shots.
+- **Continuity in the shot list.** Every line after the first picks up the
+  one before:
+  - *"At the same marked center, Togo … levers up the first sod flap"*
+  - *"Bungo's spade lifts that same slab"*
+  - *"The opened patch widens into a raw bite"*
+  - the sequences are joined by *"Match cut: the departing wheel becomes the
+    centered bright brass knob"*
+  - *"Pulling back reveals Bungo stepping left away from the polished
+    door"*
+  - *"From the doorway now opened inward…"*
+  - *"The round green front door now stands closed"*
+
+  The light moves only as the arc moves it: dew morning → late morning →
+  noon → late afternoon → dusk → lamplight.
+- **Continuity in the image prompts.** The segmenter carried the state
+  forward:
+  - 102: *"the hill still mostly intact except for the first ragged cut"*
+  - 103: *"now showing a torn opening in the turf"*
+  - 104: *"the same rounded hillside … now visibly opened by labor"*
+  - 106: the removed earth *"visibly read as banks and outlines"*
+  - 206: the door *"now closed"*
+- **The places repeat, so the reference applies.** The `loc:` tags come in
+  four runs: 101-103 untouched slope, 104-106 excavation, 201-204 exterior,
+  205-206 interior. Under the new reference block the previous still is
+  attached as the **previous shot** on **8 of the 11** scenes that have a
+  previous one (102, 103, 105, 106, 202, 203, 204, 206). It stays a palette
+  on the three that change place (104, 201, 205).
+
+**Not exercised live: the image stage itself.** No stills were generated
+for the disposable film. Doing so spends Flow credits and shares the
+accounts with the real film that was rendering. The assembly logic is pinned
+offline by `check.mjs`. It covers continuity vs palette by place, a missing
+previous place, the similarity guard, and byte-identical output for every
+other category, in all three copies. The first real Cinematic film's `IMG
+refs` log lines should show `continuity` on same-place scenes.
+
+**A trade-off this run made visible.** The brief asked for *"every single
+step from digging to the inside of the house"*. The first check covered
+shell, plaster and door fitting. This one goes from the wheelbarrow at noon
+straight to the finished door, on a match cut. In 12 eight-second shots,
+consecutive moments of one action and every stage of a build compete for
+the same shots. The treatment chose continuity, which is what it is now
+told is the spine. A longer film, or a brief that names the stages, gets
+both.

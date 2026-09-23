@@ -2270,6 +2270,21 @@ panel counts distinct quotes itself when the field is missing, because every
 report written before that day has no such field and an old film's panel still
 has to add up.
 
+**A correction is allowed to make the film shorter, and the panel says when it
+did** (2026-09-23). The chain used to refuse a rewrite that shortened a chapter
+by more than a fifth, which threw away a correct fix on the producer's own
+Google Maps film — full account in `db/port/fact-check/README.md` §10 and
+`docs/lessons-pipeline.md`, "A guard that re-derives a decision drifts from the
+node that owns it". The valve is one-sided now, so the site has a new thing to
+say: `report.short` carries `{words, min}` when the corrected narration lands
+under the length the film was ordered at. **It is not a failure and never
+red** — `deepSearchState` appends it to whatever the report's real verdict is,
+on a corrected report and on a flagged one alike, and it names the choice the
+producer actually has: *"its research does not cover the whole running time, so
+either give it more or order it shorter."* Neither half of that is a decision
+the chain can make for them. An older report without the field reads exactly as
+it did before, which is what `check:deepsearch` pins.
+
 ### The tone is part of what kind of film it is (2026-09-19)
 
 The brief asked two questions that were really one. Section 01 asks **what kind

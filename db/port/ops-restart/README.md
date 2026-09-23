@@ -61,3 +61,21 @@ key with a bad id → 400; the right key with a real film → 409 with the
 button's own "not configured" (no n8n there). The handler's 500/401/400 paths
 are also pinned in `npm run check:routes`, and the door's placement in
 `npm run check:category-lists`. The live use is recorded below.
+
+## Used live: the Rome film, 14:21:54 UTC
+
+Shipped in deploy #182 (merge `11be573`; build 14:18:13 → 14:20:33, job
+success 14:21:00). The producer's instruction was "deploy, then restart the
+projects being worked on"; the one film in production was "How Rome fed a
+million people" (`recIIvYV8S6KNaw4C`), on Media Generation `16497` — started
+13:54 on `f7f03638`, two versions behind the `c8e6df0c` another session had
+published at 14:10.
+
+The throwaway (`zn5Eh1QgV8KYhXDU`, execution 16515) posted at 14:21:54.115 and
+was itself canceled at 14:21:54.353 by the site's own Pause — exactly as this
+file says it will be, and the proof the route ran (only the site calls the
+public stop API). The old run went at 14:21:54.43 (`16497` canceled, its
+orchestrator `16496` erroring with it), and the new one started 0.4 s later:
+orchestrator `16516` (webhook) and Media Generation `16517` (integrated), on
+the current version. A route that did not exist before this deploy answering
+at all is also the plainest proof the deploy was live.

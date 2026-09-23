@@ -45,6 +45,10 @@ pages, the activity order) answers inside it, and a reload or a link keeps it.
   Story. That is the truth about how it was made, and one click in its brief
   from changing.
 
+**Live since deploy #182** (merge `11be573`, job success 14:21:00 UTC), shipped
+with the restart door (`db/port/ops-restart/`) at the producer's instruction
+"deploy directly, then restart the projects being worked on".
+
 ## Verified
 
 - `npm run check:category-lists` — the grouping on fixtures (unfiled and

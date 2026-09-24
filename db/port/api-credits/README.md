@@ -86,6 +86,11 @@ the rest**; better, move all of them to one Header Auth credential.
   `http://localhost:5678/webhook/api-credits` with the `HOV Media Ingest` key
   → 200 in 4.9 s, `source: "webhook"`, `saved: true`, nine readings; the same
   POST without the key → **403** "Authorization data is wrong!".
+- **Used from the live site within minutes**: a "Check now" at 10:55:26
+  wrote nine `webhook` readings (the site → n8n → table path, end to end),
+  the first scheduled run wrote nine at 11:00:21, and `pg_stat_user_tables`
+  counted hov.api_balance's scans going 6 → 31 between 10:49 and 11:00 — the
+  served pages and the strip reading it.
 - `db/015` applied in execution **16821** (table, 13 columns, 3 indexes).
 - Workflow **`Bkuo0qIxKprUFVpU`** published as version **`78582ddd`**; its
   first run (16822, 5 s) wrote nine readings: OpenAI **OUT**, ElevenLabs

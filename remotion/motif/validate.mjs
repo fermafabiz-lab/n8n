@@ -366,13 +366,37 @@ export function validateMotifCards(o) {
 			drop(`no such motif: ${JSON.stringify(card?.variant)}`);
 			continue;
 		}
-		const i = card.sceneIndex;
+		let i = card.sceneIndex;
+		let movedFrom = null;
 		if (!Number.isInteger(i) || i < 0 || i >= scenes.length) {
 			drop('sceneIndex is not a scene of this film');
 			continue;
 		}
+		// The cold open is a TEASER of several scenes (chapter 0) since
+		// 2026-09-11, and the render never draws a card over it: FinalVideo's
+		// montage planner keeps cards out of the hook, and the teaser's beats
+		// are one to two seconds, shorter than any card's minimum. So a card
+		// placed there was accepted here and then silently dropped at render —
+		// the Rome film's route card (Sardinia → Egypt) on a 1.96 s hook beat,
+		// Final Assembly 16974. It belongs where its content is SPOKEN: move it
+		// to the latest scene it quotes, when that scene is past the teaser.
+		// With nowhere to go, it is refused with a reason the report shows.
+		const inTeaser = (k) => (scenes[k]?.chapter ?? 1) === 0 && scenes.some((s) => (s?.chapter ?? 0) >= 1);
+		if (inTeaser(i)) {
+			const quoted = fieldsOf(card)
+				.filter((f) => f?.source?.kind === 'quote')
+				.map((f) => (Number.isInteger(f.source.sceneIndex) ? f.source.sceneIndex : i));
+			const target = quoted.length ? Math.max(...quoted) : i;
+			if (inTeaser(target) || target >= scenes.length) {
+				drop('the cold open (the teaser) owns this scene, and nothing the card quotes is spoken after it');
+				continue;
+			}
+			movedFrom = i;
+			i = target;
+		}
 		// The opening scene belongs to the hook title, and a chapter's first
-		// scene to its impact card. A boundary has exactly one owner.
+		// scene to its impact card. A boundary has exactly one owner. (A film
+		// made before the teaser has no chapter 0, so this still guards it.)
 		if (i === 0) {
 			drop('the opening scene is the hook title’s');
 			continue;
@@ -486,6 +510,7 @@ export function validateMotifCards(o) {
 		}
 
 		const notes = [];
+		if (movedFrom !== null) notes.push(`moved from scene ${movedFrom}, inside the teaser, to scene ${i}, where it is spoken`);
 		let verdict = 'ok';
 		let failed = null;
 

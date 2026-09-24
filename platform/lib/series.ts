@@ -8,6 +8,7 @@
  * the rows; `app/actions.ts` decides when.
  */
 import { normalizeVoiceTone, type VoiceTone } from "@/lib/data/derive";
+import { normalizeAutoSteps, type AutoStep } from "@/lib/hands-off";
 
 export interface SeriesCharacter {
   name: string;
@@ -78,6 +79,12 @@ export interface SeriesSettings {
   captionColor: string | null;
   /** Hands-off mode. Stored, because a show the producer lets run is a property of the show. */
   autoApprove: boolean | null;
+  /**
+   * WHICH gates hands-off signs off (lib/hands-off.ts). Null on every show
+   * frozen before the choice existed, where `autoApprove` alone answers:
+   * true is every step, which is what that show was promised.
+   */
+  autoApproveSteps: AutoStep[] | null;
 }
 
 /**
@@ -256,6 +263,7 @@ export function normalizeSeriesSettings(raw: unknown): SeriesSettings {
     musicLevel: lvl(o.musicLevel, 0.05, 1),
     captionColor: /^#[0-9a-f]{6}$/i.test(String(o.captionColor ?? "")) ? String(o.captionColor).toUpperCase() : null,
     autoApprove: typeof o.autoApprove === "boolean" ? o.autoApprove : null,
+    autoApproveSteps: normalizeAutoSteps(o.autoApproveSteps),
   };
 }
 
@@ -334,6 +342,11 @@ export function fillSeriesSettings(stored: SeriesSettings, derived: SeriesSettin
     musicLevel: take(stored.musicLevel, derived.musicLevel),
     captionColor: take(stored.captionColor, derived.captionColor),
     autoApprove: take(stored.autoApprove, derived.autoApprove),
+    // The list only where the show has no answer about hands-off at all: a
+    // show that froze the old switch keeps meaning what it said, rather than
+    // being narrowed to whatever the first film later chose.
+    autoApproveSteps:
+      stored.autoApproveSteps ?? (stored.autoApprove === null ? derived.autoApproveSteps : null),
     // multiVoiceMode has no null: "off" is both the default and a real
     // answer, so the stored one is taken as said unless it is the default
     // and the film says otherwise.
@@ -458,6 +471,7 @@ export interface SeriesPrefill {
   musicLevel: number | null;
   captionColor: string | null;
   autoApprove: boolean | null;
+  autoApproveSteps: AutoStep[] | null;
   multiVoiceMode: string;
   cast: string[];
   // What makes the page read as an episode rather than an empty brief: who
@@ -497,6 +511,7 @@ export function seriesPrefill(
     musicLevel: s.settings.musicLevel,
     captionColor: s.settings.captionColor,
     autoApprove: s.settings.autoApprove,
+    autoApproveSteps: s.settings.autoApproveSteps,
     multiVoiceMode: s.settings.multiVoiceMode,
     cast: s.settings.cast,
     characters: s.bible.characters.map((c) => c.name),

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { autoApproveTick, setAutoApprove, type ActionResult } from "@/app/actions";
+import { describeAutoSteps, isEveryStep, type AutoStep } from "@/lib/hands-off";
 
 /**
  * The hand of hands-off mode. The flag lives in Editing Options; this is the
@@ -38,7 +39,7 @@ import { autoApproveTick, setAutoApprove, type ActionResult } from "@/app/action
 const MIN_GAP_MS = 8_000;
 const TICK_MS = 10_000;
 
-export default function AutoPilot({ projectId }: { projectId: string }) {
+export default function AutoPilot({ projectId, steps }: { projectId: string; steps: AutoStep[] }) {
   const [last, setLast] = useState<ActionResult | null>(null);
   const [pending, setPending] = useState(false);
   const router = useRouter();
@@ -88,11 +89,25 @@ export default function AutoPilot({ projectId }: { projectId: string }) {
     <div className="autopilot" role="status">
       <span className="ap-dot" aria-hidden />
       <span className="ap-text">
-        <b>Hands-off mode</b> — every gate signs itself off as its asset lands,
-        and the final render starts by itself. Nothing waits for you, and
-        nothing gets a look first. Keep this page open somewhere; the pipeline
-        pauses at the next gate whenever it is closed, and catches up when it
-        is reopened.
+        {isEveryStep(steps) ? (
+          <>
+            <b>Hands-off mode</b> — every gate signs itself off as its asset lands,
+            and the final render starts by itself. Nothing waits for you, and
+            nothing gets a look first.
+          </>
+        ) : (
+          <>
+            {/* Named, because a partly-automatic film is exactly the one where
+                the producer has to remember which half is theirs. */}
+            <b>Hands-off for {describeAutoSteps(steps)}</b> —{" "}
+            {steps.length === 1
+              ? "that step signs itself off as its assets land"
+              : "those steps sign themselves off as their assets land"}
+            , without a look first. Every other step waits for you.
+          </>
+        )}{" "}
+        Keep this page open somewhere; the pipeline pauses at the next gate
+        whenever it is closed, and catches up when it is reopened.
         {last && !last.ok && (
           <em className="ap-err"> Last pass failed: {last.message}</em>
         )}

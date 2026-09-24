@@ -2141,6 +2141,30 @@ production workflows by name.
   has no delete, and the site's API key is not reachable from a web session,
   so a probe's failed run stays in n8n's own list until it ages out of the
   24-hour window. Naming probes `zz …` is what keeps them off the site.
+
+**One run, one row (2026-09-24).** The producer's screenshot: a red
+"Running unusually long" card glued to the stats block, and under it
+"Running now" — listing the SAME Media Generation execution, with a second,
+differently-worded Stop button. Every stalled execution is also a running
+one (`getStalledProduction` is `getAliveProduction`'s `running` half
+filtered by age), so the two cards could never disagree and always
+duplicated. They are one list now: a run past `STALL_AGE_MS` keeps its row
+and wears an amber **running long** chip, and the hint is said once under
+the list. **Amber, not red, on evidence**: 16517 read `running` for 1h46
+straight on 09-23 and 16578 for 14.7 hours parked overnight, so "past 45
+minutes" fires on most real films and cannot be an alarm. The project page
+still shows only the long runs (its list is the film's, not the whole
+floor's). Two small ones in the same panel: the failures line was red even
+when it said **"No failures"** — `.dsum` hard-coded red from when it only
+ever held failures, and the stopped-by-hand count added on 09-16 inherited
+it; `Disclosure calm` greys it with the stopped chip's tokens. And the
+controls on a row never wrap (`running long` and `■ Stop` each broke onto
+two lines at 390px); the name does. The panel also had no top margin, so
+it sat 0px under the stats block: it keeps 18px now, the gap the library
+toolbar keeps from the same block when there is no panel. Checked in
+Chromium against a mock n8n API (demo mode needs no database) in both
+themes at 1280 and 390, with and without a real failure.
+
 ### What was stopping production: the site's own restart button (2026-09-17)
 
 Three multi-account test runs died within minutes of starting, and the producer

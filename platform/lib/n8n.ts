@@ -252,7 +252,7 @@ const WORKER_WORKFLOWS = new Set([
  * plausible. Deliberately conservative: a false negative costs a Stop
  * button nobody presses, a false positive kills a real render.
  */
-const STALL_AGE_MS = 45 * 60 * 1000;
+export const STALL_AGE_MS = 45 * 60 * 1000;
 
 export function isStalled(e: ExecutionSummary): boolean {
   if (!e.startedAt) return false;

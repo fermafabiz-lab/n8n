@@ -7,6 +7,7 @@ import {
   n8nConfigured,
   getAliveProduction,
   getStalledProduction,
+  STALL_AGE_MS,
 } from "@/lib/n8n";
 import { stopExecutionAction } from "@/app/actions";
 import Disclosure from "@/components/Disclosure";
@@ -123,69 +124,100 @@ export default async function OpsPanel({
 
   if (running.length === 0 && stalled.length === 0 && rows.length === 0) return null;
 
+  // ONE list of what is alive, with a long runner marked on its own row. It
+  // used to be two cards: a red "Running unusually long" above "Running now",
+  // and since every stalled execution is also a running one, the same run
+  // was listed twice with two different Stop buttons — and the red card sat
+  // flush against the stats block, the one thing on the page with no gap.
+  // A long run is still a run: a Media Generation batch reads `running` for
+  // hours in normal use — generating (16517: 1h46 straight on 2026-09-23) or
+  // parked at an approval gate waiting on the producer — so "past 45 minutes"
+  // fires on most real films and cannot be an alarm. The project page shows
+  // only the long ones; the rest of the list is the dashboard's job.
+  const longIds = new Set(stalled.map((s) => s.id));
+  const live = errorsOnly
+    ? stalled
+    : [...running, ...stalled.filter((s) => !running.some((r) => r.id === s.id))];
+  const longMins = Math.round(STALL_AGE_MS / 60000);
+
   return (
-    <div style={{ marginBottom: 36, display: "flex", flexDirection: "column", gap: 14 }}>
-      {/* An execution running far past any plausible duration. Advisory only:
-          nothing the API exposes proves it is dead, so this offers a Stop and
-          says as much rather than acting on the producer's behalf. */}
-      {stalled.length > 0 && (
-        <div className="card errcard">
-          <h5>Running unusually long</h5>
-          {stalled.map((r) => (
-            <div className="kv" key={r.id}>
-              <span>
-                <b style={{ color: "var(--ink)" }}>{r.workflowName}</b> · started{" "}
-                {ago(r.startedAt)}, longer than a normal run
-              </span>
-              <span style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                <form action={stopExecutionAction}>
-                  <input type="hidden" name="executionId" value={r.id} />
-                  <button className="abtn" style={{ padding: "6px 14px", fontSize: 12 }}>
-                    ■ Stop it
-                  </button>
-                </form>
-              </span>
-            </div>
-          ))}
-          <p style={{ margin: "10px 0 0", fontSize: 12, color: "var(--dim)" }}>
-            Usually still working — a big batch can take an hour. n8n does
-            occasionally create an execution and never run it, and that looks
-            identical from here, so this is only a hint. If nothing has landed
-            in a long while, stop it and press Resume: the batch skips whatever
-            already has a clip, so nothing finished gets regenerated.
-          </p>
-        </div>
-      )}
-      {!errorsOnly && running.length > 0 && (
+    // 18px on top is the gap the library toolbar keeps from the stats block
+    // when there is no panel, so the rhythm is the same either way. The
+    // project page wraps this in its own margin.
+    <div
+      style={{
+        margin: errorsOnly ? "0 0 36px" : "18px 0 36px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 14,
+      }}
+    >
+      {live.length > 0 && (
         <div className="card">
-          <h5>Running now</h5>
-          {running.map((r) => (
-            <div className="kv" key={r.id}>
-              <span>
-                <b style={{ color: "var(--ink)" }}>{r.workflowName}</b> · started{" "}
-                {ago(r.startedAt)}
-              </span>
-              <span style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                <span className="chip run">
-                  {r.status === "waiting" ? "working (in a wait step)" : "running"}
+          <h5>{errorsOnly ? "Running unusually long" : "Running now"}</h5>
+          {live.map((r) => {
+            const long = longIds.has(r.id);
+            return (
+              <div className="kv" key={r.id}>
+                <span>
+                  <b style={{ color: "var(--ink)" }}>{r.workflowName}</b> · started{" "}
+                  {ago(r.startedAt)}
                 </span>
-                <form action={stopExecutionAction}>
-                  <input type="hidden" name="executionId" value={r.id} />
-                  <button
-                    className="abtn"
-                    style={{
-                      padding: "6px 14px",
-                      fontSize: 12,
-                      borderColor: "rgba(216, 72, 61,0.4)",
-                      color: "var(--red)",
-                    }}
+                {/* The name wraps, the controls never do: at 390px "running
+                    long" and "■ Stop" were each breaking onto two lines. */}
+                <span
+                  style={{
+                    display: "flex",
+                    gap: 10,
+                    alignItems: "center",
+                    flex: "none",
+                    marginLeft: 12,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  <span
+                    className={long ? "chip long" : "chip run"}
+                    title={long ? `Running for more than ${longMins} minutes` : undefined}
                   >
-                    ■ Stop
-                  </button>
-                </form>
-              </span>
-            </div>
-          ))}
+                    {long
+                      ? "running long"
+                      : r.status === "waiting"
+                        ? "working (in a wait step)"
+                        : "running"}
+                  </span>
+                  <form action={stopExecutionAction}>
+                    <input type="hidden" name="executionId" value={r.id} />
+                    <button
+                      className="abtn"
+                      style={{
+                        padding: "6px 14px",
+                        fontSize: 12,
+                        borderColor: "rgba(216, 72, 61,0.4)",
+                        color: "var(--red)",
+                      }}
+                    >
+                      ■ Stop
+                    </button>
+                  </form>
+                </span>
+              </div>
+            );
+          })}
+          {/* Advisory only: nothing the API exposes proves a long run is
+              dead, so this says so and offers the Stop above rather than
+              acting on the producer's behalf. Once, under the list. */}
+          {live.some((r) => longIds.has(r.id)) && (
+            <p style={{ margin: "10px 0 0", fontSize: 12, color: "var(--dim)" }}>
+              <b style={{ color: "var(--amber)" }}>Running long</b> means past{" "}
+              {longMins} minutes, and is usually still working — the clips of a
+              ten-minute film alone take well over an hour, and a batch waiting
+              at an approval gate stays running the whole time. n8n does
+              occasionally create an execution and never run it, and that looks
+              identical from here, so this is only a hint. If nothing has landed
+              in a long while, stop it and press Resume: the batch skips
+              whatever already has a clip, so nothing finished gets regenerated.
+            </p>
+          )}
         </div>
       )}
 
@@ -195,6 +227,10 @@ export default async function OpsPanel({
         // their projects on every visit.
         <Disclosure
           storageKey={errorsOnly ? "errors-project" : "errors-dash"}
+          // "No failures" in red was an alarm about nothing: only stops by
+          // hand were listed, and the row was red because the list used to
+          // hold nothing else.
+          calm={failures.length === 0}
           summary={
             <>
               <span className={failures.length ? "tdot red" : "tdot"} />

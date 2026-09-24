@@ -17,11 +17,14 @@ export default function Disclosure({
   children,
   defaultOpen = false,
   storageKey,
+  calm = false,
 }: {
   summary: React.ReactNode;
   children: React.ReactNode;
   defaultOpen?: boolean;
   storageKey?: string;
+  /** Grey instead of red, for a summary that reports nothing wrong. */
+  calm?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
 
@@ -48,7 +51,7 @@ export default function Disclosure({
 
   return (
     <div>
-      <button type="button" className="dsum" onClick={toggle}>
+      <button type="button" className={calm ? "dsum calm" : "dsum"} onClick={toggle}>
         {summary}
         <span className="darr">{open ? "HIDE ↑" : "SHOW ↓"}</span>
       </button>

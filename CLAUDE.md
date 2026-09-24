@@ -647,9 +647,19 @@ expected and harmless for an app touching only its own Drive.
   it downstream.
   **Nothing reads it** — `Cine Guard` builds `narrator_script` from the shot
   lines — so the fix drops it from both the parser example and the prompt
-  (`db/port/cinematic-parser/`). **Written, not published**: its probe
-  (16816) could not run because the OpenAI account was empty again at 10:09
-  UTC on 2026-09-24. The README has the five steps that finish it.
+  (`db/port/cinematic-parser/`).
+  - **LIVE as Claude Scripting `5312207f`** since 2026-09-24 12:24 UTC
+    (rollback `1f77881f`).
+  - It was published only after probe 16868 passed on that film's own
+    inputs.
+  - The OpenAI account was empty again from about 10:09 UTC to about 11:30,
+    which is why this took three probes.
+  - The film itself got through by a re-roll before the fix. It is the first
+    real Cinematic film with no hook and continuity: 20 scenes and 3
+    chapters, and the previous shot attached on 16 of 19. It is parked at
+    the image gate, and its batch was paused at 12:21:35.
+  - **Delete `db/port/cinematic-parser/` only after** the next Cinematic
+    film writes its treatment cleanly.
 
 - **The library is ordered by last activity since 2026-09-23** ("Recently
   worked on"; `db/port/activity-order/README.md`, lessons in

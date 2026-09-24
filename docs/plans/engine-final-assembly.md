@@ -99,6 +99,11 @@ cd n8n-engine && (cd platform && npm ci) && claude
      - **Tests:** `npm test`, 16 scenarios on PGlite with a fake Railway. `npm run e2e` makes a real Hyperframes render on the Mac: 14 s, stored, Finalizat, speed 1.1 applied.
      - **Left for phase 4:** the container (Dockerfile, the compose service, `deploy-engine.yml`) and the site half.
 3. **Shadow run.** On a real finished film, the engine computes `/assemble` and `/render` bodies and diffs them against the n8n execution's bodies, without submitting. Only intended differences are allowed: `speed`, and the store.
+   - **DONE 2026-09-24**:
+     - **What ran:** five finished films (story ×3, cinematic, kids; 11–54 scenes). Their live rows were read through a read-only throwaway (execution 16999, archived).
+     - **Result:** `/assemble` identical on all five; `/render` identical except `speed`.
+     - **Speed in practice:** the kids film ("The Missing Blue Scarf") was briefed at 0.8 and rendered by n8n at 1.0.
+     - **Detail:** `engine/README.md` and `engine/shadow/`.
 4. **Deploy with the default still `n8n`.** Then one real film with `FINAL_ASSEMBLY_ENGINE=code`, watched end to end. Then flip the default.
 5. **Retire** the `assemble` webhook, the orchestrator's disconnected `Execute Final Assembly*` nodes, and the probe branch. Update `CLAUDE.md`.
 

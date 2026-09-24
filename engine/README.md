@@ -4,6 +4,43 @@
 it is n8n workflow `4. Final Assembly` (`BY22Vlhh20Xdkr5Z`), and it moves here
 step by step. **Nothing in this directory runs in production yet.**
 
+## Phase 3 (done 2026-09-24): the shadow run
+
+On the five films Final Assembly `309157bd` had finished, the engine built
+both requests from the **live** database rows and they were diffed against
+what n8n actually sent:
+- executions 16974 and 16851, both "How Rome fed a million people" (story);
+- 16585, the Hobbit film (cinematic);
+- 16113, the remote-work film (story, 54 scenes);
+- 15866, "The Missing Blue Scarf" (kids).
+
+**Nothing was submitted.**
+
+    /assemble  IDENTICAL on all five
+    /render    IDENTICAL on all five, except `speed` (intended, D2)
+
+- **How the rows were read:** `shadow/read-inputs.workflow.js` ran once
+  through the n8n connector (execution 16999). It is the engine's
+  `loadInputs()` as one read-only statement over the same views, and was
+  archived straight after.
+- **The comparison:** `shadow/shadow.mjs` compares the two requests field by
+  field, and also diffs the live rows against the rows n8n read. The only
+  drift was `Status General` / `Link Video Final`, which the render itself
+  wrote. The script is strict: anything but `speed` fails it. A sabotaged
+  constant (sceneGap 0.35 → 0.4) failed it as it should.
+- **The results:** `shadow/last-report.json`.
+
+**D2 in numbers.** The kids film was briefed at speed 0.8 and n8n rendered
+it at 1.0; the engine sends 0.8. The other four chose 1, so for them
+nothing changes.
+
+To shadow other films:
+1. Put their ids into `read-inputs.workflow.js`.
+2. Create, run and archive it through the connector.
+3. Save the Final Assembly executions with `get_execution(includeData)`.
+4. Run:
+   `node --experimental-strip-types engine/shadow/shadow.mjs <live.json> <exec-*.json>...`
+
 ## Phase 2 (landed 2026-09-24): the worker
 
 `src/worker.ts` drives one `hov.render_job` row (`db/016_render_job.sql`)

@@ -10,19 +10,22 @@ import type { ReactNode } from "react";
 export default function SettingsShell({
   title,
   intro,
+  back = { href: "/admin", label: "Settings" },
   children,
 }: {
   title: string;
   intro: string;
+  /** Where the way back leads — a page one level down goes back to its parent. */
+  back?: { href: string; label: string };
   children: ReactNode;
 }) {
   return (
     <main className="page admin settings">
-      <Link href="/admin" className="sback">
+      <Link href={back.href} className="sback">
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M12 4l-6 6 6 6" />
         </svg>
-        Settings
+        {back.label}
       </Link>
       <div className="sechead">
         <h2>{title}</h2>

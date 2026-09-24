@@ -2625,3 +2625,43 @@ the producer had asked twice for "restart what is running after the deploy",
 and a session could not — the stop needs the n8n API key and only the site
 holds it. `POST /api/ops/restart` is the ⟳ Restart button's own
 `restartProduction` behind the n8n→site key; `db/port/ops-restart/`.
+
+### Developer insights — a balance you can see before a film dies of it (2026-09-24)
+
+The producer's words: *"ne tot trezim că rămânem fără credite"* — we keep
+waking up to find we have run out. Every time before, the first sign was a
+film dying mid-script. `/admin/insights` shows what every paid API has left,
+`/admin/insights/usage` where it went, and a strip on every page names
+anything out or nearly out. Full account: `db/port/api-credits/README.md`.
+
+- **A balance read once says where you are; read every hour it says when you
+  will be out.** So `hov.api_balance` is a history, not a current value, and
+  the pace is measured from it — only the DROPS count, because a rise is a
+  top-up or a monthly refill, not negative spending. ElevenLabs is the
+  exception: it counts characters per day itself, and its own series beats
+  any difference of ours.
+- **OpenAI will not tell an API key its balance.** Only a logged-in browser
+  can read `credit_grants`. So the check asks the question that matters —
+  does a one-token paid call go through? — and reads OUT only from
+  `credit_balance_exhausted` / `insufficient_quota`. A `rate_limit_exceeded`
+  429 is a problem, not an empty account: the two share a status code and must
+  not share a verdict.
+- **The judgement lives in the site (`lib/insights.ts`), the facts in n8n.**
+  n8n records the provider's own verdict and the numbers; what counts as
+  Low / Nearly out is decided at read time, so a threshold changes with no
+  republish and no backfill. One owner for the page, the Settings dot and the
+  strip — three copies of "is it low?" would drift exactly like the valve in
+  Deep Search did.
+- **A dead check is not a quiet one.** The page says "the hourly check has
+  stopped reporting" after three missed runs, rather than showing its last
+  numbers as current — the page's whole job is to end a silence.
+- **The strip is a client component, for StaleCopyBanner's reason**: a database
+  read in the root layout would put a query in front of every page, /login
+  included, and /login must never learn a balance. It asks a password-gated
+  route on load, every five minutes, on tab focus and when Check now finishes.
+- **Next.js puts a `role="alert"` on every page** — its route announcer, in a
+  shadow root Playwright's CSS locators pierce. A test that counts
+  `[role="alert"]` to prove a banner is gone never passes; anchor on the
+  banner's own content.
+- **A focus outline on a full-height chart column reads as a bar reaching the
+  top of the scale.** The pointed-at day gets a faint wash behind it instead.

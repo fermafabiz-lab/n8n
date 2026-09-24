@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "check": "npm run check:review && npm run check:cost && npm run check:provenance && npm run check:normalize && npm run check:validation && npm run check:routes && npm run check:footage && npm run check:kenburns && npm run check:series && npm run check:regen-wait && npm run check:deeplink && npm run check:deepsearch && npm run check:recap && npm run check:tones && npm run check:playlists && npm run check:activity && npm run check:category-lists && npm run check:hands-off && npm run check:hands-off-node",
+    "check": "npm run check:review && npm run check:cost && npm run check:provenance && npm run check:normalize && npm run check:validation && npm run check:routes && npm run check:footage && npm run check:kenburns && npm run check:series && npm run check:regen-wait && npm run check:deeplink && npm run check:deepsearch && npm run check:recap && npm run check:tones && npm run check:playlists && npm run check:activity && npm run check:category-lists && npm run check:hands-off && npm run check:hands-off-node && npm run check:insights && npm run check:api-credits-node",
     "check:review": "node --experimental-strip-types scripts/check-review.mjs",
     "check:cost": "node --experimental-strip-types scripts/check-cost.mjs",
     "check:provenance": "node --experimental-strip-types scripts/check-provenance.mjs",
@@ -27,7 +27,9 @@
     "check:activity": "node --experimental-strip-types --no-warnings scripts/check-activity-order.mjs",
     "check:category-lists": "node --experimental-strip-types --no-warnings scripts/check-category-lists.mjs",
     "check:hands-off": "node --experimental-strip-types --no-warnings --import ./scripts/footage-loader.mjs scripts/check-hands-off.mjs",
-    "check:hands-off-node": "node ../db/port/hands-off-steps/check.mjs"
+    "check:hands-off-node": "node ../db/port/hands-off-steps/check.mjs",
+    "check:insights": "node --experimental-strip-types --no-warnings --import ./scripts/footage-loader.mjs scripts/check-insights.mjs",
+    "check:api-credits-node": "node ../db/port/api-credits/check.mjs"
   },
   "dependencies": {
     "next": "^15.3.0",

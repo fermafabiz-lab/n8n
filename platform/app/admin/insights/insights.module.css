@@ -1,0 +1,563 @@
+/* Developer insights and its usage page. Every colour is a globals.css token
+   (one light-dark() value each), so the night theme needs nothing here. The
+   status colours are the site's own green/amber/red and are RESERVED for
+   status: each always sits beside a word and a glyph, never colour alone
+   (they are too close for some colour-blind readers to carry meaning by
+   themselves — measured, see lib/insights.ts). */
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin: 0 0 22px;
+  font-size: 13.5px;
+  color: var(--soft);
+}
+.bar .spacer {
+  flex: 1;
+}
+.bar a {
+  color: var(--accent-ink);
+  font-weight: 600;
+  text-decoration: none;
+}
+.bar a:hover {
+  text-decoration: underline;
+}
+.checked b {
+  color: var(--ink);
+  font-weight: 600;
+}
+.stale {
+  color: var(--amber);
+  font-weight: 600;
+}
+
+.alerts {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 24px;
+  padding: 14px 18px;
+  border-radius: var(--r-md);
+  background: var(--chip-red);
+  border: 1px solid color-mix(in srgb, var(--red) 30%, transparent);
+  color: var(--red-ink);
+  font-size: 14px;
+}
+.alerts li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 12px;
+}
+.alerts ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.alerts a {
+  color: var(--red-ink);
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 20px 20px 18px;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.cardOut {
+  border-color: color-mix(in srgb, var(--red) 45%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 12%, transparent);
+}
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.name {
+  font-family: var(--f-display), var(--f-ui), sans-serif;
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  margin: 0;
+}
+.powers {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--dim);
+}
+
+/* The status pill: a glyph, a word, a tint. */
+.lv {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  padding: 3px 10px 3px 8px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.lv_ok {
+  background: var(--chip-green);
+  color: var(--green-ink);
+}
+.lv_low {
+  background: var(--chip-amber);
+  color: var(--amber);
+}
+.lv_critical,
+.lv_out,
+.lv_error {
+  background: var(--chip-red);
+  color: var(--red-ink);
+}
+.lv_unknown {
+  background: var(--line);
+  color: var(--dim);
+}
+
+/* The figure a card leads with: same sans as everything, proportional digits. */
+.figure {
+  display: grid;
+  gap: 2px;
+}
+.value {
+  font-family: var(--f-ui), sans-serif;
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  color: var(--ink);
+}
+.valueOut {
+  color: var(--red-ink);
+}
+.caption {
+  font-size: 13px;
+  color: var(--soft);
+}
+.pace {
+  font-size: 13px;
+  color: var(--soft);
+  margin: 0;
+}
+.note {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--dim);
+  overflow-wrap: anywhere;
+}
+.tip {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--soft);
+  padding: 9px 12px;
+  border-radius: var(--r-sm, 10px);
+  background: var(--accent-a08);
+}
+.manage {
+  justify-self: start;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--accent-ink);
+  text-decoration: none;
+}
+.manage:hover {
+  text-decoration: underline;
+}
+
+/* Meter: the fill carries the level, the track is a lighter step of the same
+   hue so the state reads across the whole bar. */
+.meter {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--accent-a12);
+  overflow: hidden;
+}
+.meter > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  min-width: 3px;
+}
+.meter_low {
+  background: var(--chip-amber);
+}
+.meter_low > span {
+  background: var(--amber);
+}
+.meter_critical,
+.meter_out {
+  background: var(--chip-red);
+}
+.meter_critical > span,
+.meter_out > span {
+  background: var(--red);
+}
+
+/* Google Flow's accounts, one row each. */
+.accounts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.account {
+  display: grid;
+  gap: 6px;
+}
+.accountTop {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.email {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.accountValue {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.howto {
+  margin: 28px 0 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--dim);
+  max-width: 72ch;
+}
+.howto p {
+  margin: 0 0 8px;
+}
+.howto b {
+  color: var(--soft);
+  font-weight: 600;
+}
+
+/* ---- the usage page ---------------------------------------------------- */
+
+.ranges {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--line-soft);
+  border: 1px solid var(--line);
+}
+.ranges a {
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--soft);
+  text-decoration: none;
+}
+.ranges a[aria-current="true"] {
+  background: var(--card2);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+}
+
+.section {
+  margin: 0 0 36px;
+  display: grid;
+  gap: 16px;
+}
+.sectionHead {
+  display: grid;
+  gap: 4px;
+}
+.sectionHead h3 {
+  margin: 0;
+  font-family: var(--f-display), var(--f-ui), sans-serif;
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.sectionHead p {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--dim);
+  max-width: 72ch;
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 180px), 1fr));
+  gap: 12px;
+}
+.kpi {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 14px 16px;
+  display: grid;
+  gap: 4px;
+}
+.kpiLabel {
+  font-size: 12.5px;
+  color: var(--dim);
+}
+.kpiValue {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.kpiSub {
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.panel {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 18px 18px 14px;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.panelTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--soft);
+}
+.foot {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+
+/* Column chart (one series, one hue). Thin columns, a 2px surface gap between
+   neighbours, 4px rounded data-end, square at the baseline. */
+.chart {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+}
+/* One line of label taller than the plot and pulled up by half a line, so each
+   label's middle sits exactly on its gridline — top, middle and baseline. */
+.yaxis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: calc(150px + 1em);
+  margin-top: -0.5em;
+  line-height: 1em;
+  font-size: 11px;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.plot {
+  position: relative;
+  height: 150px;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  border-bottom: 1px solid var(--line2);
+}
+.grid1,
+.grid2 {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 1px solid var(--line);
+  pointer-events: none;
+}
+.grid1 {
+  top: 0;
+}
+.grid2 {
+  top: 50%;
+}
+.col {
+  position: relative;
+  flex: 1 1 0;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  outline: none;
+  cursor: default;
+}
+.col > span {
+  display: block;
+  width: 100%;
+  max-width: 24px;
+  border-radius: 4px 4px 0 0;
+  background: var(--accent);
+  transition: opacity 0.12s;
+}
+.col:hover > span,
+.col:focus-visible > span {
+  opacity: 0.72;
+}
+/* The pointed-at day gets a faint wash behind it — never an outline, which at
+   full height would read as a bar reaching the top of the scale. */
+.col:hover,
+.col:focus-visible {
+  background: var(--accent-a08);
+  border-radius: 4px 4px 0 0;
+}
+.xaxis {
+  grid-column: 2;
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+.tooltip {
+  position: absolute;
+  z-index: 3;
+  transform: translate(-50%, calc(-100% - 8px));
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: var(--glass-solid);
+  border: 1px solid var(--line2);
+  box-shadow: var(--shadow);
+  pointer-events: none;
+  white-space: nowrap;
+  display: grid;
+  gap: 1px;
+}
+.tooltip b {
+  font-size: 14px;
+  color: var(--ink);
+}
+.tooltip span {
+  font-size: 11.5px;
+  color: var(--dim);
+}
+.tableTwin summary {
+  font-size: 12.5px;
+  color: var(--accent-ink);
+  cursor: pointer;
+}
+.tableTwin table {
+  margin-top: 8px;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.tableTwin td,
+.tableTwin th {
+  padding: 3px 14px 3px 0;
+  text-align: left;
+  color: var(--soft);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The ranking: a real table, so it is its own table view. */
+.rank {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+.rank th {
+  text-align: left;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--dim);
+  padding: 0 10px 8px 0;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.rank td {
+  padding: 9px 10px 9px 0;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--soft);
+  vertical-align: middle;
+  font-variant-numeric: tabular-nums;
+}
+.rank tr:last-child td {
+  border-bottom: 0;
+}
+.rank td.film {
+  max-width: 0;
+  width: 42%;
+}
+.rank td.film a {
+  display: block;
+  color: var(--ink);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rank td.film a:hover {
+  text-decoration: underline;
+}
+.rankBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 120px;
+}
+.rankBar > span {
+  display: block;
+  height: 10px;
+  border-radius: 0 4px 4px 0;
+  background: var(--accent);
+  min-width: 2px;
+}
+.rankBar > b {
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.muted {
+  color: var(--dim);
+}
+
+@media (max-width: 720px) {
+  .value {
+    font-size: 26px;
+  }
+  .rank .hideSm {
+    display: none;
+  }
+  .rank td.film {
+    width: 50%;
+  }
+}

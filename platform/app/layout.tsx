@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { IBM_Plex_Mono, Inter, Outfit } from "next/font/google";
+import CreditsAlert from "@/components/CreditsAlert";
 import NavLinks from "@/components/NavLinks";
 import NavMenu from "@/components/NavMenu";
 import ProductionTicker from "@/components/ProductionTicker";
@@ -93,6 +94,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en" data-theme={themeAttribute(theme)}>
       <body className={`${display.variable} ${ui.variable} ${mono.variable}`}>
         <StaleCopyBanner />
+        {/* A paid service that is out, or nearly out — on every page, so an
+            empty balance is seen before a film dies of it (lib/insights.ts). */}
+        <CreditsAlert />
         <div className="glow g1" />
         <div className="glow g2" />
         <div className="vignette" />

@@ -56,17 +56,37 @@ export type FilmCost = {
 };
 
 /**
+ * What `filmCost` reads off a scene. A `Scene` has all of it; the usage page
+ * (/admin/insights/usage) prices every recent film at once, so it passes the
+ * draft counts and the narration's length straight from SQL instead of
+ * loading each scene's drafts and text. One pricing rule either way.
+ */
+export type CostScene = {
+  order?: Scene["order"];
+  videoUrl?: string | null;
+  imageUrl?: string | null;
+  voiceUrl?: string | null;
+  narration?: string | null;
+  /** Characters of narration, when the text itself was not loaded. */
+  narrationLength?: number;
+  versions?: ReadonlyArray<{ kind: string }> | null;
+  /** Drafts on file, when the drafts themselves were not loaded. */
+  videoDrafts?: number;
+  imageDrafts?: number;
+};
+
+/**
  * The hook is scene order 1 (or chapter 0 in the `chapter*100 + scene`
  * encoding). Priced separately because it is deliberately generated on the
  * expensive model — one clip per film, and the only one that is.
  */
-const isHook = (s: Scene): boolean => {
+const isHook = (s: CostScene): boolean => {
   const order = typeof s.order === "number" ? s.order : Number(s.order);
   return Number.isFinite(order) && (order === 1 || order < 100);
 };
 
 export function filmCost(
-  scenes: Scene[],
+  scenes: CostScene[],
   opts: { videoModel?: string | null; lengthSeconds?: number | null } = {},
 ): FilmCost {
   const model =
@@ -85,8 +105,8 @@ export function filmCost(
     // Every regeneration files the outgoing asset as a draft, so the draft
     // count IS the number of extra generations paid for. This is the same
     // signal `Prep Video Regen` uses as its take counter.
-    const videoDrafts = (s.versions ?? []).filter((v) => v.kind === "video").length;
-    const imageDrafts = (s.versions ?? []).filter((v) => v.kind === "image").length;
+    const videoDrafts = s.videoDrafts ?? (s.versions ?? []).filter((v) => v.kind === "video").length;
+    const imageDrafts = s.imageDrafts ?? (s.versions ?? []).filter((v) => v.kind === "image").length;
 
     if (s.videoUrl) {
       const made = 1 + videoDrafts;
@@ -101,7 +121,7 @@ export function filmCost(
     // Only the narration ON FILE. A line re-recorded three times was billed
     // three times, and takes are not versioned, so that is not recoverable —
     // the figure is a floor and the panel says so.
-    if (s.voiceUrl && s.narration) characters += s.narration.length;
+    if (s.voiceUrl) characters += s.narrationLength ?? (s.narration ? s.narration.length : 0);
   }
 
   // The site's own render estimate, the one AssemblyStatus judges "slow"

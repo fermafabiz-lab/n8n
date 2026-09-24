@@ -129,7 +129,12 @@ answers `onReceived` because the run outlives the site's 15-second fetch —
 `db/port/deep-search-rerun/`), `sheet-backfill`
 (workflow `IGWjknKcffnGlOmV`, fired by the series page's "Bring the pictures
 back" — `db/port/sheet-backfill/`; it is the one webhook the site WAITS on,
-because the count it reports is taken from the database after n8n is done). The site derives all of them from `N8N_NEW_PROJECT_WEBHOOK_URL`
+because the count it reports is taken from the database after n8n is done), `api-credits`
+(workflow `Bkuo0qIxKprUFVpU` "API Credits", the "Check now" on Developer
+insights — also waited on, and the one webhook behind header auth: the site
+sends `x-hov-key` = `MEDIA_INGEST_KEY`, n8n checks it with the `HOV Media
+Ingest` credential, because each knock spends an OpenAI call —
+`db/port/api-credits/`). The site derives all of them from `N8N_NEW_PROJECT_WEBHOOK_URL`
 by string-replacing the last path segment, so they must live on the same host
 — and each new one must be a plain `path` with no path parameters, or the
 derived URL will not resolve.
@@ -495,7 +500,8 @@ container using `SITE_PASSWORD` from `platform.env` as the `vf_auth` cookie.
 **A session without the key can check it too**, via
 `db/port/lib/served-css.workflow.js`. n8n fetches `/login`, the one page
 served without a password, from `http://web:3000`, and reports whether the
-stylesheet it links carries a class only the new build has. `served: true`
+stylesheets and scripts it links carry a string only the new build has (a CSS
+class, or code from a component in the root layout). `served: true`
 means the new container is the one answering. A green deploy job only says
 the image was pulled.
 The Vercel MCP connector still lists zero projects, and the web-session proxy
@@ -529,6 +535,31 @@ expected and harmless for an app touching only its own Drive.
 
 ## Open work
 
+- **Developer insights: every paid API's balance, hourly, since 2026-09-24**
+  (`db/port/api-credits/README.md`; lesson in `docs/lessons-site.md` under
+  "Developer insights"). Asked for because the team kept learning a balance
+  was empty from a film that died of it — and **OpenAI was empty again the
+  morning it was built** (`429 credit_balance_exhausted`). n8n workflow
+  **"API Credits" `Bkuo0qIxKprUFVpU`** (version `78582ddd`) reads OpenAI,
+  ElevenLabs, the three Google Flow accounts, useapi and Drive every hour and
+  on "Check now" (webhook `api-credits`, header auth = the `HOV Media Ingest`
+  key) into **`hov.api_balance`** (`db/015`, applied in execution 16821) — a
+  history, so the site can say how fast each balance falls and when it will be
+  gone. `/admin/insights` shows it (a Settings card, red while anything is out
+  or nearly out), `/admin/insights/usage` shows where it went (measured where
+  the provider counts, estimated per film with `lib/cost.ts`'s one pricing
+  rule), and **a strip on every page** names anything out or nearly out.
+  `lib/insights.ts` owns the judgement. **Three facts that are not
+  guessable**: OpenAI will not tell an API key its balance (only a browser
+  session), so the check is a one-token paid call — OUT is
+  `credit_balance_exhausted`, and a rate limit is NOT out; its spend needs the
+  key's *Usage → Read* permission, which it lacks (403 `api.usage.read`); and
+  useapi's per-account record, the only place Flow credits live, carries
+  Google session cookies — copy named fields only. Pinned by
+  `npm run check:insights` (51) and `check:api-credits-node` (34), driven in
+  Chromium 40/40. **Owed**: the Usage permission, auto recharge on OpenAI (the
+  only real fix for "empty mid-film"), and the useapi token moved into a
+  credential — it is now in this workflow's three nodes too.
 - **Hands-off is chosen step by step since 2026-09-24**
   (`db/port/hands-off-steps/README.md`, lesson in `docs/lessons-site.md` under
   "Hands-off mode"). The brief picks which gates sign themselves off — Script,

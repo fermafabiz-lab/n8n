@@ -90,6 +90,13 @@ export const mutations = {
     w.sceneRows.find((r) => r.fields['Ordine Scenă'] === 102).fields['Scene Final URL'] = '';
     delete w.sceneRows.find((r) => r.fields['Ordine Scenă'] === 104).fields.Provenance;
   },
+  // motion packs (Caption Colour since 362a9c56)
+  'motion pack editorial': (w) => eo(w, { motionPack: 'editorial' }),
+  'motion pack lowerThird on a documentary': (w) => eo(w, { category: 'documentary', motionPack: 'lowerThird' }),
+  'motion pack unknown (dropped)': (w) => eo(w, { motionPack: 'Editorial' }),
+  'category padded': (w) => eo(w, { category: '  kids  ' }),
+  'category not a string': (w) => eo(w, { category: 7 }),
+  'category whitespace only': (w) => eo(w, { category: '   ' }),
   // script / verify
   'script with no chapter markers': (w) => { w.script.fields['Script Content'] = 'Just prose.'; },
   'script row with no fields': (w) => { delete w.script.fields; },

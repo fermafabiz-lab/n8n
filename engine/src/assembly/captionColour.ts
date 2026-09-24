@@ -3,7 +3,8 @@ import type { Fields } from './types.ts';
 import type { RenderBody } from './buildProps.ts';
 
 /**
- * Caption Colour: Editing Options.captionColor as `#RRGGBB`, or nothing.
+ * Caption Colour: Editing Options.captionColor as `#RRGGBB`, or nothing —
+ * and, since 362a9c56, the film's `category` and `motionPack`.
  * Absent (or none/white/off) is the white default, and that is a decision:
  * white with the spoken word marked by brightness reads on every footage.
  * resolveCaptionAccent() in remotion/src/captionColor.ts has the final say;
@@ -20,5 +21,14 @@ export function captionColour(body: RenderBody, projectFields: Fields | undefine
       out.captionColor = '#' + h.toUpperCase();
     }
   }
+  // The film's category and its animation style, for the motion packs
+  // (remotion/src/motion/packs.ts, Final Assembly 362a9c56). `motionPack`
+  // goes through only when it is one of the four; absent lets the render
+  // apply the category's default (Editorial for Story).
+  if (typeof opts.category === 'string' && opts.category.trim()) out.category = opts.category.trim();
+  if (MOTION_PACKS.includes(opts.motionPack)) out.motionPack = opts.motionPack;
   return out;
 }
+
+/** The packs the render knows (remotion/src/motion/packs.ts). */
+export const MOTION_PACKS = ['classic', 'editorial', 'punch', 'lowerThird'];

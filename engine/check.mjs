@@ -7,14 +7,16 @@
 // Four layers, each guarding the one after it:
 //   0. The n8n bodies under fixtures/ are still the committed sources
 //      (db/port/story-close/Final Assembly.after.json + the Source Watermark
-//      paste), so a later edit to either is a loud failure here.
+//      and motion-packs Caption Colour pastes), so a later edit to any of
+//      them is a loud failure here.
 //   1. The harness is faithful: the n8n bodies, run on Final Assembly
 //      execution 16974's recorded inputs, reproduce its recorded outputs.
 //   2. TS equals n8n: both chains run on Rome, on every mutation in
 //      fixtures/mutations.mjs and on two synthetic films, compared step by
 //      step (errors compared by message).
 //   3. The composed requests (planAssemble / planRender) equal the /assemble
-//      body 16974 sent and the /render body Submit Graphics built.
+//      body 16974 sent, and the /render body the LIVE n8n chain builds from
+//      16974's inputs (= what 16974 sent + `category`).
 // Plus the speed (D2) table against remotion/server/speed.mjs.
 //
 // No network, no database, no n8n. `RESULT: OK n/n` only if n > 0.
@@ -28,8 +30,16 @@ import { normalizeSpeed as serverNormalizeSpeed } from '../remotion/server/speed
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.join(here, '..');
-const BODIES = path.join(here, 'fixtures', 'n8n-309157bd');
-const body = (name) => fs.readFileSync(path.join(BODIES, name + '.js'), 'utf8');
+// The LIVE version the engine must match, and the one execution 16974 ran
+// on. They differ in Caption Colour only (362a9c56 added `category` and
+// `motionPack` for the motion packs); layer 1 replays 16974 on the version
+// it actually ran, everything else is held to the live one.
+const CURRENT = '362a9c56';
+const RECORDED = '309157bd';
+const bodiesDir = (v) => path.join(here, 'fixtures', 'n8n-' + v);
+const BODIES = bodiesDir(CURRENT);
+const bodyOf = (v, name) => fs.readFileSync(path.join(bodiesDir(v), name + '.js'), 'utf8');
+const body = (name) => bodyOf(CURRENT, name);
 const rome = JSON.parse(fs.readFileSync(path.join(here, 'fixtures', 'rome-16974.json'), 'utf8'));
 const rec = (node) => rome.nodes[node].items;
 
@@ -57,7 +67,7 @@ const clone = (x) => JSON.parse(JSON.stringify(x));
 // to its output items (plain json), or to {executed: false} for a node that
 // did not run on this path — `$(name).isExecuted` is false and reading its
 // items throws, which is what Build Timeline's try/catch is written against.
-function runN8n(name, { nodes = {}, json = {}, items = [], runIndex = 0, random } = {}) {
+function runN8n(name, { nodes = {}, json = {}, items = [], runIndex = 0, random, version = CURRENT } = {}) {
   const $ = (n) => {
     const s = nodes[n];
     const executed = !!s && s.executed !== false;
@@ -74,7 +84,7 @@ function runN8n(name, { nodes = {}, json = {}, items = [], runIndex = 0, random 
   const math = Object.create(Math);
   if (random !== undefined) math.random = () => random;
   const logs = [];
-  const fn = new Function('$', '$json', '$input', '$runIndex', 'console', 'Math', body(name));
+  const fn = new Function('$', '$json', '$input', '$runIndex', 'console', 'Math', bodyOf(version, name));
   const out = fn($, json, $input, runIndex, { log: (...a) => logs.push(a.join(' ')) }, math);
   return { items: out.map((o) => o.json), logs };
 }
@@ -106,38 +116,39 @@ function attempt(steps, key, f) {
   try { steps[key] = f(); } catch (e) { steps.error = { at: key, message: e.message }; }
 }
 
-function n8nChain(world) {
+function n8nChain(world, version = CURRENT) {
   const w = clone(world);
+  const run = (name, opts = {}) => runN8n(name, { ...opts, version });
   const s = {};
   const nodes = {};
   if (w.receive) nodes['Receive Project ID'] = [w.receive]; else nodes['Receive Project ID'] = { executed: false };
   if (w.webhookBody) {
-    attempt(s, 'trigger', () => runN8n('Normalize Assemble Input', { json: { body: w.webhookBody } }).items[0]);
+    attempt(s, 'trigger', () => run('Normalize Assemble Input', { json: { body: w.webhookBody } }).items[0]);
     if (s.error) return s;
     nodes['Normalize Assemble Input'] = [s.trigger];
   } else nodes['Normalize Assemble Input'] = { executed: false };
   // Fetch Approved Scenes has alwaysOutputData: no rows is one empty item.
   nodes['Fetch Approved Scenes'] = w.sceneRows.length ? w.sceneRows : [{}];
-  attempt(s, 'clips', () => runN8n('Prepare Clips', { items: nodes['Fetch Approved Scenes'] }).items);
+  attempt(s, 'clips', () => run('Prepare Clips', { items: nodes['Fetch Approved Scenes'] }).items);
   if (s.error) return s;
   nodes['Prepare Clips'] = s.clips;
   nodes['Fetch Project Info'] = [w.project];
   nodes['List Music'] = [{ files: w.rootFiles }];
-  attempt(s, 'toneFolder', () => runN8n('Match Tone Folder', { nodes, items: nodes['List Music'] }).items[0]);
+  attempt(s, 'toneFolder', () => run('Match Tone Folder', { nodes, items: nodes['List Music'] }).items[0]);
   const listing = { files: (w.driveFolders || {})[s.toneFolder.folderId] || [] };
-  attempt(s, 'music', () => runN8n('Pick Music Track', { nodes, items: [listing], random: w.random }).items[0]);
+  attempt(s, 'music', () => run('Pick Music Track', { nodes, items: [listing], random: w.random }).items[0]);
   nodes['Pick Music Track'] = [s.music];
-  attempt(s, 'timeline', () => runN8n('Build Timeline', { nodes }).items[0]);
+  attempt(s, 'timeline', () => run('Build Timeline', { nodes }).items[0]);
   if (s.error) return s;
   nodes['Build Timeline'] = [s.timeline];
-  attempt(s, 'assembled', () => runN8n('Render Guard', { items: [w.assembled], runIndex: w.assemblePolls ?? 0 }).items[0]);
+  attempt(s, 'assembled', () => run('Render Guard', { items: [w.assembled], runIndex: w.assemblePolls ?? 0 }).items[0]);
   if (s.error) return s;
   nodes['Render Guard'] = [s.assembled];
   nodes['Fetch Script Titles'] = w.script ? [w.script] : [];
-  attempt(s, 'props', () => runN8n('Build Remotion Props', { nodes }).items[0].body);
-  attempt(s, 'caption', () => runN8n('Caption Colour', { nodes, json: { body: clone(s.props) } }).items[0].body);
-  attempt(s, 'motif', () => runN8n('Attach Motif Cards', { nodes, json: { body: clone(s.caption) } }).items[0].body);
-  attempt(s, 'watermark', () => { const r = runN8n('Source Watermark', { nodes, json: { body: clone(s.motif) } }); s.log = r.logs; return r.items[0].body; });
+  attempt(s, 'props', () => run('Build Remotion Props', { nodes }).items[0].body);
+  attempt(s, 'caption', () => run('Caption Colour', { nodes, json: { body: clone(s.props) } }).items[0].body);
+  attempt(s, 'motif', () => run('Attach Motif Cards', { nodes, json: { body: clone(s.caption) } }).items[0].body);
+  attempt(s, 'watermark', () => { const r = run('Source Watermark', { nodes, json: { body: clone(s.motif) } }); s.log = r.logs; return r.items[0].body; });
   // Submit Graphics' jsonBody expression.
   attempt(s, 'render', () => Object.assign({}, s.watermark, { resolution: (s.timeline.resolution || '720p') }));
   return s;
@@ -199,23 +210,32 @@ function compareChains(label, world) {
 // ---------------------------------------------------------------------------
 console.log('Layer 0 — the fixture bodies are the committed sources');
 {
-  const manifest = JSON.parse(fs.readFileSync(path.join(BODIES, 'manifest.json'), 'utf8'));
-  is('manifest names version 309157bd', manifest.versionId, '309157bd-a0af-44f2-91a5-335df8477a45');
+  // Each version = story-close's after.json, the Source Watermark paste on
+  // top (309157bd), and the motion-packs Caption Colour on top of that
+  // (362a9c56). A later edit to any of those files, or to a fixture, fails here.
   const after = JSON.parse(fs.readFileSync(path.join(repo, 'db/port/story-close/Final Assembly.after.json'), 'utf8'));
   const wf = after.workflow || after;
-  const code = Object.fromEntries(wf.nodes.filter((n) => n.parameters && n.parameters.jsCode).map((n) => [n.name, n.parameters.jsCode]));
-  code['Source Watermark'] = fs.readFileSync(path.join(repo, 'db/port/watermark-open-once/paste/Source Watermark.js'), 'utf8');
-  is('same set of Code nodes', Object.keys(code).sort(), manifest.nodes);
-  for (const name of manifest.nodes) {
-    const trim = name === 'Source Watermark' ? (x) => x.trimEnd() : (x) => x; // the paste carries a trailing newline the live node does not
-    is(`${name} === committed source`, trim(body(name)), trim(code[name]));
+  const base = Object.fromEntries(wf.nodes.filter((n) => n.parameters && n.parameters.jsCode).map((n) => [n.name, n.parameters.jsCode]));
+  const read = (f) => fs.readFileSync(path.join(repo, f), 'utf8');
+  const sources = {
+    '309157bd': { ...base, 'Source Watermark': read('db/port/watermark-open-once/paste/Source Watermark.js'), 'Caption Colour': read('db/port/motion-packs/original/fa-Caption_Colour.js') },
+    '362a9c56': { ...base, 'Source Watermark': read('db/port/watermark-open-once/paste/Source Watermark.js'), 'Caption Colour': read('db/port/motion-packs/paste/fa-Caption_Colour.js') },
+  };
+  for (const v of [RECORDED, CURRENT]) {
+    const manifest = JSON.parse(fs.readFileSync(path.join(bodiesDir(v), 'manifest.json'), 'utf8'));
+    is(`manifest names version ${v}`, manifest.versionId.slice(0, 8), v);
+    is(`${v}: same set of Code nodes`, Object.keys(sources[v]).sort(), manifest.nodes);
+    // The pastes carry a trailing newline the live nodes do not.
+    for (const name of manifest.nodes) is(`${v}: ${name} === committed source`, bodyOf(v, name).trimEnd(), sources[v][name].trimEnd());
   }
+  const changed = JSON.parse(fs.readFileSync(path.join(bodiesDir(CURRENT), 'manifest.json'), 'utf8')).nodes.filter((n) => bodyOf(CURRENT, n) !== bodyOf(RECORDED, n));
+  is(`${RECORDED} → ${CURRENT} changed only Caption Colour`, changed, ['Caption Colour']);
 }
 
 // ---------------------------------------------------------------------------
 console.log('\nLayer 1 — the n8n bodies reproduce execution 16974');
 {
-  const a = n8nChain(romeWorld());
+  const a = n8nChain(romeWorld(), RECORDED);
   ok('the chain ran to the end', !a.error || console.log(a.error));
   is('Normalize Assemble Input', a.trigger, rec('Normalize Assemble Input')[0]);
   is('Prepare Clips (11 clips)', a.clips, rec('Prepare Clips'));
@@ -292,7 +312,12 @@ console.log('\nLayer 3 — the composed requests equal what 16974 sent');
   is('/assemble body', assembly.timeline.body, rec('Build Timeline')[0].body);
   const assembled = E.judgeAssemblePoll(w.assembled, w.assemblePolls);
   const render = E.planRender({ ...input, assembly, script: w.script, assembled });
-  is('/render body (Source Watermark body + resolution)', render.body, Object.assign({}, rec('Source Watermark')[0].body, { resolution: rec('Build Timeline')[0].resolution }));
+  // 16974 ran on 309157bd; the live version adds `category` (and
+  // `motionPack` when one is picked) and nothing else — so the request today
+  // is the recorded one plus exactly that.
+  const recorded = Object.assign({}, rec('Source Watermark')[0].body, { resolution: rec('Build Timeline')[0].resolution });
+  is('/render body = what 16974 sent + category', render.body, { ...recorded, category: 'story' });
+  is('/render body = the live n8n chain on the same inputs', render.body, romeSteps.render);
   is('watermark log line', render.log, romeSteps.log);
 }
 

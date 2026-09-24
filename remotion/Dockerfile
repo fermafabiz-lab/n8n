@@ -1,4 +1,6 @@
-FROM node:20-bookworm-slim
+# 22, not 20: @hyperframes/producer requires Node >= 22 (engines field).
+# Remotion 4 runs on it unchanged.
+FROM node:22-bookworm-slim
 
 # System libraries Chrome headless needs to run inside the container.
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -28,6 +30,14 @@ COPY . .
 # Pre-download Remotion's managed headless Chrome at build time, not on the
 # first incoming request (avoids a slow/timeout-prone first render).
 RUN npx remotion browser ensure || true
+
+# Hyperframes (RENDER_ENGINE=hyperframes) drives puppeteer's chrome-headless-shell,
+# which `npm install` downloads in puppeteer's postinstall. Fail the BUILD if it
+# is missing, not the first render: a green deploy with no browser inside would
+# only show up as a dead film. Building the page bundle here too means a broken
+# shim or a missing font breaks the deploy instead of a render.
+RUN node -e "import('@hyperframes/engine').then(m => { const p = m.resolveHeadlessShellPath(); if (!p) { console.error('no chrome-headless-shell for Hyperframes'); process.exit(1); } console.log('hyperframes browser:', p); })" \
+    && node -e "import('./server/hf-bundle.mjs').then(m => m.bundleHfPage('/tmp/hov-hf-bundle-check')).then(() => console.log('hyperframes page bundle: ok'))"
 
 ENV PORT=3000
 EXPOSE 3000

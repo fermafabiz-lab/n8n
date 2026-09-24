@@ -18,6 +18,23 @@ import {registerTts} from './tts.mjs';
 import {registerCaptionColor} from './captionColor.mjs';
 import {normalizeSpeed, applySpeed} from './speed.mjs';
 
+// Which engine draws the graphics pass when a request does not say. Anything
+// but the two names falls back to Remotion rather than failing a film over a
+// typo in a variable.
+const ENGINES = new Set(['remotion', 'hyperframes']);
+const DEFAULT_ENGINE = ENGINES.has(String(process.env.RENDER_ENGINE || '').toLowerCase())
+	? String(process.env.RENDER_ENGINE).toLowerCase()
+	: 'remotion';
+const resolveEngine = (raw) => {
+	const e = String(raw || '').toLowerCase();
+	return ENGINES.has(e) ? e : DEFAULT_ENGINE;
+};
+// Hyperframes runs one Chrome per worker. Four measured ~3 GB peak together
+// with ffmpeg on the 41 s fixture, which leaves room on the 8 GB container
+// for an /assemble running beside it. Raise with HF_WORKERS once measured on
+// Railway itself.
+const HF_WORKERS = Math.max(1, Math.min(8, Number(process.env.HF_WORKERS) || 4));
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OUTPUT_DIR = path.join(__dirname, 'output');
 fs.mkdirSync(OUTPUT_DIR, {recursive: true});
@@ -69,7 +86,13 @@ app.post('/render', async (req, res) => {
 	// existed. The film is re-timed after it is drawn — see speed.mjs for why
 	// that is the only place it can happen without three surfaces drifting
 	// apart. An unrecognised value normalizes to 1, i.e. leaves the film alone.
-	const {speed: rawSpeed, resolution: rawResolution, ...inputProps} = req.body ?? {};
+	const {speed: rawSpeed, resolution: rawResolution, engine: rawEngine, ...inputProps} = req.body ?? {};
+	// `engine` is ours as well, stripped like the two above: which renderer
+	// draws the graphics pass. The request can name one (for comparing them on
+	// one film); otherwise RENDER_ENGINE on the host decides, and Remotion
+	// until that is set — so switching, and switching back, is one variable on
+	// Railway and never a deploy. See render-hf.mjs.
+	const engine = resolveEngine(rawEngine);
 	const speed = normalizeSpeed(rawSpeed);
 	// `resolution` is ours too, and stripped for the same reason: the props the
 	// composition receives must stay byte-identical to what they were before it
@@ -90,53 +113,71 @@ app.post('/render', async (req, res) => {
 	}
 
 	const jobId = randomUUID();
-	jobs.set(jobId, {status: 'rendering', progress: 0, outputFile: null, error: null});
+	jobs.set(jobId, {status: 'rendering', progress: 0, outputFile: null, error: null, engine});
 	res.json({jobId});
 
 	(async () => {
 		try {
-			const serveUrl = await getBundleLocation();
-			const composition = await selectComposition({serveUrl, id: 'FinalVideo', inputProps});
 			const outputLocation = path.join(OUTPUT_DIR, `${jobId}.mp4`);
+			if (engine === 'hyperframes') {
+				// Loaded on first use, not at boot: this server also runs
+				// /assemble, TTS and /inspect, and a Hyperframes install that
+				// fails to load must cost the Hyperframes renders, not the box.
+				const {renderWithHyperframes} = await import('./render-hf.mjs');
+				await renderWithHyperframes({
+					inputProps,
+					scale,
+					outputLocation,
+					outputDir: OUTPUT_DIR,
+					workers: HF_WORKERS,
+					onProgress: (progress) => {
+						const job = jobs.get(jobId);
+						if (job) job.progress = progress;
+					},
+				});
+			} else {
+				const serveUrl = await getBundleLocation();
+				const composition = await selectComposition({serveUrl, id: 'FinalVideo', inputProps});
 
-			await renderMedia({
-				composition,
-				serveUrl,
-				codec: 'h264',
-				// 1 or 1.5 — see the note where it is computed. The composition
-				// dimensions are untouched; this multiplies the output.
-				scale,
-				outputLocation,
-				inputProps,
-				// The container has 8GB. Parallel Chrome tabs (Remotion's default
-				// concurrency) blow past it and hang mid-frame, so rendering is
-				// serialized and each frame gets longer to land on a shared vCPU.
-				concurrency: 1,
-				timeoutInMilliseconds: 120000,
-				// THE cause of two dead renders on the 15-scene Tahiti film
-				// (2026-08-13). Remotion's OffthreadVideo frame cache defaults to
-				// null, which means HALF THE SYSTEM MEMORY at render start — 4GB
-				// here — on top of Chrome under swangle and the ffmpeg encode.
-				// Peak hit 7.91GB against an 8GB limit and the kernel killed the
-				// compositor. n8n reports that as "Compositor exited with signal
-				// SIGKILL / Remotion render failed", which names neither memory
-				// nor the cache, and it only bites once a film is long enough:
-				// every earlier render here finished in 2-4 minutes and fitted.
-				// A cap costs cache hits, not correctness — at concurrency 1 the
-				// frames are read in order and barely reused.
-				offthreadVideoCacheSizeInBytes: 1024 * 1024 * 1024,
-				chromiumOptions: {
-					// No GPU in this container; disabling it avoids Chrome trying
-					// (and failing) to init hardware acceleration, which otherwise
-					// burns memory/time before every render.
-					gl: 'swangle',
-					disableWebSecurity: false,
-				},
-				onProgress: ({progress}) => {
-					const job = jobs.get(jobId);
-					if (job) job.progress = progress;
-				},
-			});
+				await renderMedia({
+					composition,
+					serveUrl,
+					codec: 'h264',
+					// 1 or 1.5 — see the note where it is computed. The composition
+					// dimensions are untouched; this multiplies the output.
+					scale,
+					outputLocation,
+					inputProps,
+					// The container has 8GB. Parallel Chrome tabs (Remotion's default
+					// concurrency) blow past it and hang mid-frame, so rendering is
+					// serialized and each frame gets longer to land on a shared vCPU.
+					concurrency: 1,
+					timeoutInMilliseconds: 120000,
+					// THE cause of two dead renders on the 15-scene Tahiti film
+					// (2026-08-13). Remotion's OffthreadVideo frame cache defaults to
+					// null, which means HALF THE SYSTEM MEMORY at render start — 4GB
+					// here — on top of Chrome under swangle and the ffmpeg encode.
+					// Peak hit 7.91GB against an 8GB limit and the kernel killed the
+					// compositor. n8n reports that as "Compositor exited with signal
+					// SIGKILL / Remotion render failed", which names neither memory
+					// nor the cache, and it only bites once a film is long enough:
+					// every earlier render here finished in 2-4 minutes and fitted.
+					// A cap costs cache hits, not correctness — at concurrency 1 the
+					// frames are read in order and barely reused.
+					offthreadVideoCacheSizeInBytes: 1024 * 1024 * 1024,
+					chromiumOptions: {
+						// No GPU in this container; disabling it avoids Chrome trying
+						// (and failing) to init hardware acceleration, which otherwise
+						// burns memory/time before every render.
+						gl: 'swangle',
+						disableWebSecurity: false,
+					},
+					onProgress: ({progress}) => {
+						const job = jobs.get(jobId);
+						if (job) job.progress = progress;
+					},
+				});
+			}
 
 			// The speed pass, if the film is not being left at its natural rate.
 			// It replaces the served file rather than adding a second one, so
@@ -169,6 +210,7 @@ app.post('/render', async (req, res) => {
 				error: null,
 				speed,
 				speedError,
+				engine,
 			});
 		} catch (err) {
 			jobs.set(jobId, {
@@ -176,6 +218,7 @@ app.post('/render', async (req, res) => {
 				progress: 0,
 				outputFile: null,
 				error: String((err && err.message) || err),
+				engine,
 			});
 		}
 	})();

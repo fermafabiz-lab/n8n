@@ -17,7 +17,7 @@ conversation. Keep it updated when a hard-won lesson is learned.
 | **n8n** | self-hosted at `wf7.house-of-videos.com` | All orchestration. 4 workflows, see below |
 | **Postgres** | `hov` database on the Hetzner box, plus `/opt/n8n/media` for the files | The source of truth for project + scene state since the cutover on 2026-08-15 |
 | **Airtable** | base "Database Video" | **Read and written by nothing.** Frozen at the cutover and kept only as the rollback — do not cancel the plan yet |
-| **Render server** | `remotion/server/` on Railway | ffmpeg + Remotion: `/assemble`, `/tts-multi`, `/media`, `/transcript`, `/inspect` |
+| **Render server** | `remotion/server/` on Railway | ffmpeg + Remotion (or Hyperframes, `RENDER_ENGINE`): `/render`, `/assemble`, `/tts-multi`, `/media`, `/transcript`, `/inspect` |
 
 External services: **ElevenLabs** (TTS), **fal.ai** (images), **Google Flow via
 useapi** (video clips, Veo 3.1), **OpenAI** (scripting), **Google Drive**
@@ -534,6 +534,24 @@ refresh tokens after 7 days. The "Google hasn't verified this app" warning is
 expected and harmless for an app touching only its own Drive.
 
 ## Open work
+
+- **The graphics pass can be drawn by Hyperframes instead of Remotion**
+  (2026-09-24, branch `claude/hyperframes-render`, NOT merged, NOT deployed;
+  lesson in `docs/lessons-render.md`, "Hyperframes instead of Remotion").
+  Why: Remotion needs a company licence above three people; Hyperframes is
+  Apache 2.0. **Railway stays** — the producer asked to leave it, and at 23
+  lei/month it is cheaper than any Hetzner option (the box has 3.8 GB, ~2 GB
+  free, against a ~2.5 GB render). The same components run through a
+  Remotion-compatible shim, so every lesson below about captions, cards and
+  framing still holds. Parity measured on four fixtures: same frame count, the
+  same montage frame per output frame, graphics indistinguishable; Hyperframes
+  is truer to CSS colours than Remotion was (slightly more saturated films).
+  `RENDER_ENGINE=hyperframes` on Railway switches it, unsetting it switches
+  back, no deploy either way. **Owed, in order**: the Docker image built and
+  run once (Node 22, chrome-headless-shell, Debian ffmpeg 5.1 — never built
+  here); the merge (a Railway deploy: check `search_executions` first); one
+  real film with `"engine": "hyperframes"` measured for speed and memory on
+  Railway; then the variable; then, after several films, removing Remotion.
 
 - **Developer insights: every paid API's balance, hourly, since 2026-09-24**
   (`db/port/api-credits/README.md`; lesson in `docs/lessons-site.md` under

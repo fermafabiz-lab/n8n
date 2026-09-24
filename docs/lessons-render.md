@@ -4,8 +4,8 @@ Part of the split of the old monolithic `CLAUDE.md` (2026-09-13). Read the
 root `CLAUDE.md` first. This file is everything downstream of "the clip
 exists": TTS/voice synthesis and its generation settings, breath trimming,
 playback speed, the montage and its framing, text cards, captions, the sound
-mix (SFX/music/ducking), caption colour, upscaling, and the Remotion render
-pipeline itself (`remotion/src/`, `remotion/server/`).
+mix (SFX/music/ducking), caption colour, upscaling, and the render pipeline
+itself (Remotion, and Hyperframes behind `RENDER_ENGINE`) (`remotion/src/`, `remotion/server/`).
 
 These each cost hours. Do not rediscover them.
 
@@ -896,6 +896,75 @@ producer asked whether it really works:
 - **`/media` on Railway answers 401 to HEAD** — the auth exemption tests
   `method === 'GET'`. Harmless (ffmpeg GETs), but a HEAD-based health probe
   would read as broken.
+
+### Hyperframes instead of Remotion — the graphics pass, same components (2026-09-24)
+
+Branch `claude/hyperframes-render`. The producer wanted off Railway and off
+Remotion; Railway stayed (23 lei/month is its floor, and the Hetzner box has
+3.8 GB with ~2 GB free against a ~2.5 GB render), Remotion is being replaced
+because it needs a company licence above three people and Hyperframes
+(`@hyperframes/producer` 0.8.72, HeyGen) is Apache 2.0.
+
+- **Nothing in `src/components` changed.** `server/hf-bundle.mjs` aliases the
+  module `remotion` to `src/hf/remotion-shim.tsx` (AbsoluteFill, Sequence,
+  useCurrentFrame, useVideoConfig, interpolate, Easing.bezier, spring,
+  staticFile, OffthreadVideo, delayRender) and `@remotion/google-fonts/*` to
+  local `@fontsource` files. An unverified `@remotion/*` import fails the
+  bundle. `npm run check:shim` pins the maths to the real package (1e-5, spring
+  1e-9) while Remotion is still installed — delete that half of the check with
+  the package, not before.
+- **The bridge is the `hf-seek` window event.** Hyperframes' runtime fires it
+  on every seek with a synchronous `waitUntil(promise)`; the page renders
+  FinalVideo at that frame with legacy `ReactDOM.render` (synchronous, so a
+  setState before `continueRender` is in the DOM when the hold lifts) and
+  holds the capture on the shim's `whenSettled()`. **Never wait on
+  `requestAnimationFrame` there** — in capture mode it does not fire and the
+  render stalls at frame 0 for 60 s.
+- **A page must register `window.__timelines[id]`** or Hyperframes (a) waits
+  45 s for it on every render and then (b) reads the duration as 0 and refuses.
+  The page registers a paused, empty GSAP timeline of the film's length. GSAP
+  is free for commercial use.
+- **Videos are declared in HTML, not by React.** Hyperframes parses `<video>`
+  elements out of the page source before scripts run, decodes them with
+  ffmpeg and injects the frame per capture. So `render-hf.mjs` writes one
+  `<video id="hov-montage">` timed like FinalVideo's footage Sequence
+  (`montageSeconds`, the same rounding as `videoFrames`) and the shim's
+  OffthreadVideo MOVES that element into place — and moves it back on unmount,
+  because workers seek in any order and the outro unmounts the footage.
+- **1080p is a CSS `transform: scale(1.5)`**, not `outputResolution`:
+  Hyperframes only supersamples by whole numbers.
+- **Sound is the montage's own track, `-c:a copy`.** The page video is muted.
+  It ends where the footage ends (Remotion padded silence under the outro);
+  players do not care.
+- **Parity, measured on this Mac** (studio 9:16 41.8 s, Boyd 16:9 81.7 s at
+  1080p, a Romanian-diacritics and a watermark variant):
+  same frame count on every film (1100, 2057); the montage frame chosen for
+  every output frame identical (a three-level luma code, 962/1000 exact on
+  both, the same 38 exceptions — all under the chapter card's blur); chapter
+  cards, figure cards, split-flap, captions, watermark, end screen
+  indistinguishable by eye. Mean |Δ| 6–10 levels, FLAT across the film with no
+  spikes.
+- **That residual is Remotion being wrong, not Hyperframes.** The subscribe
+  button is `#E62117` = 230,33,23. Hyperframes draws 230,35,21; Remotion
+  211,39,27. Remotion captures JPEG frames and encodes full-range yuvj420p
+  tagged bt470bg, and strong colours come out desaturated. **Films rendered by
+  Hyperframes are slightly more saturated than what the producer is used to** —
+  closer to the design, but a visible change; say so before switching.
+- **Comparing the two needs care.** Stacking a Remotion (full range) and a
+  Hyperframes (limited range) frame inside ONE ffmpeg filter graph misreads a
+  range and invents a contrast difference; decode each file to PNG on its own
+  first. `scripts/compare-engines.mjs` does it that way.
+- **Speed on the Mac (M-series, 15 cores)**: Hyperframes 18.5 s for the 41.8 s
+  film with 6 workers; Remotion 88 s at concurrency 4, 100 s at 1. Boyd at
+  1080p: 77 s against 384 s. Peak ~3 GB with 6 workers. **Not measured on
+  Linux / Railway** — there it is software GL (swiftshader) and 8 vCPU, and
+  `HF_WORKERS` defaults to 4. Measure one real film before touching the poll
+  ceilings or the site's `120 + 12 × length` estimate.
+- **Not verified**: the Docker image (no Docker on the machine it was built
+  on) — Node 22, puppeteer's chrome-headless-shell, and Debian's ffmpeg 5.1
+  under Hyperframes (the Mac has ffmpeg 8.1). The Dockerfile fails the BUILD
+  if the browser or the page bundle is missing, so a broken image shows up as
+  a failed deploy, not a dead film.
 
 ### Remotion / the edit
 

@@ -276,6 +276,22 @@ export type FinalVideoProps = {
 	 * refuses rather than clamps, so a stored 4 is the default, not the maximum.
 	 */
 	watermarkScale?: number;
+	/**
+	 * The film's category as the producer asked for it (story, documentary,
+	 * cinematic, kids) — a REQUEST, not a description of the film; see
+	 * CLAUDE.md. Carried so the render can choose a motion pack for it.
+	 * Absent on every film made before 2026-09-24, and changes nothing by
+	 * itself.
+	 */
+	category?: string;
+	/** Kids films: the picture style picked on the brief (clay, crayon…). */
+	kidsStyle?: string;
+	/**
+	 * Which motion pack draws this film (src/motion/packs.ts). Set by the render
+	 * server from MOTION_PACKS and `category`, or by hand for a storyboard.
+	 * Absent or unknown → classic, today's motion.
+	 */
+	motionPack?: string;
 };
 
 export const defaultFinalVideoProps: FinalVideoProps = {

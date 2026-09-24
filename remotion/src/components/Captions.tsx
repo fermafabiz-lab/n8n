@@ -4,6 +4,8 @@ import type {SceneCaption} from '../types';
 import type {CaptionAccent} from '../captionColor';
 import type {StylePreset} from '../style';
 import {captionAt} from '../captionTiming';
+import type {CaptionMotion} from '../motion/packs';
+import {PackCaptions} from '../motion/PackCaptions';
 
 export const Captions: React.FC<{
 	scenes: SceneCaption[];
@@ -17,7 +19,9 @@ export const Captions: React.FC<{
 	suppressUntilSeconds?: number;
 	/** Vertical (9:16) framing: bigger type, raised safe-zone position. */
 	portrait?: boolean;
-}> = ({scenes, accent, preset, suppressUntilSeconds = 0, portrait = false}) => {
+	/** The motion pack's caption style (src/motion/packs.ts). Classic is today's. */
+	motion?: CaptionMotion;
+}> = ({scenes, accent, preset, suppressUntilSeconds = 0, portrait = false, motion = 'classic'}) => {
 	const frame = useCurrentFrame();
 	const {fps} = useVideoConfig();
 	const seconds = frame / fps;
@@ -26,6 +30,10 @@ export const Captions: React.FC<{
 	// the frame in the opening seconds read as clutter (seen on the contact
 	// sheet), so captions wait their turn.
 	if (seconds < suppressUntilSeconds) return null;
+
+	if (motion !== 'classic') {
+		return <PackCaptions scenes={scenes} accent={accent} preset={preset} portrait={portrait} motion={motion} />;
+	}
 
 	const active = captionAt(scenes, seconds);
 	if (!active) return null;

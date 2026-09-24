@@ -19,6 +19,7 @@ import {buildTextCards, toMontageCards} from './textCards';
 import {SourceVideo} from './components/SourceVideo';
 import {SourceWatermark} from './components/SourceWatermark';
 import {presetForTone} from './style';
+import {packFor} from './motion/packs';
 import {resolveCaptionAccent} from './captionColor';
 import type {FinalVideoProps} from './types';
 
@@ -46,8 +47,11 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 	showSourceWatermark = true,
 	watermarkOpenOnce = false,
 	watermarkScale = 1,
+	motionPack,
 }) => {
 	const {fps} = useVideoConfig();
+	// How things move (src/motion/packs.ts). Classic unless a pack is named.
+	const pack = packFor(motionPack);
 	const frame = useCurrentFrame();
 	const seconds = frame / fps;
 	const preset = presetForTone(tone);
@@ -262,6 +266,7 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 							accent={captionAccent}
 							preset={preset}
 							portrait={aspectRatio === '9:16'}
+							motion={pack.captions}
 						/>
 					)}
 					{/* What the viewer is actually looking at. Same two gates the
@@ -346,6 +351,7 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 										(narrationIsSpoken ? keyLineFor(s.narratorText) : '')
 									}
 									preset={preset}
+									titleMotion={pack.chapterTitle}
 								/>
 							</Sequence>
 						))}

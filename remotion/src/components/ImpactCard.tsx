@@ -1,5 +1,6 @@
 import React from 'react';
 import {AbsoluteFill, useCurrentFrame, useVideoConfig} from 'remotion';
+import type {ChapterTitleMotion} from '../motion/packs';
 import type {StylePreset} from '../style';
 import {CARD_SPACE_RATIO, CARD_TITLE_ADVANCE, cardTitleFont} from '../style';
 import {CURVES, curveAt} from '../easing';
@@ -95,7 +96,9 @@ export const ImpactCard: React.FC<{
 	chapter: number;
 	keyLine: string;
 	preset: StylePreset;
-}> = ({chapter, keyLine, preset}) => {
+	/** How the title words land (src/motion/packs.ts). Classic is today's. */
+	titleMotion?: ChapterTitleMotion;
+}> = ({chapter, keyLine, preset, titleMotion = 'classic'}) => {
 	const frame = useCurrentFrame();
 	const {fps, width, height} = useVideoConfig();
 	// Same canvas-relative scaling as HookTitle: these sizes were tuned on the
@@ -296,6 +299,31 @@ export const ImpactCard: React.FC<{
 						>
 							{words.map((word, wi) => {
 								const e = curveAt((t - revealStart - wi * stagger) / WORD_REVEAL, CURVES.outQuart);
+								// The motion pack's version of the same entrance. Every one
+								// keeps the rules above: same timing window (so the last word
+								// still lands 0.35 s before the exit flash), no mask, and a
+								// non-linear curve.
+								const motionStyle: React.CSSProperties =
+									titleMotion === 'tracking'
+										? {
+												opacity: curveAt((t - revealStart - wi * stagger) / WORD_REVEAL, CURVES.inOutCubic),
+												// Letters close up from wide tracking to the face's own.
+												letterSpacing: `${(0.32 * (1 - e)).toFixed(4)}em`,
+											}
+										: titleMotion === 'slam'
+											? (() => {
+													// Lands from 30% too large, fast: outExpo spends its
+													// travel in the first frames, which is what a slam is.
+													const s2 = curveAt((t - revealStart - wi * stagger) / (WORD_REVEAL * 0.6), CURVES.outExpo);
+													return {
+														opacity: Math.min(1, s2 * 1.6),
+														transform: `scale(${(1 + 0.3 * (1 - s2)).toFixed(4)})`,
+													};
+												})()
+											: {
+													opacity: e,
+													transform: `translateY(${((1 - e) * RISE_EM).toFixed(4)}em)`,
+												};
 								return (
 									<React.Fragment key={wi}>
 										<span
@@ -307,8 +335,7 @@ export const ImpactCard: React.FC<{
 												whiteSpace: 'pre-wrap',
 												overflowWrap: 'anywhere',
 												maxWidth: '100%',
-												opacity: e,
-												transform: `translateY(${((1 - e) * RISE_EM).toFixed(4)}em)`,
+												...motionStyle,
 											}}
 										>
 											{word}

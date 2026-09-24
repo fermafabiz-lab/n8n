@@ -557,7 +557,10 @@ expected and harmless for an app touching only its own Drive.
   useapi's per-account record, the only place Flow credits live, carries
   Google session cookies — copy named fields only. Pinned by
   `npm run check:insights` (51) and `check:api-credits-node` (34), driven in
-  Chromium 40/40. **Owed**: the Usage permission, auto recharge on OpenAI (the
+  Chromium 40/40. **Live**: the site in deploy #187 (merge `1fed24c`, `web`
+  back at 10:48:32 UTC, the served layout chunk proven by execution 16830),
+  the production webhook with and without the key in 16828 (200 / 403).
+  **Owed**: the Usage permission, auto recharge on OpenAI (the
   only real fix for "empty mid-film"), and the useapi token moved into a
   credential — it is now in this workflow's three nodes too.
 - **Hands-off is chosen step by step since 2026-09-24**

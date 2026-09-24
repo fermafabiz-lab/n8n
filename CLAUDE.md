@@ -743,10 +743,18 @@ expected and harmless for an app touching only its own Drive.
   PUBLIC_ERROR_MODEL_ACCESS_DENIED` while its model list still showed the
   key (the list follows the plan, not what Google serves). `Submit Video` and
   `Submit Video Regen` now send `veo-3.1-lite` (same model, normal priority, 5
-  credits a clip) to any account but `fermafabiz@gmail.com`. **Still owed**:
-  `Submit Cooldown Guard` loops in place on a refusing account, which stops the
-  pool from polling clips already in flight — the producer saw that as "stuck
-  on scene 1".
+  credits a clip) to any account but `fermafabiz@gmail.com`.
+  **The Rome film then ran the pool end to end and lost 26 of its 63 clip
+  minutes to two stalls** (Media Generation `c4cd24ea`, rollback `8dc9f448`,
+  `db/port/pool-cooldown/`). `Submit Cooldown Guard` looped `Wait Submit
+  Cooldown → Submit Video` inside one tick, and `Pool Tick` is the only thing
+  that polls the other accounts' clips — so one refusing account froze all
+  three; each stall ended with three clips landing inside a minute. In the pool
+  the guard now only decides: `Pool Cooldown?` sends the scene back to the head
+  of the queue and rests its ACCOUNT 60 s (`cooldownUntil`) while every clip in
+  flight keeps being polled. Serial path unchanged. `node
+  db/port/pool-cooldown/check.mjs`. **Unexplained**: the invited accounts made
+  a clip every ~5 min against the manager's ~2m50.
 - **Drawn cards: one accepted motif card used to SILENCE every derived card,
   and the validator refused chapter-start cards on films with chapter cards
   OFF** (2026-09-23, `db/port/motif-more-cards/README.md`). The New York

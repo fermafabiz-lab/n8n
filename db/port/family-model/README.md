@@ -45,7 +45,7 @@ bodies byte-equal to `paste/`.
 
 - `rescueVideoModel` and any other model override still apply as before;
   only the free model is swapped, and only off the primary.
-- `Submit Cooldown Guard` still holds the pool while one account refuses.
+- ~~`Submit Cooldown Guard` still holds the pool while one account refuses.~~ Fixed in `c4cd24ea`, `db/port/pool-cooldown/`.
   A `MODEL_ACCESS_DENIED` should not happen now, but any other persistent
   refusal on one account will stall the in-flight polls the same way — the
   guard should hand back to `Pool Tick` instead of looping in place.

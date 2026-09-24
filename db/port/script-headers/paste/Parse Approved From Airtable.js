@@ -64,9 +64,16 @@ if (editedText) {
 //
 // This is the case that used to silently serve the old film. The producer's
 // words are the only content there is now, so they are cut into the old
-// chapters' SHAPE: same numbers, same titles, same relative lengths (a
-// two-line hook stays a two-line hook), and every summary dropped because the
-// beats they describe belong to a story that no longer exists.
+// chapters' SHAPE: same numbers, same relative lengths (a two-line hook stays
+// a two-line hook), and every summary dropped because the beats they describe
+// belong to a story that no longer exists.
+//
+// The old TITLES go too, and they are the part that is easy to keep by
+// mistake. `chapterTitles` is passed into the render and printed on the
+// chapter cards (`FinalVideo.tsx`), so a kept title is old words ON SCREEN
+// over the new film — the same fault as the old chapters, just smaller. Empty
+// is the right answer because the render already has one: it falls back to a
+// key line taken from the scene's own narration, which is the producer's text.
 //
 // The cut only ever falls between the producer's own paragraphs — a chapter
 // break in the middle of a sentence would be a new kind of silent damage.
@@ -96,7 +103,7 @@ const spreadOverSkeleton = (text, skeleton) => {
     }
     out.push({
       chapter_number: slots[k].chapter_number,
-      chapter_title: slots[k].chapter_title || '',
+      chapter_title: '',
       chapter_summary: '',
       narrator_script: taken.join('\n\n'),
     });
@@ -109,7 +116,7 @@ if (chapters.length === 0 && editedText) {
   chapters = spreadOverSkeleton(editedText, original);
   console.log('SCRIPT NO MARKERS ' + scriptRef + ': the approved text carries no [CHAPTER n: title] lines, so ' +
     chapters.length + ' chapter(s) were rebuilt FROM THAT TEXT (' + countWords(editedText) + ' words). ' +
-    'The stored chapters were used for numbers and titles only — none of their words reached the film.');
+    'The stored chapters supplied the numbers and the proportions only — no word of theirs, title or line, reached the film.');
 }
 
 // 3. Nothing was approved at all. This is the only case where the previous

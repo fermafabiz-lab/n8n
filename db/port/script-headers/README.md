@@ -59,9 +59,13 @@ and its words may never reach the screen.**
 1. Markers present → parsed exactly as before. Nothing about the happy path
    changed.
 2. Markers absent, text present → the chapters are rebuilt **from that text**,
-   cut into the old skeleton's shape: same chapter numbers, same titles, the
-   same relative lengths (a two-line hook stays a two-line hook), every
-   summary dropped because the beats describe a story that no longer exists.
+   cut into the old skeleton's shape: same chapter numbers, the same relative
+   lengths (a two-line hook stays a two-line hook), every summary dropped
+   because the beats describe a story that no longer exists, and **the titles
+   dropped too** — `chapterTitles` is passed into the render and printed on the
+   chapter cards (`remotion/src/FinalVideo.tsx`), so a kept title is old words
+   ON SCREEN over the new film. Empty is safe because the render already has a
+   fallback: a key line taken from the scene's own narration.
    The cut only falls between the producer's own paragraphs — never inside a
    sentence — falling back to lines, then to sentences, for prose with no
    blank lines. `scriptChanged` is forced true, so the Story Bible is rebuilt

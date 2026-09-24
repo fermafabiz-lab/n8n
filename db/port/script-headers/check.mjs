@@ -69,7 +69,12 @@ console.log('The shape of the old script is kept, its words are not');
 ok('the chapter count follows the skeleton', replaced.chapters.length === 3);
 ok('the numbers are the skeleton\'s, hook included',
   replaced.chapters.map((c) => c.chapter_number).join(',') === '0,1,2');
-ok('the titles are the skeleton\'s', replaced.chapters[1].chapter_title === 'Pragul pe care ECU-ul îl poate apăra');
+// A chapter title is printed on the chapter card (remotion/src/FinalVideo.tsx
+// reads props.chapterTitles), so keeping the old one would put old words on
+// screen over the new film. Empty lets the render fall back to a key line from
+// the scene's own narration — the producer's text.
+ok('the old titles are dropped, because a title is words on screen',
+  replaced.chapters.every((c) => c.chapter_title === ''));
 ok('a two-line hook stays short rather than taking a third of the film',
   words(replaced.chapters[0].narrator_script) < words(replaced.chapters[1].narrator_script));
 ok('nothing is dropped on the floor',

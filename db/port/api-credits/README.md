@@ -75,6 +75,17 @@ the rest**; better, move all of them to one Header Auth credential.
 
 ## Live
 
+- **The site: deploy #187**, merge `1fed24c` into the trunk; build
+  10:45:28 → 10:48:13, `web` pulled and restarted by 10:48:32 UTC. Nothing
+  was running in n8n at the push. Proof it is the build answering:
+  `db/port/lib/served-css.workflow.js` (execution 16830) found
+  `hov:credits-checked` — a string only `CreditsAlert` has — in
+  `/_next/static/chunks/app/layout-d7a570d4d56ed91f.js`, the layout chunk
+  /login links.
+- **The production webhook, as the site calls it** (execution 16828): POST
+  `http://localhost:5678/webhook/api-credits` with the `HOV Media Ingest` key
+  → 200 in 4.9 s, `source: "webhook"`, `saved: true`, nine readings; the same
+  POST without the key → **403** "Authorization data is wrong!".
 - `db/015` applied in execution **16821** (table, 13 columns, 3 indexes).
 - Workflow **`Bkuo0qIxKprUFVpU`** published as version **`78582ddd`**; its
   first run (16822, 5 s) wrote nine readings: OpenAI **OUT**, ElevenLabs

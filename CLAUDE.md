@@ -291,6 +291,18 @@ the full entry in the file named:
   copy THAT node's reference instead of inventing one**, and when a `$('…')`
   read comes back empty, check what the node DECLARES before assuming the data
   shape. Full account: `docs/lessons-n8n.md`, "A typed trigger is a filter".
+- **A fallback may substitute a DEFAULT, never someone else's content — and
+  never silently.** `Parse Approved From Airtable` answered an approved script
+  with no `[CHAPTER n: title]` markers by using the PREVIOUS chapters, words
+  and all, so a producer who replaced their script got a film of the old one
+  with nothing anywhere to say so (2026-09-24, `recCrWO2ummZA4Ba4`: approved
+  text 7.000 RPM, stored chapters and all 12 scenes 5.000). Where the choice is
+  between what the human just said and what the system said earlier, the human
+  wins or the run stops. Fixed in Claude Scripting `191f8d41` + `fb126663`;
+  every branch logs now (`SCRIPT PARSE …`). Full account
+  `db/port/script-headers/README.md`, lesson in `docs/lessons-pipeline.md`,
+  "A fallback that is not logged is a lie the pipeline tells", pinned by
+  `node db/port/script-headers/check.mjs`.
 - **A branch that skips work must still write its record, or silence means two
   things at once.** Deep Search's gate sent skipped films straight past the
   report writer, so "no row" meant both "this was a Story film" and "the chain

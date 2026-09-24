@@ -43,6 +43,23 @@ export default function ScriptReview({
   const [pending, startTransition] = useTransition();
   const dirty = text !== content;
 
+  /**
+   * The markers are what the chapters are cut on after approval, and losing
+   * them used to be a silent catastrophe: until 2026-09-24 the scripting
+   * workflow answered a marker-less approval with the PREVIOUS chapters —
+   * words and all — so a producer who replaced the script got a film of the
+   * old one and no sign of it anywhere (recCrWO2ummZA4Ba4: new script said
+   * 7.000 RPM, all twelve scenes said 5.000).
+   *
+   * n8n no longer does that: a marker-less text is cut into the old chapters'
+   * shape using the producer's own words. That makes this a WARNING rather
+   * than a refusal — approving is safe, the structure is just approximate —
+   * and it appears exactly when it is true: the stored text had markers and
+   * the text in the box no longer does.
+   */
+  const MARKER = /\[CHAPTER\s+\d+\s*:/i;
+  const lostMarkers = MARKER.test(content) && !MARKER.test(text);
+
   // Restore a surviving draft after any remount; keep it saved while typing.
   // Once approved the draft is DROPPED instead: an edit typed before approval
   // and never saved would otherwise reappear on top of the approved text and
@@ -166,6 +183,16 @@ export default function ScriptReview({
         markers, they separate the chapters. Approve sends exactly what you see
         below into production.
       </p>
+      {lostMarkers && (
+        <p className="formmsg err" style={{ marginBottom: 14 }}>
+          <b>The chapter markers are gone from this text.</b> You can still
+          approve it — the chapters will be rebuilt from your paragraphs, in
+          the same shape and the same order as before, and every word will be
+          yours. Only the chapter titles and where one chapter ends stay
+          approximate. Paste the <code>[CHAPTER n: title]</code> lines back in
+          if you want the structure exactly.
+        </p>
+      )}
       {msg && <p className={`formmsg ${msg.ok ? "ok" : "err"}`}>{msg.message}</p>}
       <textarea
         value={text}

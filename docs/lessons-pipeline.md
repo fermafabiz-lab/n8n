@@ -2238,3 +2238,47 @@ Live on the producer's own show the same afternoon: 71 words, 405 characters,
 where the 100-word cap had produced 717. At ~450 characters a line,
 `composeSeriesLore`'s 8,000-character Lore cap now starts dropping the oldest
 recap lines at about episode 17 rather than about 11.
+
+### A fallback that is not logged is a lie the pipeline tells — 2026-09-24
+
+The producer replaced a script at the gate and the pipeline built the scenes
+from the OLD one. Not a race, not a stale cache, not a version pin: one line
+of code.
+
+`Parse Approved From Airtable` turns the approved text back into chapters by
+splitting on `[CHAPTER n: title]` marker lines, and it ended with
+
+```js
+if (chapters.length === 0) chapters = original.map(…);   // the stored chapters
+```
+
+A producer who REPLACES a script — pastes their own text, rewrites it by
+hand — does not reproduce those marker lines. Every block then failed the
+header match, `chapters` came out empty, and the node answered with the
+previous chapters, words and all. Everything downstream was then perfectly
+consistent and completely wrong: scenes, image prompts, narration, clips and
+the final cut told the old story while the script on screen showed the new
+one. Measured on `recCrWO2ummZA4Ba4`: the approved text said 7.000 RPM, the
+stored chapters said 5.000, and all twelve scenes said 5.000.
+
+**The general rule: a fallback may substitute a DEFAULT, never someone else's
+content.** Reaching for the previous chapters was reasonable-looking code —
+"we could not parse this, so use what we had" — and what it actually did was
+put words nobody approved into a finished film. Where the two candidates are
+"what the human just said" and "what the system said earlier", the human's
+version wins or the run stops; it never quietly loses.
+
+**And a fallback that fires silently cannot be found.** There was no log line,
+no flag on the project, nothing on screen: the only detector was a human
+watching the whole film and recognising a sentence. Every branch of that node
+now prints what it did (`SCRIPT PARSE …: markers|plain|stored`), and the
+recovery branch prints a second line saying the stored chapters contributed
+numbers and titles only. **If a branch can change what the film is made of, it
+has to say so out loud** — the same rule the Deep Search skip codes are built
+on, one level down.
+
+What replaced it: a marker-less text is cut into the old skeleton's SHAPE —
+same chapter numbers, same titles, same relative lengths, summaries dropped —
+using the producer's own words, cutting only between their paragraphs and
+never inside a sentence. Full account and the fixtures in
+`db/port/script-headers/`.

@@ -1479,6 +1479,51 @@ why. Full account: `db/port/cinematic-mode/README.md`.
   "published after the run that verified it is unverified". The run
   verifies the new path; the equality proves the old ones did not move.
 
+### Consistency is not continuity (2026-09-23)
+
+The producer, the same evening: *"la cinematic nu ar trebui sa fie hook si
+ar trebui sa fie continuitatea extrem de mare din scena in scena"*. Full
+account: `db/port/cinematic-continuity/README.md`.
+
+- **The pipeline already had consistency, and that was not what was asked
+  for.** Cast sheets, set plates and `char:`/`loc:` tags make the same
+  person look the same in every scene. Continuity means each shot STARTS
+  where the last one ended: the same slab of turf now lifted, the same
+  light a moment later. Nothing asked for that. The treatment was free to
+  jump place and hour between sequences, and its example lines were three
+  unrelated shots, which taught the model the opposite of what it was
+  asked.
+- **The previous picture was attached as a palette and then thrown away in
+  the continuous case.** The shared REFERENCE ASSEMBLY block attached the
+  previous scene's still "only for colour palette … never for layout", and
+  dropped it altogether when two image prompts shared more than 55% of
+  their words. On a Cinematic film, consecutive shots of one action SHOULD
+  share most of their words, so the guard removed the reference in exactly
+  the case it was needed. For a Cinematic film whose previous scene has the
+  same `loc:` tag, the still is now the **previous shot**, and the guard is
+  skipped. Across a change of place, or when the previous place is unknown,
+  it stays a palette. **A guard tuned for one kind of film is a bug on
+  another; check what it removes, not only what it lets through.**
+- **Continuity is asked for at every layer or it is lost at the first one
+  that does not know.** It was the same lesson as the mode itself.
+  - The treatment gets it as the film's spine.
+  - The shot list gets a CONTINUITY rule above the craft rules, and three
+    CONSECUTIVE example lines.
+  - The segmenter's rule (f) composes each first frame from where the last
+    motion left everything.
+  - The image request attaches the previous shot.
+- **A film with no hook is a missing key, not a new mode.** `Hook Wanted?`
+  skips the four hook nodes, and `Clear Hook Plan` deletes any stale
+  `hookPlan`, because the render draws the teaser from that key alone. The
+  render needed nothing: a film with no `hookPlan` is what every film was
+  before 2026-09-11. The scene the teaser used to cost goes back into the
+  shot count.
+- **Frame chaining was left to the producer.** Starting clip N+1 from the
+  last frame of clip N is the strongest continuity there is. It also makes
+  the clip phase serial, turns the image gate into a formality and makes
+  one regenerated clip invalidate every clip after it. That trade is a
+  production decision, not a prompt fix.
+
 ### Kids story is a real category now (2026-09-07)
 
 `category: 'kids'` — `ready: true`, built as variant B of the plan agreed with

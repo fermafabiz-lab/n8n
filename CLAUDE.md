@@ -569,8 +569,36 @@ expected and harmless for an app touching only its own Drive.
   `node db/port/cinematic-mode/check.mjs` (85). Verified live on the
   disposable `reczDC7RrgnX8SKsq` (delete it): 11 designed shots → 14 scenes,
   each image prompt opening with the designed shot size. **Owed**: one real
-  Cinematic film watched after its clips exist, and the hook's "action" style
-  still says "protagonist" and "climax".
+  Cinematic film watched after its clips exist.
+  **Since the same evening a Cinematic film has NO HOOK and is written for
+  continuity** (Claude Scripting `ca03c4d1`, rollback `e45ef4c1`; Media
+  Generation `8dc9f448`, rollback `b9527072`;
+  `db/port/cinematic-continuity/README.md`, lesson "Consistency is not
+  continuity" in `docs/lessons-pipeline.md`).
+  - **No hook.** `Hook Wanted?` after `Combine Chapters` skips the four hook
+    nodes. `Clear Hook Plan` deletes any stale `hookPlan`, since the render
+    draws the teaser from that key alone. The teaser's scene goes back into
+    the count: `ceil(L/8)` shots.
+  - **Continuity.** The treatment, the shot list and the segmenter each
+    carry a continuity rule.
+  - **The reference block.** In all three copies of the shared REFERENCE
+    ASSEMBLY block, a Cinematic scene with the same `loc:` as the one before
+    gets the previous still as the **previous shot**, no longer a palette.
+    The 55%-similar-prompt guard, which used to drop it in exactly that
+    case, is skipped for Cinematic. `node
+    db/port/cinematic-continuity/check.mjs` (77) proves every other
+    category unchanged.
+  - **Verified** on the disposable `rec7Fb9iLTFviELpp`: no chapter 0, 12
+    scenes for 95 s, each shot picking up the last, and 8 of 11 eligible
+    scenes getting the previous-shot reference. Delete that film and
+    `reczDC7RrgnX8SKsq`.
+  - **The site half** (`noHook` in `lib/categories.ts`: no Cold open row, no
+    hook panel) deploys with the next trunk merge.
+  - **Owed**:
+    - the `IMG refs` log of a real Cinematic film showing `continuity`;
+    - the producer's call on FRAME CHAINING (each clip starting from the
+      previous clip's last frame). It was not built, because it makes clips
+      serial and a regen invalidates everything after it.
   **The first REAL Cinematic film died at `Cine Treatment Parser`** (seen
   2026-09-24; execution 16640 of 2026-09-23 21:40,
   "The commute of an average person to work in cyberpank",

@@ -529,6 +529,9 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
   const chapters = Math.max(1, Math.ceil(length / 120));
   const tt = toneType(tone);
   const silent = catMeta.voiceMode === "silent";
+  // A category with no cold open (Cinematic) shows no Cold open row and does
+  // not price the teaser's shots — Scripting writes none for it.
+  const noHook = getCategory(category).noHook === true;
   // The steps this category can have. A silent film has no takes, so no Audio
   // chip — and a list holding only Audio has to read as OFF, or the switch
   // would stay on with nothing on screen chosen.
@@ -928,10 +931,10 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
                       const clips = Math.max(1, Math.round(length / 8));
                       // The teaser's 3-5 shots render on Fast (10 credits
                       // each) whatever the body runs on — see Current Scene.
-                      const hookExtra = t.credits === 0 ? 40 : 0;
+                      const hookExtra = t.credits === 0 && !noHook ? 40 : 0;
                       const total = clips * t.credits + hookExtra;
                       return t.credits === 0
-                        ? `Free tier — clips cost no credits (the opening teaser's few shots still render on Fast, ~40 credits). Fine for scenery and slow shots; complex motion (races, crowds, physical contact) is where it glitches.`
+                        ? `Free tier — clips cost no credits${noHook ? "" : " (the opening teaser's few shots still render on Fast, ~40 credits)"}. Fine for scenery and slow shots; complex motion (races, crowds, physical contact) is where it glitches.`
                         : `${t.note} ≈ ${total.toLocaleString("en-US")} credits for this film (${clips} clips × ${t.credits}), out of 25,050/month.`;
                     })()}
                   </p>
@@ -1345,6 +1348,7 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
                     value={watermarkScale}
                   />
                 </div>
+                {!noHook && (
                 <div className="frow" style={{ marginTop: 18 }}>
                   <label>Cold open</label>
                   {/* Every film opens on a teaser of a few fast shots now —
@@ -1378,6 +1382,7 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
                       : HOOK_STYLES.find((h) => h.id === hookStyle)?.blurb}
                   </p>
                 </div>
+                )}
               </section>
 
               <section className="fsec">

@@ -1,0 +1,262 @@
+{
+ "OpenAI Ping": {
+  "statusCode": 429,
+  "body": {
+   "error": {
+    "message": "You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.",
+    "type": "insufficient_quota",
+    "param": null,
+    "code": "credit_balance_exhausted"
+   }
+  }
+ },
+ "OpenAI Costs": {
+  "statusCode": 403,
+  "body": {
+   "error": "You have insufficient permissions for this operation. Missing scopes: api.usage.read. Check that you have the correct role in your organization, and if you're using a restricted API key, that it has the necessary scopes."
+  }
+ },
+ "ElevenLabs Subscription": {
+  "statusCode": 200,
+  "body": {
+   "tier": "creator",
+   "character_count": 79280,
+   "character_limit": 131000,
+   "max_character_limit_extension": 0,
+   "max_credit_limit_extension": 0,
+   "can_extend_character_limit": false,
+   "allowed_to_extend_character_limit": false,
+   "next_character_count_reset_unix": 1790521107,
+   "voice_slots_used": 0,
+   "professional_voice_slots_used": 0,
+   "professional_voice_slots_used_in_workspace": 0,
+   "voice_limit": 30,
+   "max_voice_add_edits": 95,
+   "voice_add_edit_counter": 0,
+   "professional_voice_limit": 1,
+   "can_extend_voice_limit": false,
+   "can_use_instant_voice_cloning": true,
+   "can_use_professional_voice_cloning": true,
+   "currency": "usd",
+   "current_overage": {
+    "amount": "0",
+    "currency": "usd"
+   },
+   "status": "active",
+   "billing_period": "monthly_period",
+   "character_refresh_period": "monthly_period",
+   "next_invoice": {
+    "amount_due_cents": 2662,
+    "subtotal_cents": 2200,
+    "tax_cents": null,
+    "discount_percent_off": null,
+    "discount_amount_off": null,
+    "discounts": [],
+    "next_payment_attempt_unix": 1790524707,
+    "payment_intent_status": null,
+    "payment_intent_statusses": []
+   },
+   "open_invoices": [],
+   "has_open_invoices": false,
+   "pending_change": null,
+   "has_used_starter_coupon_on_account": false,
+   "has_used_creator_coupon_on_account": true
+  }
+ },
+ "ElevenLabs Usage": {
+  "statusCode": 200,
+  "body": {
+   "time": [
+    1787616000000,
+    1787702400000,
+    1787788800000,
+    1787875200000,
+    1787961600000,
+    1788048000000,
+    1788134400000,
+    1788220800000,
+    1788307200000,
+    1788393600000,
+    1788480000000,
+    1788566400000,
+    1788652800000,
+    1788739200000,
+    1788825600000,
+    1788912000000,
+    1788998400000,
+    1789084800000,
+    1789171200000,
+    1789257600000,
+    1789344000000,
+    1789430400000,
+    1789516800000,
+    1789603200000,
+    1789689600000,
+    1789776000000,
+    1789862400000,
+    1789948800000,
+    1790035200000,
+    1790121600000,
+    1790208000000
+   ],
+   "usage": {
+    "All": [
+     0,
+     0,
+     16,
+     57,
+     2901,
+     0,
+     9913,
+     25154,
+     3196,
+     0,
+     6175,
+     0,
+     0,
+     2272,
+     1087,
+     9814,
+     612,
+     0,
+     106,
+     2079,
+     1024,
+     0,
+     2342,
+     6639,
+     0,
+     0,
+     0,
+     4086,
+     0,
+     1807,
+     0
+    ]
+   }
+  }
+ },
+ "Drive About": {
+  "statusCode": 200,
+  "body": {
+   "user": {
+    "kind": "drive#user",
+    "displayName": "Video",
+    "me": true,
+    "emailAddress": "fermafabiz@gmail.com"
+   },
+   "storageQuota": {
+    "limit": "32985348833280",
+    "usage": "10364750054",
+    "usageInDrive": "10352730186",
+    "usageInDriveTrash": "0"
+   }
+  }
+ },
+ "useapi Account": {
+  "statusCode": 200,
+  "body": {
+   "id": 2923,
+   "email": "fermafabiz@gmail.com",
+   "created": "2026-07-02T13:27:58.336Z",
+   "name": "Producer",
+   "subscriptionIsActive": true,
+   "subscriptions": 1,
+   "maxAccountsPerAPI": 3,
+   "accounts": {
+    "Google Flow API": {
+     "total": 3,
+     "active": 3
+    }
+   },
+   "updated": "2026-09-02T14:29:16.144Z",
+   "verified": "2026-07-02T13:29:04.684Z",
+   "sub": "260902"
+  }
+ },
+ "Flow Accounts": {
+  "statusCode": 200,
+  "body": {
+   "fermafabiz@gmail.com": {
+    "backend": "flow",
+    "created": "2026-07-02T13:36:53.958Z",
+    "health": "OK",
+    "nextRefresh": {
+     "scheduledFor": "2026-09-25T00:15:31.000Z"
+    },
+    "project": {
+     "projectId": "9ed14b6d-50f9-41e9-9a65-c1c3b4328683",
+     "projectTitle": "Jul 02 - 13:36"
+    },
+    "sessionData": {
+     "expires": "2026-09-25T01:15:31.000Z"
+    },
+    "updated": "2026-09-17T13:58:18.018Z"
+   },
+   "houseofvideos01@gmail.com": {
+    "backend": "flow",
+    "created": "2026-09-17T14:06:29.487Z",
+    "health": "OK",
+    "nextRefresh": {
+     "scheduledFor": "2026-09-24T17:15:23.000Z"
+    },
+    "project": {
+     "projectId": "b0aa12b6-7200-43a7-b7b0-24cb27073825",
+     "projectTitle": "Sep 17 - 14:06"
+    },
+    "sessionData": {
+     "expires": "2026-09-24T18:15:23.000Z"
+    },
+    "updated": "2026-09-17T21:59:27.706Z"
+   },
+   "houseofvideos02@gmail.com": {
+    "backend": "flow",
+    "created": "2026-09-17T14:16:25.554Z",
+    "health": "OK",
+    "nextRefresh": {
+     "scheduledFor": "2026-09-24T14:57:48.000Z"
+    },
+    "project": {
+     "projectId": "15ab2ad8-05e1-43aa-a216-04595113cc60",
+     "projectTitle": "Sep 17 - 14:16"
+    },
+    "sessionData": {
+     "expires": "2026-09-24T15:57:48.000Z"
+    },
+    "updated": "2026-09-17T14:16:25.554Z"
+   }
+  }
+ },
+ "Flow Account": {
+  "statusCode": 200,
+  "body": {
+   "created": "2026-09-17T14:06:29.487Z",
+   "health": "OK",
+   "updated": "2026-09-17T21:59:27.706Z",
+   "backend": "flow",
+   "credits": {
+    "credits": 21950,
+    "userPaygateTier": "PAYGATE_TIER_TWO",
+    "sku": "G1_TIER2",
+    "serviceTier": "SERVICE_TIER_ADVANCED",
+    "subscriptionCredits": 21950
+   },
+   "nextRefresh": {
+    "scheduledFor": "2026-09-24T17:15:23.000Z"
+   },
+   "sessionData": {
+    "expires": "2026-09-24T18:15:23.000Z",
+    "user": {
+     "email": "houseofvideos01@gmail.com"
+    },
+    "access_token": "ya29.…redacted…"
+   },
+   "accountCookies": [
+    {
+     "name": "SID",
+     "value": "g.a00…redacted…w0076"
+    }
+   ]
+  }
+ }
+}

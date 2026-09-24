@@ -3590,3 +3590,51 @@ export async function writeRecapFromEpisodes(
     return { ok: false, message: friendlyError(e) };
   }
 }
+
+// ---------- developer insights ----------
+
+/**
+ * "Check now" on /admin/insights: asks n8n's "API Credits" workflow to read
+ * every provider's balance this minute instead of at the next hourly run
+ * (db/port/api-credits/). The one webhook besides sheet-backfill the site
+ * WAITS on — the readings it answers with are what the page shows next — so
+ * the timeout is generous: a normal check takes 5-10 seconds.
+ *
+ * Derived from N8N_NEW_PROJECT_WEBHOOK_URL like every other webhook, and
+ * authenticated with the same shared key n8n uses against the site
+ * (`x-hov-key` = MEDIA_INGEST_KEY, the `HOV Media Ingest` credential): a
+ * balance is not a secret, but a door that spends an OpenAI call per knock
+ * should not be open to the internet.
+ */
+export async function checkCreditsNow(): Promise<ActionResult> {
+  const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
+  const webhook =
+    process.env.N8N_CREDITS_WEBHOOK_URL ?? newProject?.replace(/new-project\/?$/, "api-credits");
+  if (!webhook?.includes("api-credits")) {
+    return {
+      ok: false,
+      message: "No api-credits webhook is configured here, so there is nothing to ask — check N8N_NEW_PROJECT_WEBHOOK_URL.",
+    };
+  }
+  const key = process.env.MEDIA_INGEST_KEY;
+  if (!key) return { ok: false, message: "MEDIA_INGEST_KEY is not set here, so n8n would refuse the request." };
+  try {
+    const res = await fetch(webhook, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-hov-key": key },
+      body: "{}",
+      signal: AbortSignal.timeout(90_000),
+    });
+    if (!res.ok) return { ok: false, message: `n8n answered HTTP ${res.status} — the check did not run.` };
+    const data = (await res.json().catch(() => null)) as { saved?: boolean; saveError?: string | null } | null;
+    revalidatePath("/admin/insights");
+    revalidatePath("/admin/insights/usage");
+    revalidatePath("/admin");
+    if (data && data.saved === false) {
+      return { ok: false, message: `Checked, but the reading was not saved: ${data.saveError ?? "unknown error"}.` };
+    }
+    return { ok: true, message: "Checked just now." };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}

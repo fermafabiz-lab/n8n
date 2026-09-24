@@ -2008,3 +2008,165 @@ export async function deletePlaylistRow(playlistId: string): Promise<PlaylistDel
 export async function touchProjectActivity(projectId: string): Promise<void> {
   await query(`update hov.project set activity_at = now() where id = $1`, [projectId]);
 }
+
+// ---------------------------------------------------------------------------
+// Developer insights (db/015)
+//
+// What every paid service has left, reading by reading, written hourly by the
+// n8n "API Credits" workflow (db/port/api-credits/). Guarded by `tableReady`
+// like every reader of a newer table: before db/015 is applied the page says
+// so instead of taking itself down.
+// ---------------------------------------------------------------------------
+
+export interface ApiReadings {
+  /** False until db/015 is applied. */
+  ready: boolean;
+  /** The newest reading of every series (provider, account, metric). */
+  latest: import("@/lib/insights").Reading[];
+  /** Per series key: what was LEFT, reading by reading, oldest first. */
+  history: Record<string, import("@/lib/insights").Point[]>;
+}
+
+export async function getApiReadings(days = 30): Promise<ApiReadings> {
+  if (!(await tableReady("hov.api_balance"))) return { ready: false, latest: [], history: {} };
+  const latest = await query<{
+    provider: string;
+    account: string;
+    metric: string;
+    value: number | null;
+    unit: string | null;
+    limit: number | null;
+    resets_at: Date | null;
+    status: import("@/lib/insights").ReadingStatus;
+    note: string | null;
+    detail: Record<string, unknown> | null;
+    taken_at: Date;
+  }>(
+    `select distinct on (provider, account, metric)
+            provider, account, metric, value::float8 as value, unit, "limit"::float8 as "limit",
+            resets_at, status, note, detail, taken_at
+       from hov.api_balance
+      order by provider, account, metric, taken_at desc`,
+  );
+  const points = await query<{ provider: string; account: string; metric: string; t: number; v: number }>(
+    `select provider, account, metric,
+            (extract(epoch from taken_at) * 1000)::float8 as t, value::float8 as v
+       from hov.api_balance
+      where taken_at > now() - make_interval(days => $1)
+        and value is not null
+        and metric in ('credits', 'characters', 'storage')
+      order by taken_at`,
+    [days],
+  );
+  const history: Record<string, import("@/lib/insights").Point[]> = {};
+  for (const p of points) {
+    const key = `${p.provider}|${p.account}|${p.metric}`;
+    (history[key] ??= []).push({ t: Number(p.t), v: Number(p.v) });
+  }
+  return {
+    ready: true,
+    latest: latest.map((r) => ({
+      provider: r.provider,
+      account: r.account,
+      metric: r.metric,
+      value: r.value === null ? null : Number(r.value),
+      unit: r.unit,
+      limit: r.limit === null ? null : Number(r.limit),
+      resetsAt: r.resets_at ? new Date(r.resets_at).toISOString() : null,
+      status: r.status,
+      note: r.note,
+      detail: r.detail,
+      takenAt: new Date(r.taken_at).toISOString(),
+    })),
+    history,
+  };
+}
+
+/** One film worked on in the window, with what `filmCost` needs per scene. */
+export interface FilmUsage {
+  id: string;
+  name: string;
+  videoModel: string | null;
+  lengthSeconds: number | null;
+  activeAt: string;
+  scenes: import("@/lib/cost").CostScene[];
+}
+
+/**
+ * Every film worked on in the last `days`, with its scenes reduced to counts
+ * — the draft counts and the narration's length straight from SQL, so a month
+ * of films is one query rather than a query per film (lib/cost.ts prices it,
+ * one rule for this page and the project page). A draft counts even when its
+ * file is gone: it was still generated and still paid for.
+ */
+export async function getFilmUsage(days = 30): Promise<FilmUsage[]> {
+  const rows = await query<{
+    id: string;
+    name: string;
+    videoModel: string | null;
+    lengthSeconds: number | null;
+    activeAt: Date;
+    order: number;
+    hasVideo: boolean;
+    hasImage: boolean;
+    hasVoice: boolean;
+    narrationLength: number;
+    videoDrafts: number;
+    imageDrafts: number;
+  }>(
+    `select p.id, p.name, p.editing_options->>'videoModel' as "videoModel",
+            p.length_seconds as "lengthSeconds",
+            coalesce(p.activity_at, p.updated_at, p.created_at) as "activeAt",
+            s.scene_order as "order",
+            s.scene_final_url is not null as "hasVideo",
+            exists (select 1 from hov.attachment a where a.scene_id = s.id and a.field = 'image') as "hasImage",
+            s.voiceover_url is not null as "hasVoice",
+            coalesce(length(s.narration), 0)::int as "narrationLength",
+            (select count(*) from jsonb_array_elements(
+               case when jsonb_typeof(s.media_versions) = 'array' then s.media_versions else '[]'::jsonb end) v
+              where v->>'kind' = 'video')::int as "videoDrafts",
+            (select count(*) from jsonb_array_elements(
+               case when jsonb_typeof(s.media_versions) = 'array' then s.media_versions else '[]'::jsonb end) v
+              where coalesce(v->>'kind', 'image') <> 'video')::int as "imageDrafts"
+       from hov.project p
+       join hov.scene s on s.project_id = p.id
+      where coalesce(p.activity_at, p.updated_at, p.created_at) > now() - make_interval(days => $1)
+      order by p.id, s.scene_order`,
+    [days],
+  );
+  const films = new Map<string, FilmUsage>();
+  for (const r of rows) {
+    let f = films.get(r.id);
+    if (!f) {
+      f = {
+        id: r.id,
+        name: r.name,
+        videoModel: r.videoModel,
+        lengthSeconds: r.lengthSeconds,
+        activeAt: new Date(r.activeAt).toISOString(),
+        scenes: [],
+      };
+      films.set(r.id, f);
+    }
+    f.scenes.push({
+      order: r.order,
+      videoUrl: r.hasVideo ? "yes" : null,
+      imageUrl: r.hasImage ? "yes" : null,
+      voiceUrl: r.hasVoice ? "yes" : null,
+      narrationLength: Number(r.narrationLength),
+      videoDrafts: Number(r.videoDrafts),
+      imageDrafts: Number(r.imageDrafts),
+    });
+  }
+  return [...films.values()];
+}
+
+/** Scripts written in the window — the one thing OpenAI's spend buys. */
+export async function getScriptsWritten(days = 30): Promise<{ scripts: number; films: number }> {
+  const [row] = await query<{ scripts: number; films: number }>(
+    `select count(*)::int as scripts, count(distinct project_id)::int as films
+       from hov.script where created_at > now() - make_interval(days => $1)`,
+    [days],
+  );
+  return { scripts: Number(row?.scripts ?? 0), films: Number(row?.films ?? 0) };
+}

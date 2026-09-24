@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { getDeepSearchHealth } from "@/lib/data";
+import { getApiReadings, getDeepSearchHealth } from "@/lib/data";
+import { alertsOf, burnsOf } from "@/lib/insights";
 import { deepSearchState } from "@/lib/deep-search";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +37,18 @@ const SECTIONS = [
       <>
         <rect x="2.5" y="5" width="15" height="10.5" rx="2" />
         <path d="M2.5 8.5h15M6 12.5h3" />
+      </>
+    ),
+  },
+  {
+    href: "/admin/insights",
+    label: "Developer insights",
+    note: "What every paid API has left, and what it is spent on.",
+    icon: (
+      <>
+        <path d="M3.5 14.5a6.5 6.5 0 1 1 13 0" />
+        <path d="M10 14.5l3.2-4.2" />
+        <path d="M3.5 17h13" />
       </>
     ),
   },
@@ -89,6 +102,12 @@ export default async function SettingsPage() {
       ).length,
     )
     .catch(() => 0);
+  // The same rule for credits: a service that is out or nearly out paints the
+  // Developer insights card red (lib/insights.ts decides both). A database
+  // that does not answer is NOT an alarm, for the reason given above.
+  const creditAlerts = await getApiReadings(8)
+    .then((d) => (d.ready ? alertsOf(d.latest, burnsOf(d.latest, d.history)).length : 0))
+    .catch(() => 0);
 
   return (
     <main className="page admin settings">
@@ -110,11 +129,16 @@ export default async function SettingsPage() {
                 {s.href === "/admin/deep-search" && broken > 0 && (
                   <span className="sdot" aria-label={`${broken} films need attention`} />
                 )}
+                {s.href === "/admin/insights" && creditAlerts > 0 && (
+                  <span className="sdot" aria-label={`${creditAlerts} paid services need attention`} />
+                )}
               </span>
               <span className="snote">
                 {s.href === "/admin/deep-search" && broken > 0
                   ? `${broken} film${broken === 1 ? "" : "s"} did not get checked.`
-                  : s.note}
+                  : s.href === "/admin/insights" && creditAlerts > 0
+                    ? `${creditAlerts} paid service${creditAlerts === 1 ? " is" : "s are"} out or nearly out.`
+                    : s.note}
               </span>
             </span>
             <svg className="schev" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

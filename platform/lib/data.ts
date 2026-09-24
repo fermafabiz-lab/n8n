@@ -1640,3 +1640,28 @@ export async function touchProjectActivity(projectId: string): Promise<void> {
   if (!USE_PG || !isConfigured) return;
   return pgBackend.touchProjectActivity(projectId);
 }
+
+// ---------------------------------------------------------------------------
+// Developer insights (db/015, lib/insights.ts)
+//
+// Postgres only. The frozen Airtable backend and demo mode answer EMPTY, never
+// a made-up balance: a page whose whole job is to say "you are about to run
+// out" must not be able to show a comfortable number it did not read.
+// ---------------------------------------------------------------------------
+
+export type { ApiReadings, FilmUsage } from "./data/postgres";
+
+export async function getApiReadings(days?: number): Promise<import("./data/postgres").ApiReadings> {
+  if (USE_PG) return pgBackend.getApiReadings(days);
+  return { ready: false, latest: [], history: {} };
+}
+
+export async function getFilmUsage(days?: number): Promise<import("./data/postgres").FilmUsage[]> {
+  if (USE_PG) return pgBackend.getFilmUsage(days);
+  return [];
+}
+
+export async function getScriptsWritten(days?: number): Promise<{ scripts: number; films: number }> {
+  if (USE_PG) return pgBackend.getScriptsWritten(days);
+  return { scripts: 0, films: 0 };
+}

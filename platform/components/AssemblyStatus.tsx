@@ -21,6 +21,14 @@ const STEPS = [
   "Drawing captions, titles and the end screen",
 ];
 
+/**
+ * Where an ENGINE render is, as a step above. The engine's phases are
+ * coarser than the four steps: its `assemble` phase is the whole ffmpeg pass
+ * (the first three), shown on the stitching step it spends most of its time
+ * in; `graphics` and `store` are the drawing step.
+ */
+const ENGINE_STEP: Record<string, number> = { queued: 0, assemble: 1, graphics: 3, store: 3 };
+
 /** One ticking clock for the whole panel — two would drift apart on screen. */
 function useNow(): number {
   const [now, setNow] = useState(() => Date.now());
@@ -123,6 +131,12 @@ export default function AssemblyStatus({
    * see the `upstreamStalled` note in lib/n8n.ts for why not.
    */
   upstreamStalled = false,
+  /**
+   * The render ENGINE's own report (lib/assembly-engine.ts), when it is the
+   * one drawing this film. Measured, not estimated: the step list follows it
+   * and the "estimate" caveat is dropped. Null for an n8n render.
+   */
+  engine = null,
 }: {
   projectId: string;
   startedAt: string | null;
@@ -132,6 +146,7 @@ export default function AssemblyStatus({
   lengthSeconds?: number | null;
   upstream?: { name: string; startedAt: string | null } | null;
   upstreamStalled?: boolean;
+  engine?: { phase: string; progress: number | null } | null;
 }) {
   const now = useNow();
   const elapsed = since(now, startedAt);
@@ -174,8 +189,11 @@ export default function AssemblyStatus({
   // stays a small share; the last one is the Remotion pass, which is most of
   // the wait on any film longer than a minute.
   const assembleSeconds = lengthSeconds ? 60 + lengthSeconds * 0.5 : 225;
+  const measured = engine ? ENGINE_STEP[engine.phase] ?? null : null;
   const stepIndex =
-    elapsed === null
+    measured !== null
+      ? measured
+      : elapsed === null
       ? 0
       : elapsed >= assembleSeconds
         ? STEPS.length - 1
@@ -308,8 +326,9 @@ export default function AssemblyStatus({
           )}
           {started && (
             <p style={{ margin: "12px 0 0", fontSize: 11.5, color: "var(--dim)" }}>
-              The steps above are an estimate from elapsed time — the render
-              doesn&apos;t report progress while it works.
+              {measured !== null
+                ? `Reported by the render engine${engine?.progress != null && engine.progress > 0 && engine.progress < 1 ? ` — this step is ${Math.round(engine.progress * 100)}% done` : ""}.`
+                : "The steps above are an estimate from elapsed time — the render doesn't report progress while it works."}
             </p>
           )}
           {slow && (

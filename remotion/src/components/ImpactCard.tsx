@@ -312,12 +312,13 @@ export const ImpactCard: React.FC<{
 											}
 										: titleMotion === 'slam'
 											? (() => {
-													// Lands from 30% too large, fast: outExpo spends its
+													// Lands from 15% too large, fast: outExpo spends its
 													// travel in the first frames, which is what a slam is.
+													// 30% on the first storyboard read as too much.
 													const s2 = curveAt((t - revealStart - wi * stagger) / (WORD_REVEAL * 0.6), CURVES.outExpo);
 													return {
 														opacity: Math.min(1, s2 * 1.6),
-														transform: `scale(${(1 + 0.3 * (1 - s2)).toFixed(4)})`,
+														transform: `scale(${(1 + 0.15 * (1 - s2)).toFixed(4)})`,
 													};
 												})()
 											: {

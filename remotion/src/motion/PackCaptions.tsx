@@ -21,10 +21,17 @@ import type {CaptionMotion} from './packs';
  *     (platform UI owns the bottom ~20% of a 9:16 frame).
  */
 
-/** A small overshoot, for the punch pack's pop. Not linear, lands exactly on 1. */
+/**
+ * The punch pack's pop: a soft overshoot, not linear, landing exactly on 1.
+ * Toned down on the producer's first look (2026-09-24, "punch is too
+ * punchy"): the overshoot constant went from 1.70 (the textbook back-out) to
+ * 0.6, and the word now grows from 85% of its size instead of 55%.
+ */
+const POP_OVERSHOOT = 0.6;
+const POP_FROM = 0.85;
 const backOut = (x: number): number => {
 	const p = Math.min(1, Math.max(0, x));
-	const c1 = 1.70158;
+	const c1 = POP_OVERSHOOT;
 	const c3 = c1 + 1;
 	return 1 + c3 * Math.pow(p - 1, 3) + c1 * Math.pow(p - 1, 2);
 };
@@ -128,7 +135,7 @@ export const PackCaptions: React.FC<{
 					textAlign: 'center',
 					fontFamily: punch ? preset.displayFont : preset.captionFont,
 					fontWeight: punch ? preset.displayWeight : portrait ? 700 : 600,
-					fontSize: punch ? (portrait ? 62 : 58) : portrait ? 42 : 40,
+					fontSize: punch ? (portrait ? 54 : 50) : portrait ? 42 : 40,
 					// Uppercase Ș/Ț carry their comma below the baseline; 1.2 clears
 					// it for every display face in style.ts (docs: lessons-render,
 					// "diacritics and line height").
@@ -145,14 +152,14 @@ export const PackCaptions: React.FC<{
 					if (since < 0) return null;
 					const isActive = i === active.activeInChunk;
 					if (punch) {
-						const pop = backOut(since / 0.22);
+						const pop = backOut(since / 0.26);
 						return (
 							<span
 								key={i}
 								style={{
 									display: 'inline-block',
-									transform: `scale(${(0.55 + 0.45 * pop).toFixed(4)})`,
-									opacity: Math.min(1, since / 0.07),
+									transform: `scale(${(POP_FROM + (1 - POP_FROM) * pop).toFixed(4)})`,
+									opacity: Math.min(1, since / 0.1),
 									color: isActive ? '#111111' : '#FFFFFF',
 									background: isActive ? ink : 'transparent',
 									padding: '0 0.16em',

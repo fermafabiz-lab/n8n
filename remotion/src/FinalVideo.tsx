@@ -48,10 +48,12 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 	watermarkOpenOnce = false,
 	watermarkScale = 1,
 	motionPack,
+	category,
 }) => {
 	const {fps} = useVideoConfig();
-	// How things move (src/motion/packs.ts). Classic unless a pack is named.
-	const pack = packFor(motionPack);
+	// How things move (src/motion/packs.ts): the film's pick, else its
+	// category's default, else classic.
+	const pack = packFor(motionPack, category);
 	const frame = useCurrentFrame();
 	const seconds = frame / fps;
 	const preset = presetForTone(tone);

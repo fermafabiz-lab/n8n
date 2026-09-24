@@ -1,16 +1,21 @@
 /**
- * Motion packs: HOW the graphics move, per kind of film.
+ * Motion packs: HOW the graphics move.
  *
  * The tone preset (style.ts) owns what the graphics look like — faces,
  * colours, grounds. A pack owns motion only: how captions arrive and mark the
  * spoken word, how a chapter title lands. The two are independent, so a
- * Documentary-toned Story film and an Epic-toned one share a pack and keep
+ * Documentary-toned film and an Epic-toned one can share a pack and keep
  * their own look.
  *
- * `classic` is today's motion exactly, and it is what every film gets unless
- * a pack is named — by the render server from MOTION_PACKS and the film's
- * category, or by hand for a storyboard render. Nothing a film already looks
- * like changes because this file exists.
+ * The producer picks a pack per film, on the brief or in Final touches
+ * (`Editing Options.motionPack`). When nothing is picked the category decides
+ * (`DEFAULT_PACK_FOR_CATEGORY`): Story films get Editorial, the producer's
+ * choice on 2026-09-24 after the first storyboard; every other category keeps
+ * classic, today's motion exactly, until a pack is designed for it.
+ *
+ * The same four ids and the same defaults live in platform/lib/motion-packs.ts
+ * (the site's picker) and in n8n's Build Remotion Props. Change one, change all
+ * three — `npm run check:motion` pins the render side.
  *
  * Plan and status: docs/plans/motion-packs.md.
  */
@@ -33,30 +38,51 @@ export type ChapterTitleMotion =
 	/** Words land from slightly too large, hard and fast. */
 	| 'slam';
 
+export type MotionPackId = 'classic' | 'editorial' | 'punch' | 'lowerThird';
+
 export type MotionPack = {
-	id: string;
+	id: MotionPackId;
 	/** Shown on storyboards and in the producer's picker. */
 	label: string;
 	captions: CaptionMotion;
 	chapterTitle: ChapterTitleMotion;
 };
 
-export const PACKS: Record<string, MotionPack> = {
-	classic: {id: 'classic', label: 'Classic (today)', captions: 'classic', chapterTitle: 'classic'},
-	'story-editorial': {
-		id: 'story-editorial',
-		label: 'Story · Editorial',
-		captions: 'editorial',
-		chapterTitle: 'tracking',
-	},
-	'story-punch': {id: 'story-punch', label: 'Story · Punch', captions: 'punch', chapterTitle: 'slam'},
-	'story-lowerthird': {
-		id: 'story-lowerthird',
-		label: 'Story · Lower third',
-		captions: 'lowerThird',
-		chapterTitle: 'classic',
-	},
+export const PACKS: Record<MotionPackId, MotionPack> = {
+	classic: {id: 'classic', label: 'Classic', captions: 'classic', chapterTitle: 'classic'},
+	editorial: {id: 'editorial', label: 'Editorial', captions: 'editorial', chapterTitle: 'tracking'},
+	punch: {id: 'punch', label: 'Punch', captions: 'punch', chapterTitle: 'slam'},
+	lowerThird: {id: 'lowerThird', label: 'Lower third', captions: 'lowerThird', chapterTitle: 'classic'},
 };
 
-/** Unknown or absent → classic, never an error: a typo must not change a film. */
-export const packFor = (id?: string | null): MotionPack => PACKS[String(id ?? '')] ?? PACKS.classic;
+/** What a film gets when nobody picked a pack. Categories not listed: classic. */
+export const DEFAULT_PACK_FOR_CATEGORY: Record<string, MotionPackId> = {
+	story: 'editorial',
+};
+
+/** The storyboard's first names, still accepted so old fixtures keep rendering. */
+const ALIASES: Record<string, MotionPackId> = {
+	'story-editorial': 'editorial',
+	'story-punch': 'punch',
+	'story-lowerthird': 'lowerThird',
+	lowerthird: 'lowerThird',
+};
+
+const known = (id: unknown): MotionPackId | null => {
+	const s = String(id ?? '').trim();
+	if (!s) return null;
+	if (s in PACKS) return s as MotionPackId;
+	return ALIASES[s] ?? ALIASES[s.toLowerCase()] ?? null;
+};
+
+/**
+ * The pack a film is drawn with: the one picked for it, else its category's
+ * default, else classic. An unknown value is ignored rather than trusted — a
+ * typo must never change how a film looks.
+ */
+export const packFor = (motionPack?: string | null, category?: string | null): MotionPack => {
+	const picked = known(motionPack);
+	if (picked) return PACKS[picked];
+	const byCategory = DEFAULT_PACK_FOR_CATEGORY[String(category ?? '').trim().toLowerCase()];
+	return PACKS[byCategory ?? 'classic'];
+};

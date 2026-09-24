@@ -6,7 +6,7 @@
     "start": "remotion studio src/index.ts",
     "studio": "node scripts/studio.mjs",
     "render": "remotion render src/index.ts FinalVideo out/final-video.mp4",
-    "check": "npm run check:montage && npm run check:captions && npm run check:mix && npm run check:hook && npm run check:cards && node motif/check-motif.mjs motif/boyd-props.json motif/candidate-timeline.json && npm run check:watermark && npm run check:sar",
+    "check": "npm run check:montage && npm run check:captions && npm run check:mix && npm run check:hook && npm run check:cards && node motif/check-motif.mjs motif/boyd-props.json motif/candidate-timeline.json && npm run check:watermark && npm run check:sar && npm run check:shim",
     "check:montage": "node --experimental-strip-types scripts/check-montage.mjs",
     "check:captions": "node --experimental-strip-types scripts/check-captions.mjs",
     "check:mix": "node scripts/check-mix.mjs",
@@ -17,23 +17,37 @@
     "lambda:deploy-site": "remotion lambda sites create src/index.ts --site-name=final-video",
     "check:watermark": "node --experimental-strip-types scripts/check-watermark.mjs",
     "check:sar": "node scripts/check-sar.mjs",
-    "check:cards": "node --experimental-strip-types scripts/check-cards.mjs"
+    "check:cards": "node --experimental-strip-types scripts/check-cards.mjs",
+    "check:shim": "node scripts/check-shim.mjs",
+    "render:local": "node scripts/render-local.mjs"
   },
   "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "remotion": "4.0.489",
+    "@fontsource/anton": "^5.3.0",
+    "@fontsource/bodoni-moda": "^5.3.0",
+    "@fontsource/cormorant-garamond": "^5.3.0",
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@fontsource/inter-tight": "^5.3.0",
+    "@fontsource/outfit": "^5.3.0",
+    "@fontsource/poppins": "^5.3.0",
+    "@fontsource/space-grotesk": "^5.3.0",
+    "@hyperframes/producer": "0.8.72",
+    "@remotion/bundler": "4.0.489",
     "@remotion/cli": "4.0.489",
+    "@remotion/google-fonts": "4.0.489",
     "@remotion/lambda": "4.0.489",
     "@remotion/renderer": "4.0.489",
-    "@remotion/bundler": "4.0.489",
-    "@remotion/google-fonts": "4.0.489",
+    "cors": "^2.8.5",
+    "esbuild": "^0.28.2",
     "express": "^4.21.0",
-    "cors": "^2.8.5"
+    "gsap": "^3.15.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "4.0.489"
   },
   "devDependencies": {
-    "typescript": "^5.4.0",
+    "@types/node": "^20.0.0",
     "@types/react": "^18.3.1",
-    "@types/node": "^20.0.0"
+    "@types/react-dom": "^18.3.7",
+    "typescript": "^5.4.0"
   }
 }

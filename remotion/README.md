@@ -153,6 +153,28 @@ curl https://<proiect>.up.railway.app/render/<jobId>/status \
 Primul render e mai lent (bundling + descărcarea Chrome-ului headless dacă nu a
 prins buildul din Dockerfile); cele următoare refolosesc bundle-ul deja făcut.
 
+## 3b. Motorul grafic: Remotion sau Hyperframes (2026-09-24)
+
+Stratul grafic (`POST /render`) poate fi desenat de **Remotion** (implicit) sau de
+**Hyperframes** (`@hyperframes/producer`, Apache 2.0 — Remotion cere licență de
+companie peste 3 oameni). Aceleași componente din `src/`, neschimbate: pagina
+Hyperframes (`src/hf/entry.tsx`) le rulează printr-un shim compatibil Remotion
+(`src/hf/remotion-shim.tsx`), iar `server/hf-bundle.mjs` redirecționează importul
+`remotion` spre shim și fonturile Google spre copii locale `@fontsource`.
+
+- **Alegere**: variabila `RENDER_ENGINE=hyperframes` pe Railway (orice altă valoare
+  sau lipsa ei = Remotion). O cerere poate forța motorul cu `"engine": "..."` în body.
+  Revenirea e tot o variabilă — nu cere deploy.
+- **Workeri**: `HF_WORKERS` (implicit 4, un Chrome fiecare; ~3 GB vârf măsurat).
+- **Comparare locală**: `node scripts/compare-engines.mjs --props <props.json>
+  --montage <film.mp4> --out <dir>` randează cu ambele și arată cadrele cele mai
+  diferite. `node scripts/render-local.mjs --engine hyperframes ...` pentru unul singur.
+- **Verificare**: `npm run check:shim` ține shim-ul lipit de Remotion (interpolate,
+  bezier, spring, durata filmului) cât timp Remotion e încă instalat.
+
+Detaliile măsurate (paritate cadru cu cadru, culori, viteză) sunt în
+`docs/lessons-render.md`, „Hyperframes instead of Remotion”.
+
 ## 4. Cum îl apelează n8n
 
 Două noduri HTTP Request simple, adăugate în workflow 4 (Final Assembly) după

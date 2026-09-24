@@ -187,6 +187,35 @@ ok('prefill: only the last twelve titles travel, and a show with none is fine', 
 // --- a show frozen before the whole brief was carried ---
 const OLD_ROW = { categoryOptions: { visual_style: 'felt' }, speed: 0.8, hookStyle: 'auto', multiVoiceMode: 'off', cast: [], voice: { stability: 0.35, similarity: 0.75, style: 0.4, speakerBoost: true } };
 
+// --- which gates a show signs off by itself (lib/hands-off.ts) ---
+ok('hands-off steps: a show freezes WHICH gates its first film signed off', () => {
+  const st = S.seriesSettingsFromProject(
+    { autoApprove: true, autoApproveSteps: ['video', 'images', 'bogus'] },
+    { lengthSeconds: 90, style: null, noCaptions: false },
+  );
+  assert.deepEqual(st.autoApproveSteps, ['images', 'video']);
+  assert.equal(st.autoApprove, true);
+});
+ok('hands-off steps: a show from before the choice keeps only its switch', () => {
+  const st = S.normalizeSeriesSettings({ autoApprove: true });
+  assert.equal(st.autoApproveSteps, null);
+  assert.equal(st.autoApprove, true);
+});
+ok('hands-off steps: a show that said the old switch is not narrowed by its film', () => {
+  const stored = S.normalizeSeriesSettings({ ...OLD_ROW, autoApprove: true });
+  const derived = S.seriesSettingsFromProject({ autoApprove: true, autoApproveSteps: ['images'] }, { lengthSeconds: 90, style: null, noCaptions: false });
+  const out = S.fillSeriesSettings(stored, derived);
+  assert.equal(out.autoApprove, true);
+  assert.equal(out.autoApproveSteps, null);
+});
+ok('hands-off steps: a show that never said anything learns the list', () => {
+  const stored = S.normalizeSeriesSettings(OLD_ROW);
+  const derived = S.seriesSettingsFromProject({ autoApprove: true, autoApproveSteps: ['images'] }, { lengthSeconds: 90, style: null, noCaptions: false });
+  const out = S.fillSeriesSettings(stored, derived);
+  assert.deepEqual(out.autoApproveSteps, ['images']);
+});
+
+
 ok('fill: an old show learns length, overlays and levels from its first film', () => {
   const stored = S.normalizeSeriesSettings(OLD_ROW);
   assert.equal(S.hasFullSettings(stored), false);

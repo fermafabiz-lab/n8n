@@ -24,6 +24,8 @@ import SoundSettings from "@/components/SoundSettings";
 import UpscaleFilm from "@/components/UpscaleFilm";
 import PublishingPanel from "@/components/PublishingPanel";
 import AutoPilot from "@/components/AutoPilot";
+import AutoStepToggle from "@/components/AutoStepToggle";
+import { AUTO_STEPS, type AutoStep } from "@/lib/hands-off";
 import CinemaMode from "@/components/CinemaMode";
 import ProductionActivity from "@/components/ProductionActivity";
 import RoughCutButton from "@/components/RoughCutButton";
@@ -380,6 +382,26 @@ export default async function ProductionRoom({
    */
   const renderLocked = !!assembly?.running;
 
+  /*
+   * The steps whose panels are on screen — where "Auto-accept this step"
+   * goes. The same conditions the panels below are drawn by, gathered once
+   * so the button can never offer a step whose panel is not there. Images
+   * and Video share one board: stepping to either names it; on the live page
+   * it is whichever the stepper calls active (both, while clips and images
+   * overlap).
+   */
+  const scenesPanel = scenes.length > 0 && showing("scenes", scenes.some((s) => !s.sceneApproved));
+  const boardPanel = !scenesPanel && scenes.length > 0 && (!viewing || viewing === "images" || viewing === "video");
+  const autoHere: AutoStep[] = AUTO_STEPS.filter((k) => {
+    if (k === "script") return !!(showing("script", !!script) && script);
+    if (k === "scenes") return scenesPanel;
+    if (k === "audio") return !!audioPanel;
+    if (k === "images" || k === "video") {
+      return boardPanel && (viewing ? viewing === k : steps.find((s) => s.key === k)?.state === "act");
+    }
+    return showing("final", project.awaitingFinalSettings);
+  });
+
   // Which gate (if any) is waiting on the user — drives the notification
   // chime when a generation step finishes and hands control back.
   const stage =
@@ -433,7 +455,12 @@ export default async function ProductionRoom({
           scene that just landed, so "S10 finished" opens on S10 rather than
           on whatever the batch happens to be working. */}
       <StageChime
-        quietGates={project.editing.autoApprove}
+        // Quiet only when the gate that is waiting signs ITSELF off — a gate
+        // the producer kept for themselves still has to call them.
+        quietGates={
+          !!GATE_STEP[stage] &&
+          project.editing.autoApproveSteps.includes(GATE_STEP[stage] as AutoStep)
+        }
         items={[
           { key: id, stage, label: project.name, href: projectHref(id, GATE_STEP[stage]) },
           {
@@ -592,7 +619,9 @@ export default async function ProductionRoom({
             bury the error. */}
         {project.editing.autoApprove &&
           project.statusKind !== "done" &&
-          project.statusKind !== "err" && <AutoPilot projectId={id} />}
+          project.statusKind !== "err" && (
+            <AutoPilot projectId={id} steps={project.editing.autoApproveSteps} />
+          )}
 
         {/* The finished film belongs to Assembly, not to every step. It used
             to render on all of them — the player, its sound settings and the
@@ -705,6 +734,13 @@ export default async function ProductionRoom({
               <Link href={`/projects/${id}`}>Back to the live step</Link>
             </div>
           )
+        )}
+
+        {/* "Auto-accept this step", for the step(s) on screen. Not while a
+            render runs (nothing below can act then) or on a finished or
+            failed film (nothing left to accept, or an error to read first). */}
+        {!renderLocked && project.statusKind !== "done" && project.statusKind !== "err" && (
+          <AutoStepToggle projectId={id} steps={autoHere} on={project.editing.autoApproveSteps} />
         )}
 
         {/* A hook rewrite that is in flight follows the producer, because

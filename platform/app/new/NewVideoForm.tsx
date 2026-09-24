@@ -21,6 +21,7 @@ import VoiceTonePicker from "@/components/VoiceTonePicker";
 import StyleRefPicker from "@/components/StyleRefPicker";
 import type { HookStyleChoice, VoiceTone } from "@/lib/data/derive";
 import { CREATORS, FLOW_ACCOUNTS_MAX, HOOK_STYLES, SPEED_BY_PACE, STORYTELLER_TONE } from "@/lib/data/derive";
+import { AUTO_STEPS, AUTO_STEP_LABELS, describeAutoSteps, withAutoStep, type AutoStep } from "@/lib/hands-off";
 
 async function submit(_prev: ActionResult | null, formData: FormData) {
   return createProject(formData);
@@ -375,9 +376,15 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
   // rendered at, and the slider's own default — see WATERMARK_SCALE.
   const [watermarkScale, setWatermarkScale] = useState(1);
   const [style, setStyle] = useState(series?.style ?? "");
-  // Hands-off mode: every gate signs itself off. Off by default — approving
-  // unseen is a real trade, and it must never be the accident.
-  const [autoApprove, setAutoApprove] = useState(series?.autoApprove ?? false);
+  // Hands-off mode: WHICH gates sign themselves off (lib/hands-off.ts). Off by
+  // default — approving unseen is a real trade, and it must never be the
+  // accident. Switching it on picks every step, which is what the one switch
+  // always meant; then any step can be taken back out. An episode starts from
+  // what its show chose, and a show frozen before the choice existed from its
+  // old all-or-nothing switch.
+  const [autoSteps, setAutoSteps] = useState<AutoStep[]>(
+    () => series?.autoApproveSteps ?? (series?.autoApprove ? [...AUTO_STEPS] : []),
+  );
   // The producer's direction: the film's angle in their own words, and up to
   // three mandatory beats (one per line). Both optional, both steer the
   // writer; the must-includes are verified by the Narration Guard.
@@ -525,6 +532,13 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
   // A category with no cold open (Cinematic) shows no Cold open row and does
   // not price the teaser's shots — Scripting writes none for it.
   const noHook = getCategory(category).noHook === true;
+  // The steps this category can have. A silent film has no takes, so no Audio
+  // chip — and a list holding only Audio has to read as OFF, or the switch
+  // would stay on with nothing on screen chosen.
+  const autoChoices = AUTO_STEPS.filter((st) => !(silent && st === "audio"));
+  const autoShown = autoSteps.filter((st) => autoChoices.includes(st));
+  const autoApprove = autoShown.length > 0;
+  const autoAll = autoChoices.every((st) => autoSteps.includes(st));
   const gates = silent ? 3 : 4;
   const finishList = FINISHES.filter(
     (f) =>
@@ -1417,25 +1431,66 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
                   <span className="fhint">optional — you can turn it off any time</span>
                   <span className="no">08</span>
                 </header>
-                <input type="hidden" name="auto_approve" value={autoApprove ? "yes" : "no"} />
+                <input type="hidden" name="auto_approve_steps" value={autoApprove ? autoSteps.join(",") : ""} />
                 <div className="swlist">
                   <div className={`swrow ${autoApprove ? "on" : ""}`}>
                     <span className="no">01</span>
                     <div>
-                      <h4>Auto-approve everything</h4>
+                      <h4>Auto-approve</h4>
                       <p>
-                        {autoApprove
-                          ? "Every gate — script, scenes, takes, images, clips — signs itself off the moment its asset lands, and the final render starts by itself. Nothing waits for you, and nothing gets a look first. Works while the project page is open in a tab; regenerating anything still works as usual."
-                          : "The film stops at every gate and waits for your approval — the normal way."}
+                        {!autoApprove
+                          ? "The film stops at every gate and waits for your approval — the normal way."
+                          : autoAll
+                            ? "Every gate — script, scenes, takes, images, clips — signs itself off the moment its asset lands, and the final render starts by itself. Nothing waits for you, and nothing gets a look first. Works while the project page is open in a tab; regenerating anything still works as usual."
+                            : `${describeAutoSteps(autoShown)} ${autoShown.length === 1 ? "signs off by itself the moment its asset lands" : "sign off by themselves the moment their assets land"}; every other step waits for you. Works while the project page is open in a tab.`}
                       </p>
                     </div>
                     <Toggle
                       checked={autoApprove}
-                      ariaLabel="Auto-approve everything"
-                      onChange={setAutoApprove}
+                      ariaLabel="Auto-approve"
+                      onChange={(on) => setAutoSteps(on ? [...AUTO_STEPS] : [])}
                     />
                   </div>
                 </div>
+                {/* Which steps. Shown only while the switch is on, because
+                    with it off there is nothing to choose; untick the last
+                    step and the switch goes off with it. "All" is the old
+                    switch's meaning in one click. */}
+                {autoApprove && (
+                  <div className="field" style={{ marginTop: 12 }}>
+                    <label>
+                      Which steps{" "}
+                      <span className="fhint">the rest wait for you — you can add any step later from its page</span>
+                    </label>
+                    <div className="chiprow" role="group" aria-label="Steps that approve themselves">
+                      <button
+                        type="button"
+                        className={`pchip ${autoAll ? "on" : ""}`}
+                        aria-pressed={autoAll}
+                        onClick={() => setAutoSteps(autoAll ? [] : [...AUTO_STEPS])}
+                      >
+                        All
+                      </button>
+                      {autoChoices.map((st) => (
+                        <button
+                          type="button"
+                          key={st}
+                          className={`pchip ${autoSteps.includes(st) ? "on" : ""}`}
+                          aria-pressed={autoSteps.includes(st)}
+                          onClick={() =>
+                            setAutoSteps((cur) => {
+                              const next = withAutoStep(cur, st, !cur.includes(st));
+                              // Nothing left that this film can have: off.
+                              return next.some((x) => autoChoices.includes(x)) ? next : [];
+                            })
+                          }
+                        >
+                          {AUTO_STEP_LABELS[st]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </section>
             </div>
 
@@ -1492,9 +1547,11 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
                   <div>
                     <dt>Approval gates</dt>
                     <dd>
-                      {autoApprove
-                        ? "auto — signed off as they land"
-                        : `${gates} — script, images${silent ? "" : ", voices"}, clips`}
+                      {!autoApprove
+                        ? `${gates} — script, images${silent ? "" : ", voices"}, clips`
+                        : autoAll
+                          ? "auto — signed off as they land"
+                          : `auto: ${describeAutoSteps(autoShown)} · the rest wait for you`}
                     </dd>
                   </div>
                 </dl>

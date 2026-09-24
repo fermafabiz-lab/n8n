@@ -4,6 +4,87 @@
 it is n8n workflow `4. Final Assembly` (`BY22Vlhh20Xdkr5Z`), and it moves here
 step by step. **Nothing in this directory runs in production yet.**
 
+## Phase 2 (landed 2026-09-24): the worker
+
+`src/worker.ts` drives one `hov.render_job` row (`db/016_render_job.sql`)
+through Final Assembly's steps. Every step is written down, so a restart
+resumes where it stopped:
+
+    queued → assemble → graphics → store → done      (or failed / stopped)
+
+| File | Role |
+|---|---|
+| `src/worker.ts` | `drive(job)`, the state machine; `runWorker()`, the loop (CONCURRENCY at once, graceful SIGTERM) |
+| `src/db.ts` | every statement: `enqueue`, `claim` (FOR UPDATE SKIP LOCKED + lease), `save` (patch + heartbeat, refused once the row is not ours or not active), `loadInputs` (the same `hov.at_*` queries n8n ran), `markFinished` (`hov.at_write`, as `Update Project Status` did) |
+| `src/railway.ts` | the render server: submit, status. A 404 comes back as the same error object n8n's HTTP node produced, so the guard reads it as `lost` |
+| `src/musicSource.ts` | the Muzica library through n8n's `list-music` / `share-music` (the Drive credential stays in n8n for now) |
+| `src/store.ts` | the finished film into `/media`, streamed, content-addressed `<project>/final/<sha256-32>.mp4` (D1) |
+| `src/config.ts` | the environment, read once |
+| `src/main.ts` | the container's entry point (`npm start`) |
+| `src/cli.ts` | `npm run cli -- enqueue|status|stop <projectId>` |
+
+**Decisions made here, which differ from the plan or from n8n:**
+- **The row is the queue; there is no graphile-worker.**
+  - A second queue would hold a second copy of what the row already
+    records: the job, the phase and the poll count.
+  - The resume logic has to read the row anyway.
+  - PGlite serves every connection through one session, so graphile's
+    transactions and LISTEN could not have been tested here.
+- **At most one active render per project, enforced by the database.** A
+  partial unique index does it, so a second click is refused rather than
+  racing (the double-render history in CLAUDE.md).
+- **Stop is `phase = 'stopped'`.** The worker's next save is refused, so it
+  lets go within one poll. The Railway job itself keeps drawing, because
+  there is no cancel endpoint, as before.
+- **The inputs are frozen when the job starts** and stored in `inputs`. A
+  resumed job renders what it began with, and any render can be replayed
+  offline.
+- **Network failures on a poll are weather.** Up to
+  MAX_POLL_NETWORK_ERRORS in a row is tolerated (24 = two minutes); n8n
+  died on the first one. Railway's own `error` status is fatal at once,
+  exactly as before.
+- **`speed` is sent (D2)**, from Editing Options.speed, falling back to
+  Pace. The render server strips it off the props and re-times the drawn
+  film.
+- **Music:**
+  - A film with music off never lists or shares anything.
+  - A pinned track is shared but never listed.
+  - A tone folder with no audio in it cannot be seen through `list-music`,
+    so the pick falls to Default (see `musicSource.ts`).
+- **No script row still renders**, without chapter titles. n8n stopped there
+  silently.
+
+### Tests
+
+- `npm test` (in `npm run check`) runs 16 scenarios of the real worker. It
+  uses PGlite with every `db/NNN_*.sql` applied and a fake Railway plus
+  n8n. The scenarios:
+  - the happy path, where both requests must equal `planAssemble` /
+    `planRender` (+ speed) built from the same rows;
+  - a 404 mid-assemble and mid-graphics;
+  - an error in either phase;
+  - a Stop;
+  - a worker killed mid-graphics and resumed by another on the SAME
+    Railway job;
+  - a stale worker locked out;
+  - flaky polls;
+  - one active render per project;
+  - no clips, no script;
+  - pinned, off and tone-folder music;
+  - speed from Pace;
+  - the loop draining a queue.
+
+  Sabotaging the lease check or the speed makes them fail.
+- `npm run e2e` makes one REAL render on this machine:
+  - ffmpeg makes three clips and three voiceovers, and PGlite holds the film;
+  - the actual `remotion/server/index.mjs` runs with Hyperframes, and the
+    worker drives it;
+  - first run 2026-09-24: 14 s end to end, a 12.4 s 1280x720 film with a
+    chapter card from the script, captions and the end screen. The server
+    reported `speed: 1.1` applied.
+
+  It needs `ffmpeg` and `remotion/node_modules`.
+
 ## Phase 1 (landed 2026-09-24): the logic, pinned to n8n
 
 Every Code node of the live version (`309157bd`) is a pure TypeScript

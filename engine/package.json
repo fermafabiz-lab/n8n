@@ -3,11 +3,24 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "House of Videos pipeline in code. Phase 1: Final Assembly's n8n Code nodes as pure TypeScript, golden-tested against the n8n bodies.",
+  "description": "House of Videos pipeline in code. Final Assembly first: pure modules pinned to the n8n bodies, and a worker that drives hov.render_job.",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
-    "check": "node --experimental-strip-types --no-warnings=ExperimentalWarning check.mjs"
+    "check": "node --experimental-strip-types --no-warnings=ExperimentalWarning check.mjs && npm test",
+    "test": "node --experimental-strip-types --no-warnings=ExperimentalWarning test/worker.test.mjs",
+    "start": "node --experimental-strip-types --no-warnings=ExperimentalWarning src/main.ts",
+    "cli": "node --experimental-strip-types --no-warnings=ExperimentalWarning src/cli.ts",
+    "e2e": "node --experimental-strip-types --no-warnings=ExperimentalWarning test/e2e-local.mjs"
+  },
+  "dependencies": {
+    "pg": "^8.23.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@electric-sql/pglite-socket": "^0.2.11",
+    "@types/node": "^22.20.4",
+    "@types/pg": "^8.23.1"
   }
 }

@@ -93,6 +93,11 @@ cd n8n-engine && (cd platform && npm ci) && claude
      - **The check can fail.** Each layer was sabotaged once and caught it. The sabotage for position-matched provenance passed at first, because Rome's scenes all carry one label, so a distinct-provenance mutation was added.
      - **The one behavioural difference.** With no script row, n8n stops silently after `Fetch Script Titles`; the engine renders without chapter titles.
 2. **Worker, table, Railway client and store.** Run it locally against PGlite (`db/port/lib/local-pg.mjs`) and a local render server (`node remotion/server/index.mjs`).
+   - **DONE 2026-09-24**:
+     - **Built:** `db/016_render_job.sql` (**not applied to the live database**), plus the worker, the Railway client, music through `list-music`/`share-music`, the streamed `/media` store, the CLI and `src/main.ts`.
+     - **One departure from the plan:** **no graphile-worker — the `render_job` row is the queue** (claim with `FOR UPDATE SKIP LOCKED` + a lease). The reasons are in `engine/README.md`.
+     - **Tests:** `npm test`, 16 scenarios on PGlite with a fake Railway. `npm run e2e` makes a real Hyperframes render on the Mac: 14 s, stored, Finalizat, speed 1.1 applied.
+     - **Left for phase 4:** the container (Dockerfile, the compose service, `deploy-engine.yml`) and the site half.
 3. **Shadow run.** On a real finished film, the engine computes `/assemble` and `/render` bodies and diffs them against the n8n execution's bodies, without submitting. Only intended differences are allowed: `speed`, and the store.
 4. **Deploy with the default still `n8n`.** Then one real film with `FINAL_ASSEMBLY_ENGINE=code`, watched end to end. Then flip the default.
 5. **Retire** the `assemble` webhook, the orchestrator's disconnected `Execute Final Assembly*` nodes, and the probe branch. Update `CLAUDE.md`.

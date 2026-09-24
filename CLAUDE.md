@@ -535,6 +535,25 @@ expected and harmless for an app touching only its own Drive.
 
 ## Open work
 
+- **Final Assembly is moving out of n8n into `engine/`** (plan and phase
+  log: `docs/plans/engine-final-assembly.md`, detail `engine/README.md`).
+  Phases 1-3 are on branch `claude/engine-final-assembly` and **nothing is
+  live**:
+  - every Code node of Final Assembly `309157bd` is a pure TS module,
+    golden-tested against the n8n bodies and the Rome film's execution 16974;
+  - a worker drives `hov.render_job` (`db/016`, **not applied on the box**)
+    through assemble → graphics → store;
+  - it is tested on PGlite, and has made one real Hyperframes render on a Mac
+    (`npm run e2e`);
+  - the shadow run on five films n8n finished (`engine/shadow/`) gave
+    requests identical to n8n's, except `speed`: the kids film was briefed at
+    0.8 and n8n rendered it at 1.0;
+  - `cd engine && npm ci && npm run check` runs it all, as does the root
+    `node check.mjs`. **Any edit to
+  a Final Assembly Code node in n8n now has a second copy in
+  `engine/src/assembly/`** until the cutover. Change both, refresh
+  `engine/fixtures/`, or layer 0 of the check fails on purpose.
+
 - **The graphics pass is drawn by Hyperframes since 2026-09-24 16:04 UTC**
   (`RENDER_ENGINE=hyperframes` on Railway; merge `efeb6ab`; lesson in
   `docs/lessons-render.md`, "Hyperframes instead of Remotion"). Why: Remotion

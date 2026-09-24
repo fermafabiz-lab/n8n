@@ -27,7 +27,9 @@ export function middleware(req: NextRequest) {
       req.nextUrl.pathname === "/api/style-refs" ||
       // The ⟳ Restart button, for a session that has no browser — the route
       // takes the key and nothing else (app/api/ops/restart/route.ts).
-      req.nextUrl.pathname === "/api/ops/restart") &&
+      req.nextUrl.pathname === "/api/ops/restart" ||
+      // Its sibling for the final render (app/api/ops/assemble/route.ts).
+      req.nextUrl.pathname === "/api/ops/assemble") &&
     process.env.MEDIA_INGEST_KEY &&
     req.headers.get("x-hov-key") === process.env.MEDIA_INGEST_KEY
   ) {

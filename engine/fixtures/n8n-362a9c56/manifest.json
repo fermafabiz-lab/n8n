@@ -1,0 +1,26 @@
+{
+  "workflow": "4. Final Assembly",
+  "workflowId": "BY22Vlhh20Xdkr5Z",
+  "versionId": "362a9c56-8146-46fa-b51c-53a554a60aed",
+  "versionCreatedAt": "2026-09-24T18:55:47.355Z",
+  "fetchedAt": "2026-09-24",
+  "how": "n8n MCP get_workflow_version(BY22Vlhh20Xdkr5Z, versionId); every jsCode parameter written byte for byte",
+  "differsFrom309157bd": [
+    "Caption Colour"
+  ],
+  "nodes": [
+    "Attach Motif Cards",
+    "Build Remotion Props",
+    "Build Timeline",
+    "Caption Colour",
+    "Graphics Guard",
+    "Match Tone Folder",
+    "Normalize Assemble Input",
+    "Pick Music Track",
+    "Prepare Clips",
+    "Probe Prep",
+    "Render Guard",
+    "Set Final Link",
+    "Source Watermark"
+  ]
+}

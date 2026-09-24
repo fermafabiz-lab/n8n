@@ -591,6 +591,9 @@ export interface Scene {
    * every flag, including the ones added later" — and this is that one rule,
    * derived once here rather than three times on screen.
    */
+  /** When the row last changed. With no clip yet and nothing flagged, this
+   *  is when the batch started making one — the clock ClipWait shows. */
+  updatedAt: string | null;
   regenSince: string | null;
   /** "Observații Scenă" — reviewer feedback in, rejection reasons back out. */
   note: string | null;
@@ -774,6 +777,8 @@ export interface RawScene {
   regenImageAt?: string | null;
   regenVideoAt?: string | null;
   regenVoiceAt?: string | null;
+  /** When the row last changed — the clock on a clip being made. */
+  updatedAt?: string | null;
   note: string | null;
   evidenceRef: string | null;
   needsFactCheck: boolean;
@@ -1432,6 +1437,7 @@ export function buildScene(r: RawScene, index: number): Scene {
     regenVideo: r.regenVideo,
     regenVoice: r.regenVoice,
     regenSince: regenSinceOf(r),
+    updatedAt: r.updatedAt ?? null,
     note: r.note,
     evidenceRef: r.evidenceRef || null,
     needsFactCheck: r.needsFactCheck,

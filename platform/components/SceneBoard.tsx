@@ -31,6 +31,7 @@ import {
 import { explainRefusal } from "@/lib/refusals";
 import { matchesScene, takeSceneParam } from "@/lib/deep-link";
 import MediaPlayer from "@/components/MediaPlayer";
+import ClipWait from "@/components/ClipWait";
 import RegenBadge from "@/components/RegenBadge";
 import { usePendingStage } from "@/components/StageNav";
 import CinemaMode from "@/components/CinemaMode";
@@ -852,6 +853,10 @@ export default function SceneBoard({
                 // which is display-only and lags: a scene with nothing
                 // generated reads "Generare Script" there and was being
                 // reported as "Rendering".
+                //
+                // The clock itself is below, outside this row: `ClipWait`
+                // needs the width for its sentence, and this cell is a
+                // one-word chip.
                 <span className="chip run">Rendering</span>
               ) : (
                 <span className="chip wait">Queued</span>
@@ -861,6 +866,18 @@ export default function SceneBoard({
               <span>Status</span>
               <b>{active.status}</b>
             </div>
+            {/*
+              A clip is being made right now: images and voice are approved,
+              nothing is flagged for regeneration, and no clip has landed. The
+              chip above says so in one word; this says how long, and that the
+              pipeline re-shoots a stuck job by itself. See ClipWait for what
+              that silence used to cost.
+            */}
+            {!active.videoApproved &&
+              !active.videoUrl &&
+              !active.regenVideo &&
+              active.imageApproved &&
+              active.voiceApproved && <ClipWait since={active.updatedAt} />}
             {active.stock && (
               <div className="kv">
                 <span>Source</span>

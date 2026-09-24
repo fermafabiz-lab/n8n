@@ -291,6 +291,20 @@ the full entry in the file named:
   copy THAT node's reference instead of inventing one**, and when a `$('…')`
   read comes back empty, check what the node DECLARES before assuming the data
   shape. Full account: `docs/lessons-n8n.md`, "A typed trigger is a filter".
+- **A timeout is a guess until somebody measures it, and the cost of guessing
+  it high is invisible.** Media Generation waited an HOUR for a clip
+  (`MAX_POLLS = 120` × 30 s) on a queue whose worst legitimate clip ever
+  measured is 6m31 — five hours per scene across the five resubmits. On
+  2026-09-24 that cost the producer an afternoon on two scenes, and the screen
+  showed a `Rendering` chip that read the same at minute one and minute forty,
+  so the only move left was Stop → Resume, which RESETS the counter and starts
+  the hour again. Now 20 polls = 10 minutes, from a table of every clip ever
+  timed, and the site shows the clock (`ClipWait`) and says not to stop.
+  **The rule: when waiting and retrying cost different amounts, put the
+  ceiling just above the worst MEASURED case, never at a round number "to be
+  safe" — and put the clock on screen, or the producer's only feedback is a
+  reflex that makes it worse.** `node db/port/clip-wait/check.mjs`. Full
+  account `db/port/clip-wait/README.md`.
 - **A fallback may substitute a DEFAULT, never someone else's content — and
   never silently.** `Parse Approved From Airtable` answered an approved script
   with no `[CHAPTER n: title]` markers by using the PREVIOUS chapters, words

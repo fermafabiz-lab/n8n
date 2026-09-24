@@ -1334,3 +1334,46 @@ the gate was published at 15:18. The gate's own first real film was the
 producer's. **A change published after the run that verified it is unverified**,
 however small it looks — and "I verified this feature" is not the same claim as
 "I verified this version of it".
+
+
+### An hour of waiting looks exactly like working — 2026-09-24
+
+Two scenes of a ten-scene film had no clip, for an afternoon. The batch was
+alive the whole time. It was polling a Veo job that was already dead, and
+`Check Job Status` only gives up after `MAX_POLLS` — which was **120 at 30
+seconds a poll, one hour**, with five resubmits allowed per scene behind it.
+Five hours on one scene, and the scene after it waits its turn.
+
+The number came with its own justification in the comment — "sized for the
+low-priority Veo queue" — and that justification had never been checked
+against a clip. Every clip this project has ever timed lands between 68 and
+391 seconds; the worst legitimate one, an outlier on the 2026-09-18 A/B, is
+6m31. The ceiling was nearly ten times the worst real case.
+
+**Two lessons, and the second is the expensive one.**
+
+**A ceiling belongs just above the worst MEASURED case when the two failure
+costs differ.** Waiting too long costs the producer their day. Resubmitting
+too early costs one clip generation. Those are not remotely the same size, so
+"an hour, to be safe" was only safe for the cheap side. It is 20 polls — ten
+minutes — now, and the node carries the table of measurements so the next
+person to touch it argues with data rather than with a feeling.
+
+**A wait with no clock on screen turns into a loop that resets it.** The scene
+showed a `Rendering` chip, identical in second one and in minute forty. With
+no way to tell working from wedged, the only available move is Stop, then
+Resume — and that resets the per-scene poll counter and starts the hour over.
+Three passes in one afternoon, each one restarting the clock it was trying to
+escape. The producer's *"it's been stuck for hours"* was exactly right, and
+the pipeline's own recovery had never once been allowed to run to the end.
+
+So the fix is half a number and half a sentence on screen: `ClipWait` now says
+*"Making the clip · 12 min"*, says that n8n re-shoots a stuck job by itself
+past ten minutes, and says **don't stop production to hurry it**. The same
+shape as `RegenBadge` one level down (`db/port/regen-unstick/`), for the same
+reason — and it is worth noticing that the same fault reappeared in the
+neighbouring feature eight days later. **When you give one waiting state a
+clock, check every other place the pipeline makes somebody wait.**
+
+Full account, with the measurements and what is still owed:
+`db/port/clip-wait/README.md`.

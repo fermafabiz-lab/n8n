@@ -182,6 +182,10 @@ interface SceneRow {
   motion_prompt: string | null;
   media_versions: unknown;
   created_at: Date | null;
+  /** `select s.*` already carries it; the site needs it to put a clock on a
+   *  clip the batch is making (ClipWait). `Mark Generare Video` stamps it
+   *  when the generation starts. */
+  updated_at: Date | null;
   image_path: string | null;
   video_path: string | null;
   /** [{filename, path}] for field='image_version' — joined by buildVersions. */
@@ -381,6 +385,7 @@ function toRawScene(r: SceneRow): RawScene & { createdAt: string | null } {
     regenImageAt: r.regen_image_at ? r.regen_image_at.toISOString() : null,
     regenVideoAt: r.regen_video_at ? r.regen_video_at.toISOString() : null,
     regenVoiceAt: r.regen_voice_at ? r.regen_voice_at.toISOString() : null,
+    updatedAt: r.updated_at ? r.updated_at.toISOString() : null,
     note: r.note,
     evidenceRef: r.evidence_ref,
     needsFactCheck: r.needs_fact_check,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useWaited } from "@/lib/use-waited";
 
 /**
  * The "a regeneration is in flight" state, shown in place of the
@@ -73,23 +73,9 @@ export default function RegenBadge({
   const rejection =
     note && /REJECTED|failed|error/i.test(note) ? note.replace(/\s+/g, " ").trim() : null;
 
-  // AFTER MOUNT, never in the initial render: the server and the client would
-  // compute a different "now" and React would report a hydration mismatch on
-  // every badge. The first paint shows the label alone, which is what the
-  // badge has always shown, and the age appears a tick later.
-  const [waited, setWaited] = useState<string | null>(null);
-  useEffect(() => {
-    if (!since) return;
-    const started = new Date(since).getTime();
-    if (!Number.isFinite(started)) return;
-    const tick = () => {
-      const mins = Math.max(0, Math.round((Date.now() - started) / 60000));
-      setWaited(mins < 1 ? "just now" : mins < 60 ? `${mins} min` : `${Math.floor(mins / 60)} h ${mins % 60} min`);
-    };
-    tick();
-    const id = setInterval(tick, 30000);
-    return () => clearInterval(id);
-  }, [since]);
+  // One owner for "how long has this been going on", shared with ClipWait —
+  // including the reason it only appears after mount (lib/use-waited.ts).
+  const waited = useWaited(since);
 
   return (
     <div style={{ marginTop: 12 }}>

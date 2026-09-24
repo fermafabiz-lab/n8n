@@ -47,6 +47,15 @@ import {
 } from "@/lib/data";
 import { cleanProjectIds, films, isRecordId, normalizePlaylistName } from "@/lib/playlists";
 import {
+  AUTO_STEPS,
+  AUTO_STEP_LABELS,
+  describeAutoSteps,
+  isAutoStep,
+  normalizeAutoSteps,
+  withAutoStep,
+  type AutoStep,
+} from "@/lib/hands-off";
+import {
   composeSeriesLore,
   normalizeSeriesBible,
   normalizeSeriesRefs,
@@ -2225,6 +2234,11 @@ export async function saveMusicTrack(
   }
 }
 
+/**
+ * Hands-off for the whole film at once: every step, or none. "Turn off" on
+ * the banner is the `false` half. Written as the step list AND the old
+ * switch, which stays true exactly when the list is not empty.
+ */
 export async function setAutoApprove(
   projectId: string,
   on: boolean,
@@ -2233,8 +2247,7 @@ export async function setAutoApprove(
     return { ok: true, message: "Demo mode — nothing was written." };
   }
   try {
-    await updateEditingOptions(projectId, { autoApprove: on });
-    revalidatePath(`/projects/${projectId}`);
+    await writeAutoSteps(projectId, on ? [...AUTO_STEPS] : []);
     return {
       ok: true,
       message: on
@@ -2244,6 +2257,47 @@ export async function setAutoApprove(
   } catch (e) {
     return { ok: false, message: friendlyError(e) };
   }
+}
+
+/**
+ * "Auto-accept this step" on the project page — for the step the producer is
+ * looking at, when they forgot to choose it on the brief (2026-09-24). Adds
+ * the step to the film's list, or takes it out; the others are untouched.
+ * What is already waiting on that step is signed off by AutoPilot's next pass,
+ * a few seconds later, through the same actions as everything else.
+ */
+export async function setAutoApproveStep(
+  projectId: string,
+  step: string,
+  on: boolean,
+): Promise<ActionResult> {
+  if (!isConfigured) {
+    return { ok: true, message: "Demo mode — nothing was written." };
+  }
+  if (!isAutoStep(step)) return { ok: false, message: "Unknown step." };
+  try {
+    const project = await getProject(projectId);
+    if (!project) return { ok: false, message: "Project not found." };
+    const steps = withAutoStep(project.editing.autoApproveSteps, step, on);
+    await writeAutoSteps(projectId, steps);
+    const name = AUTO_STEP_LABELS[step];
+    return {
+      ok: true,
+      message: on
+        ? `${name} now accepts itself — what is waiting there is signed off in a few seconds, and so is everything that lands after it.`
+        : steps.length > 0
+          ? `${name} waits for you again. Still automatic: ${describeAutoSteps(steps)}.`
+          : `${name} waits for you again — nothing is automatic on this film now.`,
+    };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/** One write for both keys, so the list and the switch can never disagree. */
+async function writeAutoSteps(projectId: string, steps: AutoStep[]): Promise<void> {
+  await updateEditingOptions(projectId, { autoApproveSteps: steps, autoApprove: steps.length > 0 });
+  revalidatePath(`/projects/${projectId}`);
 }
 
 /**
@@ -2274,7 +2328,10 @@ export async function autoApproveTick(projectId: string): Promise<ActionResult> 
   try {
     const project = await getProject(projectId);
     if (!project) return { ok: false, message: "Project not found." };
-    if (!project.editing.autoApprove) {
+    // Only the steps the producer chose sign themselves off; the rest wait
+    // for a person exactly as they would with hands-off off.
+    const auto = new Set(project.editing.autoApproveSteps);
+    if (auto.size === 0) {
       return { ok: true, message: "Hands-off mode is off." };
     }
     if (project.statusKind === "done" || project.statusKind === "err") {
@@ -2282,7 +2339,7 @@ export async function autoApproveTick(projectId: string): Promise<ActionResult> 
     }
     const did: string[] = [];
 
-    const script = await getProjectScriptInfo(projectId);
+    const script = auto.has("script") ? await getProjectScriptInfo(projectId) : null;
     if (script && script.status === "awaiting_approval" && script.content) {
       const r = await approveScript(projectId, script.id);
       if (!r.ok) return r;
@@ -2291,7 +2348,7 @@ export async function autoApproveTick(projectId: string): Promise<ActionResult> 
 
     const scenes = await getScenes(projectId);
     const texts = scenes.filter(
-      (s) => !s.sceneApproved && !s.rewriteRequested && (s.narration ?? "").trim(),
+      (s) => auto.has("scenes") && !s.sceneApproved && !s.rewriteRequested && (s.narration ?? "").trim(),
     );
     if (texts.length > 0) {
       const r = await approveAllScenes(projectId, texts.map((s) => s.id));
@@ -2299,21 +2356,21 @@ export async function autoApproveTick(projectId: string): Promise<ActionResult> 
       did.push(`${texts.length} scene text${texts.length === 1 ? "" : "s"}`);
     }
 
-    const voices = scenes.filter((s) => s.voiceUrl && !s.voiceApproved && !s.regenVoice);
+    const voices = scenes.filter((s) => auto.has("audio") && s.voiceUrl && !s.voiceApproved && !s.regenVoice);
     if (voices.length > 0) {
       const r = await approveVoices(projectId, voices.map((s) => s.id));
       if (!r.ok) return r;
       did.push(`${voices.length} take${voices.length === 1 ? "" : "s"}`);
     }
 
-    const images = scenes.filter((s) => s.imageUrl && !s.imageApproved && !s.regenImage);
+    const images = scenes.filter((s) => auto.has("images") && s.imageUrl && !s.imageApproved && !s.regenImage);
     if (images.length > 0) {
       const r = await approveAllOfKind(projectId, images.map((s) => s.id), "image");
       if (!r.ok) return r;
       did.push(`${images.length} image${images.length === 1 ? "" : "s"}`);
     }
 
-    const clips = scenes.filter((s) => s.videoUrl && !s.videoApproved && !s.regenVideo);
+    const clips = scenes.filter((s) => auto.has("video") && s.videoUrl && !s.videoApproved && !s.regenVideo);
     if (clips.length > 0) {
       const r = await approveAllOfKind(projectId, clips.map((s) => s.id), "video");
       if (!r.ok) return r;
@@ -2324,7 +2381,7 @@ export async function autoApproveTick(projectId: string): Promise<ActionResult> 
     // batch set AFTER its own video gate passed, so by the time it is true
     // every clip of the batch is approved — this is the same moment the
     // human presses "Keep initial settings & render".
-    if (project.awaitingFinalSettings) {
+    if (auto.has("final") && project.awaitingFinalSettings) {
       const r = await confirmFinalSettings(projectId);
       if (!r.ok) return r;
       did.push("the final render");
@@ -2455,8 +2512,14 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     // Options. Absent or unusable resolves to 1 on every reader.
     speed: normalizeSpeed(formData.get("speed")),
     // Hands-off mode — stored in Editing Options by Normalize Webhook Input,
-    // read back by the project page's AutoPilot. yes|no like every finish.
-    auto_approve: String(formData.get("auto_approve") ?? "no"),
+    // read back by the project page's AutoPilot. `auto_approve_steps` is WHICH
+    // gates (lib/hands-off.ts, comma-separated, whitelisted here and in the
+    // node); `auto_approve` stays yes whenever any step is on, so an n8n that
+    // has not learned the list yet still stores the switch.
+    ...(() => {
+      const steps = normalizeAutoSteps(formData.get("auto_approve_steps")) ?? [];
+      return { auto_approve: steps.length > 0 ? "yes" : "no", auto_approve_steps: steps.join(",") };
+    })(),
     // Which Veo tier generates the clips. Normalized here AND in n8n; an
     // unknown id must never travel, because Current Scene sends the string
     // to the Flow API verbatim. Absent/free posts "" and stores nothing.

@@ -51,6 +51,23 @@ The banner is always visible while the mode is on, because an automation that
 approves things unseen must never itself be invisible; Turn off is one click
 and every already-given approval stays.
 
+**By step since 2026-09-24** (`db/port/hands-off-steps/README.md`). The brief
+chooses WHICH gates — Script, Scenes, Audio, Images, Video, Final render — and
+every step of the project page carries "Auto-accept this step" for the one
+forgotten on the brief. Three things worth keeping from it:
+
+- **One hand, not two.** The step button only edits the list; the approving
+  stays in `autoApproveTick`, which now asks `auto.has(step)` before each of
+  its six sections. A second path that approved "this step now" would have
+  been a second implementation of every approval rule.
+- **An old flag must keep its promise.** `autoApprove: true` with no list is
+  read as every step — the list, when present, wins even when empty — so no
+  film made before the choice changes behaviour, and the n8n node could be
+  published before the site with nothing to wait for.
+- **A choice the category cannot have must not hold a switch on.** A silent
+  film has no Audio chip; a list left holding only `audio` reads as OFF, or the
+  switch would stay on with nothing on screen chosen.
+
 ### Who made this film (2026-09-15)
 
 `Editing Options.createdBy` — one of **Alex, Dan, David, Iustin**, chosen on

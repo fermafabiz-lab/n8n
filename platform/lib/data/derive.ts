@@ -16,6 +16,7 @@
  */
 
 import { normalizeStyleRefs } from "@/lib/style-refs";
+import { autoStepsOf, type AutoStep } from "@/lib/hands-off";
 import type { DocumentaryVisualSource } from "@/lib/archive/types";
 import { parseEditingOptionsShape } from "@/lib/editingOptionsShape";
 import {
@@ -233,8 +234,17 @@ export interface EditingOptions {
    * voice regen flags being respected) comes along for free. It is a real
    * trade, said out loud in the UI: nothing gets a human look before it is
    * in the film.
+   *
+   * True when ANY step signs itself off; which ones is `autoApproveSteps`.
    */
   autoApprove: boolean;
+  /**
+   * The gates hands-off signs off (2026-09-24, lib/hands-off.ts): some of
+   * script, scenes, audio, images, video, final — chosen on the brief or
+   * switched on step by step from the project page. A film with only the old
+   * `autoApprove: true` reads as every step, which is what it was promised.
+   */
+  autoApproveSteps: AutoStep[];
   /**
    * How the narrator READS — ElevenLabs' generation settings for this film.
    *
@@ -1297,9 +1307,11 @@ export function buildProject(r: RawProject): Project {
       // film's provenance labels by itself.
       watermarkOpenOnce: opts.watermarkOpenOnce === true,
       watermarkScale: normalizeWatermarkScale(opts.watermarkScale),
-      // Strictly opt-in, `=== true`: hands-off is a real trade (nothing gets
-      // a human look) and must never switch itself on by absence.
-      autoApprove: opts.autoApprove === true,
+      // Strictly opt-in: hands-off is a real trade (nothing gets a human
+      // look) and must never switch itself on by absence. `autoStepsOf` reads
+      // the step list when there is one and the old switch when there is not.
+      autoApprove: autoStepsOf(opts).length > 0,
+      autoApproveSteps: autoStepsOf(opts),
       // No fallback to a project field, unlike `speed`: there is no older
       // column that ever meant this, so "never chosen" is the honest answer
       // for every film made before today — and it is also the answer that

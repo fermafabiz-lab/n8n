@@ -513,6 +513,20 @@ expected and harmless for an app touching only its own Drive.
 
 ## Open work
 
+- **Hands-off is chosen step by step since 2026-09-24**
+  (`db/port/hands-off-steps/README.md`, lesson in `docs/lessons-site.md` under
+  "Hands-off mode"). The brief picks which gates sign themselves off — Script,
+  Scenes, Audio, Images, Video, Final render, or All — and every step of the
+  project page has "⚡ Auto-accept this step" for the one forgotten on the
+  brief. `Editing Options.autoApproveSteps` (one owner: `lib/hands-off.ts`)
+  beside the old `autoApprove`, which a film holding only the switch still
+  reads as EVERY step. n8n half LIVE: orchestrator `00ea9681` (rollback
+  `4f022248`), `Normalize Webhook Input` stores the list — verified in n8n with
+  `test_workflow` and every write and sub-workflow pinned, byte-identical to the
+  old body on every brief without the field. **`test_workflow` with pins is how
+  to test a live node without creating a film**: pin the trigger, the Postgres
+  writes and EVERY Execute Workflow node (the tool runs unpinned ones for real).
+  Pinned by `npm run check:hands-off` (35) and `check:hands-off-node` (19).
 - **The library is ordered by last activity since 2026-09-23** ("Recently
   worked on"; `db/port/activity-order/README.md`, lessons in
   `docs/lessons-site.md`). What counts was the producer's call, asked before

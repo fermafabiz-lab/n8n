@@ -611,6 +611,11 @@ expected and harmless for an app touching only its own Drive.
   a re-roll, not a fix. The fix is in the schema: either drop the field from
   the Cinematic treatment, or make it optional. Check first what reads
   it downstream.
+  **Nothing reads it** — `Cine Guard` builds `narrator_script` from the shot
+  lines — so the fix drops it from both the parser example and the prompt
+  (`db/port/cinematic-parser/`). **Written, not published**: its probe
+  (16816) could not run because the OpenAI account was empty again at 10:09
+  UTC on 2026-09-24. The README has the five steps that finish it.
 
 - **The library is ordered by last activity since 2026-09-23** ("Recently
   worked on"; `db/port/activity-order/README.md`, lessons in

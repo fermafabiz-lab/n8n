@@ -1095,6 +1095,13 @@ expected and harmless for an app touching only its own Drive.
   `motifReport` read against its delivered cut, and whether one card every
   two minutes reads as rhythm or interruption — the number was chosen, not
   measured.
+  **A card placed on a teaser beat moves to the scene that speaks it since
+  2026-09-24** (Claude Scripting `e1183aa3`, rollback `5312207f`). The
+  validator still guarded only scene 0 — the retired single hook title — so
+  the Rome film's route card sat on a 1.96 s chapter-0 beat, was accepted, and
+  the montage planner dropped it in silence (Final Assembly 16974). Now a card
+  on any chapter-0 scene moves to the latest scene it quotes if that is past
+  the teaser, else is refused naming the teaser. `node motif/check-teaser.mjs`.
 - **Series exist since 2026-09-16** (`db/port/series/README.md`; lessons in
   `docs/lessons-site.md` under "Series — the same cast, film after film").
   `/series` lists the shows, a show is started from any film with a Story

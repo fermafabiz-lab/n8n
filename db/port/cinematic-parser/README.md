@@ -34,28 +34,44 @@ Two files, both built from the live version `1f77881f` (`original/`):
 
 ## Status
 
-**Written, NOT published.** Probe 16816 (throwaway `ncFvkRNS4rSyaL3s`, kept)
-runs the new prompt and parser on the failed film's own inputs:
+**LIVE as Claude Scripting `5312207f` since 2026-09-24 12:24 UTC**
+(rollback `1f77881f`).
 
-- its bible and brief, read from Postgres;
-- its Tema, length 160 s and style.
+**Probe 16868**, run on the failed film's own inputs, came back clean on the
+first pass:
 
-It could not run: at 10:09 UTC on 2026-09-24 the OpenAI account answered
-*"You have no credits remaining"*. A prompt change nobody has run is not one
-to publish, so this waits.
+- 3 sequences, 7 + 8 + 5 = 20 shots for 160 s;
+- each sequence listed once;
+- no `narrator_script` key.
 
-**To finish:**
+The two earlier attempts could not run. 16816 and 16841 hit the empty
+OpenAI account. 16865 was stopped from outside at 12:21:49, by the same
+stop-everything sweep that paused a real film a moment earlier (see below).
 
-1. Once the account is topped up, execute `ncFvkRNS4rSyaL3s`. Expect one
-   entry per sequence and no `narrator_script` key.
-2. `update_workflow` on Claude Scripting (see below).
-3. Read the draft back and diff it: exactly these two nodes may differ.
-4. Publish.
-5. Press "⟳ Restart writing" on `recA0UObjuWIU0H07`.
-6. Archive the probe.
+The draft was read back and diffed against a simulation built from
+`paste/`: 155 nodes, changed 0, connections identical. Against live, only
+`Cine Treatment` and `Cine Treatment Parser` differ. Nobody else had edited
+the workflow since `1f77881f`.
 
-The update itself:
+**The film that died got through without it.** After the account was topped
+up, "⟳ Restart writing" on `recA0UObjuWIU0H07` (orchestrator 16846, 11:33)
+re-rolled the old version and passed (Scripting 16847, 5 min).
 
-- `Cine Treatment`: `updateNodeParameters` with `text` = `paste/Cine_Treatment.txt`;
-- `Cine Treatment Parser`: `updateNodeParameters` with `jsonSchemaExample` =
-  `paste/Cine_Treatment_Parser.json`.
+**It is the first real Cinematic film through the no-hook / continuity path**
+(`db/port/cinematic-continuity/`):
+
+- `hookPlan` null, chapters 1–3 with no chapter 0, 20 scenes (101–106,
+  201–209, 301–305).
+- Four `loc:` runs: 4 in the apartment, 3 on the ramp, 7 in the street,
+  6 in the lobby. So the previous still was attached as the previous shot
+  on 16 of the 19 scenes that have one.
+- Every image was generated and is waiting for approval.
+
+Its Media Generation batch (16850) was stopped at 12:21:35, together with
+the orchestrator, while two scene-image-regen webhooks survived. That is
+exactly how Pause behaves. **After the images are approved, Resume carries
+it on to the clips.**
+
+A cancelled execution keeps no data, so its `IMG refs` log lines cannot be
+read. The first uncancelled Cinematic batch is where to confirm
+`continuity` in that log.

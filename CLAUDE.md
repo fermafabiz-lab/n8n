@@ -535,23 +535,19 @@ expected and harmless for an app touching only its own Drive.
 
 ## Open work
 
-- **The graphics pass can be drawn by Hyperframes instead of Remotion**
-  (2026-09-24, branch `claude/hyperframes-render`, NOT merged, NOT deployed;
-  lesson in `docs/lessons-render.md`, "Hyperframes instead of Remotion").
-  Why: Remotion needs a company licence above three people; Hyperframes is
-  Apache 2.0. **Railway stays** — the producer asked to leave it, and at 23
-  lei/month it is cheaper than any Hetzner option (the box has 3.8 GB, ~2 GB
-  free, against a ~2.5 GB render). The same components run through a
-  Remotion-compatible shim, so every lesson below about captions, cards and
-  framing still holds. Parity measured on four fixtures: same frame count, the
-  same montage frame per output frame, graphics indistinguishable; Hyperframes
-  is truer to CSS colours than Remotion was (slightly more saturated films).
-  `RENDER_ENGINE=hyperframes` on Railway switches it, unsetting it switches
-  back, no deploy either way. **Owed, in order**: the Docker image built and
-  run once (Node 22, chrome-headless-shell, Debian ffmpeg 5.1 — never built
-  here); the merge (a Railway deploy: check `search_executions` first); one
-  real film with `"engine": "hyperframes"` measured for speed and memory on
-  Railway; then the variable; then, after several films, removing Remotion.
+- **The graphics pass is drawn by Hyperframes since 2026-09-24 16:04 UTC**
+  (`RENDER_ENGINE=hyperframes` on Railway; merge `efeb6ab`; lesson in
+  `docs/lessons-render.md`, "Hyperframes instead of Remotion"). Why: Remotion
+  needs a company licence above three people; Hyperframes is Apache 2.0.
+  **Railway stays** — at 23 lei/month it is cheaper than any Hetzner option.
+  The same components run through a Remotion-compatible shim, so every lesson
+  about captions, cards and framing still holds. **Rollback is deleting the
+  variable** (no deploy). First real film (Final Assembly 16974, 70 s):
+  graphics ~65 s where Remotion took ~14 min; peak container memory 5.3 of
+  8 GB. Hyperframes reproduces CSS colours exactly, so films are slightly more
+  saturated than under Remotion. **Owed**: one long (8-minute) film measured
+  for memory; then, after several good films, removing Remotion (only then is
+  its licence no longer needed).
 
 - **Developer insights: every paid API's balance, hourly, since 2026-09-24**
   (`db/port/api-credits/README.md`; lesson in `docs/lessons-site.md` under

@@ -83,6 +83,15 @@ cd n8n-engine && (cd platform && npm ci) && claude
      - `remotion/motif/boyd-props.json`.
    - The source of truth for the bodies is `db/port/story-close/Final Assembly.after.json`, with `Source Watermark` taken from `db/port/watermark-open-once/paste/`.
    - Verify against live `309157bd` with `get_workflow_version` before starting.
+   - **DONE 2026-09-24** (branch `claude/engine-final-assembly`), `engine/README.md` has the detail:
+     - **Live version.** Checked first: live is still `309157bd`, the only history entry. Its 40 nodes and its connections equal `Final Assembly.after.json` plus the watermark paste, apart from the paste's trailing newline.
+     - **Modules.** The 11 ported Code nodes live in `engine/src/assembly/` (Set Final Link and Probe Prep are left out on purpose), plus `speed.ts` for D2 and `planAssemble` / `planRender`.
+     - **Assertions.** `npm run check` gives `RESULT: OK 1068/1068`.
+       - The n8n bodies reproduce 16974 at every node.
+       - TS equals n8n on Rome, 60 mutations, and Peking and Boyd rebuilt as synthetic inputs.
+       - The composed requests equal 16974's.
+     - **The check can fail.** Each layer was sabotaged once and caught it. The sabotage for position-matched provenance passed at first, because Rome's scenes all carry one label, so a distinct-provenance mutation was added.
+     - **The one behavioural difference.** With no script row, n8n stops silently after `Fetch Script Titles`; the engine renders without chapter titles.
 2. **Worker, table, Railway client and store.** Run it locally against PGlite (`db/port/lib/local-pg.mjs`) and a local render server (`node remotion/server/index.mjs`).
 3. **Shadow run.** On a real finished film, the engine computes `/assemble` and `/render` bodies and diffs them against the n8n execution's bodies, without submitting. Only intended differences are allowed: `speed`, and the store.
 4. **Deploy with the default still `n8n`.** Then one real film with `FINAL_ASSEMBLY_ENGINE=code`, watched end to end. Then flip the default.

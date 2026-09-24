@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Run every `npm run check` in this repo, in order, stopping at the first
-// failure. There is no root package.json (the repo is two independent apps,
-// `remotion/` and `platform/`, each with its own), so this is a plain script
+// failure. There is no root package.json (the repo is independent apps,
+// `remotion/`, `platform/` and `engine/`, each with its own), so this is a plain script
 // rather than a third `npm run check` — invoke it directly:
 //
 //   node check.mjs
@@ -20,7 +20,7 @@ import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const root = dirname(fileURLToPath(import.meta.url));
-const subprojects = ['remotion', 'platform'];
+const subprojects = ['remotion', 'platform', 'engine'];
 
 for (const dir of subprojects) {
 	console.log(`\n=== npm run check  (${dir}/) ===\n`);
@@ -31,4 +31,4 @@ for (const dir of subprojects) {
 	}
 }
 
-console.log('\n✓ all checks passed — remotion/ and platform/.');
+console.log('\n✓ all checks passed — remotion/, platform/ and engine/.');

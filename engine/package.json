@@ -1,0 +1,13 @@
+{
+  "name": "hov-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "House of Videos pipeline in code. Phase 1: Final Assembly's n8n Code nodes as pure TypeScript, golden-tested against the n8n bodies.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "check": "node --experimental-strip-types --no-warnings=ExperimentalWarning check.mjs"
+  }
+}

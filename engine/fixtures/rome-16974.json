@@ -1,0 +1,1706 @@
+{
+ "execution": {
+  "id": "16974",
+  "workflowId": "BY22Vlhh20Xdkr5Z",
+  "mode": "webhook",
+  "status": "success",
+  "startedAt": "2026-09-24T17:20:07.551Z",
+  "stoppedAt": "2026-09-24T17:22:23.508Z",
+  "retryOf": null,
+  "retrySuccessId": null,
+  "waitTill": null
+ },
+ "workflowVersion": "309157bd-a0af-44f2-91a5-335df8477a45",
+ "nodes": {
+  "Normalize Assemble Input": {
+   "runs": 1,
+   "items": [
+    {
+     "Project_ID": "recq9Ttq2izgGB5lJ",
+     "Aspect": "",
+     "No_Captions": ""
+    }
+   ]
+  },
+  "Fetch Approved Scenes": {
+   "runs": 1,
+   "items": [
+    {
+     "id": "recr4HDsY91Oxoevg",
+     "createdTime": "2026-09-24T16:16:30.057Z",
+     "fields": {
+      "Capitol": [
+       "recqQ8duDVz7f5JwB"
+      ],
+      "Project_ID": "recq9Ttq2izgGB5lJ",
+      "Provenance": {
+       "visualOrigin": "ai_generated"
+      },
+      "Video Scenă": [
+       {
+        "id": "reco5bFEalRnJn2Nl",
+        "url": "https://house-of-videos.com/media/recr4HDsY91Oxoevg/video/de7bcae7c3418ea94797de2d747a5a9a.mp4",
+        "size": 4013127,
+        "type": "video/mp4",
+        "filename": "de7bcae7c3418ea94797de2d747a5a9a.mp4"
+       }
+      ],
+      "Aprobare Voce": true,
+      "Ordine Scenă": 107,
+      "Prompt Vizual": "The final shot settles into a wider, calmer evening view of the distribution courtyard as the praefectus annonae stands off to one side and measured exchange continues under lamps. In eight seconds a grain sack is set onto the counter and the official remains watchful, landing on a controlled system rather than a solved mystery.",
+      "Script Scenă": "He had kept Rome supplied through a chain the state could supervise: harbor, measure, warehouse, river, distribution; the exact volume in motion still remained uncertain.",
+      "Voiceover URL": "https://drive.google.com/uc?export=download&id=1eG5bNFXxGEeHF7FXdkhIp3J_LB4XDpU8",
+      "Aprobare Video": true,
+      "Image Media ID": "user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:29672f53-2b1a-4344-90dd-9583fc6d7a30",
+      "Imagine Scenă": [
+       {
+        "id": "recqodeGdVuwQbVn0",
+        "url": "https://house-of-videos.com/media/recr4HDsY91Oxoevg/image/9f64d1993348b67a0cac8b41cc4b6684.jpg",
+        "size": 773087,
+        "type": "image/jpeg",
+        "filename": "9f64d1993348b67a0cac8b41cc4b6684.jpg"
+       }
+      ],
+      "Tag-uri Scenă": [
+       "loc:Rome grain distribution courtyard",
+       "char:praefectus annonae",
+       "obj:grain transport sack",
+       "tod:interior"
+      ],
+      "Versiuni Media": "[]",
+      "Aprobare Scenă": true,
+      "Scene Final URL": "https://drive.google.com/uc?export=download&id=1PHbLsl_xeY6hc9neBvooG3oylkOgdfMz",
+      "Aprobare Imagine": true,
+      "Needs Fact Check": false,
+      "Video Scenă URL": "Slow dolly-in across the distribution courtyard as one grain sack is placed onto the counter and remains there, the praefectus annonae holding still at frame edge under lamplit evening order and controlled administrative calm. Documentary, Documentary mood, cinematic. Negative: on-screen text, subtitles, captions, watermark, logos, speech, lip movement, dialogue, music, extra people, duplicated subject, morphing, warping, reversed playback.",
+      "Regenerează Voce": false,
+      "Regenerează Video": false,
+      "Imagine First Frame": "Wide calm interior shot of an enclosed stone-paved courtyard in the city with a colonnade at the back, a chest-high distribution counter at center, orderly lines marked by low wooden rails, adult men and women waiting on the left with cloth sacks and baskets, and officials seated on the right at a narrow table with wax tablets and scales; near the side stands a clean-shaven Roman man in his late 40s with olive skin, a lean build, short black hair combed forward in tight waves, and an off-white wool toga with a narrow dark purple stripe over a natural-linen tunic, seen small in profile from behind holding his folded wax tablet. Worn ochre and cream plaster walls rise above the crowd with a single arched entry beyond. Lamplit interior evening casts warm pools of light and deep stable shadow, in travertine white, brick red, Nile silt beige, oxidized bronze green, Tiber mud brown, 35mm documentary framing. Documentary, Documentary tone, cinematic, photorealistic, 8k",
+      "Regenerează Imagine": false,
+      "Durată Scenă (secunde)": 8,
+      "Status Producție Scenă": "Finalizat"
+     }
+    },
+    {
+     "id": "recHtCJCsogfRdpqO",
+     "createdTime": "2026-09-24T16:16:30.057Z",
+     "fields": {
+      "Capitol": [
+       "recOocbcBPvc7UJ7p"
+      ],
+      "Project_ID": "recq9Ttq2izgGB5lJ",
+      "Provenance": {
+       "visualOrigin": "ai_generated"
+      },
+      "Video Scenă": [
+       {
+        "id": "recEh6SiJWPHwSAfP",
+        "url": "https://house-of-videos.com/media/recHtCJCsogfRdpqO/video/e7a850089d88ba4316f01194cbcbbc31.mp4",
+        "size": 5711015,
+        "type": "video/mp4",
+        "filename": "e7a850089d88ba4316f01194cbcbbc31.mp4"
+       }
+      ],
+      "Aprobare Voce": true,
+      "Ordine Scenă": 2,
+      "Prompt Vizual": "Inside the warehouse, the shot begins tight on a single half-empty grain bay. A mensor steps into the shafted light and drags his scoop across the shallow surface, revealing how little lies in reserve.",
+      "Script Scenă": "Rome could not feed itself.",
+      "Voiceover URL": "https://drive.google.com/uc?export=download&id=1XXxiXH4lCoqvEHWdAq-3WGoeFLJ58Kz7",
+      "Aprobare Video": true,
+      "Image Media ID": "user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:ec3ade4b-63c8-4132-8be8-1f7d3f751ece",
+      "Imagine Scenă": [
+       {
+        "id": "recKLts7burpsr43c",
+        "url": "https://house-of-videos.com/media/recHtCJCsogfRdpqO/image/b757d5c3f79ecf54756e3c14e39eec16.jpg",
+        "size": 696754,
+        "type": "image/jpeg",
+        "filename": "b757d5c3f79ecf54756e3c14e39eec16.jpg"
+       }
+      ],
+      "Tag-uri Scenă": [
+       "loc:Grandi Horrea, Ostia — grain warehouse interior",
+       "char:mensor",
+       "tod:interior"
+      ],
+      "Versiuni Media": "[]",
+      "Aprobare Scenă": true,
+      "Scene Final URL": "https://drive.google.com/uc?export=download&id=1g8DrMOzNpGAIK3t42_BhrWKxz9gZM0YR",
+      "Aprobare Imagine": true,
+      "Needs Fact Check": false,
+      "Video Scenă URL": "Fast push-in on the mensor’s hand as he drags the bronze scoop right to left through the shallow grain layer and keeps it in hand, the brick cella and raised warehouse floor holding still in dim interior light. Documentary, Documentary mood, cinematic. Negative: on-screen text, subtitles, captions, watermark, logos, speech, lip movement, dialogue, music, extra people, duplicated subject, morphing, warping, reversed playback.",
+      "Regenerează Voce": false,
+      "Regenerează Video": false,
+      "Imagine First Frame": "Extreme close-up of a shallow bronze grain scoop in the hand of a Roman man in his mid 30s with sun-browned skin, a compact muscular build, curly dark hair cropped close, a square jaw, and a short trimmed beard, seen in profile from the far side as he wears a knee-length undyed beige wool tunic with narrow short sleeves, a dark reddish-brown sleeveless hoodless work cloak pinned on the right shoulder with a small bronze fibula, a plain rope belt, and dusty calf-high brown leather work boots with cross-laced fronts, the scoop poised over a thin layer of grain in a bay. A long brick warehouse corridor opening into storage cellae recedes behind him with massive red-brown brick walls, square doorways, raised floors on short brick suspensurae beneath timber planking, and shadowed arches. Dim warehouse daylight falls in narrow window shafts. Travertine white, brick red, Nile silt beige, oxidized bronze green, Tiber mud brown. 50mm tight framing, Documentary, Documentary tone, cinematic, photorealistic, 8k",
+      "Regenerează Imagine": false,
+      "Durată Scenă (secunde)": 3,
+      "Status Producție Scenă": "Finalizat"
+     }
+    },
+    {
+     "id": "recH2leshYWVvDuGN",
+     "createdTime": "2026-09-24T16:16:30.057Z",
+     "fields": {
+      "Capitol": [
+       "recqQ8duDVz7f5JwB"
+      ],
+      "Project_ID": "recq9Ttq2izgGB5lJ",
+      "Provenance": {
+       "visualOrigin": "ai_generated"
+      },
+      "Evidence Ref": "E1",
+      "Video Scenă": [
+       {
+        "id": "recYV8qMnldgMupUS",
+        "url": "https://house-of-videos.com/media/recH2leshYWVvDuGN/video/690a860ebe9af44f1f770b8d49ed115e.mp4",
+        "size": 3109316,
+        "type": "video/mp4",
+        "filename": "690a860ebe9af44f1f770b8d49ed115e.mp4"
+       }
+      ],
+      "Aprobare Voce": true,
+      "Ordine Scenă": 101,
+      "Prompt Vizual": "In a medium over-shoulder shot, the praefectus annonae stands at the edge of the quay reviewing a wax tablet while the harbor works continue beyond him. Over eight seconds he lowers the stylus to the tablet and fixes his attention on the ships, grounding the system in supervision rather than spectacle.",
+      "Script Scenă": "Augustus appointed a praefectus annonae because Rome could not feed itself.",
+      "Voiceover URL": "https://drive.google.com/uc?export=download&id=1sEpP_bHZ7uXrJ2zmMVRg1txPK8Mwgg-b",
+      "Aprobare Video": true,
+      "Image Media ID": "user:2923-email:686f7573656f66766964656f73303140676d61696c2e636f6d-image:6b2184fe-6fd3-4c53-9566-0cc478acf417",
+      "Imagine Scenă": [
+       {
+        "id": "recDuEDzbkqw2mhhs",
+        "url": "https://house-of-videos.com/media/recH2leshYWVvDuGN/image/4a32f2b466bcf54525942dcb0729fddb.jpg",
+        "size": 768376,
+        "type": "image/jpeg",
+        "filename": "4a32f2b466bcf54525942dcb0729fddb.jpg"
+       }
+      ],
+      "Tag-uri Scenă": [
+       "loc:Ostia river port — late Republic and early Imperial unloading zone",
+       "char:praefectus annonae",
+       "tod:afternoon"
+      ],
+      "Versiuni Media": "[]",
+      "Aprobare Scenă": true,
+      "Scene Final URL": "https://drive.google.com/uc?export=download&id=1D5PNGqZIfC7Xd4Zdg_b4gotd4Ijcdjpi",
+      "Aprobare Imagine": true,
+      "Needs Fact Check": false,
+      "Video Scenă URL": "Slow dolly-in on the praefectus annonae from behind as he lowers the boxwood stylus onto the wax tablet and keeps it in his hand to the end of the shot, quay traffic held distant and still in bright afternoon harbor light. Documentary, Documentary mood, cinematic. Negative: on-screen text, subtitles, captions, watermark, logos, speech, lip movement, dialogue, music, extra people, duplicated subject, morphing, warping, reversed playback.",
+      "Regenerează Voce": false,
+      "Regenerează Video": false,
+      "Imagine First Frame": "Medium over-shoulder shot of a clean-shaven Roman man in his late 40s with olive skin, a lean build, deep-set dark brown eyes, a long straight nose, and short black hair combed forward in tight waves, seen from behind in a full-length off-white wool toga with a narrow dark purple stripe over a knee-length natural-linen tunic with short sleeves, dark brown strapped leather calcei shoes, a folded wax tablet in one hand and a short boxwood stylus poised in the other, standing at the opening moment beside the quay. A busy rectangular riverfront work zone beside the Tiber with a broad stone quay running horizontally across the frame, cargo boats moored at center, stacked grain sacks and handcarts on the left, and low storage buildings of tan brick and timber on the right. Bright dry afternoon light throws short shadows across hard-packed dirt and stone paving, with a travertine white, brick red, Nile silt beige, oxidized bronze green, Tiber mud brown palette, 50mm documentary framing. Documentary, Documentary tone, cinematic, photorealistic, 8k",
+      "Regenerează Imagine": false,
+      "Durată Scenă (secunde)": 8,
+      "Status Producție Scenă": "Finalizat"
+     }
+    },
+    {
+     "id": "rec1n7vTVh3odSts9",
+     "createdTime": "2026-09-24T16:16:30.057Z",
+     "fields": {
+      "Capitol": [
+       "recqQ8duDVz7f5JwB"
+      ],
+      "Project_ID": "recq9Ttq2izgGB5lJ",
+      "Provenance": {
+       "visualOrigin": "ai_generated"
+      },
+      "Evidence Ref": "E14",
+      "Video Scenă": [
+       {
+        "id": "rechIFm7dcvo7kaP9",
+        "url": "https://house-of-videos.com/media/rec1n7vTVh3odSts9/video/2bef3ce1c77be5c2dd1bf50d37e9caea.mp4",
+        "size": 8198543,
+        "type": "video/mp4",
+        "filename": "2bef3ce1c77be5c2dd1bf50d37e9caea.mp4"
+       }
+      ],
+      "Aprobare Voce": true,
+      "Ordine Scenă": 105,
+      "Prompt Vizual": "A side-on river shot catches a hauler straining along the towpath while the loaded barge creeps beside him. The shot ends with the barge edging deeper into frame toward the urban bend, making inland transfer the visible labor of the system.",
+      "Script Scenă": "River barges hauled it inland toward Rome. At the Emporium on the Testaccio plain, major horrea took over before the annona distributed it.",
+      "Voiceover URL": "https://drive.google.com/uc?export=download&id=1biXxv527R8kHGQpaLFzBEn5w-hZmjnby",
+      "Aprobare Video": true,
+      "Image Media ID": "user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:525baab9-8e17-4f0d-a60d-ef426b1f7b86",
+      "Imagine Scenă": [
+       {
+        "id": "recOXmJXTOfoSUXD5",
+        "url": "https://house-of-videos.com/media/rec1n7vTVh3odSts9/image/33fd3fe023b02e897685c493fb46e5af.jpg",
+        "size": 780217,
+        "type": "image/jpeg",
+        "filename": "33fd3fe023b02e897685c493fb46e5af.jpg"
+       }
+      ],
+      "Tag-uri Scenă": [
+       "loc:Tiber towpath and river approach to Rome",
+       "char:river barge hauler",
+       "obj:river grain barge",
+       "tod:afternoon"
+      ],
+      "Versiuni Media": "[]",
+      "Aprobare Scenă": true,
+      "Scene Final URL": "https://drive.google.com/uc?export=download&id=1QSNTpedvnGjme1haFj-c817NMOuo01ki",
+      "Aprobare Imagine": true,
+      "Needs Fact Check": false,
+      "Video Scenă URL": "Handheld follow pacing beside the river barge hauler as he takes one heavy step left to right along the towpath, the tow rope staying over his shoulder to the end while the barge inches with him and water ripples from the hull. Documentary, Documentary mood, cinematic. Negative: on-screen text, subtitles, captions, watermark, logos, speech, lip movement, dialogue, music, extra people, duplicated subject, morphing, warping, reversed playback.",
+      "Regenerează Voce": false,
+      "Regenerează Video": false,
+      "Imagine First Frame": "Medium side-profile shot of a Roman man in his early 40s with weathered tan skin, a broad back, heavy forearms, close-cropped dark hair, and a broken nose, seen from the far side with his face turned away, wearing a sleeveless faded blue-grey knee-length tunic of coarse wool belted with a wide cracked brown leather belt, a short hoodless dark brown wool cape hanging open and tied with two cords at the chest, and thick rawhide sandals wrapped high around the ankles, a frayed tow rope over one shoulder and chaff dust on his shins and hands, braced at the opening moment against a taut line. A muddy towpath runs diagonally along the left edge of the Tiber while a loaded low barge occupies the center of the river, its towline stretched taut, with reeds, mooring posts, occasional stone embankments, and a hazy urban silhouette ahead. Late golden afternoon light rakes across the towpath and catches the tar-darkened hull, in travertine white, brick red, Nile silt beige, oxidized bronze green, Tiber mud brown, 50mm restrained handheld framing. Documentary, Documentary tone, cinematic, photorealistic, 8k",
+      "Regenerează Imagine": false,
+      "Durată Scenă (secunde)": 8,
+      "Status Producție Scenă": "Finalizat"
+     }
+    },
+    {
+     "id": "recDkEU7qCQxHEkaC",
+     "createdTime": "2026-09-24T16:16:30.057Z",
+     "fields": {
+      "Capitol": [
+       "recqQ8duDVz7f5JwB"
+      ],
+      "Project_ID": "recq9Ttq2izgGB5lJ",
+      "Provenance": {
+       "visualOrigin": "ai_generated"
+      },
+      "Video Scenă": [
+       {
+        "id": "recxBDBrRKhRgYxPD",
+        "url": "https://house-of-videos.com/media/recDkEU7qCQxHEkaC/video/51d64c1eda6838ac0505d879b2d20327.mp4",
+        "size": 4567299,
+        "type": "video/mp4",
+        "filename": "51d64c1eda6838ac0505d879b2d20327.mp4"
+       }
+      ],
+      "Aprobare Voce": true,
+      "Ordine Scenă": 106,
+      "Prompt Vizual": "At dusk in the Testaccio district, the praefectus annonae pauses alone before stacked amphorae and warehouse fronts, the mound of broken containers rising beyond. Over the shot he stops walking and looks toward the darkening storehouses, conveying endurance rather than triumph.",
+      "Script Scenă": "The next season, the praefectus annonae had not ended scarcity.",
+      "Voiceover URL": "https://drive.google.com/uc?export=download&id=1QRxVyRFGcl2j0TqLNREHmrWNK_zQ9Qzd",
+      "Aprobare Video": true,
+      "Image Media ID": "user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:d452cf39-2e63-40d2-8586-d1ac4f0c83bf",
+      "Imagine Scenă": [
+       {
+        "id": "recink7KeoLEYfeW0",
+        "url": "https://house-of-videos.com/media/recDkEU7qCQxHEkaC/image/5cb4bca3c6b9faa87456d64eaa6e4103.jpg",
+        "size": 785025,
+        "type": "image/jpeg",
+        "filename": "5cb4bca3c6b9faa87456d64eaa6e4103.jpg"
+       }
+      ],
+      "Tag-uri Scenă": [
+       "loc:Testaccio plain by the Emporium — Horrea Galbana and Monte Testaccio",
+       "char:praefectus annonae",
+       "obj:olive-oil amphora",
+       "tod:dusk"
+      ],
+      "Versiuni Media": "[]",
+      "Aprobare Scenă": true,
+      "Scene Final URL": "https://drive.google.com/uc?export=download&id=13ZVbYH4pPlzcc_eisNy-bNs91qFYhwi1",
+      "Aprobare Imagine": true,
+      "Needs Fact Check": false,
+      "Video Scenă URL": "Slow lateral dolly as the praefectus annonae walks a short distance right to left and comes to a stop, keeping the wax tablet in hand, while the Testaccio warehouses and amphora mounds remain still in cooling dusk light. Documentary, Documentary mood, cinematic. Negative: on-screen text, subtitles, captions, watermark, logos, speech, lip movement, dialogue, music, extra people, duplicated subject, morphing, warping, reversed playback.",
+      "Regenerează Voce": false,
+      "Regenerează Video": false,
+      "Imagine First Frame": "Medium-long rear shot of a clean-shaven Roman man in his late 40s with olive skin, a lean build, deep-set dark brown eyes, a long straight nose, and short black hair combed forward in tight waves, seen from behind in a full-length off-white wool toga with a narrow dark purple stripe over a knee-length natural-linen tunic with short sleeves, dark brown strapped leather calcei shoes, carrying a folded wax tablet and short boxwood stylus at his side at the opening moment as he crosses dusty ground. A broad working district south of central Rome with a river landing in the foreground, long warehouse blocks of brick and tile at center-left, and the rising mound of Monte Testaccio at center-right built from broken orange amphora sherds; cart tracks cut through the dust and intact oil amphorae stand in clusters near warehouse doors. Dusk with a cooling sky and warm reflected light along brick faces softens the district into muted travertine white, brick red, Nile silt beige, oxidized bronze green, Tiber mud brown, 50mm documentary framing. Documentary, Documentary tone, cinematic, photorealistic, 8k",
+      "Regenerează Imagine": false,
+      "Durată Scenă (secunde)": 8,
+      "Status Producție Scenă": "Finalizat"
+     }
+    },
+    {
+     "id": "recmLUnWq5OCsXNez",
+     "createdTime": "2026-09-24T16:16:30.057Z",
+     "fields": {
+      "Capitol": [
+       "recqQ8duDVz7f5JwB"
+      ],
+      "Project_ID": "recq9Ttq2izgGB5lJ",
+      "Provenance": {
+       "visualOrigin": "ai_generated"
+      },
+      "Evidence Ref": "E8, E9, E10",
+      "Video Scenă": [
+       {
+        "id": "recXiJ02HRY3dB0g5",
+        "url": "https://house-of-videos.com/media/recmLUnWq5OCsXNez/video/27f678f1b3cd9a9fb611ff1732bd5f3f.mp4",
+        "size": 4419670,
+        "type": "video/mp4",
+        "filename": "27f678f1b3cd9a9fb611ff1732bd5f3f.mp4"
+       }
+      ],
+      "Aprobare Voce": true,
+      "Ordine Scenă": 103,
+      "Prompt Vizual": "The shot opens high over Trajan’s hexagonal basin, then attention settles on a mensor near the edge of the quay checking grain in a scoop against his tablet. Across eight seconds he tips the scoop slightly and compares what he sees to the record, linking the monumental harbor to precise inspection.",
+      "Script Scenă": "Claudius built Portus north of the Tiber mouth, and Trajan’s basin later secured the harbor problem. There mensores verified quantity and quality, turning a convoy into accountable stock.",
+      "Voiceover URL": "https://drive.google.com/uc?export=download&id=1TSRkA12Z8fOLiT_Wip55FkrprBXqjbjz",
+      "Aprobare Video": true,
+      "Image Media ID": "user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:d414c613-188b-46b5-bd2a-3df4ee812080",
+      "Imagine Scenă": [
+       {
+        "id": "recdxDYkiS2ceqfTK",
+        "url": "https://house-of-videos.com/media/recmLUnWq5OCsXNez/image/3f89ff8ee1103b21c2dedf8c23370528.jpg",
+        "size": 708148,
+        "type": "image/jpeg",
+        "filename": "3f89ff8ee1103b21c2dedf8c23370528.jpg"
+       }
+      ],
+      "Tag-uri Scenă": [
+       "loc:Portus — Trajanic hexagonal basin",
+       "char:mensor",
+       "tod:dawn"
+      ],
+      "Versiuni Media": "[]",
+      "Aprobare Scenă": true,
+      "Scene Final URL": "https://drive.google.com/uc?export=download&id=1SAUUl_gR4FmjFKwzY5E6YeduiWoqateI",
+      "Aprobare Imagine": true,
+      "Needs Fact Check": false,
+      "Video Scenă URL": "Gentle pan across the hexagonal basin to the mensor as he lifts the bronze scoop slightly toward his gaze and keeps the wooden rod in his other hand, calm harbor water holding still beneath dawn haze and low sidelight. Documentary, Documentary mood, cinematic. Negative: on-screen text, subtitles, captions, watermark, logos, speech, lip movement, dialogue, music, extra people, duplicated subject, morphing, warping, reversed playback.",
+      "Regenerează Voce": false,
+      "Regenerează Video": false,
+      "Imagine First Frame": "Elevated wide shot of a Roman man in his mid 30s with sun-browned skin, a compact muscular build, curly dark hair cropped close, a square jaw, and a short trimmed beard, seen in three-quarter back view near the lower edge of frame wearing a knee-length undyed beige wool tunic with narrow short sleeves, a dark reddish-brown sleeveless hoodless work cloak pinned on the right shoulder with a small bronze fibula, a plain rope belt, and dusty calf-high brown leather work boots with cross-laced fronts, holding a shallow bronze grain scoop and wooden measuring rod while a wax tablet hangs at his waist at the opening moment. A monumental hexagonal harbor basin seen from an elevated angle, its six straight stone-edged sides enclosing calm green water at center, with ordered quays and warehouses tracing the geometric perimeter, service roads and brick store buildings on the left, moored cargo vessels on the right, and canals and low administrative buildings beyond. Dawn haze with low sidelight grazes the stone edges and leaves long cool shadows, with a travertine white, brick red, Nile silt beige, oxidized bronze green, Tiber mud brown palette, sober 35mm documentary overview. Documentary, Documentary tone, cinematic, photorealistic, 8k",
+      "Regenerează Imagine": false,
+      "Durată Scenă (secunde)": 8,
+      "Status Producție Scenă": "Finalizat"
+     }
+    },
+    {
+     "id": "reco0Lo36HpdDrb7j",
+     "createdTime": "2026-09-24T16:16:30.057Z",
+     "fields": {
+      "Capitol": [
+       "recqQ8duDVz7f5JwB"
+      ],
+      "Project_ID": "recq9Ttq2izgGB5lJ",
+      "Provenance": {
+       "visualOrigin": "ai_generated"
+      },
+      "Evidence Ref": "E2, E3, E4",
+      "Video Scenă": [
+       {
+        "id": "recOPu6xbpPH4AEmf",
+        "url": "https://house-of-videos.com/media/reco0Lo36HpdDrb7j/video/e5f38a88f7d64d4c947f01c6afd61cf9.mp4",
+        "size": 6312272,
+        "type": "video/mp4",
+        "filename": "e5f38a88f7d64d4c947f01c6afd61cf9.mp4"
+       }
+      ],
+      "Aprobare Voce": true,
+      "Ordine Scenă": 102,
+      "Prompt Vizual": "A locked-off wide sea shot frames a single grain ship approaching out of haze while smaller escorts trail far behind. During the shot the lead vessel advances slightly left to right, making the scale of supply legible without trying to count it.",
+      "Script Scenă": "Annual need ran to 20 to 40 million modii, carried by tax grain and private shippers from Sardinia, Sicily, Africa, and Egypt.",
+      "Voiceover URL": "https://drive.google.com/uc?export=download&id=1CkrEmV1Ccl9rogV3EAQU8Cw5jV9sgbk1",
+      "Aprobare Video": true,
+      "Image Media ID": "user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:b9a8ae6e-1233-48a5-9da5-b384399a1b2a",
+      "Imagine Scenă": [
+       {
+        "id": "recJJTOB0icvAwWtH",
+        "url": "https://house-of-videos.com/media/reco0Lo36HpdDrb7j/image/0c37e1f72725999eaa738e4ec64d2a81.jpg",
+        "size": 559742,
+        "type": "image/jpeg",
+        "filename": "0c37e1f72725999eaa738e4ec64d2a81.jpg"
+       }
+      ],
+      "Tag-uri Scenă": [
+       "loc:Mediterranean grain convoy — open sea approach",
+       "tod:day"
+      ],
+      "Versiuni Media": "[]",
+      "Aprobare Scenă": true,
+      "Scene Final URL": "https://drive.google.com/uc?export=download&id=14Y7atAbXQI60sq7145pwd4sTQ-NEy8ow",
+      "Aprobare Imagine": true,
+      "Needs Fact Check": false,
+      "Video Scenă URL": "Static locked-off shot as the merchant grain ship advances slowly left to right toward the camera on dark blue-green water, its sail holding shape while small ripples spread from the hull under hard noon glare and marine haze. Documentary, Documentary mood, cinematic. Negative: on-screen text, subtitles, captions, watermark, logos, speech, lip movement, dialogue, music, extra people, duplicated subject, morphing, warping, reversed playback.",
+      "Regenerează Voce": false,
+      "Regenerează Video": false,
+      "Imagine First Frame": "Wide establishing shot of one deep-bellied Roman merchant grain ship at center angled toward camera, cream square sail half-filled by wind, reddish-brown hull riding low with cargo at the opening moment, with two smaller sail silhouettes trailing far back and no people readable. A wide expanse of dark blue-green sea under a pale horizon, gulls skimming the surface to the right, and only haze and sky in the background, stressing distance from Rome and the long maritime supply line from Sardinia, Sicily, Africa, and Egypt. Hard noon glare with marine haze flattens the far distance and sparks white highlights on the water, in travertine white, brick red, Nile silt beige, oxidized bronze green, Tiber mud brown, 35mm documentary framing. Documentary, Documentary tone, cinematic, photorealistic, 8k",
+      "Regenerează Imagine": false,
+      "Durată Scenă (secunde)": 8,
+      "Status Producție Scenă": "Finalizat"
+     }
+    },
+    {
+     "id": "recpKi7xv48yzXMkv",
+     "createdTime": "2026-09-24T16:16:30.057Z",
+     "fields": {
+      "Capitol": [
+       "recOocbcBPvc7UJ7p"
+      ],
+      "Project_ID": "recq9Ttq2izgGB5lJ",
+      "Provenance": {
+       "visualOrigin": "ai_generated"
+      },
+      "Video Scenă": [
+       {
+        "id": "rec5Gon1McBkTGzjm",
+        "url": "https://house-of-videos.com/media/recpKi7xv48yzXMkv/video/bc7152d68b52997c3e3db80bcb969151.mp4",
+        "size": 6738395,
+        "type": "video/mp4",
+        "filename": "bc7152d68b52997c3e3db80bcb969151.mp4"
+       }
+      ],
+      "Aprobare Voce": true,
+      "Ordine Scenă": 4,
+      "Prompt Vizual": "The shot opens tight on the bow of a loaded river barge as the towline snaps taut. A hauler strains forward along the towpath while the barge begins to slide upriver, landing on the inland movement that leads into the harbor logistics to come.",
+      "Script Scenă": "Measured, stored, moved inland.",
+      "Voiceover URL": "https://drive.google.com/uc?export=download&id=1kS7C4W-5l0O9qppp0eF5rss_wxCMxtdw",
+      "Aprobare Video": true,
+      "Image Media ID": "user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:12d3accd-8c6b-4573-8af9-4c9e560c4a78",
+      "Imagine Scenă": [
+       {
+        "id": "recClPiysQEtWsnFW",
+        "url": "https://house-of-videos.com/media/recpKi7xv48yzXMkv/image/9d3874a08ff7e50c1c73477daaf5c63b.jpg",
+        "size": 708413,
+        "type": "image/jpeg",
+        "filename": "9d3874a08ff7e50c1c73477daaf5c63b.jpg"
+       }
+      ],
+      "Tag-uri Scenă": [
+       "loc:Tiber towpath and river approach to Rome",
+       "char:river barge hauler",
+       "obj:grain transport sack",
+       "obj:river grain barge",
+       "tod:afternoon"
+      ],
+      "Versiuni Media": "[]",
+      "Aprobare Scenă": true,
+      "Scene Final URL": "https://drive.google.com/uc?export=download&id=1PTn1WLdK-NyhApie8jnNsFRfxnPxe_yF",
+      "Aprobare Imagine": true,
+      "Needs Fact Check": false,
+      "Video Scenă URL": "Handheld lateral tracking alongside the towpath as the river barge hauler steps left to right and keeps the rope over his shoulder to the end of the shot, pulling the loaded barge so the taut line shivers and the river surface ripples from the hull. Documentary, Documentary mood, cinematic. Negative: on-screen text, subtitles, captions, watermark, logos, speech, lip movement, dialogue, music, extra people, duplicated subject, morphing, warping, reversed playback.",
+      "Regenerează Voce": false,
+      "Regenerează Video": false,
+      "Imagine First Frame": "Low tracking close shot of a low, broad-beamed wooden river barge with a blunt bow, tar-darkened hull planks, a single short mast lowered flat on deck, bundled tan sailcloth, stacked grain sacks under rough beige canvas covers, and a heavy towline fixed to an iron bow ring, beside a Roman man in his early 40s with weathered tan skin, a broad back, heavy forearms, close-cropped dark hair, and a broken nose, seen from behind in a sleeveless faded blue-grey knee-length tunic of coarse wool, belted with a wide cracked brown leather belt, a short hoodless dark brown wool cape hanging open and tied with two cords at the chest, and thick rawhide sandals wrapped high around the ankles, a frayed tow rope over one shoulder as he leans into the pull. A muddy towpath runs along the left edge of the Tiber with reeds, mooring posts, and occasional stone embankments, the river bending toward a hazy urban silhouette of warehouses, temple roofs, and smoke. Late golden afternoon light rakes from the side. Travertine white, brick red, Nile silt beige, oxidized bronze green, Tiber mud brown. 35mm dynamic framing, Documentary, Documentary tone, cinematic, photorealistic, 8k",
+      "Regenerează Imagine": false,
+      "Durată Scenă (secunde)": 3,
+      "Status Producție Scenă": "Finalizat"
+     }
+    },
+    {
+     "id": "reculTp2Qk4R378Cj",
+     "createdTime": "2026-09-24T16:16:30.057Z",
+     "fields": {
+      "Capitol": [
+       "recqQ8duDVz7f5JwB"
+      ],
+      "Project_ID": "recq9Ttq2izgGB5lJ",
+      "Provenance": {
+       "visualOrigin": "ai_generated"
+      },
+      "Evidence Ref": "E5, E6, E7",
+      "Video Scenă": [
+       {
+        "id": "recCMb1f6WLgysCMI",
+        "url": "https://house-of-videos.com/media/reculTp2Qk4R378Cj/video/fd2c01fde22be4607f94ef9e01525683.mp4",
+        "size": 2713813,
+        "type": "video/mp4",
+        "filename": "fd2c01fde22be4607f94ef9e01525683.mp4"
+       }
+      ],
+      "Aprobare Voce": true,
+      "Ordine Scenă": 104,
+      "Prompt Vizual": "Inside the warehouse, a close tracking shot follows a grain sack sliding onto timber planking above the visible brick suspensurae. The movement ends as the sack settles into a storage bay, turning transit cargo into held reserve.",
+      "Script Scenă": "At Ostia, the Grandi Horrea held grain under state oversight, with raised floors against damp. Storage turned cargo into reserve instead of trusting direct delivery.",
+      "Voiceover URL": "https://drive.google.com/uc?export=download&id=1yF10ClRzw8CWlMKgzoPUeSA7jUc9cv3D",
+      "Aprobare Video": true,
+      "Image Media ID": "user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:15c5df59-0a2d-4dc4-9699-8e4a841a47f3",
+      "Imagine Scenă": [
+       {
+        "id": "recFGkcmx52Vid2Wn",
+        "url": "https://house-of-videos.com/media/reculTp2Qk4R378Cj/image/0e102aff1308e4857bec32609995f6fe.jpg",
+        "size": 690059,
+        "type": "image/jpeg",
+        "filename": "0e102aff1308e4857bec32609995f6fe.jpg"
+       }
+      ],
+      "Tag-uri Scenă": [
+       "loc:Grandi Horrea, Ostia — grain warehouse interior",
+       "obj:grain transport sack",
+       "tod:interior"
+      ],
+      "Versiuni Media": "[]",
+      "Aprobare Scenă": true,
+      "Scene Final URL": "https://drive.google.com/uc?export=download&id=1_w_OiuO5cklm5tonAjscoVWw093Aag8R",
+      "Aprobare Imagine": true,
+      "Needs Fact Check": false,
+      "Video Scenă URL": "Slow lateral tracking alongside the grain transport sack as it slides right to left a short distance across the timber planking and stays in place at the end, the warehouse air still under dim window light inside the Grandi Horrea. Documentary, Documentary mood, cinematic. Negative: on-screen text, subtitles, captions, watermark, logos, speech, lip movement, dialogue, music, extra people, duplicated subject, morphing, warping, reversed playback.",
+      "Regenerează Voce": false,
+      "Regenerează Video": false,
+      "Imagine First Frame": "Low close-up tracking view of a large cylindrical sack of coarse tan woven hemp, packed full so the sides bow outward, tied at the neck with doubled flax cord, with a black painted stencil reading ANN in block Roman letters and a small red sealing dab near the knot, the fabric abraded at the base and dusted with pale grain flour, captured at the opening moment halfway onto timber planking above raised brick supports. A long brick warehouse corridor opening into storage cellae, with massive red-brown brick walls and square doorways repeating in perspective, raised floors on short brick suspensurae visible beneath timber planking in the foreground, and conical heaps of loose grain and hemp sacks arranged in bays at center. Dim warehouse daylight enters in narrow shafts from high windows, touching the dry floor and leaving the arches in shadow, with travertine white, brick red, Nile silt beige, oxidized bronze green, Tiber mud brown tones, 50mm documentary detail framing. Documentary, Documentary tone, cinematic, photorealistic, 8k",
+      "Regenerează Imagine": false,
+      "Durată Scenă (secunde)": 8,
+      "Status Producție Scenă": "Finalizat"
+     }
+    },
+    {
+     "id": "recshrS1NzNvjc1wU",
+     "createdTime": "2026-09-24T16:16:30.057Z",
+     "fields": {
+      "Capitol": [
+       "recOocbcBPvc7UJ7p"
+      ],
+      "Project_ID": "recq9Ttq2izgGB5lJ",
+      "Provenance": {
+       "visualOrigin": "ai_generated"
+      },
+      "Evidence Ref": "E17, E18",
+      "Video Scenă": [
+       {
+        "id": "recuhWmlFWpaNHXNo",
+        "url": "https://house-of-videos.com/media/recshrS1NzNvjc1wU/video/31c0a694eabd9548c943570894e98802.mp4",
+        "size": 3771197,
+        "type": "video/mp4",
+        "filename": "31c0a694eabd9548c943570894e98802.mp4"
+       }
+      ],
+      "Aprobare Voce": true,
+      "Ordine Scenă": 1,
+      "Prompt Vizual": "An elevated dawn view holds on the severe geometry of the distribution courtyard before a dense line of adult recipients compresses toward the rails. The camera drifts slightly as one official leans over a wax tablet, turning abstract scale into a human queue without claiming an exact count on screen.",
+      "Script Scenă": "One million people.",
+      "Voiceover URL": "https://drive.google.com/uc?export=download&id=10JfHu79qyq627OCVf5M-MhOQvv__qiFb",
+      "Aprobare Video": true,
+      "Image Media ID": "user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:aa925791-8de5-4655-8312-7d778b7fa9b2",
+      "Imagine Scenă": [
+       {
+        "id": "recoaK8wlSdeHUFbg",
+        "url": "https://house-of-videos.com/media/recshrS1NzNvjc1wU/image/95ff5a3154e5ea4fc53bbe45ea5a2387.jpg",
+        "size": 799582,
+        "type": "image/jpeg",
+        "filename": "95ff5a3154e5ea4fc53bbe45ea5a2387.jpg"
+       }
+      ],
+      "Tag-uri Scenă": [
+       "loc:Rome grain distribution courtyard",
+       "tod:night"
+      ],
+      "Versiuni Media": "[]",
+      "Aprobare Scenă": true,
+      "Scene Final URL": "https://drive.google.com/uc?export=download&id=1R_yBpu0YgqllIzdxMljHt1hCJx5HuUSb",
+      "Aprobare Imagine": true,
+      "Needs Fact Check": false,
+      "Video Scenă URL": "Slow steady drift inward toward the clear center lane as the nearest adult queue compresses one step forward toward the counter, officials remaining seated over tablets in the lamplit administrative courtyard. Documentary, Documentary mood, cinematic. Negative: on-screen text, subtitles, captions, watermark, logos, speech, lip movement, dialogue, music, extra people, duplicated subject, morphing, warping, reversed playback.",
+      "Regenerează Voce": false,
+      "Regenerează Video": false,
+      "Imagine First Frame": "Wide elevated shot of an enclosed stone-paved courtyard in the city with a colonnade at the back, a chest-high distribution counter at center, and orderly lines marked by low wooden rails, adult men and women packed into the left queue with cloth sacks and baskets while small officials sit at a narrow table on the right over wax tablets and scales, the center lane kept clear as the opening frame. Worn plastered walls in ochre and cream rise behind a single arched entry. Lamplit interior evening glows against deep shadow. Travertine white, brick red, Nile silt beige, oxidized bronze green, Tiber mud brown. 35mm documentary framing, Documentary, Documentary tone, cinematic, photorealistic, 8k",
+      "Regenerează Imagine": false,
+      "Durată Scenă (secunde)": 3,
+      "Status Producție Scenă": "Finalizat"
+     }
+    },
+    {
+     "id": "recfKTwn8FavcUUKF",
+     "createdTime": "2026-09-24T16:16:30.057Z",
+     "fields": {
+      "Capitol": [
+       "recOocbcBPvc7UJ7p"
+      ],
+      "Project_ID": "recq9Ttq2izgGB5lJ",
+      "Provenance": {
+       "visualOrigin": "ai_generated"
+      },
+      "Evidence Ref": "E4",
+      "Video Scenă": [
+       {
+        "id": "rec1ewBNzacItaCGj",
+        "url": "https://house-of-videos.com/media/recfKTwn8FavcUUKF/video/6770b28220a4f1af33189ce7d007cc93.mp4",
+        "size": 7401212,
+        "type": "video/mp4",
+        "filename": "6770b28220a4f1af33189ce7d007cc93.mp4"
+       }
+      ],
+      "Aprobare Voce": true,
+      "Ordine Scenă": 3,
+      "Prompt Vizual": "A merchant grain ship surges out of haze toward the lens, dominating the empty water around it. The fast move and isolated vessel turn long-distance supply into one stark incoming presence.",
+      "Script Scenă": "Grain from across the sea.",
+      "Voiceover URL": "https://drive.google.com/uc?export=download&id=16tdpguZHn2TaCiu3ukldxlyZHCMQauxt",
+      "Aprobare Video": true,
+      "Image Media ID": "user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:7e9323ce-0aa9-4db2-8a00-51bdfe620cc2",
+      "Imagine Scenă": [
+       {
+        "id": "recy3Uq86ELx4FVZE",
+        "url": "https://house-of-videos.com/media/recfKTwn8FavcUUKF/image/b5042eeceab3e2f11a19cdfb292a82a2.jpg",
+        "size": 817224,
+        "type": "image/jpeg",
+        "filename": "b5042eeceab3e2f11a19cdfb292a82a2.jpg"
+       }
+      ],
+      "Tag-uri Scenă": [
+       "loc:Mediterranean grain convoy — open sea approach",
+       "tod:day"
+      ],
+      "Versiuni Media": "[]",
+      "Aprobare Scenă": true,
+      "Scene Final URL": "https://drive.google.com/uc?export=download&id=1erGDMPMur9K_fskSCl4zDyG_r-UVtnam",
+      "Aprobare Imagine": true,
+      "Needs Fact Check": false,
+      "Video Scenă URL": "Crash-zoom toward the merchant grain ship as it advances directly toward the camera with its cream sail pulling taut, the trailing silhouettes staying distant on the hazy open sea under hard noon glare. Documentary, Documentary mood, cinematic. Negative: on-screen text, subtitles, captions, watermark, logos, speech, lip movement, dialogue, music, extra people, duplicated subject, morphing, warping, reversed playback.",
+      "Regenerează Voce": false,
+      "Regenerează Video": false,
+      "Imagine First Frame": "Telephoto medium shot of one deep-bellied Roman merchant grain ship at center angled toward camera, cream square sail half-filled by wind and reddish-brown hull riding low with cargo, frozen as it lifts against a dark blue-green swell while two much smaller sail silhouettes trail far behind. A wide expanse of open sea stretches to a pale horizon with gulls skimming low and only haze and sky beyond, stressing distance from Rome and the maritime line from Sardinia, Sicily, Africa, and Egypt. Hard noon glare with marine haze throws sharp highlights across the water. Travertine white, brick red, Nile silt beige, oxidized bronze green, Tiber mud brown. 50mm compressed framing, Documentary, Documentary tone, cinematic, photorealistic, 8k",
+      "Regenerează Imagine": false,
+      "Durată Scenă (secunde)": 3,
+      "Status Producție Scenă": "Finalizat"
+     }
+    }
+   ]
+  },
+  "Prepare Clips": {
+   "runs": 1,
+   "items": [
+    {
+     "id": "recshrS1NzNvjc1wU",
+     "url": "https://drive.google.com/uc?export=download&id=1R_yBpu0YgqllIzdxMljHt1hCJx5HuUSb",
+     "voiceUrl": "https://drive.google.com/uc?export=download&id=10JfHu79qyq627OCVf5M-MhOQvv__qiFb",
+     "narratorText": "One million people.",
+     "chapter": 0,
+     "order": 1,
+     "seconds": 3
+    },
+    {
+     "id": "recHtCJCsogfRdpqO",
+     "url": "https://drive.google.com/uc?export=download&id=1g8DrMOzNpGAIK3t42_BhrWKxz9gZM0YR",
+     "voiceUrl": "https://drive.google.com/uc?export=download&id=1XXxiXH4lCoqvEHWdAq-3WGoeFLJ58Kz7",
+     "narratorText": "Rome could not feed itself.",
+     "chapter": 0,
+     "order": 2,
+     "seconds": 3
+    },
+    {
+     "id": "recfKTwn8FavcUUKF",
+     "url": "https://drive.google.com/uc?export=download&id=1erGDMPMur9K_fskSCl4zDyG_r-UVtnam",
+     "voiceUrl": "https://drive.google.com/uc?export=download&id=16tdpguZHn2TaCiu3ukldxlyZHCMQauxt",
+     "narratorText": "Grain from across the sea.",
+     "chapter": 0,
+     "order": 3,
+     "seconds": 3
+    },
+    {
+     "id": "recpKi7xv48yzXMkv",
+     "url": "https://drive.google.com/uc?export=download&id=1PTn1WLdK-NyhApie8jnNsFRfxnPxe_yF",
+     "voiceUrl": "https://drive.google.com/uc?export=download&id=1kS7C4W-5l0O9qppp0eF5rss_wxCMxtdw",
+     "narratorText": "Measured, stored, moved inland.",
+     "chapter": 0,
+     "order": 4,
+     "seconds": 3
+    },
+    {
+     "id": "recH2leshYWVvDuGN",
+     "url": "https://drive.google.com/uc?export=download&id=1D5PNGqZIfC7Xd4Zdg_b4gotd4Ijcdjpi",
+     "voiceUrl": "https://drive.google.com/uc?export=download&id=1sEpP_bHZ7uXrJ2zmMVRg1txPK8Mwgg-b",
+     "narratorText": "Augustus appointed a praefectus annonae because Rome could not feed itself.",
+     "chapter": 1,
+     "order": 101,
+     "seconds": 8
+    },
+    {
+     "id": "reco0Lo36HpdDrb7j",
+     "url": "https://drive.google.com/uc?export=download&id=14Y7atAbXQI60sq7145pwd4sTQ-NEy8ow",
+     "voiceUrl": "https://drive.google.com/uc?export=download&id=1CkrEmV1Ccl9rogV3EAQU8Cw5jV9sgbk1",
+     "narratorText": "Annual need ran to 20 to 40 million modii, carried by tax grain and private shippers from Sardinia, Sicily, Africa, and Egypt.",
+     "chapter": 1,
+     "order": 102,
+     "seconds": 8
+    },
+    {
+     "id": "recmLUnWq5OCsXNez",
+     "url": "https://drive.google.com/uc?export=download&id=1SAUUl_gR4FmjFKwzY5E6YeduiWoqateI",
+     "voiceUrl": "https://drive.google.com/uc?export=download&id=1TSRkA12Z8fOLiT_Wip55FkrprBXqjbjz",
+     "narratorText": "Claudius built Portus north of the Tiber mouth, and Trajan’s basin later secured the harbor problem. There mensores verified quantity and quality, turning a convoy into accountable stock.",
+     "chapter": 1,
+     "order": 103,
+     "seconds": 8
+    },
+    {
+     "id": "reculTp2Qk4R378Cj",
+     "url": "https://drive.google.com/uc?export=download&id=1_w_OiuO5cklm5tonAjscoVWw093Aag8R",
+     "voiceUrl": "https://drive.google.com/uc?export=download&id=1yF10ClRzw8CWlMKgzoPUeSA7jUc9cv3D",
+     "narratorText": "At Ostia, the Grandi Horrea held grain under state oversight, with raised floors against damp. Storage turned cargo into reserve instead of trusting direct delivery.",
+     "chapter": 1,
+     "order": 104,
+     "seconds": 8
+    },
+    {
+     "id": "rec1n7vTVh3odSts9",
+     "url": "https://drive.google.com/uc?export=download&id=1QSNTpedvnGjme1haFj-c817NMOuo01ki",
+     "voiceUrl": "https://drive.google.com/uc?export=download&id=1biXxv527R8kHGQpaLFzBEn5w-hZmjnby",
+     "narratorText": "River barges hauled it inland toward Rome. At the Emporium on the Testaccio plain, major horrea took over before the annona distributed it.",
+     "chapter": 1,
+     "order": 105,
+     "seconds": 8
+    },
+    {
+     "id": "recDkEU7qCQxHEkaC",
+     "url": "https://drive.google.com/uc?export=download&id=13ZVbYH4pPlzcc_eisNy-bNs91qFYhwi1",
+     "voiceUrl": "https://drive.google.com/uc?export=download&id=1QRxVyRFGcl2j0TqLNREHmrWNK_zQ9Qzd",
+     "narratorText": "The next season, the praefectus annonae had not ended scarcity.",
+     "chapter": 1,
+     "order": 106,
+     "seconds": 8
+    },
+    {
+     "id": "recr4HDsY91Oxoevg",
+     "url": "https://drive.google.com/uc?export=download&id=1PHbLsl_xeY6hc9neBvooG3oylkOgdfMz",
+     "voiceUrl": "https://drive.google.com/uc?export=download&id=1eG5bNFXxGEeHF7FXdkhIp3J_LB4XDpU8",
+     "narratorText": "He had kept Rome supplied through a chain the state could supervise: harbor, measure, warehouse, river, distribution; the exact volume in motion still remained uncertain.",
+     "chapter": 1,
+     "order": 107,
+     "seconds": 8
+    }
+   ]
+  },
+  "Fetch Project Info": {
+   "runs": 1,
+   "items": [
+    {
+     "id": "recq9Ttq2izgGB5lJ",
+     "createdTime": "2026-09-24T16:13:49.455Z",
+     "fields": {
+      "Pace": "Normal",
+      "Style": "Documentary",
+      "Format": "9:16",
+      "Lenght": 60,
+      "Language": "English",
+      "Voice ID": "elevenlabs_hpp4J3VqNfWAUOO0d1Us",
+      "Project ID": "recq9Ttq2izgGB5lJ",
+      "Tonalitate": "Documentary",
+      "Story Bible": "{\n  \"logline\": \"A 60-second documentary story bible showing how imperial Rome fed a city often estimated at about one million people: grain gathered from Mediterranean provinces, landed at Ostia and Portus, measured by mensores, stored in horrea, moved up the Tiber, and rationed under the annona without inventing numbers the evidence cannot fix.\",\n  \"characters\": [\n    {\n      \"name\": \"praefectus annonae\",\n      \"role\": \"Imperial official embodying state oversight of Rome’s grain supply under the annona\",\n      \"visual_description\": \"A clean-shaven Roman man in his late 40s with olive skin, a lean build, deep-set dark brown eyes, a long straight nose, and short black hair combed forward in tight waves. He wears a full-length off-white wool toga with a narrow dark purple stripe over a knee-length natural-linen tunic with short sleeves, a brown leather belt hidden beneath the drape, and dark brown strapped leather calcei shoes. He carries a folded wax tablet and a short boxwood stylus in his left hand, and a bronze signet ring is visible on his right hand.\"\n    },\n    {\n      \"name\": \"mensor\",\n      \"role\": \"State measurer checking grain quantity and quality on ship, quay, and warehouse floor\",\n      \"visual_description\": \"A Roman man in his mid 30s with sun-browned skin, a compact muscular build, curly dark hair cropped close, a square jaw, and a short trimmed beard. He wears a knee-length undyed beige wool tunic with narrow short sleeves, a dark reddish-brown sleeveless hoodless work cloak pinned on the right shoulder with a small bronze fibula, a plain rope belt, and dusty calf-high brown leather work boots with cross-laced fronts. He carries a wooden measuring rod, a shallow bronze grain scoop, and a wax tablet hanging from a leather thong at his waist.\"\n    },\n    {\n      \"name\": \"river barge hauler\",\n      \"role\": \"Laborer representing the human effort that moved food inland from the sea harbors to Rome\",\n      \"visual_description\": \"A Roman man in his early 40s with weathered tan skin, a broad back, heavy forearms, close-cropped dark hair, and a broken nose. He wears a sleeveless faded blue-grey knee-length tunic of coarse wool, belted with a wide cracked brown leather belt, a short hoodless dark brown wool cape hanging open and tied with two cords at the chest, and thick rawhide sandals wrapped high around the ankles. He has a frayed tow rope over one shoulder and chaff dust on his shins and hands.\"\n    }\n  ],\n  \"objects\": [\n    {\n      \"name\": \"grain transport sack\",\n      \"visual_description\": \"A large cylindrical sack of coarse tan woven hemp, packed full so the sides bow outward, tied at the neck with doubled flax cord, with a black painted stencil reading ANN in block Roman letters and a small red sealing dab near the knot; the fabric is abraded at the base and dusted with pale grain flour.\"\n    },\n    {\n      \"name\": \"olive-oil amphora\",\n      \"visual_description\": \"A tall narrow Roman Dressel 20 amphora in orange-brown fired clay with a rounded belly, thick rolled rim, two loop handles from shoulder to neck, and a pointed stub base; one shoulder bears black painted tituli, the lower body is streaked with white mineral crust and shipping grime, and one side has a chipped patch exposing lighter clay beneath.\"\n    },\n    {\n      \"name\": \"river grain barge\",\n      \"visual_description\": \"A low, broad-beamed wooden river barge with a blunt bow, tar-darkened hull planks, a single short mast lowered flat on deck, bundled tan sailcloth, stacked grain sacks under rough beige canvas covers, and a heavy towline fixed to an iron bow ring; the gunwales are rubbed pale from repeated loading.\"\n    }\n  ],\n  \"locations\": [\n    {\n      \"name\": \"Mediterranean grain convoy — open sea approach\",\n      \"visual_description\": \"A wide expanse of dark blue-green sea under a pale horizon, with one deep-bellied Roman merchant grain ship at center angled toward camera, cream square sail half-filled by wind, reddish-brown hull riding low with cargo. To the left, two smaller sail silhouettes trail farther back; to the right, empty water with gulls skimming the surface. In the background, only haze and sky are visible, stressing distance from Rome and the long maritime supply line from Sardinia, Sicily, Africa, and Egypt.\"\n    },\n    {\n      \"name\": \"Ostia river port — late Republic and early Imperial unloading zone\",\n      \"visual_description\": \"A busy rectangular riverfront work zone beside the Tiber with a broad stone quay running horizontally across the frame, cargo boats moored at center, stacked grain sacks and handcarts on the left, and low storage buildings of tan brick and timber on the right. In the background, a flat riverside skyline of tiled roofs, cranes, and masts rises behind the quay. The ground is hard-packed dirt mixed with stone paving, and the space reads as the designated public area for unloading, transporting, and storing grain at Ostia before the later harbor expansions.\"\n    },\n    {\n      \"name\": \"Portus — Claudian harbor basin\",\n      \"visual_description\": \"A vast engineered harbor about 3 km north of the Tiber mouth, with open protected water at center enclosed by long stone moles, a lighthouse structure visible on one breakwater in the mid-background, and canal mouths leading inland. On the left stand moored seagoing freighters with furled cream sails; on the right, quays crowded with carts, dockworkers, and stacked cargo. Compared with Ostia, this state adds larger protected anchorage, heavier maritime infrastructure, and a clearer artificial geometry built for overflow traffic.\"\n    },\n    {\n      \"name\": \"Portus — Trajanic hexagonal basin\",\n      \"visual_description\": \"A monumental hexagonal harbor basin seen from an elevated angle, its six straight stone-edged sides enclosing calm green water at center, with ordered quays and warehouses tracing the geometric perimeter. On the left, narrow service roads and brick store buildings run in crisp lines; on the right, moored cargo vessels sit neatly against the basin walls. In the background, canals and low administrative buildings connect the harbor to the wider port complex. Compared with the Claudian basin, this state adds the unmistakable hexagonal form and a denser, more rationalized storage-and-transfer landscape.\"\n    },\n    {\n      \"name\": \"Grandi Horrea, Ostia — grain warehouse interior\",\n      \"visual_description\": \"A long brick warehouse corridor opening into storage cellae, with massive red-brown brick walls and square doorways repeating in perspective, raised floors on short brick suspensurae visible beneath timber planking in the foreground, and conical heaps of loose grain and hemp sacks arranged in bays at center. On the left, narrow high windows admit thin daylight; on the right, measuring tables, baskets, and tally marks sit beside door lintels. The background fades into shadowed arches, emphasizing dry storage technology built to protect grain from damp.\"\n    },\n    {\n      \"name\": \"Tiber towpath and river approach to Rome\",\n      \"visual_description\": \"A muddy towpath runs diagonally along the left edge of the Tiber while a loaded low barge occupies the center of the river, its towline stretched taut to men or animals just out of frame. On the right bank stand reeds, mooring posts, and occasional stone embankments; in the background, the river bends toward a hazy urban silhouette of warehouses, temple roofs, and smoke. The space is narrower and more inland than the sea harbors, showing the second transport stage after unloading and storage.\"\n    },\n    {\n      \"name\": \"Testaccio plain by the Emporium — Horrea Galbana and Monte Testaccio\",\n      \"visual_description\": \"A broad working district south of central Rome with a river landing in the foreground, long warehouse blocks of brick and tile at center-left, and the rising mound of Monte Testaccio at center-right built from broken orange amphora sherds. Cart tracks cut through dusty ground; intact oil amphorae stand in clusters near the warehouse doors. In the background, more storage buildings and a muted urban ridge close the horizon. The place is identified by the combination of river port, major horrea, and the artificial hill of discarded olive-oil containers.\"\n    },\n    {\n      \"name\": \"Rome grain distribution courtyard\",\n      \"visual_description\": \"An enclosed stone-paved courtyard in the city with a colonnade at the back, a chest-high distribution counter at center, and orderly lines marked by low wooden rails. On the left, recipients wait with cloth sacks and baskets; on the right, officials sit at a narrow table with wax tablets and scales. In the background, plastered walls in worn ochre and cream rise above the crowd, with a single arched entry controlling access. The geometry is tight and administrative, contrasting with the open harbor spaces and emphasizing rationed urban distribution.\"\n    }\n  ],\n  \"era_setting\": \"Ancient Rome during the early to high Imperial period, centered on the annona system from Augustus through the mature harbor infrastructure of Claudius and Trajan, with documentary treatment that distinguishes secure facts from estimates and leaves unknown quantities unstated.\",\n  \"visual_style\": {\n    \"palette\": \"travertine white, brick red, Nile silt beige, oxidized bronze green, Tiber mud brown\",\n    \"lighting\": \"Chapter progression must change every scene: chapter 1 hard noon glare with marine haze on the open sea; chapter 2 bright dry afternoon light on the Ostia quay; chapter 3 overcast silver light across the Claudian harbor; chapter 4 dawn haze with low sidelight over Trajan’s hexagonal basin; chapter 5 dim warehouse daylight with narrow window shafts inside the Grandi Horrea; chapter 6 late golden afternoon on the Tiber towpath; chapter 7 dusk with cooling sky and warm reflected light at Testaccio; chapter 8 lamplit interior evening in the grain distribution courtyard.\",\n    \"camera\": \"35mm and 50mm documentary framing, mostly eye-level observational compositions, locked-off wides for geography, restrained handheld for labor details, slow lateral tracking only when following sacks, amphorae, or barges; no heroic low angles, no sweeping fantasy crane moves, no anachronistic aerial spectacle except a sober elevated overview for Trajan’s hexagonal basin.\",\n    \"film_look\": \"Restrained archival-documentary texture with fine natural grain, softened contrast, dusty atmosphere, sun-faded mineral colors, subtle gate-weave feel, and period-correct surface wear on skin, cloth, wood, brick, and clay.\"\n  },\n  \"motifs\": [\n    \"grain measured before it is trusted\",\n    \"water-to-warehouse-to-river chain of supply\",\n    \"state oversight recorded on wax tablets\",\n    \"storage architecture as survival technology\",\n    \"olive oil visible beside grain as parallel bulk provisioning\",\n    \"scarcity implied by limited reserves rather than dramatized invention\"\n  ],\n  \"continuity_rules\": [\n    \"Keep all visuals strictly inside the real food-supply system of imperial Rome; no invented battles, riots, speeches, or unnamed miracles.\",\n    \"Use only the three recurring human figures listed here, with exactly the same face, age, hair, clothing, and props in every appearance.\",\n    \"Show grain logistics in the correct chain: sea convoy, unloading, harbor transfer, measurement, warehouse storage, Tiber transport, urban storage and distribution.\",\n    \"Portus — Claudian harbor basin appears before Portus — Trajanic hexagonal basin; the hexagonal basin appears only in later chapters after the Claudian state is established.\",\n    \"Do not state exact annual tonnage, population, provincial shares, or recipient totals as certain when the evidence is disputed; if text appears in-scene, it must frame them as estimates.\",\n    \"Keep architecture, ships, tools, sacks, amphorae, and writing materials rigorously ancient Roman and non-anachronistic.\",\n    \"Consecutive chapters must never share the same hour, weather, or lighting condition.\",\n    \"Treat documents, buildings, vessels, and stored goods as evidence: observational, specific, and unsensational.\"\n  ]\n}",
+      "Nume Proiect": "How Rome fed a million people",
+      "Research Thin": false,
+      "Script Status": true,
+      "Status General": "Asamblare",
+      "Editing Options": "{\"sfx\": true, \"cast\": [], \"music\": false, \"speed\": 1, \"voice\": {\"style\": 0, \"stability\": 0.5, \"similarity\": 0.75, \"speakerBoost\": true}, \"castRefs\": {\"mensor\": \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:b2095e49-4b2e-4d9f-95fa-b053165c3bf7\", \"praefectus annonae\": \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:107390b6-dfbc-4cca-948f-0b46c3c71c82\", \"river barge hauler\": \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:31a2f227-fe85-4da2-b72d-52ff47ffa8d0\"}, \"category\": \"story\", \"flowRefs\": {\"houseofvideos01@gmail.com\": {\"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:0c023277-d2d5-4ed7-a77e-cc6cb414968e\": \"user:2923-email:686f7573656f66766964656f73303140676d61696c2e636f6d-image:03539b38-1470-4a23-890f-539a8aac823e\", \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:0d329cfa-e5da-4a2b-a96f-1e700e74429e\": \"user:2923-email:686f7573656f66766964656f73303140676d61696c2e636f6d-image:4654d908-bec8-440d-9699-37689dc8c3c5\", \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:107390b6-dfbc-4cca-948f-0b46c3c71c82\": \"user:2923-email:686f7573656f66766964656f73303140676d61696c2e636f6d-image:83233733-ebc5-495f-bba2-b679f925e4ab\", \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:2acbe996-e760-4098-9a83-b572b22f6073\": \"user:2923-email:686f7573656f66766964656f73303140676d61696c2e636f6d-image:ea2e5222-768e-49ef-b704-f2f5acfa2c6f\", \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:31a2f227-fe85-4da2-b72d-52ff47ffa8d0\": \"user:2923-email:686f7573656f66766964656f73303140676d61696c2e636f6d-image:f89c7b47-0a42-4b1f-ab9a-84869297c6cd\", \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:50f10dd7-05d8-413e-9ccb-727d83459688\": \"user:2923-email:686f7573656f66766964656f73303140676d61696c2e636f6d-image:0d90abd6-696a-4485-8846-ec1319d1450e\", \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:573c6279-d7d6-4977-80a8-fd7a2b77b4a9\": \"user:2923-email:686f7573656f66766964656f73303140676d61696c2e636f6d-image:3579165d-5458-44b7-bc33-6cc0418078f0\", \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:73a9d09e-45e0-4a04-aeb0-6074a765133e\": \"user:2923-email:686f7573656f66766964656f73303140676d61696c2e636f6d-image:b2776bd7-5588-49d2-a5b4-e384b1a77b1e\", \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:93a529c6-d4f1-4fff-b674-a4b011b5fa78\": \"user:2923-email:686f7573656f66766964656f73303140676d61696c2e636f6d-image:3823a361-1266-48d9-b3b6-572b835c5390\", \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:9dc48628-10e3-4952-85a7-e74a5230b09c\": \"user:2923-email:686f7573656f66766964656f73303140676d61696c2e636f6d-image:3b93cd0b-87de-4992-988b-144779e1d77c\", \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:b2095e49-4b2e-4d9f-95fa-b053165c3bf7\": \"user:2923-email:686f7573656f66766964656f73303140676d61696c2e636f6d-image:e3f545e8-ceaa-455f-84d3-4863dfce89cc\", \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:bab8ce2b-2be4-4903-b3fb-7abf1b566f87\": \"user:2923-email:686f7573656f66766964656f73303140676d61696c2e636f6d-image:b47efde8-a4e4-4b06-ab53-8968894e23db\", \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:eac4a0ed-1b74-4f36-98a3-d116ac0aa44a\": \"user:2923-email:686f7573656f66766964656f73303140676d61696c2e636f6d-image:0843610e-1b7b-45c6-a62b-a0d741126ac1\"}, \"houseofvideos02@gmail.com\": {\"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:0c023277-d2d5-4ed7-a77e-cc6cb414968e\": \"user:2923-email:686f7573656f66766964656f73303240676d61696c2e636f6d-image:720785a9-0e87-43bb-9f3e-abd265f32a55\", \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:0d329cfa-e5da-4a2b-a96f-1e700e74429e\": \"user:2923-email:686f7573656f66766964656f73303240676d61696c2e636f6d-image:a162c732-f4ce-4f6d-b6e6-db0026894764\", \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:107390b6-dfbc-4cca-948f-0b46c3c71c82\": \"user:2923-email:686f7573656f66766964656f73303240676d61696c2e636f6d-image:366ec5e9-9bdb-418e-a7c7-4ebe27c0d666\", \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:2acbe996-e760-4098-9a83-b572b22f6073\": \"user:2923-email:686f7573656f66766964656f73303240676d61696c2e636f6d-image:a2604988-9487-4fef-8d31-709d73f21160\", \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:31a2f227-fe85-4da2-b72d-52ff47ffa8d0\": \"user:2923-email:686f7573656f66766964656f73303240676d61696c2e636f6d-image:12e5e3bf-b858-4053-b494-e707b1ccaa8d\", \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:50f10dd7-05d8-413e-9ccb-727d83459688\": \"user:2923-email:686f7573656f66766964656f73303240676d61696c2e636f6d-image:e2ae21a4-65f9-4336-a000-fa88fa1b61fe\", \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:573c6279-d7d6-4977-80a8-fd7a2b77b4a9\": \"user:2923-email:686f7573656f66766964656f73303240676d61696c2e636f6d-image:8dc58130-c594-4640-89e2-7dba2a1c0e72\", \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:73a9d09e-45e0-4a04-aeb0-6074a765133e\": \"user:2923-email:686f7573656f66766964656f73303240676d61696c2e636f6d-image:318ce3da-5b37-42bf-8364-9b8c3fbfc414\", \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:93a529c6-d4f1-4fff-b674-a4b011b5fa78\": \"user:2923-email:686f7573656f66766964656f73303240676d61696c2e636f6d-image:ddf08d2a-35a0-4242-9bb2-5a03231cef4d\", \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:9dc48628-10e3-4952-85a7-e74a5230b09c\": \"user:2923-email:686f7573656f66766964656f73303240676d61696c2e636f6d-image:db19b122-bd4b-4017-8ff0-f5d63a8a0318\", \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:b2095e49-4b2e-4d9f-95fa-b053165c3bf7\": \"user:2923-email:686f7573656f66766964656f73303240676d61696c2e636f6d-image:e8000818-4974-4eae-8808-bc36fc21af0a\", \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:bab8ce2b-2be4-4903-b3fb-7abf1b566f87\": \"user:2923-email:686f7573656f66766964656f73303240676d61696c2e636f6d-image:eeb752bd-fc56-43e8-ba4e-c1a50fe9f562\", \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:eac4a0ed-1b74-4f36-98a3-d116ac0aa44a\": \"user:2923-email:686f7573656f66766964656f73303240676d61696c2e636f6d-image:9a2a6e7f-8b6f-4f5e-b28e-ac661ec8fc00\"}}, \"hookPlan\": {\"card\": {\"line1\": \"\", \"line2\": \"\", \"source\": \"\"}, \"beats\": [\"One million people.\", \"Rome could not feed itself.\", \"Grain from across the sea.\", \"Measured, stored, moved inland.\"], \"style\": \"teaser\", \"silent\": false, \"chosenBy\": \"ai\", \"writtenAt\": \"2026-09-24T16:15:24.762Z\"}, \"sfxLevel\": 0.35, \"createdBy\": \"Alex\", \"endScreen\": false, \"hookStyle\": \"auto\", \"styleRefs\": [\"recsA4h3ceOKeAelG\", \"rec0I5MFIrcKa8dpx\", \"rec0o4mnaxznmHd33\"], \"videoPool\": true, \"castSheets\": {\"mensor\": {\"id\": \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:b2095e49-4b2e-4d9f-95fa-b053165c3bf7\", \"url\": \"https://flow-content.google/image/b2095e49-4b2e-4d9f-95fa-b053165c3bf7?Expires=1790288240&KeyName=labs-flow-prod-cdn-key&Signature=l1bPeVMv116ovPkIL34ca2GciFw\", \"kind\": \"portrait\"}, \"praefectus annonae\": {\"id\": \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:107390b6-dfbc-4cca-948f-0b46c3c71c82\", \"url\": \"https://flow-content.google/image/107390b6-dfbc-4cca-948f-0b46c3c71c82?Expires=1790288233&KeyName=labs-flow-prod-cdn-key&Signature=Gvdl2RcaSBU5i_jdGlAdsebpJ3o\", \"kind\": \"turnaround\"}, \"river barge hauler\": {\"id\": \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:31a2f227-fe85-4da2-b72d-52ff47ffa8d0\", \"url\": \"https://flow-content.google/image/31a2f227-fe85-4da2-b72d-52ff47ffa8d0?Expires=1790288249&KeyName=labs-flow-prod-cdn-key&Signature=ikRY-HI-uUFF8yRdAVn5VbfcVuI\", \"kind\": \"portrait\"}}, \"drawnCards\": true, \"motifCards\": [{\"why\": \"Shows the sea supply line as a single journey with named legs, which the ship shot cannot spatially combine.\", \"label\": \"supply\", \"stops\": [\"Sardinia\", \"Sicily\", \"Africa\", \"Egypt\"], \"seconds\": 3.7, \"variant\": \"route\", \"verdict\": \"ok\", \"headline\": \"\", \"minSeconds\": 2.6, \"sceneIndex\": 2, \"sceneOrder\": 3}], \"musicLevel\": 0.22, \"objectRefs\": {\"river grain barge\": \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:eac4a0ed-1b74-4f36-98a3-d116ac0aa44a\", \"grain transport sack\": \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:0c023277-d2d5-4ed7-a77e-cc6cb414968e\"}, \"autoApprove\": false, \"motifReport\": [{\"at\": \"scene 2\", \"why\": \"Shows the sea supply line as a single journey with named legs, which the ship shot cannot spatially combine.\", \"notes\": [], \"variant\": \"route\", \"verdict\": \"ok\"}, {\"at\": \"scene 5\", \"why\": \"note says \\\"2x larger at the top end\\\", but 40000000 against 20000000 is 2× and a difference of 20000000\", \"notes\": [], \"variant\": \"compare\", \"verdict\": \"rejected\"}, {\"at\": \"scene 10\", \"why\": \"every step must be quoted from a DIFFERENT scene — one scene’s sentences are the script, not a card\", \"notes\": [], \"variant\": \"steps\", \"verdict\": \"rejected\"}], \"chapterCards\": false, \"flowAccounts\": 3, \"locationRefs\": {\"Portus — Claudian harbor basin\": \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:9dc48628-10e3-4952-85a7-e74a5230b09c\", \"Rome grain distribution courtyard\": \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:73a9d09e-45e0-4a04-aeb0-6074a765133e\", \"Portus — Trajanic hexagonal basin\": \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:2acbe996-e760-4098-9a83-b572b22f6073\", \"Tiber towpath and river approach to Rome\": \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:573c6279-d7d6-4977-80a8-fd7a2b77b4a9\", \"Mediterranean grain convoy — open sea approach\": \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:93a529c6-d4f1-4fff-b674-a4b011b5fa78\", \"Grandi Horrea, Ostia — grain warehouse interior\": \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:50f10dd7-05d8-413e-9ccb-727d83459688\", \"Ostia river port — late Republic and early Imperial unloading zone\": \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:0d329cfa-e5da-4a2b-a96f-1e700e74429e\", \"Testaccio plain by the Emporium — Horrea Galbana and Monte Testaccio\": \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:bab8ce2b-2be4-4903-b3fb-7abf1b566f87\"}, \"locationPlates\": {\"Portus — Claudian harbor basin\": {\"id\": \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:9dc48628-10e3-4952-85a7-e74a5230b09c\", \"url\": \"https://flow-content.google/image/9dc48628-10e3-4952-85a7-e74a5230b09c?Expires=1790288338&KeyName=labs-flow-prod-cdn-key&Signature=RqkKft36YyZHaf7fVaE-uEVWQBs\"}, \"Rome grain distribution courtyard\": {\"id\": \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:73a9d09e-45e0-4a04-aeb0-6074a765133e\", \"url\": \"https://flow-content.google/image/73a9d09e-45e0-4a04-aeb0-6074a765133e?Expires=1790288381&KeyName=labs-flow-prod-cdn-key&Signature=SwAfGAfweJwFN8b_v2MxRKBMn84\"}, \"Portus — Trajanic hexagonal basin\": {\"id\": \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:2acbe996-e760-4098-9a83-b572b22f6073\", \"url\": \"https://flow-content.google/image/2acbe996-e760-4098-9a83-b572b22f6073?Expires=1790288345&KeyName=labs-flow-prod-cdn-key&Signature=dmkWgd8nMivJ-qSF9X06zt1VG2A\"}, \"Tiber towpath and river approach to Rome\": {\"id\": \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:573c6279-d7d6-4977-80a8-fd7a2b77b4a9\", \"url\": \"https://flow-content.google/image/573c6279-d7d6-4977-80a8-fd7a2b77b4a9?Expires=1790288379&KeyName=labs-flow-prod-cdn-key&Signature=Sc7MBG-61YtBD2tjD4Xw5YL2q2k\"}, \"Mediterranean grain convoy — open sea approach\": {\"id\": \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:93a529c6-d4f1-4fff-b674-a4b011b5fa78\", \"url\": \"https://flow-content.google/image/93a529c6-d4f1-4fff-b674-a4b011b5fa78?Expires=1790288323&KeyName=labs-flow-prod-cdn-key&Signature=Uhf3uSTZZtinZqG_yeUqzJFGwk4\"}, \"Grandi Horrea, Ostia — grain warehouse interior\": {\"id\": \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:50f10dd7-05d8-413e-9ccb-727d83459688\", \"url\": \"https://flow-content.google/image/50f10dd7-05d8-413e-9ccb-727d83459688?Expires=1790288353&KeyName=labs-flow-prod-cdn-key&Signature=BBI2LgUoQbqmifA_LcsTn7SfVGE\"}, \"Ostia river port — late Republic and early Imperial unloading zone\": {\"id\": \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:0d329cfa-e5da-4a2b-a96f-1e700e74429e\", \"url\": \"https://flow-content.google/image/0d329cfa-e5da-4a2b-a96f-1e700e74429e?Expires=1790288331&KeyName=labs-flow-prod-cdn-key&Signature=iyrDDWHgCIhFOt_gj7ywH2pwjsc\"}, \"Testaccio plain by the Emporium — Horrea Galbana and Monte Testaccio\": {\"id\": \"user:2923-email:6665726d61666162697a40676d61696c2e636f6d-image:bab8ce2b-2be4-4903-b3fb-7abf1b566f87\", \"url\": \"https://flow-content.google/image/bab8ce2b-2be4-4903-b3fb-7abf1b566f87?Expires=1790288370&KeyName=labs-flow-prod-cdn-key&Signature=CiaxinftlEjVBoo9Y9SrA3bfXJE\"}}, \"multiVoiceMode\": \"off\", \"watermarkScale\": 1, \"categoryOptions\": {\"multi_voice\": \"off\"}, \"autoApproveSteps\": [], \"watermarkOpenOnce\": false}",
+      "Fără Subtitrări": true
+     }
+    }
+   ]
+  },
+  "List Music": {
+   "runs": 1,
+   "items": [
+    {
+     "files": [
+      {
+       "mimeType": "application/vnd.google-apps.folder",
+       "id": "1sUp1VjvnzKqKitvWRM24tCA1R1ke5En6",
+       "name": "Default"
+      },
+      {
+       "mimeType": "application/vnd.google-apps.folder",
+       "id": "11KXZrFNQEcUbWRpElthjUkbzIQLtZXx6",
+       "name": "Educativ"
+      },
+      {
+       "mimeType": "application/vnd.google-apps.folder",
+       "id": "1Y2sG1aeVpsnx17dE57fohLVcP2WRq48k",
+       "name": "Motivational"
+      },
+      {
+       "mimeType": "application/vnd.google-apps.folder",
+       "id": "1N6jNgrATRbmb-ON_yfZWvIE3Rm8HmgKz",
+       "name": "Documentary"
+      },
+      {
+       "mimeType": "application/vnd.google-apps.folder",
+       "id": "1lUI8Aq93RpKtZZrIwtaIssQm9CaxIMXG",
+       "name": "Cinematic"
+      },
+      {
+       "mimeType": "application/vnd.google-apps.folder",
+       "id": "1rPakvcXUcAc7V_HmEBGFYyN6sMmZ0yNB",
+       "name": "Horror"
+      },
+      {
+       "mimeType": "application/vnd.google-apps.folder",
+       "id": "1OX6wRl79EasP1-UdaMezsxlj7VuXT0pY",
+       "name": "Epic"
+      },
+      {
+       "mimeType": "application/vnd.google-apps.folder",
+       "id": "1UJCIsBaIYzpcnbIicWarxbrKx0Ghj61q",
+       "name": "Dark"
+      }
+     ]
+    }
+   ]
+  },
+  "Match Tone Folder": {
+   "runs": 1,
+   "items": [
+    {
+     "folderId": "1N6jNgrATRbmb-ON_yfZWvIE3Rm8HmgKz",
+     "folderName": "Documentary"
+    }
+   ]
+  },
+  "List Tone Folder": {
+   "runs": 1,
+   "items": [
+    {
+     "files": [
+      {
+       "mimeType": "audio/mpeg",
+       "id": "17vTh3Euv_5b6i0fUAnb9ac0COwC5vzgf",
+       "name": "the_mountain-documentary-483804.mp3"
+      },
+      {
+       "mimeType": "audio/mpeg",
+       "id": "1Y6wy2tmo0SKXW58OQU9ZTKriFU20KZca",
+       "name": "monume-documentary-2-576988.mp3"
+      },
+      {
+       "mimeType": "audio/mpeg",
+       "id": "11IyuHpog6e68NaPWlbH_6Adi10RBJa33",
+       "name": "monume-documentary-576960.mp3"
+      },
+      {
+       "mimeType": "audio/mpeg",
+       "id": "158-tvGDQGejPgZ9VnelLqvr9LTqdkjoB",
+       "name": "alex-morgan-documentary-discovery-wide-horizon-573939.mp3"
+      },
+      {
+       "mimeType": "audio/mpeg",
+       "id": "1mdeCcJg-Pu93-30UOecwDeepsfkhVPUm",
+       "name": "mondamusic-documentary-documentary-music-560149.mp3"
+      },
+      {
+       "mimeType": "audio/mpeg",
+       "id": "1D9eDeG2NZ-tmWQ05qeS4SzGYprEqR39V",
+       "name": "paulyudin-documentary-documentary-music-483324.mp3"
+      },
+      {
+       "mimeType": "audio/mpeg",
+       "id": "1OTs-kjEA77iS4kS5_0hMLk-uqg00hHie",
+       "name": "leberch-documentary-580860.mp3"
+      },
+      {
+       "mimeType": "audio/mpeg",
+       "id": "1TeYoHnBLwVj5bu7di1ntJuTzeGyqSmUG",
+       "name": "leberch-documentary-580529.mp3"
+      }
+     ]
+    }
+   ]
+  },
+  "Pick Music Track": {
+   "runs": 1,
+   "items": [
+    {
+     "id": "158-tvGDQGejPgZ9VnelLqvr9LTqdkjoB",
+     "name": "alex-morgan-documentary-discovery-wide-horizon-573939.mp3",
+     "matched": "subfolder",
+     "url": "https://n8n-production-55dd.up.railway.app/media?id=158-tvGDQGejPgZ9VnelLqvr9LTqdkjoB"
+    }
+   ]
+  },
+  "Build Timeline": {
+   "runs": 1,
+   "items": [
+    {
+     "body": {
+      "scenes": [
+       {
+        "videoUrl": "https://drive.google.com/uc?export=download&id=1R_yBpu0YgqllIzdxMljHt1hCJx5HuUSb",
+        "audioUrl": "https://drive.google.com/uc?export=download&id=10JfHu79qyq627OCVf5M-MhOQvv__qiFb",
+        "holdSeconds": 3,
+        "minSeconds": 1.6,
+        "gapSeconds": 0.45
+       },
+       {
+        "videoUrl": "https://drive.google.com/uc?export=download&id=1g8DrMOzNpGAIK3t42_BhrWKxz9gZM0YR",
+        "audioUrl": "https://drive.google.com/uc?export=download&id=1XXxiXH4lCoqvEHWdAq-3WGoeFLJ58Kz7",
+        "holdSeconds": 3,
+        "minSeconds": 1.6,
+        "gapSeconds": 0.45
+       },
+       {
+        "videoUrl": "https://drive.google.com/uc?export=download&id=1erGDMPMur9K_fskSCl4zDyG_r-UVtnam",
+        "audioUrl": "https://drive.google.com/uc?export=download&id=16tdpguZHn2TaCiu3ukldxlyZHCMQauxt",
+        "holdSeconds": 3,
+        "minSeconds": 1.6,
+        "gapSeconds": 0.45
+       },
+       {
+        "videoUrl": "https://drive.google.com/uc?export=download&id=1PTn1WLdK-NyhApie8jnNsFRfxnPxe_yF",
+        "audioUrl": "https://drive.google.com/uc?export=download&id=1kS7C4W-5l0O9qppp0eF5rss_wxCMxtdw",
+        "holdSeconds": 3,
+        "minSeconds": 1.6,
+        "gapSeconds": 0.45
+       },
+       {
+        "videoUrl": "https://drive.google.com/uc?export=download&id=1D5PNGqZIfC7Xd4Zdg_b4gotd4Ijcdjpi",
+        "audioUrl": "https://drive.google.com/uc?export=download&id=1sEpP_bHZ7uXrJ2zmMVRg1txPK8Mwgg-b"
+       },
+       {
+        "videoUrl": "https://drive.google.com/uc?export=download&id=14Y7atAbXQI60sq7145pwd4sTQ-NEy8ow",
+        "audioUrl": "https://drive.google.com/uc?export=download&id=1CkrEmV1Ccl9rogV3EAQU8Cw5jV9sgbk1"
+       },
+       {
+        "videoUrl": "https://drive.google.com/uc?export=download&id=1SAUUl_gR4FmjFKwzY5E6YeduiWoqateI",
+        "audioUrl": "https://drive.google.com/uc?export=download&id=1TSRkA12Z8fOLiT_Wip55FkrprBXqjbjz"
+       },
+       {
+        "videoUrl": "https://drive.google.com/uc?export=download&id=1_w_OiuO5cklm5tonAjscoVWw093Aag8R",
+        "audioUrl": "https://drive.google.com/uc?export=download&id=1yF10ClRzw8CWlMKgzoPUeSA7jUc9cv3D"
+       },
+       {
+        "videoUrl": "https://drive.google.com/uc?export=download&id=1QSNTpedvnGjme1haFj-c817NMOuo01ki",
+        "audioUrl": "https://drive.google.com/uc?export=download&id=1biXxv527R8kHGQpaLFzBEn5w-hZmjnby"
+       },
+       {
+        "videoUrl": "https://drive.google.com/uc?export=download&id=13ZVbYH4pPlzcc_eisNy-bNs91qFYhwi1",
+        "audioUrl": "https://drive.google.com/uc?export=download&id=1QRxVyRFGcl2j0TqLNREHmrWNK_zQ9Qzd"
+       },
+       {
+        "videoUrl": "https://drive.google.com/uc?export=download&id=1PHbLsl_xeY6hc9neBvooG3oylkOgdfMz",
+        "audioUrl": "https://drive.google.com/uc?export=download&id=1eG5bNFXxGEeHF7FXdkhIp3J_LB4XDpU8",
+        "gapSeconds": 1.5
+       }
+      ],
+      "sceneChapters": [
+       0,
+       0,
+       0,
+       0,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1
+      ],
+      "hookRiser": false,
+      "aspect": "9:16",
+      "resolution": "720p",
+      "nativeAudio": 0.35,
+      "stingers": false,
+      "sceneGap": 0.35
+     },
+     "resolution": "720p",
+     "sceneCount": 11,
+     "tone": "Documentary",
+     "aspect": "9:16",
+     "musicUrl": null,
+     "sfx": true,
+     "sfxLevel": 0.35,
+     "music": false,
+     "musicLevel": 0
+    }
+   ]
+  },
+  "Render Guard": {
+   "runs": 10,
+   "items": [
+    {
+     "lost": false,
+     "status": "done",
+     "progress": 1,
+     "outputFile": "5eab198a-0b71-46e8-a417-54f015dd9190.mp4",
+     "error": null,
+     "verify": {
+      "videoSeconds": 70.166667,
+      "audioSeconds": 70.166009,
+      "sceneStartsSeconds": [
+       0,
+       1.708333,
+       3.625,
+       5.583333,
+       8.083333,
+       12.416667,
+       22.166667,
+       34.708333,
+       45.666667,
+       54.375,
+       58.416667
+      ],
+      "voiceDurationsSeconds": [
+       1.254,
+       1.473,
+       1.525,
+       2.066,
+       3.993,
+       9.415,
+       12.181,
+       10.61,
+       8.358,
+       3.689,
+       10.254
+      ],
+      "stretchFactors": [
+       0.65,
+       0.65,
+       0.65,
+       0.65,
+       0.65,
+       1.221,
+       1.5,
+       1.37,
+       1.089,
+       0.65,
+       1.469
+      ],
+      "breathTrimmedSeconds": 2.97,
+      "musicLufs": null,
+      "musicGainDb": null,
+      "musicVolume": null,
+      "musicDuck": null,
+      "hookEndSeconds": 8.083333,
+      "hookRiser": false
+     },
+     "outputUrl": "http://n8n-production-55dd.up.railway.app/output/5eab198a-0b71-46e8-a417-54f015dd9190.mp4"
+    }
+   ]
+  },
+  "Fetch Script Titles": {
+   "runs": 1,
+   "items": [
+    {
+     "id": "recqLPO6YOGjHnE30",
+     "createdTime": "2026-09-24T16:15:24.816Z",
+     "fields": {
+      "Status": "approved",
+      "Language": "English",
+      "Script Title": "How Rome Fed a Million People",
+      "Script Content": "[CHAPTER 0: HOOK]\nOne million people.\nRome could not feed itself.\nGrain from across the sea.\nMeasured, stored, moved inland.\n\n[CHAPTER 1: The Chain That Fed Rome]\nAugustus appointed a praefectus annonae because Rome could not feed itself. Annual need ran to 20 to 40 million modii, carried by tax grain and private shippers from Sardinia, Sicily, Africa, and Egypt.\n\nClaudius built Portus north of the Tiber mouth, and Trajan’s basin later secured the harbor problem. There mensores verified quantity and quality, turning a convoy into accountable stock.\n\nAt Ostia, the Grandi Horrea held grain under state oversight, with raised floors against damp. Storage turned cargo into reserve instead of trusting direct delivery.\n\nRiver barges hauled it inland toward Rome. At the Emporium on the Testaccio plain, major horrea took over before the annona distributed it.\n\nThe next season, the praefectus annonae had not ended scarcity. He had kept Rome supplied through a chain the state could supervise: harbor, measure, warehouse, river, distribution; the exact volume in motion still remained uncertain.",
+      "script chapters": "[{\"chapter_number\":0,\"chapter_title\":\"HOOK\",\"chapter_summary\":\"The camera swiftly introduces the enormity of Rome's population and the city's alarming inability to sustain itself independently. It shifts to visualizing the vast sea routes that brought grain from distant lands, emphasizing the intricate system of measurement and storage that kept the supply chain moving. ENDS WITH: Measured, stored, moved inland. LEADS INTO: Rome's dependency on a complex grain distribution system is revealed, starting at the sea harbors and leading into the logistics within Portus and Ostia.\",\"narrator_script\":\"One million people.\\nRome could not feed itself.\\nGrain from across the sea.\\nMeasured, stored, moved inland.\"},{\"chapter_number\":1,\"chapter_title\":\"The Chain That Fed Rome\",\"chapter_summary\":\"The story begins with the anomaly the hook has set up: Rome was a vast city, yet the grain that kept it alive did not simply arrive at a market inside the capital. The praefectus annonae's problem is brutally practical: convert seaborne supply into dependable rations before a shortfall reaches the people who depend on it. At Portus and earlier Ostia, grain convoys are broken down into something the state can count, because mensores measure quantity and quality instead of trusting hope, rumor, or a captain's word. That first overturns the obvious reading that feeding Rome was just about having enough ships. Then the grain moves into warehouses such as the Grandi Horrea, where storage creates a buffer and a record, which overturns the next easy idea that cargo went straight from hull to mouth. The final break comes on the Tiber, where river barge haulers drag food inland toward Rome, proving the decisive struggle was not one delivery but every transfer in the chain. By the time grain reaches the city's distribution courtyard under the annona, the system's shape is settled even if exact totals are not: Rome fed itself through coordinated oversight, labor, and infrastructure, while the full volume moving at any one moment remains genuinely unknown.\\nENDS WITH: Grain reaches Rome through the annona's managed chain, changing the question from whether food arrived at all to how tightly the state could control its passage.\\nLEADS INTO: A moment later in time, the consequence is plain: Rome has grain to distribute because the harbors, warehouses, river traffic, and officials held together.\\nRESOLVES WITH: After the transfers are complete, the praefectus annonae has not solved abundance forever; he has kept this cycle from breaking. What is settled is the mechanism: imported grain was measured, stored, and hauled into Rome under supervision. What remains unresolved is scale in exact numbers, because the surviving evidence does not let the film claim more than that.\",\"narrator_script\":\"Augustus appointed a praefectus annonae because Rome could not feed itself. Annual need ran to 20 to 40 million modii, carried by tax grain and private shippers from Sardinia, Sicily, Africa, and Egypt.\\n\\nClaudius built Portus north of the Tiber mouth, and Trajan’s basin later secured the harbor problem. There mensores verified quantity and quality, turning a convoy into accountable stock.\\n\\nAt Ostia, the Grandi Horrea held grain under state oversight, with raised floors against damp. Storage turned cargo into reserve instead of trusting direct delivery.\\n\\nRiver barges hauled it inland toward Rome. At the Emporium on the Testaccio plain, major horrea took over before the annona distributed it.\\n\\nThe next season, the praefectus annonae had not ended scarcity. He had kept Rome supplied through a chain the state could supervise: harbor, measure, warehouse, river, distribution; the exact volume in motion still remained uncertain.\"}]",
+      "Associated Project": [
+       "recq9Ttq2izgGB5lJ"
+      ],
+      "Regenerează Video": false
+     }
+    }
+   ]
+  },
+  "Build Remotion Props": {
+   "runs": 1,
+   "items": [
+    {
+     "body": {
+      "finalVideoUrl": "http://n8n-production-55dd.up.railway.app/output/5eab198a-0b71-46e8-a417-54f015dd9190.mp4",
+      "projectTitle": "How Rome fed a million people",
+      "scenes": [
+       {
+        "narratorText": "One million people.",
+        "startSeconds": 0,
+        "durationSeconds": 1.708333,
+        "chapter": 0,
+        "speechSeconds": 1.254
+       },
+       {
+        "narratorText": "Rome could not feed itself.",
+        "startSeconds": 1.708333,
+        "durationSeconds": 1.916667,
+        "chapter": 0,
+        "speechSeconds": 1.473
+       },
+       {
+        "narratorText": "Grain from across the sea.",
+        "startSeconds": 3.625,
+        "durationSeconds": 1.9583329999999997,
+        "chapter": 0,
+        "speechSeconds": 1.525
+       },
+       {
+        "narratorText": "Measured, stored, moved inland.",
+        "startSeconds": 5.583333,
+        "durationSeconds": 2.5,
+        "chapter": 0,
+        "speechSeconds": 2.066
+       },
+       {
+        "narratorText": "Augustus appointed a praefectus annonae because Rome could not feed itself.",
+        "startSeconds": 8.083333,
+        "durationSeconds": 4.333334000000001,
+        "chapter": 1,
+        "speechSeconds": 3.993
+       },
+       {
+        "narratorText": "Annual need ran to 20 to 40 million modii, carried by tax grain and private shippers from Sardinia, Sicily, Africa, and Egypt.",
+        "startSeconds": 12.416667,
+        "durationSeconds": 9.75,
+        "chapter": 1,
+        "speechSeconds": 9.415
+       },
+       {
+        "narratorText": "Claudius built Portus north of the Tiber mouth, and Trajan’s basin later secured the harbor problem. There mensores verified quantity and quality, turning a convoy into accountable stock.",
+        "startSeconds": 22.166667,
+        "durationSeconds": 12.541666000000003,
+        "chapter": 1,
+        "speechSeconds": 12.181
+       },
+       {
+        "narratorText": "At Ostia, the Grandi Horrea held grain under state oversight, with raised floors against damp. Storage turned cargo into reserve instead of trusting direct delivery.",
+        "startSeconds": 34.708333,
+        "durationSeconds": 10.958333999999994,
+        "chapter": 1,
+        "speechSeconds": 10.61
+       },
+       {
+        "narratorText": "River barges hauled it inland toward Rome. At the Emporium on the Testaccio plain, major horrea took over before the annona distributed it.",
+        "startSeconds": 45.666667,
+        "durationSeconds": 8.708333000000003,
+        "chapter": 1,
+        "speechSeconds": 8.358
+       },
+       {
+        "narratorText": "The next season, the praefectus annonae had not ended scarcity.",
+        "startSeconds": 54.375,
+        "durationSeconds": 4.041666999999997,
+        "chapter": 1,
+        "speechSeconds": 3.689
+       },
+       {
+        "narratorText": "He had kept Rome supplied through a chain the state could supervise: harbor, measure, warehouse, river, distribution; the exact volume in motion still remained uncertain.",
+        "startSeconds": 58.416667,
+        "durationSeconds": 11.750000000000007,
+        "chapter": 1,
+        "speechSeconds": 10.254
+       }
+      ],
+      "tone": "Documentary",
+      "channelName": "Video Factory",
+      "aspectRatio": "9:16",
+      "showCaptions": false,
+      "narrationIsSpoken": true,
+      "montageIntensity": 0,
+      "hookPlan": {
+       "card": {
+        "line1": "",
+        "line2": "",
+        "source": ""
+       },
+       "beats": [
+        "One million people.",
+        "Rome could not feed itself.",
+        "Grain from across the sea.",
+        "Measured, stored, moved inland."
+       ],
+       "style": "teaser",
+       "silent": false,
+       "chosenBy": "ai",
+       "writtenAt": "2026-09-24T16:15:24.762Z"
+      },
+      "showChapterCards": false,
+      "showTextCards": true,
+      "showEndScreen": false,
+      "chapterTitles": {
+       "0": "HOOK",
+       "1": "The Chain That Fed Rome"
+      }
+     }
+    }
+   ]
+  },
+  "Caption Colour": {
+   "runs": 1,
+   "items": [
+    {
+     "body": {
+      "finalVideoUrl": "http://n8n-production-55dd.up.railway.app/output/5eab198a-0b71-46e8-a417-54f015dd9190.mp4",
+      "projectTitle": "How Rome fed a million people",
+      "scenes": [
+       {
+        "narratorText": "One million people.",
+        "startSeconds": 0,
+        "durationSeconds": 1.708333,
+        "chapter": 0,
+        "speechSeconds": 1.254
+       },
+       {
+        "narratorText": "Rome could not feed itself.",
+        "startSeconds": 1.708333,
+        "durationSeconds": 1.916667,
+        "chapter": 0,
+        "speechSeconds": 1.473
+       },
+       {
+        "narratorText": "Grain from across the sea.",
+        "startSeconds": 3.625,
+        "durationSeconds": 1.9583329999999997,
+        "chapter": 0,
+        "speechSeconds": 1.525
+       },
+       {
+        "narratorText": "Measured, stored, moved inland.",
+        "startSeconds": 5.583333,
+        "durationSeconds": 2.5,
+        "chapter": 0,
+        "speechSeconds": 2.066
+       },
+       {
+        "narratorText": "Augustus appointed a praefectus annonae because Rome could not feed itself.",
+        "startSeconds": 8.083333,
+        "durationSeconds": 4.333334000000001,
+        "chapter": 1,
+        "speechSeconds": 3.993
+       },
+       {
+        "narratorText": "Annual need ran to 20 to 40 million modii, carried by tax grain and private shippers from Sardinia, Sicily, Africa, and Egypt.",
+        "startSeconds": 12.416667,
+        "durationSeconds": 9.75,
+        "chapter": 1,
+        "speechSeconds": 9.415
+       },
+       {
+        "narratorText": "Claudius built Portus north of the Tiber mouth, and Trajan’s basin later secured the harbor problem. There mensores verified quantity and quality, turning a convoy into accountable stock.",
+        "startSeconds": 22.166667,
+        "durationSeconds": 12.541666000000003,
+        "chapter": 1,
+        "speechSeconds": 12.181
+       },
+       {
+        "narratorText": "At Ostia, the Grandi Horrea held grain under state oversight, with raised floors against damp. Storage turned cargo into reserve instead of trusting direct delivery.",
+        "startSeconds": 34.708333,
+        "durationSeconds": 10.958333999999994,
+        "chapter": 1,
+        "speechSeconds": 10.61
+       },
+       {
+        "narratorText": "River barges hauled it inland toward Rome. At the Emporium on the Testaccio plain, major horrea took over before the annona distributed it.",
+        "startSeconds": 45.666667,
+        "durationSeconds": 8.708333000000003,
+        "chapter": 1,
+        "speechSeconds": 8.358
+       },
+       {
+        "narratorText": "The next season, the praefectus annonae had not ended scarcity.",
+        "startSeconds": 54.375,
+        "durationSeconds": 4.041666999999997,
+        "chapter": 1,
+        "speechSeconds": 3.689
+       },
+       {
+        "narratorText": "He had kept Rome supplied through a chain the state could supervise: harbor, measure, warehouse, river, distribution; the exact volume in motion still remained uncertain.",
+        "startSeconds": 58.416667,
+        "durationSeconds": 11.750000000000007,
+        "chapter": 1,
+        "speechSeconds": 10.254
+       }
+      ],
+      "tone": "Documentary",
+      "channelName": "Video Factory",
+      "aspectRatio": "9:16",
+      "showCaptions": false,
+      "narrationIsSpoken": true,
+      "montageIntensity": 0,
+      "hookPlan": {
+       "card": {
+        "line1": "",
+        "line2": "",
+        "source": ""
+       },
+       "beats": [
+        "One million people.",
+        "Rome could not feed itself.",
+        "Grain from across the sea.",
+        "Measured, stored, moved inland."
+       ],
+       "style": "teaser",
+       "silent": false,
+       "chosenBy": "ai",
+       "writtenAt": "2026-09-24T16:15:24.762Z"
+      },
+      "showChapterCards": false,
+      "showTextCards": true,
+      "showEndScreen": false,
+      "chapterTitles": {
+       "0": "HOOK",
+       "1": "The Chain That Fed Rome"
+      }
+     }
+    }
+   ]
+  },
+  "Attach Motif Cards": {
+   "runs": 1,
+   "items": [
+    {
+     "body": {
+      "finalVideoUrl": "http://n8n-production-55dd.up.railway.app/output/5eab198a-0b71-46e8-a417-54f015dd9190.mp4",
+      "projectTitle": "How Rome fed a million people",
+      "scenes": [
+       {
+        "narratorText": "One million people.",
+        "startSeconds": 0,
+        "durationSeconds": 1.708333,
+        "chapter": 0,
+        "speechSeconds": 1.254
+       },
+       {
+        "narratorText": "Rome could not feed itself.",
+        "startSeconds": 1.708333,
+        "durationSeconds": 1.916667,
+        "chapter": 0,
+        "speechSeconds": 1.473
+       },
+       {
+        "narratorText": "Grain from across the sea.",
+        "startSeconds": 3.625,
+        "durationSeconds": 1.9583329999999997,
+        "chapter": 0,
+        "speechSeconds": 1.525
+       },
+       {
+        "narratorText": "Measured, stored, moved inland.",
+        "startSeconds": 5.583333,
+        "durationSeconds": 2.5,
+        "chapter": 0,
+        "speechSeconds": 2.066
+       },
+       {
+        "narratorText": "Augustus appointed a praefectus annonae because Rome could not feed itself.",
+        "startSeconds": 8.083333,
+        "durationSeconds": 4.333334000000001,
+        "chapter": 1,
+        "speechSeconds": 3.993
+       },
+       {
+        "narratorText": "Annual need ran to 20 to 40 million modii, carried by tax grain and private shippers from Sardinia, Sicily, Africa, and Egypt.",
+        "startSeconds": 12.416667,
+        "durationSeconds": 9.75,
+        "chapter": 1,
+        "speechSeconds": 9.415
+       },
+       {
+        "narratorText": "Claudius built Portus north of the Tiber mouth, and Trajan’s basin later secured the harbor problem. There mensores verified quantity and quality, turning a convoy into accountable stock.",
+        "startSeconds": 22.166667,
+        "durationSeconds": 12.541666000000003,
+        "chapter": 1,
+        "speechSeconds": 12.181
+       },
+       {
+        "narratorText": "At Ostia, the Grandi Horrea held grain under state oversight, with raised floors against damp. Storage turned cargo into reserve instead of trusting direct delivery.",
+        "startSeconds": 34.708333,
+        "durationSeconds": 10.958333999999994,
+        "chapter": 1,
+        "speechSeconds": 10.61
+       },
+       {
+        "narratorText": "River barges hauled it inland toward Rome. At the Emporium on the Testaccio plain, major horrea took over before the annona distributed it.",
+        "startSeconds": 45.666667,
+        "durationSeconds": 8.708333000000003,
+        "chapter": 1,
+        "speechSeconds": 8.358
+       },
+       {
+        "narratorText": "The next season, the praefectus annonae had not ended scarcity.",
+        "startSeconds": 54.375,
+        "durationSeconds": 4.041666999999997,
+        "chapter": 1,
+        "speechSeconds": 3.689
+       },
+       {
+        "narratorText": "He had kept Rome supplied through a chain the state could supervise: harbor, measure, warehouse, river, distribution; the exact volume in motion still remained uncertain.",
+        "startSeconds": 58.416667,
+        "durationSeconds": 11.750000000000007,
+        "chapter": 1,
+        "speechSeconds": 10.254
+       }
+      ],
+      "tone": "Documentary",
+      "channelName": "Video Factory",
+      "aspectRatio": "9:16",
+      "showCaptions": false,
+      "narrationIsSpoken": true,
+      "montageIntensity": 0,
+      "hookPlan": {
+       "card": {
+        "line1": "",
+        "line2": "",
+        "source": ""
+       },
+       "beats": [
+        "One million people.",
+        "Rome could not feed itself.",
+        "Grain from across the sea.",
+        "Measured, stored, moved inland."
+       ],
+       "style": "teaser",
+       "silent": false,
+       "chosenBy": "ai",
+       "writtenAt": "2026-09-24T16:15:24.762Z"
+      },
+      "showChapterCards": false,
+      "showTextCards": true,
+      "showEndScreen": false,
+      "chapterTitles": {
+       "0": "HOOK",
+       "1": "The Chain That Fed Rome"
+      },
+      "textCards": [
+       {
+        "label": "supply",
+        "stops": [
+         "Sardinia",
+         "Sicily",
+         "Africa",
+         "Egypt"
+        ],
+        "seconds": 3.7,
+        "variant": "route",
+        "headline": "",
+        "minSeconds": 2.6,
+        "sceneIndex": 2
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "Source Watermark": {
+   "runs": 1,
+   "items": [
+    {
+     "body": {
+      "finalVideoUrl": "http://n8n-production-55dd.up.railway.app/output/5eab198a-0b71-46e8-a417-54f015dd9190.mp4",
+      "projectTitle": "How Rome fed a million people",
+      "scenes": [
+       {
+        "narratorText": "One million people.",
+        "startSeconds": 0,
+        "durationSeconds": 1.708333,
+        "chapter": 0,
+        "speechSeconds": 1.254,
+        "provenance": {
+         "visualOrigin": "ai_generated"
+        }
+       },
+       {
+        "narratorText": "Rome could not feed itself.",
+        "startSeconds": 1.708333,
+        "durationSeconds": 1.916667,
+        "chapter": 0,
+        "speechSeconds": 1.473,
+        "provenance": {
+         "visualOrigin": "ai_generated"
+        }
+       },
+       {
+        "narratorText": "Grain from across the sea.",
+        "startSeconds": 3.625,
+        "durationSeconds": 1.9583329999999997,
+        "chapter": 0,
+        "speechSeconds": 1.525,
+        "provenance": {
+         "visualOrigin": "ai_generated"
+        }
+       },
+       {
+        "narratorText": "Measured, stored, moved inland.",
+        "startSeconds": 5.583333,
+        "durationSeconds": 2.5,
+        "chapter": 0,
+        "speechSeconds": 2.066,
+        "provenance": {
+         "visualOrigin": "ai_generated"
+        }
+       },
+       {
+        "narratorText": "Augustus appointed a praefectus annonae because Rome could not feed itself.",
+        "startSeconds": 8.083333,
+        "durationSeconds": 4.333334000000001,
+        "chapter": 1,
+        "speechSeconds": 3.993,
+        "provenance": {
+         "visualOrigin": "ai_generated"
+        }
+       },
+       {
+        "narratorText": "Annual need ran to 20 to 40 million modii, carried by tax grain and private shippers from Sardinia, Sicily, Africa, and Egypt.",
+        "startSeconds": 12.416667,
+        "durationSeconds": 9.75,
+        "chapter": 1,
+        "speechSeconds": 9.415,
+        "provenance": {
+         "visualOrigin": "ai_generated"
+        }
+       },
+       {
+        "narratorText": "Claudius built Portus north of the Tiber mouth, and Trajan’s basin later secured the harbor problem. There mensores verified quantity and quality, turning a convoy into accountable stock.",
+        "startSeconds": 22.166667,
+        "durationSeconds": 12.541666000000003,
+        "chapter": 1,
+        "speechSeconds": 12.181,
+        "provenance": {
+         "visualOrigin": "ai_generated"
+        }
+       },
+       {
+        "narratorText": "At Ostia, the Grandi Horrea held grain under state oversight, with raised floors against damp. Storage turned cargo into reserve instead of trusting direct delivery.",
+        "startSeconds": 34.708333,
+        "durationSeconds": 10.958333999999994,
+        "chapter": 1,
+        "speechSeconds": 10.61,
+        "provenance": {
+         "visualOrigin": "ai_generated"
+        }
+       },
+       {
+        "narratorText": "River barges hauled it inland toward Rome. At the Emporium on the Testaccio plain, major horrea took over before the annona distributed it.",
+        "startSeconds": 45.666667,
+        "durationSeconds": 8.708333000000003,
+        "chapter": 1,
+        "speechSeconds": 8.358,
+        "provenance": {
+         "visualOrigin": "ai_generated"
+        }
+       },
+       {
+        "narratorText": "The next season, the praefectus annonae had not ended scarcity.",
+        "startSeconds": 54.375,
+        "durationSeconds": 4.041666999999997,
+        "chapter": 1,
+        "speechSeconds": 3.689,
+        "provenance": {
+         "visualOrigin": "ai_generated"
+        }
+       },
+       {
+        "narratorText": "He had kept Rome supplied through a chain the state could supervise: harbor, measure, warehouse, river, distribution; the exact volume in motion still remained uncertain.",
+        "startSeconds": 58.416667,
+        "durationSeconds": 11.750000000000007,
+        "chapter": 1,
+        "speechSeconds": 10.254,
+        "provenance": {
+         "visualOrigin": "ai_generated"
+        }
+       }
+      ],
+      "tone": "Documentary",
+      "channelName": "Video Factory",
+      "aspectRatio": "9:16",
+      "showCaptions": false,
+      "narrationIsSpoken": true,
+      "montageIntensity": 0,
+      "hookPlan": {
+       "card": {
+        "line1": "",
+        "line2": "",
+        "source": ""
+       },
+       "beats": [
+        "One million people.",
+        "Rome could not feed itself.",
+        "Grain from across the sea.",
+        "Measured, stored, moved inland."
+       ],
+       "style": "teaser",
+       "silent": false,
+       "chosenBy": "ai",
+       "writtenAt": "2026-09-24T16:15:24.762Z"
+      },
+      "showChapterCards": false,
+      "showTextCards": true,
+      "showEndScreen": false,
+      "chapterTitles": {
+       "0": "HOOK",
+       "1": "The Chain That Fed Rome"
+      },
+      "textCards": [
+       {
+        "label": "supply",
+        "stops": [
+         "Sardinia",
+         "Sicily",
+         "Africa",
+         "Egypt"
+        ],
+        "seconds": 3.7,
+        "variant": "route",
+        "headline": "",
+        "minSeconds": 2.6,
+        "sceneIndex": 2
+       }
+      ],
+      "showSourceWatermark": false,
+      "watermarkOpenOnce": false,
+      "watermarkScale": 1
+     }
+    }
+   ]
+  },
+  "Graphics Guard": {
+   "runs": 12,
+   "items": [
+    {
+     "lost": false,
+     "status": "done",
+     "progress": 1,
+     "outputFile": "bf482797-04b2-4bd7-8748-da184c704e08.mp4",
+     "error": null,
+     "speed": 1,
+     "speedError": null,
+     "engine": "hyperframes",
+     "outputUrl": "http://n8n-production-55dd.up.railway.app/output/bf482797-04b2-4bd7-8748-da184c704e08.mp4"
+    }
+   ]
+  },
+  "Set Final Link": {
+   "runs": 1,
+   "items": [
+    {
+     "video_url": "https://drive.google.com/uc?export=download&id=1c3tsJrwX3kZmg12imHcScDerELOn3qvw",
+     "verify": {
+      "videoSeconds": 70.166667,
+      "audioSeconds": 70.166009,
+      "sceneStartsSeconds": [
+       0,
+       1.708333,
+       3.625,
+       5.583333,
+       8.083333,
+       12.416667,
+       22.166667,
+       34.708333,
+       45.666667,
+       54.375,
+       58.416667
+      ],
+      "voiceDurationsSeconds": [
+       1.254,
+       1.473,
+       1.525,
+       2.066,
+       3.993,
+       9.415,
+       12.181,
+       10.61,
+       8.358,
+       3.689,
+       10.254
+      ],
+      "stretchFactors": [
+       0.65,
+       0.65,
+       0.65,
+       0.65,
+       0.65,
+       1.221,
+       1.5,
+       1.37,
+       1.089,
+       0.65,
+       1.469
+      ],
+      "breathTrimmedSeconds": 2.97,
+      "musicLufs": null,
+      "musicGainDb": null,
+      "musicVolume": null,
+      "musicDuck": null,
+      "hookEndSeconds": 8.083333,
+      "hookRiser": false
+     }
+    }
+   ]
+  },
+  "Assemble Webhook": {
+   "runs": 1,
+   "items": [
+    {
+     "body": {
+      "Project_ID": "recq9Ttq2izgGB5lJ"
+     }
+    }
+   ],
+   "note": "headers dropped; body as received"
+  }
+ },
+ "note": "Final Assembly execution 16974 (the Rome film, 2026-09-24, first Hyperframes film), read with the n8n MCP get_execution. Each node keeps only its LAST run (Render Guard polled 10 times, Graphics Guard 12); runs says how many there were."
+}

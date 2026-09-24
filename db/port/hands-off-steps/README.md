@@ -75,3 +75,31 @@ published first, while the old site was still live, with nothing to wait for.
   switching on picks all six, unticking leaves `images,video`, and a stand-in
   n8n received `auto_approve_steps: "images,video"` with `auto_approve: "yes"`;
   All on a full list clears it and the switch goes off; 390px in both themes.
+
+## Live
+
+- **n8n**: orchestrator `00ea9681`, published 2026-09-24 ~09:07 UTC, before
+  the site. Being additive, it needed nothing to wait for.
+- **The site**: deploy #185, merge `d66c124` into the trunk. The build ran
+  09:30:46 → 09:32:53, and `web` was pulled and restarted by 09:33:09 UTC.
+  The trunk had gained the Cinematic writing path from another session in
+  the meantime (`CLAUDE.md` conflicted, resolved by keeping both entries).
+  `platform/lib/data.ts` and `derive.ts` merged cleanly. The merged tree was
+  re-checked before the push: `tsc`, all of `npm run check`, and `next build`.
+- **Proof that the served page runs it**: `db/port/lib/served-css.workflow.js`
+  (execution 16798, 09:33:50). The login page, fetched from inside n8n,
+  links `/_next/static/css/532290fefe8b70b4.css`. That file carries
+  `.autostep{`, it is the same content hash the local build of the same tree
+  produced, and its `last-modified` (09:31:14) falls inside the build.
+- **Nothing was running in n8n at the push.** The two Claude Scripting runs
+  that had been parked at the scene gate (16776 and 16603) were stopped at
+  09:23:30 by a Delete on the site. The film "De ce motorul are limitator de
+  turație?" is gone from `hov.project`. `deleteProjects` stops EVERY running
+  execution, as Pause does, so the disposable "ZZ DELETE cinematic continuity"
+  film's run went with it. Neither was restarted: one was deleted and the
+  other is a test film.
+- **Owed — the end-to-end proof on a real film.** The first film made from
+  the brief after 09:33:09 carries `editing_options.autoApproveSteps`, even
+  when hands-off is off (`[]`). The old site never sent the field, so the
+  key being present at all means the new brief made it. Read it back with a
+  hands-off film's choice of steps, and watch AutoPilot sign off only those.

@@ -390,7 +390,12 @@ the full entry in the file named:
   calls it. **Judge it by the new executions**: Pause stops every running
   execution, the caller included, so the throwaway may come back canceled
   while the restart completes; and it is one film per call, as the buttons
-  have always been.
+  have always been. **Delete stops every running execution too**
+  (`deleteProjects`: n8n cannot map an execution to a film). So deleting one
+  film cancels every other film's run: on 2026-09-24 at 09:23:30, deleting a
+  film at its scene gate also stopped a test film parked at its own. When
+  two parked runs die in the same second, look for a Delete before looking
+  for a crash.
 - **Any Code-node body or prompt edited through MCP must come from a real,
   committed file first** (`db/port/<feature>/paste/<Node Name>.js`), never
   composed inline in the tool call. `db/port/lib/README.md`.
@@ -487,6 +492,12 @@ Verifying a deploy no longer depends on the producer reloading the page. A
 session with the SSH key can check the real thing directly:
 `docker ps` for health, `docker logs n8n-web-1`, and a `wget` inside the
 container using `SITE_PASSWORD` from `platform.env` as the `vf_auth` cookie.
+**A session without the key can check it too**, via
+`db/port/lib/served-css.workflow.js`. n8n fetches `/login`, the one page
+served without a password, from `http://web:3000`, and reports whether the
+stylesheet it links carries a class only the new build has. `served: true`
+means the new container is the one answering. A green deploy job only says
+the image was pulled.
 The Vercel MCP connector still lists zero projects, and the web-session proxy
 still answers 403 — neither matters now.
 
@@ -532,6 +543,13 @@ expected and harmless for an app touching only its own Drive.
   to test a live node without creating a film**: pin the trigger, the Postgres
   writes and EVERY Execute Workflow node (the tool runs unpinned ones for real).
   Pinned by `npm run check:hands-off` (35) and `check:hands-off-node` (19).
+  **The site half is live since deploy #185** (merge `d66c124`, `web`
+  restarted 09:33:09 UTC on 2026-09-24). The served stylesheet carries the
+  new `.autostep` class (execution 16798). **Owed**: the first film made
+  from the new brief. It carries `editing_options.autoApproveSteps` even
+  with hands-off off (`[]`), and the old site never sent the field, so the
+  key's presence is the end-to-end proof. Then watch AutoPilot sign off only
+  the chosen steps.
 - **Cinematic films have their own writing path since 2026-09-23** (Claude
   Scripting `e45ef4c1`, rollback `538a914c`; full account
   `db/port/cinematic-mode/README.md`, lesson in `docs/lessons-pipeline.md`
@@ -553,6 +571,18 @@ expected and harmless for an app touching only its own Drive.
   each image prompt opening with the designed shot size. **Owed**: one real
   Cinematic film watched after its clips exist, and the hook's "action" style
   still says "protagonist" and "climax".
+  **The first REAL Cinematic film died at `Cine Treatment Parser`** (seen
+  2026-09-24; execution 16640 of 2026-09-23 21:40,
+  "The commute of an average person to work in cyberpank",
+  `recA0UObjuWIU0H07`). It has no script and no scenes. The model wrote a
+  full treatment, but it left `narrator_script` out of chapters 1 and 2. The
+  parser's `fromJson` schema makes every key in the example required, and a
+  silent film has nothing to narrate. The model then re-emitted all three
+  chapters with `"narrator_script": ""`, so the list held six. Even a
+  tolerant parser would have handed on a doubled film. "⟳ Restart writing" is
+  a re-roll, not a fix. The fix is in the schema: either drop the field from
+  the Cinematic treatment, or make it optional. Check first what reads
+  it downstream.
 
 - **The library is ordered by last activity since 2026-09-23** ("Recently
   worked on"; `db/port/activity-order/README.md`, lessons in

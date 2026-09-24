@@ -960,11 +960,24 @@ because it needs a company licence above three people and Hyperframes
   Linux / Railway** — there it is software GL (swiftshader) and 8 vCPU, and
   `HF_WORKERS` defaults to 4. Measure one real film before touching the poll
   ceilings or the site's `120 + 12 × length` estimate.
-- **Not verified**: the Docker image (no Docker on the machine it was built
-  on) — Node 22, puppeteer's chrome-headless-shell, and Debian's ffmpeg 5.1
-  under Hyperframes (the Mac has ffmpeg 8.1). The Dockerfile fails the BUILD
-  if the browser or the page bundle is missing, so a broken image shows up as
-  a failed deploy, not a dead film.
+- **The Docker image works** (Railway deploy `d74eb3b2`, 2026-09-24 15:59):
+  Node 22, puppeteer's chrome-headless-shell 154, Debian's ffmpeg 5.1. The
+  build step printed `hyperframes browser: …` and `hyperframes page bundle: ok`.
+- **First real film, measured on Railway** (Final Assembly 16974, "How Rome
+  fed a million people", 70.2 s, 9:16, 1684 frames, `RENDER_ENGINE=hyperframes`,
+  `HF_WORKERS` default 4): `/assemble` 54 s, the graphics pass **~65 s** —
+  about 26 frames a second, where Remotion's ~2 fps would have been ~14 min.
+  Whole Final Assembly 2 min 16 s. Output 1684 frames, sound byte-identical
+  to the montage (-19.5 LUFS both). **Peak memory 5.3 of 8 GB** (Railway
+  metrics, whole container), CPU peak 4.8 of 8 — higher than the Mac's ~3 GB,
+  so the headroom next to a concurrent `/assemble` is ~2.7 GB. Measure one
+  long (8-minute) film before raising `HF_WORKERS`; lower it to 3 if a long
+  film ever dies with a SIGKILL.
+- **The switch cost a Railway deploy that did not trigger by itself**: the
+  workspace's trial had expired, so the merge produced no deployment at all
+  (not SKIPPED, nothing). A merge that touches `remotion/**` and yields no
+  new row in `list-deployments` within minutes means the plan, not the path
+  filter.
 
 ### Remotion / the edit
 

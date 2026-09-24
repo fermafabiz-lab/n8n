@@ -1053,8 +1053,12 @@ expected and harmless for an app touching only its own Drive.
   the guard now only decides: `Pool Cooldown?` sends the scene back to the head
   of the queue and rests its ACCOUNT 60 s (`cooldownUntil`) while every clip in
   flight keeps being polled. Serial path unchanged. `node
-  db/port/pool-cooldown/check.mjs`. **Unexplained**: the invited accounts made
-  a clip every ~5 min against the manager's ~2m50.
+  db/port/pool-cooldown/check.mjs`. **The invited accounts' half speed is the
+  CAPTCHA, measured the next day**: Google accepted ~4% of their tokens against
+  the manager's ~50% in the same hour, while a clip on `01` generated in 51 s
+  once through. 2Captcha is ~9% accepted everywhere at 20-35 s a solve — two of
+  every five `captchaRetry` attempts are near-certain losses. Full table in
+  `db/port/pool-cooldown/README.md`.
 - **Drawn cards: one accepted motif card used to SILENCE every derived card,
   and the validator refused chapter-start cards on films with chapter cards
   OFF** (2026-09-23, `db/port/motif-more-cards/README.md`). The New York

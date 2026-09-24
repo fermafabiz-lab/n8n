@@ -73,3 +73,41 @@ deploys the site, and a Media Generation run was live when this shipped.
   rests 60s` lines with `POOL … poll` ticks continuing between them, and no
   window where every account goes quiet at once.
 - Why the invited accounts run at half the manager's pace.
+
+## Why the invited accounts are slower — answered the same day
+
+**It is the captcha, not the generation.** Measured 2026-09-24 12:33-12:45
+with a throwaway workflow (execution 16883 + a job read, 16889), on the two
+invited accounts while the live batch used only `fermafabiz`, and read against
+`captcha-stats` for the same hour:
+
+| account | captcha attempts | accepted | CapSolver | 2Captcha |
+|---|---|---|---|---|
+| `fermafabiz` (the live batch's images) | 101 | **51 (50%)** | 48/76 (63%), ~16 s | 3/25 (12%), ~33 s |
+| `houseofvideos01` | 13 | **1** | 1/8 | 0/5 |
+| `houseofvideos02` | 13 | **0** | 0/8 | 0/5 |
+
+Five of six image requests on the invited accounts ended `captcha_quality:
+PUBLIC_ERROR_UNUSUAL_ACTIVITY after 5 attempts` (each 40-50 s of solving for
+nothing). The one clip, on `01` with `veo-3.1-lite`: 3 captcha attempts, 41.8 s,
+then **Google generated it in ~51 s** (created 12:34:04, media 12:34:46,
+completed 12:35:37) — faster than the low-priority queue's ~110 s. So a slow
+invited account is one whose requests spend most of their time being refused at
+the captcha, and whose failed submits then rest (before `c4cd24ea`: froze the
+pool). The image requests in this test were sent in parallel, which may have
+lowered their scores; the single clip, and the Rome film's serial image phase
+(01: 12 of 22 refused vs `fermafabiz` 1 of 26), point the same way.
+
+**Why Google scores their tokens lower is not proven.** The accounts are a week
+old (linked 2026-09-17) against the manager's months; reCAPTCHA Enterprise
+weighs account and session history, so age/activity is the leading guess.
+
+**Two things follow regardless of the why:**
+- 2Captcha is ~9% accepted on every account and takes 20-35 s a solve (useapi's
+  own docs: "30-60 seconds versus ~8-12 seconds for the others"). With
+  `captchaRetry: 5` rotating CapSolver/2Captcha, two of every five attempts are
+  near-certain losses. `captchaOrder` (e.g. CapSolver ×5) or a better second
+  provider would cut that on ALL accounts.
+- Invited accounts are better used for clips than for images: a clip is one
+  captcha per 8 s of film, an image is one per scene and the image phase is
+  serial.

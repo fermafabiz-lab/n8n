@@ -93,6 +93,12 @@ app.post('/render', async (req, res) => {
 	// until that is set — so switching, and switching back, is one variable on
 	// Railway and never a deploy. See render-hf.mjs.
 	const engine = resolveEngine(rawEngine);
+	// MOTION_PACKS=off on the host puts every film back on classic motion —
+	// the rollback for the motion packs (src/motion/packs.ts), one variable
+	// and no deploy, like RENDER_ENGINE. Unset or anything else: packs on.
+	if (String(process.env.MOTION_PACKS || '').toLowerCase() === 'off') {
+		inputProps.motionPack = 'classic';
+	}
 	const speed = normalizeSpeed(rawSpeed);
 	// `resolution` is ours too, and stripped for the same reason: the props the
 	// composition receives must stay byte-identical to what they were before it

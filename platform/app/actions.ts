@@ -1,5 +1,6 @@
 "use server";
 
+import { normalizeMotionPack } from "@/lib/motion-packs";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
@@ -1605,6 +1606,9 @@ export async function confirmFinalSettings(
        clamped on the way in, so a value the slider could not have produced
        resolves to the standard size instead of the nearest end. */
     watermarkScale: number;
+    /* The animation style (lib/motion-packs.ts). Null is "Auto": stored as
+       null, so the category's default decides at render time. */
+    motionPack?: string | null;
     /* NO `speed` here, on purpose. The pace is decided and signed off at the
        audio step, which is the only moment it is free to change, and this
        panel must not be able to move it — nor to reset it. Because
@@ -1653,6 +1657,7 @@ export async function confirmFinalSettings(
         // never quieten a film's provenance labels by itself.
         watermarkOpenOnce: settings.watermarkOpenOnce === true,
         watermarkScale: normalizeWatermarkScale(settings.watermarkScale),
+        motionPack: normalizeMotionPack(settings.motionPack),
       });
     }
     // Same merge, separate condition: the cards change even when no toggle
@@ -2625,6 +2630,10 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     // mistake, and a badge silently drawn at the maximum would be a worse
     // answer than the standard one.
     watermark_scale: normalizeWatermarkScale(formData.get("watermark_scale")),
+      // A known pack id, or "" for Auto — lib/motion-packs.ts. The node stores
+      // it only when it is one of the four, so Auto leaves the category's
+      // default in charge at render time.
+      motion_pack: normalizeMotionPack(formData.get("motion_pack")) ?? "",
     // How the narrator reads. OMITTED when the producer left it on "Voice
     // default", and that absence is the feature: every ElevenLabs voice has
     // its own stored settings, so sending an object we made up would override

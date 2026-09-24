@@ -7,6 +7,7 @@ import { DEFAULT_CATEGORY, getCategory } from "@/lib/categories";
 import { TONES } from "@/lib/tones";
 import Toggle from "@/components/Toggle";
 import CaptionColorPicker from "@/components/CaptionColorPicker";
+import { MOTION_PACKS, defaultMotionPackFor, type MotionPackId } from "@/lib/motion-packs";
 import WatermarkOpenPicker from "@/components/WatermarkOpenPicker";
 import WatermarkSizePicker from "@/components/WatermarkSizePicker";
 import WatermarkPreview, { SAMPLE_SCENES } from "@/components/WatermarkPreview";
@@ -375,6 +376,10 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
   // How big the badge is drawn. 1 is the size every film before this was
   // rendered at, and the slider's own default — see WATERMARK_SCALE.
   const [watermarkScale, setWatermarkScale] = useState(1);
+  // How the graphics move (lib/motion-packs.ts). "" is "Auto": nothing is
+  // stored and the render uses the category's default, so the pick follows
+  // the category until the producer makes one.
+  const [motionPack, setMotionPack] = useState<MotionPackId | "">("");
   const [style, setStyle] = useState(series?.style ?? "");
   // Hands-off mode: WHICH gates sign themselves off (lib/hands-off.ts). Off by
   // default — approving unseen is a real trade, and it must never be the
@@ -1347,6 +1352,34 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
                     name="watermark_scale"
                     value={watermarkScale}
                   />
+                </div>
+                <div className="frow" style={{ marginTop: 18 }}>
+                  <label>Animation style</label>
+                  <input type="hidden" name="motion_pack" value={motionPack} />
+                  <div className="seg" role="group" aria-label="Animation style" style={{ flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      className={motionPack === "" ? "on" : ""}
+                      onClick={() => setMotionPack("")}
+                    >
+                      Auto · {MOTION_PACKS.find((p) => p.id === defaultMotionPackFor(category))?.label}
+                    </button>
+                    {MOTION_PACKS.map((p) => (
+                      <button
+                        type="button"
+                        key={p.id}
+                        className={motionPack === p.id ? "on" : ""}
+                        onClick={() => setMotionPack(p.id)}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="fnote">
+                    {motionPack === ""
+                      ? "How captions and chapter titles move. Auto follows the film's category. Changeable in Final touches."
+                      : MOTION_PACKS.find((p) => p.id === motionPack)?.hint}
+                  </p>
                 </div>
                 {!noHook && (
                 <div className="frow" style={{ marginTop: 18 }}>

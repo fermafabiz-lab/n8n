@@ -10,6 +10,7 @@ import WatermarkSizePicker from "@/components/WatermarkSizePicker";
 import WatermarkPreview, { type PreviewScene } from "@/components/WatermarkPreview";
 import { useSetPendingStage } from "@/components/StageNav";
 import type { EditingOptions, MotifCard } from "@/lib/data";
+import { MOTION_PACKS, defaultMotionPackFor } from "@/lib/motion-packs";
 
 /**
  * The last gate: every clip is approved and the batch is holding just before
@@ -252,6 +253,9 @@ export default function FinalSettings({
   const watermarkScaleMoved =
     rows.some((o) => o.key === "sourceWatermark") &&
     opts.watermarkScale !== initial.watermarkScale;
+  // Not a row either, so counted by hand like the three above: picking a
+  // style and nothing else must still render with it.
+  const motionPackMoved = (opts.motionPack ?? null) !== (initial.motionPack ?? null);
   // The pace is NOT here any more — it is decided and signed off at the audio
   // step, the one moment it costs nothing, and this panel neither shows it nor
   // writes it. (confirmFinalSettings therefore omits `speed` entirely rather
@@ -268,7 +272,8 @@ export default function FinalSettings({
     musicLevelMoved ||
     captionColorMoved ||
     watermarkOpenMoved ||
-    watermarkScaleMoved;
+    watermarkScaleMoved ||
+    motionPackMoved;
   const changeCount =
     changedKeys.length +
     dropped.length +
@@ -276,7 +281,8 @@ export default function FinalSettings({
     (musicLevelMoved ? 1 : 0) +
     (captionColorMoved ? 1 : 0) +
     (watermarkOpenMoved ? 1 : 0) +
-    (watermarkScaleMoved ? 1 : 0);
+    (watermarkScaleMoved ? 1 : 0) +
+    (motionPackMoved ? 1 : 0);
   const done = msg?.ok === true;
   const router = useRouter();
   const setPendingStage = useSetPendingStage();
@@ -540,6 +546,40 @@ export default function FinalSettings({
             </div>
           );
         })}
+      </div>
+
+      {/* How the graphics move (lib/motion-packs.ts). Not a toggle row: one
+          choice among five, where "Auto" stores nothing and lets the
+          category's default decide at render time. */}
+      <div style={{ marginTop: 22, paddingTop: 18, borderTop: "1px solid var(--line)" }}>
+        <h4 style={{ margin: 0 }}>
+          Animation style
+          {motionPackMoved && <span className="chg">changed</span>}
+        </h4>
+        <div className="seg" role="group" aria-label="Animation style" style={{ flexWrap: "wrap", marginTop: 10 }}>
+          <button
+            type="button"
+            className={!opts.motionPack ? "on" : ""}
+            onClick={() => setOpts((p) => ({ ...p, motionPack: null }))}
+          >
+            Auto · {MOTION_PACKS.find((m) => m.id === defaultMotionPackFor(category))?.label}
+          </button>
+          {MOTION_PACKS.map((m) => (
+            <button
+              type="button"
+              key={m.id}
+              className={opts.motionPack === m.id ? "on" : ""}
+              onClick={() => setOpts((p) => ({ ...p, motionPack: m.id }))}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+        <p className="fnote" style={{ marginTop: 8 }}>
+          {opts.motionPack
+            ? MOTION_PACKS.find((m) => m.id === opts.motionPack)?.hint
+            : "How captions and chapter titles move. Auto follows the film's category."}
+        </p>
       </div>
 
       {/* Drawn cards. Absent entirely when the pipeline chose none, which is

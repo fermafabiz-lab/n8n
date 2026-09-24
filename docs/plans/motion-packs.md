@@ -79,3 +79,23 @@ cd n8n-engine && (cd platform && npm ci) && claude
 - Non-Story categories match `classic` (a flat diff, as `compare-engines` measured today).
 - The first real Story film with `MOTION_PACKS=story` is watched by the producer.
 
+
+## Status (2026-09-24 evening)
+
+- **Storyboard done and chosen.** The producer saw three Story directions on the
+  Rome film (`remotion/out/storyboard/`, local only) and asked for all three to
+  be available, with Punch toned down (overshoot 1.70 → 0.6, grows from 85%
+  instead of 55%, slam title 1.3 → 1.15).
+- **Four packs, picked per film:** `classic`, `editorial`, `punch`,
+  `lowerThird`. Chosen on the brief ("Animation style", Auto by default) and in
+  Final touches; stored as `Editing Options.motionPack` only when explicit.
+  **Auto = the category's default: Editorial for Story, Classic elsewhere.**
+- **Where the rule lives (three copies, move together):**
+  `remotion/src/motion/packs.ts` (`npm run check:motion`),
+  `platform/lib/motion-packs.ts` (`npm run check:normalize`), and n8n —
+  orchestrator `Normalize Webhook Input` stores `motion_pack`, Final Assembly
+  `Caption Colour` sends `category` + `motionPack` to the render
+  (`db/port/motion-packs/`, `node db/port/motion-packs/check.mjs`).
+- **Rollback:** `MOTION_PACKS=off` on Railway puts every film on classic.
+- **Measured locally:** a Documentary film with no pick renders identical to
+  classic; a Story film with no pick renders as Editorial.

@@ -17,6 +17,7 @@
 
 import { normalizeStyleRefs } from "@/lib/style-refs";
 import { autoStepsOf, type AutoStep } from "@/lib/hands-off";
+import { normalizeMotionPack, type MotionPackId } from "@/lib/motion-packs";
 import type { DocumentaryVisualSource } from "@/lib/archive/types";
 import { parseEditingOptionsShape } from "@/lib/editingOptionsShape";
 import {
@@ -221,6 +222,13 @@ export interface EditingOptions {
    * they move together, or a film is drawn at a size the slider never offered.
    */
   watermarkScale: number;
+  /**
+   * How the film's graphics move — captions and chapter titles
+   * (lib/motion-packs.ts). Null means nobody picked: the render then uses the
+   * category's default (Editorial for Story, Classic elsewhere), so a default
+   * changed later still reaches every film that never chose.
+   */
+  motionPack: MotionPackId | null;
   /**
    * Hands-off mode: the site signs off every gate by itself as the assets
    * land — script, scene texts, takes, images, clips — and presses the final
@@ -1366,6 +1374,7 @@ export function buildProject(r: RawProject): Project {
       // film's provenance labels by itself.
       watermarkOpenOnce: opts.watermarkOpenOnce === true,
       watermarkScale: normalizeWatermarkScale(opts.watermarkScale),
+      motionPack: normalizeMotionPack(opts.motionPack),
       // Strictly opt-in: hands-off is a real trade (nothing gets a human
       // look) and must never switch itself on by absence. `autoStepsOf` reads
       // the step list when there is one and the old switch when there is not.

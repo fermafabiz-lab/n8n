@@ -273,6 +273,14 @@ export const captionAt = (scenes: SceneCaption[], seconds: number) => {
 				keywords: flags.slice(count, count + chunk.length),
 				/** Position in the scene's spoken words — for tests and debugging. */
 				wordIndex,
+				/**
+				 * Film seconds each word of the chunk starts being spoken. Motion
+				 * packs (src/motion/) animate a word's entrance from it; the
+				 * classic captions ignore it.
+				 */
+				wordStartsSeconds: timings
+					.slice(count, count + chunk.length)
+					.map((t) => scene.startSeconds + t.start),
 			};
 		}
 		count += chunk.length;

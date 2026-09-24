@@ -100,3 +100,11 @@ Rough size: phase 1 is 1–2 days of session work; phases 2–4 are 2–4 days. 
   - the site panel shows real progress;
   - no n8n Final Assembly execution.
 
+
+## Note from the animation track (2026-09-24)
+
+Final Assembly's `Caption Colour` node now also sends **`category`** and
+**`motionPack`** in the render body (`db/port/motion-packs/paste/fa-Caption_Colour.js`).
+The engine's `captionColour` / `buildProps` port must send the same two fields,
+with the same rule: `category` when it is a non-empty string, `motionPack` only
+when it is one of `classic | editorial | punch | lowerThird`.

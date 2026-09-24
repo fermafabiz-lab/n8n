@@ -155,5 +155,16 @@ check('publishing: ytTitle clamped to 200 chars', normalizePublishing({ytTitle: 
 check('publishing: description clamped to 5500 chars', normalizePublishing({description: 'x'.repeat(6000)}).description.length, 5500);
 check('publishing: non-string fields become empty strings, not thrown away silently', normalizePublishing({notes: 12345}).notes, '');
 
+// --- motion packs (lib/motion-packs.ts) -----------------------------------------
+// The render's half of the same rules is remotion/scripts/check-motion.mjs;
+// the ids and the Story default must match it.
+const mp = await import(join(root, 'lib', 'motion-packs.ts'));
+check('motion pack: absent -> null (Auto, the category decides)', mp.normalizeMotionPack(undefined), null);
+check('motion pack: unknown refused -> null', mp.normalizeMotionPack('flashy'), null);
+check('motion pack: the four ids pass', ['classic', 'editorial', 'punch', 'lowerThird'].map(mp.normalizeMotionPack), ['classic', 'editorial', 'punch', 'lowerThird']);
+check('motion pack: case matters (the render reads lowerThird exactly)', mp.normalizeMotionPack('lowerthird'), null);
+check('motion pack: Story defaults to editorial', mp.defaultMotionPackFor('story'), 'editorial');
+check('motion pack: every other category defaults to classic', ['documentary', 'cinematic', 'kids', null].map(mp.defaultMotionPackFor), ['classic', 'classic', 'classic', 'classic']);
+
 console.log(`\n${results.filter(Boolean).length}/${results.length} passed`);
 process.exit(results.every(Boolean) ? 0 : 1);

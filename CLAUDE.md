@@ -537,7 +537,13 @@ expected and harmless for an app touching only its own Drive.
 
 - **Final Assembly is moving out of n8n into `engine/`** (plan and phase
   log: `docs/plans/engine-final-assembly.md`, detail `engine/README.md`).
-  **The engine is LIVE on the box since 2026-09-24, but idle by default.**
+  **Since 2026-09-25 19:20 UTC EVERY final render from the site goes
+  through the engine** (repo Variable `FINAL_ASSEMBLY_ENGINE=code`, written
+  into `platform.env` by `deploy-platform.yml`, deploy `e307671`).
+  **Rollback:** `gh variable set FINAL_ASSEMBLY_ENGINE --body n8n && gh
+  workflow run "Deploy platform"`. The one path still on n8n is Upscale
+  film's rebuild, which fires the `assemble` webhook itself (phase 5).
+  The notes below describe how it got here.
   - **What it is.** A container `hov-engine`, started by
     `.github/workflows/deploy-engine.yml` with `docker run`, not compose,
     because nothing deploys the box's compose file. It drives `hov.render_job`
@@ -548,9 +554,9 @@ expected and harmless for an app touching only its own Drive.
     only through `POST /api/ops/assemble {projectId, engine: "code"}` (the
     `x-hov-key` door, like `/api/ops/restart`), and a Restart on it then stays
     on the engine for a day (`lib/assembly-engine.ts`).
-  - **The switch is not wired yet.** `FINAL_ASSEMBLY_ENGINE` is not written
-    into `platform.env` by `deploy-platform.yml`; flipping every film means
-    adding it there, which is the next step.
+  - **The switch.** `FINAL_ASSEMBLY_ENGINE` is written into `platform.env`
+    by `deploy-platform.yml` from the Variable of the same name (default
+    `n8n`).
   - **The first real film is done** (2026-09-25, render_job 2, the 70 s Rome
     film `recq9Ttq2izgGB5lJ`): 2 minutes queued → done. Its assemble verify is
     identical to n8n's execution 16974. It is stored at
@@ -580,8 +586,14 @@ expected and harmless for an app touching only its own Drive.
     - the site panel watched during an engine render (the Rome film already
       had a final link, so the panel never showed);
     - a long film;
-    - wiring the switch;
-    - phase 5, retiring n8n's Final Assembly.
+    - the first NEW film rendered with the switch on, which is also the
+      first chance to see the panel's real phase;
+    - phase 5: repoint Upscale film to `/api/ops/assemble` and retire n8n's
+      Final Assembly.
+  - **A button test is done.** On 2026-09-25 the producer turned captions on
+    for the Rome film in Final touches. render_job 3 (`requested_by: site`)
+    rendered it in 1 min 52 s, and the only change in the request was
+    `showCaptions`.
 
 - **The graphics pass is drawn by Hyperframes since 2026-09-24 16:04 UTC**
   (`RENDER_ENGINE=hyperframes` on Railway; merge `efeb6ab`; lesson in

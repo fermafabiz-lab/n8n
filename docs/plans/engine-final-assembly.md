@@ -116,6 +116,9 @@ cd n8n-engine && (cd platform && npm ci) && claude
        - adding `FINAL_ASSEMBLY_ENGINE` to `deploy-platform.yml` so the default can be flipped;
        - watching the panel during an engine render;
        - one long film.
+   - **The default is flipped, 2026-09-25 19:20 UTC** (deploy `e307671`, Variable `FINAL_ASSEMBLY_ENGINE=code`):
+     - **Before the flip:** a button test through Final touches (render_job 3, captions on).
+     - **Still owed:** the panel, watched on the first new film.
 5. **Retire** the `assemble` webhook, the orchestrator's disconnected `Execute Final Assembly*` nodes, and the probe branch. Update `CLAUDE.md`.
 
 Rough size: phase 1 is 1–2 days of session work; phases 2–4 are 2–4 days. Each phase ends in a commit and a report.

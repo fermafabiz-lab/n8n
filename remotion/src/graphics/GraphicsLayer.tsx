@@ -117,7 +117,7 @@ export const GraphicsLayer: React.FC<{
 					<Sequence key={`g-${i}-${from}`} from={from} durationInFrames={dur}>
 						{p.kind === 'tag' && <LowerThird design={p.design} title={p.title} subtitle={p.subtitle} accent={accent} portrait={portrait} />}
 						{p.kind === 'chapterTag' && (
-							<LowerThird design={p.design} title={p.title} subtitle={p.subtitle} accent={accent} portrait={portrait} />
+							<LowerThird design={p.design} title={p.title} subtitle={p.subtitle} accent={accent} portrait={portrait} chapter />
 						)}
 						{p.kind === 'stat' && (
 							<StatOverlay
@@ -131,9 +131,9 @@ export const GraphicsLayer: React.FC<{
 						)}
 						{p.kind === 'chapterTitle' &&
 							(p.design === 'prism' ? (
-								<PrismTitle title={p.title} kicker={p.kicker} accent={accent} />
+								<PrismTitle title={p.title} kicker={p.kicker} accent={accent} portrait={portrait} />
 							) : (
-								<HandwrittenTitle title={p.title} kicker={p.kicker} accent={accent} />
+								<HandwrittenTitle title={p.title} kicker={p.kicker} accent={accent} portrait={portrait} />
 							))}
 						{p.kind === 'flash' && <EditorialFlash hitAt={FLASH_HIT} />}
 					</Sequence>

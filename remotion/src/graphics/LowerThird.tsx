@@ -24,21 +24,46 @@ export const LowerThird: React.FC<{
 	/** The tone's accent (preset.cardInk). */
 	accent: string;
 	portrait: boolean;
-}> = ({design, title, subtitle, accent, portrait}) => {
+	/** A chapter opening rather than a name tag: on a vertical frame it is set
+	 *  larger, higher and over a shade (see `big`). */
+	chapter?: boolean;
+}> = ({design, title, subtitle, accent, portrait, chapter = false}) => {
 	const frame = useCurrentFrame();
 	const {fps, width, height, durationInFrames} = useVideoConfig();
 	const t = frame / fps;
 	const dur = durationInFrames / fps;
 	const s = Math.min(width, height) / 1080;
 	const out = dur - 0.5;
+	// A chapter opening on a vertical frame. Sized from the short side, the
+	// landscape design comes out at two thirds on 9:16 — a 15 px kicker — and
+	// sits on the captions' shoulder. Here it is a third larger, in the upper
+	// band (below the platforms' top bar, well above the captions), with wider
+	// margins and a shade so it holds on any picture.
+	const big = portrait && chapter;
+	const k = big ? 1.3 : 1;
+	// Small print never under 22 px on a vertical frame: a phone shows the
+	// 720-wide frame at about half size.
+	const fine = (n: number) => (portrait ? Math.max(n * s, big ? 26 : 22) : n * s);
+	const shade = big ? power3Out(prog(t, 0, 0.4)) * (1 - power2In(prog(t, dur - 0.45, 0.4))) : 0;
+	const Shade = big ? (
+		<AbsoluteFill
+			style={{
+				background:
+					'linear-gradient(180deg, rgba(0,0,0,0) 14%, rgba(0,0,0,0.5) 26%, rgba(0,0,0,0.5) 52%, rgba(0,0,0,0) 66%)',
+				opacity: shade,
+			}}
+		/>
+	) : null;
 
-	const box: React.CSSProperties = {
-		position: 'absolute',
-		left: portrait ? 40 : 130 * s,
-		right: portrait ? 40 : undefined,
-		bottom: portrait ? 450 : 215,
-		maxWidth: portrait ? width - 80 : width * 0.6,
-	};
+	const box: React.CSSProperties = big
+		? {position: 'absolute', left: 52, right: 60, top: height * 0.3, maxWidth: width - 112}
+		: {
+				position: 'absolute',
+				left: portrait ? 40 : 130 * s,
+				right: portrait ? 40 : undefined,
+				bottom: portrait ? 450 : 215,
+				maxWidth: portrait ? width - 80 : width * 0.6,
+			};
 
 	if (design === 'sideRule') {
 		const bar = power3Out(prog(t, 0.1, 0.5)) * (1 - power2In(prog(t, out + 0.07, 0.32)));
@@ -48,6 +73,7 @@ export const LowerThird: React.FC<{
 		const roleOut = power2In(prog(t, out, 0.3));
 		return (
 			<AbsoluteFill>
+				{Shade}
 				<div style={{...box, display: 'flex', alignItems: 'stretch', gap: 26 * s}}>
 					<div
 						style={{
@@ -63,7 +89,7 @@ export const LowerThird: React.FC<{
 						<div
 							style={{
 								fontFamily: GF.leagueGothic,
-								fontSize: 92 * s,
+								fontSize: 92 * s * k,
 								...BALANCE,
 								lineHeight: 1.0,
 								color: '#FFFFFF',
@@ -80,7 +106,7 @@ export const LowerThird: React.FC<{
 							<div
 								style={{
 									fontFamily: GF.jetbrainsMono,
-									fontSize: 26 * s,
+									fontSize: fine(26),
 									lineHeight: 1.25,
 									color: '#E7EAF0',
 									letterSpacing: '0.04em',
@@ -106,6 +132,7 @@ export const LowerThird: React.FC<{
 		const role = power2Out(prog(t, 0.56, 0.45));
 		return (
 			<AbsoluteFill>
+				{Shade}
 				<div
 					style={{
 						...box,
@@ -124,7 +151,7 @@ export const LowerThird: React.FC<{
 						style={{
 							fontFamily: GF.montserrat,
 							fontWeight: 700,
-							fontSize: 48 * s,
+							fontSize: 48 * s * k,
 							...BALANCE,
 							lineHeight: 1.12,
 							letterSpacing: '-0.015em',
@@ -149,7 +176,7 @@ export const LowerThird: React.FC<{
 							style={{
 								fontFamily: GF.montserrat,
 								fontWeight: 400,
-								fontSize: 25 * s,
+								fontSize: fine(25),
 								lineHeight: 1.25,
 								letterSpacing: '0.02em',
 								color: '#AEB6C2',
@@ -173,6 +200,7 @@ export const LowerThird: React.FC<{
 		const base = power4Out(prog(t, 0.5, 0.5)) * (1 - power2In(prog(t, out, 0.3)));
 		return (
 			<AbsoluteFill>
+				{Shade}
 				<div style={{...box, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 14 * s}}>
 					{subtitle && (
 						<div style={{overflow: 'visible'}}>
@@ -181,7 +209,7 @@ export const LowerThird: React.FC<{
 									display: 'inline-block',
 									fontFamily: GF.spaceMono,
 									fontWeight: 700,
-									fontSize: 22 * s,
+									fontSize: fine(22),
 									color: '#141518',
 									background: accent,
 									padding: `${6 * s}px ${14 * s}px`,
@@ -198,7 +226,7 @@ export const LowerThird: React.FC<{
 					<div
 						style={{
 							fontFamily: GF.archivoBlack,
-							fontSize: 70 * s,
+							fontSize: 70 * s * k,
 							...BALANCE,
 							lineHeight: 1.08,
 							letterSpacing: '-0.015em',
@@ -234,12 +262,13 @@ export const LowerThird: React.FC<{
 	if (gone) return null;
 	return (
 		<AbsoluteFill>
-			<div style={{...box, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 22 * s}}>
+			{Shade}
+			<div style={{...box, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 22 * s * k}}>
 				<div
 					style={{
 						fontFamily: GF.barlowCondensed,
 						fontWeight: 800,
-						fontSize: 88 * s,
+						fontSize: 88 * s * k,
 						...BALANCE,
 						lineHeight: 1.12,
 						color: '#212529',
@@ -259,7 +288,7 @@ export const LowerThird: React.FC<{
 						style={{
 							fontFamily: GF.barlowCondensed,
 							fontWeight: 700,
-							fontSize: 48 * s,
+							fontSize: 48 * s * k,
 							lineHeight: 1.15,
 							color: '#FFFFFF',
 							background: accent,

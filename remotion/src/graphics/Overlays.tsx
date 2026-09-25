@@ -120,7 +120,12 @@ const Dim: React.FC<{amount: number}> = ({amount}) => (
  * blue copy settle from wide to a few pixels either side, on a slight
  * perspective bow, then breathe until they blur out.
  */
-export const PrismTitle: React.FC<{title: string; kicker?: string; accent: string}> = ({title, kicker, accent}) => {
+export const PrismTitle: React.FC<{title: string; kicker?: string; accent: string; portrait?: boolean}> = ({
+	title,
+	kicker,
+	accent,
+	portrait = false,
+}) => {
 	const {t, dur, width, height, s} = useClock();
 	const IN = Math.min(0.8, Math.max(0.3, dur * 0.08));
 	const OUT = Math.min(0.6, Math.max(0.25, dur * 0.06));
@@ -136,12 +141,12 @@ export const PrismTitle: React.FC<{title: string; kicker?: string; accent: strin
 		words,
 		advance: 0.6,
 		spaceRatio: 0.3,
-		wrapWidth: width * 0.84,
-		maxSize: 260 * s,
-		minSize: 60 * s,
+		wrapWidth: width * (portrait ? 0.8 : 0.84),
+		maxSize: portrait ? 150 : 260 * s,
+		minSize: portrait ? 56 : 60 * s,
 		maxLines: 3,
 		lineHeight: 1.12,
-		maxHeight: height * 0.5,
+		maxHeight: height * (portrait ? 0.34 : 0.5),
 	});
 	const layer = (color: string, dx: number, opacity: number): React.CSSProperties => ({
 		position: 'absolute',
@@ -157,9 +162,13 @@ export const PrismTitle: React.FC<{title: string; kicker?: string; accent: strin
 				style={{
 					alignItems: 'center',
 					justifyContent: 'center',
+					// Vertical: centred at 42% of the height, clear of the captions.
+					paddingBottom: portrait ? height * 0.16 : 0,
 					transform: `perspective(${950 * s}px) rotateX(6deg) scale(${breathe.toFixed(4)})`,
 					opacity: fade * (1 - leave),
-					filter: `blur(${blur.toFixed(2)}px)`,
+					// On a vertical frame the kicker is too small to survive the
+					// blur, so only the title is blurred there.
+					filter: portrait ? undefined : `blur(${blur.toFixed(2)}px)`,
 				}}
 			>
 				{kicker && (
@@ -167,11 +176,12 @@ export const PrismTitle: React.FC<{title: string; kicker?: string; accent: strin
 						style={{
 							fontFamily: GF.spaceMono,
 							fontWeight: 700,
-							fontSize: 24 * s,
-							letterSpacing: '0.35em',
+							fontSize: portrait ? 28 : 24 * s,
+							letterSpacing: portrait ? '0.3em' : '0.35em',
+							textShadow: portrait ? '0 2px 12px rgba(0,0,0,0.6)' : undefined,
 							textTransform: 'uppercase',
 							color: '#FFFFFF',
-							opacity: 0.8,
+							opacity: portrait ? 0.92 : 0.8,
 							marginBottom: 24 * s,
 						}}
 					>
@@ -181,13 +191,14 @@ export const PrismTitle: React.FC<{title: string; kicker?: string; accent: strin
 				<div
 					style={{
 						position: 'relative',
-						maxWidth: width * 0.86,
+						maxWidth: width * (portrait ? 0.82 : 0.86),
 						textAlign: 'center',
 						fontFamily: GF.inter,
 						fontWeight: 600,
 						fontSize,
 						lineHeight: 1.12,
 						letterSpacing: '-0.02em',
+						filter: portrait ? `blur(${blur.toFixed(2)}px)` : undefined,
 					}}
 				>
 					<div style={layer('#FF2A4D', -spread, 0.45 + 0.4 * focus)}>{title}</div>
@@ -206,7 +217,12 @@ export const PrismTitle: React.FC<{title: string; kicker?: string; accent: strin
  * video size and needs no per-glyph paths, which is what lets any title in
  * any language use it.
  */
-export const HandwrittenTitle: React.FC<{title: string; kicker?: string; accent: string}> = ({title, kicker, accent}) => {
+export const HandwrittenTitle: React.FC<{title: string; kicker?: string; accent: string; portrait?: boolean}> = ({
+	title,
+	kicker,
+	accent,
+	portrait = false,
+}) => {
 	const {t, dur, width, height, s} = useClock();
 	const write = power2Out(prog(t, 0.25, Math.min(1.8, dur * 0.45)));
 	const under = power2Out(prog(t, 0.25 + Math.min(1.8, dur * 0.45) - 0.1, 0.7));
@@ -217,12 +233,12 @@ export const HandwrittenTitle: React.FC<{title: string; kicker?: string; accent:
 		words,
 		advance: 0.42,
 		spaceRatio: 0.25,
-		wrapWidth: width * 0.84,
-		maxSize: 170 * s,
-		minSize: 50 * s,
+		wrapWidth: width * (portrait ? 0.8 : 0.84),
+		maxSize: portrait ? 130 : 170 * s,
+		minSize: portrait ? 56 : 50 * s,
 		maxLines: 3,
 		lineHeight: 1.15,
-		maxHeight: height * 0.5,
+		maxHeight: height * (portrait ? 0.34 : 0.5),
 	});
 	// The feathered edge of the wipe, 12% wide, travels from before the first
 	// letter to past the last, so the first and last glyphs are written too.
@@ -231,13 +247,13 @@ export const HandwrittenTitle: React.FC<{title: string; kicker?: string; accent:
 	return (
 		<AbsoluteFill style={{opacity: 1 - leave}}>
 			<Dim amount={dim} />
-			<AbsoluteFill style={{alignItems: 'center', justifyContent: 'center'}}>
+			<AbsoluteFill style={{alignItems: 'center', justifyContent: 'center', paddingBottom: portrait ? height * 0.16 : 0}}>
 				{kicker && (
 					<div
 						style={{
 							fontFamily: GF.caveat,
 							fontWeight: 700,
-							fontSize: fontSize * 0.34,
+							fontSize: portrait ? Math.max(fontSize * 0.42, 36) : fontSize * 0.34,
 							color: accent,
 							marginBottom: 6 * s,
 							opacity: power2Out(prog(t, 0.1, 0.4)),
@@ -246,7 +262,7 @@ export const HandwrittenTitle: React.FC<{title: string; kicker?: string; accent:
 						{kicker}
 					</div>
 				)}
-				<div style={{position: 'relative', maxWidth: width * 0.86, textAlign: 'center'}}>
+				<div style={{position: 'relative', maxWidth: width * (portrait ? 0.82 : 0.86), textAlign: 'center'}}>
 					<div
 						style={{
 							fontFamily: GF.caveat,
@@ -264,7 +280,14 @@ export const HandwrittenTitle: React.FC<{title: string; kicker?: string; accent:
 					<svg
 						viewBox="0 0 100 10"
 						preserveAspectRatio="none"
-						style={{display: 'block', width: '70%', height: fontSize * 0.14, margin: '0 auto'}}
+						style={{
+							display: 'block',
+							width: '70%',
+							height: fontSize * 0.14,
+							margin: '0 auto',
+							overflow: 'visible',
+							clipPath: `inset(-50% ${((1 - under) * 100).toFixed(2)}% -50% 0)`,
+						}}
 					>
 						<path
 							d="M2 6 C 25 2, 55 9, 98 4"
@@ -272,9 +295,6 @@ export const HandwrittenTitle: React.FC<{title: string; kicker?: string; accent:
 							stroke={accent}
 							strokeWidth={1.4}
 							strokeLinecap="round"
-							pathLength={1}
-							strokeDasharray="1 1"
-							strokeDashoffset={(1 - under).toFixed(4)}
 							vectorEffect="non-scaling-stroke"
 							style={{strokeWidth: 7 * s}}
 						/>

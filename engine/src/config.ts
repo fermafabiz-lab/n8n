@@ -26,6 +26,12 @@ export interface Config {
   elevenLabsKey: string;
   /** Voice takes in flight at once. ElevenLabs allows 5 concurrent requests on this plan. */
   voiceConcurrency: number;
+  /** useapi.net, for Google Flow images (and clips, later). */
+  useapiToken: string;
+  /** The site, from inside the compose network, and the key its ingest door takes. */
+  siteUrl: string;
+  mediaIngestKey: string;
+  imageConcurrency: number;
 }
 
 const str = (env: NodeJS.ProcessEnv, k: string, fallback?: string): string => {
@@ -58,5 +64,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     pgPoolMax: num(env, 'PG_POOL_MAX', 4),
     elevenLabsKey: str(env, 'ELEVENLABS_API_KEY', ''),
     voiceConcurrency: num(env, 'VOICE_CONCURRENCY', 3),
+    useapiToken: str(env, 'USEAPI_TOKEN', ''),
+    siteUrl: str(env, 'SITE_INTERNAL_URL', 'http://web:3000').replace(/\/+$/, ''),
+    mediaIngestKey: str(env, 'MEDIA_INGEST_KEY', ''),
+    imageConcurrency: num(env, 'IMAGE_CONCURRENCY', 2),
   };
 }

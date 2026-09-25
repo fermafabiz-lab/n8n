@@ -1,0 +1,27 @@
+{
+  "generate": {
+    "method": "POST",
+    "url": "https://api.useapi.net/v1/google-flow/images",
+    "sendHeaders": true,
+    "headerParameters": {
+      "parameters": [
+        {
+          "name": "Authorization",
+          "value": "Bearer <USEAPI_TOKEN — redacted from the fixture>"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={{ $json.requestBody }}",
+    "options": {
+      "timeout": 180000
+    }
+  },
+  "markRejected": "={{ { typecast: true, fields: { 'Regenerează Imagine': false, 'Observații Scenă': 'Image regeneration REJECTED: ' + String(($json.error && ($json.error.description || $json.error.message)) || 'the image service refused this prompt').slice(0, 400) + ' — edit the image prompt and press Regenerate again.' } } }}",
+  "writeImage": "={{ JSON.stringify({ sceneId: $json.sceneId, field: 'image', url: $json.url, fields: { 'Image Media ID': $json.mediaId, 'Aprobare Imagine': false, 'Regenerează Imagine': false, 'Observații Scenă': '' } }) }}"
+}

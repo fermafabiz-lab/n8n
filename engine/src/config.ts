@@ -32,6 +32,9 @@ export interface Config {
   siteUrl: string;
   mediaIngestKey: string;
   imageConcurrency: number;
+  /** OpenAI, for the clip motion judge. Empty = the judge is skipped (the take is kept). */
+  openaiKey: string;
+  clipConcurrency: number;
 }
 
 const str = (env: NodeJS.ProcessEnv, k: string, fallback?: string): string => {
@@ -68,5 +71,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     siteUrl: str(env, 'SITE_INTERNAL_URL', 'http://web:3000').replace(/\/+$/, ''),
     mediaIngestKey: str(env, 'MEDIA_INGEST_KEY', ''),
     imageConcurrency: num(env, 'IMAGE_CONCURRENCY', 2),
+    openaiKey: str(env, 'OPENAI_API_KEY', ''),
+    clipConcurrency: num(env, 'CLIP_CONCURRENCY', 3),
   };
 }

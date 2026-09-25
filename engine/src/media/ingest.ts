@@ -5,19 +5,19 @@
 import { NetworkError } from '../railway.ts';
 
 export interface Ingest {
-  image(sceneId: string, url: string, fields: Record<string, unknown>): Promise<any>;
+  image(sceneId: string, url: string, fields: Record<string, unknown>, field?: 'image' | 'video'): Promise<any>;
 }
 
 export function siteIngest(siteUrl: string, key: string, fetchImpl: typeof fetch = fetch): Ingest {
   return {
-    async image(sceneId, url, fields) {
+    async image(sceneId, url, fields, field = 'image') {
       if (!key) throw new Error('MEDIA_INGEST_KEY is not set on the engine');
       let res: Response;
       try {
         res = await fetchImpl(`${siteUrl}/api/media/ingest`, {
           method: 'POST',
           headers: { 'x-hov-key': key, 'content-type': 'application/json' },
-          body: JSON.stringify({ sceneId, field: 'image', url, fields }),
+          body: JSON.stringify({ sceneId, field, url, fields }),
           signal: AbortSignal.timeout(180_000),
         });
       } catch (e) {

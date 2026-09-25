@@ -1,0 +1,22 @@
+{
+  "fetchedAt": "2026-09-25",
+  "how": "n8n MCP get_workflow_version; bodies byte for byte",
+  "mediaGeneration": {
+    "workflowId": "yHG4DBCDjR3RJzav",
+    "versionId": "527c67b7-a38d-48b3-b56e-3c52cec8b0bb"
+  },
+  "files": {
+    "VRW Build Regen.js": "Media Generation / VRW Build Regen / jsCode",
+    "Prep Video Regen.js": "Media Generation / Prep Video Regen / jsCode",
+    "RG End Frame Prompt.js": "Media Generation / RG End Frame Prompt / jsCode",
+    "RG Attach End Frame.js": "Media Generation / RG Attach End Frame / jsCode",
+    "Regen Cooldown Guard.js": "Media Generation / Regen Cooldown Guard / jsCode",
+    "Check Video Regen.js": "Media Generation / Check Video Regen / jsCode",
+    "Extract Regen Video URL.js": "Media Generation / Extract Regen Video URL / jsCode",
+    "Regen Resubmit Guard.js": "Media Generation / Regen Resubmit Guard / jsCode",
+    "RG Motion Prep.js": "Media Generation / RG Motion Prep / jsCode",
+    "RG Motion Verdict.js": "Media Generation / RG Motion Verdict / jsCode",
+    "RG Motion Resubmit.js": "Media Generation / RG Motion Resubmit / jsCode",
+    "expressions.json": "the regen chain's HTTP bodies, conditions and queries (tokens redacted)"
+  }
+}

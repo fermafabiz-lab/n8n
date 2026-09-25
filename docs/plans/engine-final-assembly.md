@@ -120,6 +120,8 @@ cd n8n-engine && (cd platform && npm ci) && claude
      - **Before the flip:** a button test through Final touches (render_job 3, captions on).
      - **Still owed:** the panel, watched on the first new film.
 5. **Retire** the `assemble` webhook, the orchestrator's disconnected `Execute Final Assembly*` nodes, and the probe branch. Update `CLAUDE.md`.
+   - **Upscale repointed 2026-09-25**: `6. Upscale Film` `ab2f7ec8` (rollback `53d44168`) calls `/api/ops/assemble`. Nothing calls the `assemble` webhook any more.
+   - **Still to do:** retire n8n's Final Assembly once a few films have gone well; it is the rollback until then.
 
 Rough size: phase 1 is 1–2 days of session work; phases 2–4 are 2–4 days. Each phase ends in a commit and a report.
 

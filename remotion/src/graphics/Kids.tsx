@@ -269,7 +269,10 @@ export const NameCircle: React.FC<{title: string; box: [number, number, number, 
 						position: 'absolute',
 						left: 0,
 						right: 0,
-						top: -64 * s,
+						// Above the contour, unless that is off the top of the frame —
+						// then just inside its top edge (below it would sit on the
+						// captions).
+						top: y - 64 * s < 8 * s ? 14 * s : -64 * s,
 						textAlign: 'center',
 						fontFamily: GF.caveat,
 						fontWeight: 700,

@@ -565,6 +565,53 @@ expected and harmless for an app touching only its own Drive.
   **Owed**: the first real film rendered with a plan and transitions, watched —
   whether one transition every ~12 s reads as punctuation or as noise.
 
+- **Clip regeneration can be made by the engine** (2026-09-25,
+  `docs/plans/engine-media-generation.md`, phase 4; site Variable
+  `VIDEO_ENGINE=code`, engine deploy `f6092b6`).
+  - **How it works.** "Regenerate video", Restart and the clip queued after
+    an image approval queue a `hov.media_job` 'clip' row instead of calling
+    `scene-video-regen`.
+  - **What was ported.** The whole `VRW *` / `RG *` chain (40 nodes, 62 KB)
+    is in `engine/src/clip/regen.ts`, node by node. `check-clip.mjs` holds
+    it to the live bodies on 144 assertions, and compares the static-data
+    counters each node leaves behind.
+  - **The takes** land in `/media` through `/api/media/ingest`; there is no
+    Drive upload.
+  - **Two changes from n8n:**
+    - `AUDIO_GENERATION_FILTERED` gets the advice about the sound, not the
+      "real person in the still" note;
+    - any failure releases `Regenerează Video` with a note starting
+      `REJECTED —`, a prefix every reader already skips, so it is never
+      taken for the producer's correction.
+  - **Rollback:** `gh variable set VIDEO_ENGINE --body n8n && gh workflow
+    run "Deploy platform"`.
+  - **Still in n8n:** the batch's own clips (the pool, stealing, the VP
+    refusal ladder); they move with the production pass.
+
+- **Image regeneration can be made by the engine** (2026-09-25,
+  `docs/plans/engine-media-generation.md`, phase 3; site Variable
+  `IMAGE_ENGINE=code`).
+  - **How it works.** "Regenerate image" and Restart queue a `hov.media_job`
+    row instead of calling `scene-image-regen`. The engine rebuilds
+    `IR Build Request`'s request from the database, draws it in Flow and
+    writes it through the site's `/api/media/ingest`, the same door as
+    `IR Write Image`.
+  - **Three changes from n8n:**
+    - `captchaRetry` is 5, the fix CLAUDE.md listed as still owed on that
+      node;
+    - network, 429 and 5xx failures are retried rather than reported as
+      "REJECTED";
+    - every failure releases `Regenerează Imagine` with the reason (a
+      missing prompt or an empty answer used to strand it).
+  - **Checks.** `engine/check-image.mjs` also asserts that **the three live
+    copies of REFERENCE ASSEMBLY are identical**, so the "change one, change
+    all three" rule is now checked instead of remembered.
+  - **Rollback:** `gh variable set IMAGE_ENGINE --body n8n && gh workflow
+    run "Deploy platform"`.
+  - **Still on n8n:** the batch's own first images (`Build Image Request`,
+    account routing, the consistency judge); they move with the production
+    pass.
+
 - **Voice takes are made by the engine since 2026-09-25**
   (`docs/plans/engine-media-generation.md`, phase 2; site Variable
   `VOICE_ENGINE=code`).
@@ -1169,9 +1216,13 @@ expected and harmless for an app touching only its own Drive.
   **`captchaRetry: 1` since 2026-09-02** to "save spend" — a fraction of a
   cent — and turned every weak token into a 1-5 minute wait. Every Flow body
   now ends `captchaRetry = 5`, which also rotates to the second configured
-  provider. **Still owed**: the same line in Claude Scripting's
-  `IR Generate Image` (left alone because another session was publishing
-  there).
+  provider. ~~Still owed: the same line in Claude Scripting's IR Generate
+  Image~~ — **done 2026-09-25** (Claude Scripting `b5b1205d`, rollback
+  `e1183aa3`, `db/port/ir-captcha/`), after it cost three site regenerations
+  in five minutes, each written on the scene as "REJECTED". Measured then with
+  useapi's `captcha-stats`: 17% of captcha attempts accepted (CapSolver 38%,
+  **2Captcha 7%** — 2Captcha handled two thirds of the attempts), and the
+  CapSolver balance had run out the same evening.
   **The same evening it happened: the free clip model left the invited
   accounts** (Media Generation `b9527072`, `db/port/family-model/`). From
   2026-09-23 Google serves `veo-3.1-lite-low-priority` only to the Ultra

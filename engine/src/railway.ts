@@ -8,7 +8,9 @@ export class NetworkError extends Error {}
 export interface RenderServer {
   submitAssemble(body: unknown): Promise<string>;
   submitRender(body: unknown): Promise<string>;
-  status(kind: 'assemble' | 'render', jobId: string): Promise<PollStatus>;
+  /** Multi-voice synthesis: several speakers, one take (remotion/server tts). */
+  submitTtsMulti(body: unknown): Promise<string>;
+  status(kind: 'assemble' | 'render' | 'tts-multi', jobId: string): Promise<PollStatus>;
 }
 
 export function railway(baseUrl: string, apiKey: string, fetchImpl: typeof fetch = fetch): RenderServer {
@@ -34,6 +36,7 @@ export function railway(baseUrl: string, apiKey: string, fetchImpl: typeof fetch
   return {
     submitAssemble: (body) => submit('/assemble', body),
     submitRender: (body) => submit('/render', body),
+    submitTtsMulti: (body) => submit('/tts-multi', body),
     // A 404 comes back as a STATUS, not a throw, in the shape n8n's HTTP node
     // gave the guards: `{error: {message: '...404...'}}`. It means the
     // container was replaced mid-job, and the guard turns it into `lost`.

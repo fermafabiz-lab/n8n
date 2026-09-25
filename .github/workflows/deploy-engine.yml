@@ -99,6 +99,7 @@ jobs:
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           RENDER_URL: ${{ vars.RENDER_URL }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
           ENGINE_CONCURRENCY: ${{ vars.ENGINE_CONCURRENCY || '2' }}
           IMAGE_TAG: ${{ env.IMAGE }}:${{ github.sha }}
           REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -107,7 +108,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          envs: RENDER_API_KEY,RENDER_URL,ENGINE_CONCURRENCY,IMAGE_TAG,REGISTRY_TOKEN,REGISTRY_USER
+          envs: RENDER_API_KEY,RENDER_URL,ELEVENLABS_API_KEY,ENGINE_CONCURRENCY,IMAGE_TAG,REGISTRY_TOKEN,REGISTRY_USER
           script: |
             set -euo pipefail
             cd /opt/n8n
@@ -142,6 +143,7 @@ jobs:
             N8N_WEBHOOK_BASE=http://n8n:5678/webhook
             CONCURRENCY=${ENGINE_CONCURRENCY}
             WORKER_ID=hov-engine
+            ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
             ENVEOF
             sed -i 's/^[[:space:]]*//' "$ENVFILE"
 

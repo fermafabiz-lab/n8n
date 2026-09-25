@@ -1,0 +1,19 @@
+{
+  "fetchedAt": "2026-09-25",
+  "how": "n8n MCP get_workflow_version; bodies and expressions written byte for byte",
+  "mediaGeneration": {
+    "workflowId": "yHG4DBCDjR3RJzav",
+    "versionId": "527c67b7-a38d-48b3-b56e-3c52cec8b0bb"
+  },
+  "claudeScripting": {
+    "workflowId": "gkEtGMecv4TC3ZHp",
+    "versionId": "e1183aa3-dead-4673-a456-84414dd6f167"
+  },
+  "files": {
+    "mg-AB Pick Voice.js": "Media Generation / AB Pick Voice / jsCode",
+    "cs-VR Pick Voice.js": "Claude Scripting / VR Pick Voice / jsCode",
+    "cs-VR Multi Guard.js": "Claude Scripting / VR Multi Guard / jsCode",
+    "mg-AB Multi Guard.js": "Media Generation / AB Multi Guard / jsCode",
+    "expressions.json": "the n8n expressions of the Speak / Submit Multi / Write nodes, per workflow"
+  }
+}

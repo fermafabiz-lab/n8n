@@ -41,6 +41,7 @@ import {randomUUID} from 'crypto';
 import {execFile} from 'child_process';
 import {createRenderJob, executeRenderJob} from '@hyperframes/producer';
 import {bundleHfPage} from './hf-bundle.mjs';
+import {extractCutStills} from './cut-stills.mjs';
 
 const FPS = 24;
 const BUNDLE_DIR = path.join(os.tmpdir(), 'hov-hf-bundle');
@@ -159,7 +160,13 @@ export async function renderWithHyperframes({inputProps, scale = 1, outputLocati
 		fs.cpSync(BUNDLE_DIR, jobDir, {recursive: true});
 		const montage = path.join(jobDir, 'montage.mp4');
 		await placeMontage(inputProps.finalVideoUrl, montage, outputDir);
-		fs.writeFileSync(path.join(jobDir, 'index.html'), pageHtml({props: inputProps, meta, scale, bundle}));
+		// The frozen frames the film's transitions need (src/transitions/).
+		// Written next to the page and named in the props only here, so a
+		// film without a transition style — or whose extraction failed —
+		// renders exactly as before.
+		const transitionStills = await extractCutStills({props: inputProps, montage, jobDir, fps: FPS});
+		const props = transitionStills ? {...inputProps, transitionStills} : inputProps;
+		fs.writeFileSync(path.join(jobDir, 'index.html'), pageHtml({props, meta, scale, bundle}));
 
 		const silent = path.join(jobDir, `graphics-${randomUUID()}.mp4`);
 		// `standard` is x264 medium at CRF 18 — Remotion's h264 defaults, so the

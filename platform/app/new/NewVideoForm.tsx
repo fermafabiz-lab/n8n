@@ -9,6 +9,7 @@ import Toggle from "@/components/Toggle";
 import CaptionColorPicker from "@/components/CaptionColorPicker";
 import { MOTION_PACKS, defaultMotionPackFor, type MotionPackId } from "@/lib/motion-packs";
 import { GRAPHIC_STYLES, offersGraphicStyle, type GraphicStyleId } from "@/lib/graphic-styles";
+import { TRANSITION_STYLES, type TransitionStyleId } from "@/lib/transition-styles";
 import WatermarkOpenPicker from "@/components/WatermarkOpenPicker";
 import WatermarkSizePicker from "@/components/WatermarkSizePicker";
 import WatermarkPreview, { SAMPLE_SCENES } from "@/components/WatermarkPreview";
@@ -384,6 +385,9 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
   // Which graphics ride over the footage (lib/graphic-styles.ts). "" is "AI
   // picks": the pipeline chooses by the film's theme once the scenes exist.
   const [graphicStyle, setGraphicStyle] = useState<GraphicStyleId | "">("");
+  // How the picture hands over at a few cuts (lib/transition-styles.ts), for
+  // every category. "" is "AI picks", by the film's theme.
+  const [transitionStyle, setTransitionStyle] = useState<TransitionStyleId | "">("");
   const [style, setStyle] = useState(series?.style ?? "");
   // Hands-off mode: WHICH gates sign themselves off (lib/hands-off.ts). Off by
   // default — approving unseen is a real trade, and it must never be the
@@ -1415,6 +1419,34 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
                   </p>
                 </div>
                 )}
+                <div className="frow" style={{ marginTop: 18 }}>
+                  <label>Transitions</label>
+                  <input type="hidden" name="transition_style" value={transitionStyle} />
+                  <div className="seg" role="group" aria-label="Transitions" style={{ flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      className={transitionStyle === "" ? "on" : ""}
+                      onClick={() => setTransitionStyle("")}
+                    >
+                      ✨ AI picks
+                    </button>
+                    {TRANSITION_STYLES.map((t) => (
+                      <button
+                        type="button"
+                        key={t.id}
+                        className={transitionStyle === t.id ? "on" : ""}
+                        onClick={() => setTransitionStyle(t.id)}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="fnote">
+                    {transitionStyle === ""
+                      ? "How the picture hands over at a few cuts — never at every one. The AI picks a family by the film's theme. Changeable in Final touches."
+                      : TRANSITION_STYLES.find((t) => t.id === transitionStyle)?.hint}
+                  </p>
+                </div>
                 {!noHook && (
                 <div className="frow" style={{ marginTop: 18 }}>
                   <label>Cold open</label>

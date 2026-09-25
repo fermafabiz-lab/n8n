@@ -300,6 +300,18 @@ export type FinalVideoProps = {
 	graphicStyle?: string;
 	/** The name tags, place stamps and figures to draw, anchored to scenes. */
 	graphicItems?: import('./graphics/styles').GraphicItem[];
+	/**
+	 * How the picture hands over at the cuts that get a transition
+	 * (src/transitions/): none | push | crossfade | blur | shutter | glitch.
+	 * Absent or unknown → none, today's hard cuts.
+	 */
+	transitionStyle?: string;
+	/**
+	 * Set by the render server, never by the pipeline: where the frozen frames
+	 * either side of each cut were written, and for which cuts. Without it no
+	 * transition is drawn, because one needs both pictures.
+	 */
+	transitionStills?: {base: string; cuts: number[]};
 };
 
 export const defaultFinalVideoProps: FinalVideoProps = {

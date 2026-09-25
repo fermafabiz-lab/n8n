@@ -35,7 +35,9 @@ export const Transitions: React.FC<{
 	 * boundary — flaring here as well would stack two effects on one frame.
 	 */
 	chapterCards?: boolean;
-}> = ({scenes, tone, chapterCards = true}) => {
+	/** Cuts a film transition already owns (src/transitions/), in seconds. */
+	ownedCuts?: number[];
+}> = ({scenes, tone, chapterCards = true, ownedCuts = []}) => {
 	const frame = useCurrentFrame();
 	const {fps} = useVideoConfig();
 	const t = frame / fps;
@@ -50,6 +52,7 @@ export const Transitions: React.FC<{
 		if ((scenes[i].chapter ?? 0) === (scenes[i - 1].chapter ?? 0)) continue;
 		if (chapterCards) continue; // the card owns this frame
 		const boundary = scenes[i].startSeconds;
+		if (ownedCuts.some((c) => Math.abs(c - boundary) < 1e-3)) continue; // a transition owns it
 		const d = Math.abs(t - boundary);
 		if (d >= chapterLeakHalf) continue;
 		// The window is placed so the envelope's PEAK lands on the boundary,

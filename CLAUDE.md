@@ -555,6 +555,30 @@ expected and harmless for an app touching only its own Drive.
   transitions** (Push, Crossfade, Blur, Shutter, Glitch/Ripple — one family
   per film, by theme, with AI picks), not started.
 
+- **Image regeneration can be made by the engine** (2026-09-25,
+  `docs/plans/engine-media-generation.md`, phase 3; site Variable
+  `IMAGE_ENGINE=code`).
+  - **How it works.** "Regenerate image" and Restart queue a `hov.media_job`
+    row instead of calling `scene-image-regen`. The engine rebuilds
+    `IR Build Request`'s request from the database, draws it in Flow and
+    writes it through the site's `/api/media/ingest`, the same door as
+    `IR Write Image`.
+  - **Three changes from n8n:**
+    - `captchaRetry` is 5, the fix CLAUDE.md listed as still owed on that
+      node;
+    - network, 429 and 5xx failures are retried rather than reported as
+      "REJECTED";
+    - every failure releases `Regenerează Imagine` with the reason (a
+      missing prompt or an empty answer used to strand it).
+  - **Checks.** `engine/check-image.mjs` also asserts that **the three live
+    copies of REFERENCE ASSEMBLY are identical**, so the "change one, change
+    all three" rule is now checked instead of remembered.
+  - **Rollback:** `gh variable set IMAGE_ENGINE --body n8n && gh workflow
+    run "Deploy platform"`.
+  - **Still on n8n:** the batch's own first images (`Build Image Request`,
+    account routing, the consistency judge); they move with the production
+    pass.
+
 - **Voice takes are made by the engine since 2026-09-25**
   (`docs/plans/engine-media-generation.md`, phase 2; site Variable
   `VOICE_ENGINE=code`).

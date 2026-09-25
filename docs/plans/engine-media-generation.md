@@ -81,6 +81,10 @@ order the batch runs in.
      consistency judge.
    - Image regeneration as engine work.
    - Image regen lives today in Claude Scripting's `IR *` tail; it moves too.
+   - **Image regeneration DONE 2026-09-25**:
+     - **Built:** `engine/src/image/`. `check-image.mjs` has 128 assertions, including the three live REFERENCE ASSEMBLY copies being identical; 12 image scenarios.
+     - **Deployed:** the engine at `50d6a99`. The site half (`IMAGE_ENGINE`) waited for a scripting run to finish before it went out.
+     - **Still in n8n, moving with the production pass:** the batch's image loop (account routing, cooldowns, the consistency judge).
 4. **Clips — the largest part.**
    - Submit and poll (10-minute ceiling), end frames, motion judge, the VP
      ladder (audio-filter arm, fresh seed after a refusal, regenerate the

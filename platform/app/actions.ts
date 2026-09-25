@@ -99,7 +99,7 @@ import { normalizeWatermarkScale } from "@/lib/provenance";
 import { attachArchiveAsset, DEFAULT_SECONDS } from "@/lib/archive/attach";
 import { detachStockFromScene, resetArchiveSuggestions } from "@/lib/data/stock";
 import { engineFor, queueEngineRender, stopEngineRender, type AssemblyEngine } from "@/lib/assembly-engine";
-import { queueVoiceTake, stopVoiceTake, voiceEngine } from "@/lib/media-engine";
+import { imageEngine, queueImageTake, queueVoiceTake, stopVoiceTake, voiceEngine } from "@/lib/media-engine";
 
 /**
  * Ask n8n to look for archive footage for this film's newly approved scenes.
@@ -845,6 +845,12 @@ async function fireSceneRewriteWebhook(sceneId: string): Promise<void> {
  * send that never left.
  */
 async function fireImageRegenWebhook(sceneId: string): Promise<"sent" | "off"> {
+  // On the engine (IMAGE_ENGINE=code) the regeneration is a hov.media_job
+  // row, not a webhook; see lib/media-engine.ts.
+  if (imageEngine() === "code") {
+    await queueImageTake(sceneId, "site");
+    return "sent";
+  }
   const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
   const webhook =
     process.env.N8N_IMAGE_REGEN_WEBHOOK_URL ??
@@ -1352,6 +1358,8 @@ export async function cancelImageRegen(
     // `writeSceneApproval` never moves `Status Producție Scenă` for an image,
     // and the board derives what it shows from the checkboxes anyway.
     await writeSceneFields(sceneId, { "Regenerează Imagine": false });
+    // And the engine's regeneration in flight, so it cannot land after the cancel.
+    await stopVoiceTake(sceneId, "image");
     revalidatePath(`/projects/${projectId}`);
     return {
       ok: true,

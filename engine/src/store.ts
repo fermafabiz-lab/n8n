@@ -1,8 +1,15 @@
 // The finished film goes into the site's own media store (D1), never Drive:
-// `/media` on the box, served by Caddy at MEDIA_BASE_URL. Same layout as
-// platform/lib/media-store.ts — content-addressed `<owner>/<field>/<sha256-32>.<ext>`,
-// so the same bytes always land at the same path and Caddy's `immutable`
-// header stays true. The owner is the PROJECT id and the field is `final`.
+// `/media` on the box, served by Caddy at MEDIA_BASE_URL. Content-addressed,
+// `films/<project>/<sha256-32>.mp4`, so the same bytes always land at the
+// same path and Caddy's `immutable` header stays true.
+//
+// NOT `<project>/final/…` beside the site's own files, which is what the
+// media-store layout would suggest and what the first real run used: the
+// site creates `<project>/` itself (reference sheets, `<project>/sheet/`) as
+// its own user with 755, so the engine — another user in the same group —
+// could not make a folder inside it (EACCES, render_job 1, 2026-09-25). The
+// engine writes only under `films/` and `.incoming/`, which it creates
+// itself, so it never depends on permissions someone else chose.
 //
 // Streamed, not buffered: a 12-minute film is hundreds of MB, which
 // storeMediaBytes() (built for stills and clips) would hold in memory.
@@ -39,7 +46,7 @@ export async function storeFinalFilm(opts: {
   try {
     await pipeline(Readable.fromWeb(res.body as any), tap, createWriteStream(tmp));
     if (!bytes) throw new Error('refusing to store an empty film');
-    const path = `${projectId}/final/${hash.digest('hex').slice(0, 32)}.mp4`;
+    const path = `films/${projectId}/${hash.digest('hex').slice(0, 32)}.mp4`;
     const abs = join(mediaRoot, path);
     await mkdir(dirname(abs), { recursive: true });
     let exists = false;

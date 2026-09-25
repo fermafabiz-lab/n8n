@@ -154,6 +154,10 @@ await scenario('happy path: queued → assemble → graphics → store → done'
   fake.plan.assemble.push(['running', 'running', 'done']);
   fake.plan.render.push(['running', 'done']);
   assert.ok(await enqueue(db, pid, { aspect: '9:16', captions: 'no' }, 'test'));
+  // As on the box: the site already made this film's own folder (reference
+  // sheets), as another user, and the engine cannot write inside it. The
+  // first real run died of exactly this (EACCES, 2026-09-25).
+  fs.mkdirSync(path.join(MEDIA_ROOT, pid), { mode: 0o555 });
   const outcome = await drive(await claimOne(), deps());
   assert.equal(outcome, 'done');
   const row = await job(pid);
@@ -182,7 +186,7 @@ await scenario('happy path: queued → assemble → graphics → store → done'
   // Stored in /media, content-addressed, and the project points at it.
   const bytes = fs.readFileSync(path.join(MEDIA_ROOT, row.final_url.replace('https://media.example/', '')));
   const hash = createHash('sha256').update(bytes).digest('hex').slice(0, 32);
-  assert.equal(row.final_url, `https://media.example/${pid}/final/${hash}.mp4`);
+  assert.equal(row.final_url, `https://media.example/films/${pid}/${hash}.mp4`);
   assert.equal(fs.readdirSync(path.join(MEDIA_ROOT, '.incoming')).length, 0, 'no partial file left behind');
   const p = (await db.query(`select status, final_video_url from hov.project where id = $1`, [pid])).rows[0];
   assert.deepEqual(p, { status: 'Finalizat', final_video_url: row.final_url });

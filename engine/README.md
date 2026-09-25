@@ -55,7 +55,7 @@ resumes where it stopped:
 | `src/db.ts` | every statement: `enqueue`, `claim` (FOR UPDATE SKIP LOCKED + lease), `save` (patch + heartbeat, refused once the row is not ours or not active), `loadInputs` (the same `hov.at_*` queries n8n ran), `markFinished` (`hov.at_write`, as `Update Project Status` did) |
 | `src/railway.ts` | the render server: submit, status. A 404 comes back as the same error object n8n's HTTP node produced, so the guard reads it as `lost` |
 | `src/musicSource.ts` | the Muzica library through n8n's `list-music` / `share-music` (the Drive credential stays in n8n for now) |
-| `src/store.ts` | the finished film into `/media`, streamed, content-addressed `<project>/final/<sha256-32>.mp4` (D1) |
+| `src/store.ts` | the finished film into `/media`, streamed, content-addressed `films/<project>/<sha256-32>.mp4` (D1) — its own folder, never the site's `<project>/` (EACCES on the first real run) |
 | `src/config.ts` | the environment, read once |
 | `src/main.ts` | the container's entry point (`npm start`) |
 | `src/cli.ts` | `npm run cli -- enqueue|status|stop <projectId>` |

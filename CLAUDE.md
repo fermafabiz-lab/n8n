@@ -541,8 +541,11 @@ expected and harmless for an app touching only its own Drive.
   through the engine** (repo Variable `FINAL_ASSEMBLY_ENGINE=code`, written
   into `platform.env` by `deploy-platform.yml`, deploy `e307671`).
   **Rollback:** `gh variable set FINAL_ASSEMBLY_ENGINE --body n8n && gh
-  workflow run "Deploy platform"`. The one path still on n8n is Upscale
-  film's rebuild, which fires the `assemble` webhook itself (phase 5).
+  workflow run "Deploy platform"`. Upscale film's rebuild goes through the
+  site too since the same evening (`6. Upscale Film` `ab2f7ec8`, rollback
+  `53d44168`: `Fire Reassemble` → `/api/ops/assemble`), so **nothing calls
+  n8n's `assemble` webhook any more** — Final Assembly `BY22Vlhh20Xdkr5Z` is
+  kept only as the rollback until retired.
   The notes below describe how it got here.
   - **What it is.** A container `hov-engine`, started by
     `.github/workflows/deploy-engine.yml` with `docker run`, not compose,
@@ -588,8 +591,11 @@ expected and harmless for an app touching only its own Drive.
     - a long film;
     - the first NEW film rendered with the switch on, which is also the
       first chance to see the panel's real phase;
-    - phase 5: repoint Upscale film to `/api/ops/assemble` and retire n8n's
-      Final Assembly.
+    - the first real upscale with rebuild (a `render_job` row with
+      `requested_by: ops`);
+    - retiring n8n's Final Assembly and the orchestrator's disconnected
+      `Execute Final Assembly*` nodes, after a few good films — until then
+      it is the rollback.
   - **A button test is done.** On 2026-09-25 the producer turned captions on
     for the Rome film in Final touches. render_job 3 (`requested_by: site`)
     rendered it in 1 min 52 s, and the only change in the request was

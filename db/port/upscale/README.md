@@ -1,5 +1,14 @@
 # Upscaling a finished film
 
+> **2026-09-25: the rebuild goes through the site, so through the engine.**
+> `Fire Reassemble` now POSTs `http://web:3000/api/ops/assemble {projectId}`
+> with the `HOV Media Ingest` key instead of n8n's `assemble` webhook, so an
+> upscaled film is rebuilt by whichever engine the site's
+> `FINAL_ASSEMBLY_ENGINE` names (the engine since that day). Version
+> `ab2f7ec8`, rollback `53d44168`. Not yet exercised on a real upscale: the
+> first one with "rebuild" should show a `render_job` row with
+> `requested_by: ops`. `docs/plans/engine-final-assembly.md`, phase 5.
+
 **APPLIED 2026-09-04.** Live:
 
 | piece | where | id / version |

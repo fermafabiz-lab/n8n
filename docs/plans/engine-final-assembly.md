@@ -105,6 +105,17 @@ cd n8n-engine && (cd platform && npm ci) && claude
      - **Speed in practice:** the kids film ("The Missing Blue Scarf") was briefed at 0.8 and rendered by n8n at 1.0.
      - **Detail:** `engine/README.md` and `engine/shadow/`.
 4. **Deploy with the default still `n8n`.** Then one real film with `FINAL_ASSEMBLY_ENGINE=code`, watched end to end. Then flip the default.
+   - **DONE 2026-09-24/25, with the default still `n8n`**:
+     - **On the box:** `db/016` applied (execution 17007), the `hov-engine` container live (`deploy-engine.yml`, `docker run` rather than compose), and the site with `startAssembly` / `/api/ops/assemble`.
+     - **First real film:** the Rome film (70 s) went through `/api/ops/assemble`, 2 minutes end to end. Verify identical to n8n's; served from `/media/films/…`; Finalizat.
+     - **No second n8n execution:** none ran.
+     - **Two surprises:**
+       - Final Assembly had moved to `362a9c56` (motion packs) in the meantime; the engine was brought level before the deploy.
+       - The first store died on EACCES inside the site's own `/media/<project>/`, and the engine now writes only under `films/`.
+     - **Not done yet:**
+       - adding `FINAL_ASSEMBLY_ENGINE` to `deploy-platform.yml` so the default can be flipped;
+       - watching the panel during an engine render;
+       - one long film.
 5. **Retire** the `assemble` webhook, the orchestrator's disconnected `Execute Final Assembly*` nodes, and the probe branch. Update `CLAUDE.md`.
 
 Rough size: phase 1 is 1–2 days of session work; phases 2–4 are 2–4 days. Each phase ends in a commit and a report.

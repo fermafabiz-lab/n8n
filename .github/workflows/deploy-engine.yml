@@ -100,6 +100,8 @@ jobs:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           RENDER_URL: ${{ vars.RENDER_URL }}
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          USEAPI_TOKEN: ${{ secrets.USEAPI_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ENGINE_CONCURRENCY: ${{ vars.ENGINE_CONCURRENCY || '2' }}
           IMAGE_TAG: ${{ env.IMAGE }}:${{ github.sha }}
           REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -108,7 +110,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          envs: RENDER_API_KEY,RENDER_URL,ELEVENLABS_API_KEY,ENGINE_CONCURRENCY,IMAGE_TAG,REGISTRY_TOKEN,REGISTRY_USER
+          envs: RENDER_API_KEY,RENDER_URL,ELEVENLABS_API_KEY,USEAPI_TOKEN,OPENAI_API_KEY,ENGINE_CONCURRENCY,IMAGE_TAG,REGISTRY_TOKEN,REGISTRY_USER
           script: |
             set -euo pipefail
             cd /opt/n8n
@@ -118,6 +120,9 @@ jobs:
             envval() { grep -E "^$1=" .env | tail -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//"; }
             HOV_DB_PASSWORD="$(envval HOV_DB_PASSWORD)"
             SITE_HOST="$(envval SITE_HOST)"
+            # The site's ingest door (/api/media/ingest) takes this key; it
+            # lives in the box's .env, like the site's own copy.
+            MEDIA_INGEST_KEY="$(envval MEDIA_INGEST_KEY)"
             [ -n "$HOV_DB_PASSWORD" ] || { echo "::error::HOV_DB_PASSWORD not found in /opt/n8n/.env"; exit 1; }
             [ -n "$SITE_HOST" ] || { echo "::error::SITE_HOST not found in /opt/n8n/.env"; exit 1; }
 
@@ -144,6 +149,10 @@ jobs:
             CONCURRENCY=${ENGINE_CONCURRENCY}
             WORKER_ID=hov-engine
             ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
+            USEAPI_TOKEN=${USEAPI_TOKEN}
+            OPENAI_API_KEY=${OPENAI_API_KEY}
+            MEDIA_INGEST_KEY=${MEDIA_INGEST_KEY}
+            SITE_INTERNAL_URL=http://web:3000
             ENVEOF
             sed -i 's/^[[:space:]]*//' "$ENVFILE"
 

@@ -8,6 +8,8 @@ import { railway } from './railway.ts';
 import { runWorker } from './worker.ts';
 import { runMediaWorker } from './media/loop.ts';
 import { elevenLabs } from './voice/elevenlabs.ts';
+import { flowImages } from './image/flow.ts';
+import { siteIngest } from './media/ingest.ts';
 
 // /media is shared with the site and n8n through group 2000 (hovmedia): a
 // directory this process creates — a project's own folder, the first time
@@ -37,7 +39,7 @@ const render = railway(config.renderUrl, config.renderApiKey);
 // the lease rules; each loop stops on the same signal.
 await Promise.all([
   runWorker({ db, config, render, music: n8nMusic(config.n8nWebhookBase) }, stop.signal),
-  runMediaWorker({ db, config, render, speaker: elevenLabs(config.elevenLabsKey) }, stop.signal),
+  runMediaWorker({ db, config, render, speaker: elevenLabs(config.elevenLabsKey), flow: flowImages(config.useapiToken), ingest: siteIngest(config.siteUrl, config.mediaIngestKey) }, stop.signal),
 ]);
 await db.end();
 console.log(JSON.stringify({ at: new Date().toISOString(), msg: 'engine worker stopped' }));

@@ -99,7 +99,7 @@ import { normalizeWatermarkScale } from "@/lib/provenance";
 import { attachArchiveAsset, DEFAULT_SECONDS } from "@/lib/archive/attach";
 import { detachStockFromScene, resetArchiveSuggestions } from "@/lib/data/stock";
 import { engineFor, queueEngineRender, stopEngineRender, type AssemblyEngine } from "@/lib/assembly-engine";
-import { imageEngine, queueImageTake, queueVoiceTake, stopVoiceTake, voiceEngine } from "@/lib/media-engine";
+import { imageEngine, queueClipTake, queueImageTake, queueVoiceTake, stopVoiceTake, videoEngine, voiceEngine } from "@/lib/media-engine";
 
 /**
  * Ask n8n to look for archive footage for this film's newly approved scenes.
@@ -925,6 +925,12 @@ async function fireVoiceRegenWebhook(
  * in flight, and n8n is what clears it.
  */
 async function fireVideoRegenWebhook(sceneId: string): Promise<"sent" | "off"> {
+  // On the engine (VIDEO_ENGINE=code) the re-shoot is a hov.media_job row,
+  // not a webhook; see lib/media-engine.ts.
+  if (videoEngine() === "code") {
+    await queueClipTake(sceneId, "site");
+    return "sent";
+  }
   const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
   const webhook =
     process.env.N8N_VIDEO_REGEN_WEBHOOK_URL ??
@@ -1288,6 +1294,8 @@ export async function cancelVideoRegen(
       "Regenerează Video": false,
       "Status Producție Scenă": "Așteaptă Aprobare Video",
     });
+    // And the engine's re-shoot in flight, so it cannot land after the cancel.
+    await stopVoiceTake(sceneId, "clip");
     revalidatePath(`/projects/${projectId}`);
     return {
       ok: true,

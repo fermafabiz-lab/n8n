@@ -22,6 +22,10 @@ export interface Config {
   /** Consecutive network failures on a poll before the job is failed. */
   maxPollNetworkErrors: number;
   pgPoolMax: number;
+  /** ElevenLabs, for voice takes. Empty = voice jobs fail with a clear message. */
+  elevenLabsKey: string;
+  /** Voice takes in flight at once. ElevenLabs allows 5 concurrent requests on this plan. */
+  voiceConcurrency: number;
 }
 
 const str = (env: NodeJS.ProcessEnv, k: string, fallback?: string): string => {
@@ -52,5 +56,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     workerId: str(env, 'WORKER_ID', `engine-${process.pid}`),
     maxPollNetworkErrors: num(env, 'MAX_POLL_NETWORK_ERRORS', 24),
     pgPoolMax: num(env, 'PG_POOL_MAX', 4),
+    elevenLabsKey: str(env, 'ELEVENLABS_API_KEY', ''),
+    voiceConcurrency: num(env, 'VOICE_CONCURRENCY', 3),
   };
 }

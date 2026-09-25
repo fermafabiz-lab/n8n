@@ -15,7 +15,7 @@
 // storeMediaBytes() (built for stills and clips) would hold in memory.
 import { createHash, randomUUID } from 'node:crypto';
 import { createWriteStream } from 'node:fs';
-import { mkdir, rename, rm, stat } from 'node:fs/promises';
+import { mkdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
@@ -58,4 +58,26 @@ export async function storeFinalFilm(opts: {
     await rm(tmp, { force: true });
     throw e;
   }
+}
+
+/**
+ * Small media (a voice take) already in memory, into the same store:
+ * `<dir>/<sha256-32>.<ext>` under a folder the engine creates itself, never
+ * one the site owns (the EACCES lesson of render_job 1).
+ */
+export async function storeBytes(opts: { buf: Buffer; dir: string; ext: string; mediaRoot: string; mediaBaseUrl: string }): Promise<StoredFilm> {
+  if (!opts.buf.length) throw new Error('refusing to store an empty file');
+  const hash = createHash('sha256').update(opts.buf).digest('hex').slice(0, 32);
+  const path = `${opts.dir}/${hash}.${opts.ext}`;
+  const abs = join(opts.mediaRoot, path);
+  await mkdir(dirname(abs), { recursive: true });
+  let exists = false;
+  try { exists = (await stat(abs)).size === opts.buf.length; } catch {}
+  if (!exists) {
+    const tmp = join(opts.mediaRoot, '.incoming', `${randomUUID()}.part`);
+    await mkdir(dirname(tmp), { recursive: true });
+    await writeFile(tmp, opts.buf);
+    await rename(tmp, abs);
+  }
+  return { path, url: opts.mediaBaseUrl ? `${opts.mediaBaseUrl}/${path}` : '', bytes: opts.buf.length };
 }

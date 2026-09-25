@@ -1,0 +1,22 @@
+{
+  "mg": {
+    "speakText": "={{ ($('AB Current Scene').first().json.fields['Script Scenă'] || '').replace(/\\[[^\\]]{0,60}\\]\\s*/g, ' ').replace(/\\s+/g, ' ').trim() }}",
+    "voiceId": "={{ String($('AB Pick Voice').first().json.voice_id || '').replace(/^elevenlabs_/, '') }}",
+    "model": "eleven_multilingual_v2",
+    "outputFormat": "mp3_44100_128",
+    "voiceSettings": "={{ (() => { try { const t = (JSON.parse(($('AB Load Project').first().json.fields || {})['Editing Options'] || '{}') || {}).voice; const u = (x) => { const n = Number(x); return Number.isFinite(n) && n >= 0 && n <= 1 ? n : null; }; const s = u(t && t.stability), m = u(t && t.similarity), y = u(t && t.style); return (s !== null && m !== null && y !== null) ? JSON.stringify({ stability: s, similarity_boost: m, style: y, use_speaker_boost: t.speakerBoost !== false }) : ''; } catch (e) { return ''; } })() }}",
+    "multiBody": "={{ { segments: $('AB Pick Voice').first().json.segments, gapMs: 350, voiceTone: (() => { try { return (JSON.parse(($('AB Load Project').first().json.fields || {})['Editing Options'] || '{}') || {}).voice || null; } catch (e) { return null; } })() } }}",
+    "noSpeech": "={{ (() => { try { if (String((($('AB Current Scene').first().json.fields || {})['Script Scenă']) || '').trim() === '') return true; } catch (e) {} try { return JSON.parse((($('AB Load Project').first().json.fields || {})['Editing Options']) || '{}').category === 'cinematic'; } catch (e) { return false; } })() }}",
+    "writeVoice": "select * from hov.at_write($hov$scene$hov$, $hov${{ $('AB Current Scene').first().json.id }}$hov$,\n  $hov${{ JSON.stringify({ \"Voiceover URL\": 'https://drive.google.com/uc?export=download&id=' + $('AB Upload Audio').first().json.id, \"Status Producție Scenă\": \"Așteaptă Aprobare Voce\", \"Aprobare Voce\": false, \"Regenerează Voce\": false }) }}$hov$::jsonb)"
+  },
+  "cs": {
+    "speakText": "={{ ($('VR Load Scene').first().json.fields['Script Scenă'] || '').replace(/\\[[^\\]]{0,60}\\]\\s*/g, ' ').replace(/\\s+/g, ' ').trim() }}",
+    "voiceId": "={{ String($('VR Pick Voice').first().json.voice_id || '').replace(/^elevenlabs_/, '') }}",
+    "model": "eleven_multilingual_v2",
+    "outputFormat": "mp3_44100_128",
+    "voiceSettings": "={{ (() => { try { const t = (JSON.parse((($('VR Load Project').first().json || {}).fields || {})['Editing Options'] || '{}') || {}).voice; const u = (x) => { const n = Number(x); return Number.isFinite(n) && n >= 0 && n <= 1 ? n : null; }; const s = u(t && t.stability), m = u(t && t.similarity), y = u(t && t.style); return (s !== null && m !== null && y !== null) ? JSON.stringify({ stability: s, similarity_boost: m, style: y, use_speaker_boost: t.speakerBoost !== false }) : ''; } catch (e) { return ''; } })() }}",
+    "multiBody": "={{ { segments: $('VR Pick Voice').first().json.segments, gapMs: 350, voiceTone: (() => { try { return (JSON.parse((($('VR Load Project').first().json || {}).fields || {})['Editing Options'] || '{}') || {}).voice || null; } catch (e) { return null; } })() } }}",
+    "noSpeech": null,
+    "writeVoice": "={{ { typecast: true, fields: { 'Voiceover URL': 'https://drive.google.com/uc?export=download&id=' + $('VR Upload Audio').first().json.id, 'Status Producție Scenă': 'Așteaptă Aprobare Voce', 'Aprobare Voce': false, 'Regenerează Voce': false, 'Observații Scenă': '' } } }}"
+  }
+}

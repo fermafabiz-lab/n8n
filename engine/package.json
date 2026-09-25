@@ -8,11 +8,12 @@
     "node": ">=22"
   },
   "scripts": {
-    "check": "node --experimental-strip-types --no-warnings=ExperimentalWarning check.mjs && npm test",
+    "check": "node --experimental-strip-types --no-warnings=ExperimentalWarning check.mjs && node --experimental-strip-types --no-warnings=ExperimentalWarning check-voice.mjs && npm test && npm run test:voice",
     "test": "node --experimental-strip-types --no-warnings=ExperimentalWarning test/worker.test.mjs",
     "start": "node --experimental-strip-types --no-warnings=ExperimentalWarning src/main.ts",
     "cli": "node --experimental-strip-types --no-warnings=ExperimentalWarning src/cli.ts",
-    "e2e": "node --experimental-strip-types --no-warnings=ExperimentalWarning test/e2e-local.mjs"
+    "e2e": "node --experimental-strip-types --no-warnings=ExperimentalWarning test/e2e-local.mjs",
+    "test:voice": "node --experimental-strip-types --no-warnings=ExperimentalWarning test/voice.test.mjs"
   },
   "dependencies": {
     "pg": "^8.23.0"

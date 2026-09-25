@@ -535,6 +535,27 @@ expected and harmless for an app touching only its own Drive.
 
 ## Open work
 
+- **Voice takes are made by the engine since 2026-09-25**
+  (`docs/plans/engine-media-generation.md`, phase 2; site Variable
+  `VOICE_ENGINE=code`).
+  - **How it works.** "Regenerate voice", Restart and a line edited in
+    Final touches queue a `hov.media_job` row (db/017, applied in execution
+    17338) instead of calling `scene-voice-regen`. The engine speaks to
+    ElevenLabs directly, or to `/tts-multi` for a characters film.
+  - **Where the take goes.** It is stored at `/media/voices/<scene>/<sha>.mp3`,
+    **not Drive**, so review plays it from the box. The scene is then written
+    exactly as `VR Write Voice` did.
+  - **A failure** releases `Regenerează Voce` and writes the reason into
+    `Observații Scenă`, so the flag can no longer be stranded.
+  - **The audio panel's per-scene voice pin works for the first time.** The
+    site always sent `voice_id`; n8n's `VR Pick Voice` never read it.
+  - **Rollback:** `gh variable set VOICE_ENGINE --body n8n && gh workflow
+    run "Deploy platform"`.
+  - **Still on n8n:** a production batch's own first takes (`AB *` in Media
+    Generation) — that stage moves with the production pass (phase 6).
+  - **Checks.** `check-voice.mjs` holds the picker to BOTH live n8n bodies
+    (537 assertions), and `test/voice.test.mjs` runs 12 job scenarios.
+
 - **Final Assembly is moving out of n8n into `engine/`** (plan and phase
   log: `docs/plans/engine-final-assembly.md`, detail `engine/README.md`).
   **Since 2026-09-25 19:20 UTC EVERY final render from the site goes

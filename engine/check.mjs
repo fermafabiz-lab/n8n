@@ -322,13 +322,13 @@ console.log('\nLayer 3 — the composed requests equal what 16974 sent');
 }
 
 // ---------------------------------------------------------------------------
-console.log('\nGraphic styles + transitions — engine = the next Caption Colour (db/port/transitions)');
+console.log('\nGraphic styles + transitions — engine = the next Caption Colour (db/port/kids-cine-graphics)');
 {
   // The live body the next Final Assembly publish carries, run on Rome with a
   // graphic plan and a pick; the engine's captionColour + graphicStyles must
   // give the same body. Without either key both are today's output, which
   // Layer 2 already holds on every fixture.
-  const next = fs.readFileSync(path.join(repo, 'db/port/transitions/paste/fa-Caption_Colour.js'), 'utf8');
+  const next = fs.readFileSync(path.join(repo, 'db/port/kids-cine-graphics/paste/fa-Caption_Colour.js'), 'utf8');
   const w = romeWorld();
   const a = n8nChain(w);
   const orders = w.sceneRows.map((r) => (r.fields || {})['Ordine Scenă']).filter((o) => o !== undefined);
@@ -337,7 +337,7 @@ console.log('\nGraphic styles + transitions — engine = the next Caption Colour
     { kind: 'stat', sceneOrder: orders[5], value: 40, suffix: 'M', label: 'modii' },
     { kind: 'place', sceneOrder: 99999, title: 'Nowhere' },
   ] };
-  for (const [label, extra] of [['AI plan', { graphicPlan: plan }], ['pick beats plan', { graphicPlan: plan, graphicStyle: 'cinematic' }], ['classic', { graphicPlan: plan, graphicStyle: 'classic' }], ['pick, no plan', { graphicStyle: 'handwritten' }], ['unknown', { graphicStyle: 'neon' }], ['plan transition', { graphicPlan: { ...plan, transition: 'blur' } }], ['picked transition', { graphicPlan: { ...plan, transition: 'blur' }, transitionStyle: 'shutter' }], ['kids, transition only', { category: 'kids', graphicPlan: { style: 'classic', transition: 'crossfade', items: [] } }], ['picked none', { transitionStyle: 'none', graphicPlan: { ...plan, transition: 'glitch' } }]]) {
+  for (const [label, extra] of [['AI plan', { graphicPlan: plan }], ['pick beats plan', { graphicPlan: plan, graphicStyle: 'cinematic' }], ['classic', { graphicPlan: plan, graphicStyle: 'classic' }], ['pick, no plan', { graphicStyle: 'handwritten' }], ['unknown', { graphicStyle: 'neon' }], ['plan transition', { graphicPlan: { ...plan, transition: 'blur' } }], ['picked transition', { graphicPlan: { ...plan, transition: 'blur' }, transitionStyle: 'shutter' }], ['kids, transition only', { category: 'kids', graphicPlan: { style: 'classic', transition: 'crossfade', items: [] } }], ['picked none', { transitionStyle: 'none', graphicPlan: { ...plan, transition: 'glitch' } }], ['kids plan', { category: 'kids', graphicPlan: { style: 'kidsAll', transition: 'crossfade', items: [{ kind: 'character', sceneOrder: orders[4], title: 'Pip', box: [0.1, 0.1, 0.3, 0.6], image: 'https://x/y.png' }, { kind: 'celebrate', sceneOrder: orders[5] }] } }], ['cinematic plan', { category: 'cinematic', graphicPlan: { style: 'cineNeon', items: [{ kind: 'slate', sceneOrder: orders[4], title: 'H10', subtitle: '18:42' }] } }]]) {
     const project = clone(w.project);
     const opts = JSON.parse(project.fields['Editing Options'] || '{}');
     project.fields['Editing Options'] = JSON.stringify({ ...opts, ...extra });

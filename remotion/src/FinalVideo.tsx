@@ -21,7 +21,7 @@ import {SourceWatermark} from './components/SourceWatermark';
 import {presetForTone} from './style';
 import {packFor} from './motion/packs';
 import {graphicStyleFor} from './graphics/styles';
-import {CHAPTER_TITLE_SECONDS, GraphicsLayer, placeGraphics} from './graphics/GraphicsLayer';
+import {CHAPTER_TITLE_SECONDS, FULL_FRAME_KINDS, GraphicsLayer, placeGraphics} from './graphics/GraphicsLayer';
 import {transitionStyleFor} from './transitions/families';
 import {planTransitions} from './transitions/plan';
 import {transitionAt} from './transitions/TransitionLayer';
@@ -219,7 +219,7 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 	// agree on it: the Sequence, the caption suppression below, and anything
 	// later that asks "is a card up".
 	const cardWindowStart = (startSeconds: number) => Math.max(0, startSeconds - FLASH_LEAD);
-	const fullFrameTitles = showChapterCards && (gstyle.chapter === 'prism' || gstyle.chapter === 'handwritten');
+	const fullFrameTitles = showChapterCards && ['prism', 'handwritten', 'kidsTitle', 'calm', 'glitch'].includes(gstyle.chapter);
 	const chapterCardUp =
 		(impactCards &&
 			chapterStarts.some((s) => {
@@ -245,9 +245,14 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 							...cardShots.map((c) => ({from: c.startSeconds, to: c.startSeconds + c.durationSeconds})),
 							...(hookCard ? [{from: hookCard.from, to: hookCard.to}] : []),
 						],
+						filmTitle: projectTitle,
 					}),
-		[gstyle, showChapterCards, graphicItems, scenes, chapterTitles, cardShots, hookCard],
+		[gstyle, showChapterCards, graphicItems, scenes, chapterTitles, cardShots, hookCard, projectTitle],
 	);
+	// A style graphic that takes the whole frame (a character card, the film's
+	// title, a chapter title) is text in its own right: captions and the
+	// source label give way to it, as they do to every card.
+	const graphicFullUp = placedGraphics.some((p) => FULL_FRAME_KINDS.has(p.kind) && seconds >= p.from && seconds < p.to);
 
 	// The film's transitions (src/transitions/): sparse, and never on a cut
 	// something else already owns — a full-frame chapter card or title, a
@@ -259,12 +264,13 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 			...cardShots.map((c) => ({from: c.startSeconds, to: c.startSeconds + c.durationSeconds})),
 			...shots.filter((sh) => sh.kind === 'black').map((sh) => ({from: sh.startSeconds, to: sh.startSeconds + sh.durationSeconds})),
 			...(hookCard ? [{from: hookCard.from, to: hookCard.to}] : []),
+			...placedGraphics.filter((p) => FULL_FRAME_KINDS.has(p.kind) || p.kind === 'leak').map((p) => ({from: p.from, to: p.to})),
 		];
 		if (impactCards || fullFrameTitles || (showChapterCards && gstyle.flash)) {
 			for (const cs of chapterStarts) owned.push({from: cs.startSeconds - 0.6, to: cs.startSeconds + 0.6});
 		}
 		return planTransitions({style: tstyle, scenes, blocked: owned, stills: transitionStills?.cuts ?? null});
-	}, [tstyle, scenes, cardShots, shots, hookCard, impactCards, fullFrameTitles, showChapterCards, gstyle, chapterStarts, transitionStills]);
+	}, [tstyle, scenes, cardShots, shots, hookCard, impactCards, fullFrameTitles, showChapterCards, gstyle, chapterStarts, transitionStills, placedGraphics]);
 	const framingAt = (sec: number) => {
 		const sh = shotAt(shots, sec + 0.5 / fps + 1e-6);
 		return sh ? shotTransform(sh, sec) : kenBurnsTransform(scenes, sec, preset.energy);
@@ -339,7 +345,7 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 					{/* A spoken teaser IS captioned — its beats are narration, and a
 					    viewer with the sound off is exactly who a hook has to win. Only
 					    the hook's own card takes the frame from them, like every card. */}
-					{showCaptions && !activeCard && !chapterCardUp && !hookCardUp && (
+					{showCaptions && !activeCard && !chapterCardUp && !graphicFullUp && !hookCardUp && (
 						<Captions
 							scenes={scenes}
 							accent={captionAccent}
@@ -357,7 +363,7 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 					    Rendered whatever `showSourceWatermark` says: the switch owns
 					    the LABEL, and a licence that demands a credit is not a style
 					    choice. A scene owing neither draws nothing. */}
-					{!activeCard && !chapterCardUp && !hookCardUp && (
+					{!activeCard && !chapterCardUp && !graphicFullUp && !hookCardUp && (
 						<SourceWatermark
 							scenes={scenes}
 							preset={preset}

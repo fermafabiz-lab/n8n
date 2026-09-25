@@ -11,7 +11,7 @@ import WatermarkPreview, { type PreviewScene } from "@/components/WatermarkPrevi
 import { useSetPendingStage } from "@/components/StageNav";
 import type { EditingOptions, MotifCard } from "@/lib/data";
 import { MOTION_PACKS, defaultMotionPackFor } from "@/lib/motion-packs";
-import { GRAPHIC_STYLES, graphicStyleLabel, offersGraphicStyle } from "@/lib/graphic-styles";
+import { GRAPHIC_STYLES, graphicStyleLabel, graphicStylesFor, offersGraphicStyle, type GraphicPlanItem } from "@/lib/graphic-styles";
 import { TRANSITION_STYLES, transitionStyleLabel } from "@/lib/transition-styles";
 
 /**
@@ -169,6 +169,29 @@ function describeMotif(card: MotifCard): { title: string; detail: string } {
     detail: card.note ?? card.label ?? card.variant,
   };
 }
+
+/** What each kind of planned graphic is called on the panel. */
+const ITEM_KIND: Record<GraphicPlanItem["kind"], string> = {
+  person: "Name",
+  place: "Place",
+  stat: "Figure",
+  character: "Character",
+  speech: "Speech bubble",
+  moment: "Sticker",
+  celebrate: "Confetti",
+  slate: "Location slate",
+};
+
+const itemText = (it: GraphicPlanItem): string =>
+  it.kind === "stat"
+    ? `${it.value}${it.suffix ?? ""} ${it.label}`
+    : it.kind === "speech"
+      ? `“${it.text}”`
+      : it.kind === "moment"
+        ? it.label
+        : it.kind === "celebrate"
+          ? "the happy ending"
+          : it.title;
 
 /** The slider's floor, in percent. Mirrors the brief's control: the switch
  *  above owns silence, so the level never reaches zero. */
@@ -613,7 +636,7 @@ export default function FinalSettings({
             >
               ✨ AI picks{plan?.source === "ai" ? ` · ${graphicStyleLabel(plan.style)}` : ""}
             </button>
-            {GRAPHIC_STYLES.map((g) => (
+            {graphicStylesFor(category).map((g) => (
               <button
                 type="button"
                 key={g.id}
@@ -638,23 +661,18 @@ export default function FinalSettings({
                   {plan.items.map((it, i) => (
                     <li key={i}>
                       <span style={{ color: "var(--soft)" }}>
-                        Scene {it.sceneOrder} · {it.kind === "person" ? "Name" : it.kind === "place" ? "Place" : "Figure"} —{" "}
+                        Scene {it.sceneOrder} · {ITEM_KIND[it.kind]} —{" "}
                       </span>
-                      {it.kind === "stat" ? (
-                        <b>
-                          {it.value}
-                          {it.suffix ?? ""} {it.label}
-                        </b>
-                      ) : (
-                        <b>{it.title}</b>
-                      )}
-                      {it.kind !== "stat" && it.subtitle ? <span style={{ color: "var(--soft)" }}> · {it.subtitle}</span> : null}
+                      <b>{itemText(it)}</b>
+                      {(it.kind === "person" || it.kind === "place" || it.kind === "slate") && it.subtitle ? (
+                        <span style={{ color: "var(--soft)" }}> · {it.subtitle}</span>
+                      ) : null}
                     </li>
                   ))}
                 </ul>
               ) : (
                 <p className="fnote" style={{ margin: "0 0 8px" }}>
-                  {plan ? "No names, places or figures were worth a graphic — only chapter titles will be drawn." : "No graphics chosen yet."}
+                  {plan ? "Nothing in the scenes was worth a graphic — only the style's titles will be drawn." : "No graphics chosen yet."}
                 </p>
               )}
               {planMsg && <p className={`formmsg ${planMsg.ok ? "ok" : "err"}`}>{planMsg.message}</p>}

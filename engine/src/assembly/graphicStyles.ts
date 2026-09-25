@@ -14,7 +14,9 @@ import type { RenderBody } from './buildProps.ts';
  * rendered scene list the way attachMotifCards maps its cards. Nothing is
  * sent when there is nothing to say: absent is classic, today's film.
  */
-export const GRAPHIC_STYLES = ['classic', 'reportage', 'editorial', 'cinematic', 'handwritten'];
+// Kids story and Cinematic have their own six since 2026-09-25
+// (db/port/kids-cine-graphics/).
+export const GRAPHIC_STYLES = ['classic', 'reportage', 'editorial', 'cinematic', 'handwritten', 'kidsStorybook', 'kidsPlayful', 'kidsAll', 'cineFilm', 'cineNeon', 'cineMemory'];
 /** remotion/src/transitions/families.ts, db/port/transitions/. */
 export const TRANSITION_STYLES = ['none', 'push', 'crossfade', 'blur', 'shutter', 'glitch'];
 

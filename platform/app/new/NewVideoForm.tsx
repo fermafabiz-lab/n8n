@@ -8,7 +8,7 @@ import { TONES } from "@/lib/tones";
 import Toggle from "@/components/Toggle";
 import CaptionColorPicker from "@/components/CaptionColorPicker";
 import { MOTION_PACKS, defaultMotionPackFor, type MotionPackId } from "@/lib/motion-packs";
-import { GRAPHIC_STYLES, offersGraphicStyle, type GraphicStyleId } from "@/lib/graphic-styles";
+import { GRAPHIC_STYLES, graphicStylesFor, offersGraphicStyle, type GraphicStyleId } from "@/lib/graphic-styles";
 import { TRANSITION_STYLES, type TransitionStyleId } from "@/lib/transition-styles";
 import WatermarkOpenPicker from "@/components/WatermarkOpenPicker";
 import WatermarkSizePicker from "@/components/WatermarkSizePicker";
@@ -1392,16 +1392,18 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
                 {offersGraphicStyle(category) && (
                 <div className="frow" style={{ marginTop: 18 }}>
                   <label>Graphics</label>
-                  <input type="hidden" name="graphic_style" value={graphicStyle} />
+                  {/* A pick from another category (the category changed after
+                      it was made) is not this film's: it reads as AI picks. */}
+                  <input type="hidden" name="graphic_style" value={graphicStylesFor(category).some((g) => g.id === graphicStyle) ? graphicStyle : ""} />
                   <div className="seg" role="group" aria-label="Graphics" style={{ flexWrap: "wrap" }}>
                     <button
                       type="button"
-                      className={graphicStyle === "" ? "on" : ""}
+                      className={!graphicStylesFor(category).some((g) => g.id === graphicStyle) ? "on" : ""}
                       onClick={() => setGraphicStyle("")}
                     >
                       ✨ AI picks
                     </button>
-                    {GRAPHIC_STYLES.map((g) => (
+                    {graphicStylesFor(category).map((g) => (
                       <button
                         type="button"
                         key={g.id}
@@ -1413,8 +1415,8 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
                     ))}
                   </div>
                   <p className="fnote">
-                    {graphicStyle === ""
-                      ? "Name tags, places, figures and chapter titles over the footage. The AI picks a style by the film's theme once the scenes are written. Changeable in Final touches."
+                    {!graphicStylesFor(category).some((g) => g.id === graphicStyle)
+                      ? "Graphics over the footage — titles, names, bubbles, slates, depending on the kind of film. The AI picks a style by the film's theme once the scenes are written. Changeable in Final touches."
                       : GRAPHIC_STYLES.find((g) => g.id === graphicStyle)?.hint}
                   </p>
                 </div>

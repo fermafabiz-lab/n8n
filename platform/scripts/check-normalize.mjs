@@ -173,7 +173,17 @@ const gs = await import(join(root, 'lib', 'graphic-styles.ts'));
 check('graphic style: absent -> null (AI picks)', gs.normalizeGraphicStyle(undefined), null);
 check('graphic style: unknown refused -> null', gs.normalizeGraphicStyle('neon'), null);
 check('graphic style: the five ids pass', ['classic', 'reportage', 'editorial', 'cinematic', 'handwritten'].map(gs.normalizeGraphicStyle), ['classic', 'reportage', 'editorial', 'cinematic', 'handwritten']);
-check('graphic style: offered on Story and Documentary only', ['story', 'documentary', 'kids', 'cinematic', null].map(gs.offersGraphicStyle), [true, true, false, false, true]);
+check('graphic style: offered on every category', ['story', 'documentary', 'kids', 'cinematic', null].map(gs.offersGraphicStyle), [true, true, true, true, true]);
+check('graphic style: each category offers its own set', ['story', 'kids', 'cinematic', 'odd'].map((c) => gs.graphicStylesFor(c).map((g) => g.id).join(',')), ['reportage,editorial,cinematic,handwritten,classic', 'kidsStorybook,kidsPlayful,kidsAll,classic', 'cineFilm,cineNeon,cineMemory,classic', 'reportage,editorial,cinematic,handwritten,classic']);
+check('graphic style: the kids and cinematic ids pass', ['kidsAll', 'cineNeon'].map(gs.normalizeGraphicStyle), ['kidsAll', 'cineNeon']);
+check('graphic plan: kids and cinematic items are read',
+  gs.normalizeGraphicPlan({ style: 'kidsAll', items: [
+    { kind: 'character', sceneOrder: 2, title: 'Pip', box: [0.1, 0.1, 0.2, 0.3], image: 'https://x' },
+    { kind: 'speech', sceneOrder: 3, text: 'Oh dear!' },
+    { kind: 'moment', sceneOrder: 4, label: 'Found it!' },
+    { kind: 'celebrate', sceneOrder: 5 },
+    { kind: 'slate', sceneOrder: 6, title: 'H10', subtitle: '18:42' },
+  ] }).items.map((i) => i.kind).join(','), 'character,speech,moment,celebrate,slate');
 check('graphic plan: garbage -> null', gs.normalizeGraphicPlan({ style: 'neon', items: [] }), null);
 check('graphic plan: malformed items dropped, good ones kept',
   gs.normalizeGraphicPlan({ style: 'reportage', source: 'ai', why: 'x', at: null, items: [

@@ -91,6 +91,10 @@ order the batch runs in.
      still), the pool with work stealing.
    - `scene-video-regen` becomes engine work.
    - Clips land in `/media` (already ingested today; Drive is dropped).
+   - **Clip regeneration DONE 2026-09-25**:
+     - **Built:** `engine/src/clip/`. `check-clip.mjs` has 144 assertions (counters included, three sabotages caught); 15 clip scenarios.
+     - **Deployed:** the engine at `f6092b6`. The site half (`VIDEO_ENGINE`) goes out with `IMAGE_ENGINE` once no production batch is running.
+     - **Still in n8n, moving with the production pass:** the batch's clip loop (pool, stealing, VP ladder).
 5. **Setup:** reference upload, cast sheets, set plates, cross-account
    replication.
 6. **The production pass.**

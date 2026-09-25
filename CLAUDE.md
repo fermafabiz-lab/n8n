@@ -555,6 +555,29 @@ expected and harmless for an app touching only its own Drive.
   transitions** (Push, Crossfade, Blur, Shutter, Glitch/Ripple — one family
   per film, by theme, with AI picks), not started.
 
+- **Clip regeneration can be made by the engine** (2026-09-25,
+  `docs/plans/engine-media-generation.md`, phase 4; site Variable
+  `VIDEO_ENGINE=code`, engine deploy `f6092b6`).
+  - **How it works.** "Regenerate video", Restart and the clip queued after
+    an image approval queue a `hov.media_job` 'clip' row instead of calling
+    `scene-video-regen`.
+  - **What was ported.** The whole `VRW *` / `RG *` chain (40 nodes, 62 KB)
+    is in `engine/src/clip/regen.ts`, node by node. `check-clip.mjs` holds
+    it to the live bodies on 144 assertions, and compares the static-data
+    counters each node leaves behind.
+  - **The takes** land in `/media` through `/api/media/ingest`; there is no
+    Drive upload.
+  - **Two changes from n8n:**
+    - `AUDIO_GENERATION_FILTERED` gets the advice about the sound, not the
+      "real person in the still" note;
+    - any failure releases `Regenerează Video` with a note starting
+      `REJECTED —`, a prefix every reader already skips, so it is never
+      taken for the producer's correction.
+  - **Rollback:** `gh variable set VIDEO_ENGINE --body n8n && gh workflow
+    run "Deploy platform"`.
+  - **Still in n8n:** the batch's own clips (the pool, stealing, the VP
+    refusal ladder); they move with the production pass.
+
 - **Image regeneration can be made by the engine** (2026-09-25,
   `docs/plans/engine-media-generation.md`, phase 3; site Variable
   `IMAGE_ENGINE=code`).

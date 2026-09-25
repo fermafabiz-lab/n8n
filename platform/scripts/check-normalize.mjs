@@ -166,5 +166,24 @@ check('motion pack: case matters (the render reads lowerThird exactly)', mp.norm
 check('motion pack: Story defaults to editorial', mp.defaultMotionPackFor('story'), 'editorial');
 check('motion pack: every other category defaults to classic', ['documentary', 'cinematic', 'kids', null].map(mp.defaultMotionPackFor), ['classic', 'classic', 'classic', 'classic']);
 
+// --- graphic styles (lib/graphic-styles.ts) --------------------------------------
+// Same five ids as remotion/src/graphics/styles.ts and the two n8n nodes in
+// db/port/graphic-styles (whose own check is db/port/graphic-styles/check.mjs).
+const gs = await import(join(root, 'lib', 'graphic-styles.ts'));
+check('graphic style: absent -> null (AI picks)', gs.normalizeGraphicStyle(undefined), null);
+check('graphic style: unknown refused -> null', gs.normalizeGraphicStyle('neon'), null);
+check('graphic style: the five ids pass', ['classic', 'reportage', 'editorial', 'cinematic', 'handwritten'].map(gs.normalizeGraphicStyle), ['classic', 'reportage', 'editorial', 'cinematic', 'handwritten']);
+check('graphic style: offered on Story and Documentary only', ['story', 'documentary', 'kids', 'cinematic', null].map(gs.offersGraphicStyle), [true, true, false, false, true]);
+check('graphic plan: garbage -> null', gs.normalizeGraphicPlan({ style: 'neon', items: [] }), null);
+check('graphic plan: malformed items dropped, good ones kept',
+  gs.normalizeGraphicPlan({ style: 'reportage', source: 'ai', why: 'x', at: null, items: [
+    { kind: 'person', sceneOrder: 3, title: 'Augustus', subtitle: 'Emperor' },
+    { kind: 'stat', sceneOrder: 4, value: 40, suffix: 'M', label: 'modii' },
+    { kind: 'person', sceneOrder: 0, title: 'Nobody' },
+    { kind: 'stat', sceneOrder: 5, value: 'lots', label: 'x' },
+    { kind: 'map', sceneOrder: 6, title: 'x' },
+  ] }).items,
+  [{ kind: 'person', sceneOrder: 3, title: 'Augustus', subtitle: 'Emperor' }, { kind: 'stat', sceneOrder: 4, value: 40, label: 'modii', suffix: 'M' }]);
+
 console.log(`\n${results.filter(Boolean).length}/${results.length} passed`);
 process.exit(results.every(Boolean) ? 0 : 1);

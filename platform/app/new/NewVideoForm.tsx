@@ -8,6 +8,7 @@ import { TONES } from "@/lib/tones";
 import Toggle from "@/components/Toggle";
 import CaptionColorPicker from "@/components/CaptionColorPicker";
 import { MOTION_PACKS, defaultMotionPackFor, type MotionPackId } from "@/lib/motion-packs";
+import { GRAPHIC_STYLES, offersGraphicStyle, type GraphicStyleId } from "@/lib/graphic-styles";
 import WatermarkOpenPicker from "@/components/WatermarkOpenPicker";
 import WatermarkSizePicker from "@/components/WatermarkSizePicker";
 import WatermarkPreview, { SAMPLE_SCENES } from "@/components/WatermarkPreview";
@@ -380,6 +381,9 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
   // stored and the render uses the category's default, so the pick follows
   // the category until the producer makes one.
   const [motionPack, setMotionPack] = useState<MotionPackId | "">("");
+  // Which graphics ride over the footage (lib/graphic-styles.ts). "" is "AI
+  // picks": the pipeline chooses by the film's theme once the scenes exist.
+  const [graphicStyle, setGraphicStyle] = useState<GraphicStyleId | "">("");
   const [style, setStyle] = useState(series?.style ?? "");
   // Hands-off mode: WHICH gates sign themselves off (lib/hands-off.ts). Off by
   // default — approving unseen is a real trade, and it must never be the
@@ -1381,6 +1385,36 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
                       : MOTION_PACKS.find((p) => p.id === motionPack)?.hint}
                   </p>
                 </div>
+                {offersGraphicStyle(category) && (
+                <div className="frow" style={{ marginTop: 18 }}>
+                  <label>Graphics</label>
+                  <input type="hidden" name="graphic_style" value={graphicStyle} />
+                  <div className="seg" role="group" aria-label="Graphics" style={{ flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      className={graphicStyle === "" ? "on" : ""}
+                      onClick={() => setGraphicStyle("")}
+                    >
+                      ✨ AI picks
+                    </button>
+                    {GRAPHIC_STYLES.map((g) => (
+                      <button
+                        type="button"
+                        key={g.id}
+                        className={graphicStyle === g.id ? "on" : ""}
+                        onClick={() => setGraphicStyle(g.id)}
+                      >
+                        {g.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="fnote">
+                    {graphicStyle === ""
+                      ? "Name tags, places, figures and chapter titles over the footage. The AI picks a style by the film's theme once the scenes are written. Changeable in Final touches."
+                      : GRAPHIC_STYLES.find((g) => g.id === graphicStyle)?.hint}
+                  </p>
+                </div>
+                )}
                 {!noHook && (
                 <div className="frow" style={{ marginTop: 18 }}>
                   <label>Cold open</label>

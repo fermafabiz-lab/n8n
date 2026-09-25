@@ -8,11 +8,12 @@ import { attachMotifCards } from './attachMotifCards.ts';
 import { buildProps } from './buildProps.ts';
 import { buildTimeline } from './buildTimeline.ts';
 import { captionColour } from './captionColour.ts';
+import { graphicStyles } from './graphicStyles.ts';
 import { prepareClips } from './prepareClips.ts';
 import { sourceWatermark } from './sourceWatermark.ts';
 import type { AtRow, MusicPick, PollStatus, Triggers } from './types.ts';
 
-export { attachMotifCards, buildProps, buildTimeline, captionColour, prepareClips, sourceWatermark };
+export { attachMotifCards, buildProps, buildTimeline, captionColour, graphicStyles, prepareClips, sourceWatermark };
 export { chapterTitlesOf } from './buildProps.ts';
 export { editingOptions } from './editingOptions.ts';
 export { judgeAssemblePoll, judgeGraphicsPoll, ASSEMBLE_MAX_POLLS, GRAPHICS_MAX_POLLS } from './guards.ts';
@@ -53,6 +54,8 @@ export function planRender(input: FilmInput & {
   const fields = input.project.fields;
   let body = buildProps({ clips, triggers: input.triggers, projectFields: fields, script: input.script, assembled: input.assembled }).body;
   body = captionColour(body, fields);
+  // Same position as in n8n, where it is the tail of Caption Colour.
+  body = graphicStyles(body, fields, input.sceneRows, clips);
   body = attachMotifCards(body, fields, input.sceneRows, clips);
   const wm = sourceWatermark(body, fields, input.sceneRows, clips);
   return { body: Object.assign({}, wm.body, { resolution: (timeline.resolution || '720p') }), log: [wm.log] };

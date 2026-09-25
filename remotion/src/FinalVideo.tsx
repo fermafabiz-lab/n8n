@@ -20,6 +20,8 @@ import {SourceVideo} from './components/SourceVideo';
 import {SourceWatermark} from './components/SourceWatermark';
 import {presetForTone} from './style';
 import {packFor} from './motion/packs';
+import {graphicStyleFor} from './graphics/styles';
+import {CHAPTER_TITLE_SECONDS, GraphicsLayer, placeGraphics} from './graphics/GraphicsLayer';
 import {resolveCaptionAccent} from './captionColor';
 import type {FinalVideoProps} from './types';
 
@@ -49,11 +51,19 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 	watermarkScale = 1,
 	motionPack,
 	category,
+	graphicStyle,
+	graphicItems,
 }) => {
 	const {fps} = useVideoConfig();
 	// How things move (src/motion/packs.ts): the film's pick, else its
 	// category's default, else classic.
 	const pack = packFor(motionPack, category);
+	// Which graphics ride over the footage (src/graphics/styles.ts). A style
+	// other than classic replaces the full-screen chapter card with its own
+	// chapter opening, so "is there an impact card" is no longer simply
+	// showChapterCards.
+	const gstyle = graphicStyleFor(graphicStyle);
+	const impactCards = showChapterCards && gstyle.chapter === 'impactCard';
 	const frame = useCurrentFrame();
 	const seconds = frame / fps;
 	const preset = presetForTone(tone);
@@ -107,7 +117,7 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 						scenes,
 						evidence,
 						explicit: textCards,
-						chapterCardsOn: showChapterCards,
+						chapterCardsOn: impactCards,
 						// The whole teaser, not a title window: a motif card cut into
 						// three-second shots would be the fourth picture in nine seconds.
 						hookSeconds: hookEnd,
@@ -119,7 +129,7 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 			evidence,
 			textCards,
 			showTextCards,
-			showChapterCards,
+			impactCards,
 			hookEnd,
 			narrationIsSpoken,
 		],
@@ -134,11 +144,11 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 				seed: projectTitle || 'house-of-videos',
 				// A chapter card already owns its boundary with a light leak;
 				// a black frame there too would be two effects on one cut.
-				blackPunctuation: !showChapterCards,
+				blackPunctuation: !impactCards,
 				// The planner places TIME; it never sees what a card holds.
 				cards: toMontageCards(cards),
 			}),
-		[scenes, intensity, projectTitle, showChapterCards, cards],
+		[scenes, intensity, projectTitle, impactCards, cards],
 	);
 	// Cards are material, not rhythm, so they land even at intensity 0 — turning
 	// the montage off must not throw away a sourced claim.
@@ -204,12 +214,35 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 	// agree on it: the Sequence, the caption suppression below, and anything
 	// later that asks "is a card up".
 	const cardWindowStart = (startSeconds: number) => Math.max(0, startSeconds - FLASH_LEAD);
+	const fullFrameTitles = showChapterCards && (gstyle.chapter === 'prism' || gstyle.chapter === 'handwritten');
 	const chapterCardUp =
-		showChapterCards &&
-		chapterStarts.some((s) => {
-			const from = cardWindowStart(s.startSeconds);
-			return seconds >= from && seconds < from + IMPACT_CARD_SECONDS;
-		});
+		(impactCards &&
+			chapterStarts.some((s) => {
+				const from = cardWindowStart(s.startSeconds);
+				return seconds >= from && seconds < from + IMPACT_CARD_SECONDS;
+			})) ||
+		(fullFrameTitles &&
+			chapterStarts.some((s) => seconds >= s.startSeconds && seconds < s.startSeconds + CHAPTER_TITLE_SECONDS));
+
+	// The style's graphics, placed once for the whole film. Chapter openings
+	// only while chapter cards are on — the switch keeps meaning "no chapter
+	// graphic" whatever the style draws instead.
+	const placedGraphics = useMemo(
+		() =>
+			gstyle.id === 'classic'
+				? []
+				: placeGraphics({
+						style: showChapterCards ? gstyle : {...gstyle, chapter: 'impactCard', flash: false},
+						items: graphicItems ?? [],
+						scenes,
+						chapterTitles,
+						blocked: [
+							...cardShots.map((c) => ({from: c.startSeconds, to: c.startSeconds + c.durationSeconds})),
+							...(hookCard ? [{from: hookCard.from, to: hookCard.to}] : []),
+						],
+					}),
+		[gstyle, showChapterCards, graphicItems, scenes, chapterTitles, cardShots, hookCard],
+	);
 
 	/**
 	 * A card is one Sequence and one duration whatever it holds; only the
@@ -254,7 +287,7 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 					    change of picture in the footage, at every intensity — laying a
 					    luminance dip over it made two transitions out of one, and that
 					    is what read as a fault. See Transitions. */}
-					<Transitions scenes={scenes} tone={tone} chapterCards={showChapterCards} />
+					<Transitions scenes={scenes} tone={tone} chapterCards={impactCards || (showChapterCards && gstyle.flash)} />
 					{/* Captions go dark under a card. The card is already text, and
 					    the whole reason a card earns its place is that it shows what
 					    the narration is NOT saying — printing the spoken line over it
@@ -294,6 +327,10 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 					    starts at zero and its reveal is frame-exact, exactly as the
 					    chapter card does. Placement came from the planner, so a card
 					    never lands two in a row or over the hook. */}
+					{/* The style's graphics: name and place tags, figures, chapter
+					    openings (src/graphics/). Placed so none sits under a card or
+					    over the cold open — see placeGraphics. */}
+					<GraphicsLayer placed={placedGraphics} accent={preset.cardInk} portrait={aspectRatio === '9:16'} />
 					{cardShots.map((cs) => (
 						<Sequence
                             key={`tc-${cs.startSeconds}`}
@@ -326,7 +363,7 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 							<CutFlash at={cs.startSeconds + cs.durationSeconds} tone={tone} outgoing />
 						</React.Fragment>
 					))}
-					{showChapterCards &&
+					{impactCards &&
 						chapterStarts.map((s) => (
 							<Sequence
                                 key={`ch-${s.chapter}`}

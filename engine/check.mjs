@@ -174,7 +174,7 @@ function tsChain(world) {
   attempt(s, 'assembled', () => E.judgeAssemblePoll(w.assembled, w.assemblePolls ?? 0));
   if (s.error) return s;
   attempt(s, 'props', () => E.buildProps({ clips: s.clips, triggers, projectFields: pf, script: w.script, assembled: s.assembled }).body);
-  attempt(s, 'caption', () => E.captionColour(s.props, pf));
+  attempt(s, 'caption', () => E.graphicStyles(E.captionColour(s.props, pf), pf, w.sceneRows, s.clips));
   attempt(s, 'motif', () => E.attachMotifCards(s.caption, pf, w.sceneRows, s.clips));
   attempt(s, 'watermark', () => { const r = E.sourceWatermark(s.motif, pf, w.sceneRows, s.clips); s.log = [r.log]; return r.body; });
   attempt(s, 'render', () => Object.assign({}, s.watermark, { resolution: (s.timeline.resolution || '720p') }));
@@ -319,6 +319,40 @@ console.log('\nLayer 3 — the composed requests equal what 16974 sent');
   is('/render body = what 16974 sent + category', render.body, { ...recorded, category: 'story' });
   is('/render body = the live n8n chain on the same inputs', render.body, romeSteps.render);
   is('watermark log line', render.log, romeSteps.log);
+}
+
+// ---------------------------------------------------------------------------
+console.log('\nGraphic styles — engine = the next Caption Colour (db/port/graphic-styles)');
+{
+  // The live body the next Final Assembly publish carries, run on Rome with a
+  // graphic plan and a pick; the engine's captionColour + graphicStyles must
+  // give the same body. Without either key both are today's output, which
+  // Layer 2 already holds on every fixture.
+  const next = fs.readFileSync(path.join(repo, 'db/port/graphic-styles/paste/fa-Caption_Colour.js'), 'utf8');
+  const w = romeWorld();
+  const a = n8nChain(w);
+  const orders = w.sceneRows.map((r) => (r.fields || {})['Ordine Scenă']).filter((o) => o !== undefined);
+  const plan = { style: 'reportage', source: 'ai', items: [
+    { kind: 'person', sceneOrder: orders[4], title: 'Augustus', subtitle: 'Emperor' },
+    { kind: 'stat', sceneOrder: orders[5], value: 40, suffix: 'M', label: 'modii' },
+    { kind: 'place', sceneOrder: 99999, title: 'Nowhere' },
+  ] };
+  for (const [label, extra] of [['AI plan', { graphicPlan: plan }], ['pick beats plan', { graphicPlan: plan, graphicStyle: 'cinematic' }], ['classic', { graphicPlan: plan, graphicStyle: 'classic' }], ['pick, no plan', { graphicStyle: 'handwritten' }], ['unknown', { graphicStyle: 'neon' }]]) {
+    const project = clone(w.project);
+    const opts = JSON.parse(project.fields['Editing Options'] || '{}');
+    project.fields['Editing Options'] = JSON.stringify({ ...opts, ...extra });
+    const nodes = { 'Fetch Project Info': [project], 'Fetch Approved Scenes': w.sceneRows, 'Prepare Clips': a.clips };
+    const $ = (n) => ({ first: () => ({ json: nodes[n][0] }), all: () => nodes[n].map((j) => ({ json: j })) });
+    const n8n = new Function('$', '$json', next)($, { body: clone(a.props) })[0].json.body;
+    const ts = E.graphicStyles(E.captionColour(clone(a.props), project.fields), project.fields, w.sceneRows, a.clips);
+    is(`${label}: engine = n8n`, ts, n8n);
+  }
+  ok('the AI plan maps two of three items (the third scene is not in the film)', (() => {
+    const project = clone(w.project);
+    project.fields['Editing Options'] = JSON.stringify({ ...JSON.parse(project.fields['Editing Options'] || '{}'), graphicPlan: plan });
+    const b = E.graphicStyles(clone(a.props), project.fields, w.sceneRows, a.clips);
+    return b.graphicStyle === 'reportage' && b.graphicItems.length === 2 && b.graphicItems.every((g) => Number.isInteger(g.sceneIndex));
+  })());
 }
 
 // ---------------------------------------------------------------------------

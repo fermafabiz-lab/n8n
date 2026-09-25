@@ -292,6 +292,14 @@ export type FinalVideoProps = {
 	 * Absent or unknown → classic, today's motion.
 	 */
 	motionPack?: string;
+	/**
+	 * Which graphics the film carries over its footage and in which design
+	 * (src/graphics/styles.ts): classic | reportage | editorial | cinematic |
+	 * handwritten. Absent or unknown → classic, today's film.
+	 */
+	graphicStyle?: string;
+	/** The name tags, place stamps and figures to draw, anchored to scenes. */
+	graphicItems?: import('./graphics/styles').GraphicItem[];
 };
 
 export const defaultFinalVideoProps: FinalVideoProps = {

@@ -29,6 +29,16 @@ export const FONTS = {
 	InterTight: {pkg: 'inter-tight', family: 'Inter Tight', weights: ['600', '700', '800']},
 	IBMPlexMono: {pkg: 'ibm-plex-mono', family: 'IBM Plex Mono', weights: ['500']},
 	Poppins: {pkg: 'poppins', family: 'Poppins', weights: ['700']},
+	// The graphic styles (src/graphics/), faces from the Hyperframes catalog
+	// blocks they were modelled on.
+	LeagueGothic: {pkg: 'league-gothic', family: 'League Gothic', weights: ['400']},
+	JetBrainsMono: {pkg: 'jetbrains-mono', family: 'JetBrains Mono', weights: ['400']},
+	Montserrat: {pkg: 'montserrat', family: 'Montserrat', weights: ['400', '700']},
+	SpaceMono: {pkg: 'space-mono', family: 'Space Mono', weights: ['700']},
+	ArchivoBlack: {pkg: 'archivo-black', family: 'Archivo Black', weights: ['400']},
+	BarlowCondensed: {pkg: 'barlow-condensed', family: 'Barlow Condensed', weights: ['700', '800']},
+	Caveat: {pkg: 'caveat', family: 'Caveat', weights: ['700']},
+	Inter: {pkg: 'inter', family: 'Inter', weights: ['400', '500', '600']},
 };
 
 const fontModule = (name) => {

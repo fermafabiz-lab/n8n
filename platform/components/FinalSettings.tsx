@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { confirmFinalSettings, type ActionResult } from "@/app/actions";
+import { confirmFinalSettings, requestGraphicPlan, type ActionResult } from "@/app/actions";
 import Toggle from "@/components/Toggle";
 import CaptionColorPicker from "@/components/CaptionColorPicker";
 import WatermarkOpenPicker from "@/components/WatermarkOpenPicker";
@@ -11,6 +11,7 @@ import WatermarkPreview, { type PreviewScene } from "@/components/WatermarkPrevi
 import { useSetPendingStage } from "@/components/StageNav";
 import type { EditingOptions, MotifCard } from "@/lib/data";
 import { MOTION_PACKS, defaultMotionPackFor } from "@/lib/motion-packs";
+import { GRAPHIC_STYLES, graphicStyleLabel, offersGraphicStyle } from "@/lib/graphic-styles";
 
 /**
  * The last gate: every clip is approved and the batch is holding just before
@@ -256,6 +257,11 @@ export default function FinalSettings({
   // Not a row either, so counted by hand like the three above: picking a
   // style and nothing else must still render with it.
   const motionPackMoved = (opts.motionPack ?? null) !== (initial.motionPack ?? null);
+  const graphicStyleMoved = (opts.graphicStyle ?? null) !== (initial.graphicStyle ?? null);
+  const showGraphics = offersGraphicStyle(category);
+  const plan = initial.graphicPlan;
+  const [planMsg, setPlanMsg] = useState<ActionResult | null>(null);
+  const [planPending, startPlan] = useTransition();
   // The pace is NOT here any more — it is decided and signed off at the audio
   // step, the one moment it costs nothing, and this panel neither shows it nor
   // writes it. (confirmFinalSettings therefore omits `speed` entirely rather
@@ -273,7 +279,8 @@ export default function FinalSettings({
     captionColorMoved ||
     watermarkOpenMoved ||
     watermarkScaleMoved ||
-    motionPackMoved;
+    motionPackMoved ||
+    graphicStyleMoved;
   const changeCount =
     changedKeys.length +
     dropped.length +
@@ -282,7 +289,8 @@ export default function FinalSettings({
     (captionColorMoved ? 1 : 0) +
     (watermarkOpenMoved ? 1 : 0) +
     (watermarkScaleMoved ? 1 : 0) +
-    (motionPackMoved ? 1 : 0);
+    (motionPackMoved ? 1 : 0) +
+    (graphicStyleMoved ? 1 : 0);
   const done = msg?.ok === true;
   const router = useRouter();
   const setPendingStage = useSetPendingStage();
@@ -581,6 +589,83 @@ export default function FinalSettings({
             : "How captions and chapter titles move. Auto follows the film's category."}
         </p>
       </div>
+
+      {/* Which graphics ride over the footage (lib/graphic-styles.ts), and
+          what they say. "AI picks" stores nothing and uses the style the
+          graphic-plan workflow chose by theme; the list under it is what that
+          workflow found in the scenes, shown so a wrong name is caught here
+          rather than in the finished film. */}
+      {showGraphics && (
+        <div style={{ marginTop: 22, paddingTop: 18, borderTop: "1px solid var(--line)" }}>
+          <h4 style={{ margin: 0 }}>
+            Graphics
+            {graphicStyleMoved && <span className="chg">changed</span>}
+          </h4>
+          <div className="seg" role="group" aria-label="Graphics" style={{ flexWrap: "wrap", marginTop: 10 }}>
+            <button
+              type="button"
+              className={!opts.graphicStyle ? "on" : ""}
+              onClick={() => setOpts((p) => ({ ...p, graphicStyle: null }))}
+            >
+              ✨ AI picks{plan?.source === "ai" ? ` · ${graphicStyleLabel(plan.style)}` : ""}
+            </button>
+            {GRAPHIC_STYLES.map((g) => (
+              <button
+                type="button"
+                key={g.id}
+                className={opts.graphicStyle === g.id ? "on" : ""}
+                onClick={() => setOpts((p) => ({ ...p, graphicStyle: g.id }))}
+              >
+                {g.label}
+              </button>
+            ))}
+          </div>
+          <p className="fnote" style={{ marginTop: 8 }}>
+            {opts.graphicStyle
+              ? GRAPHIC_STYLES.find((g) => g.id === opts.graphicStyle)?.hint
+              : plan?.source === "ai"
+                ? `Chosen for this film's theme${plan.why ? `: ${plan.why}` : "."}`
+                : "The AI has not chosen yet — without a choice the film has no graphics. Press Choose again."}
+          </p>
+          {opts.graphicStyle !== "classic" && (
+            <div style={{ marginTop: 10 }}>
+              {plan && plan.items.length > 0 ? (
+                <ul style={{ margin: "0 0 8px", paddingLeft: 18, fontSize: 13.5, lineHeight: 1.55 }}>
+                  {plan.items.map((it, i) => (
+                    <li key={i}>
+                      <span style={{ color: "var(--soft)" }}>
+                        Scene {it.sceneOrder} · {it.kind === "person" ? "Name" : it.kind === "place" ? "Place" : "Figure"} —{" "}
+                      </span>
+                      {it.kind === "stat" ? (
+                        <b>
+                          {it.value}
+                          {it.suffix ?? ""} {it.label}
+                        </b>
+                      ) : (
+                        <b>{it.title}</b>
+                      )}
+                      {it.kind !== "stat" && it.subtitle ? <span style={{ color: "var(--soft)" }}> · {it.subtitle}</span> : null}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="fnote" style={{ margin: "0 0 8px" }}>
+                  {plan ? "No names, places or figures were worth a graphic — only chapter titles will be drawn." : "No graphics chosen yet."}
+                </p>
+              )}
+              {planMsg && <p className={`formmsg ${planMsg.ok ? "ok" : "err"}`}>{planMsg.message}</p>}
+              <button
+                type="button"
+                className="btn ghost"
+                disabled={planPending}
+                onClick={() => startPlan(async () => setPlanMsg(await requestGraphicPlan(projectId)))}
+              >
+                ⟳ Choose again
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Drawn cards. Absent entirely when the pipeline chose none, which is
           the common case and the correct one — most scenes deserve no graphic,

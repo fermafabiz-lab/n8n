@@ -1,6 +1,7 @@
 "use server";
 
 import { normalizeMotionPack } from "@/lib/motion-packs";
+import { normalizeGraphicStyle, offersGraphicStyle } from "@/lib/graphic-styles";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
@@ -125,6 +126,58 @@ async function fireArchiveSuggest(projectId: string): Promise<void> {
   } catch (e) {
     console.warn(`archive-suggest webhook: ${(e as Error).message}`);
   }
+}
+
+/**
+ * Ask the pipeline for the film's graphic plan — the style ("AI picks") and
+ * the people, places and figures its graphics show (lib/graphic-styles.ts,
+ * db/port/graphic-styles/). Story and Documentary only; never for a film
+ * whose producer chose Classic.
+ *
+ * Fired when the LAST scene text is approved, because a tag names what a
+ * scene says and the texts are final only then — so a film approved scene by
+ * scene asks once, not fifty times, and a plan that exists is not replaced
+ * unless `force` (the "Choose again" button). Fire-and-forget: the webhook
+ * answers `onReceived` and the plan appears on the next load.
+ */
+async function fireGraphicPlan(projectId: string, force = false): Promise<boolean> {
+  try {
+    if (process.env.DATA_BACKEND !== "postgres") return false;
+    const project = await getProject(projectId);
+    if (!project || !offersGraphicStyle(project.category)) return false;
+    if (project.editing?.graphicStyle === "classic") return false;
+    if (!force) {
+      if (project.editing?.graphicPlan) return false;
+      const scenes = await getScenes(projectId);
+      const texts = scenes.filter((sc) => (sc.narration ?? "").trim());
+      if (!texts.length || texts.some((sc) => !sc.sceneApproved)) return false;
+    }
+    const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
+    const webhook = newProject?.replace(/new-project\/?$/, "graphic-plan");
+    if (!webhook?.includes("graphic-plan")) return false;
+    await fetch(webhook, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project_id: projectId }),
+      signal: AbortSignal.timeout(8000),
+    });
+    return true;
+  } catch (e) {
+    console.warn(`graphic-plan webhook: ${(e as Error).message}`);
+    return false;
+  }
+}
+
+/**
+ * "Choose again" in Final touches: a fresh graphic plan from the scenes as
+ * they now stand. The old plan stays on screen until the new one lands.
+ */
+export async function requestGraphicPlan(projectId: string): Promise<ActionResult> {
+  if (!isConfigured) return { ok: true, message: "Demo mode — nothing was written." };
+  const asked = await fireGraphicPlan(projectId, true);
+  return asked
+    ? { ok: true, message: "Choosing the graphics again — about a minute. Reload to see them." }
+    : { ok: false, message: "Could not ask for new graphics here (Story and Documentary films only, and not with Classic)." };
 }
 
 /**
@@ -703,6 +756,7 @@ export async function saveSceneScript(
     // at; the run itself picks only scenes not yet looked at, so firing per
     // approval is cheap and the lease keeps overlapping runs apart.
     if (approve) await fireArchiveSuggest(projectId);
+    if (approve) await fireGraphicPlan(projectId);
 
     revalidatePath(`/projects/${projectId}`);
     const suffix =
@@ -1609,6 +1663,9 @@ export async function confirmFinalSettings(
     /* The animation style (lib/motion-packs.ts). Null is "Auto": stored as
        null, so the category's default decides at render time. */
     motionPack?: string | null;
+    /* The graphic style (lib/graphic-styles.ts). Null is "AI picks": the
+       plan's own choice is then used at render time. */
+    graphicStyle?: string | null;
     /* NO `speed` here, on purpose. The pace is decided and signed off at the
        audio step, which is the only moment it is free to change, and this
        panel must not be able to move it — nor to reset it. Because
@@ -1658,6 +1715,7 @@ export async function confirmFinalSettings(
         watermarkOpenOnce: settings.watermarkOpenOnce === true,
         watermarkScale: normalizeWatermarkScale(settings.watermarkScale),
         motionPack: normalizeMotionPack(settings.motionPack),
+        graphicStyle: normalizeGraphicStyle(settings.graphicStyle),
       });
     }
     // Same merge, separate condition: the cards change even when no toggle
@@ -2149,6 +2207,7 @@ export async function approveAllScenes(
     }
     // One run for the whole batch — see saveSceneScript.
     await fireArchiveSuggest(projectId);
+    await fireGraphicPlan(projectId);
     revalidatePath(`/projects/${projectId}`);
     return { ok: true, message: `Approved ${sceneIds.length} scenes — production continues.` };
   } catch (e) {
@@ -2634,6 +2693,9 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
       // it only when it is one of the four, so Auto leaves the category's
       // default in charge at render time.
       motion_pack: normalizeMotionPack(formData.get("motion_pack")) ?? "",
+      // A known style id, or "" for AI picks — lib/graphic-styles.ts. The node
+      // stores it only when it is one of the five.
+      graphic_style: normalizeGraphicStyle(formData.get("graphic_style")) ?? "",
     // How the narrator reads. OMITTED when the producer left it on "Voice
     // default", and that absence is the feature: every ElevenLabs voice has
     // its own stored settings, so sending an object we made up would override

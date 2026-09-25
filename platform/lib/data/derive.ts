@@ -18,6 +18,7 @@
 import { normalizeStyleRefs } from "@/lib/style-refs";
 import { autoStepsOf, type AutoStep } from "@/lib/hands-off";
 import { normalizeMotionPack, type MotionPackId } from "@/lib/motion-packs";
+import { normalizeGraphicPlan, normalizeGraphicStyle, type GraphicPlan, type GraphicStyleId } from "@/lib/graphic-styles";
 import type { DocumentaryVisualSource } from "@/lib/archive/types";
 import { parseEditingOptionsShape } from "@/lib/editingOptionsShape";
 import {
@@ -229,6 +230,16 @@ export interface EditingOptions {
    * changed later still reaches every film that never chose.
    */
   motionPack: MotionPackId | null;
+  /**
+   * Which graphics ride over the footage (lib/graphic-styles.ts). Null is
+   * "AI picks": the graphic-plan workflow chooses by the film's theme.
+   */
+  graphicStyle: GraphicStyleId | null;
+  /**
+   * What the graphic-plan workflow wrote: the style it resolved and the
+   * people, places and figures the graphics show. Null until it has run.
+   */
+  graphicPlan: GraphicPlan | null;
   /**
    * Hands-off mode: the site signs off every gate by itself as the assets
    * land — script, scene texts, takes, images, clips — and presses the final
@@ -1375,6 +1386,8 @@ export function buildProject(r: RawProject): Project {
       watermarkOpenOnce: opts.watermarkOpenOnce === true,
       watermarkScale: normalizeWatermarkScale(opts.watermarkScale),
       motionPack: normalizeMotionPack(opts.motionPack),
+      graphicStyle: normalizeGraphicStyle(opts.graphicStyle),
+      graphicPlan: normalizeGraphicPlan(opts.graphicPlan),
       // Strictly opt-in: hands-off is a real trade (nothing gets a human
       // look) and must never switch itself on by absence. `autoStepsOf` reads
       // the step list when there is one and the old switch when there is not.

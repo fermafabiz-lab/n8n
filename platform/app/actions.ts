@@ -98,6 +98,7 @@ import { normalizeStyleRefs } from "@/lib/style-refs";
 import { normalizeWatermarkScale } from "@/lib/provenance";
 import { attachArchiveAsset, DEFAULT_SECONDS } from "@/lib/archive/attach";
 import { detachStockFromScene, resetArchiveSuggestions } from "@/lib/data/stock";
+import { engineFor, queueEngineRender, stopEngineRender, type AssemblyEngine } from "@/lib/assembly-engine";
 
 /**
  * Ask n8n to look for archive footage for this film's newly approved scenes.
@@ -1731,7 +1732,7 @@ export async function confirmFinalSettings(
     // production sits "Assembling" forever, and the producer ends up pressing
     // Restart render by hand on every single video. Firing here makes that
     // manual click the automatic behaviour.
-    const fired = await fireAssembleWebhook(projectId);
+    const fired = await startAssembly(projectId);
     revalidatePath(`/projects/${projectId}`);
     return {
       ok: true,
@@ -1746,8 +1747,24 @@ export async function confirmFinalSettings(
   }
 }
 
-/** POST the Final Assembly webhook for a project. Shared by the
- *  final-settings confirm and the manual Restart render button. */
+/**
+ * Start the final render of a film, on whichever engine draws it
+ * (lib/assembly-engine.ts: n8n by default, the engine when
+ * FINAL_ASSEMBLY_ENGINE=code or when this film is being tried on it).
+ * Shared by the final-settings confirm, Restart render, re-render with
+ * sound, and the /api/ops/assemble door.
+ */
+export async function startAssembly(
+  projectId: string,
+  engine?: AssemblyEngine,
+  requestedBy = "site",
+): Promise<ActionResult> {
+  const which = engine ?? (await engineFor(projectId));
+  if (which === "code") return queueEngineRender(projectId, requestedBy);
+  return fireAssembleWebhook(projectId);
+}
+
+/** POST the Final Assembly webhook for a project (the n8n engine). */
 async function fireAssembleWebhook(projectId: string): Promise<ActionResult> {
   const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
   const webhook =
@@ -1839,13 +1856,15 @@ export async function stopAssembly(projectId: string): Promise<ActionResult> {
   try {
     const alive = await getAliveAssembly().catch(() => []);
     for (const e of alive) await stopExecution(e.id).catch(() => {});
+    // And the engine's job for THIS film, if it is the one drawing it.
+    const engineStopped = await stopEngineRender(projectId);
     // Back to the gate it came from: Final touches renders again, the render
     // lock lifts, and pressing render is a clean restart rather than a race.
     await writeProjectFields(projectId, { "Status General": "Setari Finale" });
     revalidatePath(`/projects/${projectId}`);
     return {
       ok: true,
-      message: alive.length
+      message: alive.length || engineStopped
         ? `Render stopped — back at Final touches. Nothing else was touched: every clip, take and approval is intact.`
         : "No render was running in n8n — the project is back at Final touches.",
     };
@@ -1865,8 +1884,12 @@ export async function retryAssembly(projectId: string): Promise<ActionResult> {
   if (isConfigured) {
     const alive = await getAliveAssembly().catch(() => []);
     for (const e of alive) await stopExecution(e.id).catch(() => {});
+    // Decided BEFORE the stop: stopping writes the film's newest engine job,
+    // and engineFor() reads it to keep a film on the engine it was tried on.
   }
-  const fired = await fireAssembleWebhook(projectId);
+  const engine = await engineFor(projectId);
+  if (isConfigured) await stopEngineRender(projectId);
+  const fired = await startAssembly(projectId, engine);
   if (!fired.ok) return fired;
   revalidatePath(`/projects/${projectId}`);
   return {
@@ -1900,7 +1923,7 @@ export async function rerenderWithSound(
   } catch (e) {
     return { ok: false, message: friendlyError(e) };
   }
-  const fired = await fireAssembleWebhook(projectId);
+  const fired = await startAssembly(projectId);
   if (!fired.ok) return fired;
   revalidatePath(`/projects/${projectId}`);
   const pace =

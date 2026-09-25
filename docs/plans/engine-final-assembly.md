@@ -83,9 +83,39 @@ cd n8n-engine && (cd platform && npm ci) && claude
      - `remotion/motif/boyd-props.json`.
    - The source of truth for the bodies is `db/port/story-close/Final Assembly.after.json`, with `Source Watermark` taken from `db/port/watermark-open-once/paste/`.
    - Verify against live `309157bd` with `get_workflow_version` before starting.
+   - **DONE 2026-09-24** (branch `claude/engine-final-assembly`), `engine/README.md` has the detail:
+     - **Live version.** Checked first: live is still `309157bd`, the only history entry. Its 40 nodes and its connections equal `Final Assembly.after.json` plus the watermark paste, apart from the paste's trailing newline.
+     - **Modules.** The 11 ported Code nodes live in `engine/src/assembly/` (Set Final Link and Probe Prep are left out on purpose), plus `speed.ts` for D2 and `planAssemble` / `planRender`.
+     - **Assertions.** `npm run check` gives `RESULT: OK 1068/1068`.
+       - The n8n bodies reproduce 16974 at every node.
+       - TS equals n8n on Rome, 60 mutations, and Peking and Boyd rebuilt as synthetic inputs.
+       - The composed requests equal 16974's.
+     - **The check can fail.** Each layer was sabotaged once and caught it. The sabotage for position-matched provenance passed at first, because Rome's scenes all carry one label, so a distinct-provenance mutation was added.
+     - **The one behavioural difference.** With no script row, n8n stops silently after `Fetch Script Titles`; the engine renders without chapter titles.
 2. **Worker, table, Railway client and store.** Run it locally against PGlite (`db/port/lib/local-pg.mjs`) and a local render server (`node remotion/server/index.mjs`).
+   - **DONE 2026-09-24**:
+     - **Built:** `db/016_render_job.sql` (**not applied to the live database**), plus the worker, the Railway client, music through `list-music`/`share-music`, the streamed `/media` store, the CLI and `src/main.ts`.
+     - **One departure from the plan:** **no graphile-worker — the `render_job` row is the queue** (claim with `FOR UPDATE SKIP LOCKED` + a lease). The reasons are in `engine/README.md`.
+     - **Tests:** `npm test`, 16 scenarios on PGlite with a fake Railway. `npm run e2e` makes a real Hyperframes render on the Mac: 14 s, stored, Finalizat, speed 1.1 applied.
+     - **Left for phase 4:** the container (Dockerfile, the compose service, `deploy-engine.yml`) and the site half.
 3. **Shadow run.** On a real finished film, the engine computes `/assemble` and `/render` bodies and diffs them against the n8n execution's bodies, without submitting. Only intended differences are allowed: `speed`, and the store.
+   - **DONE 2026-09-24**:
+     - **What ran:** five finished films (story ×3, cinematic, kids; 11–54 scenes). Their live rows were read through a read-only throwaway (execution 16999, archived).
+     - **Result:** `/assemble` identical on all five; `/render` identical except `speed`.
+     - **Speed in practice:** the kids film ("The Missing Blue Scarf") was briefed at 0.8 and rendered by n8n at 1.0.
+     - **Detail:** `engine/README.md` and `engine/shadow/`.
 4. **Deploy with the default still `n8n`.** Then one real film with `FINAL_ASSEMBLY_ENGINE=code`, watched end to end. Then flip the default.
+   - **DONE 2026-09-24/25, with the default still `n8n`**:
+     - **On the box:** `db/016` applied (execution 17007), the `hov-engine` container live (`deploy-engine.yml`, `docker run` rather than compose), and the site with `startAssembly` / `/api/ops/assemble`.
+     - **First real film:** the Rome film (70 s) went through `/api/ops/assemble`, 2 minutes end to end. Verify identical to n8n's; served from `/media/films/…`; Finalizat.
+     - **No second n8n execution:** none ran.
+     - **Two surprises:**
+       - Final Assembly had moved to `362a9c56` (motion packs) in the meantime; the engine was brought level before the deploy.
+       - The first store died on EACCES inside the site's own `/media/<project>/`, and the engine now writes only under `films/`.
+     - **Not done yet:**
+       - adding `FINAL_ASSEMBLY_ENGINE` to `deploy-platform.yml` so the default can be flipped;
+       - watching the panel during an engine render;
+       - one long film.
 5. **Retire** the `assemble` webhook, the orchestrator's disconnected `Execute Final Assembly*` nodes, and the probe branch. Update `CLAUDE.md`.
 
 Rough size: phase 1 is 1–2 days of session work; phases 2–4 are 2–4 days. Each phase ends in a commit and a report.

@@ -153,13 +153,18 @@ jobs:
           AIRTABLE_SCRIPTS_TABLE: ${{ vars.AIRTABLE_SCRIPTS_TABLE || 'Scripturi' }}
           N8N_API_URL: ${{ vars.N8N_API_URL || 'https://wf7.house-of-videos.com/api/v1' }}
           N8N_NEW_PROJECT_WEBHOOK_URL: ${{ vars.N8N_NEW_PROJECT_WEBHOOK_URL || 'https://wf7.house-of-videos.com/webhook/new-project' }}
+          # Who draws the final render: "code" = the engine container
+          # (engine/, deploy-engine.yml), anything else = n8n's Final
+          # Assembly. Rollback is setting the Variable to n8n and re-running
+          # this workflow. See platform/lib/assembly-engine.ts.
+          FINAL_ASSEMBLY_ENGINE: ${{ vars.FINAL_ASSEMBLY_ENGINE || 'n8n' }}
           REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REGISTRY_USER: ${{ github.actor }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          envs: AIRTABLE_API_KEY,AIRTABLE_BASE_ID,N8N_API_KEY,ELEVENLABS_API_KEY,DVIDS_API_KEY,EU_AV_API_BASE,EUROPEANA_API_KEY,FLICKR_API_KEY,PEXELS_API_KEY,PIXABAY_API_KEY,UNSPLASH_ACCESS_KEY,OPENVERSE_CLIENT_ID,OPENVERSE_CLIENT_SECRET,FOOTAGE_ENABLE_LOC,FOOTAGE_DESTOCKD,SITE_PASSWORD,AIRTABLE_PROJECTS_TABLE,AIRTABLE_SCENES_TABLE,AIRTABLE_SCRIPTS_TABLE,N8N_API_URL,N8N_NEW_PROJECT_WEBHOOK_URL,REGISTRY_TOKEN,REGISTRY_USER
+          envs: AIRTABLE_API_KEY,AIRTABLE_BASE_ID,N8N_API_KEY,ELEVENLABS_API_KEY,DVIDS_API_KEY,EU_AV_API_BASE,EUROPEANA_API_KEY,FLICKR_API_KEY,PEXELS_API_KEY,PIXABAY_API_KEY,UNSPLASH_ACCESS_KEY,OPENVERSE_CLIENT_ID,OPENVERSE_CLIENT_SECRET,FOOTAGE_ENABLE_LOC,FOOTAGE_DESTOCKD,SITE_PASSWORD,AIRTABLE_PROJECTS_TABLE,AIRTABLE_SCENES_TABLE,AIRTABLE_SCRIPTS_TABLE,N8N_API_URL,N8N_NEW_PROJECT_WEBHOOK_URL,FINAL_ASSEMBLY_ENGINE,REGISTRY_TOKEN,REGISTRY_USER
           script: |
             set -euo pipefail
             cd /opt/n8n
@@ -191,6 +196,7 @@ jobs:
             FOOTAGE_ENABLE_LOC=${FOOTAGE_ENABLE_LOC}
             FOOTAGE_DESTOCKD=${FOOTAGE_DESTOCKD}
             SITE_PASSWORD=${SITE_PASSWORD}
+            FINAL_ASSEMBLY_ENGINE=${FINAL_ASSEMBLY_ENGINE}
             ENVEOF
 
             echo "${REGISTRY_TOKEN}" \

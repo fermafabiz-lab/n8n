@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getAssemblyStateFor } from "@/lib/assembly-engine";
 import { notFound } from "next/navigation";
 import { getDeepSearch, getProject, getProjectScriptInfo, getScenes, type Scene } from "@/lib/data";
 import { getCategory } from "@/lib/categories";
@@ -360,9 +361,12 @@ export default async function ProductionRoom({
 
   // The render reports nothing while it works, so the page asks n8n directly
   // whether it is alive.
+  //
+  // An engine render (lib/assembly-engine.ts) answers first: its job names
+  // this project and reports its real phase. n8n's guess answers otherwise.
   const assembly =
     assembling && !project.finalVideoUrl
-      ? await getAssemblyState().catch(() => null)
+      ? await getAssemblyStateFor(id, getAssemblyState).catch(() => null)
       : null;
 
   /**
@@ -817,6 +821,7 @@ export default async function ProductionRoom({
             projectId={id}
             lengthSeconds={project.lengthSeconds}
             startedAt={assembly?.running?.startedAt ?? null}
+            engine={assembly?.engine ?? null}
             failure={
               assembly?.failed?.detail
                 ? {

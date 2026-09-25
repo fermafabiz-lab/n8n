@@ -1,0 +1,16 @@
+{
+  // Editor and `tsc --noEmit` only. Node runs the sources directly with
+  // --experimental-strip-types, so everything here must be erasable syntax:
+  // no enums, no namespaces, no parameter properties, and `.ts` in imports.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true
+  },
+  "include": ["src"]
+}

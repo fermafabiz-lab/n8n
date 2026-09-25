@@ -1183,9 +1183,13 @@ expected and harmless for an app touching only its own Drive.
   **`captchaRetry: 1` since 2026-09-02** to "save spend" — a fraction of a
   cent — and turned every weak token into a 1-5 minute wait. Every Flow body
   now ends `captchaRetry = 5`, which also rotates to the second configured
-  provider. **Still owed**: the same line in Claude Scripting's
-  `IR Generate Image` (left alone because another session was publishing
-  there).
+  provider. ~~Still owed: the same line in Claude Scripting's IR Generate
+  Image~~ — **done 2026-09-25** (Claude Scripting `b5b1205d`, rollback
+  `e1183aa3`, `db/port/ir-captcha/`), after it cost three site regenerations
+  in five minutes, each written on the scene as "REJECTED". Measured then with
+  useapi's `captcha-stats`: 17% of captcha attempts accepted (CapSolver 38%,
+  **2Captcha 7%** — 2Captcha handled two thirds of the attempts), and the
+  CapSolver balance had run out the same evening.
   **The same evening it happened: the free clip model left the invited
   accounts** (Media Generation `b9527072`, `db/port/family-model/`). From
   2026-09-23 Google serves `veo-3.1-lite-low-priority` only to the Ultra

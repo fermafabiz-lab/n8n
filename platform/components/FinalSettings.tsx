@@ -12,6 +12,7 @@ import { useSetPendingStage } from "@/components/StageNav";
 import type { EditingOptions, MotifCard } from "@/lib/data";
 import { MOTION_PACKS, defaultMotionPackFor } from "@/lib/motion-packs";
 import { GRAPHIC_STYLES, graphicStyleLabel, offersGraphicStyle } from "@/lib/graphic-styles";
+import { TRANSITION_STYLES, transitionStyleLabel } from "@/lib/transition-styles";
 
 /**
  * The last gate: every clip is approved and the batch is holding just before
@@ -258,6 +259,7 @@ export default function FinalSettings({
   // style and nothing else must still render with it.
   const motionPackMoved = (opts.motionPack ?? null) !== (initial.motionPack ?? null);
   const graphicStyleMoved = (opts.graphicStyle ?? null) !== (initial.graphicStyle ?? null);
+  const transitionStyleMoved = (opts.transitionStyle ?? null) !== (initial.transitionStyle ?? null);
   const showGraphics = offersGraphicStyle(category);
   const plan = initial.graphicPlan;
   const [planMsg, setPlanMsg] = useState<ActionResult | null>(null);
@@ -280,7 +282,8 @@ export default function FinalSettings({
     watermarkOpenMoved ||
     watermarkScaleMoved ||
     motionPackMoved ||
-    graphicStyleMoved;
+    graphicStyleMoved ||
+    transitionStyleMoved;
   const changeCount =
     changedKeys.length +
     dropped.length +
@@ -290,7 +293,8 @@ export default function FinalSettings({
     (watermarkOpenMoved ? 1 : 0) +
     (watermarkScaleMoved ? 1 : 0) +
     (motionPackMoved ? 1 : 0) +
-    (graphicStyleMoved ? 1 : 0);
+    (graphicStyleMoved ? 1 : 0) +
+    (transitionStyleMoved ? 1 : 0);
   const done = msg?.ok === true;
   const router = useRouter();
   const setPendingStage = useSetPendingStage();
@@ -666,6 +670,55 @@ export default function FinalSettings({
           )}
         </div>
       )}
+
+      {/* How the picture hands over at a few cuts (lib/transition-styles.ts),
+          every category. "AI picks" stores nothing and uses the family the
+          graphic-plan workflow chose by theme. */}
+      <div style={{ marginTop: 22, paddingTop: 18, borderTop: "1px solid var(--line)" }}>
+        <h4 style={{ margin: 0 }}>
+          Transitions
+          {transitionStyleMoved && <span className="chg">changed</span>}
+        </h4>
+        <div className="seg" role="group" aria-label="Transitions" style={{ flexWrap: "wrap", marginTop: 10 }}>
+          <button
+            type="button"
+            className={!opts.transitionStyle ? "on" : ""}
+            onClick={() => setOpts((p) => ({ ...p, transitionStyle: null }))}
+          >
+            ✨ AI picks{plan?.transition ? ` · ${transitionStyleLabel(plan.transition)}` : ""}
+          </button>
+          {TRANSITION_STYLES.map((t) => (
+            <button
+              type="button"
+              key={t.id}
+              className={opts.transitionStyle === t.id ? "on" : ""}
+              onClick={() => setOpts((p) => ({ ...p, transitionStyle: t.id }))}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <p className="fnote" style={{ marginTop: 8 }}>
+          {opts.transitionStyle
+            ? TRANSITION_STYLES.find((t) => t.id === opts.transitionStyle)?.hint
+            : plan?.transition
+              ? "Chosen for this film's theme. A few cuts get it, never every one."
+              : "The AI has not chosen yet — without a choice the film keeps plain cuts."}
+        </p>
+        {!showGraphics && !opts.transitionStyle && (
+          <>
+            {planMsg && <p className={`formmsg ${planMsg.ok ? "ok" : "err"}`}>{planMsg.message}</p>}
+            <button
+              type="button"
+              className="btn ghost"
+              disabled={planPending}
+              onClick={() => startPlan(async () => setPlanMsg(await requestGraphicPlan(projectId)))}
+            >
+              ⟳ Choose again
+            </button>
+          </>
+        )}
+      </div>
 
       {/* Drawn cards. Absent entirely when the pipeline chose none, which is
           the common case and the correct one — most scenes deserve no graphic,

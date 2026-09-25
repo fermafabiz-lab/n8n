@@ -15,6 +15,8 @@ import type { RenderBody } from './buildProps.ts';
  * sent when there is nothing to say: absent is classic, today's film.
  */
 export const GRAPHIC_STYLES = ['classic', 'reportage', 'editorial', 'cinematic', 'handwritten'];
+/** remotion/src/transitions/families.ts, db/port/transitions/. */
+export const TRANSITION_STYLES = ['none', 'push', 'crossfade', 'blur', 'shutter', 'glitch'];
 
 export function graphicStyles(body: RenderBody, projectFields: Fields | undefined, sceneRows: AtRow[], clips: Clip[]): RenderBody {
   const out: any = { ...body };
@@ -22,10 +24,19 @@ export function graphicStyles(body: RenderBody, projectFields: Fields | undefine
   const plan = (opts.graphicPlan && typeof opts.graphicPlan === 'object') ? opts.graphicPlan : null;
   const style = GRAPHIC_STYLES.includes(opts.graphicStyle) ? opts.graphicStyle
     : (plan && GRAPHIC_STYLES.includes(plan.style) ? plan.style : null);
-  if (!style || style === 'classic') return out;
+  // Transitions, for every category (db/port/transitions/): the pick wins,
+  // 'none' included; else the plan's. Set after the graphics, as the n8n
+  // body does, so the key order of the request matches it.
+  const transition = TRANSITION_STYLES.includes(opts.transitionStyle) ? opts.transitionStyle
+    : (plan && TRANSITION_STYLES.includes(plan.transition) ? plan.transition : null);
+  const withTransition = (b: any) => {
+    if (transition && transition !== 'none') b.transitionStyle = transition;
+    return b;
+  };
+  if (!style || style === 'classic') return withTransition(out);
   out.graphicStyle = style;
   const planned = plan && Array.isArray(plan.items) ? plan.items : [];
-  if (!planned.length) return out;
+  if (!planned.length) return withTransition(out);
   const orderById = new Map<string, unknown>();
   for (const row of sceneRows) {
     const f = row.fields || {};
@@ -43,5 +54,5 @@ export function graphicStyles(body: RenderBody, projectFields: Fields | undefine
     items.push(g);
   }
   if (items.length) out.graphicItems = items;
-  return out;
+  return withTransition(out);
 }

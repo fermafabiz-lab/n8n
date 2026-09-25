@@ -184,6 +184,15 @@ check('graphic plan: malformed items dropped, good ones kept',
     { kind: 'map', sceneOrder: 6, title: 'x' },
   ] }).items,
   [{ kind: 'person', sceneOrder: 3, title: 'Augustus', subtitle: 'Emperor' }, { kind: 'stat', sceneOrder: 4, value: 40, label: 'modii', suffix: 'M' }]);
+check('graphic plan: its transition is read, a bad one dropped',
+  [gs.normalizeGraphicPlan({ style: 'classic', transition: 'blur', items: [] }).transition, gs.normalizeGraphicPlan({ style: 'classic', transition: 'wipe', items: [] }).transition], ['blur', null]);
+
+// --- transitions (lib/transition-styles.ts) ---------------------------------------
+const ts = await import(join(root, 'lib', 'transition-styles.ts'));
+check('transition: absent -> null (AI picks)', ts.normalizeTransitionStyle(undefined), null);
+check('transition: none is a real choice', ts.normalizeTransitionStyle('none'), 'none');
+check('transition: the six ids pass', ['none', 'push', 'crossfade', 'blur', 'shutter', 'glitch'].map(ts.normalizeTransitionStyle), ['none', 'push', 'crossfade', 'blur', 'shutter', 'glitch']);
+check('transition: unknown refused', ts.normalizeTransitionStyle('wipe'), null);
 
 console.log(`\n${results.filter(Boolean).length}/${results.length} passed`);
 process.exit(results.every(Boolean) ? 0 : 1);

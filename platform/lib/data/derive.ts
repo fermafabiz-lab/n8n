@@ -19,6 +19,7 @@ import { normalizeStyleRefs } from "@/lib/style-refs";
 import { autoStepsOf, type AutoStep } from "@/lib/hands-off";
 import { normalizeMotionPack, type MotionPackId } from "@/lib/motion-packs";
 import { normalizeGraphicPlan, normalizeGraphicStyle, type GraphicPlan, type GraphicStyleId } from "@/lib/graphic-styles";
+import { normalizeTransitionStyle, type TransitionStyleId } from "@/lib/transition-styles";
 import type { DocumentaryVisualSource } from "@/lib/archive/types";
 import { parseEditingOptionsShape } from "@/lib/editingOptionsShape";
 import {
@@ -240,6 +241,12 @@ export interface EditingOptions {
    * people, places and figures the graphics show. Null until it has run.
    */
   graphicPlan: GraphicPlan | null;
+  /**
+   * How the picture hands over at the cuts that get a transition
+   * (lib/transition-styles.ts). Null is "AI picks" (graphicPlan.transition);
+   * "none" is the producer asking for plain cuts.
+   */
+  transitionStyle: TransitionStyleId | null;
   /**
    * Hands-off mode: the site signs off every gate by itself as the assets
    * land — script, scene texts, takes, images, clips — and presses the final
@@ -1388,6 +1395,7 @@ export function buildProject(r: RawProject): Project {
       motionPack: normalizeMotionPack(opts.motionPack),
       graphicStyle: normalizeGraphicStyle(opts.graphicStyle),
       graphicPlan: normalizeGraphicPlan(opts.graphicPlan),
+      transitionStyle: normalizeTransitionStyle(opts.transitionStyle),
       // Strictly opt-in: hands-off is a real trade (nothing gets a human
       // look) and must never switch itself on by absence. `autoStepsOf` reads
       // the step list when there is one and the old switch when there is not.

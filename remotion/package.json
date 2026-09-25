@@ -6,7 +6,7 @@
     "start": "remotion studio src/index.ts",
     "studio": "node scripts/studio.mjs",
     "render": "remotion render src/index.ts FinalVideo out/final-video.mp4",
-    "check": "npm run check:montage && npm run check:captions && npm run check:mix && npm run check:hook && npm run check:cards && node motif/check-motif.mjs motif/boyd-props.json motif/candidate-timeline.json && node motif/check-teaser.mjs && npm run check:watermark && npm run check:sar && npm run check:shim && npm run check:motion",
+    "check": "npm run check:montage && npm run check:captions && npm run check:mix && npm run check:hook && npm run check:cards && node motif/check-motif.mjs motif/boyd-props.json motif/candidate-timeline.json && node motif/check-teaser.mjs && npm run check:watermark && npm run check:sar && npm run check:shim && npm run check:motion && npm run check:transitions",
     "check:montage": "node --experimental-strip-types scripts/check-montage.mjs",
     "check:captions": "node --experimental-strip-types scripts/check-captions.mjs",
     "check:mix": "node scripts/check-mix.mjs",
@@ -20,7 +20,8 @@
     "check:cards": "node --experimental-strip-types scripts/check-cards.mjs",
     "check:shim": "node scripts/check-shim.mjs",
     "render:local": "node scripts/render-local.mjs",
-    "check:motion": "node scripts/check-motion.mjs"
+    "check:motion": "node scripts/check-motion.mjs",
+    "check:transitions": "node scripts/check-transitions.mjs"
   },
   "dependencies": {
     "@fontsource/anton": "^5.3.0",

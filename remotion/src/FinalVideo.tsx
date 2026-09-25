@@ -22,6 +22,9 @@ import {presetForTone} from './style';
 import {packFor} from './motion/packs';
 import {graphicStyleFor} from './graphics/styles';
 import {CHAPTER_TITLE_SECONDS, GraphicsLayer, placeGraphics} from './graphics/GraphicsLayer';
+import {transitionStyleFor} from './transitions/families';
+import {planTransitions} from './transitions/plan';
+import {transitionAt} from './transitions/TransitionLayer';
 import {resolveCaptionAccent} from './captionColor';
 import type {FinalVideoProps} from './types';
 
@@ -53,8 +56,10 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 	category,
 	graphicStyle,
 	graphicItems,
+	transitionStyle,
+	transitionStills,
 }) => {
-	const {fps} = useVideoConfig();
+	const {fps, width, height} = useVideoConfig();
 	// How things move (src/motion/packs.ts): the film's pick, else its
 	// category's default, else classic.
 	const pack = packFor(motionPack, category);
@@ -244,6 +249,37 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 		[gstyle, showChapterCards, graphicItems, scenes, chapterTitles, cardShots, hookCard],
 	);
 
+	// The film's transitions (src/transitions/): sparse, and never on a cut
+	// something else already owns — a full-frame chapter card or title, a
+	// chapter flash, a text card, the hook card, a black punctuation shot.
+	const tstyle = transitionStyleFor(transitionStyle);
+	const plannedTransitions = useMemo(() => {
+		if (tstyle === 'none') return [];
+		const owned: {from: number; to: number}[] = [
+			...cardShots.map((c) => ({from: c.startSeconds, to: c.startSeconds + c.durationSeconds})),
+			...shots.filter((sh) => sh.kind === 'black').map((sh) => ({from: sh.startSeconds, to: sh.startSeconds + sh.durationSeconds})),
+			...(hookCard ? [{from: hookCard.from, to: hookCard.to}] : []),
+		];
+		if (impactCards || fullFrameTitles || (showChapterCards && gstyle.flash)) {
+			for (const cs of chapterStarts) owned.push({from: cs.startSeconds - 0.6, to: cs.startSeconds + 0.6});
+		}
+		return planTransitions({style: tstyle, scenes, blocked: owned, stills: transitionStills?.cuts ?? null});
+	}, [tstyle, scenes, cardShots, shots, hookCard, impactCards, fullFrameTitles, showChapterCards, gstyle, chapterStarts, transitionStills]);
+	const framingAt = (sec: number) => {
+		const sh = shotAt(shots, sec + 0.5 / fps + 1e-6);
+		return sh ? shotTransform(sh, sec) : kenBurnsTransform(scenes, sec, preset.energy);
+	};
+	const tNow = transitionAt({
+		planned: plannedTransitions,
+		seconds,
+		stillsBase: transitionStills?.base ?? '',
+		width,
+		height,
+		framingAt,
+		grade: gradeForTone(tone),
+		fps,
+	});
+
 	/**
 	 * A card is one Sequence and one duration whatever it holds; only the
 	 * drawing differs. Kept as a function rather than a nested ternary because
@@ -266,6 +302,7 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
             {/* Footage starts on frame 1 — the title plays OVER the hook scene. */}
             <Sequence from={0} durationInFrames={videoFrames}>
 				<AbsoluteFill style={{overflow: 'hidden'}}>
+					<AbsoluteFill style={tNow.live}>
 					<AbsoluteFill
 						style={{
 							transform: shot
@@ -282,12 +319,19 @@ export const FinalVideo: React.FC<FinalVideoProps> = ({
 						    to take the whole preview down), loud failure in a render. */}
 						<SourceVideo src={finalVideoUrl} />
 					</AbsoluteFill>
+					</AbsoluteFill>
+					{tNow.overlay}
 					<FilmLayer tone={tone} />
 					{/* Chapter boundaries only. An ordinary scene cut is already a
 					    change of picture in the footage, at every intensity — laying a
 					    luminance dip over it made two transitions out of one, and that
 					    is what read as a fault. See Transitions. */}
-					<Transitions scenes={scenes} tone={tone} chapterCards={impactCards || (showChapterCards && gstyle.flash)} />
+					<Transitions
+						scenes={scenes}
+						tone={tone}
+						chapterCards={impactCards || (showChapterCards && gstyle.flash)}
+						ownedCuts={plannedTransitions.map((p) => p.at)}
+					/>
 					{/* Captions go dark under a card. The card is already text, and
 					    the whole reason a card earns its place is that it shows what
 					    the narration is NOT saying — printing the spoken line over it

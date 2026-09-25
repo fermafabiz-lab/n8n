@@ -2,6 +2,7 @@
 
 import { normalizeMotionPack } from "@/lib/motion-packs";
 import { normalizeGraphicStyle, offersGraphicStyle } from "@/lib/graphic-styles";
+import { normalizeTransitionStyle } from "@/lib/transition-styles";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
@@ -145,8 +146,12 @@ async function fireGraphicPlan(projectId: string, force = false): Promise<boolea
   try {
     if (process.env.DATA_BACKEND !== "postgres") return false;
     const project = await getProject(projectId);
-    if (!project || !offersGraphicStyle(project.category)) return false;
-    if (project.editing?.graphicStyle === "classic") return false;
+    if (!project) return false;
+    // Something to choose: graphics (Story and Documentary, not Classic) or
+    // transitions (every category, unless the producer already picked).
+    const graphics = offersGraphicStyle(project.category) && project.editing?.graphicStyle !== "classic";
+    const transition = !project.editing?.transitionStyle;
+    if (!graphics && !transition) return false;
     if (!force) {
       if (project.editing?.graphicPlan) return false;
       const scenes = await getScenes(projectId);
@@ -178,7 +183,7 @@ export async function requestGraphicPlan(projectId: string): Promise<ActionResul
   const asked = await fireGraphicPlan(projectId, true);
   return asked
     ? { ok: true, message: "Choosing the graphics again — about a minute. Reload to see them." }
-    : { ok: false, message: "Could not ask for new graphics here (Story and Documentary films only, and not with Classic)." };
+    : { ok: false, message: "Could not ask for a new choice here — both the graphics and the transitions are already picked by hand." };
 }
 
 /**
@@ -1675,6 +1680,8 @@ export async function confirmFinalSettings(
     /* The graphic style (lib/graphic-styles.ts). Null is "AI picks": the
        plan's own choice is then used at render time. */
     graphicStyle?: string | null;
+    /* The transition family (lib/transition-styles.ts). Null is "AI picks". */
+    transitionStyle?: string | null;
     /* NO `speed` here, on purpose. The pace is decided and signed off at the
        audio step, which is the only moment it is free to change, and this
        panel must not be able to move it — nor to reset it. Because
@@ -1725,6 +1732,7 @@ export async function confirmFinalSettings(
         watermarkScale: normalizeWatermarkScale(settings.watermarkScale),
         motionPack: normalizeMotionPack(settings.motionPack),
         graphicStyle: normalizeGraphicStyle(settings.graphicStyle),
+        transitionStyle: normalizeTransitionStyle(settings.transitionStyle),
       });
     }
     // Same merge, separate condition: the cards change even when no toggle
@@ -2705,6 +2713,9 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
       // A known style id, or "" for AI picks — lib/graphic-styles.ts. The node
       // stores it only when it is one of the five.
       graphic_style: normalizeGraphicStyle(formData.get("graphic_style")) ?? "",
+      // A known family, "none" for plain cuts, or "" for AI picks —
+      // lib/transition-styles.ts.
+      transition_style: normalizeTransitionStyle(formData.get("transition_style")) ?? "",
     // How the narrator reads. OMITTED when the producer left it on "Voice
     // default", and that absence is the feature: every ElevenLabs voice has
     // its own stored settings, so sending an object we made up would override

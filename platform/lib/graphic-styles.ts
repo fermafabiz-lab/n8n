@@ -17,6 +17,8 @@
  * their own graphics later.
  */
 
+import { normalizeTransitionStyle, type TransitionStyleId } from "@/lib/transition-styles";
+
 export type GraphicStyleId = "classic" | "reportage" | "editorial" | "cinematic" | "handwritten";
 
 export const GRAPHIC_STYLES: { id: GraphicStyleId; label: string; hint: string }[] = [
@@ -50,6 +52,8 @@ export type GraphicPlanItem =
 /** What the graphic-plan workflow wrote into Editing Options.graphicPlan. */
 export interface GraphicPlan {
   style: GraphicStyleId;
+  /** The transition family the AI chose (lib/transition-styles.ts), when it was asked. */
+  transition: TransitionStyleId | null;
   source: "ai" | "producer";
   why: string;
   items: GraphicPlanItem[];
@@ -86,6 +90,7 @@ export function normalizeGraphicPlan(value: unknown): GraphicPlan | null {
   }
   return {
     style,
+    transition: normalizeTransitionStyle(v.transition),
     source: v.source === "producer" ? "producer" : "ai",
     why: str(v.why, 240),
     items,

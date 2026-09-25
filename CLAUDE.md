@@ -537,22 +537,51 @@ expected and harmless for an app touching only its own Drive.
 
 - **Final Assembly is moving out of n8n into `engine/`** (plan and phase
   log: `docs/plans/engine-final-assembly.md`, detail `engine/README.md`).
-  Phases 1-3 are on branch `claude/engine-final-assembly` and **nothing is
-  live**:
-  - every Code node of Final Assembly `309157bd` is a pure TS module,
-    golden-tested against the n8n bodies and the Rome film's execution 16974;
-  - a worker drives `hov.render_job` (`db/016`, **not applied on the box**)
-    through assemble → graphics → store;
-  - it is tested on PGlite, and has made one real Hyperframes render on a Mac
-    (`npm run e2e`);
-  - the shadow run on five films n8n finished (`engine/shadow/`) gave
-    requests identical to n8n's, except `speed`: the kids film was briefed at
-    0.8 and n8n rendered it at 1.0;
-  - `cd engine && npm ci && npm run check` runs it all, as does the root
-    `node check.mjs`. **Any edit to
-  a Final Assembly Code node in n8n now has a second copy in
-  `engine/src/assembly/`** until the cutover. Change both, refresh
-  `engine/fixtures/`, or layer 0 of the check fails on purpose.
+  **The engine is LIVE on the box since 2026-09-24, but idle by default.**
+  - **What it is.** A container `hov-engine`, started by
+    `.github/workflows/deploy-engine.yml` with `docker run`, not compose,
+    because nothing deploys the box's compose file. It drives `hov.render_job`
+    (`db/016`, applied in execution 17007) through assemble → graphics → store,
+    and resumes after a restart.
+  - **Which engine renders.** The site's `FINAL_ASSEMBLY_ENGINE` defaults to
+    `n8n`, so every render button still goes to n8n. A film goes to the engine
+    only through `POST /api/ops/assemble {projectId, engine: "code"}` (the
+    `x-hov-key` door, like `/api/ops/restart`), and a Restart on it then stays
+    on the engine for a day (`lib/assembly-engine.ts`).
+  - **The switch is not wired yet.** `FINAL_ASSEMBLY_ENGINE` is not written
+    into `platform.env` by `deploy-platform.yml`; flipping every film means
+    adding it there, which is the next step.
+  - **The first real film is done** (2026-09-25, render_job 2, the 70 s Rome
+    film `recq9Ttq2izgGB5lJ`): 2 minutes queued → done. Its assemble verify is
+    identical to n8n's execution 16974. It is stored at
+    `/media/films/<project>/<sha>.mp4` and served by Caddy (200, 57 MB), and
+    the project reads Finalizat with that link. Its old Drive link, if it is
+    ever wanted back:
+    `https://drive.google.com/uc?export=download&id=1c3tsJrwX3kZmg12imHcScDerELOn3qvw`.
+  - **render_job 1 died storing:** EACCES, because the site owns
+    `/media/<project>/`. **The engine writes only under folders it creates
+    itself.**
+  - **What it adds over n8n:**
+    - `speed` is sent (D2): the kids film "The Missing Blue Scarf" was
+      briefed at 0.8 and n8n rendered it at 1.0;
+    - the film is stored in `/media`, not Drive (D1);
+    - one active render per film, enforced by the database;
+    - a Stop reaches only that film.
+  - **Checks.** `cd engine && npm ci && npm run check` (1169 golden
+    assertions against the n8n bodies, plus 16 worker scenarios), also in the
+    root `node check.mjs`.
+  - **Every Final Assembly Code node has a second copy in
+    `engine/src/assembly/`** until the cutover. Change both, and refresh
+    `engine/fixtures/n8n-<version>/`, or layer 0 of the check fails on
+    purpose. The motion-packs track already did this once: `362a9c56` added
+    `category`/`motionPack`, and the engine was brought level before its
+    deploy.
+  - **Still owed:**
+    - the site panel watched during an engine render (the Rome film already
+      had a final link, so the panel never showed);
+    - a long film;
+    - wiring the switch;
+    - phase 5, retiring n8n's Final Assembly.
 
 - **The graphics pass is drawn by Hyperframes since 2026-09-24 16:04 UTC**
   (`RENDER_ENGINE=hyperframes` on Railway; merge `efeb6ab`; lesson in

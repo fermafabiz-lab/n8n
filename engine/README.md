@@ -4,6 +4,25 @@
 it is n8n workflow `4. Final Assembly` (`BY22Vlhh20Xdkr5Z`), and it moves here
 step by step. **Nothing in this directory runs in production yet.**
 
+## Phase 4 (2026-09-24/25): live on the box, idle by default
+
+- **On the box:**
+  - `db/016` applied (execution 17007);
+  - `hov-engine` running;
+  - the site queueing through `startAssembly`, with `FINAL_ASSEMBLY_ENGINE`
+    unset, so every button still renders on n8n.
+- **The one door to the engine:** `POST /api/ops/assemble {projectId,
+  engine: "code"}`, with `x-hov-key`, from a throwaway n8n workflow.
+- **First real film:** render_job 2, the 70 s Rome film:
+  - 2 minutes queued → done;
+  - verify identical to n8n's execution 16974;
+  - `https://house-of-videos.com/media/films/recq9Ttq2izgGB5lJ/182e2aa1524b7399355b6f0712296007.mp4`
+    (200, 57 MB, 720x1280, 70.17 s);
+  - the project Finalizat;
+  - no n8n Final Assembly execution.
+- **render_job 1 died** at the store step on EACCES inside the site's own
+  `/media/<project>/`, which is why films live under `films/`.
+
 ## Phase 3 (done 2026-09-24): the shadow run
 
 On the five films Final Assembly `309157bd` had finished, the engine built

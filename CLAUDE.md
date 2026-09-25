@@ -564,6 +564,19 @@ expected and harmless for an app touching only its own Drive.
   (rollback `9527f7a0`), Final Assembly `8085b059` (rollback `7a193f67`).
   **Owed**: the first real film rendered with a plan and transitions, watched —
   whether one transition every ~12 s reads as punctuation or as noise.
+  **Kids story and Cinematic have their own bundles since 2026-09-25 ~21:32
+  UTC** (merge `5530878`; `db/port/kids-cine-graphics/README.md`). Kids:
+  Storybook / Playful / Everything — handwritten chapter titles, speech
+  bubbles, character cards and name contours, stickers, confetti. Cinematic:
+  Film / Neon / Memory — the film's title, typed location slates, 2.39:1 bars,
+  calm or glitch chapter titles, light leaks. Graphic Plan (`06867393`,
+  rollback `712e08d0`) now plans every category; for Kids it is SHOWN each
+  scene's still and returns where a character stands, so a contour or bubble
+  lands on them (verified on "The Missing Blue Scarf": Tilly's contour on
+  Tilly). Final Assembly `df21dd5f` (rollback `8085b059`) and orchestrator
+  `de456e79` (rollback `25fa727b`) accept the new ids. **Local renders on a
+  Mac**: Hyperframes' experimental fast capture silently drops some elements —
+  set `PRODUCER_EXPERIMENTAL_FAST_CAPTURE=false`; Railway never uses it.
 
 - **Clip regeneration can be made by the engine** (2026-09-25,
   `docs/plans/engine-media-generation.md`, phase 4; site Variable

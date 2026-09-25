@@ -575,6 +575,11 @@ expected and harmless for an app touching only its own Drive.
     Generation) — that stage moves with the production pass (phase 6).
   - **Checks.** `check-voice.mjs` holds the picker to BOTH live n8n bodies
     (537 assertions), and `test/voice.test.mjs` runs 12 job scenarios.
+  - **First real take** (2026-09-25): scene 2 of the Rome film, pressed by
+    the producer. media_job 1 took **3.1 s** from click to take (n8n's
+    webhook quoted 30–60 s). A valid mp3 (44.1 kHz, 128 kbps) is served from
+    `/media/voices/…` with byte ranges, and the scene went back to "awaiting
+    voice approval". No n8n voice-regen execution ran.
 
 - **Final Assembly is moving out of n8n into `engine/`** (plan and phase
   log: `docs/plans/engine-final-assembly.md`, detail `engine/README.md`).

@@ -28,7 +28,11 @@ makes a real film carry one: who chooses the style, and what the graphics SAY.
    base64). A failed answer writes nothing — the film stays classic.
 4. **Final touches** shows the resolved style and the list, lets the producer
    pick another style (`confirmFinalSettings` → `graphicStyle`), and re-plans.
-5. **Final Assembly's `Caption Colour`** sends `graphicStyle` (the pick, else
+5. **The render props.** Since `FINAL_ASSEMBLY_ENGINE=code` the film is
+   assembled by `engine/`, where `src/assembly/graphicStyles.ts` does it
+   right after `captionColour` (`engine/check.mjs` holds it equal to the n8n
+   body below). **Final Assembly's `Caption Colour`** — still the path when
+   the switch is `n8n` — sends `graphicStyle` (the pick, else
    the plan's style) and `graphicItems` (sceneOrder → the render's scene index,
    the way `Attach Motif Cards` maps cards). Absent = classic = today's film.
 

@@ -535,6 +535,26 @@ expected and harmless for an app touching only its own Drive.
 
 ## Open work
 
+- **Graphic styles are live since 2026-09-25 ~19:27 UTC** (merge `4d37e8e`;
+  `db/port/graphic-styles/README.md`). Name tags, place stamps, count-up
+  figures and chapter openings over the footage, in one of Reportage /
+  Editorial / Cinematic / Handwritten / Classic (`remotion/src/graphics/`),
+  **Story and Documentary only** — Kids and Cinematic get their own later, the
+  producer's call. The brief and Final touches offer "✨ AI picks" (default,
+  stores nothing) or a style (`Editing Options.graphicStyle`). When the last
+  scene text is approved the site fires **`graphic-plan`** — workflow
+  **`5oSW8UaZeOHVUOSx` "Graphic Plan"** — which picks the style by THEME and
+  extracts people, places and figures, each checked in code against the words
+  its scene says, into `Editing Options.graphicPlan`. The render gets
+  `graphicStyle` / `graphicItems` from `engine/src/assembly/graphicStyles.ts`
+  and, on the n8n path, from `Caption Colour` (Final Assembly `7a193f67`,
+  rollback `362a9c56`); `engine/check.mjs` holds the two equal. Orchestrator
+  `9527f7a0` stores the brief's pick (rollback `c9384794`). Vertical films
+  have their own sizing (the landscape designs at two thirds were unreadable).
+  **Owed**: the first real film rendered with a plan, watched; and **Stage 3,
+  transitions** (Push, Crossfade, Blur, Shutter, Glitch/Ripple — one family
+  per film, by theme, with AI picks), not started.
+
 - **Final Assembly is moving out of n8n into `engine/`** (plan and phase
   log: `docs/plans/engine-final-assembly.md`, detail `engine/README.md`).
   **Since 2026-09-25 19:20 UTC EVERY final render from the site goes

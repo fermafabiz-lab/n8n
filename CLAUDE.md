@@ -551,9 +551,19 @@ expected and harmless for an app touching only its own Drive.
   rollback `362a9c56`); `engine/check.mjs` holds the two equal. Orchestrator
   `9527f7a0` stores the brief's pick (rollback `c9384794`). Vertical films
   have their own sizing (the landscape designs at two thirds were unreadable).
-  **Owed**: the first real film rendered with a plan, watched; and **Stage 3,
-  transitions** (Push, Crossfade, Blur, Shutter, Glitch/Ripple — one family
-  per film, by theme, with AI picks), not started.
+  **Transitions are live too since 2026-09-25 ~20:14 UTC** (merge `7b9c03a`;
+  `db/port/transitions/README.md`): one family per film — Push, Crossfade,
+  Blur, Shutter, Glitch (each alternating its catalog variants) or None — for
+  **every category**, picked on the brief / Final touches or by Graphic Plan
+  (`712e08d0`, rollback `7d0014ab`) by theme. Sparse on purpose (one every
+  ~12 s, chapter changes first, never on a cut a card or chapter title owns).
+  **Drawn over the montage, NOT with xfade in /assemble**: an overlap would
+  move every scene start. The render server extracts the frames either side
+  of each cut (`server/cut-stills.mjs`), so it works on Hyperframes only — a
+  film rolled back to Remotion has plain cuts. Orchestrator `25fa727b`
+  (rollback `9527f7a0`), Final Assembly `8085b059` (rollback `7a193f67`).
+  **Owed**: the first real film rendered with a plan and transitions, watched —
+  whether one transition every ~12 s reads as punctuation or as noise.
 
 - **Voice takes are made by the engine since 2026-09-25**
   (`docs/plans/engine-media-generation.md`, phase 2; site Variable

@@ -40,7 +40,9 @@ export const LowerThird: React.FC<{
 	// band (below the platforms' top bar, well above the captions), with wider
 	// margins and a shade so it holds on any picture.
 	const big = portrait && chapter;
-	const k = big ? 1.3 : 1;
+	// Name and place tags on a vertical frame are a fifth larger for the same
+	// reason, and keep their spot above the captions.
+	const k = big ? 1.3 : portrait ? 1.2 : 1;
 	// Small print never under 22 px on a vertical frame: a phone shows the
 	// 720-wide frame at about half size.
 	const fine = (n: number) => (portrait ? Math.max(n * s, big ? 26 : 22) : n * s);
@@ -59,10 +61,10 @@ export const LowerThird: React.FC<{
 		? {position: 'absolute', left: 52, right: 60, top: height * 0.3, maxWidth: width - 112}
 		: {
 				position: 'absolute',
-				left: portrait ? 40 : 130 * s,
-				right: portrait ? 40 : undefined,
-				bottom: portrait ? 450 : 215,
-				maxWidth: portrait ? width - 80 : width * 0.6,
+				left: portrait ? 52 : 130 * s,
+				right: portrait ? 60 : undefined,
+				bottom: portrait ? 440 : 215,
+				maxWidth: portrait ? width - 112 : width * 0.6,
 			};
 
 	if (design === 'sideRule') {
@@ -151,7 +153,8 @@ export const LowerThird: React.FC<{
 						style={{
 							fontFamily: GF.montserrat,
 							fontWeight: 700,
-							fontSize: 48 * s * k,
+							// The card's sans reads smaller than the condensed faces at one size.
+							fontSize: 48 * s * k * (portrait && !big ? 1.2 : 1),
 							...BALANCE,
 							lineHeight: 1.12,
 							letterSpacing: '-0.015em',
@@ -176,7 +179,7 @@ export const LowerThird: React.FC<{
 							style={{
 								fontFamily: GF.montserrat,
 								fontWeight: 400,
-								fontSize: fine(25),
+								fontSize: portrait ? Math.max(25 * s * k, 24) : 25 * s,
 								lineHeight: 1.25,
 								letterSpacing: '0.02em',
 								color: '#AEB6C2',

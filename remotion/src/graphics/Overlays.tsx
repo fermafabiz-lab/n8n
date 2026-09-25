@@ -53,9 +53,9 @@ export const StatOverlay: React.FC<{
 			<div
 				style={{
 					position: 'absolute',
-					left: portrait ? 44 : width * 0.62,
-					top: portrait ? 200 : 150 * s,
-					width: portrait ? width - 88 : width * 0.34,
+					left: portrait ? 52 : width * 0.62,
+					top: portrait ? 240 : 150 * s,
+					width: portrait ? width - 112 : width * 0.34,
 					opacity: inn * (1 - out),
 					transform: `translateY(${((1 - inn) * 28 * s + out * -20 * s).toFixed(2)}px)`,
 					fontFamily: GF.inter,
@@ -75,7 +75,7 @@ export const StatOverlay: React.FC<{
 					{shown}
 					{suffix}
 				</div>
-				<div style={{marginTop: 10 * s, fontWeight: 500, fontSize: 42 * s, lineHeight: 1.2, color: '#F5F5F7'}}>{label}</div>
+				<div style={{marginTop: 10 * s, fontWeight: 500, fontSize: portrait ? 34 : 42 * s, lineHeight: 1.2, color: '#F5F5F7'}}>{label}</div>
 				<div
 					style={{
 						position: 'relative',
@@ -98,7 +98,7 @@ export const StatOverlay: React.FC<{
 					/>
 				</div>
 				{caption && (
-					<div style={{marginTop: 22 * s, fontWeight: 500, fontSize: 30 * s, lineHeight: 1.3, color: '#E6E6EA'}}>{caption}</div>
+					<div style={{marginTop: 22 * s, fontWeight: 500, fontSize: portrait ? 24 : 30 * s, lineHeight: 1.3, color: '#E6E6EA'}}>{caption}</div>
 				)}
 			</div>
 		</AbsoluteFill>

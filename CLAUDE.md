@@ -600,6 +600,24 @@ expected and harmless for an app touching only its own Drive.
     run "Deploy platform"`.
   - **Still in n8n:** the batch's own clips (the pool, stealing, the VP
     refusal ladder); they move with the production pass.
+  - **First real re-shoot** (2026-09-26, Rome scene 9, media_job 3):
+    **1 min 45 s** from queue to take, judged "ok", a valid 8 s 720x1280
+    clip served from `/media/<scene>/video/…`.
+  - **media_job 2 before it found a bug worth remembering.** The poll URL
+    ENCODED the useapi job id (`…-email:you@gmail.com-bot:google-flow`), and
+    useapi answers an encoded id with **400 "Invalid job ID format"**. So a
+    clip that finished at 14:23 read as still running, and after 20 polls it
+    would have been re-generated for nothing. It was stopped by hand before
+    that, and fixed in `afbd31d`: the id goes in raw, as n8n sends it. The
+    fake now refuses encoded ids.
+  - **The lesson:** a test fake that accepts what the real service refuses
+    proves nothing about the request. Give fakes the real service's
+    strictness, and real-shaped ids.
+  - **A slow start is Google, not the engine.** For its first 4 minutes that
+    job's submits met 403 `UNUSUAL_ACTIVITY` and 429 `TOO_MUCH_TRAFFIC`. It
+    cooled down 60 s between attempts, exactly as n8n does.
+  - **2Captcha was 0 of 3 in that window.** Removing it from the useapi
+    account leaves CapSolver alone.
 
 - **Image regeneration can be made by the engine** (2026-09-25,
   `docs/plans/engine-media-generation.md`, phase 3; site Variable

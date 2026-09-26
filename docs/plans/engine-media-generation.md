@@ -139,6 +139,11 @@ order the batch runs in.
          - **Not shared with `src/clip/regen.ts`, on purpose:** the two chains differ in keys (`regen:`), seeds (`:rgmotion:`), ceilings (4 resubmits against 5) and where the motion comes from.
          - **Dropped:** Drive (Upload/Share/Set Scene Result). Per D1, clips land in /media through ingest.
      - **6c — setup:** user reference upload, cast sheets, set plates, sheet ingest, cross-account replication (`Replicate *`, `Build Flow Refs`, `Save Flow Refs`), `Assign Accounts`.
+       - **DONE 2026-09-26**:
+         - **Ported:** `engine/src/produce/setup.ts` covers User Ref? / Extract Asset Id, Cast Sheet Prep (tiers by appearances, turnaround / portrait / object sheets, the producer's photo as the protagonist's base, the kids styles), Collect Cast Refs, both ingest preps, Set Plate Prep, Collect Set Plates, Replicate Prep, Collect Replicated (filed under the account the id names) and Build Flow Refs.
+         - **Checked:** `check-produce-setup.mjs` has 198 assertions. It includes a whole replication loop, each side accumulating its own table. All 13 sabotages fail it; four needed a targeted case first (the 10% lead rule, a stored turnaround never downgraded, objects matched by full name only, the three-object cap).
+         - **One deliberate change: Save Flow Refs merges** the stored table with this pass's copies. n8n's `jsonb ||` REPLACES `flowRefs`, and Replicate Prep skips what is stored. So an execution that copies only new sheets throws the older copies away, and the next execution copies them again. The check asserts the difference.
+         - **Not ported:** `Find Audio Folder` (Drive; voices are in /media).
      - **6d — the production job:**
        - `db/018 production_job`;
        - a worker that walks setup → voices → images → asset gate → clips → video gate → Finalizat → settings gate;

@@ -1,0 +1,21 @@
+{
+  "fetchedAt": "2026-09-26",
+  "how": "n8n MCP get_workflow_version; bodies byte for byte",
+  "mediaGeneration": {
+    "workflowId": "yHG4DBCDjR3RJzav",
+    "versionId": "527c67b7-a38d-48b3-b56e-3c52cec8b0bb"
+  },
+  "files": {
+    "Extract Asset Id.js": "Media Generation / Extract Asset Id / jsCode",
+    "Cast Sheet Prep.js": "Media Generation / Cast Sheet Prep / jsCode",
+    "Collect Cast Refs.js": "Media Generation / Collect Cast Refs / jsCode",
+    "Sheet Ingest Prep.js": "Media Generation / Sheet Ingest Prep / jsCode",
+    "Set Plate Prep.js": "Media Generation / Set Plate Prep / jsCode",
+    "Collect Set Plates.js": "Media Generation / Collect Set Plates / jsCode",
+    "Plate Ingest Prep.js": "Media Generation / Plate Ingest Prep / jsCode",
+    "Replicate Prep.js": "Media Generation / Replicate Prep / jsCode",
+    "Collect Replicated.js": "Media Generation / Collect Replicated / jsCode",
+    "Build Flow Refs.js": "Media Generation / Build Flow Refs / jsCode",
+    "expressions.json": "the setup chain expressions, conditions, queries and bodies (no headers: those carry keys)"
+  }
+}

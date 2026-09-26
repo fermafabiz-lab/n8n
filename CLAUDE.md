@@ -668,8 +668,15 @@ expected and harmless for an app touching only its own Drive.
   - **A slow start is Google, not the engine.** For its first 4 minutes that
     job's submits met 403 `UNUSUAL_ACTIVITY` and 429 `TOO_MUCH_TRAFFIC`. It
     cooled down 60 s between attempts, exactly as n8n does.
-  - **2Captcha was 0 of 3 in that window.** Removing it from the useapi
-    account leaves CapSolver alone.
+  - **2Captcha was 0 of 3 in that window, and it is REMOVED since
+    2026-09-26 18:12 UTC.** Across 142 captcha attempts that afternoon it was
+    0 of 45, against CapSolver's 35%, and it took half of every
+    `captchaRetry` ladder. That made "Cities that never woke up" wait an hour
+    on its last three clips: 10 video submits were accepted out of about 95.
+    It was removed with `POST /v1/google-flow/accounts/captcha-providers
+    {"2Captcha": ""}` (execution 17696). The response showed `CapSolver`
+    alone, so providers left out of the body are kept. Do not add it back
+    without measuring it in `captcha-stats` first.
 
 - **Image regeneration can be made by the engine** (2026-09-25,
   `docs/plans/engine-media-generation.md`, phase 3; site Variable

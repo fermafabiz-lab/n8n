@@ -1,7 +1,7 @@
 import Link from "next/link";
 import SettingsShell from "@/components/SettingsShell";
 import { HOOK_VEO_MODEL, VEO_CREDITS, filmCost } from "@/lib/cost";
-import { summarizeDays } from "@/lib/captcha";
+import { summarizeDays, tokenRateOf } from "@/lib/captcha";
 import { getApiReadings, getCaptchaDays, getFilmUsage, getOpenAiLedger, getOpenAiTopUp, getScriptsWritten } from "@/lib/data";
 import {
   burnFromDaily,
@@ -424,7 +424,7 @@ export default async function UsagePage({
           <h3 id="u-cap">Captcha — CapSolver</h3>
           <p>
             Every still and every clip needs a captcha token. useapi buys each one from CapSolver, then Google accepts it
-            or refuses it as unusual activity — and a refused token is paid for and tried again.
+            or refuses it as a bot — and a refused token is paid for and tried again.
           </p>
         </div>
         <div className={s.kpis}>
@@ -446,7 +446,11 @@ export default async function UsagePage({
             value={captcha?.ready ? fmtCount(cap.attempts) : "—"}
             sub={cap.perJob !== null ? `${cap.perJob.toFixed(1)} per image or clip request` : period}
           />
-          <Kpi label="Accepted by Google" value={pct(cap.acceptRate)} sub={`${fmtCount(cap.accepted)} tokens ${period}`} />
+          <Kpi
+            label="Tokens Google accepted"
+            value={pct(cap.tokenRate)}
+            sub={cap.throughRate !== null ? `${pct(cap.throughRate)} of requests went through` : period}
+          />
           <Kpi label="Average solve" value={secs(cap.avgSolveMs)} sub="time to get one token" />
           <Kpi
             label="Captcha cost (estimate)"
@@ -480,7 +484,7 @@ export default async function UsagePage({
                     cap.accounts.map((a) => ({
                       id: a.id,
                       label: a.id,
-                      note: `${pct(a.attempts ? a.accepted / a.attempts : null)} accepted`,
+                      note: `${pct(tokenRateOf(a))} of tokens accepted`,
                       value: a.attempts,
                       calls: a.attempts,
                     })),
@@ -512,7 +516,7 @@ export default async function UsagePage({
                 <thead>
                   <tr>
                     <th>Provider</th>
-                    <th className={s.hideSm}>Accepted</th>
+                    <th className={s.hideSm}>Tokens accepted</th>
                     <th className={s.hideSm}>Average solve</th>
                     <th className={s.hideSm}>Cost (estimate)</th>
                     <th>Solves</th>
@@ -522,7 +526,7 @@ export default async function UsagePage({
                   {cap.providers.map((p) => (
                     <tr key={p.id}>
                       <td className={s.film}>{p.id}</td>
-                      <td className={s.hideSm}>{pct(p.attempts ? p.accepted / p.attempts : null)}</td>
+                      <td className={s.hideSm}>{pct(tokenRateOf(p))}</td>
                       <td className={s.hideSm}>{secs(p.attempts ? p.ms / p.attempts : null)}</td>
                       <td className={s.hideSm}>{fmtUsd(p.cost)}</td>
                       <td>
@@ -542,7 +546,7 @@ export default async function UsagePage({
                 <thead>
                   <tr>
                     <th>Account</th>
-                    <th className={s.hideSm}>Accepted</th>
+                    <th className={s.hideSm}>Tokens accepted</th>
                     <th className={s.hideSm}>Average solve</th>
                     <th>Solves</th>
                   </tr>
@@ -551,7 +555,7 @@ export default async function UsagePage({
                   {cap.accounts.map((a) => (
                     <tr key={a.id}>
                       <td className={s.film}>{a.id}</td>
-                      <td className={s.hideSm}>{pct(a.attempts ? a.accepted / a.attempts : null)}</td>
+                      <td className={s.hideSm}>{pct(tokenRateOf(a))}</td>
                       <td className={s.hideSm}>{secs(a.attempts ? a.ms / a.attempts : null)}</td>
                       <td>
                         <span className={s.rankBar}>
@@ -577,10 +581,12 @@ export default async function UsagePage({
         )}
         <p className={s.foot}>
           <b>How this is measured.</b> useapi records every captcha attempt — which provider, which Flow account, what
-          Google answered — and keeps three months; the site reads it one day at a time, every hour. A solve is paid for
-          whether Google accepts the token or not, so the cost is set by how many solves a picture needs: the estimate
-          counts every attempt at useapi&apos;s price table (CapSolver about $3 per 1,000). Once CapSolver&apos;s balance is
-          read every hour, its drops are the measured cost. Days are UTC.
+          Google answered — and keeps three months; the site reads it one day at a time, every hour. A token counts as
+          accepted unless Google called it a bot (403 unusual activity, 429 too much traffic), which is useapi&apos;s own
+          rule: a refused prompt or a throttled account came after Google had taken the token, and a 503 says nothing
+          about it and is left out. A solve is paid for either way, so the cost is set by how many solves a picture
+          needs: the estimate counts every attempt at useapi&apos;s price table (CapSolver about $3 per 1,000). Once
+          CapSolver&apos;s balance is read every hour, its drops are the measured cost. Days are UTC.
         </p>
       </section>
 

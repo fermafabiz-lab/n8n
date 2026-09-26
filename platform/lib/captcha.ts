@@ -22,7 +22,7 @@
  *
  * Pure: `sumDay` turns one day's records into the row, `summarizeDays` turns
  * rows into what the Analytics page shows. `scripts/check-captcha.mjs` pins
- * both against a real day.
+ * both against a real day and against useapi's own summaries of two more.
  */
 
 /**
@@ -52,25 +52,41 @@ export interface CaptchaRecord {
 }
 
 /**
- * What happened to a token, in the producer's terms:
- * - `accepted`  Google took it and the request went through (200).
- * - `refused`   Google scored the token as a bot (403 UNUSUAL_ACTIVITY) — a
- *               captcha failure, paid for and retried.
- * - `traffic`   429 UNUSUAL_ACTIVITY_TOO_MUCH_TRAFFIC — useapi counts it as a
- *               captcha failure too (the provider's token quality); what is
- *               left when the retry budget ran out.
- * - `throttled` Google limiting the ACCOUNT (other 429s: throttled, quota) —
- *               the token was fine.
- * - `other`     anything else (5xx, a refused prompt…).
+ * What happened to an attempt, in the producer's terms:
+ * - `accepted`    the request went through (200).
+ * - `refused`     Google scored the token as a bot (403 UNUSUAL_ACTIVITY) —
+ *                 paid for, then retried.
+ * - `traffic`     429 UNUSUAL_ACTIVITY_TOO_MUCH_TRAFFIC — Google's other bot
+ *                 verdict, paid for and retried the same way.
+ * - `throttled`   Google limiting the ACCOUNT (the other 429s: throttled,
+ *                 high traffic, quota) — the token was fine.
+ * - `other`       the token was fine and the request failed after it: a
+ *                 refused prompt (400), a model the account lacks (403
+ *                 MODEL_ACCESS_DENIED), a timeout (524).
+ * - `unavailable` 503: Google Flow was down, which says nothing about the token.
  */
 export const OUTCOMES = [
-  { id: "accepted", label: "Accepted by Google", note: "the request went through" },
-  { id: "refused", label: "Refused as unusual activity", note: "a bot score — paid, then retried" },
-  { id: "traffic", label: "Too much traffic", note: "the retries ran out on a weak token" },
+  { id: "accepted", label: "Went through", note: "Google took the token and made the picture" },
+  { id: "refused", label: "Refused as unusual activity", note: "a bot verdict on the token (403) — paid, then retried" },
+  { id: "traffic", label: "Refused as too much traffic", note: "the other bot verdict (429) — paid, then retried" },
   { id: "throttled", label: "Account throttled", note: "Google limiting the account, not the token" },
-  { id: "other", label: "Other errors", note: "server errors, refused prompts" },
+  { id: "other", label: "Token fine, request refused", note: "a refused prompt, a model the account lacks, a timeout" },
+  { id: "unavailable", label: "Flow unavailable", note: "Google Flow was down (503) — says nothing about the token" },
 ] as const;
 export type Outcome = (typeof OUTCOMES)[number]["id"];
+
+/**
+ * Whether Google TOOK the token — useapi's own rule for its success rate,
+ * worked out from its summaries (execution 17775) rather than assumed: only
+ * the two bot verdicts fail a token, a 503 is left out of the sample, and
+ * everything else happened after Google had accepted it. So "tokens accepted"
+ * is not "requests that went through": on 2026-09-04, 85 refused prompts put
+ * the first at 88% and the second at 59%.
+ */
+export const tokenFailed = (o: Outcome) => o === "refused" || o === "traffic";
+export const tokenJudged = (o: Outcome) => o !== "unavailable";
+/** A tally's share of tokens Google took, 0..1 — null when none was judged. */
+export const tokenRateOf = (t: Pick<Tally, "passed" | "judged">) => (t.judged > 0 ? t.passed / t.judged : null);
 
 export function outcomeOf(r: CaptchaRecord): Outcome {
   const code = Number(r.statusCode);
@@ -79,6 +95,7 @@ export function outcomeOf(r: CaptchaRecord): Outcome {
   if (reason === "PUBLIC_ERROR_UNUSUAL_ACTIVITY_TOO_MUCH_TRAFFIC") return "traffic";
   if (reason.startsWith("PUBLIC_ERROR_UNUSUAL_ACTIVITY") || (code === 403 && !reason)) return "refused";
   if (code === 429) return "throttled";
+  if (code === 503) return "unavailable";
   return "other";
 }
 
@@ -98,7 +115,12 @@ export function kindOf(r: CaptchaRecord): string {
 
 export interface Tally {
   attempts: number;
+  /** Requests that went through (200). */
   accepted: number;
+  /** Tokens Google took (`tokenFailed` is false) — useapi's successes. */
+  passed: number;
+  /** Tokens that got a verdict (`tokenJudged`) — useapi's sample size. */
+  judged: number;
   /** Summed solve time, ms — divide by attempts for the average. */
   ms: number;
 }
@@ -116,7 +138,9 @@ export interface CaptchaDay {
   outcomes: Record<Outcome, number>;
 }
 
-const blank = (): Tally => ({ attempts: 0, accepted: 0, ms: 0 });
+const blank = (): Tally => ({ attempts: 0, accepted: 0, passed: 0, judged: 0, ms: 0 });
+const blankOutcomes = (): Record<Outcome, number> =>
+  Object.fromEntries(OUTCOMES.map((o) => [o.id, 0])) as Record<Outcome, number>;
 
 export function sumDay(day: string, records: CaptchaRecord[]): CaptchaDay {
   const out: CaptchaDay = {
@@ -128,12 +152,14 @@ export function sumDay(day: string, records: CaptchaRecord[]): CaptchaDay {
     byProvider: {},
     byAccount: {},
     byKind: {},
-    outcomes: { accepted: 0, refused: 0, traffic: 0, throttled: 0, other: 0 },
+    outcomes: blankOutcomes(),
   };
   const jobs = new Set<string>();
   for (const r of records) {
     const outcome = outcomeOf(r);
     const ok = outcome === "accepted" ? 1 : 0;
+    const judged = tokenJudged(outcome) ? 1 : 0;
+    const passed = judged && !tokenFailed(outcome) ? 1 : 0;
     const ms = Math.max(0, Number(r.captchaDurationMs) || 0);
     out.attempts++;
     out.accepted += ok;
@@ -148,6 +174,8 @@ export function sumDay(day: string, records: CaptchaRecord[]): CaptchaDay {
       const t = (bucket[key] ??= blank());
       t.attempts++;
       t.accepted += ok;
+      t.passed += passed;
+      t.judged += judged;
       t.ms += ms;
     }
   }
@@ -166,9 +194,13 @@ export interface CaptchaSummary {
   days: number;
   attempts: number;
   accepted: number;
+  passed: number;
+  judged: number;
   jobs: number;
-  /** Accepted ÷ attempts, 0..1 — null with no attempts. */
-  acceptRate: number | null;
+  /** Tokens Google took ÷ tokens judged, 0..1 — useapi's success rate; null with none. */
+  tokenRate: number | null;
+  /** Requests that went through ÷ requests, 0..1 — null with no requests. */
+  throughRate: number | null;
   /** Solves a request needed on average. */
   perJob: number | null;
   avgSolveMs: number | null;
@@ -179,6 +211,7 @@ export interface CaptchaSummary {
   providers: Array<{ id: string } & Tally & { cost: number }>;
   accounts: Array<{ id: string } & Tally>;
   kinds: Array<{ id: string } & Tally>;
+  /** `rate` is the day's token rate. */
   perDay: Array<{ t: number; attempts: number; accepted: number; rate: number | null; cost: number }>;
 }
 
@@ -187,17 +220,34 @@ const merge = (into: Record<string, Tally>, from: Record<string, Tally> | null |
     const m = (into[k] ??= blank());
     m.attempts += Number(t.attempts) || 0;
     m.accepted += Number(t.accepted) || 0;
+    m.passed += Number(t.passed) || 0;
+    m.judged += Number(t.judged) || 0;
     m.ms += Number(t.ms) || 0;
   }
 };
+
+/** A day's token verdicts, from its outcome counts (the row keeps no separate total). */
+function verdicts(d: CaptchaDay): { passed: number; judged: number } {
+  let passed = 0;
+  let judged = 0;
+  for (const o of OUTCOMES) {
+    const n = Number(d.outcomes?.[o.id]) || 0;
+    if (!tokenJudged(o.id)) continue;
+    judged += n;
+    if (!tokenFailed(o.id)) passed += n;
+  }
+  return { passed, judged };
+}
 
 export function summarizeDays(days: CaptchaDay[]): CaptchaSummary {
   const byProvider: Record<string, Tally> = {};
   const byAccount: Record<string, Tally> = {};
   const byKind: Record<string, Tally> = {};
-  const outcomes: Record<Outcome, number> = { accepted: 0, refused: 0, traffic: 0, throttled: 0, other: 0 };
+  const outcomes = blankOutcomes();
   let attempts = 0;
   let accepted = 0;
+  let passed = 0;
+  let judged = 0;
   let jobs = 0;
   let solveMs = 0;
   const perDay: CaptchaSummary["perDay"] = [];
@@ -210,11 +260,14 @@ export function summarizeDays(days: CaptchaDay[]): CaptchaSummary {
     merge(byAccount, d.byAccount);
     merge(byKind, d.byKind);
     for (const o of OUTCOMES) outcomes[o.id] += Number(d.outcomes?.[o.id]) || 0;
+    const v = verdicts(d);
+    passed += v.passed;
+    judged += v.judged;
     perDay.push({
       t: Date.parse(`${d.day}T00:00:00Z`),
       attempts: d.attempts,
       accepted: d.accepted,
-      rate: d.attempts > 0 ? d.accepted / d.attempts : null,
+      rate: v.judged > 0 ? v.passed / v.judged : null,
       cost: costOfProviders(d.byProvider ?? {}),
     });
   }
@@ -227,8 +280,11 @@ export function summarizeDays(days: CaptchaDay[]): CaptchaSummary {
     days: days.length,
     attempts,
     accepted,
+    passed,
+    judged,
     jobs,
-    acceptRate: attempts > 0 ? accepted / attempts : null,
+    tokenRate: judged > 0 ? passed / judged : null,
+    throughRate: jobs > 0 ? accepted / jobs : null,
     perJob: jobs > 0 ? attempts / jobs : null,
     avgSolveMs: attempts > 0 ? solveMs / attempts : null,
     estCost,

@@ -150,3 +150,28 @@
   font-size: 12.5px;
   color: var(--muted, #6b6b76);
 }
+
+/* Adding a track to the library (lib/music.ts). The row wraps on a phone. */
+.upload {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line, #e2e2e6);
+}
+.upload .row {
+  flex-wrap: wrap;
+}
+.file {
+  flex: 1 1 200px;
+  min-width: 0;
+  font-size: 12.5px;
+}
+.groupInput {
+  flex: 1 1 140px;
+  min-width: 0;
+  font-size: 13px;
+  padding: 5px 10px;
+  border: 1px solid var(--line, #e2e2e6);
+  border-radius: 8px;
+  background: var(--card2, #f6f6f8);
+  color: inherit;
+}

@@ -32,6 +32,8 @@ export function middleware(req: NextRequest) {
       req.nextUrl.pathname === "/api/ops/assemble" ||
       // And for the production run: the orchestrator asks who produces a film.
       req.nextUrl.pathname === "/api/ops/produce" ||
+      // The one-time copy of the Drive music library (app/api/music/import).
+      req.nextUrl.pathname === "/api/music/import" ||
       // The hourly read of finished executions into the OpenAI ledger, called
       // by n8n's "API Credits" workflow (app/api/insights/openai/route.ts).
       req.nextUrl.pathname === "/api/insights/openai") &&

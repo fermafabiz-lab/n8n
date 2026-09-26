@@ -2726,3 +2726,48 @@ much, with a pie. Full account: `db/port/openai-usage/README.md`.
   while the OLD one keeps answering with the new build's chunks underneath —
   every interactive check then fails at once for no visible reason. Kill by the
   pid of whatever is listening.
+
+### CapSolver and the captcha — a masked key, and a record kept by the day (2026-09-26)
+
+The producer's ask: *"add the captcha program (CapSolver) to see how much we
+have left and if you can add some analytics"*, and call the page "Analytics".
+Full account: `db/port/captcha/README.md`.
+
+- **A key another service holds for you is still a key you have to hold
+  yourself.** useapi keeps the producer's CapSolver key to buy captchas with,
+  but answers it masked (`"CAP-B…"`), n8n has no CapSolver credential, and the
+  MCP connector cannot create one. The balance call needs the raw key, so the
+  site gets its own copy as a GitHub Secret (`CAPSOLVER_API_KEY`), like every
+  other key it holds. Until the Secret exists the card reads "unavailable" and
+  says what to add. **Missing configuration is never shown as an empty
+  balance**: an alarm for a key nobody has added yet teaches the team to
+  ignore the strip.
+- **A record that is final once the day ends is read once.** useapi's
+  `captcha-stats` keeps every attempt for three months and answers one UTC day
+  per call. A finished day never changes, so the site marks a day `complete`
+  20 minutes after it ends (useapi's latency is 5-15 minutes) and never asks
+  for it again. After the first back-fill the hourly cost is one call, for
+  today.
+- **Use the source's own summary as the answer key, over every day it has
+  summarised, not the one you saved.** The first version was pinned to one
+  real day, whose sums matched useapi's to the hundredth. That day held
+  nothing but 200s and bot verdicts, so "went through" and "token accepted"
+  were the same number on it, and the page shipped counting 200s. The live
+  back-fill brought useapi's summaries for a month. Read against them, 13 of
+  27 days missed, by exactly their refused prompts, throttles, timeouts and
+  503s: 59% on the page where useapi said 88%. useapi counts a token as taken
+  unless Google called it a bot, and leaves a 503 out.
+  `check-captcha.mjs` now also rebuilds two of those days from useapi's
+  summaries. **A check that passes on data without the edge cases proves
+  nothing about them.** It is the fake-service lesson from CLAUDE.md
+  again, with a friendly fixture in place of a lenient fake.
+- **Classify by what the producer can act on, not by status code.** The page
+  has five classes: accepted, refused as a bot, too much traffic, account
+  throttled, and other. A throttled ACCOUNT and a refused TOKEN both read as
+  "the captcha failed", but the fixes are opposite: rest the account, or
+  change the provider.
+- **When a page outgrows its name, rename the page, not just the button.**
+  "Where the credits go" became "Analytics" once it also held the captcha. The
+  bar link, the page title, the inline mention on Developer insights and the
+  header comment all changed together, and `check:captcha` fails if the old
+  name comes back on screen.

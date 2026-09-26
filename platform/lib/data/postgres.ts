@@ -2354,11 +2354,17 @@ export async function getOpenAiTopUp(): Promise<{ outAt: string; okAt: string } 
 
 export const captchaReady = () => tableReady("hov.captcha_day");
 
-/** The days already read to the end — never fetched again. */
+/**
+ * The days already read to the end — never fetched again. A row summed before
+ * the token rule was corrected (2026-09-26: a 503 is `unavailable`, and every
+ * tally counts `passed`/`judged`) has no `unavailable` key and is read again,
+ * so the correction reaches the month without anyone deleting rows.
+ */
 export async function completeCaptchaDays(days: string[]): Promise<Set<string>> {
   if (days.length === 0 || !(await captchaReady())) return new Set();
   const rows = await query<{ day: string }>(
-    `select to_char(day, 'YYYY-MM-DD') as day from hov.captcha_day where complete and day = any($1::date[])`,
+    `select to_char(day, 'YYYY-MM-DD') as day from hov.captcha_day
+      where complete and outcomes ? 'unavailable' and day = any($1::date[])`,
     [days],
   );
   return new Set(rows.map((r) => r.day));

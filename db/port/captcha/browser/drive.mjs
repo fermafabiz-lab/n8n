@@ -101,6 +101,13 @@ check("the balance is a reading", sql("select value || '/' || status || '/' || s
 seen.dates.length = 0;
 const t2 = await (await post("/api/insights/tick", {}, { "x-hov-key": KEY })).json();
 check("the next tick reads only today", [t2.captcha.read, seen.dates.length], [1, 1]);
+// A row summed before the token rule was corrected has no `unavailable` key:
+// the next tick must read that day again, and the re-read must restore it.
+run(`update hov.captcha_day set outcomes = outcomes - 'unavailable' where day = '2026-09-20'`);
+seen.dates.length = 0;
+const t3 = await (await post("/api/insights/tick", {}, { "x-hov-key": KEY })).json();
+check("a day summed under the old rule is read again", [t3.captcha.read, [...seen.dates].sort()], [2, ["2026-09-20", new Date().toISOString().slice(0, 10)].sort()]);
+check("…and comes back in the new shape", sql("select (outcomes ? 'unavailable')::text || '/' || complete from hov.captcha_day where day = '2026-09-20'"), "true/true");
 
 // ---- the pages ----
 const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium", args: ["--no-sandbox"] }).catch(() => chromium.launch());
@@ -123,7 +130,7 @@ await page.waitForURL("**/admin/insights/usage");
 check("it opens Analytics", (await page.locator("h2").first().innerText()).trim(), "Analytics");
 const cap = page.locator("section").filter({ has: page.locator("h3", { hasText: "Captcha — CapSolver" }) });
 const kpis = await cap.locator('div[class*="_kpi__"]').allInnerTexts();
-check("captcha KPIs: balance, solves, accepted", [kpis[0].includes("$7.42"), kpis[1].includes("159"), kpis[2].includes("23%")], [true, true, true]);
+check("captcha KPIs: balance, solves, tokens accepted", [kpis[0].includes("$7.42"), kpis[1].includes("159"), kpis[2].includes("23%"), kpis[2].includes("64% of requests went through")], [true, true, true, true]);
 const titles = await cap.locator('[class*="_panelTitle__"]').allInnerTexts();
 check("every captcha chart titled", titles, [
   "Captcha — what happened to each solve",
@@ -135,13 +142,13 @@ check("every captcha chart titled", titles, [
   "Captcha — by Google Flow account",
 ]);
 const outcomes = await cap.locator('div[class*="_panel__"]').filter({ hasText: "what happened to each solve" }).locator("li").allInnerTexts();
-check("outcomes legend", outcomes.map((t) => t.split("\n")[0]), ["Accepted by Google", "Refused as unusual activity", "Too much traffic"]);
+check("outcomes legend", outcomes.map((t) => t.split("\n")[0]), ["Went through", "Refused as unusual activity", "Refused as too much traffic"]);
 const providers = await cap.locator("table").filter({ hasText: "Provider" }).locator("tbody tr").allInnerTexts();
 check("by provider", providers.map((t) => t.split("\t")[0]), ["CapSolver", "2Captcha"]);
 const accounts = await cap.locator("table").filter({ hasText: "Account" }).locator("tbody tr").count();
 check("by account", accounts, 3);
 await cap.locator('div[class*="_panel__"]').filter({ hasText: "what happened to each solve" }).locator("svg path").first().focus();
-check("focus a slice: the middle names it", (await cap.locator('[class*="_donutMid__"]').first().innerText()).includes("Accepted by Google"), true);
+check("focus a slice: the middle names it", (await cap.locator('[class*="_donutMid__"]').first().innerText()).includes("Went through"), true);
 check("no errors in the pages", errors, []);
 await page.screenshot({ path: `${SHOTS}/analytics-1280.png`, fullPage: true });
 const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });

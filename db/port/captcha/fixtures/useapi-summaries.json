@@ -1,0 +1,56 @@
+{
+  "_about": "useapi's own summary of two days of captcha attempts, as captcha-stats returned them and hov.captcha_day stored them (read back in execution 17775, 2026-09-26; 'lookup' dropped). They are the answer key for what counts as an accepted token: 2026-09-04 carries 85 refused prompts (400) and one 429 HIGH_TRAFFIC, 2026-09-17 carries 503s, 524s and a record with no tier. Both days ran captchaRetry 1 (avg_attempt 1), so every attempt is its own request and by_status_code_* (per request) gives the attempt mix exactly. platform/scripts/check-captcha.mjs rebuilds those attempts from it.",
+  "2026-09-04": {
+    "to": "2026-09-04T17:58:50.000Z",
+    "from": "2026-09-04T12:48:15.000Z",
+    "time_span": "5 hours 10 minutes",
+    "avg_api_ms": 20847,
+    "avg_attempt": 1,
+    "avg_captcha_ms": 6169,
+    "sample_size_by_sku": { "G1_TIER2": 298 },
+    "sample_size_by_tier": { "PAYGATE_TIER_TWO": 298 },
+    "success_rate_by_sku": { "G1_TIER2": 88.26 },
+    "success_rate_by_tier": { "PAYGATE_TIER_TWO": 88.26 },
+    "by_status_code_images": {
+      "200": 53.67,
+      "400": 38.99,
+      "403": 4.59,
+      "429:PUBLIC_ERROR_HIGH_TRAFFIC": 0.46,
+      "429:PUBLIC_ERROR_UNUSUAL_ACTIVITY_TOO_MUCH_TRAFFIC": 2.29
+    },
+    "by_status_code_videos": {
+      "200": 75,
+      "403": 23.75,
+      "429:PUBLIC_ERROR_UNUSUAL_ACTIVITY_TOO_MUCH_TRAFFIC": 1.25
+    },
+    "sample_size_by_provider": { "CapSolver": 298 },
+    "success_rate_by_provider": { "CapSolver": 88.26 }
+  },
+  "2026-09-17": {
+    "to": "2026-09-17T23:41:30.000Z",
+    "from": "2026-09-17T10:52:56.000Z",
+    "time_span": "12 hours 48 minutes",
+    "avg_api_ms": 21134,
+    "avg_attempt": 1,
+    "avg_captcha_ms": 6083,
+    "sample_size_by_sku": { "(empty)": 1, "G1_TIER2": 323 },
+    "sample_size_by_tier": { "(empty)": 1, "PAYGATE_TIER_TWO": 323 },
+    "success_rate_by_sku": { "(empty)": 100, "G1_TIER2": 90.71 },
+    "success_rate_by_tier": { "(empty)": 100, "PAYGATE_TIER_TWO": 90.71 },
+    "by_status_code_images": {
+      "200": 93.84,
+      "403": 0.47,
+      "503": 0.47,
+      "524": 0.95,
+      "429:PUBLIC_ERROR_UNUSUAL_ACTIVITY_TOO_MUCH_TRAFFIC": 4.27
+    },
+    "by_status_code_videos": {
+      "200": 79.49,
+      "403": 7.69,
+      "503": 3.42,
+      "429:PUBLIC_ERROR_UNUSUAL_ACTIVITY_TOO_MUCH_TRAFFIC": 9.4
+    },
+    "sample_size_by_provider": { "CapSolver": 324 },
+    "success_rate_by_provider": { "CapSolver": 90.74 }
+  }
+}

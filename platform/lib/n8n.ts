@@ -461,3 +461,87 @@ export async function stopExecution(id: string): Promise<{ok: boolean; message: 
   const body = await res.text();
   return {ok: false, message: `n8n API: HTTP ${res.status} — ${body.slice(0, 200)}`};
 }
+
+// ---------------------------------------------------------------------------
+// Reading finished executions — the OpenAI ledger (lib/openai-collect.ts)
+// ---------------------------------------------------------------------------
+
+export interface ExecutionListItem {
+  id: string;
+  workflowId: string;
+  status: string;
+  mode: string | null;
+  startedAt: string | null;
+  stoppedAt: string | null;
+}
+
+/** One page of a workflow's executions, newest first, without their data. */
+export async function listExecutions(opts: {
+  workflowId: string;
+  cursor?: string | null;
+  limit?: number;
+}): Promise<{ data: ExecutionListItem[]; nextCursor: string | null }> {
+  if (!n8nConfigured) return { data: [], nextCursor: null };
+  const q = new URLSearchParams({ workflowId: opts.workflowId, limit: String(opts.limit ?? 100) });
+  if (opts.cursor) q.set("cursor", opts.cursor);
+  const res = await api(`/executions?${q}`);
+  if (!res.ok) throw new Error(`n8n API: HTTP ${res.status}`);
+  const body = (await res.json()) as { data?: RawExecution[]; nextCursor?: string | null };
+  return {
+    data: (body.data ?? []).map((r) => {
+      const s = toSummary(r);
+      return { id: s.id, workflowId: s.workflowId, status: s.status, mode: s.mode, startedAt: s.startedAt, stoppedAt: s.stoppedAt };
+    }),
+    nextCursor: body.nextCursor ?? null,
+  };
+}
+
+/**
+ * One execution WITH its node data. Some are tens of megabytes (a whole
+ * film's media pass), so the size is checked before the body is read: past
+ * `maxBytes` this answers "too large" rather than parsing it.
+ */
+export async function getExecutionWithData(
+  id: string,
+  maxBytes = 150 * 1024 * 1024,
+): Promise<{ ok: true; execution: unknown } | { ok: false; reason: string }> {
+  if (!n8nConfigured) return { ok: false, reason: "n8n API not configured" };
+  const res = await api(`/executions/${id}?includeData=true`);
+  if (!res.ok) return { ok: false, reason: `HTTP ${res.status}` };
+  const size = Number(res.headers.get("content-length") ?? 0);
+  if (size > maxBytes) {
+    await res.body?.cancel().catch(() => {});
+    return { ok: false, reason: `too large (${Math.round(size / 1048576)} MB)` };
+  }
+  return { ok: true, execution: await res.json() };
+}
+
+export interface WorkflowWithNodes {
+  id: string;
+  name: string;
+  isArchived: boolean;
+  nodes: Array<{ name: string; type: string; parameters?: Record<string, unknown> }>;
+}
+
+/** Every workflow on the instance with its nodes (the list endpoint carries them). */
+export async function listWorkflowsWithNodes(): Promise<WorkflowWithNodes[]> {
+  if (!n8nConfigured) return [];
+  const out: WorkflowWithNodes[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < 20; page++) {
+    const q = new URLSearchParams({ limit: "100", excludePinnedData: "true" });
+    if (cursor) q.set("cursor", cursor);
+    const res = await api(`/workflows?${q}`);
+    if (!res.ok) throw new Error(`n8n API: HTTP ${res.status}`);
+    const body = (await res.json()) as {
+      data?: Array<{ id: string; name?: string; isArchived?: boolean; nodes?: WorkflowWithNodes["nodes"] }>;
+      nextCursor?: string | null;
+    };
+    for (const w of body.data ?? []) {
+      out.push({ id: String(w.id), name: String(w.name ?? ""), isArchived: Boolean(w.isArchived), nodes: w.nodes ?? [] });
+    }
+    cursor = body.nextCursor ?? null;
+    if (!cursor) break;
+  }
+  return out;
+}

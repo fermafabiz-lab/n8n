@@ -49,7 +49,9 @@ export default function DailyBars({
     format === "usd" ? `$${v.toFixed(v >= 100 ? 0 : 2)}` : Math.round(v).toLocaleString("en-US");
   const max = niceMax(Math.max(0, ...points.map((p) => p.v)));
   const h = hover === null ? null : points[hover];
-  const ticks = points.length ? [points[0], points[Math.floor((points.length - 1) / 2)], points[points.length - 1]] : [];
+  // First, middle and last day — each once: a one- or two-day series would
+  // otherwise print the same date under the axis two or three times.
+  const ticks = [...new Set(points.length ? [0, Math.floor((points.length - 1) / 2), points.length - 1] : [])].map((i) => points[i]);
 
   return (
     <div>

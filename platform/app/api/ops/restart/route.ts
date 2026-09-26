@@ -22,9 +22,15 @@
  * EVERY running execution on the instance except a single scene's re-shoot
  * — including the caller's own, if it is still waiting for this answer. The
  * restart finishes regardless (it runs here, not there), so judge it by the
- * new executions it starts, not by whether the reply arrived. And Resume
- * refuses while anything is alive, so this restarts ONE film per call: the
- * site has never run two films' production at once from its buttons either.
+ * new executions it starts, not by whether the reply arrived.
+ *
+ * SEVERAL FILMS GO IN ONE CALL, never one call each (2026-09-26):
+ *
+ *     {"projectIds": ["rec…", "rec…"]}
+ *
+ * Two calls in a row cannot work — the second call's Pause kills the run the
+ * first call's Resume started, and its Resume refuses because the first
+ * film's run is alive. `restartProductions` pauses once and resumes each.
  */
 
 import { isRecordId } from "@/lib/playlists";
@@ -32,7 +38,7 @@ import { isRecordId } from "@/lib/playlists";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const reply = (status: number, body: { ok: boolean; message: string }) =>
+const reply = (status: number, body: { ok: boolean; message: string; results?: unknown }) =>
   new Response(JSON.stringify(body), {
     status,
     headers: { "Content-Type": "application/json" },
@@ -46,21 +52,26 @@ export async function POST(req: Request) {
   if (!key) return reply(500, { ok: false, message: "MEDIA_INGEST_KEY is not set" });
   if (req.headers.get("x-hov-key") !== key) return reply(401, { ok: false, message: "bad key" });
 
-  let projectId: unknown;
+  let body: { projectId?: unknown; projectIds?: unknown } | null;
   try {
-    projectId = ((await req.json()) as { projectId?: unknown } | null)?.projectId;
+    body = (await req.json()) as { projectId?: unknown; projectIds?: unknown } | null;
   } catch {
-    return reply(400, { ok: false, message: "body must be JSON: {\"projectId\": \"rec…\"}" });
+    return reply(400, { ok: false, message: "body must be JSON: {\"projectId\": \"rec…\"} or {\"projectIds\": [\"rec…\"]}" });
   }
-  if (!isRecordId(projectId)) {
-    return reply(400, { ok: false, message: "projectId must be a record id (rec + 14 letters and digits)" });
+  const ids = Array.isArray(body?.projectIds) ? body.projectIds : [body?.projectId];
+  if (ids.length === 0 || ids.length > 10 || !ids.every(isRecordId)) {
+    return reply(400, { ok: false, message: "projectId / projectIds must be record ids (rec + 14 letters and digits), at most 10" });
   }
 
   // Loaded only past the lock, so a request without the key never touches
   // the action module (or n8n).
-  const { restartProduction } = await import("@/app/actions");
-  const r = await restartProduction(projectId);
+  const { restartProduction, restartProductions } = await import("@/app/actions");
   // 409, not 500: "already running" or "not configured" is a state of the
   // world the caller can read and act on, not a crash.
-  return reply(r.ok ? 200 : 409, { ok: r.ok, message: r.message });
+  if (ids.length === 1) {
+    const r = await restartProduction(ids[0]);
+    return reply(r.ok ? 200 : 409, { ok: r.ok, message: r.message });
+  }
+  const r = await restartProductions(ids);
+  return reply(r.ok ? 200 : 409, { ok: r.ok, message: r.message, results: r.results });
 }

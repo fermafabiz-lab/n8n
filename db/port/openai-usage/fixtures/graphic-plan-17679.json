@@ -1,0 +1,123 @@
+{
+ "_about": "Graphic Plan execution 17679 (2026-09-26): webhook body {project_id} and one chat.completion reply with usage, as recorded. Reply content trimmed; headers dropped.",
+ "id": "17679",
+ "workflowId": "5oSW8UaZeOHVUOSx",
+ "status": "success",
+ "mode": "webhook",
+ "startedAt": "2026-09-26T17:31:45.215Z",
+ "stoppedAt": "2026-09-26T17:31:48.170Z",
+ "data": {
+  "resultData": {
+   "runData": {
+    "Plan Webhook": [
+     {
+      "startTime": 1790443905228,
+      "executionIndex": 0,
+      "source": [],
+      "executionStatus": "success",
+      "data": {
+       "main": [
+        [
+         {
+          "json": {
+           "params": {},
+           "query": {},
+           "body": {
+            "project_id": "recFwxgbWLGBwb6Tr"
+           },
+           "webhookUrl": "https://wf7.house-of-videos.com/webhook/graphic-plan",
+           "executionMode": "production"
+          }
+         }
+        ]
+       ]
+      }
+     }
+    ],
+    "Plan Model": [
+     {
+      "startTime": 1790443905290,
+      "executionIndex": 3,
+      "executionStatus": "success",
+      "source": [
+       {
+        "previousNode": "Build Plan Prompt",
+        "previousNodeOutput": 0,
+        "previousNodeRun": 0
+       }
+      ],
+      "data": {
+       "main": [
+        [
+         {
+          "json": {
+           "id": "chatcmpl-ESQXSH94HGksAwrWPClGbLTtbkWkA",
+           "object": "chat.completion",
+           "created": 1790443906,
+           "model": "gpt-5.4-2026-03-05",
+           "choices": [
+            {
+             "index": 0,
+             "message": {
+              "role": "assistant",
+              "content": "{\"style\":\"cinematic\",\"transition\":\"blur\", … (trimmed)}",
+              "refusal": null,
+              "annotations": []
+             },
+             "finish_reason": "stop"
+            }
+           ],
+           "usage": {
+            "prompt_tokens": 1081,
+            "completion_tokens": 110,
+            "total_tokens": 1191,
+            "prompt_tokens_details": {
+             "cached_tokens": 0,
+             "audio_tokens": 0
+            },
+            "completion_tokens_details": {
+             "reasoning_tokens": 0,
+             "audio_tokens": 0,
+             "accepted_prediction_tokens": 0,
+             "rejected_prediction_tokens": 0
+            }
+           },
+           "service_tier": "default",
+           "system_fingerprint": null
+          }
+         }
+        ]
+       ]
+      }
+     }
+    ],
+    "Parse Plan": [
+     {
+      "startTime": 1790443908140,
+      "executionIndex": 4,
+      "executionStatus": "success",
+      "source": [
+       {
+        "previousNode": "Plan Model",
+        "previousNodeOutput": 0,
+        "previousNodeRun": 0
+       }
+      ],
+      "data": {
+       "main": [
+        [
+         {
+          "json": {
+           "style": "cinematic",
+           "transition": "blur"
+          }
+         }
+        ]
+       ]
+      }
+     }
+    ]
+   }
+  }
+ }
+}

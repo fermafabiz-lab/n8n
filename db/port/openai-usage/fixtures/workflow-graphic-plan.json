@@ -1,0 +1,39 @@
+{
+ "_about": "The node names and types of Graphic Plan (5oSW8UaZeOHVUOSx) as published on 2026-09-26, parameters reduced to what the ledger reads (model, web search, URL).",
+ "id": "5oSW8UaZeOHVUOSx",
+ "name": "Graphic Plan",
+ "nodes": [
+  {
+   "name": "Plan Webhook",
+   "type": "n8n-nodes-base.webhook",
+   "parameters": {}
+  },
+  {
+   "name": "Load Film",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Build Plan Prompt",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Plan Model",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "https://api.openai.com/v1/chat/completions"
+   }
+  },
+  {
+   "name": "Parse Plan",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Save Plan",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  }
+ ]
+}

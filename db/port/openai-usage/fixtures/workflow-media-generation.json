@@ -1,0 +1,1349 @@
+{
+ "_about": "The node names and types of 3. Media Generation (Batch) (yHG4DBCDjR3RJzav) as published on 2026-09-26, parameters reduced to what the ledger reads (model, web search, URL).",
+ "id": "yHG4DBCDjR3RJzav",
+ "name": "3. Media Generation (Batch)",
+ "nodes": [
+  {
+   "name": "Receive Batch Input",
+   "type": "n8n-nodes-base.executeWorkflowTrigger",
+   "parameters": {}
+  },
+  {
+   "name": "Submit Video",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "https://api.useapi.net/v1/google-flow/videos"
+   }
+  },
+  {
+   "name": "Update Scene Record",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "http://web:3000/api/media/ingest"
+   }
+  },
+  {
+   "name": "Upload Audio to Drive",
+   "type": "n8n-nodes-base.googleDrive",
+   "parameters": {}
+  },
+  {
+   "name": "Share Audio",
+   "type": "n8n-nodes-base.googleDrive",
+   "parameters": {}
+  },
+  {
+   "name": "Wait Video",
+   "type": "n8n-nodes-base.wait",
+   "parameters": {}
+  },
+  {
+   "name": "Poll Video Job",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "=https://api.useapi.net/v1/google-flow/jobs/{{ $json.poolJobid || $('Submit Video').first().json.jobid }}"
+   }
+  },
+  {
+   "name": "Check Job Status",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "If Video Done",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Wait Retry",
+   "type": "n8n-nodes-base.wait",
+   "parameters": {}
+  },
+  {
+   "name": "Extract Video URL",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Fetch Approved Scenes",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Sort & Cap Scenes",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Loop Images",
+   "type": "n8n-nodes-base.splitInBatches",
+   "parameters": {}
+  },
+  {
+   "name": "Build Image Request",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Generate Scene Image",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "https://api.useapi.net/v1/google-flow/images"
+   }
+  },
+  {
+   "name": "Decode Scene Image",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Write Scene Image",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "http://web:3000/api/media/ingest"
+   }
+  },
+  {
+   "name": "Wait Image Approval",
+   "type": "n8n-nodes-base.wait",
+   "parameters": {}
+  },
+  {
+   "name": "Fetch Scene Images",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Evaluate Image Approval",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "If Any Regen",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Split Regen List",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Regenerate Scene Image",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "https://api.useapi.net/v1/google-flow/images"
+   }
+  },
+  {
+   "name": "Decode Regen Image",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Write Regen Image",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "http://web:3000/api/media/ingest"
+   }
+  },
+  {
+   "name": "If All Images Approved",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Refetch Scenes For Video",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Sort Scenes For Video",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Loop Scenes",
+   "type": "n8n-nodes-base.splitInBatches",
+   "parameters": {}
+  },
+  {
+   "name": "Current Scene",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Submit Mux",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "https://n8n-production-55dd.up.railway.app/assemble"
+   }
+  },
+  {
+   "name": "Wait Mux",
+   "type": "n8n-nodes-base.wait",
+   "parameters": {}
+  },
+  {
+   "name": "Poll Mux",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ 'https://n8n-production-55dd.up.railway.app/assemble/' + $('Submit Mux').first().json.jobId + '/status' }}"
+   }
+  },
+  {
+   "name": "Check Mux Status",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "If Mux Done",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Wait Mux Retry",
+   "type": "n8n-nodes-base.wait",
+   "parameters": {}
+  },
+  {
+   "name": "Get Mux Result",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ $json.outputUrl }}"
+   }
+  },
+  {
+   "name": "Return Batch Result",
+   "type": "n8n-nodes-base.set",
+   "parameters": {}
+  },
+  {
+   "name": "Wait Between Images",
+   "type": "n8n-nodes-base.wait",
+   "parameters": {}
+  },
+  {
+   "name": "Mark Generare Video",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Warm-up Cooldown",
+   "type": "n8n-nodes-base.wait",
+   "parameters": {}
+  },
+  {
+   "name": "Upload Asset To Flow",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "https://api.useapi.net/v1/google-flow/assets/fermafabiz%40gmail.com"
+   }
+  },
+  {
+   "name": "Extract Asset Id",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Wait Video Approval",
+   "type": "n8n-nodes-base.wait",
+   "parameters": {}
+  },
+  {
+   "name": "Fetch Scene Videos",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Evaluate Video Approval",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "If Any Video Regen",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "If All Videos Approved",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Prep Video Regen",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Submit Video Regen",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "https://api.useapi.net/v1/google-flow/videos"
+   }
+  },
+  {
+   "name": "Wait Video Regen",
+   "type": "n8n-nodes-base.wait",
+   "parameters": {}
+  },
+  {
+   "name": "Poll Video Regen",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "=https://api.useapi.net/v1/google-flow/jobs/{{ $('Submit Video Regen').first().json.jobid }}"
+   }
+  },
+  {
+   "name": "Check Video Regen",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "If Video Regen Done",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Wait Video Regen Retry",
+   "type": "n8n-nodes-base.wait",
+   "parameters": {}
+  },
+  {
+   "name": "Extract Regen Video URL",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Submit Mux Regen",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "https://n8n-production-55dd.up.railway.app/assemble"
+   }
+  },
+  {
+   "name": "Wait Mux Regen",
+   "type": "n8n-nodes-base.wait",
+   "parameters": {}
+  },
+  {
+   "name": "Poll Mux Regen",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ 'https://n8n-production-55dd.up.railway.app/assemble/' + $('Submit Mux Regen').first().json.jobId + '/status' }}"
+   }
+  },
+  {
+   "name": "Check Mux Regen",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "If Mux Regen Done",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Wait Mux Regen Retry",
+   "type": "n8n-nodes-base.wait",
+   "parameters": {}
+  },
+  {
+   "name": "Get Mux Regen Result",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ $json.outputUrl }}"
+   }
+  },
+  {
+   "name": "Write Regen Video",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "http://web:3000/api/media/ingest"
+   }
+  },
+  {
+   "name": "If Job Failed",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Resubmit Guard",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "If Regen Job Failed",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Regen Resubmit Guard",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Prep Finalizat List",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Mark Scene Finalizat",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Upload Scene To Drive",
+   "type": "n8n-nodes-base.googleDrive",
+   "parameters": {}
+  },
+  {
+   "name": "Share Scene Clip",
+   "type": "n8n-nodes-base.googleDrive",
+   "parameters": {}
+  },
+  {
+   "name": "Set Scene Result",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Upload Regen Clip To Drive",
+   "type": "n8n-nodes-base.googleDrive",
+   "parameters": {}
+  },
+  {
+   "name": "Share Regen Clip",
+   "type": "n8n-nodes-base.googleDrive",
+   "parameters": {}
+  },
+  {
+   "name": "Set Regen Result",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Download TTS Audio",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ $json.audio_url }}"
+   }
+  },
+  {
+   "name": "Needs Image?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Needs Clip?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "If Any Voice Regen",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Prep Voice Regen",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Upload VR Audio",
+   "type": "n8n-nodes-base.googleDrive",
+   "parameters": {}
+  },
+  {
+   "name": "Share VR Audio",
+   "type": "n8n-nodes-base.googleDrive",
+   "parameters": {}
+  },
+  {
+   "name": "Submit Mux VR",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "https://n8n-production-55dd.up.railway.app/assemble"
+   }
+  },
+  {
+   "name": "Wait Mux VR",
+   "type": "n8n-nodes-base.wait",
+   "parameters": {}
+  },
+  {
+   "name": "Poll Mux VR",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ 'https://n8n-production-55dd.up.railway.app/assemble/' + $('Submit Mux VR').first().json.jobId + '/status' }}"
+   }
+  },
+  {
+   "name": "Mux VR Guard",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "If Mux VR Done",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Get Mux VR Result",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ $json.outputUrl }}"
+   }
+  },
+  {
+   "name": "Upload VR Clip",
+   "type": "n8n-nodes-base.googleDrive",
+   "parameters": {}
+  },
+  {
+   "name": "Share VR Clip",
+   "type": "n8n-nodes-base.googleDrive",
+   "parameters": {}
+  },
+  {
+   "name": "Write Voice Regen",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Find Audio Folder",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "https://www.googleapis.com/drive/v3/files"
+   }
+  },
+  {
+   "name": "Mark Image Regen Rejected",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ 'http://web:3000/api/at/tblkNIyOUeLnKqako/' + $('Split Regen List').item.json.id }}"
+   }
+  },
+  {
+   "name": "Refetch Scenes For Audio",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Sort Scenes For Audio",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Loop Audio",
+   "type": "n8n-nodes-base.splitInBatches",
+   "parameters": {}
+  },
+  {
+   "name": "Needs Voice?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "AB Current Scene",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "AB Download Audio",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ $json.audio_url }}"
+   }
+  },
+  {
+   "name": "AB Upload Audio",
+   "type": "n8n-nodes-base.googleDrive",
+   "parameters": {}
+  },
+  {
+   "name": "AB Share Audio",
+   "type": "n8n-nodes-base.googleDrive",
+   "parameters": {}
+  },
+  {
+   "name": "AB Write Voice",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Download Clip",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ $json.Video_Signed_URL }}"
+   }
+  },
+  {
+   "name": "Download Regen Clip",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ $json.Video_Signed_URL }}"
+   }
+  },
+  {
+   "name": "Prep Settings Gate",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Mark Awaiting Final Settings",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Wait Final Settings",
+   "type": "n8n-nodes-base.wait",
+   "parameters": {}
+  },
+  {
+   "name": "Fetch Final Settings",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Settings Gate Guard",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "If Settings Confirmed",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "AB Load Project",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ 'http://web:3000/api/at/tbl0zT7ilefOqE3xk/' + $('Receive Batch Input').first().json.Project_ID }}"
+   }
+  },
+  {
+   "name": "AB Pick Voice",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "AB Multi?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "AB Submit Multi",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "https://n8n-production-55dd.up.railway.app/tts-multi"
+   }
+  },
+  {
+   "name": "AB Wait Multi",
+   "type": "n8n-nodes-base.wait",
+   "parameters": {}
+  },
+  {
+   "name": "AB Poll Multi",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ 'https://n8n-production-55dd.up.railway.app/tts-multi/' + $('AB Submit Multi').first().json.jobId + '/status' }}"
+   }
+  },
+  {
+   "name": "AB Multi Guard",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "AB If Multi Done",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "AB Multi Result",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Mark Flow Upload Rejected",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Prep Flow Reject",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "IMG Give Up?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Rewrite Prompt AI",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "https://api.openai.com/v1/chat/completions"
+   }
+  },
+  {
+   "name": "Apply Rewritten Prompt",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Filter Failure?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "VP Prep",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "VP Give Up?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Mark Video Prompt Rejected",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "VP Rewrite AI",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "https://api.openai.com/v1/chat/completions"
+   }
+  },
+  {
+   "name": "VP Apply",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Regen Filter Failure?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Mark Regen Filtered",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "AB No Speech?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "IMG Load Project",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ 'http://web:3000/api/at/tbl0zT7ilefOqE3xk/' + $('Receive Batch Input').first().json.Project_ID }}"
+   }
+  },
+  {
+   "name": "Fetch Scenes After Batch",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "More Batches?",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Another Pass?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Fetch Regen Flags",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "If Video Regen Pending",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Replay Scenes For Images",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "AB Speak",
+   "type": "@elevenlabs/n8n-nodes-elevenlabs.elevenLabs",
+   "parameters": {}
+  },
+  {
+   "name": "Speak VR",
+   "type": "@elevenlabs/n8n-nodes-elevenlabs.elevenLabs",
+   "parameters": {}
+  },
+  {
+   "name": "VRB Load Project",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ 'http://web:3000/api/at/tbl0zT7ilefOqE3xk/' + $('Receive Batch Input').first().json.Project_ID }}"
+   }
+  },
+  {
+   "name": "Submit Cooldown Guard",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Wait Submit Cooldown",
+   "type": "n8n-nodes-base.wait",
+   "parameters": {}
+  },
+  {
+   "name": "Regen Cooldown Guard",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Wait Regen Cooldown",
+   "type": "n8n-nodes-base.wait",
+   "parameters": {}
+  },
+  {
+   "name": "VP Reload Scene",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "IMG Reload Scene",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Flow Pace",
+   "type": "n8n-nodes-base.wait",
+   "parameters": {}
+  },
+  {
+   "name": "IMG Error Router",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "IMG Refusal?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "IMG Cooldown Guard",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Wait IMG Cooldown",
+   "type": "n8n-nodes-base.wait",
+   "parameters": {}
+  },
+  {
+   "name": "IMG Retry Now?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "User Ref?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Download User Ref",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ JSON.parse($('IMG Load Project').first().json.fields['Editing Options']).refImage }}"
+   }
+  },
+  {
+   "name": "Save User Ref Id",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Cast Sheet Prep",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Cast Sheet?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Generate Cast Sheet",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "https://api.useapi.net/v1/google-flow/images"
+   }
+  },
+  {
+   "name": "Collect Cast Refs",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Save Cast Refs",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Load Scene Cast",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Set Plate Prep",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Set Plate?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Generate Set Plate",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "https://api.useapi.net/v1/google-flow/images"
+   }
+  },
+  {
+   "name": "Collect Set Plates",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Save Set Plates",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Judge Prep",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Judge?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Consistency Judge",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "https://api.openai.com/v1/chat/completions"
+   }
+  },
+  {
+   "name": "Judge Verdict",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "If Reroll?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "CONS Reload Scene",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "End Frame Prompt",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "End Frame?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Generate End Frame",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "https://api.useapi.net/v1/google-flow/images"
+   }
+  },
+  {
+   "name": "Attach End Frame",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Motion Prep",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Judge Motion?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Motion Sheet",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "=https://n8n-production-55dd.up.railway.app/inspect"
+   }
+  },
+  {
+   "name": "Motion Judge",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "https://api.openai.com/v1/chat/completions"
+   }
+  },
+  {
+   "name": "Motion Verdict",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Motion Reroll?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Motion Resubmit",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "RG End Frame Prompt",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "RG End Frame?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "RG Generate End Frame",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "https://api.useapi.net/v1/google-flow/images"
+   }
+  },
+  {
+   "name": "RG Attach End Frame",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "RG Motion Prep",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "RG Judge Motion?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "RG Motion Sheet",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "=https://n8n-production-55dd.up.railway.app/inspect"
+   }
+  },
+  {
+   "name": "RG Motion Judge",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "https://api.openai.com/v1/chat/completions"
+   }
+  },
+  {
+   "name": "RG Motion Verdict",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "RG Motion Reroll?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "RG Motion Resubmit",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Sheet Ingest Prep",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Sheet Ingest?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Ingest Sheets",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "http://web:3000/api/media/ingest"
+   }
+  },
+  {
+   "name": "Plate Ingest Prep",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Plate Ingest?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Ingest Plates",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "http://web:3000/api/media/ingest"
+   }
+  },
+  {
+   "name": "Assign Accounts",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Video Regen Webhook",
+   "type": "n8n-nodes-base.webhook",
+   "parameters": {}
+  },
+  {
+   "name": "VRW Load Scene",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "VRW Can Regen?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "VRW Refuse?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "VRW Refuse",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "VRW Video Done?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "VRW Filtered Done?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "VRW End",
+   "type": "n8n-nodes-base.noOp",
+   "parameters": {}
+  },
+  {
+   "name": "VRW Build Regen",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Load Sheet Media",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Replicate Prep",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Replicate Any?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Loop Replicate",
+   "type": "n8n-nodes-base.splitInBatches",
+   "parameters": {}
+  },
+  {
+   "name": "Download Sheet",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ $json.url }}"
+   }
+  },
+  {
+   "name": "Upload Sheet To Account",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "=https://api.useapi.net/v1/google-flow/assets/{{ encodeURIComponent($('Replicate Prep').all()[$runIndex].json.account) }}"
+   }
+  },
+  {
+   "name": "Collect Replicated",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Build Flow Refs",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Refs To Save?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Save Flow Refs",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Pool Tick",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Pool Record",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Video Pool?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Pool Route",
+   "type": "n8n-nodes-base.switch",
+   "parameters": {}
+  },
+  {
+   "name": "Pool Wait",
+   "type": "n8n-nodes-base.wait",
+   "parameters": {}
+  },
+  {
+   "name": "Pool Action?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Pool Submitted?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Pool Retry?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Pool Return?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "VP Steer",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "VP Fire Image Regen",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "http://localhost:5678/webhook/scene-image-regen"
+   }
+  },
+  {
+   "name": "VP Image Wait",
+   "type": "n8n-nodes-base.wait",
+   "parameters": {}
+  },
+  {
+   "name": "VP Image Check",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "VP Image Ready",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "VP Image Route",
+   "type": "n8n-nodes-base.switch",
+   "parameters": {}
+  },
+  {
+   "name": "VP Prompt Fix?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "VP Note Still",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Steal Fresh Url",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "=https://api.useapi.net/v1/google-flow/assets/{{ $('Pool Tick').first().json.poolImageId }}"
+   }
+  },
+  {
+   "name": "Steal Download",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ $json.url }}"
+   }
+  },
+  {
+   "name": "Steal Upload",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "=https://api.useapi.net/v1/google-flow/assets/{{ encodeURIComponent($('Pool Tick').first().json.poolTo) }}"
+   }
+  },
+  {
+   "name": "Steal Record",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "IMG Account",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Pool Cooldown?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  }
+ ]
+}

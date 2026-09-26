@@ -94,13 +94,22 @@ check("the row offers All films once there is any chip to leave", /\(playlists\.
 
 check("the restart door checks the key before anything else", route.indexOf('req.headers.get("x-hov-key") !== key') < route.indexOf("await req.json()"), true);
 check("…refuses with no key configured rather than skipping the check", /if \(!key\) return reply\(500/.test(route), true);
-check("…takes only a record id", /if \(!isRecordId\(projectId\)\)/.test(route), true);
-check("…and runs exactly the button's restartProduction", /const \{ restartProduction \} = await import\("@\/app\/actions"\);/.test(route), true);
+check("…takes only record ids, at most ten", /if \(ids\.length === 0 \|\| ids\.length > 10 \|\| !ids\.every\(isRecordId\)\)/.test(route), true);
+// One film: exactly the button's restartProduction. Several (2026-09-26):
+// restartProductions, which pauses once — two single calls would kill each other.
+check(
+  "…and runs exactly the button's restartProduction for one film, restartProductions for several",
+  /const \{ restartProduction, restartProductions \} = await import\("@\/app\/actions"\);/.test(route) &&
+    /if \(ids\.length === 1\) \{\s*const r = await restartProduction\(ids\[0\]\);/.test(route),
+  true,
+);
 // The middleware exemption must sit in the KEY-gated group, never beside the
 // unconditional ones above it (/api/media/ingest, /api/at/).
 const door = mw.slice(mw.indexOf("if (\n    (req.nextUrl.pathname.startsWith(\"/api/archive/\")"), mw.indexOf("req.cookies.get(\"vf_auth\")"));
 check("the middleware lets it past the password gate ONLY with the key", door.includes('"/api/ops/restart"') && door.includes('req.headers.get("x-hov-key") === process.env.MEDIA_INGEST_KEY'), true);
 check("…and nowhere unconditionally", mw.split("\n").filter((l) => l.includes("/api/ops/restart") && l.includes("return NextResponse.next()")).length, 0);
+// The OpenAI ledger's door (2026-09-26) sits in the same key-gated group.
+check("the ledger door is key-gated the same way", door.includes('"/api/insights/openai"'), true);
 
 // Keep this LAST (see check-watermark.mjs).
 console.log(`\n${results.filter(Boolean).length}/${results.length} passed`);

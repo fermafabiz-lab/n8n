@@ -87,9 +87,11 @@ export const Slate: React.FC<{title: string; subtitle?: string; portrait: boolea
 /** C3 — 2.39:1 bars. Slide in at the start, out at the end of the window. */
 export const Letterbox: React.FC = () => {
 	const {t, dur, width, height} = useClock();
-	// On a vertical frame the film is already narrower than 2.39:1; the bars
-	// frame a 2.39:1 band of it only on landscape.
-	const bar = Math.max(0, (height - width / 2.39) / 2);
+	// Landscape only. On a vertical frame 2.39:1 bars would leave a strip a
+	// quarter of the screen tall — measured on the cyberpunk film in 9:16, the
+	// picture shrank to 300 of 1280 px. A phone film is not letterboxed.
+	const bar = width > height ? Math.max(0, (height - width / 2.39) / 2) : 0;
+	if (bar === 0) return null;
 	const inn = power3Out(prog(t, 0.2, 1.1));
 	const out = power2In(prog(t, dur - 1, 0.9));
 	const k = inn * (1 - out);

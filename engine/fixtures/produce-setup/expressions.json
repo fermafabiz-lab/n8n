@@ -1,0 +1,30 @@
+{
+ "User Ref?": "={{ (() => { try { const o = JSON.parse((($('IMG Load Project').first().json.fields || {})['Editing Options']) || '{}') || {}; return !!(o.refImage && String(o.refImage).startsWith('http') && !o.refImageMediaId); } catch (e) { return false; } })() }}",
+ "Cast Sheet?": "={{ !$json.skip }}",
+ "Set Plate?": "={{ !$json.skip }}",
+ "Sheet Ingest?": "={{ !$json.skip }}",
+ "Plate Ingest?": "={{ !$json.skip }}",
+ "Replicate Any?": "={{ $json.skip }}",
+ "Refs To Save?": "={{ $json.count }}",
+ "Download User Ref.url": "={{ JSON.parse($('IMG Load Project').first().json.fields['Editing Options']).refImage }}",
+ "Upload Asset To Flow.url": "https://api.useapi.net/v1/google-flow/assets/fermafabiz%40gmail.com",
+ "Upload Sheet To Account.url": "=https://api.useapi.net/v1/google-flow/assets/{{ encodeURIComponent($('Replicate Prep').all()[$runIndex].json.account) }}",
+ "Generate Cast Sheet.jsonBody": "={{ Object.assign({}, $json.requestBody, { captchaRetry: 5 }) }}",
+ "Generate Cast Sheet.batching": {
+  "batch": {
+   "batchSize": 1,
+   "batchInterval": 8000
+  }
+ },
+ "Generate Set Plate.jsonBody": "={{ Object.assign({}, $json.requestBody, { captchaRetry: 5 }) }}",
+ "Ingest Sheets.jsonBody": "={{ JSON.stringify({ field: \"sheets\", projectId: $json.projectId, items: $json.items }) }}",
+ "Ingest Plates.jsonBody": "={{ JSON.stringify({ field: \"sheets\", projectId: $json.projectId, items: $json.items }) }}",
+ "Load Scene Cast.query": "-- Which characters, objects and locations the film's approved scenes hold,\n-- read BEFORE the sheets are planned so a lead gets a turnaround and a\n-- one-scene extra gets nothing. Tags are the segmenter's own answer\n-- (`char:` / `obj:` / `loc:`); films made before the tags existed still\n-- carry names in Prompt Vizual, which Cast Sheet Prep matches instead.\nselect s.id, s.scene_order, s.tags, s.visual_prompt\n  from hov.scene s\n where s.project_id = $hov${{ $('Receive Batch Input').first().json.Project_ID }}$hov$\n   and s.scene_approved\n order by s.scene_order",
+ "Load Sheet Media.query": "select sm.flow_id, sm.kind, sm.name,\n       current_setting('hov.media_base_url', true) || '/' || sm.path as url\n  from hov.sheet_media sm\n where sm.project_id = $hov${{ $('Receive Batch Input').first().json.Project_ID }}$hov$",
+ "Save User Ref Id.query": "update hov.project\n   set editing_options = coalesce(editing_options, '{}'::jsonb) || $hov${{ JSON.stringify({ refImageMediaId: $json.mediaId }) }}$hov$::jsonb\n where id = $hov${{ $('Receive Batch Input').first().json.Project_ID }}$hov$\nreturning id, editing_options->>'refImageMediaId' as media_id",
+ "Save Cast Refs.query": "-- The sheets, on the project, so the next pass and every regeneration find\n-- them instead of making them again. Merged in JS upstream, because `||` on\n-- jsonb replaces a whole key rather than merging into it.\nupdate hov.project\n   set editing_options = coalesce(editing_options, '{}'::jsonb) || $hov${{ JSON.stringify({ castRefs: $json.castRefs, castSheets: $json.castSheets, objectRefs: $json.objectRefs }) }}$hov$::jsonb\n where id = $hov${{ $('Receive Batch Input').first().json.Project_ID }}$hov$\nreturning id, editing_options->'castRefs' as cast_refs, editing_options->'castSheets' as cast_sheets, editing_options->'objectRefs' as object_refs",
+ "Save Set Plates.query": "-- The plates, on the project, merged in JS upstream (jsonb || replaces keys).\nupdate hov.project\n   set editing_options = coalesce(editing_options, '{}'::jsonb) || $hov${{ JSON.stringify({ locationRefs: $json.locationRefs, locationPlates: $json.locationPlates }) }}$hov$::jsonb\n where id = $hov${{ $('Receive Batch Input').first().json.Project_ID }}$hov$\nreturning id, editing_options->'locationRefs' as location_refs, editing_options->'locationPlates' as location_plates",
+ "Save Flow Refs.query": "update hov.project\n   set editing_options = coalesce(editing_options, '{}'::jsonb) || $hov${{ JSON.stringify({ flowRefs: $json.flowRefs }) }}$hov$::jsonb\n where id = $hov${{ $('Receive Batch Input').first().json.Project_ID }}$hov$\nreturning id, editing_options->'flowRefs' as flow_refs",
+ "Fetch Approved Scenes.query": "select id, \"createdTime\", fields from hov.at_scene\nwhere fields->>'Project_ID' = $hov${{ $('Receive Batch Input').first().json.Project_ID }}$hov$\n  and (fields->>'Aprobare Scenă')::boolean",
+ "Warm-up Cooldown": {}
+}

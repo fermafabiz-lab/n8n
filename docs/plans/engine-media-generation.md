@@ -105,6 +105,84 @@ order the batch runs in.
      replaced by queueing it, behind a per-film flag, like
      `FINAL_ASSEMBLY_ENGINE`.
    - A shadow run on real films, then one film end to end, then the flip.
+   - **Phase 6, broken down** (written 2026-09-26, after reading the live batch `527c67b7`). The batch is one execution. From `Receive Batch Input`:
+     - setup;
+     - `Sort & Cap Scenes` (the whole film, pending first, cap 200);
+     - `Assign Accounts` (contiguous blocks; a scene stays on the account that minted its image);
+     - the audio loop, then the image loop;
+     - the **asset gate** (`Evaluate Image Approval` every 15 s: every image approved AND present, every voice approved where there is speech);
+     - the clip loop (serial, or the 3-account pool);
+     - the **video gate** (`Evaluate Video Approval`: every clip approved AND present);
+     - `Mark Scene Finalizat`, and `More Batches?` for another pass while clips are missing (at most 12);
+     - the **final-settings gate** (status leaves `Setări Finale`, or 2 h pass), which bounces once per flagged scene for a missed video regen.
+
+     **All three gates are pure reads of the database**, so in the engine they are checks a worker runs on a `production_job` row, not waits held open inside a process.
+     - **6a — the batch's image stage:**
+       - `Build Image Request` (the shared REFERENCE ASSEMBLY, already ported and held to all three copies);
+       - `IMG Account` and the cooldown guard on 403 `UNUSUAL_ACTIVITY`;
+       - the refusal ladder (`Rewrite Prompt AI` / `Apply Rewritten Prompt`);
+       - the consistency judge and its re-roll.
+
+       Golden-tested like the regen ports.
+       - **DONE 2026-09-26**:
+         - **Ported:** `engine/src/produce/images.ts` has the build (n-1 chain and strict re-roll), account choice, the per-account reference remap, silent-refusal decode, error routing, the rewrite ladder, the cooldown with failover, and the consistency judge. `engine/src/produce/gates.ts` has Sort & Cap, Assign Accounts, both approval gates, More Batches? and the settings gate.
+         - **Checked:** `check-produce-images.mjs` has 156 assertions against the live nodes, static-data counters included. Six sabotages all fail it, after a threshold case was added for the one that did not.
+     - **6b — the batch's clip stage:**
+       - `Current Scene` (the frozen prompt);
+       - serial submit/poll;
+       - the pool with `Pool Tick` / cooldown and work stealing;
+       - the VP ladder (audio arm, fresh seed, regenerate the still with a steer);
+       - end frame and motion judge (shared with 4).
+       - **DONE 2026-09-26**:
+         - **Ported:** `engine/src/produce/clips.ts` covers Sort Scenes For Video, Current Scene, the pool (Pool Tick / Pool Record / Steal Record, including work stealing, the per-account rest and the fresh still), Submit Video's overrides, Submit Cooldown Guard with its end-frame pause, Check Job Status, Extract Video URL, Resubmit Guard, the motion judge (Prep / Verdict / Resubmit), the VP ladder (Prep, the steer, Image Ready, the person-only prompt rewrite, the four writes) and Update Scene Record's fields.
+         - **Checked:** `check-produce-clips.mjs` has 320 assertions. The pool is driven through a whole three-account film tick by tick. Of 16 sabotages, 15 fail the check. The 16th (the donor's `length < 2` guard) is dead code in n8n too, since `best` starts at 1.
+         - **Not shared with `src/clip/regen.ts`, on purpose:** the two chains differ in keys (`regen:`), seeds (`:rgmotion:`), ceilings (4 resubmits against 5) and where the motion comes from.
+         - **Dropped:** Drive (Upload/Share/Set Scene Result). Per D1, clips land in /media through ingest.
+     - **6c — setup:** user reference upload, cast sheets, set plates, sheet ingest, cross-account replication (`Replicate *`, `Build Flow Refs`, `Save Flow Refs`), `Assign Accounts`.
+       - **DONE 2026-09-26**:
+         - **Ported:** `engine/src/produce/setup.ts` covers User Ref? / Extract Asset Id, Cast Sheet Prep (tiers by appearances, turnaround / portrait / object sheets, the producer's photo as the protagonist's base, the kids styles), Collect Cast Refs, both ingest preps, Set Plate Prep, Collect Set Plates, Replicate Prep, Collect Replicated (filed under the account the id names) and Build Flow Refs.
+         - **Checked:** `check-produce-setup.mjs` has 198 assertions. It includes a whole replication loop, each side accumulating its own table. All 13 sabotages fail it; four needed a targeted case first (the 10% lead rule, a stored turnaround never downgraded, objects matched by full name only, the three-object cap).
+         - **One deliberate change: Save Flow Refs merges** the stored table with this pass's copies. n8n's `jsonb ||` REPLACES `flowRefs`, and Replicate Prep skips what is stored. So an execution that copies only new sheets throws the older copies away, and the next execution copies them again. The check asserts the difference.
+         - **Not ported:** `Find Audio Folder` (Drive; voices are in /media).
+     - **6d — the production job:**
+       - `db/018 production_job`;
+       - a worker that walks setup → voices → images → asset gate → clips → video gate → Finalizat → settings gate;
+       - resume from any phase, Pause = this film only;
+       - the orchestrator's two `Execute Media Generation*` nodes replaced by a call to `/api/ops/produce` behind a per-film flag (`PRODUCTION_ENGINE`), exactly as Final Assembly moved.
+       - **BUILT 2026-09-26, not live**:
+         - **The run is a row.** `db/018_production_job.sql` holds `stage`, `pass` and a `state` that carries everything n8n kept in an execution and in static data. That includes the pool with its jobs in flight at Google, so a restart resumes them.
+         - **The worker** (`engine/src/produce/worker.ts`) walks the stages with the ported steps.
+           - Voices, and the regenerations the gates used to fire as webhooks, are `media_job` rows.
+           - Images are drawn inline, one at a time (the n-1 chain).
+           - Clips run serially or through the pool.
+           - It is started by `src/main.ts` only when db/018 is readable, so an engine deploy never waits on the migration.
+         - **The site.** `lib/production-engine.ts` plus `POST /api/ops/produce` answer the orchestrator with `{engine: "code" | "n8n"}` according to `PRODUCTION_ENGINE`.
+           - Under `code`, Resume queues a row.
+           - Pause stops THIS film's run.
+           - The project page counts an active run as "running".
+         - **Tests.** `engine/test/produce.test.mjs` runs 8 whole films against PGlite and a fake Flow / OpenAI / site, with the media worker beside it and a fake producer approving:
+           - serial;
+           - three accounts with the pool and replication;
+           - the VP ladder;
+           - image rewrites and a strict re-roll;
+           - a throttle;
+           - held gates dispatching a regeneration;
+           - **a restart mid-clip that polls the job in flight instead of submitting it again**;
+           - the settings gate sending a pass back.
+         - **Deliberate differences from n8n:**
+           - **The n-1 image** is the previous BUILD's decode. n8n indexes Decode and Build by the same `$runIndex`, and the two drift apart after a failed Generate or a cooldown retry.
+           - **Submit Video's "latest run" overrides** (end frame, cooldown, motion re-roll) are kept as the latest of each, as `.first()` reads them.
+           - **The batch's first voice take** keeps `Observații Scenă`, as AB Write Voice does.
+           - **A failed voice take** no longer kills the run. The gate simply waits for it.
+         - **Owed for 6d to be live:**
+           1. Merge to the trunk (site + engine deploy).
+           2. Apply db/018.
+           3. In the orchestrator, an HTTP node before each of the three `Execute Media Generation*` nodes (Batch, Resume, Restart). It calls `/api/ops/produce` with `onError: continueRegularOutput`, and an If on `$json.engine === 'code'` stops there. A 404 or error falls through to n8n, so the change is inert until `PRODUCTION_ENGINE=code`.
+     - **6e — shadow then cutover.**
+       - The engine computes the image and clip requests for a real film's scenes, and they are diffed against what n8n sent (the executions keep them).
+       - Then one real film end to end on the engine, watched.
+       - Then the flip.
+
 7. **Retire** Media Generation in n8n. It stays the rollback until a few
    films are good.
 

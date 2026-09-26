@@ -319,6 +319,10 @@ function friendlyError(e: unknown): string {
  * nothing — which is why the flag also has a local exit in the UI.
  */
 async function nudgeProduction(projectId: string): Promise<"alive" | "started" | "no"> {
+  // On the engine a regeneration is its own media job; resume-project would
+  // start an n8n batch for a film the engine produces.
+  const { productionEngine } = await import("@/lib/production-engine");
+  if (productionEngine() === "code") return "no";
   const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
   const webhook =
     process.env.N8N_RESUME_WEBHOOK_URL ??
@@ -3150,6 +3154,17 @@ export async function restartScripting(projectId: string): Promise<ActionResult>
 }
 
 export async function resumeProject(projectId: string): Promise<ActionResult> {
+  // On the engine (PRODUCTION_ENGINE=code) Resume is a row, not a webhook:
+  // the run is this film's alone, so "already running" is asked of THIS film
+  // and never of the whole n8n instance.
+  const { productionEngine, queueProduction } = await import("@/lib/production-engine");
+  if (productionEngine() === "code") {
+    const r = await queueProduction(projectId, "resume");
+    if (!r.ok) return { ok: false, message: r.message === "production is already running for this film" ? "Production is already running for this film — nothing was restarted. The page refreshes itself." : r.message };
+    await touchProjectActivity(projectId).catch(() => {});
+    revalidatePath(`/projects/${projectId}`);
+    return { ok: true, message: "Production resumed — already-generated images, voices and clips are kept; only missing pieces are made." };
+  }
   const newProject = process.env.N8N_NEW_PROJECT_WEBHOOK_URL;
   const webhook =
     process.env.N8N_RESUME_WEBHOOK_URL ??
@@ -3222,8 +3237,16 @@ export async function pauseProduction(projectId: string): Promise<ActionResult> 
     // stops claiming otherwise: it counts what is actually in flight and says
     // so. It does NOT refuse — a wedged execution is real and Pause is still
     // the cure; the producer just gets to know the price first.
+    // The engine's run is this film's alone: stopping it touches nothing else.
+    const { stopProduction } = await import("@/lib/production-engine");
+    const engineStopped = await stopProduction(projectId);
     const running = await getExecutions("running", 20);
     if (running.length === 0) {
+      if (engineStopped > 0) {
+        await touchProjectActivity(projectId).catch(() => {});
+        revalidatePath(`/projects/${projectId}`);
+        return { ok: true, message: "Paused — this film's production stopped. Everything already made is kept; press Resume to continue from where it left off." };
+      }
       return { ok: false, message: "Nothing is running right now." };
     }
     // A SINGLE SCENE'S RE-SHOOT IS NOT THE FILM'S PRODUCTION, and since

@@ -585,6 +585,33 @@ expected and harmless for an app touching only its own Drive.
   `de456e79`). Same merge: 2.39:1 bars are landscape only — on 9:16 they left
   a quarter-screen strip.
 
+- **The production pass is being ported to the engine, phase 6**
+  (`docs/plans/engine-media-generation.md`, 6a–6e). Nothing uses it yet.
+  - **Ported and pinned to Media Generation `527c67b7`** under
+    `engine/src/produce/`:
+    - 6a: the image stage and the skeleton (`images.ts`, `gates.ts`);
+    - 6b: the clip stage with the three-account pool, stealing and the VP
+      ladder (`clips.ts`);
+    - 6c: the setup, meaning the sheets, the plates and the replication
+      (`setup.ts`).
+    - Each has its own `check-produce-*.mjs` in `npm run check`.
+  - **6d is BUILT, not live:**
+    - `db/018` `production_job`, the worker `src/produce/worker.ts`, and
+      `lib/production-engine.ts` with `/api/ops/produce` on the site
+      (`PRODUCTION_ENGINE`, unset = n8n).
+    - Eight whole-film scenarios run in `engine/test/produce.test.mjs`,
+      including a restart mid-clip that resumes the job in flight.
+    - Owed: the merge, db/018 applied, and the orchestrator asking
+      `/api/ops/produce` before each `Execute Media Generation*` (see the plan).
+    - Then 6e: one real film on the engine, then the flip.
+  - **A LIVE n8n bug found by the port: `Save Flow Refs` replaces
+    `editing_options.flowRefs` instead of adding to it** (`jsonb ||` works
+    on the whole key). `Replicate Prep` skips the copies already stored. So
+    an execution that copies only NEW sheets (an upgrade, a new character)
+    wipes the older copies, and the next execution uploads them again. It is
+    harmless to a single execution and costs re-uploads across executions.
+    The engine merges instead. n8n is left as it is until the cutover.
+
 - **Clip regeneration can be made by the engine** (2026-09-25,
   `docs/plans/engine-media-generation.md`, phase 4; site Variable
   `VIDEO_ENGINE=code`, engine deploy `f6092b6`).

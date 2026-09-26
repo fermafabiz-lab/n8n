@@ -35,6 +35,8 @@ export interface Config {
   /** OpenAI, for the clip motion judge. Empty = the judge is skipped (the take is kept). */
   openaiKey: string;
   clipConcurrency: number;
+  /** Production runs (whole films) driven at once. */
+  productionConcurrency: number;
 }
 
 const str = (env: NodeJS.ProcessEnv, k: string, fallback?: string): string => {
@@ -73,5 +75,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     imageConcurrency: num(env, 'IMAGE_CONCURRENCY', 2),
     openaiKey: str(env, 'OPENAI_API_KEY', ''),
     clipConcurrency: num(env, 'CLIP_CONCURRENCY', 3),
+    productionConcurrency: num(env, 'PRODUCTION_CONCURRENCY', 4),
   };
 }

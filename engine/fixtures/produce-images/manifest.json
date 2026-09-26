@@ -1,0 +1,25 @@
+{
+  "fetchedAt": "2026-09-26",
+  "how": "n8n MCP get_workflow_version; bodies byte for byte",
+  "mediaGeneration": {
+    "workflowId": "yHG4DBCDjR3RJzav",
+    "versionId": "527c67b7-a38d-48b3-b56e-3c52cec8b0bb"
+  },
+  "files": {
+    "Build Image Request.js": "Media Generation / Build Image Request / jsCode",
+    "IMG Account.js": "Media Generation / IMG Account / jsCode",
+    "Decode Scene Image.js": "Media Generation / Decode Scene Image / jsCode",
+    "IMG Error Router.js": "Media Generation / IMG Error Router / jsCode",
+    "Judge Prep.js": "Media Generation / Judge Prep / jsCode",
+    "Prep Flow Reject.js": "Media Generation / Prep Flow Reject / jsCode",
+    "IMG Cooldown Guard.js": "Media Generation / IMG Cooldown Guard / jsCode",
+    "Judge Verdict.js": "Media Generation / Judge Verdict / jsCode",
+    "Sort & Cap Scenes.js": "Media Generation / Sort & Cap Scenes / jsCode",
+    "Assign Accounts.js": "Media Generation / Assign Accounts / jsCode",
+    "Evaluate Image Approval.js": "Media Generation / Evaluate Image Approval / jsCode",
+    "Evaluate Video Approval.js": "Media Generation / Evaluate Video Approval / jsCode",
+    "More Batches?.js": "Media Generation / More Batches? / jsCode",
+    "Settings Gate Guard.js": "Media Generation / Settings Gate Guard / jsCode",
+    "expressions.json": "the batch image stage expressions, conditions, writes and waits"
+  }
+}

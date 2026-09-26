@@ -133,6 +133,11 @@ order the batch runs in.
        - the pool with `Pool Tick` / cooldown and work stealing;
        - the VP ladder (audio arm, fresh seed, regenerate the still with a steer);
        - end frame and motion judge (shared with 4).
+       - **DONE 2026-09-26**:
+         - **Ported:** `engine/src/produce/clips.ts` covers Sort Scenes For Video, Current Scene, the pool (Pool Tick / Pool Record / Steal Record, including work stealing, the per-account rest and the fresh still), Submit Video's overrides, Submit Cooldown Guard with its end-frame pause, Check Job Status, Extract Video URL, Resubmit Guard, the motion judge (Prep / Verdict / Resubmit), the VP ladder (Prep, the steer, Image Ready, the person-only prompt rewrite, the four writes) and Update Scene Record's fields.
+         - **Checked:** `check-produce-clips.mjs` has 320 assertions. The pool is driven through a whole three-account film tick by tick. Of 16 sabotages, 15 fail the check. The 16th (the donor's `length < 2` guard) is dead code in n8n too, since `best` starts at 1.
+         - **Not shared with `src/clip/regen.ts`, on purpose:** the two chains differ in keys (`regen:`), seeds (`:rgmotion:`), ceilings (4 resubmits against 5) and where the motion comes from.
+         - **Dropped:** Drive (Upload/Share/Set Scene Result). Per D1, clips land in /media through ingest.
      - **6c — setup:** user reference upload, cast sheets, set plates, sheet ingest, cross-account replication (`Replicate *`, `Build Flow Refs`, `Save Flow Refs`), `Assign Accounts`.
      - **6d — the production job:**
        - `db/018 production_job`;

@@ -1,0 +1,27 @@
+{
+  "fetchedAt": "2026-09-26",
+  "how": "n8n MCP get_workflow_version; bodies byte for byte",
+  "mediaGeneration": {
+    "workflowId": "yHG4DBCDjR3RJzav",
+    "versionId": "527c67b7-a38d-48b3-b56e-3c52cec8b0bb"
+  },
+  "files": {
+    "Sort Scenes For Video.js": "Media Generation / Sort Scenes For Video / jsCode",
+    "Pool Tick.js": "Media Generation / Pool Tick / jsCode",
+    "Current Scene.js": "Media Generation / Current Scene / jsCode",
+    "Check Job Status.js": "Media Generation / Check Job Status / jsCode",
+    "Pool Record.js": "Media Generation / Pool Record / jsCode",
+    "Steal Record.js": "Media Generation / Steal Record / jsCode",
+    "End Frame Prompt.js": "Media Generation / End Frame Prompt / jsCode",
+    "Extract Video URL.js": "Media Generation / Extract Video URL / jsCode",
+    "Motion Prep.js": "Media Generation / Motion Prep / jsCode",
+    "VP Prep.js": "Media Generation / VP Prep / jsCode",
+    "Resubmit Guard.js": "Media Generation / Resubmit Guard / jsCode",
+    "Attach End Frame.js": "Media Generation / Attach End Frame / jsCode",
+    "Submit Cooldown Guard.js": "Media Generation / Submit Cooldown Guard / jsCode",
+    "Motion Verdict.js": "Media Generation / Motion Verdict / jsCode",
+    "Motion Resubmit.js": "Media Generation / Motion Resubmit / jsCode",
+    "VP Image Ready.js": "Media Generation / VP Image Ready / jsCode",
+    "expressions.json": "the batch clip stage expressions, conditions, writes and waits (no headers: those carry keys)"
+  }
+}

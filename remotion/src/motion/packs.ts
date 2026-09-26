@@ -28,7 +28,15 @@ export type CaptionMotion =
 	/** Big uppercase words pop in; the spoken word sits on an ink pill. */
 	| 'punch'
 	/** The phrase sits in a translucent band, bottom left, behind an ink rule. */
-	| 'lowerThird';
+	| 'lowerThird'
+	// Kids story (2026-09-26), from the catalog's caption-pill-karaoke,
+	// caption-gradient-fill and caption-emoji-pop, in a rounded face:
+	/** The phrase in a white pill; the spoken word turns a warm colour. */
+	| 'kidsPill'
+	/** Words bounce in as they are spoken; the spoken word is coloured and bigger. */
+	| 'kidsBounce'
+	/** Thick white-outlined words that squeeze in, like stickers. */
+	| 'kidsSticker';
 
 export type ChapterTitleMotion =
 	/** Today's: each word rises and fades in. */
@@ -38,7 +46,7 @@ export type ChapterTitleMotion =
 	/** Words land from slightly too large, hard and fast. */
 	| 'slam';
 
-export type MotionPackId = 'classic' | 'editorial' | 'punch' | 'lowerThird';
+export type MotionPackId = 'classic' | 'editorial' | 'punch' | 'lowerThird' | 'kidsPill' | 'kidsBounce' | 'kidsSticker';
 
 export type MotionPack = {
 	id: MotionPackId;
@@ -53,6 +61,9 @@ export const PACKS: Record<MotionPackId, MotionPack> = {
 	editorial: {id: 'editorial', label: 'Editorial', captions: 'editorial', chapterTitle: 'tracking'},
 	punch: {id: 'punch', label: 'Punch', captions: 'punch', chapterTitle: 'slam'},
 	lowerThird: {id: 'lowerThird', label: 'Lower third', captions: 'lowerThird', chapterTitle: 'classic'},
+	kidsPill: {id: 'kidsPill', label: 'Pill', captions: 'kidsPill', chapterTitle: 'classic'},
+	kidsBounce: {id: 'kidsBounce', label: 'Bounce', captions: 'kidsBounce', chapterTitle: 'classic'},
+	kidsSticker: {id: 'kidsSticker', label: 'Sticker', captions: 'kidsSticker', chapterTitle: 'classic'},
 };
 
 /** What a film gets when nobody picked a pack. Categories not listed: classic. */

@@ -39,7 +39,14 @@ export function clipServices(o: { useapiToken: string; renderUrl: string; render
       return String(json.jobid);
     },
     async pollJob(jobId) {
-      const res = await call(`${useapi}/v1/google-flow/jobs/${encodeURIComponent(jobId)}`, { headers: auth }, 30_000);
+      // The id goes in RAW, as n8n's Poll Video Regen sends it. It carries `:`
+      // and `@` (`…-email:you@gmail.com-bot:google-flow`), and useapi answers an
+      // encoded one with 400 "Invalid job ID format" — which reads as a job
+      // that never finishes (2026-09-26, media_job 2). Only a slash would break
+      // the path, and a job id never has one.
+      if (jobId.includes('/')) throw new Error('unexpected job id: ' + jobId);
+      const res = await call(`${useapi}/v1/google-flow/jobs/${jobId}`, { headers: auth }, 30_000);
+      if (res.status === 400) throw new Error(`useapi refused the job id ${jobId}: ${(await res.text()).slice(0, 200)}`);
       const text = await res.text();
       if (res.status === 429 || res.status >= 500) throw new NetworkError(`useapi job poll answered ${res.status}`);
       try { return JSON.parse(text); } catch { return { status: 'unknown', raw: text.slice(0, 500) }; }

@@ -19,7 +19,7 @@ import { MONTHLY_CREDITS } from "@/lib/cost";
  * so changing one needs no republish and no backfill.
  */
 
-export const PROVIDER_IDS = ["openai", "google-flow", "elevenlabs", "useapi", "google-drive"] as const;
+export const PROVIDER_IDS = ["openai", "google-flow", "elevenlabs", "useapi", "capsolver", "google-drive"] as const;
 export type ProviderId = (typeof PROVIDER_IDS)[number];
 export const isProviderId = (v: string): v is ProviderId =>
   (PROVIDER_IDS as readonly string[]).includes(v);
@@ -78,6 +78,12 @@ export const PROVIDERS: Record<ProviderId, ProviderInfo> = {
       "The door to Google Flow. If its subscription lapses, no image or clip can be made, whatever credits Flow holds.",
     manage: { label: "Subscription", href: "https://useapi.net/docs/subscription" },
   },
+  capsolver: {
+    label: "CapSolver",
+    powers:
+      "Solves the captcha Google asks for on every image and every clip (useapi buys each token from it). When it is empty, Flow refuses every picture.",
+    manage: { label: "Add funds", href: "https://dashboard.capsolver.com/dashboard/overview" },
+  },
   "google-drive": {
     label: "Google Drive",
     powers: "Keeps the voiceovers and the render's files.",
@@ -91,6 +97,7 @@ export const PRIMARY_METRIC: Record<ProviderId, string> = {
   "google-flow": "credits",
   elevenlabs: "characters",
   useapi: "subscription",
+  capsolver: "balance",
   "google-drive": "storage",
 };
 
@@ -206,6 +213,14 @@ export type Level = "ok" | "low" | "critical" | "out" | "error" | "unknown";
 /** Below this share of the allowance a balance is low / critical… */
 export const LOW_FRACTION = 0.15;
 export const CRITICAL_FRACTION = 0.05;
+/**
+ * …or, for a prepaid dollar balance with no allowance to measure against
+ * (CapSolver), below these amounts: $3 is about a thousand solves — a day of
+ * films — and $1 is a few hours. Before a week of readings exists this is
+ * the only warning a new balance can give.
+ */
+export const LOW_USD = 3;
+export const CRITICAL_USD = 1;
 /** …or when, at the recent pace, it is gone in fewer days than this. */
 export const LOW_DAYS = 5;
 export const CRITICAL_DAYS = 2;
@@ -226,8 +241,9 @@ export function levelOf(r: Reading, burn: number | null = null, now = Date.now()
   const refill = r.resetsAt ? Date.parse(r.resetsAt) : NaN;
   const refillsFirst = days !== null && Number.isFinite(refill) && refill < now + days * DAY;
   const soon = (limit: number) => days !== null && days < limit && !refillsFirst;
-  if ((frac !== null && frac < CRITICAL_FRACTION) || soon(CRITICAL_DAYS)) return "critical";
-  if ((frac !== null && frac < LOW_FRACTION) || soon(LOW_DAYS)) return "low";
+  const usd = r.unit === "usd" && frac === null ? r.value : null;
+  if ((frac !== null && frac < CRITICAL_FRACTION) || (usd !== null && usd < CRITICAL_USD) || soon(CRITICAL_DAYS)) return "critical";
+  if ((frac !== null && frac < LOW_FRACTION) || (usd !== null && usd < LOW_USD) || soon(LOW_DAYS)) return "low";
   return "ok";
 }
 
@@ -283,6 +299,9 @@ export function headlineOf(r: Reading): { value: string; caption: string } {
     case "credits":
       if (v === null) return { value: "—", caption: r.note ?? "No figure at the last check." };
       return { value: fmtCount(v), caption: `credits left · the plan gives ${fmtCount(MONTHLY_CREDITS)} a month` };
+    case "balance":
+      if (v === null) return { value: "—", caption: r.note ?? "No figure at the last check." };
+      return { value: fmtUsd(v), caption: "left · about $3 per 1,000 captcha solves" };
     case "characters":
       if (v === null) return { value: "—", caption: r.note ?? "No figure at the last check." };
       return {
@@ -308,7 +327,7 @@ export function headlineOf(r: Reading): { value: string; caption: string } {
 export function paceLine(r: Reading, burn: number | null, now = Date.now()): string | null {
   if (r.value === null || burn === null) return null;
   if (burn <= 0) return "Nothing spent over the last week.";
-  const unit = r.metric === "storage" ? fmtBytes(burn) : fmtCount(burn);
+  const unit = r.metric === "storage" ? fmtBytes(burn) : r.unit === "usd" ? fmtUsd(burn) : fmtCount(burn);
   const days = daysLeft(r.value, burn);
   if (days === null) return null;
   const refill = r.resetsAt ? Date.parse(r.resetsAt) : NaN;
@@ -340,6 +359,8 @@ function alertText(r: Reading, level: "out" | "critical", burn: number | null): 
         return "ElevenLabs has no characters left — no line can be recorded.";
       case "useapi":
         return "The useapi.net subscription is not active — no image or clip can be made.";
+      case "capsolver":
+        return "CapSolver has no balance left — Google Flow refuses every image and clip without a captcha token.";
       case "google-drive":
         return "Google Drive is full — voiceovers cannot be saved.";
     }

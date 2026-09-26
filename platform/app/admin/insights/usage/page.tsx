@@ -1,8 +1,19 @@
 import Link from "next/link";
 import SettingsShell from "@/components/SettingsShell";
 import { HOOK_VEO_MODEL, VEO_CREDITS, filmCost } from "@/lib/cost";
-import { getApiReadings, getFilmUsage, getOpenAiLedger, getOpenAiTopUp, getScriptsWritten } from "@/lib/data";
-import { burnFromDaily, combinedDailyDrops, fmtCount, fmtUsd as fmtUsdPlain, type Point } from "@/lib/insights";
+import { summarizeDays } from "@/lib/captcha";
+import { getApiReadings, getCaptchaDays, getFilmUsage, getOpenAiLedger, getOpenAiTopUp, getScriptsWritten } from "@/lib/data";
+import {
+  burnFromDaily,
+  burnPerDay,
+  combinedDailyDrops,
+  dailyDrops,
+  daysLeft,
+  fmtCount,
+  fmtDays,
+  fmtUsd as fmtUsdPlain,
+  type Point,
+} from "@/lib/insights";
 import { PRICES, PRICES_READ_AT, PRICES_SOURCE, capSlices, familyLabel, summarize } from "@/lib/openai-usage";
 import DailyBars from "../DailyBars";
 import Donut from "../Donut";
@@ -12,7 +23,7 @@ import s from "../insights.module.css";
 export const dynamic = "force-dynamic";
 
 /**
- * Where the credits go — the second half of the producer's ask of 2026-09-24:
+ * Analytics (it was "Where the credits go" until 2026-09-26) — the second half of the producer's ask of 2026-09-24:
  * "pe ce consumă fiecare și cât consumă", what each service is spent on and
  * how much.
  *
@@ -62,12 +73,13 @@ export default async function UsagePage({
   const since = sinceTopUp ? (topUpAt as number) : now - days * DAY;
   const period = sinceTopUp ? `since the top-up on ${dayFmt.format(new Date(topUpAt as number))}` : `in the last ${days} days`;
 
-  const [readings, films, scripts, ledger, ledgerSinceTopUp] = await Promise.all([
+  const [readings, films, scripts, ledger, ledgerSinceTopUp, captcha] = await Promise.all([
     getApiReadings(Math.max(days, 30)).catch(() => null),
     getFilmUsage(days).catch(() => []),
     getScriptsWritten(days).catch(() => ({ scripts: 0, films: 0 })),
     getOpenAiLedger(since).catch(() => null),
     topUpAt !== null && !sinceTopUp ? getOpenAiLedger(topUpAt).catch(() => null) : Promise.resolve(null),
+    getCaptchaDays(new Date(since).toISOString().slice(0, 10)).catch(() => null),
   ]);
   const latest = readings?.latest ?? [];
   const history = readings?.history ?? {};
@@ -98,6 +110,20 @@ export default async function UsagePage({
   const byChars = [...costs].sort((a, b) => b.c.characters - a.c.characters).filter((x) => x.c.characters > 0).slice(0, TOP);
   const maxChars = Math.max(1, ...byChars.map((x) => x.c.characters));
 
+  // ---- Captcha: useapi's record of every solve, and CapSolver's balance ----
+  const cap = summarizeDays(captcha?.days ?? []);
+  const capBalance = latest.find((r) => r.provider === "capsolver" && r.metric === "balance");
+  const capHistory = history["capsolver||balance"] ?? [];
+  const capDaily = dailyDrops(capHistory).filter((p) => p.t + DAY > since);
+  const capPace = burnPerDay(capHistory, now);
+  const capLeft = capBalance?.value != null ? daysLeft(capBalance.value, capPace) : null;
+  const capSolves = cap.perDay.map((d) => ({ t: d.t, v: d.attempts }));
+  const capRate = cap.perDay.filter((d) => d.rate !== null).map((d) => ({ t: d.t, v: d.rate as number }));
+  const pct = (v: number | null) => (v === null ? "—" : `${Math.round(v * 100)}%`);
+  const secs = (ms: number | null) => (ms === null ? "—" : `${(ms / 1000).toFixed(1)} s`);
+  const provMax = Math.max(1, ...cap.providers.map((p) => p.attempts));
+  const acctMax = Math.max(1, ...cap.accounts.map((a) => a.attempts));
+
   // ---- OpenAI: what OpenAI measures (needs the Usage permission) ----
   const spend = latest.find((r) => r.provider === "openai" && r.metric === "spend_30d");
   const spendDaily = (Array.isArray(spend?.detail?.daily) ? (spend.detail.daily as Point[]) : []).filter((p) => p.t + DAY > since);
@@ -116,8 +142,8 @@ export default async function UsagePage({
 
   return (
     <SettingsShell
-      title="Where the credits go"
-      intro="What each paid service was spent on — measured where the service counts it, estimated from the films and from n8n's own record of every call where it does not."
+      title="Analytics"
+      intro="What each paid service was spent on, and what it bought — measured where the service counts it, estimated from the films and from n8n's own record of every call where it does not."
       back={{ href: "/admin/insights", label: "Developer insights" }}
     >
       <div className={s.bar}>
@@ -389,6 +415,172 @@ export default async function UsagePage({
             .join(", ")}) and its hook at {HOOK_VEO_MODEL}. Accounts invited to the Ultra plan pay 5 credits for the
           clips the manager makes free, so the measured figure above is the one to trust; the table says where they
           went.
+        </p>
+      </section>
+
+      {/* ---------------- Captcha ---------------- */}
+      <section className={s.section} aria-labelledby="u-cap">
+        <div className={s.sectionHead}>
+          <h3 id="u-cap">Captcha — CapSolver</h3>
+          <p>
+            Every still and every clip needs a captcha token. useapi buys each one from CapSolver, then Google accepts it
+            or refuses it as unusual activity — and a refused token is paid for and tried again.
+          </p>
+        </div>
+        <div className={s.kpis}>
+          <Kpi
+            label="CapSolver balance"
+            value={capBalance?.value != null ? fmtUsd(capBalance.value) : "—"}
+            sub={
+              capBalance?.value != null
+                ? capPace !== null && capPace > 0
+                  ? `about ${fmtUsd(capPace)} a day${capLeft !== null ? ` — lasts ${fmtDays(capLeft)}` : ""}`
+                  : "left at the last check"
+                : capBalance?.status === "unavailable"
+                  ? "not connected yet — see below"
+                  : (capBalance?.note ?? "no reading yet")
+            }
+          />
+          <Kpi
+            label="Captcha solves"
+            value={captcha?.ready ? fmtCount(cap.attempts) : "—"}
+            sub={cap.perJob !== null ? `${cap.perJob.toFixed(1)} per image or clip request` : period}
+          />
+          <Kpi label="Accepted by Google" value={pct(cap.acceptRate)} sub={`${fmtCount(cap.accepted)} tokens ${period}`} />
+          <Kpi label="Average solve" value={secs(cap.avgSolveMs)} sub="time to get one token" />
+          <Kpi
+            label="Captcha cost (estimate)"
+            value={captcha?.ready ? fmtUsd(cap.estCost) : "—"}
+            sub={cap.costPerAccepted !== null ? `${fmtUsd(cap.costPerAccepted)} per request that went through` : "at about $3 per 1,000 solves"}
+          />
+        </div>
+
+        {!captcha?.ready ? (
+          <div className="setupnote" style={{ margin: 0 }}>
+            The captcha record is not switched on yet (the <code>hov.captcha_day</code> table, db/020). Once it is, this
+            section fills itself in from useapi within the hour.
+          </div>
+        ) : cap.attempts === 0 ? (
+          <p className={s.foot}>
+            No captcha solves recorded {period} yet
+            {captcha.lastFetch ? ` (last read ${whenFmt(captcha.lastFetch)})` : " — press Update now under OpenAI"}.
+          </p>
+        ) : (
+          <>
+            <div className={s.pair}>
+              <div className={s.panel}>
+                <p className={s.panelTitle}>Captcha — what happened to each solve</p>
+                <Donut unit="solves" slices={cap.outcomes.filter((o) => o.value > 0)} label={`Captcha outcomes, ${period}`} />
+              </div>
+              <div className={s.panel}>
+                <p className={s.panelTitle}>Captcha — solves per Google Flow account</p>
+                <Donut
+                  unit="solves"
+                  slices={capSlices(
+                    cap.accounts.map((a) => ({
+                      id: a.id,
+                      label: a.id,
+                      note: `${pct(a.attempts ? a.accepted / a.attempts : null)} accepted`,
+                      value: a.attempts,
+                      calls: a.attempts,
+                    })),
+                    6,
+                  )}
+                  label={`Captcha solves per Flow account, ${period}`}
+                />
+              </div>
+            </div>
+
+            <div className={s.panel}>
+              <p className={s.panelTitle}>Captcha — solves per day</p>
+              <DailyBars points={capSolves} unit="solves" label="Captcha solves per day" />
+            </div>
+            <div className={s.panel}>
+              <p className={s.panelTitle}>Captcha — share of tokens Google accepted, per day</p>
+              <DailyBars points={capRate} unit="accepted" format="pct" label="Share of captcha tokens accepted per day" />
+            </div>
+            {capDaily.length > 0 && (
+              <div className={s.panel}>
+                <p className={s.panelTitle}>CapSolver — dollars spent per day (measured)</p>
+                <DailyBars points={capDaily} unit="USD" format="usd" label="CapSolver dollars spent per day" />
+              </div>
+            )}
+
+            <div className={s.panel}>
+              <p className={s.panelTitle}>Captcha — by provider</p>
+              <table className={s.rank}>
+                <thead>
+                  <tr>
+                    <th>Provider</th>
+                    <th className={s.hideSm}>Accepted</th>
+                    <th className={s.hideSm}>Average solve</th>
+                    <th className={s.hideSm}>Cost (estimate)</th>
+                    <th>Solves</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cap.providers.map((p) => (
+                    <tr key={p.id}>
+                      <td className={s.film}>{p.id}</td>
+                      <td className={s.hideSm}>{pct(p.attempts ? p.accepted / p.attempts : null)}</td>
+                      <td className={s.hideSm}>{secs(p.attempts ? p.ms / p.attempts : null)}</td>
+                      <td className={s.hideSm}>{fmtUsd(p.cost)}</td>
+                      <td>
+                        <span className={s.rankBar}>
+                          <span style={{ width: `${Math.max(2, (p.attempts / provMax) * 78)}%` }} />
+                          <b>{fmtCount(p.attempts)}</b>
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className={s.panel}>
+              <p className={s.panelTitle}>Captcha — by Google Flow account</p>
+              <table className={s.rank}>
+                <thead>
+                  <tr>
+                    <th>Account</th>
+                    <th className={s.hideSm}>Accepted</th>
+                    <th className={s.hideSm}>Average solve</th>
+                    <th>Solves</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cap.accounts.map((a) => (
+                    <tr key={a.id}>
+                      <td className={s.film}>{a.id}</td>
+                      <td className={s.hideSm}>{pct(a.attempts ? a.accepted / a.attempts : null)}</td>
+                      <td className={s.hideSm}>{secs(a.attempts ? a.ms / a.attempts : null)}</td>
+                      <td>
+                        <span className={s.rankBar}>
+                          <span style={{ width: `${Math.max(2, (a.attempts / acctMax) * 78)}%` }} />
+                          <b>{fmtCount(a.attempts)}</b>
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
+        {capBalance?.status === "unavailable" && (
+          <div className="setupnote" style={{ margin: 0 }}>
+            <b>CapSolver&apos;s balance is not connected yet.</b> useapi holds the CapSolver key but only shows it masked, so
+            the site needs its own copy: add it in GitHub → Settings → Secrets and variables → Actions as{" "}
+            <code>CAPSOLVER_API_KEY</code> (the key from dashboard.capsolver.com), then run the &ldquo;Deploy
+            platform&rdquo; workflow once. The balance appears on Developer insights at the next hourly check.
+          </div>
+        )}
+        <p className={s.foot}>
+          <b>How this is measured.</b> useapi records every captcha attempt — which provider, which Flow account, what
+          Google answered — and keeps three months; the site reads it one day at a time, every hour. A solve is paid for
+          whether Google accepts the token or not, so the cost is set by how many solves a picture needs: the estimate
+          counts every attempt at useapi&apos;s price table (CapSolver about $3 per 1,000). Once CapSolver&apos;s balance is
+          read every hour, its drops are the measured cost. Days are UTC.
         </p>
       </section>
 

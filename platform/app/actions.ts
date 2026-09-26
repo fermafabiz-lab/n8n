@@ -3853,6 +3853,10 @@ export async function checkCreditsNow(): Promise<ActionResult> {
     revalidatePath("/admin/insights");
     revalidatePath("/admin/insights/usage");
     revalidatePath("/admin");
+    // CapSolver is read by the site itself (its key is a site secret), so it
+    // is asked here, beside n8n's answer, rather than by n8n.
+    const { readCapSolver } = await import("@/lib/captcha-sync");
+    await readCapSolver("webhook").catch(() => null);
     if (data && data.saved === false) {
       return { ok: false, message: `Checked, but the reading was not saved: ${data.saveError ?? "unknown error"}.` };
     }
@@ -3872,9 +3876,13 @@ export async function checkCreditsNow(): Promise<ActionResult> {
 export async function readOpenAiUsageNow(): Promise<ActionResult> {
   try {
     const { collectOpenAiUsage } = await import("@/lib/openai-collect");
-    const r = await collectOpenAiUsage({ budgetMs: 25_000 });
+    const { syncCaptchaDays } = await import("@/lib/captcha-sync");
+    // Today's captcha first (a second or two), then the ledger with the rest.
+    const captcha = await syncCaptchaDays({ budgetMs: 8_000, daysBack: 2 }).catch(() => null);
+    const r = await collectOpenAiUsage({ budgetMs: 20_000 });
     revalidatePath("/admin/insights/usage");
-    return { ok: r.ok, message: r.message };
+    const note = captcha && !captcha.ok ? ` Captcha: ${captcha.message}` : "";
+    return { ok: r.ok, message: `${r.message}${note}` };
   } catch (e) {
     return { ok: false, message: friendlyError(e) };
   }

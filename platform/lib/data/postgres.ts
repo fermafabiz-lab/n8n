@@ -2054,7 +2054,7 @@ export async function getApiReadings(days = 30): Promise<ApiReadings> {
        from hov.api_balance
       where taken_at > now() - make_interval(days => $1)
         and value is not null
-        and metric in ('credits', 'characters', 'storage')
+        and metric in ('credits', 'characters', 'storage', 'balance')
       order by taken_at`,
     [days],
   );
@@ -2342,4 +2342,116 @@ export async function getOpenAiTopUp(): Promise<{ outAt: string; okAt: string } 
       limit 1`,
   );
   return row ? { outAt: new Date(row.out_at).toISOString(), okAt: new Date(row.ok_at).toISOString() } : null;
+}
+
+// ---------------------------------------------------------------------------
+// The captcha (db/020) and the site's own readings
+//
+// useapi's captcha record, summed per day (lib/captcha.ts), and the CapSolver
+// balance, which the SITE reads (its key is a site secret) and files beside
+// n8n's hourly readings in hov.api_balance.
+// ---------------------------------------------------------------------------
+
+export const captchaReady = () => tableReady("hov.captcha_day");
+
+/** The days already read to the end — never fetched again. */
+export async function completeCaptchaDays(days: string[]): Promise<Set<string>> {
+  if (days.length === 0 || !(await captchaReady())) return new Set();
+  const rows = await query<{ day: string }>(
+    `select to_char(day, 'YYYY-MM-DD') as day from hov.captcha_day where complete and day = any($1::date[])`,
+    [days],
+  );
+  return new Set(rows.map((r) => r.day));
+}
+
+export async function saveCaptchaDay(
+  d: import("@/lib/captcha").CaptchaDay,
+  summary: Record<string, unknown> | null,
+  complete: boolean,
+): Promise<void> {
+  await query(
+    `insert into hov.captcha_day (day, attempts, accepted, jobs, solve_ms, by_provider, by_account, by_kind, outcomes, summary, complete, fetched_at)
+     values ($1::date, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9::jsonb, $10::jsonb, $11, now())
+     on conflict (day) do update set
+       attempts = excluded.attempts, accepted = excluded.accepted, jobs = excluded.jobs,
+       solve_ms = excluded.solve_ms, by_provider = excluded.by_provider, by_account = excluded.by_account,
+       by_kind = excluded.by_kind, outcomes = excluded.outcomes, summary = excluded.summary,
+       complete = excluded.complete, fetched_at = now()`,
+    [
+      d.day,
+      d.attempts,
+      d.accepted,
+      d.jobs,
+      d.solveMs,
+      JSON.stringify(d.byProvider),
+      JSON.stringify(d.byAccount),
+      JSON.stringify(d.byKind),
+      JSON.stringify(d.outcomes),
+      summary ? JSON.stringify(summary) : null,
+      complete,
+    ],
+  );
+}
+
+export interface CaptchaDays {
+  ready: boolean;
+  days: import("@/lib/captcha").CaptchaDay[];
+  lastFetch: string | null;
+}
+
+/** Every day from `sinceDay` (YYYY-MM-DD) on. */
+export async function getCaptchaDays(sinceDay: string): Promise<CaptchaDays> {
+  if (!(await captchaReady())) return { ready: false, days: [], lastFetch: null };
+  const rows = await query<{
+    day: string;
+    attempts: number;
+    accepted: number;
+    jobs: number;
+    solve_ms: string | number;
+    by_provider: Record<string, import("@/lib/captcha").Tally>;
+    by_account: Record<string, import("@/lib/captcha").Tally>;
+    by_kind: Record<string, import("@/lib/captcha").Tally>;
+    outcomes: Record<import("@/lib/captcha").Outcome, number>;
+    fetched_at: Date;
+  }>(
+    `select to_char(day, 'YYYY-MM-DD') as day, attempts, accepted, jobs, solve_ms, by_provider, by_account, by_kind,
+            outcomes, fetched_at
+       from hov.captcha_day where day >= $1::date order by day`,
+    [sinceDay],
+  );
+  return {
+    ready: true,
+    days: rows.map((r) => ({
+      day: r.day,
+      attempts: Number(r.attempts),
+      accepted: Number(r.accepted),
+      jobs: Number(r.jobs),
+      solveMs: Number(r.solve_ms),
+      byProvider: r.by_provider ?? {},
+      byAccount: r.by_account ?? {},
+      byKind: r.by_kind ?? {},
+      outcomes: r.outcomes ?? { accepted: 0, refused: 0, traffic: 0, throttled: 0, other: 0 },
+    })),
+    lastFetch: rows.length ? new Date(Math.max(...rows.map((r) => new Date(r.fetched_at).getTime()))).toISOString() : null,
+  };
+}
+
+/** A reading the SITE takes (CapSolver), filed with n8n's in hov.api_balance. */
+export async function saveApiReading(r: {
+  provider: string;
+  account?: string;
+  metric: string;
+  value: number | null;
+  unit: string | null;
+  status: "ok" | "out" | "error" | "unavailable";
+  note: string | null;
+  detail: Record<string, unknown> | null;
+  source: "schedule" | "webhook" | "manual";
+}): Promise<void> {
+  if (!(await tableReady("hov.api_balance"))) return;
+  await query(
+    `insert into hov.api_balance (provider, account, metric, value, unit, status, note, detail, source)
+     values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)`,
+    [r.provider, r.account ?? "", r.metric, r.value, r.unit, r.status, r.note, r.detail ? JSON.stringify(r.detail) : null, r.source],
+  );
 }

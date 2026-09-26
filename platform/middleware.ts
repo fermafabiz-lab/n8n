@@ -33,8 +33,11 @@ export function middleware(req: NextRequest) {
       // And for the production run: the orchestrator asks who produces a film.
       req.nextUrl.pathname === "/api/ops/produce" ||
       // The hourly read of finished executions into the OpenAI ledger, called
-      // by n8n's "API Credits" workflow (app/api/insights/openai/route.ts).
-      req.nextUrl.pathname === "/api/insights/openai") &&
+      // by n8n's "API Credits" workflow (app/api/insights/openai/route.ts)…
+      req.nextUrl.pathname === "/api/insights/openai" ||
+      // …and the whole hourly tick it grew into: CapSolver, the captcha
+      // record, the ledger (app/api/insights/tick/route.ts).
+      req.nextUrl.pathname === "/api/insights/tick") &&
     process.env.MEDIA_INGEST_KEY &&
     req.headers.get("x-hov-key") === process.env.MEDIA_INGEST_KEY
   ) {

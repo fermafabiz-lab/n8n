@@ -105,6 +105,42 @@ order the batch runs in.
      replaced by queueing it, behind a per-film flag, like
      `FINAL_ASSEMBLY_ENGINE`.
    - A shadow run on real films, then one film end to end, then the flip.
+   - **Phase 6, broken down** (written 2026-09-26, after reading the live batch `527c67b7`). The batch is one execution. From `Receive Batch Input`:
+     - setup;
+     - `Sort & Cap Scenes` (the whole film, pending first, cap 200);
+     - `Assign Accounts` (contiguous blocks; a scene stays on the account that minted its image);
+     - the audio loop, then the image loop;
+     - the **asset gate** (`Evaluate Image Approval` every 15 s: every image approved AND present, every voice approved where there is speech);
+     - the clip loop (serial, or the 3-account pool);
+     - the **video gate** (`Evaluate Video Approval`: every clip approved AND present);
+     - `Mark Scene Finalizat`, and `More Batches?` for another pass while clips are missing (at most 12);
+     - the **final-settings gate** (status leaves `Setări Finale`, or 2 h pass), which bounces once per flagged scene for a missed video regen.
+
+     **All three gates are pure reads of the database**, so in the engine they are checks a worker runs on a `production_job` row, not waits held open inside a process.
+     - **6a — the batch's image stage:**
+       - `Build Image Request` (the shared REFERENCE ASSEMBLY, already ported and held to all three copies);
+       - `IMG Account` and the cooldown guard on 403 `UNUSUAL_ACTIVITY`;
+       - the refusal ladder (`Rewrite Prompt AI` / `Apply Rewritten Prompt`);
+       - the consistency judge and its re-roll.
+
+       Golden-tested like the regen ports.
+     - **6b — the batch's clip stage:**
+       - `Current Scene` (the frozen prompt);
+       - serial submit/poll;
+       - the pool with `Pool Tick` / cooldown and work stealing;
+       - the VP ladder (audio arm, fresh seed, regenerate the still with a steer);
+       - end frame and motion judge (shared with 4).
+     - **6c — setup:** user reference upload, cast sheets, set plates, sheet ingest, cross-account replication (`Replicate *`, `Build Flow Refs`, `Save Flow Refs`), `Assign Accounts`.
+     - **6d — the production job:**
+       - `db/018 production_job`;
+       - a worker that walks setup → voices → images → asset gate → clips → video gate → Finalizat → settings gate;
+       - resume from any phase, Pause = this film only;
+       - the orchestrator's two `Execute Media Generation*` nodes replaced by a call to `/api/ops/produce` behind a per-film flag (`PRODUCTION_ENGINE`), exactly as Final Assembly moved.
+     - **6e — shadow then cutover.**
+       - The engine computes the image and clip requests for a real film's scenes, and they are diffed against what n8n sent (the executions keep them).
+       - Then one real film end to end on the engine, watched.
+       - Then the flip.
+
 7. **Retire** Media Generation in n8n. It stays the rollback until a few
    films are good.
 

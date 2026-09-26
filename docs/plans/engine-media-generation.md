@@ -169,6 +169,9 @@ order the batch runs in.
            - held gates dispatching a regeneration;
            - **a restart mid-clip that polls the job in flight instead of submitting it again**;
            - the settings gate sending a pass back.
+         - **Voices run beside everything else (2026-09-26, at the producer's request).** The takes are queued before the setup starts, and nothing waits on them before the asset gate. So the setup (sheets, plates, copies) and the stills proceed while ElevenLabs works. n8n ran setup → every take → the first still in series.
+           - The first still is now drawn as soon as the setup is done, not after the last take.
+           - `test/produce.test.mjs` pins both halves with slow takes, and both fail against the old order.
          - **Deliberate differences from n8n:**
            - **The n-1 image** is the previous BUILD's decode. n8n indexes Decode and Build by the same `$runIndex`, and the two drift apart after a failed Generate or a cooldown retry.
            - **Submit Video's "latest run" overrides** (end frame, cooldown, motion re-roll) are kept as the latest of each, as `.first()` reads them.

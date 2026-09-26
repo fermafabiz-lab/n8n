@@ -611,6 +611,10 @@ expected and harmless for an app touching only its own Drive.
       - the engine's production loop reads the table every 2 s (the
         `pg_stat_user_tables` scan count rose 6 in 4 s, executions
         17671/17672).
+    - **Voices in parallel (2026-09-26, at the producer's request).** The
+      voice takes are queued before the sheets and plates. The stills start
+      as soon as the setup is done, and only the asset gate waits for both.
+      n8n still runs them in series, and was deliberately left alone.
     - **Tests:** eight whole-film scenarios run in
       `engine/test/produce.test.mjs`, including a restart mid-clip that
       resumes the job in flight.

@@ -2,9 +2,10 @@
 // pure steps in setup.ts, gates.ts, images.ts and clips.ts in the order n8n
 // runs them:
 //
-//   setup (photo, sheets, plates, copies on the other accounts)
+//   voices, queued first as media_jobs (the same take the regen button makes)
+//   and made in the background — nothing before the asset gate waits on them
+//   → setup (photo, sheets, plates, copies on the other accounts)
 //   → pass: Sort & Cap → Assign Accounts
-//   → voices (queued as media_jobs, the same take the regen button makes)
 //   → images, one at a time in pass order (the n-1 chain), with the refusal
 //     ladder, the account failover and the consistency judge
 //   → the asset gate → the clips (serial, or the three-account pool) → the
@@ -47,11 +48,11 @@ export interface ProduceDeps {
   waits?: Partial<Waits>;
 }
 export interface Waits {
-  sheet: number; pace: number; betweenImages: number; gate: number; voicePoll: number;
+  sheet: number; pace: number; betweenImages: number; gate: number;
   firstPoll: number; poll: number; pool: number; cooldown: number; vpImage: number; imgCooldownUnit: number;
 }
 const WAITS: Waits = {
-  sheet: U.SHEET_INTERVAL_MS, pace: 8000, betweenImages: 2000, gate: 15000, voicePoll: 5000,
+  sheet: U.SHEET_INTERVAL_MS, pace: 8000, betweenImages: 2000, gate: 15000,
   firstPoll: C.WAITS.firstPoll * 1000, poll: C.WAITS.poll * 1000, pool: C.WAITS.pool * 1000, cooldown: C.WAITS.cooldown * 1000, vpImage: C.WAITS.imageWait * 1000,
   imgCooldownUnit: 1000,
 };
@@ -84,7 +85,10 @@ export async function driveProduction(job: D.ProductionJob, deps: ProduceDeps): 
 
   try {
     for (;;) {
-      if (job.stage === 'setup') { await setup(); job.stage = 'voices'; st.passBuilt = false; await persist(); }
+      // The voices start FIRST and run beside everything else: a take needs
+      // only its scene's words, never a sheet, a plate or a still, so there is
+      // no reason for it to wait on the setup the way n8n's serial chain made it.
+      if (job.stage === 'setup') { await queueVoices(await D.approvedScenes(db, pid)); await setup(); job.stage = 'voices'; st.passBuilt = false; await persist(); }
       if (job.stage === 'voices') { if (!st.passBuilt) await startPass(); await voices(); job.stage = 'images'; st.imgIndex = 0; await persist(); }
       if (job.stage === 'images') { await images(); job.stage = 'asset_gate'; await persist(); }
       if (job.stage === 'asset_gate') { await assetGate(); job.stage = 'clips'; st.pool = null; st.serialIndex = 0; await persist(); }
@@ -206,17 +210,19 @@ export async function driveProduction(job: D.ProductionJob, deps: ProduceDeps): 
   }
 
   // --- Voices -----------------------------------------------------------------------------------------------
+  // Queued, never waited on: the images need the sheets, not the takes, and
+  // the one place that needs both — the asset gate — waits for both anyway.
+  // (n8n synthesised every take before drawing the first still.) Idempotent:
+  // a scene with a take, or with one already in flight, is not queued again.
   async function voices() {
+    await queueVoices(await D.scenesById(db, st.expected));
+  }
+  async function queueVoices(rows: AtRow[]) {
     const pf = (await project()).fields || {};
-    const rows = await D.scenesById(db, st.expected);
     const wanted = rows.filter((r) => String((r.fields || {})['Voiceover URL'] || '') === '' && !noSpeech(r, pf)).map((r) => r.id);
-    for (const id of wanted) await enqueueMedia(db, id, 'voice', { batch: true }, 'production:' + job.id);
-    if (wanted.length) log('voices queued', { scenes: wanted.length });
-    for (;;) {
-      const active = (await D.activeMedia(db, wanted)).filter((m) => m.kind === 'voice');
-      if (!active.length) return;
-      await pause(W.voicePoll);
-    }
+    let queued = 0;
+    for (const id of wanted) if (await enqueueMedia(db, id, 'voice', { batch: true }, 'production:' + job.id)) queued++;
+    if (queued) log('voices queued', { scenes: queued });
   }
 
   // --- Images: Loop Images, one scene at a time in pass order ---------------------------------------------------

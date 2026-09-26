@@ -38,7 +38,7 @@ const hex = (s) => Buffer.from(s).toString('hex');
 const unhex = (id) => { const m = /-email:([0-9a-f]+)-/.exec(id || ''); return m ? Buffer.from(m[1], 'hex').toString() : ''; };
 const A0 = 'fermafabiz@gmail.com', A1 = 'houseofvideos01@gmail.com', A2 = 'houseofvideos02@gmail.com';
 const fake = {};
-const reset = () => Object.assign(fake, { requests: [], images: [], uploads: [], submits: [], jobs: new Map(), imageScript: [], jobScripts: [], judgeScript: [], consistencyScript: [] });
+const reset = () => Object.assign(fake, { requests: [], images: [], uploads: [], submits: [], jobs: new Map(), imageScript: [], jobScripts: [], judgeScript: [], consistencyScript: [], voiceDelay: 0 });
 // Flow ids are unique for ever (hov.sheet_media.flow_id is): the counter is never reset.
 fake.n = 0;
 reset();
@@ -49,7 +49,7 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   let body;
   try { body = raw.length && /json/.test(req.headers['content-type'] || '') ? JSON.parse(raw.toString()) : undefined; } catch {}
-  fake.requests.push({ method: req.method, path: url.pathname, body });
+  fake.requests.push({ method: req.method, path: url.pathname, body, at: Date.now() });
   const json = (c, o) => { res.writeHead(c, { 'content-type': 'application/json' }); res.end(JSON.stringify(o)); };
   let m;
   if (url.pathname.startsWith('/dl/') || url.pathname.startsWith('/m/')) { res.writeHead(200, { 'content-type': 'image/png' }); return res.end(Buffer.from('png:' + url.pathname)); }
@@ -115,7 +115,12 @@ const config = {
 };
 const logs = [];
 const log = (msg, extra) => logs.push({ msg, ...extra });
-const speaker = { async speak(voice, text) { fake.requests.push({ path: 'elevenlabs', body: { voice, text } }); return Buffer.from('mp3:' + text); } };
+const speaker = { async speak(voice, text) {
+  fake.requests.push({ path: 'elevenlabs', body: { voice, text }, at: Date.now() });
+  if (fake.voiceDelay) await new Promise((ok) => setTimeout(ok, fake.voiceDelay));
+  fake.requests.push({ path: 'elevenlabs:done', at: Date.now() });
+  return Buffer.from('mp3:' + text);
+} };
 const clip = clipServices({ useapiToken: 'tok', renderUrl: BASE, renderApiKey: 'rk', openaiKey: 'ok', useapiBase: BASE, openaiBase: BASE });
 const ingest = siteIngest(BASE, 'ik');
 const services = produceServices({ useapiToken: 'tok', openaiKey: 'ok', siteUrl: BASE, ingestKey: 'ik', useapiBase: BASE, openaiBase: BASE });
@@ -191,7 +196,17 @@ console.log('production runs');
 
 await scenario('one account, serial: setup, voices, images in order, both gates, clips, Finalizat, the settings gate', async () => {
   const { pid, ids } = await film();
+  // Slow takes, so the order is visible: the voices must run BESIDE the setup
+  // and the stills, not before them.
+  fake.voiceDelay = 400;
   const { outcome } = await produce(pid);
+  const flow = fake.requests.filter((r) => r.path === '/v1/google-flow/images');
+  const takesStarted = fake.requests.filter((r) => r.path === 'elevenlabs').map((r) => r.at);
+  const takesDone = fake.requests.filter((r) => r.path === 'elevenlabs:done').map((r) => r.at);
+  const firstFrame = flow.find((r) => !/reference (sheet|plate)/i.test(r.body.prompt));
+  const setupDone = flow.filter((r) => /reference (sheet|plate)/i.test(r.body.prompt)).at(-1).at;
+  assert.ok(Math.min(...takesStarted) < setupDone, 'the takes start during the setup, not after it');
+  assert.ok(firstFrame.at < Math.max(...takesDone), 'the first still is drawn while a take is still being made');
   assert.equal(outcome, 'done');
   const j = await jobOf(pid);
   assert.equal(j.phase, 'done');

@@ -174,6 +174,44 @@ itself. By hand:
 `run-tick.workflow.js` runs the tick once from a Claude session, with a
 270 s budget (the first back-fill).
 
+## Live (2026-09-26)
+
+- **db/020** was applied in execution 17768: the table is present with 12
+  columns.
+- **The site**: deploy #201 (merge `656bd1d`), then the correction in deploy
+  #202 (merge `0c6a400`).
+- **API Credits** went live as `8e51ec0c` (`Insights Tick`; rollback
+  `2cbef392`).
+- **First tick, execution 17772**: 31 days read, and the answer carried
+  `capsolver`, `captcha` and `ledger`. Only the new build knows that route, so
+  the answer itself proves the deploy is serving.
+- **After the correction, execution 17780** read the 30 old-shaped days again
+  by itself, plus today.
+- **The check, execution 17781**: 31 rows in the new shape, and all 33
+  provider-days equal useapi's `sample_size_by_provider` and
+  `success_rate_by_provider` to the hundredth.
+- **The CapSolver balance reads `unavailable`** until the Secret
+  `CAPSOLVER_API_KEY` exists. Add it (GitHub → Settings → Secrets and
+  variables → Actions, with the key from dashboard.capsolver.com), then run
+  "Deploy platform".
+
+The first month, 2026-08-27 to 09-26:
+
+| | solves | requests | solves per request | tokens accepted | requests through |
+|---|---|---|---|---|---|
+| to 09-17 | 2,105 | 2,037 | 1.03 | 84.8% | 81.0% |
+| 09-18 to 09-21 | 511 | 511 | 1.00 | 67.7% | 67.5% |
+| from 09-22 (`captchaRetry` 5) | 1,140 | 551 | 2.07 | 27.9% | 56.4% |
+
+- **By provider**: CapSolver 73.2% over 3,323 solves (8.8 s each); 2Captcha
+  3.9% over 433 (28.9 s each).
+- **By account since 09-18**: fermafabiz 47.3%, houseofvideos01 26.2%,
+  houseofvideos02 28.9%.
+- **Estimated cost of the month**: about $11 (3,323 × $0.003 + 433 ×
+  $0.00299). The cost is small. What the captcha costs is **time**: every
+  refused token is a 20-30 s solve plus a retry, and since 09-22 nearly three
+  solves in four are refused.
+
 ## Files
 
 - `db/020_captcha_day.sql`, with `apply-020.workflow.js` and `verify-020.sql`

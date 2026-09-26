@@ -881,9 +881,10 @@ expected and harmless for an app touching only its own Drive.
   every finished n8n execution once with the n8n API key only it holds
   (`lib/openai-collect.ts`) and stores each OpenAI call — the step that asked,
   the film, the model, the tokens, the list price — in **`hov.openai_call`**
-  (`db/019`, applied in execution 17697). Hourly from API Credits' new
-  **Read OpenAI Ledger** node (version `2cbef392`, 120 s a run: the workflow's
-  `executionTimeout` is 180) and on "⟳ Update now". The usage page puts OpenAI
+  (`db/019`, applied in execution 17697). Hourly from API Credits'
+  **Insights Tick** node (it was `Read OpenAI Ledger` until the captcha joined
+  it; 120 s a run: the workflow's `executionTimeout` is 180) and on
+  "⟳ Update now". The usage page, now called **Analytics**, puts OpenAI
   first, with a "Since the OpenAI top-up" period and two pies (by pipeline
   step, by model), and every chart on it is titled "Service — what, per what".
   **Two things n8n records wrong or not at all**: an agent with an output
@@ -900,6 +901,47 @@ expected and harmless for an app touching only its own Drive.
   web-search research call is **$0.073** (17707), so searches add cents, not
   dollars. If the account fell by much more, it was not this pipeline — look
   for another key on the same OpenAI organisation (needs *Usage → Read*).
+  **Since the evening of 2026-09-26 the captcha is on it too**
+  (`db/port/captcha/README.md`, lesson in `docs/lessons-site.md` under
+  "CapSolver and the captcha").
+  - **What was added:** a CapSolver card on Developer insights, and a
+    "Captcha — CapSolver" section on the page now called **Analytics** (it was
+    "Where the credits go"; the button says Analytics too).
+  - **The SITE reads both, because it holds the keys.**
+    - CapSolver's `getBalance` needs the raw key, and useapi shows it only
+      masked. So it is a GitHub Secret, **`CAPSOLVER_API_KEY`**, which is
+      **not added yet**. Until it is, the card says so, grey, never an alarm.
+    - useapi's `captcha-stats` keeps every attempt for three months. The site
+      reads it one UTC day at a time into **`hov.captcha_day`** (`db/020`,
+      applied in execution 17768). A finished day is read once.
+  - **The hourly node.** API Credits' last node is **`Insights Tick`** →
+    `POST http://web:3000/api/insights/tick` (version `8e51ec0c`, rollback
+    `2cbef392`). It reads the balance, then the captcha days, then the OpenAI
+    ledger, on one 120 s budget.
+  - **"Tokens accepted" is useapi's rule, not "went through".** Only Google's
+    two bot verdicts fail a token: 403 unusual activity and 429 too much
+    traffic. A 503 is left out, and a refused prompt or a throttled account
+    came AFTER Google took the token.
+  - **The first version counted 200s.** It matched the one day it was pinned
+    to, which held no other kind of answer. The live back-fill then missed on
+    13 of 27 days: 59% where useapi said 88%. Fixed in merge `0c6a400`. Rows
+    summed under the old rule re-read themselves: `completeCaptchaDays`
+    requires `outcomes ? 'unavailable'`.
+  - **Pinned by** `check:captcha` (67 checks, two of the days rebuilt from
+    useapi's own summaries) and `db/port/captcha/browser/drive.mjs` (27).
+  - **Live since deploy #202.** Execution 17780 re-read the month under the
+    corrected rule. In 17781, all 33 provider-days match useapi's own sample
+    and success rate to the hundredth.
+  - **The first month's answer** (08-27 to 09-26):
+    - 3,756 solves for 3,099 requests, about **$11** at useapi's prices.
+    - Google accepted **85%** of tokens up to 09-17, at 1.03 solves per
+      request.
+    - It has accepted **28%** since 09-22, at 2.07 solves per request, with
+      44% of requests still failing.
+    - By account since 09-18: fermafabiz 47%, houseofvideos01 26%,
+      houseofvideos02 29%.
+    - 2Captcha: 3.9% of 433 solves (it was removed at 18:12 UTC on 09-26).
+  - **The captcha, not the price, is the problem to work on.**
 - **Hands-off is chosen step by step since 2026-09-24**
   (`db/port/hands-off-steps/README.md`, lesson in `docs/lessons-site.md` under
   "Hands-off mode"). The brief picks which gates sign themselves off — Script,
@@ -2066,6 +2108,14 @@ expected and harmless for an app touching only its own Drive.
   thing standing between a Drive-served take and a stall. It needs three
   n8n nodes changed and a backfill.
 - Rotate the ai33 / Railway / useapi keys. Discord webhook URLs are still empty.
+  **The useapi token is in git as well**, not only in n8n nodes. Found
+  2026-09-26: the committed workflow dumps `db/port/audio-filter/Media
+  Generation.before.json` / `.after.json` and `db/port/consistency/Claude
+  Scripting.original.json` carry it in full. Deleting those files does not take
+  it out of history, so rotation is the only fix. After rotating, the new token
+  goes to the n8n nodes that hard-code it, the GitHub Secret `USEAPI_TOKEN`
+  (the site and the engine), and nowhere in the repo. Strip `Authorization`
+  headers from any workflow dump before committing it.
 
 ## Working language
 

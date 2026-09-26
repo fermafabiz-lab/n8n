@@ -13,9 +13,12 @@
  * changing a default later reaches every film that never chose.
  */
 
-export type MotionPackId = "classic" | "editorial" | "punch" | "lowerThird";
+export type MotionPackId = "classic" | "editorial" | "punch" | "lowerThird" | "kidsPill" | "kidsBounce" | "kidsSticker";
 
-export const MOTION_PACKS: { id: MotionPackId; label: string; hint: string }[] = [
+export const MOTION_PACKS: { id: MotionPackId; label: string; hint: string; kidsOnly?: boolean }[] = [
+  { id: "kidsSticker", kidsOnly: true, label: "Sticker", hint: "Thick outlined words that squeeze in like stickers, the spoken word yellow" },
+  { id: "kidsBounce", kidsOnly: true, label: "Bounce", hint: "Rounded words bounce in as they are spoken, the spoken word bigger and warm" },
+  { id: "kidsPill", kidsOnly: true, label: "Pill", hint: "The phrase in a white pill, the spoken word warm" },
   { id: "editorial", label: "Editorial", hint: "Words rise in as they are spoken, the spoken word underlined" },
   { id: "punch", label: "Punch", hint: "Bold capitals pop in, the spoken word on a coloured pill" },
   { id: "lowerThird", label: "Lower third", hint: "The phrase in a band at the bottom left, TV-documentary style" },
@@ -25,6 +28,17 @@ export const MOTION_PACKS: { id: MotionPackId; label: string; hint: string }[] =
 /** What a category gets when nobody picked. Unlisted categories: classic. */
 export const DEFAULT_MOTION_PACK: Record<string, MotionPackId> = {
   story: "editorial",
+  kids: "kidsSticker",
+};
+
+/**
+ * The packs a category offers: the three Kids styles only on a Kids story
+ * (a rounded sticker caption on a documentary would be a mistake the picker
+ * should not offer), the rest everywhere.
+ */
+export const motionPacksFor = (category: string | null | undefined) => {
+  const kids = String(category ?? "").trim().toLowerCase() === "kids";
+  return MOTION_PACKS.filter((p) => !p.kidsOnly || kids);
 };
 
 export const defaultMotionPackFor = (category: string | null | undefined): MotionPackId =>

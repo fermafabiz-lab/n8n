@@ -69,6 +69,8 @@ export const PACKS: Record<MotionPackId, MotionPack> = {
 /** What a film gets when nobody picked a pack. Categories not listed: classic. */
 export const DEFAULT_PACK_FOR_CATEGORY: Record<string, MotionPackId> = {
 	story: 'editorial',
+	// The producer's pick on 2026-09-26, from the three Kids styles.
+	kids: 'kidsSticker',
 };
 
 /** The storyboard's first names, still accepted so old fixtures keep rendering. */

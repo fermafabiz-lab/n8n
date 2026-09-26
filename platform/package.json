@@ -22,7 +22,7 @@
     "check:regen-wait": "node --experimental-strip-types --no-warnings --import ./scripts/alias-loader.mjs scripts/check-regen-wait.mjs",
     "check:deepsearch": "node --experimental-strip-types --no-warnings --import ./scripts/alias-loader.mjs scripts/check-deep-search.mjs",
     "check:recap": "node ../db/port/series-recap/check.mjs",
-    "check:graphic-styles-node": "node ../db/port/kids-cine-graphics/check.mjs",
+    "check:graphic-styles-node": "node ../db/port/kids-cine-graphics/check.mjs && node ../db/port/kids-captions/check.mjs",
     "check:tones": "node --experimental-strip-types --no-warnings scripts/check-tones.mjs",
     "check:playlists": "node --experimental-strip-types --no-warnings scripts/check-playlists.mjs",
     "check:activity": "node --experimental-strip-types --no-warnings scripts/check-activity-order.mjs",

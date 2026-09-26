@@ -328,7 +328,7 @@ console.log('\nGraphic styles + transitions — engine = the next Caption Colour
   // graphic plan and a pick; the engine's captionColour + graphicStyles must
   // give the same body. Without either key both are today's output, which
   // Layer 2 already holds on every fixture.
-  const next = fs.readFileSync(path.join(repo, 'db/port/kids-cine-graphics/paste/fa-Caption_Colour.js'), 'utf8');
+  const next = fs.readFileSync(path.join(repo, 'db/port/kids-captions/paste/fa-Caption_Colour.js'), 'utf8');
   const w = romeWorld();
   const a = n8nChain(w);
   const orders = w.sceneRows.map((r) => (r.fields || {})['Ordine Scenă']).filter((o) => o !== undefined);

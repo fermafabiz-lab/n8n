@@ -7,7 +7,7 @@ import { DEFAULT_CATEGORY, getCategory } from "@/lib/categories";
 import { TONES } from "@/lib/tones";
 import Toggle from "@/components/Toggle";
 import CaptionColorPicker from "@/components/CaptionColorPicker";
-import { MOTION_PACKS, defaultMotionPackFor, type MotionPackId } from "@/lib/motion-packs";
+import { MOTION_PACKS, defaultMotionPackFor, motionPacksFor, type MotionPackId } from "@/lib/motion-packs";
 import { GRAPHIC_STYLES, graphicStylesFor, offersGraphicStyle, type GraphicStyleId } from "@/lib/graphic-styles";
 import { TRANSITION_STYLES, type TransitionStyleId } from "@/lib/transition-styles";
 import WatermarkOpenPicker from "@/components/WatermarkOpenPicker";
@@ -1363,16 +1363,16 @@ export default function NewVideoForm({ series }: { series: SeriesPrefill | null 
                 </div>
                 <div className="frow" style={{ marginTop: 18 }}>
                   <label>Animation style</label>
-                  <input type="hidden" name="motion_pack" value={motionPack} />
+                  <input type="hidden" name="motion_pack" value={motionPacksFor(category).some((p) => p.id === motionPack) ? motionPack : ""} />
                   <div className="seg" role="group" aria-label="Animation style" style={{ flexWrap: "wrap" }}>
                     <button
                       type="button"
-                      className={motionPack === "" ? "on" : ""}
+                      className={!motionPacksFor(category).some((p) => p.id === motionPack) ? "on" : ""}
                       onClick={() => setMotionPack("")}
                     >
                       Auto · {MOTION_PACKS.find((p) => p.id === defaultMotionPackFor(category))?.label}
                     </button>
-                    {MOTION_PACKS.map((p) => (
+                    {motionPacksFor(category).map((p) => (
                       <button
                         type="button"
                         key={p.id}

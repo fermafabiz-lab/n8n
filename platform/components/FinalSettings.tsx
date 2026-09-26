@@ -10,7 +10,7 @@ import WatermarkSizePicker from "@/components/WatermarkSizePicker";
 import WatermarkPreview, { type PreviewScene } from "@/components/WatermarkPreview";
 import { useSetPendingStage } from "@/components/StageNav";
 import type { EditingOptions, MotifCard } from "@/lib/data";
-import { MOTION_PACKS, defaultMotionPackFor } from "@/lib/motion-packs";
+import { MOTION_PACKS, defaultMotionPackFor, motionPacksFor } from "@/lib/motion-packs";
 import { GRAPHIC_STYLES, graphicStyleLabel, graphicStylesFor, offersGraphicStyle, type GraphicPlanItem } from "@/lib/graphic-styles";
 import { TRANSITION_STYLES, transitionStyleLabel } from "@/lib/transition-styles";
 
@@ -599,7 +599,7 @@ export default function FinalSettings({
           >
             Auto · {MOTION_PACKS.find((m) => m.id === defaultMotionPackFor(category))?.label}
           </button>
-          {MOTION_PACKS.map((m) => (
+          {motionPacksFor(category).map((m) => (
             <button
               type="button"
               key={m.id}

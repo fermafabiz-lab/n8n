@@ -2689,3 +2689,40 @@ anything out or nearly out. Full account: `db/port/api-credits/README.md`.
   banner's own content.
 - **A focus outline on a full-height chart column reads as a bar reaching the
   top of the scale.** The pointed-at day gets a faint wash behind it instead.
+
+### What used the OpenAI credits — n8n is the only record that knows the step (2026-09-26)
+
+The producer's question after a top-up went fast: *what* consumed it, and how
+much, with a pie. Full account: `db/port/openai-usage/README.md`.
+
+- **OpenAI cannot answer "which step" for anyone.** Its request log needs a
+  browser session, the stored-completions list is empty unless calls send
+  `store: true`, and its usage and costs endpoints want `api.usage.read` —
+  and even granted, they group by model, key and project, never by the node
+  that asked. Two agents on gpt-5.4 are one line on the bill. The per-step
+  answer has to come from the orchestrator's own record, which here is n8n's
+  executions, read through the API key only the SITE holds.
+- **An agent with an output parser answers through a TOOL CALL, so n8n counts
+  its answer as zero tokens.** The model run's text is `""` and
+  `tokenUsageEstimate.completionTokens` is 0, while the agent's own output is
+  twenty thousand characters. Output tokens are six times the price of input on
+  gpt-5.4, so trusting n8n's estimate would have put the most expensive steps
+  at the bottom of the ranking. Measure the answer off the agent's output (the
+  model run's `source[0]` names the agent and its run). Raw HTTP calls carry
+  OpenAI's real `usage` and need none of this.
+- **The model node is not the step.** `Editor Model` serves seven agents; the
+  model run's `source[0].previousNode` is the agent that asked, and that is
+  what the producer can act on.
+- **Say what the number leaves out, beside the number.** Two model nodes search
+  the web with context `high` — $10 per 1,000 searches plus every page read —
+  and n8n records none of it. The page marks those steps and says the real
+  bill for them is higher, rather than presenting a total that silently isn't.
+- **A pie with one slice was invisible**: the ring's slice gap sets `stroke` in
+  the stylesheet, and CSS outranks an SVG presentation attribute, so the lone
+  `<circle stroke={colour}>` was painted the card's colour. Inline `style` for
+  anything the stylesheet also sets. Found only by looking at the screenshot.
+- **`next start` renames itself `next-server`**, so `kill` by the command line
+  you started misses it and the rebuilt site's new server dies on EADDRINUSE
+  while the OLD one keeps answering with the new build's chunks underneath —
+  every interactive check then fails at once for no visible reason. Kill by the
+  pid of whatever is listening.

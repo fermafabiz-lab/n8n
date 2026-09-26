@@ -164,7 +164,10 @@ check('motion pack: unknown refused -> null', mp.normalizeMotionPack('flashy'), 
 check('motion pack: the four ids pass', ['classic', 'editorial', 'punch', 'lowerThird'].map(mp.normalizeMotionPack), ['classic', 'editorial', 'punch', 'lowerThird']);
 check('motion pack: case matters (the render reads lowerThird exactly)', mp.normalizeMotionPack('lowerthird'), null);
 check('motion pack: Story defaults to editorial', mp.defaultMotionPackFor('story'), 'editorial');
-check('motion pack: every other category defaults to classic', ['documentary', 'cinematic', 'kids', null].map(mp.defaultMotionPackFor), ['classic', 'classic', 'classic', 'classic']);
+check('motion pack: every other category defaults to classic', ['documentary', 'cinematic', null].map(mp.defaultMotionPackFor), ['classic', 'classic', 'classic']);
+check('motion pack: Kids story defaults to kidsSticker', mp.defaultMotionPackFor('kids'), 'kidsSticker');
+check('motion pack: the kids styles pass', ['kidsPill', 'kidsBounce', 'kidsSticker'].map(mp.normalizeMotionPack), ['kidsPill', 'kidsBounce', 'kidsSticker']);
+check('motion pack: kids styles offered on Kids story only', [mp.motionPacksFor('kids').some((p) => p.id === 'kidsSticker'), mp.motionPacksFor('story').some((p) => p.id === 'kidsSticker')], [true, false]);
 
 // --- graphic styles (lib/graphic-styles.ts) --------------------------------------
 // Same five ids as remotion/src/graphics/styles.ts and the two n8n nodes in

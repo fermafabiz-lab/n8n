@@ -31,4 +31,5 @@ export function captionColour(body: RenderBody, projectFields: Fields | undefine
 }
 
 /** The packs the render knows (remotion/src/motion/packs.ts). */
-export const MOTION_PACKS = ['classic', 'editorial', 'punch', 'lowerThird'];
+// The three Kids story caption styles since 2026-09-26 (db/port/kids-captions/).
+export const MOTION_PACKS = ['classic', 'editorial', 'punch', 'lowerThird', 'kidsPill', 'kidsBounce', 'kidsSticker'];

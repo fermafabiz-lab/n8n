@@ -36,7 +36,8 @@ const id = (...a) => packFor(...a).id;
 check(id(undefined, undefined) === 'classic', 'no pick, no category → classic (every film made before this)');
 check(id(undefined, 'story') === 'editorial', 'a Story film with no pick → editorial (the producer’s default)');
 check(id(undefined, 'Story') === 'editorial', 'category is read case-insensitively');
-for (const c of ['documentary', 'cinematic', 'kids', 'something-new']) {
+check(id(undefined, 'kids') === 'kidsSticker', 'a Kids story film with no pick → kidsSticker (the producer’s default)');
+for (const c of ['documentary', 'cinematic', 'something-new']) {
 	check(id(undefined, c) === 'classic', `${c} with no pick → classic`);
 }
 for (const p of ['classic', 'editorial', 'punch', 'lowerThird']) {

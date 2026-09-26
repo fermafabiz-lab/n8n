@@ -41,11 +41,14 @@ const server = http.createServer(async (req, res) => {
     fake.submits.push(body);
     const step = fake.submitScript.length ? fake.submitScript.shift() : 'ok';
     if (step === '429') return json(429, { error: 'Too many requests' });
-    const id = `job-${++fake.n}`;
+    // Shaped like a real useapi job id: `:` and `@` in it, which must reach the poll unencoded.
+    const id = `j09261422${++fake.n}v-u2923-email:fermafabiz@gmail.com-bot:google-flow`;
     fake.jobs.set(id, [...(fake.jobScripts.shift() || ['running', 'done'])]);
     return json(200, { jobid: id });
   }
   if ((m = /^\/v1\/google-flow\/jobs\/(.+)$/.exec(url.pathname))) {
+    // As useapi does: an encoded id is refused.
+    if (/%40|%3A/i.test(req.url)) return json(400, { error: 'Invalid job ID format', code: 400 });
     const s = fake.jobs.get(m[1]);
     const step = s.length > 1 ? s.shift() : s[0];
     if (step === 'running') return json(200, { status: 'processing' });
@@ -121,7 +124,7 @@ await scenario('a clean take: n8n\'s submit body, polled, judged, stored, the sc
   assert.equal(judge.body.model, 'gpt-4o');
   const ingest = fake.requests.find((r) => r.path === '/api/media/ingest');
   assert.equal(ingest.body.field, 'video');
-  assert.equal(ingest.body.url, 'https://flow-content.google/video/job-' + fake.n + '.mp4');
+  assert.equal(ingest.body.url, `https://flow-content.google/video/j09261422${fake.n}v-u2923-email:fermafabiz@gmail.com-bot:google-flow.mp4`);
   const s = await sceneRow(id);
   assert.match(s.scene_final_url, /^https:\/\/site\.example\/media\/.+\/video\//);
   assert.deepEqual({ ...s, scene_final_url: undefined }, { scene_final_url: undefined, video_approved: false, regen_video: false, production_status: 'Așteaptă Aprobare Video', image_approved: false, note: null });

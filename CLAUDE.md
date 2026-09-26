@@ -864,7 +864,13 @@ expected and harmless for an app touching only its own Drive.
   Bible Model` search the web with context **high**, which n8n never sees —
   the searches and the pages they read are NOT in the ledger, and the page
   says so. Pinned by `check:openai-usage` (77) and
-  `db/port/openai-usage/browser/drive.mjs` (37).
+  `db/port/openai-usage/browser/drive.mjs` (37). **Live since deploy #199**
+  (merge `95aa3e0`, served proven by 17699); first read 17704 (291 runs, 501
+  calls). **The first answer**: since the 2026-09-24 top-up n8n's films spent
+  **$2.11 in 85 calls**, 48% of it `Segment Chapter Into Scenes`; a measured
+  web-search research call is **$0.073** (17707), so searches add cents, not
+  dollars. If the account fell by much more, it was not this pipeline — look
+  for another key on the same OpenAI organisation (needs *Usage → Read*).
 - **Hands-off is chosen step by step since 2026-09-24**
   (`db/port/hands-off-steps/README.md`, lesson in `docs/lessons-site.md` under
   "Hands-off mode"). The brief picks which gates sign themselves off — Script,

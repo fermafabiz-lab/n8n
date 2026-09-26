@@ -99,6 +99,35 @@ A pie past six slices cannot be read; the step table carries the detail.
   keyboard and pointer answers, the table twins, 390 px dark, and the
   several-films restart (every run stopped once, both films resumed).
 
+## Live, and the first answer (2026-09-26)
+
+- **Deploy #199** (merge `95aa3e0`): build 18:15:03 → 18:17:02, `web` restarted
+  by 18:17:15 UTC; execution **17699** found `--series-1:` (a token only the new
+  globals.css has) in `/_next/static/css/c7279cbce98830d2.css`, the stylesheet
+  /login links.
+- **The first read** (execution **17704**, `read-ledger.workflow.js`): 291 runs
+  in 46 s, 501 OpenAI calls, done — every run n8n still keeps, back to
+  2026-09-13.
+- **Since the top-up** (the hourly check read "out" at 11:27:57 and "ok" at
+  11:34:07 UTC on 2026-09-24), execution **17706**: **$2.11 over 85 calls**
+  (35 measured), 283K tokens in, 94K out. `Segment Chapter Into Scenes` is
+  **$1.01 of it — 48%** (12 calls, 53K output tokens: every scene's image and
+  motion prompts are written there), then the story bible $0.23, the narration
+  editor $0.12, research $0.10, the outline $0.09. Per film $0.37-0.53. Per day
+  $1.13 (24th), $0.61, $0.37.
+- **What a web search really adds** (execution **17707**,
+  `probe-web-search.workflow.js`: the Research prompt shape on "How Rome fed a
+  million people", gpt-5.4, `search_context_size: high`, straight to the
+  Responses API): 2 searches (4 queries each), 12,840 tokens in (2,688 cached),
+  1,780 out (216 reasoning) — **$0.073 for the whole call**, of which $0.02 the
+  searches. So the part n8n cannot see is cents per film, not dollars: the
+  eleven web-search calls since the top-up add roughly $0.5 to the $2.11.
+- **So n8n's films explain about $2.5-3 since the top-up.** If the account
+  fell by much more than that, the difference was not spent by this pipeline:
+  another key or app on the same OpenAI organisation is the next suspect, and
+  only OpenAI can say which — *Usage → Read* on the key, then the usage
+  endpoint grouped by `api_key_id`, or the dashboard's Usage page by key.
+
 ## The restart door takes several films (same change)
 
 `POST /api/ops/restart {"projectIds": [...]}` → `restartProductions`: one Pause,

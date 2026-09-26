@@ -1,0 +1,314 @@
+[
+ {
+  "type": "addNode",
+  "node": {
+   "name": "Ask Site: Produce (Batch)",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    -612,
+    -56
+   ],
+   "notes": "Asks the site who produces this film (PRODUCTION_ENGINE, lib/production-engine.ts). A failure falls through to n8n.",
+   "parameters": {
+    "method": "POST",
+    "url": "http://web:3000/api/ops/produce",
+    "authentication": "genericCredentialType",
+    "genericAuthType": "httpHeaderAuth",
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={{ JSON.stringify({ projectId: $(\"Create Project in Airtable\").item.json.id, Voice_ID: $('New Project Webhook').isExecuted ? ($('Normalize Webhook Input').first().json.voice || 'elevenlabs_hpp4J3VqNfWAUOO0d1Us') : 'elevenlabs_hpp4J3VqNfWAUOO0d1Us', Aspect_Ratio: $('New Project Webhook').isExecuted ? ($('Normalize Webhook Input').first().json.aspect || '16:9') : '16:9' }) }}",
+    "options": {
+     "timeout": 20000
+    }
+   },
+   "credentials": {
+    "httpHeaderAuth": {
+     "id": "8kpY42LmZaBYBzfY",
+     "name": "HOV Media Ingest"
+    }
+   }
+  }
+ },
+ {
+  "type": "setNodeSettings",
+  "nodeName": "Ask Site: Produce (Batch)",
+  "settings": {
+   "onError": "continueRegularOutput",
+   "alwaysOutputData": true
+  }
+ },
+ {
+  "type": "addNode",
+  "node": {
+   "name": "Engine Produces? (Batch)",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2.3,
+   "position": [
+    -492,
+    -56
+   ],
+   "notes": "true = the engine queued the production run (hov.production_job): n8n stops here. false = n8n produces, as before.",
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "loose",
+      "version": 3
+     },
+     "conditions": [
+      {
+       "id": "engine-is-code-batch",
+       "leftValue": "={{ $json.engine === 'code' }}",
+       "rightValue": "",
+       "operator": {
+        "type": "boolean",
+        "operation": "true",
+        "singleValue": true
+       }
+      }
+     ],
+     "combinator": "and"
+    },
+    "options": {}
+   }
+  }
+ },
+ {
+  "type": "removeConnection",
+  "source": "Check Script Status",
+  "sourceIndex": 0,
+  "target": "Execute Media Generation (Batch)",
+  "targetIndex": 0
+ },
+ {
+  "type": "addConnection",
+  "source": "Check Script Status",
+  "sourceIndex": 0,
+  "target": "Ask Site: Produce (Batch)",
+  "targetIndex": 0
+ },
+ {
+  "type": "addConnection",
+  "source": "Ask Site: Produce (Batch)",
+  "sourceIndex": 0,
+  "target": "Engine Produces? (Batch)",
+  "targetIndex": 0
+ },
+ {
+  "type": "addConnection",
+  "source": "Engine Produces? (Batch)",
+  "sourceIndex": 1,
+  "target": "Execute Media Generation (Batch)",
+  "targetIndex": 0
+ },
+ {
+  "type": "addNode",
+  "node": {
+   "name": "Ask Site: Produce (Resume)",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    -2116,
+    504
+   ],
+   "notes": "Asks the site who produces this film (PRODUCTION_ENGINE, lib/production-engine.ts). A failure falls through to n8n.",
+   "parameters": {
+    "method": "POST",
+    "url": "http://web:3000/api/ops/produce",
+    "authentication": "genericCredentialType",
+    "genericAuthType": "httpHeaderAuth",
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={{ JSON.stringify({ projectId: $('Fetch Project For Resume').first().json.id, Voice_ID: $('Fetch Project For Resume').first().json.fields['Voice ID'] || 'elevenlabs_hpp4J3VqNfWAUOO0d1Us', Aspect_Ratio: $('Fetch Project For Resume').first().json.fields['Format'] || '16:9' }) }}",
+    "options": {
+     "timeout": 20000
+    }
+   },
+   "credentials": {
+    "httpHeaderAuth": {
+     "id": "8kpY42LmZaBYBzfY",
+     "name": "HOV Media Ingest"
+    }
+   }
+  }
+ },
+ {
+  "type": "setNodeSettings",
+  "nodeName": "Ask Site: Produce (Resume)",
+  "settings": {
+   "onError": "continueRegularOutput",
+   "alwaysOutputData": true
+  }
+ },
+ {
+  "type": "addNode",
+  "node": {
+   "name": "Engine Produces? (Resume)",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2.3,
+   "position": [
+    -1996,
+    504
+   ],
+   "notes": "true = the engine queued the production run (hov.production_job): n8n stops here. false = n8n produces, as before.",
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "loose",
+      "version": 3
+     },
+     "conditions": [
+      {
+       "id": "engine-is-code-resume",
+       "leftValue": "={{ $json.engine === 'code' }}",
+       "rightValue": "",
+       "operator": {
+        "type": "boolean",
+        "operation": "true",
+        "singleValue": true
+       }
+      }
+     ],
+     "combinator": "and"
+    },
+    "options": {}
+   }
+  }
+ },
+ {
+  "type": "removeConnection",
+  "source": "Fetch Project For Resume",
+  "sourceIndex": 0,
+  "target": "Execute Media Generation (Resume)",
+  "targetIndex": 0
+ },
+ {
+  "type": "addConnection",
+  "source": "Fetch Project For Resume",
+  "sourceIndex": 0,
+  "target": "Ask Site: Produce (Resume)",
+  "targetIndex": 0
+ },
+ {
+  "type": "addConnection",
+  "source": "Ask Site: Produce (Resume)",
+  "sourceIndex": 0,
+  "target": "Engine Produces? (Resume)",
+  "targetIndex": 0
+ },
+ {
+  "type": "addConnection",
+  "source": "Engine Produces? (Resume)",
+  "sourceIndex": 1,
+  "target": "Execute Media Generation (Resume)",
+  "targetIndex": 0
+ },
+ {
+  "type": "addNode",
+  "node": {
+   "name": "Ask Site: Produce (Restart)",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    -1092,
+    824
+   ],
+   "notes": "Asks the site who produces this film (PRODUCTION_ENGINE, lib/production-engine.ts). A failure falls through to n8n.",
+   "parameters": {
+    "method": "POST",
+    "url": "http://web:3000/api/ops/produce",
+    "authentication": "genericCredentialType",
+    "genericAuthType": "httpHeaderAuth",
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={{ JSON.stringify({ projectId: $('Fetch Project For Restart').first().json.id, Voice_ID: $('Fetch Project For Restart').first().json.fields['Voice ID'] || 'elevenlabs_hpp4J3VqNfWAUOO0d1Us', Aspect_Ratio: $('Fetch Project For Restart').first().json.fields['Format'] || '16:9' }) }}",
+    "options": {
+     "timeout": 20000
+    }
+   },
+   "credentials": {
+    "httpHeaderAuth": {
+     "id": "8kpY42LmZaBYBzfY",
+     "name": "HOV Media Ingest"
+    }
+   }
+  }
+ },
+ {
+  "type": "setNodeSettings",
+  "nodeName": "Ask Site: Produce (Restart)",
+  "settings": {
+   "onError": "continueRegularOutput",
+   "alwaysOutputData": true
+  }
+ },
+ {
+  "type": "addNode",
+  "node": {
+   "name": "Engine Produces? (Restart)",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2.3,
+   "position": [
+    -972,
+    824
+   ],
+   "notes": "true = the engine queued the production run (hov.production_job): n8n stops here. false = n8n produces, as before.",
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "loose",
+      "version": 3
+     },
+     "conditions": [
+      {
+       "id": "engine-is-code-restart",
+       "leftValue": "={{ $json.engine === 'code' }}",
+       "rightValue": "",
+       "operator": {
+        "type": "boolean",
+        "operation": "true",
+        "singleValue": true
+       }
+      }
+     ],
+     "combinator": "and"
+    },
+    "options": {}
+   }
+  }
+ },
+ {
+  "type": "removeConnection",
+  "source": "Check Script Status (Restart)",
+  "sourceIndex": 0,
+  "target": "Execute Media Generation (Restart)",
+  "targetIndex": 0
+ },
+ {
+  "type": "addConnection",
+  "source": "Check Script Status (Restart)",
+  "sourceIndex": 0,
+  "target": "Ask Site: Produce (Restart)",
+  "targetIndex": 0
+ },
+ {
+  "type": "addConnection",
+  "source": "Ask Site: Produce (Restart)",
+  "sourceIndex": 0,
+  "target": "Engine Produces? (Restart)",
+  "targetIndex": 0
+ },
+ {
+  "type": "addConnection",
+  "source": "Engine Produces? (Restart)",
+  "sourceIndex": 1,
+  "target": "Execute Media Generation (Restart)",
+  "targetIndex": 0
+ }
+]

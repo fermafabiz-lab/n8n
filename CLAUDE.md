@@ -595,15 +595,33 @@ expected and harmless for an app touching only its own Drive.
     - 6c: the setup, meaning the sheets, the plates and the replication
       (`setup.ts`).
     - Each has its own `check-produce-*.mjs` in `npm run check`.
-  - **6d is BUILT, not live:**
-    - `db/018` `production_job`, the worker `src/produce/worker.ts`, and
-      `lib/production-engine.ts` with `/api/ops/produce` on the site
-      (`PRODUCTION_ENGINE`, unset = n8n).
-    - Eight whole-film scenarios run in `engine/test/produce.test.mjs`,
-      including a restart mid-clip that resumes the job in flight.
-    - Owed: the merge, db/018 applied, and the orchestrator asking
-      `/api/ops/produce` before each `Execute Media Generation*` (see the plan).
-    - Then 6e: one real film on the engine, then the flip.
+  - **6d is LIVE and INERT since 2026-09-26** (merge `6a583cd`).
+    - **What exists:** `db/018` `production_job` (applied in execution
+      17654), the worker `src/produce/worker.ts`, and on the site
+      `lib/production-engine.ts` plus `/api/ops/produce`.
+    - **The switch is `PRODUCTION_ENGINE`.** It is unset, which means n8n
+      produces every film exactly as before.
+    - **The orchestrator asks first.** Before each `Execute Media
+      Generation*` it posts to `/api/ops/produce` (`0e7f1a93`, rollback
+      `55ef60c7`, `db/port/production-engine/`), and an If stops n8n when
+      the answer is `engine: "code"`.
+    - **Proved on the live system:**
+      - the route answers `{engine: "n8n"}` with the key and 307 without it
+        (execution 17655);
+      - the engine's production loop reads the table every 2 s (the
+        `pg_stat_user_tables` scan count rose 6 in 4 s, executions
+        17671/17672).
+    - **Tests:** eight whole-film scenarios run in
+      `engine/test/produce.test.mjs`, including a restart mid-clip that
+      resumes the job in flight.
+    - **The engine deploy's first try died on a GHCR manifest PUT** (16 min
+      hanging, then 400). That was GitHub's fault; a re-run passed.
+    - **Owed, 6e:** one real film on the engine, started with
+      `POST /api/ops/produce {projectId, engine: "code"}` or by setting the
+      Variable, watched through every gate. Then the flip.
+    - **Unproved:** that the three `Ask Site` nodes carry their credential.
+      It is redacted in the API, and a missing one would read as `n8n`, so
+      the first `code` film proves it.
   - **A LIVE n8n bug found by the port: `Save Flow Refs` replaces
     `editing_options.flowRefs` instead of adding to it** (`jsonb ||` works
     on the whole key). `Replicate Prep` skips the copies already stored. So

@@ -638,6 +638,31 @@ expected and harmless for an app touching only its own Drive.
     harmless to a single execution and costs re-uploads across executions.
     The engine merges instead. n8n is left as it is until the cutover.
 
+- **The music library lives on the box since 2026-09-26, not in Drive**
+  (the producer's call, to take n8n out).
+  - **Where it is:** `db/019` `hov.music_track` (applied in execution
+    17715) holds the list, and the bytes are under `/media/music/`.
+  - **The site** (`platform/lib/music.ts`, `/api/music`) lists from the
+    table. The Final touches picker plays each track directly and has an
+    upload row (file + tone group, `/api/music/upload`).
+  - **The engine's render** (`dbMusic` in `engine/src/musicSource.ts`) picks
+    from the table and hands Railway the file Caddy serves. The pick rule is
+    unchanged and still golden-checked.
+  - **Copied tracks keep their DRIVE ids,** so films that pinned a track
+    still find it.
+  - **An empty table falls back to n8n's Drive listing,** and a pin the
+    table lacks still goes through Railway's `/media?id=` Drive proxy.
+  - **Copied:** all 46 Drive tracks in 8 groups, 201 MB, on 2026-09-26
+    18:49 (execution 17720, 46/46). The smallest is 2 MB, so none is a saved
+    error page, and one track fetched back through Caddy came as
+    `audio/mpeg`, 3.59 MB.
+  - **How the copy was made:** a throwaway calling
+    `POST /api/music/import` (x-hov-key) once per track. n8n's "Music
+    Library" workflow (`xBRdtrArbbi89yvX`) is now read by nothing but that
+    fallback. Retire it after a few renders.
+  - **New music goes in through the site's upload,** not the Drive folder
+    (nothing syncs Drive any more).
+
 - **Clip regeneration can be made by the engine** (2026-09-25,
   `docs/plans/engine-media-generation.md`, phase 4; site Variable
   `VIDEO_ENGINE=code`, engine deploy `f6092b6`).

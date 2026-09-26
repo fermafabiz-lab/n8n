@@ -394,8 +394,12 @@ the full entry in the file named:
   behind the n8n→site key — and `db/port/ops-restart/` has the throwaway that
   calls it. **Judge it by the new executions**: Pause stops every running
   execution, the caller included, so the throwaway may come back canceled
-  while the restart completes; and it is one film per call, as the buttons
-  have always been. **Delete stops every running execution too**
+  while the restart completes. **Several films go in ONE call**
+  (`{"projectIds": [...]}`, since 2026-09-26): one call per film cannot work —
+  the second call's Pause stops the run the first call's Resume started, and
+  its Resume refuses because that run is alive. `restartProductions` pauses
+  once, resumes the first film with every check and the rest with the bare
+  webhook. **Delete stops every running execution too**
   (`deleteProjects`: n8n cannot map an execution to a film). So deleting one
   film cancels every other film's run: on 2026-09-24 at 09:23:30, deleting a
   film at its scene gate also stopped a test film parked at its own. When
@@ -841,6 +845,32 @@ expected and harmless for an app touching only its own Drive.
   **Owed**: the Usage permission, auto recharge on OpenAI (the
   only real fix for "empty mid-film"), and the useapi token moved into a
   credential — it is now in this workflow's three nodes too.
+  **Since 2026-09-26 OpenAI is counted CALL BY CALL** — "what used the
+  credits after the top-up, and how much" (`db/port/openai-usage/README.md`).
+  OpenAI cannot say (its log needs a browser session, its usage wants
+  `api.usage.read`, and it counts per model, never per step), so the SITE reads
+  every finished n8n execution once with the n8n API key only it holds
+  (`lib/openai-collect.ts`) and stores each OpenAI call — the step that asked,
+  the film, the model, the tokens, the list price — in **`hov.openai_call`**
+  (`db/019`, applied in execution 17697). Hourly from API Credits' new
+  **Read OpenAI Ledger** node (version `2cbef392`, 120 s a run: the workflow's
+  `executionTimeout` is 180) and on "⟳ Update now". The usage page puts OpenAI
+  first, with a "Since the OpenAI top-up" period and two pies (by pipeline
+  step, by model), and every chart on it is titled "Service — what, per what".
+  **Two things n8n records wrong or not at all**: an agent with an output
+  parser answers through a tool call, so n8n counts its answer as ZERO tokens
+  (the ledger measures it off the agent's output instead — at $15 per million
+  output tokens that zero hid most of the cost); and `Research Model` / `Story
+  Bible Model` search the web with context **high**, which n8n never sees —
+  the searches and the pages they read are NOT in the ledger, and the page
+  says so. Pinned by `check:openai-usage` (77) and
+  `db/port/openai-usage/browser/drive.mjs` (37). **Live since deploy #199**
+  (merge `95aa3e0`, served proven by 17699); first read 17704 (291 runs, 501
+  calls). **The first answer**: since the 2026-09-24 top-up n8n's films spent
+  **$2.11 in 85 calls**, 48% of it `Segment Chapter Into Scenes`; a measured
+  web-search research call is **$0.073** (17707), so searches add cents, not
+  dollars. If the account fell by much more, it was not this pipeline — look
+  for another key on the same OpenAI organisation (needs *Usage → Read*).
 - **Hands-off is chosen step by step since 2026-09-24**
   (`db/port/hands-off-steps/README.md`, lesson in `docs/lessons-site.md` under
   "Hands-off mode"). The brief picks which gates sign themselves off — Script,

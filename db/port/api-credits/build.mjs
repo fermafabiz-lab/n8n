@@ -68,7 +68,7 @@ const lines = [
   // SITE, which holds the n8n API key the reading needs. This asks it to read
   // whatever n8n finished since the last hour. Not on the webhook path, whose
   // answer is `Result`'s (responseMode: lastNode).
-  `const ledger = node({ type: 'n8n-nodes-base.httpRequest', version: 4.4, config: { name: 'Read OpenAI Ledger', onError: 'continueRegularOutput', parameters: { method: 'POST', url: 'http://web:3000/api/insights/openai', authentication: 'genericCredentialType', genericAuthType: 'httpHeaderAuth', sendBody: true, contentType: 'json', specifyBody: 'json', jsonBody: '{"budgetMs":240000}', options: { timeout: 300000, response: { response: { fullResponse: true, neverError: true } } } }, credentials: ${KEY}, position: [240, 80] }, output: [{}] });`,
+  `const ledger = node({ type: 'n8n-nodes-base.httpRequest', version: 4.4, config: { name: 'Read OpenAI Ledger', onError: 'continueRegularOutput', parameters: { method: 'POST', url: 'http://web:3000/api/insights/openai', authentication: 'genericCredentialType', genericAuthType: 'httpHeaderAuth', sendBody: true, contentType: 'json', specifyBody: 'json', jsonBody: '{"budgetMs":120000}', options: { timeout: 150000, response: { response: { fullResponse: true, neverError: true } } } }, credentials: ${KEY}, position: [240, 80] }, output: [{}] });`,
   "",
   "export default workflow('api-credits', 'API Credits')",
   "  .add(hourly)",

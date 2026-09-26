@@ -642,6 +642,11 @@ expected and harmless for an app touching only its own Drive.
   - **Still on n8n:** the batch's own first images (`Build Image Request`,
     account routing, the consistency judge); they move with the production
     pass.
+  - **First real regeneration** (2026-09-26, Rome scene 5, media_job 4):
+    **55 s** from click to picture, 9:16. It carried the full reference set:
+    the cast sheet ("praefectus annonae"), the object sheet (the grain sack),
+    the set plate (Ostia river port) and the previous frame as palette —
+    exactly what the batch would attach.
 
 - **Voice takes are made by the engine since 2026-09-25**
   (`docs/plans/engine-media-generation.md`, phase 2; site Variable

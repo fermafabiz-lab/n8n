@@ -588,9 +588,15 @@ expected and harmless for an app touching only its own Drive.
     - 6c: the setup, meaning the sheets, the plates and the replication
       (`setup.ts`).
     - Each has its own `check-produce-*.mjs` in `npm run check`.
-  - **Owed:** 6d is the `production_job` worker plus
-    `/api/ops/produce` behind `PRODUCTION_ENGINE`. 6e is a shadow run on a
-    real film, then the flip.
+  - **6d is BUILT, not live:**
+    - `db/018` `production_job`, the worker `src/produce/worker.ts`, and
+      `lib/production-engine.ts` with `/api/ops/produce` on the site
+      (`PRODUCTION_ENGINE`, unset = n8n).
+    - Eight whole-film scenarios run in `engine/test/produce.test.mjs`,
+      including a restart mid-clip that resumes the job in flight.
+    - Owed: the merge, db/018 applied, and the orchestrator asking
+      `/api/ops/produce` before each `Execute Media Generation*` (see the plan).
+    - Then 6e: one real film on the engine, then the flip.
   - **A LIVE n8n bug found by the port: `Save Flow Refs` replaces
     `editing_options.flowRefs` instead of adding to it** (`jsonb ||` works
     on the whole key). `Replicate Prep` skips the copies already stored. So

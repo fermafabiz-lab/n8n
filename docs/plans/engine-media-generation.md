@@ -149,6 +149,35 @@ order the batch runs in.
        - a worker that walks setup → voices → images → asset gate → clips → video gate → Finalizat → settings gate;
        - resume from any phase, Pause = this film only;
        - the orchestrator's two `Execute Media Generation*` nodes replaced by a call to `/api/ops/produce` behind a per-film flag (`PRODUCTION_ENGINE`), exactly as Final Assembly moved.
+       - **BUILT 2026-09-26, not live**:
+         - **The run is a row.** `db/018_production_job.sql` holds `stage`, `pass` and a `state` that carries everything n8n kept in an execution and in static data. That includes the pool with its jobs in flight at Google, so a restart resumes them.
+         - **The worker** (`engine/src/produce/worker.ts`) walks the stages with the ported steps.
+           - Voices, and the regenerations the gates used to fire as webhooks, are `media_job` rows.
+           - Images are drawn inline, one at a time (the n-1 chain).
+           - Clips run serially or through the pool.
+           - It is started by `src/main.ts` only when db/018 is readable, so an engine deploy never waits on the migration.
+         - **The site.** `lib/production-engine.ts` plus `POST /api/ops/produce` answer the orchestrator with `{engine: "code" | "n8n"}` according to `PRODUCTION_ENGINE`.
+           - Under `code`, Resume queues a row.
+           - Pause stops THIS film's run.
+           - The project page counts an active run as "running".
+         - **Tests.** `engine/test/produce.test.mjs` runs 8 whole films against PGlite and a fake Flow / OpenAI / site, with the media worker beside it and a fake producer approving:
+           - serial;
+           - three accounts with the pool and replication;
+           - the VP ladder;
+           - image rewrites and a strict re-roll;
+           - a throttle;
+           - held gates dispatching a regeneration;
+           - **a restart mid-clip that polls the job in flight instead of submitting it again**;
+           - the settings gate sending a pass back.
+         - **Deliberate differences from n8n:**
+           - **The n-1 image** is the previous BUILD's decode. n8n indexes Decode and Build by the same `$runIndex`, and the two drift apart after a failed Generate or a cooldown retry.
+           - **Submit Video's "latest run" overrides** (end frame, cooldown, motion re-roll) are kept as the latest of each, as `.first()` reads them.
+           - **The batch's first voice take** keeps `Observații Scenă`, as AB Write Voice does.
+           - **A failed voice take** no longer kills the run. The gate simply waits for it.
+         - **Owed for 6d to be live:**
+           1. Merge to the trunk (site + engine deploy).
+           2. Apply db/018.
+           3. In the orchestrator, an HTTP node before each of the three `Execute Media Generation*` nodes (Batch, Resume, Restart). It calls `/api/ops/produce` with `onError: continueRegularOutput`, and an If on `$json.engine === 'code'` stops there. A 404 or error falls through to n8n, so the change is inert until `PRODUCTION_ENGINE=code`.
      - **6e — shadow then cutover.**
        - The engine computes the image and clip requests for a real film's scenes, and they are diffed against what n8n sent (the executions keep them).
        - Then one real film end to end on the engine, watched.

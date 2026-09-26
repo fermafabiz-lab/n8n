@@ -117,7 +117,13 @@ check(
   [],
 );
 check("restart = pause + resume, so it inherits both stamps", /pauseProduction\(projectId\)[\s\S]*resumeProject\(projectId\)/.test(fnBody(actions, "restartProduction")), true);
-check("a failed stamp never fails the action", (actions.match(/touchProjectActivity\(projectId\)\.catch\(\(\) => \{\}\)/g) ?? []).length, 3);
+// Every stamp, however many there are (the engine's Pause and Resume added two
+// on 2026-09-26): a stamp without its catch would fail the action it decorates.
+{
+  const stamps = (actions.match(/touchProjectActivity\(projectId\)/g) ?? []).length;
+  const caught = (actions.match(/touchProjectActivity\(projectId\)\.catch\(\(\) => \{\}\)/g) ?? []).length;
+  check("a failed stamp never fails the action", [stamps >= 3, caught], [true, stamps]);
+}
 
 check("the grid orders the WHOLE library before scoping (tabs and playlists follow)", /const scoped = inActive \? ordered\.filter/.test(grid), true);
 check("…and holds still while pointing or selecting", /const holding = pointing \|\| manage;/.test(grid), true);

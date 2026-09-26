@@ -29,7 +29,9 @@ export function middleware(req: NextRequest) {
       // takes the key and nothing else (app/api/ops/restart/route.ts).
       req.nextUrl.pathname === "/api/ops/restart" ||
       // Its sibling for the final render (app/api/ops/assemble/route.ts).
-      req.nextUrl.pathname === "/api/ops/assemble") &&
+      req.nextUrl.pathname === "/api/ops/assemble" ||
+      // And for the production run: the orchestrator asks who produces a film.
+      req.nextUrl.pathname === "/api/ops/produce") &&
     process.env.MEDIA_INGEST_KEY &&
     req.headers.get("x-hov-key") === process.env.MEDIA_INGEST_KEY
   ) {

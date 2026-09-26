@@ -357,6 +357,13 @@ export default async function ProductionRoom({
       // n8n API unreachable — fall back to showing Resume.
     }
   }
+  // A production run on the engine names its film, so it counts here even
+  // when n8n has nothing running (lib/production-engine.ts).
+  {
+    const { latestProductionJob, isProducing, asExecution } = await import("@/lib/production-engine");
+    const run = await latestProductionJob(id).catch(() => null);
+    if (run && isProducing(run)) aliveNow = [...(aliveNow ?? []), asExecution(run)];
+  }
   const hasRunning = (aliveNow?.length ?? 0) > 0;
 
   // The render reports nothing while it works, so the page asks n8n directly

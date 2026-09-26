@@ -63,13 +63,15 @@ export async function driveVoice(job: MediaJob, deps: VoiceDeps): Promise<'done'
 
     const stored = await storeBytes({ buf: audio, dir: `voices/${job.scene_id}`, ext: 'mp3', mediaRoot: config.mediaRoot, mediaBaseUrl: config.mediaBaseUrl });
     if (!stored.url) throw new Error('MEDIA_BASE_URL is not set: the take was stored but has no public URL');
-    // The same fields VR Write Voice writes.
+    // The same fields VR Write Voice writes — or, for a production run's first
+    // take, AB Write Voice, which leaves the note alone: it may hold the
+    // producer's correction for the image or the clip.
     await writeScene(db, job.scene_id, {
       'Voiceover URL': stored.url,
       'Status Producție Scenă': 'Așteaptă Aprobare Voce',
       'Aprobare Voce': false,
       'Regenerează Voce': false,
-      'Observații Scenă': '',
+      ...(job.request?.batch ? {} : { 'Observații Scenă': '' }),
     });
     await finishMedia(db, job, config.workerId, 'done', { result: { url: stored.url, bytes: stored.bytes, voice_id: pick.voice_id, multi: pick.multi, pinned: job.request?.voice_id ? true : false } });
     log('voice done', { url: stored.url, bytes: stored.bytes, voice: pick.voice_id, multi: pick.multi });

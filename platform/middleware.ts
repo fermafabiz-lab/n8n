@@ -31,7 +31,10 @@ export function middleware(req: NextRequest) {
       // Its sibling for the final render (app/api/ops/assemble/route.ts).
       req.nextUrl.pathname === "/api/ops/assemble" ||
       // And for the production run: the orchestrator asks who produces a film.
-      req.nextUrl.pathname === "/api/ops/produce") &&
+      req.nextUrl.pathname === "/api/ops/produce" ||
+      // The hourly read of finished executions into the OpenAI ledger, called
+      // by n8n's "API Credits" workflow (app/api/insights/openai/route.ts).
+      req.nextUrl.pathname === "/api/insights/openai") &&
     process.env.MEDIA_INGEST_KEY &&
     req.headers.get("x-hov-key") === process.env.MEDIA_INGEST_KEY
   ) {

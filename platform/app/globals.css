@@ -145,6 +145,21 @@
   --accent-a28: light-dark(rgba(122, 79, 214, 0.28), rgba(144, 112, 224, 0.36));
   --accent-cast: 0 8px 20px rgba(122, 79, 214, 0.34);
 
+  /* Chart series — identity, never status (a series is "which one", not
+     "good" or "bad"). The first six slots of the dataviz reference palette,
+     in its order, because the ORDER is what keeps neighbours apart for
+     colour-blind eyes; re-validated on these two card surfaces (#f4f4f7 /
+     #26262d) on 2026-09-26: every adjacent pair passes. By day four of them
+     sit under 3:1 on the card, so a chart using them always shows the
+     values in words beside it (the legend) and as a table. Used by the
+     usage page's pies (app/admin/insights/Donut.tsx). */
+  --series-1: light-dark(#2a78d6, #3987e5);
+  --series-2: light-dark(#eb6834, #d95926);
+  --series-3: light-dark(#1baf7a, #199e70);
+  --series-4: light-dark(#eda100, #c98500);
+  --series-5: light-dark(#e87ba4, #d55181);
+  --series-6: light-dark(#008300, #008300);
+
   /* Status. The dark system's #1f9d63 / #d8483d / #2f6bd6 were tuned to glow
      on black and go chalky on light; these are the same signals at light-ground
      contrast, and the night values lift them back (5.8 / 7.4 / 6.0 on the

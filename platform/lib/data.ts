@@ -1665,3 +1665,13 @@ export async function getScriptsWritten(days?: number): Promise<{ scripts: numbe
   if (USE_PG) return pgBackend.getScriptsWritten(days);
   return { scripts: 0, films: 0 };
 }
+
+export async function getOpenAiLedger(sinceMs: number): Promise<import("./data/postgres").OpenAiLedger> {
+  if (USE_PG) return pgBackend.getOpenAiLedger(sinceMs);
+  return { ready: false, groups: [], scanned: { executions: 0, lastScan: null, oldestRun: null } };
+}
+
+export async function getOpenAiTopUp(): Promise<{ outAt: string; okAt: string } | null> {
+  if (USE_PG) return pgBackend.getOpenAiTopUp();
+  return null;
+}

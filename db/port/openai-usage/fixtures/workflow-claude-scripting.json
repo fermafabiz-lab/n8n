@@ -1,0 +1,917 @@
+{
+ "_about": "The node names and types of Claude Scripting (gkEtGMecv4TC3ZHp) as published on 2026-09-26, parameters reduced to what the ledger reads (model, web search, URL).",
+ "id": "gkEtGMecv4TC3ZHp",
+ "name": "Claude Scripting",
+ "nodes": [
+  {
+   "name": "Receive Project Data",
+   "type": "n8n-nodes-base.executeWorkflowTrigger",
+   "parameters": {}
+  },
+  {
+   "name": "Story Bible Model",
+   "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+   "parameters": {
+    "model": {
+     "__rl": true,
+     "value": "gpt-5.4",
+     "mode": "list",
+     "cachedResultName": "gpt-5.4"
+    },
+    "builtInTools": {
+     "webSearch": {
+      "searchContextSize": "high"
+     }
+    }
+   }
+  },
+  {
+   "name": "Story Bible Parser",
+   "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+   "parameters": {}
+  },
+  {
+   "name": "Generate Story Bible",
+   "type": "@n8n/n8n-nodes-langchain.agent",
+   "parameters": {}
+  },
+  {
+   "name": "Save Story Bible",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Outline Model",
+   "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+   "parameters": {
+    "model": {
+     "__rl": true,
+     "value": "gpt-5.4",
+     "mode": "list",
+     "cachedResultName": "gpt-5.4"
+    },
+    "builtInTools": {}
+   }
+  },
+  {
+   "name": "Outline Parser",
+   "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+   "parameters": {}
+  },
+  {
+   "name": "Generate Outline",
+   "type": "@n8n/n8n-nodes-langchain.agent",
+   "parameters": {}
+  },
+  {
+   "name": "Narration Model",
+   "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+   "parameters": {
+    "model": {
+     "__rl": true,
+     "value": "gpt-5.4",
+     "mode": "list",
+     "cachedResultName": "gpt-5.4"
+    },
+    "builtInTools": {}
+   }
+  },
+  {
+   "name": "Combine Chapters",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Save Script To Airtable",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Split Chapters",
+   "type": "n8n-nodes-base.splitOut",
+   "parameters": {}
+  },
+  {
+   "name": "Create Chapter Records",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Segment Model",
+   "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+   "parameters": {
+    "model": {
+     "__rl": true,
+     "value": "gpt-5.4",
+     "mode": "list",
+     "cachedResultName": "gpt-5.4"
+    },
+    "builtInTools": {}
+   }
+  },
+  {
+   "name": "Segment Parser",
+   "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+   "parameters": {}
+  },
+  {
+   "name": "Segment Chapter Into Scenes",
+   "type": "@n8n/n8n-nodes-langchain.agent",
+   "parameters": {}
+  },
+  {
+   "name": "Split All Scenes",
+   "type": "n8n-nodes-base.splitOut",
+   "parameters": {}
+  },
+  {
+   "name": "Save scenes To Airtable1",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Wait For Scene Approval",
+   "type": "n8n-nodes-base.wait",
+   "parameters": {}
+  },
+  {
+   "name": "Check Scene Status",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Aggregate Scene Approval",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "If Scenes Approved",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Mark Project Approved",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Wait For Script Approval",
+   "type": "n8n-nodes-base.wait",
+   "parameters": {}
+  },
+  {
+   "name": "Fetch Script Status",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Check Script Approved",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Parse Approved From Airtable",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Hook Model",
+   "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+   "parameters": {
+    "model": {
+     "__rl": true,
+     "value": "gpt-4o",
+     "mode": "list",
+     "cachedResultName": "gpt-4o"
+    },
+    "builtInTools": {}
+   }
+  },
+  {
+   "name": "Hook Parser",
+   "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+   "parameters": {}
+  },
+  {
+   "name": "Generate Hook",
+   "type": "@n8n/n8n-nodes-langchain.agent",
+   "parameters": {}
+  },
+  {
+   "name": "Prepend Hook To Chapters",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Fetch Style Card",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ 'http://web:3000/api/style-refs"
+   }
+  },
+  {
+   "name": "Prepare Style Block",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "If Script Rejected",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Rewrite Script",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "https://api.openai.com/v1/chat/completions"
+   }
+  },
+  {
+   "name": "Update Script Record",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Research Model",
+   "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+   "parameters": {
+    "model": {
+     "__rl": true,
+     "mode": "list",
+     "value": "gpt-5.4",
+     "cachedResultName": "gpt-5.4"
+    },
+    "builtInTools": {
+     "webSearch": {
+      "searchContextSize": "high"
+     }
+    }
+   }
+  },
+  {
+   "name": "Research Tema",
+   "type": "@n8n/n8n-nodes-langchain.agent",
+   "parameters": {}
+  },
+  {
+   "name": "If Script Changed",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Rebuild Story Bible",
+   "type": "@n8n/n8n-nodes-langchain.agent",
+   "parameters": {}
+  },
+  {
+   "name": "Choose Bible",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Find Text Regens",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "If Any Text Regen",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Split Text Regens",
+   "type": "n8n-nodes-base.splitOut",
+   "parameters": {}
+  },
+  {
+   "name": "Rewrite Scene Text",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "https://api.openai.com/v1/chat/completions"
+   }
+  },
+  {
+   "name": "Parse Scene Rewrite",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Update Scene Text",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Genre Profile",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "No Research",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "If Needs Research",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Fetch Genre Profile",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ 'http://web:3000/api/at/Genre%20Profiles"
+   }
+  },
+  {
+   "name": "Scene Regen Webhook",
+   "type": "n8n-nodes-base.webhook",
+   "parameters": {}
+  },
+  {
+   "name": "Load Scene",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ 'http://web:3000/api/at/tblkNIyOUeLnKqako/' + $json.body.scene_id }}"
+   }
+  },
+  {
+   "name": "Load Project Bible",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ 'http://web:3000/api/at/tbl0zT7ilefOqE3xk/' + ($('Load Scene').first().json.fields['Project_ID'] || '') }}"
+   }
+  },
+  {
+   "name": "Rewrite Scene Standalone",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "https://api.openai.com/v1/chat/completions"
+   }
+  },
+  {
+   "name": "Write Scene Rewrite",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ 'http://web:3000/api/at/tblkNIyOUeLnKqako/' + $('Scene Regen Webhook').first().json.body.scene_id }}"
+   }
+  },
+  {
+   "name": "Mark Scene Regen Failed",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ 'http://web:3000/api/at/tblkNIyOUeLnKqako/' + $('Scene Regen Webhook').first().json.body.scene_id }}"
+   }
+  },
+  {
+   "name": "Image Regen Webhook",
+   "type": "n8n-nodes-base.webhook",
+   "parameters": {}
+  },
+  {
+   "name": "IR Load Scene",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ 'http://web:3000/api/at/tblkNIyOUeLnKqako/' + $json.body.scene_id }}"
+   }
+  },
+  {
+   "name": "IR Load Siblings",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ 'http://web:3000/api/at/tblkNIyOUeLnKqako"
+   }
+  },
+  {
+   "name": "IR Load Project",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ 'http://web:3000/api/at/tbl0zT7ilefOqE3xk/' + ($('IR Load Scene').first().json.fields['Project_ID'] || '') }}"
+   }
+  },
+  {
+   "name": "IR Build Request",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "IR Generate Image",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "https://api.useapi.net/v1/google-flow/images"
+   }
+  },
+  {
+   "name": "IR Write Image",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "http://web:3000/api/media/ingest"
+   }
+  },
+  {
+   "name": "IR Mark Rejected",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ 'http://web:3000/api/at/tblkNIyOUeLnKqako/' + $('Image Regen Webhook').first().json.body.scene_id }}"
+   }
+  },
+  {
+   "name": "Voice Regen Webhook",
+   "type": "n8n-nodes-base.webhook",
+   "parameters": {}
+  },
+  {
+   "name": "VR Load Scene",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ 'http://web:3000/api/at/tblkNIyOUeLnKqako/' + $json.body.scene_id }}"
+   }
+  },
+  {
+   "name": "VR Load Project",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ 'http://web:3000/api/at/tbl0zT7ilefOqE3xk/' + ($('VR Load Scene').first().json.fields['Project_ID'] || '') }}"
+   }
+  },
+  {
+   "name": "VR Find Audio Folder",
+   "type": "n8n-nodes-base.googleDrive",
+   "parameters": {}
+  },
+  {
+   "name": "VR Download Audio",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ $json.audio_url }}"
+   }
+  },
+  {
+   "name": "VR Upload Audio",
+   "type": "n8n-nodes-base.googleDrive",
+   "parameters": {}
+  },
+  {
+   "name": "VR Share Audio",
+   "type": "n8n-nodes-base.googleDrive",
+   "parameters": {}
+  },
+  {
+   "name": "VR Write Voice",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ 'http://web:3000/api/at/tblkNIyOUeLnKqako/' + $('Voice Regen Webhook').first().json.body.scene_id }}"
+   }
+  },
+  {
+   "name": "VR Pick Voice",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Fetch Project Record",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ 'http://web:3000/api/at/tbl0zT7ilefOqE3xk/' + $('Receive Project Data').first().json.Project_ID }}"
+   }
+  },
+  {
+   "name": "Voice Mode",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "VR Load All Scenes",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ 'http://web:3000/api/at/tblkNIyOUeLnKqako"
+   }
+  },
+  {
+   "name": "VR Multi?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "VR Submit Multi",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "https://n8n-production-55dd.up.railway.app/tts-multi"
+   }
+  },
+  {
+   "name": "VR Wait Multi",
+   "type": "n8n-nodes-base.wait",
+   "parameters": {}
+  },
+  {
+   "name": "VR Poll Multi",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "={{ 'https://n8n-production-55dd.up.railway.app/tts-multi/' + $('VR Submit Multi').first().json.jobId + '/status' }}"
+   }
+  },
+  {
+   "name": "VR Multi Guard",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "VR If Multi Done",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "VR Multi Result",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Extract Claims",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Prep Evidence Rows",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Save Evidence",
+   "type": "n8n-nodes-base.httpRequest",
+   "parameters": {
+    "url": "http://web:3000/api/at/tblU26cUiQQV2eNdg"
+   }
+  },
+  {
+   "name": "Validate Evidence Refs",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Evidence Done",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Plan Scene Splits",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Save Rebuilt Bible",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Prep Motif Input",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Motif Model",
+   "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+   "parameters": {
+    "model": {
+     "__rl": true,
+     "value": "gpt-5.4",
+     "mode": "list",
+     "cachedResultName": "gpt-5.4"
+    },
+    "builtInTools": {}
+   }
+  },
+  {
+   "name": "Motif Parser",
+   "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+   "parameters": {}
+  },
+  {
+   "name": "Save Motif Cards",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Motif Done",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Choose Motif Cards",
+   "type": "@n8n/n8n-nodes-langchain.agent",
+   "parameters": {}
+  },
+  {
+   "name": "Validate Motif Cards",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "VR Speak",
+   "type": "@elevenlabs/n8n-nodes-elevenlabs.elevenLabs",
+   "parameters": {}
+  },
+  {
+   "name": "Draw Cards?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "IR Decode Image",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "Write Full Narration",
+   "type": "@n8n/n8n-nodes-langchain.agent",
+   "parameters": {}
+  },
+  {
+   "name": "Editor Model",
+   "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+   "parameters": {
+    "model": {
+     "__rl": true,
+     "value": "gpt-5.4",
+     "mode": "list",
+     "cachedResultName": "gpt-5.4"
+    }
+   }
+  },
+  {
+   "name": "Edit Full Narration",
+   "type": "@n8n/n8n-nodes-langchain.agent",
+   "parameters": {}
+  },
+  {
+   "name": "Narration Guard",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "If Narration Retry",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Hook Guard",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "If Hook Retry",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Save Hook Plan",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "Hook Plan Done",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "FC Prep",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "FC Run?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "FC Gap?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "FC Fix?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "FC Judge Parser",
+   "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+   "parameters": {}
+  },
+  {
+   "name": "FC Rewrite Parser",
+   "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+   "parameters": {}
+  },
+  {
+   "name": "FC Save Report",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "FC Done",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "FC Resolve",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "FC Apply",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "FC Judge",
+   "type": "@n8n/n8n-nodes-langchain.agent",
+   "parameters": {}
+  },
+  {
+   "name": "FC Source",
+   "type": "@n8n/n8n-nodes-langchain.agent",
+   "parameters": {}
+  },
+  {
+   "name": "FC Rewrite",
+   "type": "@n8n/n8n-nodes-langchain.agent",
+   "parameters": {}
+  },
+  {
+   "name": "DS Webhook",
+   "type": "n8n-nodes-base.webhook",
+   "parameters": {}
+  },
+  {
+   "name": "DS Load",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "DS Prep",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "DS Run?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "DS Judge",
+   "type": "@n8n/n8n-nodes-langchain.agent",
+   "parameters": {}
+  },
+  {
+   "name": "DS Gap?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "DS Source",
+   "type": "@n8n/n8n-nodes-langchain.agent",
+   "parameters": {}
+  },
+  {
+   "name": "DS Resolve",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "DS Save",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "DS Fix?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "DS Rewrite",
+   "type": "@n8n/n8n-nodes-langchain.agent",
+   "parameters": {}
+  },
+  {
+   "name": "DS Apply",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "DS Write",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "FC Top Up?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "FC Fill",
+   "type": "@n8n/n8n-nodes-langchain.agent",
+   "parameters": {}
+  },
+  {
+   "name": "FC Fill Apply",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "DS Top Up?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "DS Fill",
+   "type": "@n8n/n8n-nodes-langchain.agent",
+   "parameters": {}
+  },
+  {
+   "name": "DS Fill Apply",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "FC Fill Check",
+   "type": "@n8n/n8n-nodes-langchain.agent",
+   "parameters": {}
+  },
+  {
+   "name": "DS Fill Check",
+   "type": "@n8n/n8n-nodes-langchain.agent",
+   "parameters": {}
+  },
+  {
+   "name": "Cinematic?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Cine Treatment",
+   "type": "@n8n/n8n-nodes-langchain.agent",
+   "parameters": {}
+  },
+  {
+   "name": "Cine Treatment Model",
+   "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+   "parameters": {
+    "model": {
+     "__rl": true,
+     "value": "gpt-5.4",
+     "mode": "list",
+     "cachedResultName": "gpt-5.4"
+    },
+    "builtInTools": {}
+   }
+  },
+  {
+   "name": "Cine Treatment Parser",
+   "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+   "parameters": {}
+  },
+  {
+   "name": "Cine Shot List",
+   "type": "@n8n/n8n-nodes-langchain.agent",
+   "parameters": {}
+  },
+  {
+   "name": "Cine Shot Model",
+   "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+   "parameters": {
+    "model": {
+     "__rl": true,
+     "value": "gpt-5.4",
+     "mode": "list",
+     "cachedResultName": "gpt-5.4"
+    },
+    "builtInTools": {}
+   }
+  },
+  {
+   "name": "Cine Guard",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  },
+  {
+   "name": "If Cine Retry",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Hook Wanted?",
+   "type": "n8n-nodes-base.if",
+   "parameters": {}
+  },
+  {
+   "name": "Clear Hook Plan",
+   "type": "n8n-nodes-base.postgres",
+   "parameters": {}
+  },
+  {
+   "name": "No Hook Done",
+   "type": "n8n-nodes-base.code",
+   "parameters": {}
+  }
+ ]
+}

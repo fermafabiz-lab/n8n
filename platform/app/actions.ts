@@ -3197,24 +3197,33 @@ export async function resumeProject(projectId: string): Promise<ActionResult> {
     for (const dead of await getStalledProduction().catch(() => [])) {
       await stopExecution(dead.id).catch(() => {});
     }
-    const res = await fetch(webhook, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ project_id: projectId }),
-    });
-    if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
-    // Stamped here and not left to the pipeline: the resume run may take a
-    // while to write its first row, and the film should rise when it is pressed.
-    await touchProjectActivity(projectId).catch(() => {});
-    revalidatePath(`/projects/${projectId}`);
-    return {
-      ok: true,
-      message:
-        "Production resumed — already-generated images, voices and clips are kept; only missing pieces are regenerated.",
-    };
+    return await fireResume(webhook, projectId);
   } catch (e) {
     return { ok: false, message: friendlyError(e) };
   }
+}
+
+/**
+ * The resume webhook itself, with no "is anything alive" check — the caller
+ * owns that question. Not exported: a server action is callable from any
+ * browser, and this one without its checks would start a duplicate batch.
+ */
+async function fireResume(webhook: string, projectId: string): Promise<ActionResult> {
+  const res = await fetch(webhook, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ project_id: projectId }),
+  });
+  if (!res.ok) throw new Error(`n8n webhook: HTTP ${res.status}`);
+  // Stamped here and not left to the pipeline: the resume run may take a
+  // while to write its first row, and the film should rise when it is pressed.
+  await touchProjectActivity(projectId).catch(() => {});
+  revalidatePath(`/projects/${projectId}`);
+  return {
+    ok: true,
+    message:
+      "Production resumed — already-generated images, voices and clips are kept; only missing pieces are regenerated.",
+  };
 }
 
 export async function pauseProduction(projectId: string): Promise<ActionResult> {
@@ -3363,6 +3372,67 @@ export async function restartProduction(projectId: string): Promise<ActionResult
     message: paused.ok
       ? `${paused.message} ${resumed.message}`
       : resumed.message,
+  };
+}
+
+/**
+ * Restart SEVERAL films' production at once — what a deploy asks for when two
+ * films are being made (2026-09-26: "dă restart la sesiunile active").
+ *
+ * restartProduction cannot simply be called once per film: Pause stops EVERY
+ * running execution (n8n cannot tell which film an execution belongs to), so
+ * the second film's Pause would kill the run the first film's Resume had just
+ * started; and Resume refuses while anything is alive, so the second film's
+ * Resume would refuse because of the first. So: one Pause for all of them,
+ * wait for the list to clear, the normal Resume (every check) for the first
+ * film, and then the bare webhook for the rest — the only thing alive at that
+ * point is the run this function started a moment ago. If the first Resume
+ * refuses, nothing else is started.
+ */
+export async function restartProductions(
+  projectIds: string[],
+): Promise<ActionResult & { results: Array<{ projectId: string; ok: boolean; message: string }> }> {
+  const ids = [...new Set(projectIds)].filter(isRecordId).slice(0, 10);
+  if (ids.length === 0) return { ok: false, message: "No films to restart.", results: [] };
+  if (ids.length === 1) {
+    const r = await restartProduction(ids[0]);
+    return { ...r, results: [{ projectId: ids[0], ...r }] };
+  }
+  const paused = await pauseProduction(ids[0]);
+  for (let i = 0; i < 6; i++) {
+    const still = await getAliveProduction().catch(() => []);
+    if (still.length === 0) break;
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  const results: Array<{ projectId: string; ok: boolean; message: string }> = [];
+  const { productionEngine } = await import("@/lib/production-engine");
+  if (productionEngine() === "code") {
+    // On the engine each film's run is its own row: Resume never looks at the others.
+    for (const id of ids) results.push({ projectId: id, ...(await resumeProject(id)) });
+  } else {
+    const first = await resumeProject(ids[0]);
+    results.push({ projectId: ids[0], ...first });
+    const webhook =
+      process.env.N8N_RESUME_WEBHOOK_URL ??
+      process.env.N8N_NEW_PROJECT_WEBHOOK_URL?.replace(/new-project\/?$/, "resume-project");
+    for (const id of ids.slice(1)) {
+      if (!first.ok || !webhook) {
+        results.push({ projectId: id, ok: false, message: "Not started: the first film's resume did not go through." });
+        continue;
+      }
+      try {
+        results.push({ projectId: id, ...(await fireResume(webhook, id)) });
+      } catch (e) {
+        results.push({ projectId: id, ok: false, message: friendlyError(e) });
+      }
+    }
+  }
+  revalidatePath("/");
+  const ok = results.every((r) => r.ok);
+  return {
+    ok,
+    message: `${paused.ok ? paused.message + " " : ""}${results.filter((r) => r.ok).length} of ${ids.length} films resumed.`,
+    results,
   };
 }
 
@@ -3787,6 +3857,24 @@ export async function checkCreditsNow(): Promise<ActionResult> {
       return { ok: false, message: `Checked, but the reading was not saved: ${data.saveError ?? "unknown error"}.` };
     }
     return { ok: true, message: "Checked just now." };
+  } catch (e) {
+    return { ok: false, message: friendlyError(e) };
+  }
+}
+
+/**
+ * "Update now" on the usage page: read whatever n8n finished since the last
+ * reading into the OpenAI ledger (lib/openai-collect.ts). The hourly run of
+ * "API Credits" does the same; this is for when the producer is looking.
+ * Twenty-five seconds at most, so the button answers — a long backlog is
+ * finished by the next press or the next hour, never lost.
+ */
+export async function readOpenAiUsageNow(): Promise<ActionResult> {
+  try {
+    const { collectOpenAiUsage } = await import("@/lib/openai-collect");
+    const r = await collectOpenAiUsage({ budgetMs: 25_000 });
+    revalidatePath("/admin/insights/usage");
+    return { ok: r.ok, message: r.message };
   } catch (e) {
     return { ok: false, message: friendlyError(e) };
   }

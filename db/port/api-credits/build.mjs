@@ -64,6 +64,11 @@ const lines = [
   code("normalize", "Normalize", 2400, 300, body("Normalize"), ", executeOnce: true"),
   `const save = node({ type: 'n8n-nodes-base.postgres', version: 2.7, config: { name: 'Save Snapshot', onError: 'continueRegularOutput', parameters: { resource: 'database', operation: 'executeQuery', query: '={{ $json.sql }}', options: {} }, credentials: ${PG}, position: [2640, 300] }, output: [{}] });`,
   code("result", "Result", 2880, 300, body("Result"), ", executeOnce: true"),
+  // Hourly only, on its own branch: the OpenAI ledger (db/019) is filled by the
+  // SITE, which holds the n8n API key the reading needs. This asks it to read
+  // whatever n8n finished since the last hour. Not on the webhook path, whose
+  // answer is `Result`'s (responseMode: lastNode).
+  `const ledger = node({ type: 'n8n-nodes-base.httpRequest', version: 4.4, config: { name: 'Read OpenAI Ledger', onError: 'continueRegularOutput', parameters: { method: 'POST', url: 'http://web:3000/api/insights/openai', authentication: 'genericCredentialType', genericAuthType: 'httpHeaderAuth', sendBody: true, contentType: 'json', specifyBody: 'json', jsonBody: '{"budgetMs":240000}', options: { timeout: 300000, response: { response: { fullResponse: true, neverError: true } } } }, credentials: ${KEY}, position: [240, 80] }, output: [{}] });`,
   "",
   "export default workflow('api-credits', 'API Credits')",
   "  .add(hourly)",
@@ -80,7 +85,9 @@ const lines = [
   "  .to(save)",
   "  .to(result)",
   "  .add(hook)",
-  "  .to(oaiPing);",
+  "  .to(oaiPing)",
+  "  .add(hourly)",
+  "  .to(ledger);",
   "",
 ];
 let out = lines.join("\n");

@@ -2170,3 +2170,176 @@ export async function getScriptsWritten(days = 30): Promise<{ scripts: number; f
   );
   return { scripts: Number(row?.scripts ?? 0), films: Number(row?.films ?? 0) };
 }
+
+// ---------------------------------------------------------------------------
+// The OpenAI ledger (db/019)
+//
+// Every OpenAI call n8n made, read out of its finished executions by
+// lib/openai-collect.ts and priced by lib/openai-usage.ts. Guarded by
+// `tableReady` like every reader of a newer table.
+// ---------------------------------------------------------------------------
+
+export const openAiLedgerReady = () => tableReady("hov.openai_call");
+
+/** Which of these executions the ledger has already read. */
+export async function scannedExecutions(ids: number[]): Promise<Set<number>> {
+  if (ids.length === 0) return new Set();
+  const rows = await query<{ id: string }>(
+    `select execution_id::text as id from hov.openai_scan where execution_id = any($1::bigint[])`,
+    [ids],
+  );
+  return new Set(rows.map((r) => Number(r.id)));
+}
+
+/**
+ * One execution read: its calls and the note that it was read, together or
+ * not at all. A scene id stands for its film, resolved here while the scene
+ * still exists. Re-reading an execution changes nothing (the keys hold).
+ */
+export async function saveOpenAiScan(
+  scan: { executionId: number; workflowId: string; status: string; startedAt: string | null; note: string },
+  calls: import("@/lib/openai-usage").OpenAiCall[],
+): Promise<void> {
+  await withTransaction(async (q) => {
+    if (calls.length > 0) {
+      await q(
+        `insert into hov.openai_call
+           (execution_id, node, run_index, item_index, workflow_id, workflow_name, step,
+            project_id, scene_id, model, at, input_tokens, cached_tokens, output_tokens,
+            reasoning_tokens, web_search, web_search_calls, measured, cost_usd)
+         select x.execution_id, x.node, x.run_index, x.item_index, x.workflow_id, x.workflow_name, x.step,
+                coalesce(x.project_id, (select s.project_id from hov.scene s where s.id = x.scene_id)),
+                x.scene_id, x.model, x.at, x.input_tokens, x.cached_tokens, x.output_tokens,
+                x.reasoning_tokens, x.web_search, x.web_search_calls, x.measured, x.cost_usd
+           from jsonb_to_recordset($1::jsonb) as x(
+                  execution_id bigint, node text, run_index int, item_index int, workflow_id text,
+                  workflow_name text, step text, project_id text, scene_id text, model text,
+                  at timestamptz, input_tokens int, cached_tokens int, output_tokens int,
+                  reasoning_tokens int, web_search boolean, web_search_calls int, measured boolean,
+                  cost_usd numeric)
+         on conflict do nothing`,
+        [
+          JSON.stringify(
+            calls.map((c) => ({
+              execution_id: c.executionId,
+              node: c.node,
+              run_index: c.runIndex,
+              item_index: c.itemIndex,
+              workflow_id: c.workflowId,
+              workflow_name: c.workflowName,
+              step: c.step,
+              project_id: c.projectId,
+              scene_id: c.sceneId,
+              model: c.model,
+              at: c.at,
+              input_tokens: c.inputTokens,
+              cached_tokens: c.cachedTokens,
+              output_tokens: c.outputTokens,
+              reasoning_tokens: c.reasoningTokens,
+              web_search: c.webSearch,
+              web_search_calls: c.webSearchCalls,
+              measured: c.measured,
+              cost_usd: Number(c.costUsd.toFixed(6)),
+            })),
+          ),
+        ],
+      );
+    }
+    await q(
+      `insert into hov.openai_scan (execution_id, workflow_id, status, started_at, calls, note)
+       values ($1, $2, $3, $4, $5, $6)
+       on conflict (execution_id) do update
+         set status = excluded.status, scanned_at = now(), calls = excluded.calls, note = excluded.note`,
+      [scan.executionId, scan.workflowId, scan.status, scan.startedAt, calls.length, scan.note],
+    );
+  });
+}
+
+export interface OpenAiLedger {
+  /** False until db/019 is applied. */
+  ready: boolean;
+  groups: import("@/lib/openai-usage").CallGroup[];
+  /** How far the reading has got: executions read, the newest read, the oldest run covered. */
+  scanned: { executions: number; lastScan: string | null; oldestRun: string | null };
+}
+
+/** Every call since `sinceMs`, summed per day, step, model, film and kind. */
+export async function getOpenAiLedger(sinceMs: number): Promise<OpenAiLedger> {
+  if (!(await openAiLedgerReady())) return { ready: false, groups: [], scanned: { executions: 0, lastScan: null, oldestRun: null } };
+  const [rows, stats] = await Promise.all([
+    query<{
+      day: number;
+      step: string;
+      workflow_name: string;
+      model: string;
+      project_id: string | null;
+      project_name: string | null;
+      web_search: boolean;
+      measured: boolean;
+      calls: number;
+      input_tokens: number;
+      output_tokens: number;
+      cost_usd: number;
+    }>(
+      `select (extract(epoch from date_trunc('day', c.at at time zone 'UTC')) * 1000)::float8 as day,
+              c.step, c.workflow_name, c.model, c.project_id, p.name as project_name,
+              c.web_search, c.measured,
+              count(*)::int as calls,
+              sum(c.input_tokens)::float8 as input_tokens,
+              sum(c.output_tokens)::float8 as output_tokens,
+              sum(c.cost_usd)::float8 as cost_usd
+         from hov.openai_call c
+         left join hov.project p on p.id = c.project_id
+        where c.at >= to_timestamp($1::float8 / 1000)
+        group by 1, 2, 3, 4, 5, 6, 7, 8`,
+      [sinceMs],
+    ),
+    query<{ executions: number; last_scan: Date | null; oldest_run: Date | null }>(
+      `select count(*)::int as executions, max(scanned_at) as last_scan, min(started_at) as oldest_run
+         from hov.openai_scan`,
+    ),
+  ]);
+  return {
+    ready: true,
+    groups: rows.map((r) => ({
+      day: Number(r.day),
+      step: r.step,
+      workflowName: r.workflow_name,
+      model: r.model,
+      projectId: r.project_id,
+      projectName: r.project_name,
+      webSearch: r.web_search,
+      measured: r.measured,
+      calls: Number(r.calls),
+      inputTokens: Number(r.input_tokens),
+      outputTokens: Number(r.output_tokens),
+      costUsd: Number(r.cost_usd),
+    })),
+    scanned: {
+      executions: Number(stats[0]?.executions ?? 0),
+      lastScan: stats[0]?.last_scan ? new Date(stats[0].last_scan).toISOString() : null,
+      oldestRun: stats[0]?.oldest_run ? new Date(stats[0].oldest_run).toISOString() : null,
+    },
+  };
+}
+
+/**
+ * When the OpenAI account was last refilled, as the hourly check saw it: the
+ * first reading that said "ok" after one that said "out". `outAt` is the last
+ * reading still empty, so the top-up happened between the two.
+ */
+export async function getOpenAiTopUp(): Promise<{ outAt: string; okAt: string } | null> {
+  if (!(await tableReady("hov.api_balance"))) return null;
+  const [row] = await query<{ out_at: Date; ok_at: Date }>(
+    `select prev_at as out_at, taken_at as ok_at
+       from (select taken_at, status,
+                    lag(status) over (order by taken_at) as prev,
+                    lag(taken_at) over (order by taken_at) as prev_at
+               from hov.api_balance
+              where provider = 'openai' and metric = 'access') t
+      where status = 'ok' and prev = 'out'
+      order by taken_at desc
+      limit 1`,
+  );
+  return row ? { outAt: new Date(row.out_at).toISOString(), okAt: new Date(row.ok_at).toISOString() } : null;
+}

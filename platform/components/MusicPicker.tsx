@@ -22,7 +22,7 @@ import { saveMusicTrack } from "@/app/actions";
 import { mediaSrc } from "@/lib/media";
 import styles from "./MusicPicker.module.css";
 
-type Track = { id: string; name: string; group: string };
+type Track = { id: string; name: string; group: string; url?: string };
 
 /** "atlasaudio-cinematic-softness-511863.mp3" -> "atlasaudio cinematic softness" */
 function prettyName(raw: string): string {
@@ -53,8 +53,9 @@ export default function MusicPicker({
   const [pinned, setPinned] = useState(current);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  // Share is idempotent but still a Drive write — remember who already got one.
-  const sharedRef = useRef<Set<string>>(new Set());
+  const [uploading, setUploading] = useState(false);
+  const [uploadGroup, setUploadGroup] = useState("");
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
   // A save from another tab (or the auto pick changing server-side) wins once
   // the server confirms it; local guesses only cover the gap.
@@ -67,8 +68,8 @@ export default function MusicPicker({
     };
   }, []);
 
-  async function load() {
-    if (tracks || loading) return;
+  async function load(force = false) {
+    if ((tracks && !force) || loading) return;
     setLoading(true);
     try {
       const res = await fetch("/api/music", { cache: "no-store" });
@@ -96,17 +97,9 @@ export default function MusicPicker({
     el.pause();
     setPlayingId(t.id);
     try {
-      if (!sharedRef.current.has(t.id)) {
-        // Make the file link-readable first — /api/media fetches Drive with
-        // no session, so an unshared file answers HTML and the play fails.
-        await fetch("/api/music", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: t.id }),
-        });
-        sharedRef.current.add(t.id);
-      }
-      el.src = mediaSrc(`https://drive.google.com/uc?export=download&id=${t.id}`);
+      // The library is on the box since 2026-09-26 (lib/music.ts): every
+      // track carries its own public URL, played directly.
+      el.src = mediaSrc(t.url || `https://drive.google.com/uc?export=download&id=${t.id}`);
       el.onended = () => setPlayingId((p) => (p === t.id ? null : p));
       await el.play();
     } catch {
@@ -125,6 +118,31 @@ export default function MusicPicker({
     if (res.ok) setPinned(t ? { id: t.id, name: t.name } : null);
   }
 
+  async function upload() {
+    const file = fileRef.current?.files?.[0];
+    if (!file || uploading) return;
+    setUploading(true);
+    setNote("");
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("group", uploadGroup || "Muzica");
+      const res = await fetch("/api/music/upload", { method: "POST", body: form });
+      const out = (await res.json()) as { ok?: boolean; message?: string; track?: Track };
+      if (!out.ok) {
+        setNote(out.message || "Nu am putut încărca piesa.");
+        return;
+      }
+      setNote(`Am adăugat „${prettyName(out.track?.name || file.name)}” în ${out.track?.group || "Muzica"}.`);
+      if (fileRef.current) fileRef.current.value = "";
+      await load(true);
+    } catch {
+      setNote("Nu am putut încărca piesa — încearcă din nou.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
   const groups = new Map<string, Track[]>();
   for (const t of tracks ?? []) {
     const g = groups.get(t.group) ?? [];
@@ -141,7 +159,7 @@ export default function MusicPicker({
             {pinned ? (
               <>Aleasă: <strong>{prettyName(pinned.name)}</strong></>
             ) : (
-              <>Automată, după tonul filmului — din folderul Drive „Muzica”.</>
+              <>Automată, după tonul filmului — din biblioteca de muzică.</>
             )}
             {!musicOn && (
               <span className={styles.offNote}> Muzica e oprită pentru acest film; alegerea se aude doar dacă o pornești.</span>
@@ -166,7 +184,7 @@ export default function MusicPicker({
         <div className={styles.body}>
           {loading && <div className={styles.hint}>Se încarcă biblioteca…</div>}
           {!loading && tracks && tracks.length === 0 && (
-            <div className={styles.hint}>Nu am găsit melodii în folderul „Muzica” de pe Drive.</div>
+            <div className={styles.hint}>Biblioteca de muzică e goală — adaugă o piesă mai jos.</div>
           )}
           {!loading && tracks && tracks.length > 0 && (
             <>
@@ -206,6 +224,30 @@ export default function MusicPicker({
                 </div>
               ))}
             </>
+          )}
+          {!loading && tracks && (
+            <div className={styles.upload}>
+              <div className={styles.groupName}>Adaugă o piesă</div>
+              <div className={styles.row}>
+                <input ref={fileRef} type="file" accept="audio/*" className={styles.file} disabled={uploading} />
+                <input
+                  list="music-groups"
+                  className={styles.groupInput}
+                  placeholder="Ton / grupă (ex. Epic)"
+                  value={uploadGroup}
+                  onChange={(e) => setUploadGroup(e.target.value)}
+                  disabled={uploading}
+                />
+                <datalist id="music-groups">
+                  {[...groups.keys()].map((g) => (
+                    <option key={g} value={g} />
+                  ))}
+                </datalist>
+                <button type="button" className={styles.pick} disabled={uploading} onClick={() => void upload()}>
+                  {uploading ? "Se încarcă…" : "Încarcă"}
+                </button>
+              </div>
+            </div>
           )}
         </div>
       )}

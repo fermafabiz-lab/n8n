@@ -1,0 +1,29 @@
+{
+  "needsImage": "={{ (($json.fields || {})['Imagine Scenă'] || []).length === 0 }}",
+  "generate": "={{ (() => { const src = $('Build Image Request').first().json; const r = Object.assign({}, src.requestBody); let acct = ''; try { const m = $('Assign Accounts').all().find((x) => x.json.id === src.sceneId); if (m && m.json.flowEmail) acct = m.json.flowEmail; } catch (err) {} try { const ia = $('IMG Account').first().json; if (ia && ia.sceneId === src.sceneId && ia.imgAccount) acct = ia.imgAccount; } catch (err) {} if (acct) r.email = acct; let map = {}; try { const b = ($('Build Flow Refs').first().json || {}).flowRefs || {}; map = Object.assign({}, b[acct] || {}); } catch (err) {} try { const o = JSON.parse((($('IMG Load Project').first().json.fields || {})['Editing Options']) || '{}'); const s = ((o.flowRefs || {})[acct]) || {}; for (const k of Object.keys(s)) if (!map[k]) map[k] = s[k]; } catch (err) {} const keys = Object.keys(r).filter((k) => k.indexOf('reference_') === 0).sort((a, b) => Number(a.slice(10)) - Number(b.slice(10))); const kept = []; for (const k of keys) { const id = String(r[k] || ''); delete r[k]; if (!id) continue; if (map[id]) { kept.push(map[id]); continue; } let owner = ''; const h = id.match(/-email:([0-9a-f]+)-/i); if (h) { for (let i = 0; i < h[1].length; i += 2) owner += String.fromCharCode(parseInt(h[1].substr(i, 2), 16)); } if (acct && owner && owner !== acct) continue; kept.push(id); } kept.forEach((id, i) => { r['reference_' + (i + 1)] = id; }); r.captchaRetry = 5; return r; })() }}",
+  "rewrite": "={{ { model: 'gpt-4o-mini', temperature: 0.4, messages: [ { role: 'system', content: 'You rewrite image-generation prompts that were refused by a content filter. Keep the scene\\'s story intent, location, lighting, palette, lens and mood EXACTLY; change only what triggers the refusal. If the reason involves a child/minor: replace the child with an adult, OR keep the child implied but strictly off-screen (a small shoe, a toy, a shadow under a door, an empty swing) — no minor may be visible. If it involves a real/recognizable person: make the person generic and unrecognizable.' + ($json.attempt >= 2 ? ' THIS IS REWRITE ATTEMPT ' + $json.attempt + ': earlier rewrites of this prompt were STILL refused, so go much further. Remove every explicit depiction of violence, blood, injury, weapons, drugs, self-harm, nudity or sexual content; no children or teenagers anywhere; no real or named people, no brands or logos; every person generic, adult, fully clothed and calm; keep the faces of people out of frame (from behind, in silhouette, at a distance, or hands and objects only) and show the situation through objects, environment, light and weather.' : '') + ($json.attempt >= 3 ? ' Remove every person from the frame entirely: an empty environment whose objects, light and weather carry the mood.' : '') + ' Return ONLY the rewritten prompt text, no commentary.' }, { role: 'user', content: 'Refusal reason: ' + $json.reason + '\\n\\nOriginal prompt:\\n' + $json.prompt } ] } }}",
+  "applyRewritten": "select * from hov.at_write($hov$scene$hov$, $hov${{ $('Prep Flow Reject').first().json.sceneId }}$hov$,\n  $hov${{ JSON.stringify({ \"Imagine First Frame\": ($json.choices && $json.choices[0] && $json.choices[0].message && $json.choices[0].message.content || '').trim() || $('Prep Flow Reject').first().json.prompt, \"Regenerează Imagine\": false, \"Aprobare Imagine\": false, \"Status Producție Scenă\": \"Așteaptă Aprobare Imagine\", \"Observații Scenă\": 'AUTO-REWRITE (attempt ' + $('Prep Flow Reject').first().json.attempt + '): ' + $('Prep Flow Reject').first().json.service + ' rejected the previous image — ' + $('Prep Flow Reject').first().json.reason + '. The image prompt was rewritten automatically and resubmitted.' }) }}$hov$::jsonb)",
+  "markRejected": "select * from hov.at_write($hov$scene$hov$, $hov${{ $('Loop Images').first().json.id }}$hov$,\n  $hov${{ JSON.stringify({ \"Status Producție Scenă\": \"Așteaptă Aprobare Imagine\", \"Aprobare Imagine\": false, \"Regenerează Imagine\": false, \"Observații Scenă\": 'REJECTED by ' + ($json.service || 'Google Flow') + ' after ' + (($json.attempt || 1) - 1) + ' automatic rewrites: ' + ($json.reason || 'content policy') + '. The prompt keeps tripping the filter — often the location or a character in the Story Bible carries the refused content. Rewrite the image prompt yourself and regenerate the image.' }) }}$hov$::jsonb)",
+  "writeImage": "={{ JSON.stringify({ sceneId: $json.sceneId, field: \"image\", url: $json.url, fields: { \"Image Media ID\": $json.mediaId, \"Aprobare Imagine\": false, \"Regenerează Imagine\": false, \"Status Producție Scenă\": \"Așteaptă Aprobare Imagine\" } }) }}",
+  "judgeRequest": "={{ $json.body }}",
+  "waits": {
+    "Flow Pace": {
+      "amount": 8
+    },
+    "Wait Between Images": {
+      "amount": 2
+    },
+    "Wait IMG Cooldown": {
+      "amount": "={{ $json.waitSeconds || 60 }}"
+    },
+    "Wait Image Approval": {
+      "amount": 15
+    },
+    "Wait Video Approval": {
+      "amount": 15
+    },
+    "Wait Final Settings": {
+      "amount": 15
+    }
+  }
+}

@@ -124,6 +124,9 @@ order the batch runs in.
        - the consistency judge and its re-roll.
 
        Golden-tested like the regen ports.
+       - **DONE 2026-09-26**:
+         - **Ported:** `engine/src/produce/images.ts` has the build (n-1 chain and strict re-roll), account choice, the per-account reference remap, silent-refusal decode, error routing, the rewrite ladder, the cooldown with failover, and the consistency judge. `engine/src/produce/gates.ts` has Sort & Cap, Assign Accounts, both approval gates, More Batches? and the settings gate.
+         - **Checked:** `check-produce-images.mjs` has 156 assertions against the live nodes, static-data counters included. Six sabotages all fail it, after a threshold case was added for the one that did not.
      - **6b — the batch's clip stage:**
        - `Current Scene` (the frozen prompt);
        - serial submit/poll;

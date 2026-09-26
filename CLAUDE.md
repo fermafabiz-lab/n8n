@@ -577,6 +577,13 @@ expected and harmless for an app touching only its own Drive.
   `de456e79` (rollback `25fa727b`) accept the new ids. **Local renders on a
   Mac**: Hyperframes' experimental fast capture silently drops some elements —
   set `PRODUCER_EXPERIMENTAL_FAST_CAPTURE=false`; Railway never uses it.
+  **Kids story captions since 2026-09-26 14:41 UTC** (merge `70e3466`,
+  `db/port/kids-captions/`): three caption motion packs in the rounded card
+  face — Pill, Bounce, **Sticker (the Kids default, the producer's pick)** —
+  offered on the site for Kids story only (`motionPacksFor`). Caption Colour
+  `3ca5a3e4` (rollback `df21dd5f`), orchestrator `55ef60c7` (rollback
+  `de456e79`). Same merge: 2.39:1 bars are landscape only — on 9:16 they left
+  a quarter-screen strip.
 
 - **Clip regeneration can be made by the engine** (2026-09-25,
   `docs/plans/engine-media-generation.md`, phase 4; site Variable

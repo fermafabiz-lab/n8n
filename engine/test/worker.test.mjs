@@ -25,7 +25,7 @@ import { PGLiteSocketServer } from '@electric-sql/pglite-socket';
 import pg from 'pg';
 import * as E from '../src/assembly/index.ts';
 import { enqueue, loadInputs, pool } from '../src/db.ts';
-import { n8nMusic } from '../src/musicSource.ts';
+import { dbMusic, n8nMusic } from '../src/musicSource.ts';
 import { railway } from '../src/railway.ts';
 import { drive, runWorker } from '../src/worker.ts';
 
@@ -217,6 +217,35 @@ await scenario('pinned track: shared, never listed', async () => {
   assert.equal(fake.requests.filter((r) => r.path === '/webhook/list-music').length, 0);
   assert.deepEqual(fake.shared, ['pin-777']);
   assert.match(submits('assemble')[0].body.musicUrl, /id=pin-777$/);
+});
+
+await scenario('the library on the box (db/019): listed from the table, the render downloads the file Caddy serves, n8n never asked', async () => {
+  await db.query(`insert into hov.music_track (id, name, grp, path) values ('drive-a', 'calm.mp3', 'Epic', 'music/aaa.mp3'), ('drive-b', 'storm.mp3', 'Epic', 'music/bbb.mp3'), ('drive-c', 'loose.mp3', 'Muzica', 'music/ccc.mp3')`);
+  const pid = await film({ editing: { music: true } });
+  await enqueue(db, pid);
+  assert.equal(await drive(await claimOne(), { ...deps(), music: dbMusic(db, 'https://media.example', n8nMusic(`${BASE}/webhook`)) }), 'done');
+  assert.equal(fake.requests.filter((r) => r.path.startsWith('/webhook/')).length, 0, 'no n8n call');
+  assert.equal(submits('assemble')[0].body.musicUrl, 'https://media.example/music/bbb.mp3', 'Epic group, random 0.99 → the second track, served from /media');
+  // A pin by the Drive id finds the same track after the move.
+  const pinned = await film({ editing: { music: true, musicTrack: { id: 'drive-a', name: 'calm.mp3' } } });
+  await enqueue(db, pinned);
+  assert.equal(await drive(await claimOne(), { ...deps(), music: dbMusic(db, 'https://media.example', n8nMusic(`${BASE}/webhook`)) }), 'done');
+  assert.equal(submits('assemble').at(-1).body.musicUrl, 'https://media.example/music/aaa.mp3');
+  // A pin the library does not hold still falls back to Drive through n8n.
+  const legacy = await film({ editing: { music: true, musicTrack: { id: 'old-drive-9', name: 'x' } } });
+  await enqueue(db, legacy);
+  assert.equal(await drive(await claimOne(), { ...deps(), music: dbMusic(db, 'https://media.example', n8nMusic(`${BASE}/webhook`)) }), 'done');
+  assert.match(submits('assemble').at(-1).body.musicUrl, /media\?id=old-drive-9$/);
+  assert.deepEqual(fake.shared.slice(-1), ['old-drive-9']);
+  await db.query(`delete from hov.music_track`);
+});
+
+await scenario('an empty library falls back to n8n\'s Drive listing', async () => {
+  const pid = await film({ editing: { music: true } });
+  await enqueue(db, pid);
+  assert.equal(await drive(await claimOne(), { ...deps(), music: dbMusic(db, 'https://media.example', n8nMusic(`${BASE}/webhook`)) }), 'done');
+  assert.ok(fake.requests.some((r) => r.path === '/webhook/list-music'));
+  assert.match(submits('assemble').at(-1).body.musicUrl, /media\?id=/);
 });
 
 await scenario('Railway restarted mid-assemble (404): the same request is resubmitted', async () => {

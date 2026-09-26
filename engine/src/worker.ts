@@ -181,6 +181,10 @@ async function chooseMusic(fields: AtRow['fields'], deps: Deps, log: (m: string,
     pick = pickMusicTrack(fields, lib.rootFiles, folder.folderId ? lib.folders[folder.folderId] || [] : [], random);
   }
   if (pick.id) await deps.music.share(pick.id).catch((e) => log('share-music failed; relying on the folder share', { error: String(e) }));
+  // The library on the box (db/019): the render server downloads the file
+  // Caddy serves instead of streaming Drive through its /media proxy.
+  const local = pick.id && deps.music.urlFor ? await deps.music.urlFor(pick.id).catch(() => null) : null;
+  if (local) pick = { ...pick, url: local };
   return pick;
 }
 

@@ -3,7 +3,7 @@
 // hand and gives its leases back (docker compose stop waits for it).
 import { loadConfig } from './config.ts';
 import { pool } from './db.ts';
-import { n8nMusic } from './musicSource.ts';
+import { dbMusic, n8nMusic } from './musicSource.ts';
 import { railway } from './railway.ts';
 import { runWorker } from './worker.ts';
 import { runMediaWorker } from './media/loop.ts';
@@ -48,7 +48,7 @@ const render = railway(config.renderUrl, config.renderApiKey);
 const ingest = siteIngest(config.siteUrl, config.mediaIngestKey);
 const clip = clipServices({ useapiToken: config.useapiToken, renderUrl: config.renderUrl, renderApiKey: config.renderApiKey, openaiKey: config.openaiKey });
 await Promise.all([
-  runWorker({ db, config, render, music: n8nMusic(config.n8nWebhookBase) }, stop.signal),
+  runWorker({ db, config, render, music: dbMusic(db, config.mediaBaseUrl, n8nMusic(config.n8nWebhookBase)) }, stop.signal),
   runMediaWorker({ db, config, render, speaker: elevenLabs(config.elevenLabsKey), flow: flowImages(config.useapiToken), ingest, clip }, stop.signal),
   production
     ? runProductionWorker({ db, config, clip, ingest, services: produceServices({ useapiToken: config.useapiToken, openaiKey: config.openaiKey, siteUrl: config.siteUrl, ingestKey: config.mediaIngestKey }) }, stop.signal)

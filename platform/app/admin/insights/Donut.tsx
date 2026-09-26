@@ -41,12 +41,13 @@ export default function Donut({
 }: {
   slices: DonutSlice[];
   label: string;
-  unit?: "USD";
+  /** Dollars, or a plain count (captcha solves). */
+  unit?: "USD" | "solves";
 }) {
   const [on, setOn] = useState<number | null>(null);
   // Most single OpenAI calls cost a fraction of a cent: say so rather than "$0.00".
   const fmt = (v: number) =>
-    unit === "USD" ? (v > 0 && v < 0.01 ? "<$0.01" : `$${v.toFixed(v >= 100 ? 0 : 2)}`) : String(v);
+    unit === "USD" ? (v > 0 && v < 0.01 ? "<$0.01" : `$${v.toFixed(v >= 100 ? 0 : 2)}`) : Math.round(v).toLocaleString("en-US");
   const total = slices.reduce((n, x) => n + Math.max(0, x.value), 0);
   const pct = (v: number) => (total > 0 ? Math.round((v / total) * 1000) / 10 : 0);
   const shown = slices.filter((x) => x.value > 0);
@@ -86,7 +87,7 @@ export default function Donut({
                 fill={color}
                 className={on !== null && slices[on]?.id !== x.id ? s.dim : undefined}
                 tabIndex={0}
-                aria-label={`${x.label}: ${fmt(x.value)}, ${pct(x.value)}%, ${x.calls} calls`}
+                aria-label={`${x.label}: ${fmt(x.value)}, ${pct(x.value)}%${unit === "USD" ? `, ${x.calls} calls` : ""}`}
                 onPointerEnter={() => setOn(slices.indexOf(x))}
                 onFocus={() => setOn(slices.indexOf(x))}
                 onBlur={() => setOn(null)}
@@ -133,9 +134,9 @@ export default function Donut({
           <thead>
             <tr>
               <th>Part</th>
-              <th>{unit}</th>
+              <th>{unit === "USD" ? "USD" : "Solves"}</th>
               <th>Share</th>
-              <th>Calls</th>
+              {unit === "USD" && <th>Calls</th>}
             </tr>
           </thead>
           <tbody>
@@ -144,7 +145,7 @@ export default function Donut({
                 <td>{x.label}</td>
                 <td>{fmt(x.value)}</td>
                 <td>{pct(x.value)}%</td>
-                <td>{x.calls.toLocaleString("en-US")}</td>
+                {unit === "USD" && <td>{x.calls.toLocaleString("en-US")}</td>}
               </tr>
             ))}
           </tbody>

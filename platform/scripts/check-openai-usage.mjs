@@ -204,7 +204,7 @@ const tableTitles = [...page.matchAll(/<FilmTable\s+title="([^"]+)"/g)].map((m) 
 is("the page has its charts and tables titled (at least nine)", titles.length + tableTitles.length >= 9, true);
 is(
   "every chart and table on the usage page is titled Service — what",
-  [...titles, ...tableTitles].every((t) => /^(OpenAI|Google Flow|ElevenLabs) — /.test(t)),
+  [...titles, ...tableTitles].every((t) => /^(OpenAI|Google Flow|ElevenLabs|Captcha|CapSolver) — /.test(t)),
   true,
 );
 is("the OpenAI pies are there", ["OpenAI — dollars by pipeline step (estimate)", "OpenAI — dollars by model (estimate)"].every((t) => titles.includes(t)), true);

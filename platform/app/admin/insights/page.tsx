@@ -132,7 +132,9 @@ export default async function InsightsPage() {
         )}
         <CheckNow />
         <span className={s.spacer} />
-        <Link href="/admin/insights/usage">Where the credits go →</Link>
+        <Link href="/admin/insights/usage" className="btn">
+          Analytics
+        </Link>
       </div>
 
       {alerts.length > 0 && (
@@ -211,7 +213,7 @@ export default async function InsightsPage() {
                       Spent {fmtUsd(spend.value)} in the last 30 days — <Link href="/admin/insights/usage">by day and model</Link>.
                     </>
                   ) : (
-                    <>OpenAI will not say what it spent to this key — see <Link href="/admin/insights/usage">Where the credits go</Link>.</>
+                    <>OpenAI will not say what it spent to this key — see what each step used in <Link href="/admin/insights/usage">Analytics</Link>.</>
                   )}
                 </p>
               )}
@@ -233,6 +235,11 @@ export default async function InsightsPage() {
           <b>OpenAI</b> does not reveal its balance to an API key (only to a logged-in browser), so the check asks the
           question that matters: does a paid call go through? <b>Google Flow</b> reports credits per account but not the
           plan&apos;s allowance, so the bar is measured against {fmtCount(MONTHLY_CREDITS)} a month.
+        </p>
+        <p>
+          <b>CapSolver</b> is read by the site itself, with the key in the GitHub Secret <code>CAPSOLVER_API_KEY</code>{" "}
+          (useapi holds the key too, but only shows it masked). It is prepaid dollars with no allowance, so it is{" "}
+          <b>Low</b> under $3 (about a day of films) and <b>Nearly out</b> under $1, as well as by its pace.
         </p>
       </div>
     </SettingsShell>

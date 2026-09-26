@@ -41,13 +41,18 @@ export default function DailyBars({
 }: {
   points: DailyPoint[];
   unit: string;
-  format?: "count" | "usd";
+  /** "pct": the points are shares 0..1, drawn against a fixed 100%. */
+  format?: "count" | "usd" | "pct";
   label: string;
 }) {
   const [hover, setHover] = useState<number | null>(null);
   const fmt = (v: number) =>
-    format === "usd" ? `$${v.toFixed(v >= 100 ? 0 : 2)}` : Math.round(v).toLocaleString("en-US");
-  const max = niceMax(Math.max(0, ...points.map((p) => p.v)));
+    format === "usd"
+      ? `$${v.toFixed(v >= 100 ? 0 : 2)}`
+      : format === "pct"
+        ? `${Math.round(v * 100)}%`
+        : Math.round(v).toLocaleString("en-US");
+  const max = format === "pct" ? 1 : niceMax(Math.max(0, ...points.map((p) => p.v)));
   const h = hover === null ? null : points[hover];
   // First, middle and last day — each once: a one- or two-day series would
   // otherwise print the same date under the axis two or three times.

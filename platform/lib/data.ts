@@ -1675,3 +1675,8 @@ export async function getOpenAiTopUp(): Promise<{ outAt: string; okAt: string } 
   if (USE_PG) return pgBackend.getOpenAiTopUp();
   return null;
 }
+
+export async function getCaptchaDays(sinceDay: string): Promise<import("./data/postgres").CaptchaDays> {
+  if (USE_PG) return pgBackend.getCaptchaDays(sinceDay);
+  return { ready: false, days: [], lastFetch: null };
+}

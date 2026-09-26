@@ -58,6 +58,8 @@ jobs:
           UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
           OPENVERSE_CLIENT_ID: ${{ secrets.OPENVERSE_CLIENT_ID }}
           OPENVERSE_CLIENT_SECRET: ${{ secrets.OPENVERSE_CLIENT_SECRET }}
+          USEAPI_TOKEN: ${{ secrets.USEAPI_TOKEN }}
+          CAPSOLVER_API_KEY: ${{ secrets.CAPSOLVER_API_KEY }}
         run: |
           missing=""
           # SITE_PASSWORD gol nu e o valoare implicita blanda: middleware.ts
@@ -101,6 +103,15 @@ jobs:
           done
           if [ -n "$optional" ]; then
             echo "::warning::Surse de footage fara cheie (optionale):$optional — vezi docs/footage-sources.md."
+          fi
+          # Developer insights / Analytics: the captcha. Both are optional —
+          # without them the CapSolver card and the captcha section say they
+          # are not connected, and nothing else changes.
+          if [ -z "${CAPSOLVER_API_KEY}" ]; then
+            echo "::warning::CAPSOLVER_API_KEY nu e setat — soldul CapSolver nu apare pe Developer insights (cheia din dashboard.capsolver.com)."
+          fi
+          if [ -z "${USEAPI_TOKEN}" ]; then
+            echo "::warning::USEAPI_TOKEN nu e setat — statisticile de captcha nu apar pe Analytics."
           fi
           echo "Toate secretele necesare sunt setate."
 
@@ -166,13 +177,18 @@ jobs:
           IMAGE_ENGINE: ${{ vars.IMAGE_ENGINE || 'n8n' }}
           # Clip regeneration, the same way (scene-video-regen otherwise).
           VIDEO_ENGINE: ${{ vars.VIDEO_ENGINE || 'n8n' }}
+          # The captcha on Developer insights / Analytics (platform/lib/captcha-sync.ts):
+          # CapSolver's balance with its key, useapi's captcha record with the
+          # same token the engine uses. Read by the site only; optional.
+          USEAPI_TOKEN: ${{ secrets.USEAPI_TOKEN }}
+          CAPSOLVER_API_KEY: ${{ secrets.CAPSOLVER_API_KEY }}
           REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REGISTRY_USER: ${{ github.actor }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          envs: AIRTABLE_API_KEY,AIRTABLE_BASE_ID,N8N_API_KEY,ELEVENLABS_API_KEY,DVIDS_API_KEY,EU_AV_API_BASE,EUROPEANA_API_KEY,FLICKR_API_KEY,PEXELS_API_KEY,PIXABAY_API_KEY,UNSPLASH_ACCESS_KEY,OPENVERSE_CLIENT_ID,OPENVERSE_CLIENT_SECRET,FOOTAGE_ENABLE_LOC,FOOTAGE_DESTOCKD,SITE_PASSWORD,AIRTABLE_PROJECTS_TABLE,AIRTABLE_SCENES_TABLE,AIRTABLE_SCRIPTS_TABLE,N8N_API_URL,N8N_NEW_PROJECT_WEBHOOK_URL,FINAL_ASSEMBLY_ENGINE,VOICE_ENGINE,IMAGE_ENGINE,VIDEO_ENGINE,REGISTRY_TOKEN,REGISTRY_USER
+          envs: AIRTABLE_API_KEY,AIRTABLE_BASE_ID,N8N_API_KEY,ELEVENLABS_API_KEY,DVIDS_API_KEY,EU_AV_API_BASE,EUROPEANA_API_KEY,FLICKR_API_KEY,PEXELS_API_KEY,PIXABAY_API_KEY,UNSPLASH_ACCESS_KEY,OPENVERSE_CLIENT_ID,OPENVERSE_CLIENT_SECRET,FOOTAGE_ENABLE_LOC,FOOTAGE_DESTOCKD,SITE_PASSWORD,AIRTABLE_PROJECTS_TABLE,AIRTABLE_SCENES_TABLE,AIRTABLE_SCRIPTS_TABLE,N8N_API_URL,N8N_NEW_PROJECT_WEBHOOK_URL,FINAL_ASSEMBLY_ENGINE,VOICE_ENGINE,IMAGE_ENGINE,VIDEO_ENGINE,USEAPI_TOKEN,CAPSOLVER_API_KEY,REGISTRY_TOKEN,REGISTRY_USER
           script: |
             set -euo pipefail
             cd /opt/n8n
@@ -208,6 +224,8 @@ jobs:
             VOICE_ENGINE=${VOICE_ENGINE}
             IMAGE_ENGINE=${IMAGE_ENGINE}
             VIDEO_ENGINE=${VIDEO_ENGINE}
+            USEAPI_TOKEN=${USEAPI_TOKEN}
+            CAPSOLVER_API_KEY=${CAPSOLVER_API_KEY}
             ENVEOF
 
             echo "${REGISTRY_TOKEN}" \
